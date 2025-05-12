@@ -6,6 +6,7 @@ and sessions from configuration.
 """
 
 import json
+import warnings
 from typing import Any
 
 from .config import create_connector_from_config, load_config_file
@@ -115,12 +116,13 @@ class MCPClient:
             The created MCPSession.
 
         Raises:
-            ValueError: If no servers are configured or the specified server doesn't exist.
+            ValueError: If the specified server doesn't exist.
         """
         # Get server config
         servers = self.config.get("mcpServers", {})
         if not servers:
-            raise ValueError("No MCP servers defined in config")
+            warnings.warn("No MCP servers defined in config", UserWarning, stacklevel=2)
+            return None
 
         if server_name not in servers:
             raise ValueError(f"Server '{server_name}' not found in config")
@@ -152,13 +154,14 @@ class MCPClient:
         Returns:
             The created MCPSession. If server_name is None, returns the first created session.
 
-        Raises:
-            ValueError: If no servers are configured or the specified server doesn't exist.
+        Warns:
+            Warning: If no servers are configured.
         """
         # Get server config
         servers = self.config.get("mcpServers", {})
         if not servers:
-            raise ValueError("No MCP servers defined in config")
+            warnings.warn("No MCP servers defined in config", UserWarning, stacklevel=2)
+            return {}
 
         # Create sessions for all servers
         for name in servers:

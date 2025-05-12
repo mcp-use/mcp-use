@@ -1,11 +1,12 @@
 name: Check Version Bump and Publish to PyPI
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Python Tests"]
     branches:
       - main
-    paths:
-      - 'pyproject.toml'
+    types:
+      - completed
 
 # Required for PyPI trusted publishing
 permissions:
@@ -14,11 +15,14 @@ permissions:
 
 jobs:
   check-version-and-publish:
+    # Only proceed if the referenced workflow completed successfully
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # This fetches all history for comparing versions
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v4

@@ -3,7 +3,6 @@ import time
 from typing import ClassVar
 
 import numpy as np
-from fastembed import TextEmbedding
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -115,10 +114,21 @@ class ToolSearchEngine:
             return True
 
         try:
+            from fastembed import TextEmbedding  # optional dependency install with [search]
+        except ImportError:
+            logger.error(
+                "The 'fastembed' library is not installed. "
+                "To use the search functionality, please install it by running: "
+                "pip install mcp-use[search]"
+            )
+            return False
+
+        try:
             self.model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
             self.embedding_function = lambda texts: list(self.model.embed(texts))
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to load the embedding model: {e}")
             return False
 
     async def start_indexing(self) -> None:

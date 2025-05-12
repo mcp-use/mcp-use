@@ -231,11 +231,11 @@ class TestMCPClientSessionManagement:
         """Test creating a session when no servers are configured."""
         client = MCPClient()
 
-        # Test create_session raises ValueError
-        with pytest.raises(ValueError) as exc_info:
+        # Expect a UserWarning when no servers are configured
+        with pytest.warns(UserWarning) as exc_info:
             await client.create_session("server1")
 
-        assert "No MCP servers defined in config" in str(exc_info.value)
+        assert "No MCP servers defined in config" in str(exc_info[0].message)
 
     @pytest.mark.asyncio
     async def test_create_session_nonexistent_server(self):
