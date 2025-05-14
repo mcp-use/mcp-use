@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/mcp-use-mcp-use-badge.png)](https://mseep.ai/app/mcp-use-mcp-use)
+
 <picture>
   <img alt="" src="./static/image.jpg"  width="full">
 </picture>
