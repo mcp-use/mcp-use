@@ -4,14 +4,15 @@ WebSocket connection management for MCP implementations.
 This module provides a connection manager for WebSocket-based MCP connections.
 """
 
-import websockets
-from websockets.client import ClientConnection
+from typing import Any
+
+from mcp.client.websocket import websocket_client
 
 from ..logging import logger
 from .base import ConnectionManager
 
 
-class WebSocketConnectionManager(ConnectionManager[ClientConnection]):
+class WebSocketConnectionManager(ConnectionManager[tuple[Any, Any]]):
     """Connection manager for WebSocket-based MCP connections.
 
     This class handles the lifecycle of WebSocket connections, ensuring proper
@@ -21,19 +22,16 @@ class WebSocketConnectionManager(ConnectionManager[ClientConnection]):
     def __init__(
         self,
         url: str,
-        headers: dict[str, str] | None = None,
     ):
         """Initialize a new WebSocket connection manager.
 
         Args:
             url: The WebSocket URL to connect to
-            headers: Optional headers to include in the WebSocket connection
         """
         super().__init__()
         self.url = url
-        self.headers = headers or {}
 
-    async def _establish_connection(self) -> ClientConnection:
+    async def _establish_connection(self) -> tuple[Any, Any]:
         """Establish a WebSocket connection.
 
         Returns:
@@ -43,21 +41,23 @@ class WebSocketConnectionManager(ConnectionManager[ClientConnection]):
             Exception: If connection cannot be established
         """
         logger.debug(f"Connecting to WebSocket: {self.url}")
-        try:
-            ws = await websockets.connect(self.url, extra_headers=self.headers)
-            return ws
-        except Exception as e:
-            logger.error(f"Failed to connect to WebSocket: {e}")
-            raise
+        # Create the context manager
+        self._ws_ctx = websocket_client(self.url)
 
-    async def _close_connection(self, connection: ClientConnection) -> None:
-        """Close the WebSocket connection.
+        # Enter the context manager
+        read_stream, write_stream = await self._ws_ctx.__aenter__()
 
-        Args:
-            connection: The WebSocket connection to close
-        """
-        try:
-            logger.debug("Closing WebSocket connection")
-            await connection.close()
-        except Exception as e:
-            logger.warning(f"Error closing WebSocket connection: {e}")
+        # Return the streams
+        return (read_stream, write_stream)
+
+    async def _close_connection(self) -> None:
+        """Close the WebSocket connection."""
+        if self._ws_ctx:
+            # Exit the context manager
+            try:
+                logger.debug("Closing WebSocket connection")
+                await self._ws_ctx.__aexit__(None, None, None)
+            except Exception as e:
+                logger.warning(f"Error closing WebSocket connection: {e}")
+            finally:
+                self._ws_ctx = None

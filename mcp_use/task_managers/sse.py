@@ -66,12 +66,9 @@ class SseConnectionManager(ConnectionManager[tuple[Any, Any]]):
         # Return the streams
         return (read_stream, write_stream)
 
-    async def _close_connection(self, connection: tuple[Any, Any]) -> None:
-        """Close the SSE connection.
+    async def _close_connection(self) -> None:
+        """Close the SSE connection."""
 
-        Args:
-            connection: The connection to close (ignored, we use the context manager)
-        """
         if self._sse_ctx:
             # Exit the context manager
             try:

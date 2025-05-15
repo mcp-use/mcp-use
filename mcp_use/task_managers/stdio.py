@@ -57,12 +57,8 @@ class StdioConnectionManager(ConnectionManager[tuple[Any, Any]]):
         # Return the streams
         return (read_stream, write_stream)
 
-    async def _close_connection(self, connection: tuple[Any, Any]) -> None:
-        """Close the stdio connection.
-
-        Args:
-            connection: The connection to close (ignored, we use the context manager)
-        """
+    async def _close_connection(self) -> None:
+        """Close the stdio connection."""
         if self._stdio_ctx:
             # Exit the context manager
             try:

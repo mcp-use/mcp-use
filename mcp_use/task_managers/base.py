@@ -46,14 +46,12 @@ class ConnectionManager(Generic[T], ABC):
         pass
 
     @abstractmethod
-    async def _close_connection(self, connection: T) -> None:
+    async def _close_connection(self) -> None:
         """Close the connection.
 
         This method should be implemented by subclasses to close
         the specific type of connection.
 
-        Args:
-            connection: The connection to close.
         """
         pass
 
@@ -139,10 +137,10 @@ class ConnectionManager(Generic[T], ABC):
             self._ready_event.set()
 
         finally:
-            # Close the connection if it was established
+            # Close the connection if it was establishedSUPABASE_URL
             if self._connection is not None:
                 try:
-                    await self._close_connection(self._connection)
+                    await self._close_connection()
                 except Exception as e:
                     logger.warning(f"Error closing connection in {self.__class__.__name__}: {e}")
                 self._connection = None
