@@ -75,9 +75,6 @@ class MCPSession:
         # Initialize the session
         self.session_info = await self.connector.initialize()
 
-        # Discover available tools
-        await self.discover_tools()
-
         return self.session_info
 
     @property
@@ -88,28 +85,3 @@ class MCPSession:
             True if the connector is connected, False otherwise.
         """
         return hasattr(self.connector, "client") and self.connector.client is not None
-
-    async def discover_tools(self) -> list[Tool]:
-        """Discover available tools from the MCP implementation.
-
-        Returns:
-            The list of available tools in MCP format.
-        """
-        self.tools: list[Tool] = self.connector.tools
-        return self.tools
-
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
-        """Call an MCP tool with the given arguments.
-
-        Args:
-            name: The name of the tool to call.
-            arguments: The arguments to pass to the tool.
-
-        Returns:
-            The result of the tool call.
-        """
-        # Make sure we're connected
-        if not self.is_connected and self.auto_connect:
-            await self.connect()
-
-        return await self.connector.call_tool(name, arguments)

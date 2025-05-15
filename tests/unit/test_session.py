@@ -84,8 +84,6 @@ class TestMCPSessionOperations(IsolatedAsyncioTestCase):
         self.connector.connect = AsyncMock()
         self.connector.disconnect = AsyncMock()
         self.connector.initialize = AsyncMock(return_value={"session_id": "test_session"})
-        self.connector.tools = [{"name": "test_tool"}]
-        self.connector.call_tool = AsyncMock(return_value={"result": "success"})
 
         # By default, the connector is not connected
         type(self.connector).client = PropertyMock(return_value=None)
@@ -105,9 +103,6 @@ class TestMCPSessionOperations(IsolatedAsyncioTestCase):
         self.assertEqual(self.session.session_info, {"session_id": "test_session"})
         self.assertEqual(result, {"session_id": "test_session"})
 
-        # Verify tools were discovered
-        self.assertEqual(self.session.tools, [{"name": "test_tool"}])
-
     async def test_initialize_already_connected(self):
         """Test initializing the session when already connected."""
         # Set up the connector to indicate it's already connected
@@ -119,56 +114,3 @@ class TestMCPSessionOperations(IsolatedAsyncioTestCase):
         # Verify connect was not called since already connected
         self.connector.connect.assert_not_called()
         self.connector.initialize.assert_called_once()
-
-    async def test_discover_tools(self):
-        """Test discovering available tools."""
-        tools = await self.session.discover_tools()
-
-        # Verify tools were set correctly
-        self.assertEqual(tools, [{"name": "test_tool"}])
-        self.assertEqual(self.session.tools, [{"name": "test_tool"}])
-
-    async def test_call_tool_connected(self):
-        """Test calling a tool when already connected."""
-        # Set up the connector to indicate it's already connected
-        type(self.connector).client = PropertyMock(return_value=MagicMock())
-
-        # Call the tool
-        result = await self.session.call_tool("test_tool", {"param": "value"})
-
-        # Verify the connector's call_tool method was called with the right arguments
-        self.connector.call_tool.assert_called_once_with("test_tool", {"param": "value"})
-
-        # Verify the result is correct
-        self.assertEqual(result, {"result": "success"})
-
-        # Verify connect was not called since already connected
-        self.connector.connect.assert_not_called()
-
-    async def test_call_tool_not_connected(self):
-        """Test calling a tool when not connected."""
-        # Call the tool
-        result = await self.session.call_tool("test_tool", {"param": "value"})
-
-        # Verify connect was called since auto_connect is True
-        self.connector.connect.assert_called_once()
-
-        # Verify the connector's call_tool method was called with the right arguments
-        self.connector.call_tool.assert_called_once_with("test_tool", {"param": "value"})
-
-        # Verify the result is correct
-        self.assertEqual(result, {"result": "success"})
-
-    async def test_call_tool_with_auto_connect_false(self):
-        """Test calling a tool with auto_connect set to False."""
-        # Create a session with auto_connect=False
-        session = MCPSession(self.connector, auto_connect=False)
-
-        # Set up the connector to indicate it's already connected
-        type(self.connector).client = PropertyMock(return_value=MagicMock())
-
-        # Call the tool
-        await session.call_tool("test_tool", {"param": "value"})
-
-        # Verify connect was not called since auto_connect is False
-        self.connector.connect.assert_not_called()
