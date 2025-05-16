@@ -7,7 +7,9 @@ through the standard input/output streams.
 
 import sys
 
-from mcp import ClientSession, StdioServerParameters
+from mcp import StdioServerParameters
+
+from mcp_use.sessions.mcp_use_client_session import McpUseClientSession
 
 from ..logging import logger
 from ..task_managers import StdioConnectionManager
@@ -60,8 +62,13 @@ class StdioConnector(BaseConnector):
             self._connection_manager = StdioConnectionManager(server_params, self.errlog)
             read_stream, write_stream = await self._connection_manager.start()
 
-            # Create the client session
-            self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
+            # Create the client session with message handler
+            self.client = McpUseClientSession(
+                read_stream,
+                write_stream,
+                sampling_callback=None,
+                message_handler=self._handle_client_message,
+            )
             await self.client.__aenter__()
 
             # Mark as connected
