@@ -15,8 +15,8 @@ class ToolSearchInput(BaseModel):
 
     query: str = Field(description="The search query to find relevant tools")
     top_k: int = Field(
-        default=100,
-        description="The maximum number of tools to return (defaults to 100)",
+        default=20,
+        description="The maximum number of tools to return (defaults to 20)",
     )
 
 
@@ -39,7 +39,7 @@ class SearchToolsTool(MCPServerTool):
         super().__init__(server_manager)
         self._search_tool = ToolSearchEngine(server_manager=server_manager)
 
-    async def _arun(self, query: str, top_k: int = 100) -> str:
+    async def _arun(self, query: str, top_k: int = 20) -> str:
         """Search for tools across all MCP servers using semantic search."""
         # Make sure the index is ready, and if not, allow the search_tools method to handle it
         # No need to manually check or build the index here as the search_tools method will do that
@@ -50,7 +50,7 @@ class SearchToolsTool(MCPServerTool):
         )
         return self.format_search_results(results)
 
-    def _run(self, query: str, top_k: int = 100) -> str:
+    def _run(self, query: str, top_k: int = 20) -> str:
         """Synchronous version that raises a NotImplementedError - use _arun instead."""
         raise NotImplementedError("SearchToolsTool requires async execution. Use _arun instead.")
 
@@ -74,6 +74,8 @@ class SearchToolsTool(MCPServerTool):
         # Add footer with information about how to use the results
         formatted_output += (
             "\nTo use a tool, connect to the appropriate server first, then invoke the tool."
+            "Alternatively, you can use the 'use_tool_from_server' tool to directly use a tool "
+            "from a specific server without first connecting to it."
         )
 
         return formatted_output
