@@ -26,8 +26,10 @@
         <img src="https://img.shields.io/github/stars/pietrozullo/mcp-use?style=social" /></a>
     </p>
     <p align="center">
-    <a href="https://x.com/pietrozullo" alt="Twitter Follow">
+    <a href="https://x.com/pietrozullo" alt="Twitter Follow - Pietro">
         <img src="https://img.shields.io/twitter/follow/Pietro?style=social" /></a>
+    <a href="https://x.com/pederzh" alt="Twitter Follow - Luigi">
+        <img src="https://img.shields.io/twitter/follow/Luigi?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/XkNkSkMz3V?style=flat" /></a>
 </p>
@@ -39,17 +41,16 @@
 
 ## ✨ Key Features
 
-| Feature | Description |
-|---------|-------------|
-| 🔄 [**Ease of use**](#quick-start) | Create your first MCP capable agent you need only 6 lines of code |
-| 🤖 [**LLM Flexibility**](#installing-langchain-providers) | Works with any langchain supported LLM that supports tool calling (OpenAI, Anthropic, Groq, LLama etc.) |
-| 🌐 [**Code Builder**](https://mcp-use.io/builder) | Explore MCP capabilities and generate starter code with the interactive [code builder](https://mcp-use.io/builder). |
-| 🔗 [**HTTP Support**](#http-connection-example) | Direct connection to MCP servers running on specific HTTP ports |
-| ⚙️ [**Dynamic Server Selection**](#dynamic-server-selection-server-manager) | Agents can dynamically choose the most appropriate MCP server for a given task from the available pool |
-| 🧩 [**Multi-Server Support**](#multi-server-support) | Use multiple MCP servers simultaneously in a single agent |
-| 🛡️ [**Tool Restrictions**](#tool-access-control) | Restrict potentially dangerous tools like file system or network access |
-| 🔧 [**Custom Agents**](#build-a-custom-agent) | Build your own agents with any framework using the LangChain adapter or create new adapters |
-
+| Feature                                                                     | Description                                                                                                         |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 🔄 [**Ease of use**](#quick-start)                                          | Create your first MCP capable agent you need only 6 lines of code                                                   |
+| 🤖 [**LLM Flexibility**](#installing-langchain-providers)                   | Works with any langchain supported LLM that supports tool calling (OpenAI, Anthropic, Groq, LLama etc.)             |
+| 🌐 [**Code Builder**](https://mcp-use.io/builder)                           | Explore MCP capabilities and generate starter code with the interactive [code builder](https://mcp-use.io/builder). |
+| 🔗 [**HTTP Support**](#http-connection-example)                             | Direct connection to MCP servers running on specific HTTP ports                                                     |
+| ⚙️ [**Dynamic Server Selection**](#dynamic-server-selection-server-manager) | Agents can dynamically choose the most appropriate MCP server for a given task from the available pool              |
+| 🧩 [**Multi-Server Support**](#multi-server-support)                        | Use multiple MCP servers simultaneously in a single agent                                                           |
+| 🛡️ [**Tool Restrictions**](#tool-access-control)                            | Restrict potentially dangerous tools like file system or network access                                             |
+| 🔧 [**Custom Agents**](#build-a-custom-agent)                               | Build your own agents with any framework using the LangChain adapter or create new adapters                         |
 
 # Quick start
 
@@ -520,6 +521,101 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+# Sandboxed Execution
+
+MCP-Use supports running MCP servers in a sandboxed environment using E2B's cloud infrastructure. This allows you to run MCP servers without having to install dependencies locally, making it easier to use tools that might have complex setups or system requirements.
+
+## Installation
+
+To use sandboxed execution, you need to install the E2B dependency:
+
+```bash
+# Install mcp-use with E2B support
+pip install "mcp-use[e2b]"
+
+# Or install the dependency directly
+pip install e2b-code-interpreter
+```
+
+You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) to get your API key.
+
+## Configuration
+
+To enable sandboxed execution, use the `ClientOptions` parameter when creating your `MCPClient`:
+
+```python
+import asyncio
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.types.clientoptions import ClientOptions
+
+async def main():
+    # Load environment variables (needs E2B_API_KEY)
+    load_dotenv()
+
+    # Define MCP server configuration
+    server_config = {
+        "mcpServers": {
+            "everything": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-everything"],
+            }
+        }
+    }
+
+    # Define sandbox options
+    sandbox_options: SandboxOptions = {
+        "api_key": os.getenv("E2B_API_KEY"),  # API key can also be provided directly
+        "sandbox_template_id": "base",  # Use base template
+    }
+
+    # Create client options for sandboxed mode
+    client_options: ClientOptions = {
+        "is_sandboxed": True,
+        "sandbox_options": sandbox_options
+    }
+
+    # Create client with sandboxed mode enabled
+    client = MCPClient(
+        config=server_config,
+        options=client_options
+    )
+
+    # Create agent with the sandboxed client
+    llm = ChatOpenAI(model="gpt-4o")
+    agent = MCPAgent(llm=llm, client=client)
+
+    # Run your agent
+    result = await agent.run("Use the command line tools to help me add 1+1")
+    print(result)
+
+    # Clean up
+    await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Sandbox Options
+
+The `SandboxOptions` type provides configuration for the sandbox environment:
+
+| Option                 | Description                                                                              | Default               |
+| ---------------------- | ---------------------------------------------------------------------------------------- | --------------------- |
+| `api_key`              | E2B API key. Required - can be provided directly or via E2B_API_KEY environment variable | None                  |
+| `sandbox_template_id`  | Template ID for the sandbox environment                                                  | "base"                |
+| `supergateway_command` | Command to run supergateway                                                              | "npx -y supergateway" |
+
+## Benefits of Sandboxed Execution
+
+- **No local dependencies**: Run MCP servers without installing dependencies locally
+- **Isolation**: Execute code in a secure, isolated environment
+- **Consistent environment**: Ensure consistent behavior across different systems
+- **Resource efficiency**: Offload resource-intensive tasks to cloud infrastructure
+
 # Build a Custom Agent:
 
 You can also build your own custom agent using the LangChain adapter:
@@ -610,7 +706,6 @@ agent = MCPAgent(
 ```
 
 This is useful when you only need to see the agent's steps and decision-making process without all the low-level debug information from other components.
-
 
 # Roadmap
 

@@ -49,6 +49,60 @@ client = MCPClient.from_dict(config=config)
 | --------- | ---- | -------- | ---------------------------------------------- |
 | `config`  | dict | Yes      | Dictionary containing MCP server configuration |
 
+#### Sandboxed Execution
+
+Both `from_config_file` and `from_dict` methods support the `options` parameter for configuring client features, including sandboxed execution:
+
+```python
+from mcp_use import MCPClient
+from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.types.clientoptions import ClientOptions
+
+# Define sandbox options
+sandbox_options: SandboxOptions = {
+    "api_key": "your_e2b_api_key",
+    "sandbox_template_id": "code-interpreter-v1"
+}
+
+# Create client options for sandboxed mode
+client_options: ClientOptions = {
+    "is_sandboxed": True,
+    "sandbox_options": sandbox_options
+}
+
+# Create client with sandboxed mode enabled
+client = MCPClient.from_config_file(
+    config_path="config.json",
+    options=client_options
+)
+```
+
+| Parameter | Type          | Required | Default | Description                                          |
+| --------- | ------------- | -------- | ------- | ---------------------------------------------------- |
+| `options` | ClientOptions | No       | {}      | Client configuration options, including sandbox mode |
+
+The `ClientOptions` type is a TypedDict with the following fields:
+
+| Field             | Type           | Required | Default | Description                                       |
+| ----------------- | -------------- | -------- | ------- | ------------------------------------------------- |
+| `is_sandboxed`    | bool           | No       | False   | Whether to run commands in a sandbox environment  |
+| `sandbox_options` | SandboxOptions | No       | None    | Configuration options for the sandbox environment |
+
+The `SandboxOptions` type supports the following options:
+
+| Option                 | Type | Required | Default               | Description                                                                              |
+| ---------------------- | ---- | -------- | --------------------- | ---------------------------------------------------------------------------------------- |
+| `api_key`              | str  | Yes      | None                  | E2B API key. Required - can be provided directly or via E2B_API_KEY environment variable |
+| `sandbox_template_id`  | str  | No       | "base"                | Template ID for the sandbox environment                                                  |
+| `supergateway_command` | str  | No       | "npx -y supergateway" | Command to run supergateway                                                              |
+
+**When to use sandboxed execution**:
+
+- When you want to run MCP servers without installing their dependencies locally
+- To ensure consistent execution environments across different systems
+- For improved security through isolation
+- To leverage cloud resources for resource-intensive MCP servers
+
 ### Core Methods
 
 #### create_session
@@ -133,22 +187,22 @@ agent = MCPAgent(
 )
 ```
 
-| Parameter                 | Type                | Required | Default | Description                                                  |
-| ------------------------- | ------------------- | -------- | ------- | ------------------------------------------------------------ |
-| `llm`                     | BaseLanguageModel   | Yes      | -       | Any LangChain-compatible language model                      |
-| `client`                  | MCPClient           | No       | None    | The MCPClient instance                                       |
-| `connectors`              | list[BaseConnector] | No       | None    | List of connectors if not using client                       |
-| `server_name`             | str                 | No       | None    | Name of the server to use                                    |
-| `max_steps`               | int                 | No       | 5       | Maximum number of steps the agent can take                   |
-| `auto_initialize`         | bool                | No       | False   | Whether to initialize automatically                          |
-| `memory_enabled`          | bool                | No       | True    | Whether to enable memory                                     |
-| `system_prompt`           | str                 | No       | None    | Custom system prompt                                         |
-| `system_prompt_template`  | str                 | No       | None    | Custom system prompt template                                |
-| `additional_instructions` | str                 | No       | None    | Additional instructions for the agent                        |
-| `session_options`         | dict                | No       | {}      | Additional options for session creation                      |
-| `output_parser`           | OutputParser        | No       | None    | Custom output parser for LLM responses                       |
+| Parameter                 | Type                | Required | Default | Description                                                                                                                                     |
+| ------------------------- | ------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `llm`                     | BaseLanguageModel   | Yes      | -       | Any LangChain-compatible language model                                                                                                         |
+| `client`                  | MCPClient           | No       | None    | The MCPClient instance                                                                                                                          |
+| `connectors`              | list[BaseConnector] | No       | None    | List of connectors if not using client                                                                                                          |
+| `server_name`             | str                 | No       | None    | Name of the server to use                                                                                                                       |
+| `max_steps`               | int                 | No       | 5       | Maximum number of steps the agent can take                                                                                                      |
+| `auto_initialize`         | bool                | No       | False   | Whether to initialize automatically                                                                                                             |
+| `memory_enabled`          | bool                | No       | True    | Whether to enable memory                                                                                                                        |
+| `system_prompt`           | str                 | No       | None    | Custom system prompt                                                                                                                            |
+| `system_prompt_template`  | str                 | No       | None    | Custom system prompt template                                                                                                                   |
+| `additional_instructions` | str                 | No       | None    | Additional instructions for the agent                                                                                                           |
+| `session_options`         | dict                | No       | {}      | Additional options for session creation                                                                                                         |
+| `output_parser`           | OutputParser        | No       | None    | Custom output parser for LLM responses                                                                                                          |
 | `use_server_manager`      | bool                | No       | False   | If `True`, enables automatic selection of the appropriate server based on the chosen tool when multiple servers are configured via `MCPClient`. |
-| `disallowed_tools`        | list[str]           | No       | None    | List of tool names that should not be available to the agent |
+| `disallowed_tools`        | list[str]           | No       | None    | List of tool names that should not be available to the agent                                                                                    |
 
 **When to use different parameters**:
 
@@ -459,3 +513,91 @@ This approach is useful when:
 - You want to limit the agent's capabilities for specific tasks
 - You're concerned about security implications of certain tools
 - You want to focus the agent on specific functionality
+
+### Sandboxed Execution with Multiple Servers
+
+Configure and use multiple sandboxed MCP servers:
+
+```python
+import os
+from dotenv import load_dotenv
+from mcp_use import MCPClient, MCPAgent
+from mcp_use.types.sandbox import SandboxOptions
+from langchain_anthropic import ChatAnthropic
+
+# Load environment variables
+load_dotenv()
+
+# Define sandbox options
+sandbox_options: SandboxOptions = {
+    "api_key": os.getenv("E2B_API_KEY"),
+    "sandbox_template_id": "code-interpreter-v1"
+}
+
+# Create client with multiple sandboxed servers
+client = MCPClient.from_dict(
+    {
+        "mcpServers": {
+            "browser": {
+                "command": "npx",
+                "args": ["@playwright/mcp@latest"]
+            },
+            "command": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-everything"]
+            }
+        }
+    },
+    is_sandboxed=True,
+    sandbox_options=sandbox_options
+)
+
+# Create agent with server manager enabled
+agent = MCPAgent(
+    llm=ChatAnthropic(model="claude-3-5-sonnet"),
+    client=client,
+    use_server_manager=True  # Automatically selects the appropriate server
+)
+
+# Run a task that will use tools from both servers
+result = await agent.run(
+    "Search for information about Python and then use the command line to check the latest version"
+)
+```
+
+This approach is useful when:
+
+- You need to use multiple MCP servers but don't want to install their dependencies locally
+- You want to ensure consistent execution environments for all servers
+- You need to leverage cloud resources for resource-intensive MCP servers
+
+## Error Handling
+
+mcp_use provides several exception types to handle different error scenarios:
+
+| Exception                | Description                       | When It Occurs                      |
+| ------------------------ | --------------------------------- | ----------------------------------- |
+| `MCPConnectionError`     | Connection to MCP server failed   | Network issues, server not running  |
+| `MCPAuthenticationError` | Authentication with server failed | Invalid credentials or tokens       |
+| `MCPTimeoutError`        | Operation timed out               | Server takes too long to respond    |
+| `MCPServerError`         | Server returned an error          | Internal server error               |
+| `MCPClientError`         | Client-side error                 | Invalid configuration or parameters |
+| `MCPError`               | Generic MCP-related error         | Any other MCP-related issue         |
+
+**Handling Strategies**:
+
+```python
+from mcp_use.exceptions import MCPConnectionError, MCPTimeoutError
+
+try:
+    result = await agent.run("Find information")
+except MCPConnectionError:
+    # Handle connection issues
+    print("Failed to connect to the MCP server")
+except MCPTimeoutError:
+    # Handle timeout issues
+    print("Operation timed out")
+except Exception as e:
+    # Handle other exceptions
+    print(f"An error occurred: {e}")
+```
