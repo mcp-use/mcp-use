@@ -20,21 +20,15 @@ from ..task_managers import SseConnectionManager
 try:
     logger.debug("Attempting to import e2b_code_interpreter...")
     from e2b_code_interpreter import (
-        AsyncCommandHandle,
-        AsyncSandbox,
         CommandHandle,
-        CommandResult,
-        OutputMessage,
         Sandbox,
     )
 
     logger.debug("Successfully imported e2b_code_interpreter")
 except ImportError as e:
-    logger.error(f"Failed to import e2b_code_interpreter: {e}")
-    AsyncSandbox = None
-    OutputMessage = None
-    CommandResult = None
-    AsyncCommandHandle = None
+    logger.debug(f"Failed to import e2b_code_interpreter: {e}")
+    CommandHandle = None
+    Sandbox = None
 
 from ..types.sandbox import SandboxOptions
 from .base import BaseConnector
@@ -69,7 +63,7 @@ class SandboxConnector(BaseConnector):
             sse_read_timeout: Timeout for the SSE connection in seconds.
         """
         super().__init__()
-        if AsyncSandbox is None:
+        if Sandbox is None:
             raise ImportError(
                 "E2B SDK (e2b-code-interpreter) not found. "
                 "Please install it with 'pip install mcp-use[e2b]' "
@@ -129,7 +123,7 @@ class SandboxConnector(BaseConnector):
         Returns:
             True if server is responding, raises TimeoutError otherwise
         """
-        print(f"Waiting for server at {base_url} to respond...")
+        logger.info(f"Waiting for server at {base_url} to respond...")
         sys.stdout.flush()
 
         start_time = time.time()
@@ -144,7 +138,7 @@ class SandboxConnector(BaseConnector):
                         async with session.get(ping_url, timeout=2) as response:
                             if response.status == 200:
                                 elapsed = time.time() - start_time
-                                print(
+                                logger.info(
                                     f"Server is ready! "
                                     f"SSE endpoint responded with 200 after {elapsed:.1f}s"
                                 )
@@ -154,7 +148,7 @@ class SandboxConnector(BaseConnector):
                         async with session.get(base_url, timeout=2) as response:
                             if response.status < 500:  # Accept any non-server error
                                 elapsed = time.time() - start_time
-                                print(
+                                logger.info(
                                     f"Server is ready! Base URL responded with "
                                     f"{response.status} after {elapsed:.1f}s"
                                 )
@@ -170,7 +164,7 @@ class SandboxConnector(BaseConnector):
             # Log status every 5 seconds
             elapsed = time.time() - start_time
             if int(elapsed) % 5 == 0:
-                print(f"Still waiting for server to respond... ({elapsed:.1f}s elapsed)")
+                logger.info(f"Still waiting for server to respond... ({elapsed:.1f}s elapsed)")
                 sys.stdout.flush()
 
         # If we get here, we timed out
