@@ -13,7 +13,7 @@ select = [
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Unused imports
-"tests/**/*.py" = ["F811", "F401"]  # Redefinition in test files
+"tests/**/*.py" = ["F811", "F401", "B017"]  # Redefinition in test files
 "mcp_use/connectors/websocket.py" = ["C901"]  # Function too complex
 
 [lint.isort]
