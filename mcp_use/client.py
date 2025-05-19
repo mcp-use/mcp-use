@@ -12,6 +12,7 @@ from typing import Any
 from .config import create_connector_from_config, load_config_file
 from .logging import logger
 from .session import MCPSession
+from .types.clientoptions import ClientOptions
 
 
 class MCPClient:
@@ -24,14 +25,17 @@ class MCPClient:
     def __init__(
         self,
         config: str | dict[str, Any] | None = None,
+        options: ClientOptions | None = None,
     ) -> None:
         """Initialize a new MCP client.
 
         Args:
             config: Either a dict containing configuration or a path to a JSON config file.
                    If None, an empty configuration is used.
+            options: Configuration options for the client.
         """
         self.config: dict[str, Any] = {}
+        self.options = options or {}
         self.sessions: dict[str, MCPSession] = {}
         self.active_sessions: list[str] = []
 
@@ -43,22 +47,24 @@ class MCPClient:
                 self.config = config
 
     @classmethod
-    def from_dict(cls, config: dict[str, Any]) -> "MCPClient":
+    def from_dict(cls, config: dict[str, Any], options: ClientOptions | None = None) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
         Args:
             config: The configuration dictionary.
+            options: Optional client configuration options.
         """
-        return cls(config=config)
+        return cls(config=config, options=options)
 
     @classmethod
-    def from_config_file(cls, filepath: str) -> "MCPClient":
+    def from_config_file(cls, filepath: str, options: ClientOptions | None = None) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
         Args:
             filepath: The path to the configuration file.
+            options: Optional client configuration options.
         """
-        return cls(config=load_config_file(filepath))
+        return cls(config=load_config_file(filepath), options=options)
 
     def add_server(
         self,
@@ -111,6 +117,7 @@ class MCPClient:
 
         Args:
             server_name: The name of the server to create a session for.
+            auto_initialize: Whether to automatically initialize the session.
 
         Returns:
             The created MCPSession.
@@ -128,7 +135,9 @@ class MCPClient:
             raise ValueError(f"Server '{server_name}' not found in config")
 
         server_config = servers[server_name]
-        connector = create_connector_from_config(server_config)
+
+        # Create connector with options
+        connector = create_connector_from_config(server_config, options=self.options)
 
         # Create the session
         session = MCPSession(connector)
