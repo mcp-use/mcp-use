@@ -9,9 +9,12 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
+import mcp_use
 from mcp_use import MCPAgent, MCPClient
 from mcp_use.types.clientoptions import ClientOptions
 from mcp_use.types.sandbox import SandboxOptions
+
+mcp_use.set_debug(debug=1)
 
 # Server configuration (MCP standard compliant)
 sandboxed_server = {
