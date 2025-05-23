@@ -10,7 +10,17 @@ from typing import Any
 
 from mcp import ClientSession
 from mcp.shared.exceptions import McpError
-from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
+from mcp.types import (
+    CallToolResult,
+    GetPromptResult,
+    JSONRPCNotification,
+    Prompt,
+    ReadResourceResult,
+    Resource,
+    ServerCapabilities,
+    Tool,
+    ToolListChangedNotification,
+)
 
 from ..logging import logger
 from ..task_managers import ConnectionManager
@@ -91,9 +101,12 @@ class BaseConnector(ABC):
         logger.debug("Initializing MCP session")
 
         # Initialize the session
+        # 1. Client communicates its capabilities to the server (sampling and roots)
+        # 2. Server responds with its capabilities (tools, resources, prompts)
+        # 3. Client acknowledges with notifications/initialized.
         result = await self.client.initialize()
 
-        server_capabilities = result.capabilities
+        server_capabilities: ServerCapabilities = result.capabilities
 
         if server_capabilities.tools:
             # Get available tools
@@ -221,3 +234,31 @@ class BaseConnector(ABC):
 
         logger.debug(f"Sending request: {method} with params: {params}")
         return await self.client.request({"method": method, "params": params or {}})
+
+    async def _discovery(self) -> None:
+        """
+        Discovery of new tools: the client will ask the server for the list of new available tools.
+        1. https://modelcontextprotocol.io/docs/concepts/resources#list-changes
+        2. https://modelcontextprotocol.io/specification/2025-03-26/server/tools#list-changed-notification
+        """
+        if not self.client:
+            raise RuntimeError("MCP client is not connected")
+
+        logger.debug("Discovering new tools from the server")
+        # Client asks the server for the list of new available tools.
+        tools_result = await self.list_tools()
+        self._tools = tools_result or []
+
+    # Client message handler to store progress notifications
+    async def _handle_client_message(
+        self,
+        message: JSONRPCNotification,
+    ) -> None:
+        if not self.client:
+            raise RuntimeError("MCP client is not connected")
+
+        logger.debug(f"Received notification: {message}")
+        if isinstance(message, ToolListChangedNotification):
+            """When servers notify clients when their list of available resources changes via the
+            notifications/resources/list_changed notification."""
+            await self._discovery()
