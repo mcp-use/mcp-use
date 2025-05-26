@@ -9,6 +9,7 @@ import logging
 from collections.abc import AsyncIterator
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents.output_parsers.tools import ToolAgentAction
 from langchain.globals import set_debug
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -21,7 +22,6 @@ from langchain_core.utils.input import get_color_mapping
 
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
-from mcp_use.session import MCPSession
 
 from ..adapters.langchain_adapter import LangChainAdapter
 from ..logging import logger
@@ -102,9 +102,7 @@ class MCPAgent:
 
         # State tracking
         self._agent_executor: AgentExecutor | None = None
-        self._sessions: dict[str, MCPSession] = {}
         self._system_message: SystemMessage | None = None
-        self._tools: list[BaseTool] = []
 
     async def initialize(self) -> None:
         """Initialize the MCP client and agent."""
@@ -346,19 +344,17 @@ class MCPAgent:
         history_to_use = (
             external_history if external_history is not None else self._conversation_history
         )
-        langchain_history: list[BaseMessage] = [
-            m for m in history_to_use if isinstance(m, HumanMessage | AIMessage)
-        ]
-        inputs = {"input": query, "chat_history": langchain_history}
+        inputs = {"input": query, "chat_history": history_to_use}
 
         # 3. Stream & diff -------------------------------------------------------
-        accumulated = ""
         async for event in self._agent_executor.astream_events(inputs):
+            if event.get("event") == "on_chain_end":
+                output = event["data"]["output"]
+                if isinstance(output, list):
+                    for message in output:
+                        if not isinstance(message, ToolAgentAction):
+                            self.add_to_history(message)
             yield event
-
-        # 4. Persist assistant message ------------------------------------------
-        if self.memory_enabled and accumulated:
-            self.add_to_history(AIMessage(content=accumulated))
 
         # 5. House-keeping -------------------------------------------------------
         if initialised_here and manage_connector:
