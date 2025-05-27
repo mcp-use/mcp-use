@@ -111,11 +111,8 @@ pip install langchain-openai
 
 # For Anthropic
 pip install langchain-anthropic
-
-# For other providers, check the [LangChain chat models documentation](https://python.langchain.com/docs/integrations/chat/)
 ```
-
-and add your API keys for the provider you want to use to your `.env` file.
+For other providers, check the [LangChain chat models documentation](https://python.langchain.com/docs/integrations/chat/) and add your API keys for the provider you want to use to your `.env` file.
 
 ```bash
 OPENAI_API_KEY=
