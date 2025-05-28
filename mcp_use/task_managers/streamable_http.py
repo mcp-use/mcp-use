@@ -5,6 +5,7 @@ This module provides a connection manager for streamable HTTP-based MCP connecti
 that ensures proper task isolation and resource cleanup.
 """
 
+from datetime import timedelta
 from typing import Any
 
 from mcp.client.streamable_http import streamablehttp_client
@@ -39,8 +40,8 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
         super().__init__()
         self.url = url
         self.headers = headers or {}
-        self.timeout = timeout
-        self.read_timeout = read_timeout
+        self.timeout = timedelta(seconds=timeout)
+        self.read_timeout = timedelta(seconds=read_timeout)
         self._http_ctx = None
 
     async def _establish_connection(self) -> tuple[Any, Any]:
@@ -57,11 +58,11 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
             url=self.url,
             headers=self.headers,
             timeout=self.timeout,
-            read_timeout=self.read_timeout,
+            sse_read_timeout=self.read_timeout,
         )
 
-        # Enter the context manager
-        read_stream, write_stream = await self._http_ctx.__aenter__()
+        # Enter the context manager. Ignoring the session id callback
+        read_stream, write_stream, _ = await self._http_ctx.__aenter__()
 
         # Return the streams
         return (read_stream, write_stream)
