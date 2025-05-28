@@ -218,7 +218,9 @@ class TestMCPClientSessionManagement:
         await client.create_session("server1")
 
         # Verify behavior
-        mock_create_connector.assert_called_once_with({"url": "http://server1.com"}, options={})
+        mock_create_connector.assert_called_once_with(
+            {"url": "http://server1.com"}, sandbox=False, sandbox_options=None
+        )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_called_once()
 
@@ -271,7 +273,9 @@ class TestMCPClientSessionManagement:
         await client.create_session("server1", auto_initialize=False)
 
         # Verify behavior
-        mock_create_connector.assert_called_once_with({"url": "http://server1.com"}, options={})
+        mock_create_connector.assert_called_once_with(
+            {"url": "http://server1.com"}, sandbox=False, sandbox_options=None
+        )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_not_called()
 

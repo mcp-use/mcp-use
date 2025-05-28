@@ -11,7 +11,6 @@ from langchain_openai import ChatOpenAI
 
 import mcp_use
 from mcp_use import MCPAgent, MCPClient
-from mcp_use.types.clientoptions import ClientOptions
 from mcp_use.types.sandbox import SandboxOptions
 
 mcp_use.set_debug(debug=1)
@@ -42,10 +41,8 @@ async def main():
         "sandbox_template_id": "code-interpreter-v1",  # Use code interpreter template
     }
 
-    client_options: ClientOptions = {"is_sandboxed": True, "sandbox_options": sandbox_options}
-
     # Create client with sandboxed mode enabled and sandbox options
-    client = MCPClient(config=sandboxed_server, options=client_options)
+    client = MCPClient(config=sandboxed_server, sandbox=True, sandbox_options=sandbox_options)
 
     # Create LLM and agent
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)

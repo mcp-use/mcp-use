@@ -7,6 +7,8 @@ This module provides functionality to load MCP configuration from JSON files.
 import json
 from typing import Any
 
+from mcp_use.types.sandbox import SandboxOptions
+
 from .connectors import (
     BaseConnector,
     HttpConnector,
@@ -15,7 +17,6 @@ from .connectors import (
     WebSocketConnector,
 )
 from .connectors.utils import is_stdio_server
-from .types.clientoptions import ClientOptions
 
 
 def load_config_file(filepath: str) -> dict[str, Any]:
@@ -33,24 +34,23 @@ def load_config_file(filepath: str) -> dict[str, Any]:
 
 def create_connector_from_config(
     server_config: dict[str, Any],
-    options: ClientOptions | None = None,
+    sandbox: bool = False,
+    sandbox_options: SandboxOptions | None = None,
 ) -> BaseConnector:
     """Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
     create_connector_from_config(server_config)
     Args:
         server_config: The server configuration section
-        options: Optional client configuration options including sandboxing preferences.
-                 If None, default client options will be used.
+        sandbox: Whether to use sandboxed execution mode for running MCP servers.
+        sandbox_options: Optional sandbox configuration options.
 
     Returns:
         A configured connector instance
     """
-    # Use default options if none provided
-    options = options or {"is_sandboxed": False}
 
     # Stdio connector (command-based)
-    if is_stdio_server(server_config) and not options.get("is_sandboxed", False):
+    if is_stdio_server(server_config) and not sandbox:
         return StdioConnector(
             command=server_config["command"],
             args=server_config["args"],
@@ -58,12 +58,12 @@ def create_connector_from_config(
         )
 
     # Sandboxed connector
-    elif is_stdio_server(server_config) and options.get("is_sandboxed", False):
+    elif is_stdio_server(server_config) and sandbox:
         return SandboxConnector(
             command=server_config["command"],
             args=server_config["args"],
             env=server_config.get("env", None),
-            e2b_options=options.get("sandbox_options", {}),
+            e2b_options=sandbox_options,
         )
 
     # HTTP connector

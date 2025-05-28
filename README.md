@@ -571,7 +571,7 @@ You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) t
 
 ## Configuration
 
-To enable sandboxed execution, use the `ClientOptions` parameter when creating your `MCPClient`:
+To enable sandboxed execution, use the sandbox parameter when creating your `MCPClient`:
 
 ```python
 import asyncio
@@ -580,7 +580,6 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 from mcp_use.types.sandbox import SandboxOptions
-from mcp_use.types.clientoptions import ClientOptions
 
 async def main():
     # Load environment variables (needs E2B_API_KEY)
@@ -602,16 +601,12 @@ async def main():
         "sandbox_template_id": "base",  # Use base template
     }
 
-    # Create client options for sandboxed mode
-    client_options: ClientOptions = {
-        "is_sandboxed": True,
-        "sandbox_options": sandbox_options
-    }
-
     # Create client with sandboxed mode enabled
     client = MCPClient(
         config=server_config,
-        options=client_options
+        sandbox=True,
+        sandbox_options=sandbox_options,
+
     )
 
     # Create agent with the sandboxed client

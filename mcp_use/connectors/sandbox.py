@@ -79,7 +79,7 @@ class SandboxConnector(BaseConnector):
         self.api_key = _e2b_options.get("api_key") or os.environ.get("E2B_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "E2B API key is required. Provide it via 'e2b_options.api_key' "
+                "E2B API key is required. Provide it via 'sandbox_options.api_key' "
                 "or the E2B_API_KEY environment variable."
             )
 

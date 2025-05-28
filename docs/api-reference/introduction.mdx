@@ -56,7 +56,6 @@ Both `from_config_file` and `from_dict` methods support the `options` parameter 
 ```python
 from mcp_use import MCPClient
 from mcp_use.types.sandbox import SandboxOptions
-from mcp_use.types.clientoptions import ClientOptions
 
 # Define sandbox options
 sandbox_options: SandboxOptions = {
@@ -64,29 +63,13 @@ sandbox_options: SandboxOptions = {
     "sandbox_template_id": "code-interpreter-v1"
 }
 
-# Create client options for sandboxed mode
-client_options: ClientOptions = {
-    "is_sandboxed": True,
-    "sandbox_options": sandbox_options
-}
-
 # Create client with sandboxed mode enabled
 client = MCPClient.from_config_file(
     config_path="config.json",
-    options=client_options
+    sandbox=True,
+    sandbox_options=sandbox_options
 )
 ```
-
-| Parameter | Type          | Required | Default | Description                                          |
-| --------- | ------------- | -------- | ------- | ---------------------------------------------------- |
-| `options` | ClientOptions | No       | {}      | Client configuration options, including sandbox mode |
-
-The `ClientOptions` type is a TypedDict with the following fields:
-
-| Field             | Type           | Required | Default | Description                                       |
-| ----------------- | -------------- | -------- | ------- | ------------------------------------------------- |
-| `is_sandboxed`    | bool           | No       | False   | Whether to run commands in a sandbox environment  |
-| `sandbox_options` | SandboxOptions | No       | None    | Configuration options for the sandbox environment |
 
 The `SandboxOptions` type supports the following options:
 

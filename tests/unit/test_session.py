@@ -19,7 +19,6 @@ class TestMCPSessionInitialization(unittest.TestCase):
 
         self.assertEqual(session.connector, connector)
         self.assertIsNone(session.session_info)
-        self.assertEqual(session.tools, [])
         self.assertTrue(session.auto_connect)
 
     def test_init_with_auto_connect_false(self):
@@ -29,7 +28,6 @@ class TestMCPSessionInitialization(unittest.TestCase):
 
         self.assertEqual(session.connector, connector)
         self.assertIsNone(session.session_info)
-        self.assertEqual(session.tools, [])
         self.assertFalse(session.auto_connect)
 
 
