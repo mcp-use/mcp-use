@@ -5,7 +5,7 @@ This module provides a connector for communicating with MCP implementations
 through HTTP APIs with SSE for transport.
 """
 
-from mcp import ClientSession
+from mcp_use.sessions.mcp_use_client_session import McpUseClientSession
 
 from ..logging import logger
 from ..task_managers import SseConnectionManager
@@ -63,7 +63,12 @@ class HttpConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
+            self.client = McpUseClientSession(
+                read_stream,
+                write_stream,
+                sampling_callback=None,
+                message_handler=self._handle_client_message,
+            )
             await self.client.__aenter__()
 
             # Mark as connected
