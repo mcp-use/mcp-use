@@ -5,10 +5,12 @@ This module provides a connector for communicating with MCP implementations
 through HTTP APIs with SSE for transport.
 """
 
-from mcp import ClientSession
+from datetime import timedelta
+
+from mcp import ClientSession, McpError
 
 from ..logging import logger
-from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
+from ..task_managers import ConnectionManager, SseConnectionManager, StreamableHttpConnectionManager
 from .base import BaseConnector
 
 
@@ -26,7 +28,6 @@ class HttpConnector(BaseConnector):
         headers: dict[str, str] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
-        use_streamable_http: bool = False,
     ):
         """Initialize a new HTTP connector.
 
@@ -36,7 +37,6 @@ class HttpConnector(BaseConnector):
             headers: Optional additional headers.
             timeout: Timeout for HTTP operations in seconds.
             sse_read_timeout: Timeout for SSE read operations in seconds.
-            use_streamable_http: Whether to use streamable HTTP instead of SSE.
         """
         super().__init__()
         self.base_url = base_url.rstrip("/")
@@ -46,7 +46,14 @@ class HttpConnector(BaseConnector):
             self.headers["Authorization"] = f"Bearer {auth_token}"
         self.timeout = timeout
         self.sse_read_timeout = sse_read_timeout
-        self.use_streamable_http = use_streamable_http
+
+    async def _setup_client(self, connection_manager: ConnectionManager) -> None:
+        """Set up the client session with the provided connection manager."""
+
+        self._connection_manager = connection_manager
+        read_stream, write_stream = await self._connection_manager.start()
+        self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
+        await self.client.__aenter__()
 
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
@@ -54,27 +61,31 @@ class HttpConnector(BaseConnector):
             logger.debug("Already connected to MCP implementation")
             return
 
-        transport = "streamable HTTP" if self.use_streamable_http else "HTTP/SSE"
+        transport = "streamable HTTP"
         logger.debug(
             f"Connecting to MCP implementation via {transport}: {self.base_url}",
         )
         try:
-            # Create and start the connection manager
-            self._connection_manager = (
-                SseConnectionManager(
-                    self.base_url, self.headers, self.timeout, self.sse_read_timeout
-                )
-                if not self.use_streamable_http
-                else StreamableHttpConnectionManager(
+            # Attempt to set up the client with streamable HTTP and send a single ping,
+            # if there are any issues with the ping, fall back to SSE.
+            await self._setup_client(
+                StreamableHttpConnectionManager(
                     self.base_url, self.headers, self.timeout, self.sse_read_timeout
                 )
             )
-
-            read_stream, write_stream = await self._connection_manager.start()
-
-            # Create the client session
-            self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
-            await self.client.__aenter__()
+            try:
+                # Temporarily set a read timeout so the test ping doesn't block indefinitely
+                self.client._session_read_timeout_seconds = timedelta(seconds=self.timeout)
+                await self.client.send_ping()
+                self.client._session_read_timeout_seconds = None
+            except McpError as e:
+                logger.warning(f"Streamable HTTP connection failed, falling back to SSE: {e}")
+                transport = "SSE"
+                await self._setup_client(
+                    SseConnectionManager(
+                        self.base_url, self.headers, self.timeout, self.sse_read_timeout
+                    )
+                )
 
             # Mark as connected
             self._connected = True

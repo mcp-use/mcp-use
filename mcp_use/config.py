@@ -72,7 +72,6 @@ def create_connector_from_config(
             base_url=server_config["url"],
             headers=server_config.get("headers", None),
             auth_token=server_config.get("auth_token", None),
-            use_streamable_http=server_config.get("use_streamable_http", False),
         )
 
     # WebSocket connector
