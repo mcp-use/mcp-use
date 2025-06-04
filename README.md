@@ -777,18 +777,52 @@ If you use MCP-Use in your research or project, please cite:
 
 <!-- gh-dependents-info-used-by-start -->
 
-| Repository | Stars |
-|------------|-------|
-| <img src="https://avatars.githubusercontent.com/u/170207473?s=40&v=4" width="20" height="20"> [tavily-ai/meeting-prep-agent](https://github.com/tavily-ai/meeting-prep-agent) | ⭐ 112 |
-| <img src="https://avatars.githubusercontent.com/u/20041231?s=40&v=4" width="20" height="20"> [krishnaik06/MCP-CRASH-Course](https://github.com/krishnaik06/MCP-CRASH-Course) | ⭐ 37 |
-| <img src="https://avatars.githubusercontent.com/u/892404?s=40&v=4" width="20" height="20"> [truemagic-coder/solana-agent-app](https://github.com/truemagic-coder/solana-agent-app) | ⭐ 29 |
-| <img src="https://avatars.githubusercontent.com/u/8344498?s=40&v=4" width="20" height="20"> [schogini/techietalksai](https://github.com/schogini/techietalksai) | ⭐ 21 |
-| <img src="https://avatars.githubusercontent.com/u/201161342?s=40&v=4" width="20" height="20"> [autometa-dev/whatsapp-mcp-voice-agent](https://github.com/autometa-dev/whatsapp-mcp-voice-agent) | ⭐ 18 |
-| <img src="https://avatars.githubusercontent.com/u/100749943?s=40&v=4" width="20" height="20"> [Deniscartin/mcp-cli](https://github.com/Deniscartin/mcp-cli) | ⭐ 17 |
-| <img src="https://avatars.githubusercontent.com/u/6764390?s=40&v=4" width="20" height="20"> [elastic/genai-workshops](https://github.com/elastic/genai-workshops) | ⭐ 9 |
-| <img src="https://avatars.githubusercontent.com/u/6688805?s=40&v=4" width="20" height="20"> [innovaccer/Healthcare-MCP](https://github.com/innovaccer/Healthcare-MCP) | ⭐ 6 |
-| <img src="https://avatars.githubusercontent.com/u/205593730?s=40&v=4" width="20" height="20"> [Qingyon-AI/Revornix](https://github.com/Qingyon-AI/Revornix) | ⭐ 5 |
-| <img src="https://avatars.githubusercontent.com/u/68845761?s=40&v=4" width="20" height="20"> [entbappy/MCP-Tutorials](https://github.com/entbappy/MCP-Tutorials) | ⭐ 5 |
+<table>
+  <tr>
+    <th width="400">Repository</th>
+    <th>Stars</th>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/170207473?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/tavily-ai/meeting-prep-agent"><strong>tavily-ai/meeting-prep-agent</strong></a></td>
+    <td>⭐ 112</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/20041231?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/krishnaik06/MCP-CRASH-Course"><strong>krishnaik06/MCP-CRASH-Course</strong></a></td>
+    <td>⭐ 37</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/892404?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/truemagic-coder/solana-agent-app"><strong>truemagic-coder/solana-agent-app</strong></a></td>
+    <td>⭐ 29</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/8344498?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/schogini/techietalksai"><strong>schogini/techietalksai</strong></a></td>
+    <td>⭐ 21</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/201161342?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/autometa-dev/whatsapp-mcp-voice-agent"><strong>autometa-dev/whatsapp-mcp-voice-agent</strong></a></td>
+    <td>⭐ 18</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/100749943?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/Deniscartin/mcp-cli"><strong>Deniscartin/mcp-cli</strong></a></td>
+    <td>⭐ 17</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/6764390?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/elastic/genai-workshops"><strong>elastic/genai-workshops</strong></a></td>
+    <td>⭐ 9</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/6688805?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/innovaccer/Healthcare-MCP"><strong>innovaccer/Healthcare-MCP</strong></a></td>
+    <td>⭐ 6</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/205593730?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/Qingyon-AI/Revornix"><strong>Qingyon-AI/Revornix</strong></a></td>
+    <td>⭐ 5</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/68845761?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/entbappy/MCP-Tutorials"><strong>entbappy/MCP-Tutorials</strong></a></td>
+    <td>⭐ 5</td>
+  </tr>
+</table>
 
 [![Generated by github-dependents-info](https://img.shields.io/static/v1?label=Used%20by&message=42&color=informational&logo=slickpic)](https://github.com/nvuillam/github-dependents-info)<!-- gh-dependents-info-used-by-end -->
 ## Contributors
