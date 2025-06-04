@@ -1,5 +1,4 @@
-name: Transport Integration Tests
-
+name: Transports
 on:
   push:
     branches: [main]
@@ -8,7 +7,7 @@ on:
 
 jobs:
   transports:
-    name: "Transport: ${{ matrix.transport }}"
+    name: "${{ matrix.transport }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

@@ -75,6 +75,7 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
             try:
                 await self._http_ctx.__aexit__(None, None, None)
             except Exception as e:
-                logger.warning(f"Error closing streamable HTTP context: {e}")
+                # Only log if it's not a normal connection termination
+                logger.debug(f"Streamable HTTP context cleanup: {e}")
             finally:
                 self._http_ctx = None

@@ -10,7 +10,7 @@ from mcp_use import MCPClient
 @pytest.fixture
 async def server_process():
     """Start the streamableHttp server process for testing"""
-    server_path = Path(__file__).parent / "server.py"
+    server_path = Path(__file__).parent.parent / "server.py"
 
     print(f"Starting server: python {server_path}")
 
