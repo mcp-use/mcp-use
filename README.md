@@ -737,14 +737,6 @@ agent = MCPAgent(
 
 This is useful when you only need to see the agent's steps and decision-making process without all the low-level debug information from other components.
 
-# Roadmap
-
-<ul>
-<li>[x] Multiple Servers at once </li>
-<li>[x] Test remote connectors (http, ws)</li>
-<li>[ ] ... </li>
-</ul>
-
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=pietrozullo/mcp-use&type=Date)](https://www.star-history.com/#pietrozullo/mcp-use&Date)
