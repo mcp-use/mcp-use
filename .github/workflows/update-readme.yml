@@ -51,14 +51,20 @@ jobs:
           PUBLIC_REPOS=$(jq -r '.public_dependents_number' dependents.json)
           TOTAL_STARS=$(jq -r '[.all_public_dependent_repos[].stars] | add' dependents.json)
 
-          # Create the dependents table
+          # Create the dependents table using HTML for full width
           cat > dependents_table.md << 'EOF'
-          | Repository | Stars |
-          |------------|-------|
+          <table>
+            <tr>
+              <th width="400">Repository</th>
+              <th>Stars</th>
+            </tr>
           EOF
 
           # Add top repositories to the table (limit to top 10) with avatars
-          jq -r '.all_public_dependent_repos[:10] | .[] | "| <img src=\"\(.img)\" width=\"20\" height=\"20\"> [\(.owner)/\(.repo_name)](https://github.com/\(.name)) | ⭐ \(.stars) |"' dependents.json >> dependents_table.md
+          jq -r '.all_public_dependent_repos[:10] | .[] | "  <tr>\n    <td><img src=\"\(.img)\" width=\"20\" height=\"20\" style=\"vertical-align: middle; margin-right: 8px;\"> <a href=\"https://github.com/\(.name)\"><strong>\(.owner)/\(.repo_name)</strong></a></td>\n    <td>⭐ \(.stars)</td>\n  </tr>"' dependents.json >> dependents_table.md
+
+          # Close the table
+          echo "</table>" >> dependents_table.md
 
           # Update README by replacing content between tags
           awk '
