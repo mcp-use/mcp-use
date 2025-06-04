@@ -60,12 +60,6 @@ jobs:
           # Add top repositories to the table (limit to top 10)
           jq -r '.all_public_dependent_repos[:10] | .[] | "| [\(.owner)/\(.repo_name)](https://github.com/\(.name)) | ⭐ \(.stars) |"' dependents.json >> dependents_table.md
 
-          # Add summary
-          cat >> dependents_table.md << EOF
-
-          **Total: ${TOTAL_REPOS} repositories using mcp-use** | **Public repositories: ${PUBLIC_REPOS}** | **Combined stars: ${TOTAL_STARS}**
-          EOF
-
           # Update README by replacing content between tags
           awk '
           BEGIN { in_section = 0 }
