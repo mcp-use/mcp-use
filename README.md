@@ -775,9 +775,8 @@ If you use MCP-Use in your research or project, please cite:
 
 ## Top Starred Dependents
 
-<!-- gh-dependents-info-start -->
-<!-- gh-dependents-info-end -->
-
+<!-- gh-dependents-info-used-by-start -->
+<!-- gh-dependents-info-used-by-end -->
 ## Contributors
 
 Thanks to all our amazing contributors!
