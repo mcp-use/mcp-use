@@ -106,11 +106,5 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add README.md
-          git commit -m "chore: update dependents info (automated)
-
-          Updated GitHub dependents information
-
-          🤖 Generated with [Claude Code](https://claude.ai/code)
-
-          Co-Authored-By: Claude <noreply@anthropic.com>"
+          git commit -m "chore: update dependents info (automated)"
           git push
