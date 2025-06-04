@@ -43,7 +43,50 @@ jobs:
       # Generate dependents info
       - name: Generate GitHub Dependents Info
         run: |
-          github-dependents-info --repo ${{ github.repository }} --badgemarkdownfile README.md --sort stars --minstars 1
+          # Get dependents data in JSON format
+          github-dependents-info --repo ${{ github.repository }} --sort stars --minstars 1 --json > dependents.json
+
+          # Extract total count and stars
+          TOTAL_REPOS=$(jq -r '.total_dependents_number' dependents.json)
+          PUBLIC_REPOS=$(jq -r '.public_dependents_number' dependents.json)
+          TOTAL_STARS=$(jq -r '[.all_public_dependent_repos[].stars] | add' dependents.json)
+
+          # Create the dependents table
+          cat > dependents_table.md << 'EOF'
+          | Repository | Stars |
+          |------------|-------|
+          EOF
+
+          # Add top repositories to the table (limit to top 10)
+          jq -r '.all_public_dependent_repos[:10] | .[] | "| [\(.owner)/\(.repo_name)](https://github.com/\(.name)) | ⭐ \(.stars) |"' dependents.json >> dependents_table.md
+
+          # Add summary
+          cat >> dependents_table.md << EOF
+
+          **Total: ${TOTAL_REPOS} repositories using mcp-use** | **Public repositories: ${PUBLIC_REPOS}** | **Combined stars: ${TOTAL_STARS}**
+          EOF
+
+          # Update README by replacing content between tags
+          awk '
+          BEGIN { in_section = 0 }
+          /<!-- gh-dependents-info-used-by-start -->/ {
+            print $0
+            print ""
+            system("cat dependents_table.md")
+            print ""
+            in_section = 1
+            next
+          }
+          /<!-- gh-dependents-info-used-by-end -->/ {
+            in_section = 0
+            print $0
+            next
+          }
+          !in_section { print }
+          ' README.md > README_updated.md
+
+          mv README_updated.md README.md
+          rm dependents_table.md dependents.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
