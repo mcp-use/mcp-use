@@ -46,14 +46,6 @@ class HttpConnector(BaseConnector):
         self.timeout = timeout
         self.sse_read_timeout = sse_read_timeout
 
-    async def _setup_client(self, connection_manager: ConnectionManager) -> None:
-        """Set up the client session with the provided connection manager."""
-
-        self._connection_manager = connection_manager
-        read_stream, write_stream = await self._connection_manager.start()
-        self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
-        await self.client.__aenter__()
-
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
         if self._connected:
