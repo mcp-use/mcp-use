@@ -70,7 +70,7 @@ class BaseAdapter(ABC):
         sessions = client.get_all_active_sessions()
 
         # Extract connectors from sessions
-        connectors = [session.connector for session in sessions.values()]
+        connectors = list(sessions.values())
 
         # Create tools from connectors
         return await adapter._create_tools_from_connectors(connectors)

@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from mcp_use.client import MCPClient
-from mcp_use.session import MCPSession
+from mcp_use.connectors.base import BaseConnector
 
 
 class TestMCPClientInitialization:
@@ -21,8 +21,8 @@ class TestMCPClientInitialization:
         client = MCPClient()
 
         assert client.config == {}
-        assert client.sessions == {}
-        assert client.active_sessions == []
+        assert client.connectors == {}
+        assert client.active_connectors == []
 
     def test_init_with_dict_config(self):
         """Test initialization with a dictionary config."""
@@ -30,8 +30,8 @@ class TestMCPClientInitialization:
         client = MCPClient(config=config)
 
         assert client.config == config
-        assert client.sessions == {}
-        assert client.active_sessions == []
+        assert client.connectors == {}
+        assert client.active_connectors == []
 
     def test_from_dict(self):
         """Test creation from a dictionary."""
@@ -39,8 +39,8 @@ class TestMCPClientInitialization:
         client = MCPClient.from_dict(config)
 
         assert client.config == config
-        assert client.sessions == {}
-        assert client.active_sessions == []
+        assert client.connectors == {}
+        assert client.active_connectors == []
 
     def test_init_with_file_config(self):
         """Test initialization with a file config."""
@@ -56,8 +56,8 @@ class TestMCPClientInitialization:
             client = MCPClient(config=temp_path)
 
             assert client.config == config
-            assert client.sessions == {}
-            assert client.active_sessions == []
+            assert client.connectors == {}
+            assert client.active_connectors == []
         finally:
             # Clean up temp file
             os.unlink(temp_path)
@@ -76,8 +76,8 @@ class TestMCPClientInitialization:
             client = MCPClient.from_config_file(temp_path)
 
             assert client.config == config
-            assert client.sessions == {}
-            assert client.active_sessions == []
+            assert client.connectors == {}
+            assert client.active_connectors == []
         finally:
             # Clean up temp file
             os.unlink(temp_path)
@@ -134,14 +134,14 @@ class TestMCPClientServerManagement:
         }
         client = MCPClient(config=config)
 
-        # Add an active session
-        client.active_sessions.append("server1")
+        # Add an active connector
+        client.active_connectors.append("server1")
 
         client.remove_server("server1")
 
         assert "mcpServers" in client.config
         assert "server1" not in client.config["mcpServers"]
-        assert "server1" not in client.active_sessions
+        assert "server1" not in client.active_connectors
         assert "server2" in client.config["mcpServers"]
 
     def test_get_server_names(self):
@@ -195,239 +195,226 @@ class TestMCPClientSaveConfig:
             os.unlink(temp_path)
 
 
-class TestMCPClientSessionManagement:
-    """Tests for MCPClient session management methods."""
+class TestMCPClientConnectorManagement:
+    """Tests for MCPClient connector management methods."""
 
     @pytest.mark.asyncio
     @patch("mcp_use.client.create_connector_from_config")
-    @patch("mcp_use.client.MCPSession")
-    async def test_create_session(self, mock_session_class, mock_create_connector):
-        """Test creating a session."""
+    async def test_create_connector(self, mock_create_connector):
+        """Test creating a connector."""
         config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
         client = MCPClient(config=config)
 
         # Set up mocks
         mock_connector = MagicMock()
+        mock_connector.initialize = AsyncMock()
         mock_create_connector.return_value = mock_connector
 
-        mock_session = MagicMock()
-        mock_session.initialize = AsyncMock()
-        mock_session_class.return_value = mock_session
-
-        # Test create_session
-        await client.create_session("server1")
+        # Test create_connector
+        await client.create_connector("server1")
 
         # Verify behavior
         mock_create_connector.assert_called_once_with({"url": "http://server1.com"}, options={})
-        mock_session_class.assert_called_once_with(mock_connector)
-        mock_session.initialize.assert_called_once()
+        mock_connector.initialize.assert_called_once()
 
         # Verify state changes
-        assert client.sessions["server1"] == mock_session
-        assert "server1" in client.active_sessions
+        assert client.connectors["server1"] == mock_connector
+        assert "server1" in client.active_connectors
 
     @pytest.mark.asyncio
-    async def test_create_session_no_servers(self):
-        """Test creating a session when no servers are configured."""
+    async def test_create_connector_no_servers(self):
+        """Test creating a connector when no servers are configured."""
         client = MCPClient()
 
         # Expect a UserWarning when no servers are configured
         with pytest.warns(UserWarning) as exc_info:
-            await client.create_session("server1")
+            await client.create_connector("server1")
 
         assert "No MCP servers defined in config" in str(exc_info[0].message)
 
     @pytest.mark.asyncio
-    async def test_create_session_nonexistent_server(self):
-        """Test creating a session for a non-existent server."""
+    async def test_create_connector_nonexistent_server(self):
+        """Test creating a connector for a non-existent server."""
         config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
         client = MCPClient(config=config)
 
-        # Test create_session raises ValueError
+        # Test create_connector raises ValueError
         with pytest.raises(ValueError) as exc_info:
-            await client.create_session("server2")
+            await client.create_connector("server2")
 
         assert "Server 'server2' not found in config" in str(exc_info.value)
 
     @pytest.mark.asyncio
     @patch("mcp_use.client.create_connector_from_config")
-    @patch("mcp_use.client.MCPSession")
-    async def test_create_session_no_auto_initialize(
-        self, mock_session_class, mock_create_connector
-    ):
-        """Test creating a session without auto-initializing."""
+    async def test_create_connector_no_auto_initialize(self, mock_create_connector):
+        """Test creating a connector without auto-initializing."""
         config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
         client = MCPClient(config=config)
 
         # Set up mocks
         mock_connector = MagicMock()
+        mock_connector.initialize = AsyncMock()
         mock_create_connector.return_value = mock_connector
 
-        mock_session = MagicMock()
-        mock_session.initialize = AsyncMock()
-        mock_session_class.return_value = mock_session
-
-        # Test create_session
-        await client.create_session("server1", auto_initialize=False)
+        # Test create_connector
+        await client.create_connector("server1", auto_initialize=False)
 
         # Verify behavior
         mock_create_connector.assert_called_once_with({"url": "http://server1.com"}, options={})
-        mock_session_class.assert_called_once_with(mock_connector)
-        mock_session.initialize.assert_not_called()
+        mock_connector.initialize.assert_not_called()
 
         # Verify state changes
-        assert client.sessions["server1"] == mock_session
-        assert "server1" in client.active_sessions
+        assert client.connectors["server1"] == mock_connector
+        assert "server1" in client.active_connectors
 
-    def test_get_session(self):
-        """Test getting an existing session."""
+    def test_get_connector(self):
+        """Test getting an existing connector."""
         client = MCPClient()
 
-        # Add a mock session
-        mock_session = MagicMock(spec=MCPSession)
-        client.sessions["server1"] = mock_session
+        # Add a mock connector
+        mock_connector = MagicMock(spec=BaseConnector)
+        client.connectors["server1"] = mock_connector
 
-        # Test get_session
-        session = client.get_session("server1")
+        # Test get_connector
+        connector = client.get_connector("server1")
 
-        assert session == mock_session
+        assert connector == mock_connector
 
-    def test_get_session_nonexistent(self):
-        """Test getting a non-existent session."""
+    def test_get_connector_nonexistent(self):
+        """Test getting a non-existent connector."""
         client = MCPClient()
 
-        # Test get_session raises ValueError
+        # Test get_connector raises ValueError
         with pytest.raises(ValueError) as exc_info:
-            client.get_session("server1")
+            client.get_connector("server1")
 
-        assert "No session exists for server 'server1'" in str(exc_info.value)
+        assert "No connector exists for server 'server1'" in str(exc_info.value)
 
-    def test_get_all_active_sessions(self):
-        """Test getting all active sessions."""
+    def test_get_all_active_connectors(self):
+        """Test getting all active connectors."""
         client = MCPClient()
 
-        # Add mock sessions
-        mock_session1 = MagicMock(spec=MCPSession)
-        mock_session2 = MagicMock(spec=MCPSession)
-        client.sessions["server1"] = mock_session1
-        client.sessions["server2"] = mock_session2
-        client.active_sessions = ["server1", "server2"]
+        # Add mock connectors
+        mock_connector1 = MagicMock(spec=BaseConnector)
+        mock_connector2 = MagicMock(spec=BaseConnector)
+        client.connectors["server1"] = mock_connector1
+        client.connectors["server2"] = mock_connector2
+        client.active_connectors = ["server1", "server2"]
 
-        # Test get_all_active_sessions
-        sessions = client.get_all_active_sessions()
+        # Test get_all_active_connectors
+        connectors = client.get_all_active_connectors()
 
-        assert len(sessions) == 2
-        assert sessions["server1"] == mock_session1
-        assert sessions["server2"] == mock_session2
+        assert len(connectors) == 2
+        assert connectors["server1"] == mock_connector1
+        assert connectors["server2"] == mock_connector2
 
-    def test_get_all_active_sessions_some_inactive(self):
-        """Test getting all active sessions when some are inactive."""
+    def test_get_all_active_connectors_some_inactive(self):
+        """Test getting all active connectors when some are inactive."""
         client = MCPClient()
 
-        # Add mock sessions
-        mock_session1 = MagicMock(spec=MCPSession)
-        mock_session2 = MagicMock(spec=MCPSession)
-        client.sessions["server1"] = mock_session1
-        client.sessions["server2"] = mock_session2
-        client.active_sessions = ["server1"]  # Only server1 is active
+        # Add mock connectors
+        mock_connector1 = MagicMock(spec=BaseConnector)
+        mock_connector2 = MagicMock(spec=BaseConnector)
+        client.connectors["server1"] = mock_connector1
+        client.connectors["server2"] = mock_connector2
+        client.active_connectors = ["server1"]  # Only server1 is active
 
-        # Test get_all_active_sessions
-        sessions = client.get_all_active_sessions()
+        # Test get_all_active_connectors
+        connectors = client.get_all_active_connectors()
 
-        assert len(sessions) == 1
-        assert sessions["server1"] == mock_session1
-        assert "server2" not in sessions
+        assert len(connectors) == 1
+        assert connectors["server1"] == mock_connector1
+        assert "server2" not in connectors
 
     @pytest.mark.asyncio
-    async def test_close_session(self):
-        """Test closing a session."""
+    async def test_close_connector(self):
+        """Test closing a connector."""
         client = MCPClient()
 
         # Add a mock session
-        mock_session = MagicMock(spec=MCPSession)
-        mock_session.disconnect = AsyncMock()
-        client.sessions["server1"] = mock_session
-        client.active_sessions = ["server1"]
+        mock_connector = MagicMock(spec=BaseConnector)
+        mock_connector.disconnect = AsyncMock()
+        client.connectors["server1"] = mock_connector
+        client.active_connectors = ["server1"]
 
-        # Test close_session
-        await client.close_session("server1")
+        # Test close_connector
+        await client.close_connector("server1")
 
         # Verify behavior
-        mock_session.disconnect.assert_called_once()
+        mock_connector.disconnect.assert_called_once()
 
         # Verify state changes
-        assert "server1" not in client.sessions
-        assert "server1" not in client.active_sessions
+        assert "server1" not in client.connectors
+        assert "server1" not in client.active_connectors
 
     @pytest.mark.asyncio
-    async def test_close_session_nonexistent(self):
+    async def test_close_connector_nonexistent(self):
         """Test closing a non-existent session."""
         client = MCPClient()
 
-        # Test close_session doesn't raise an exception
-        await client.close_session("server1")
+        # Test close_connector doesn't raise an exception
+        await client.close_connector("server1")
 
         # State should remain unchanged
-        assert "server1" not in client.sessions
-        assert "server1" not in client.active_sessions
+        assert "server1" not in client.connectors
+        assert "server1" not in client.active_connectors
 
     @pytest.mark.asyncio
-    async def test_close_all_sessions(self):
-        """Test closing all sessions."""
+    async def test_close_all_connectors(self):
+        """Test closing all connectors."""
         client = MCPClient()
 
         # Add mock sessions
-        mock_session1 = MagicMock(spec=MCPSession)
-        mock_session1.disconnect = AsyncMock()
-        mock_session2 = MagicMock(spec=MCPSession)
-        mock_session2.disconnect = AsyncMock()
+        mock_connector1 = MagicMock(spec=BaseConnector)
+        mock_connector1.disconnect = AsyncMock()
+        mock_connector2 = MagicMock(spec=BaseConnector)
+        mock_connector2.disconnect = AsyncMock()
 
-        client.sessions["server1"] = mock_session1
-        client.sessions["server2"] = mock_session2
-        client.active_sessions = ["server1", "server2"]
+        client.connectors["server1"] = mock_connector1
+        client.connectors["server2"] = mock_connector2
+        client.active_connectors = ["server1", "server2"]
 
-        # Test close_all_sessions
-        await client.close_all_sessions()
+        # Test close_all_connectors
+        await client.close_all_connectors()
 
         # Verify behavior
-        mock_session1.disconnect.assert_called_once()
-        mock_session2.disconnect.assert_called_once()
+        mock_connector1.disconnect.assert_called_once()
+        mock_connector2.disconnect.assert_called_once()
 
         # Verify state changes
-        assert len(client.sessions) == 0
-        assert len(client.active_sessions) == 0
+        assert len(client.connectors) == 0
+        assert len(client.active_connectors) == 0
 
     @pytest.mark.asyncio
-    async def test_close_all_sessions_one_fails(self):
-        """Test closing all sessions when one fails."""
+    async def test_close_all_connectors_one_fails(self):
+        """Test closing all connectors when one fails."""
         client = MCPClient()
 
         # Add mock sessions, one that raises an exception
-        mock_session1 = MagicMock(spec=MCPSession)
-        mock_session1.disconnect = AsyncMock(side_effect=Exception("Disconnect failed"))
-        mock_session2 = MagicMock(spec=MCPSession)
-        mock_session2.disconnect = AsyncMock()
+        mock_connector1 = MagicMock(spec=BaseConnector)
+        mock_connector1.disconnect = AsyncMock(side_effect=Exception("Disconnect failed"))
+        mock_connector2 = MagicMock(spec=BaseConnector)
+        mock_connector2.disconnect = AsyncMock()
 
-        client.sessions["server1"] = mock_session1
-        client.sessions["server2"] = mock_session2
-        client.active_sessions = ["server1", "server2"]
+        client.connectors["server1"] = mock_connector1
+        client.connectors["server2"] = mock_connector2
+        client.active_connectors = ["server1", "server2"]
 
-        # Test close_all_sessions
-        await client.close_all_sessions()
+        # Test close_all_connectors
+        await client.close_all_connectors()
 
         # Verify behavior - even though server1 failed, server2 should still be disconnected
-        mock_session1.disconnect.assert_called_once()
-        mock_session2.disconnect.assert_called_once()
+        mock_connector1.disconnect.assert_called_once()
+        mock_connector2.disconnect.assert_called_once()
 
         # Verify state changes
-        assert len(client.sessions) == 0
-        assert len(client.active_sessions) == 0
+        assert len(client.connectors) == 0
+        assert len(client.active_connectors) == 0
 
     @pytest.mark.asyncio
     @patch("mcp_use.client.create_connector_from_config")
-    @patch("mcp_use.client.MCPSession")
-    async def test_create_all_sessions(self, mock_session_class, mock_create_connector):
-        """Test creating all sessions."""
+    async def test_create_all_connectors(self, mock_create_connector):
+        """Test creating all connectors."""
         config = {
             "mcpServers": {
                 "server1": {"url": "http://server1.com"},
@@ -438,34 +425,29 @@ class TestMCPClientSessionManagement:
 
         # Set up mocks
         mock_connector1 = MagicMock()
+        mock_connector1.initialize = AsyncMock()
         mock_connector2 = MagicMock()
+        mock_connector2.initialize = AsyncMock()
         mock_create_connector.side_effect = [mock_connector1, mock_connector2]
 
-        mock_session1 = MagicMock()
-        mock_session1.initialize = AsyncMock()
-        mock_session2 = MagicMock()
-        mock_session2.initialize = AsyncMock()
-        mock_session_class.side_effect = [mock_session1, mock_session2]
+        # Test create_all_connectors
+        connectors = await client.create_all_connectors()
 
-        # Test create_all_sessions
-        sessions = await client.create_all_sessions()
-
-        # Verify behavior - connectors and sessions are created for each server
+        # Verify behavior - connectors are created for each server
         assert mock_create_connector.call_count == 2
-        assert mock_session_class.call_count == 2
 
-        # In the implementation, initialize is called twice for each session:
-        # Once in create_session and once in the explicit initialize call
-        assert mock_session1.initialize.call_count == 2
-        assert mock_session2.initialize.call_count == 2
+        # In the implementation, initialize is called twice for each connector:
+        # Once in create_connector and once in the explicit initialize call
+        assert mock_connector1.initialize.call_count == 2
+        assert mock_connector2.initialize.call_count == 2
 
         # Verify state changes
-        assert len(client.sessions) == 2
-        assert client.sessions["server1"] == mock_session1
-        assert client.sessions["server2"] == mock_session2
-        assert len(client.active_sessions) == 2
-        assert "server1" in client.active_sessions
-        assert "server2" in client.active_sessions
+        assert len(client.connectors) == 2
+        assert client.connectors["server1"] == mock_connector1
+        assert client.connectors["server2"] == mock_connector2
+        assert len(client.active_connectors) == 2
+        assert "server1" in client.active_connectors
+        assert "server2" in client.active_connectors
 
         # Verify return value
-        assert sessions == client.sessions
+        assert connectors == client.connectors

@@ -7,7 +7,7 @@ This module provides a base class for agents that use MCP tools.
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..session import MCPSession
+from ..connectors.base import BaseConnector
 
 
 class BaseAgent(ABC):
@@ -17,13 +17,13 @@ class BaseAgent(ABC):
     Agents are responsible for integrating LLMs with MCP tools.
     """
 
-    def __init__(self, session: MCPSession):
+    def __init__(self, connector: BaseConnector):
         """Initialize a new agent.
 
         Args:
-            session: The MCP session to use for tool calls.
+            connector: The MCP connector to use for tool calls.
         """
-        self.session = session
+        self.connector = connector
 
     @abstractmethod
     async def initialize(self) -> None:

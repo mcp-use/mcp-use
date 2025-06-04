@@ -63,8 +63,8 @@ class HttpConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
-            await self.client.__aenter__()
+            self.session = ClientSession(read_stream, write_stream, sampling_callback=None)
+            await self.session.__aenter__()
 
             # Mark as connected
             self._connected = True

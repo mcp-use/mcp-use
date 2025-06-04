@@ -30,7 +30,7 @@ class TestStdioConnectorInitialization:
         assert connector.args == []
         assert connector.env is None
         assert connector.errlog == sys.stderr
-        assert connector.client is None
+        assert connector.session is None
         assert connector._connection_manager is None
         assert connector._tools is None
         assert connector._connected is False
@@ -48,7 +48,7 @@ class TestStdioConnectorInitialization:
         assert connector.args == args
         assert connector.env == env
         assert connector.errlog == errlog
-        assert connector.client is None
+        assert connector.session is None
         assert connector._connection_manager is None
         assert connector._tools is None
         assert connector._connected is False
@@ -88,7 +88,7 @@ class TestStdioConnectorConnection:
 
         # Verify state
         assert connector._connected is True
-        assert connector.client == mock_client_instance
+        assert connector.session == mock_client_instance
         assert connector._connection_manager == mock_manager_instance
 
     @pytest.mark.asyncio
@@ -102,7 +102,7 @@ class TestStdioConnectorConnection:
 
         # Verify no connection established since already connected
         assert connector._connection_manager is None
-        assert connector.client is None
+        assert connector.session is None
 
     @pytest.mark.asyncio
     @patch("mcp_use.connectors.stdio.StdioConnectionManager")
@@ -133,7 +133,7 @@ class TestStdioConnectorConnection:
 
         # Verify resources were cleaned up
         assert connector._connected is False
-        assert connector.client is None
+        assert connector.session is None
 
         # Mock should be called to clean up resources
         mock_manager_instance.stop.assert_called_once()
@@ -199,7 +199,7 @@ class TestStdioConnectorOperations:
         mock_list_prompts_response.prompts = []  # Assumes a .prompts attribute
         mock_client.list_prompts = AsyncMock(return_value=mock_list_prompts_response)
 
-        connector.client = mock_client
+        connector.session = mock_client
 
         # Initialize
         result_session_info = await connector.initialize()
@@ -223,7 +223,8 @@ class TestStdioConnectorOperations:
     async def test_initialize_no_client(self):
         """Test initializing without a client."""
         connector = StdioConnector()
-        connector.client = None
+        connector.auto_connect = False  # Disable auto_connect to test the error condition
+        connector.session = None
 
         # Expect RuntimeError
         with pytest.raises(RuntimeError, match="MCP client is not connected"):
@@ -256,7 +257,7 @@ class TestStdioConnectorOperations:
         mock_client = Mock()
         mock_result = Mock(spec=CallToolResult)
         mock_client.call_tool = AsyncMock(return_value=mock_result)
-        connector.client = mock_client
+        connector.session = mock_client
 
         # Call tool
         tool_name = "test_tool"
@@ -271,7 +272,7 @@ class TestStdioConnectorOperations:
     async def test_call_tool_no_client(self):
         """Test calling a tool without a client."""
         connector = StdioConnector()
-        connector.client = None
+        connector.session = None
 
         # Expect RuntimeError
         with pytest.raises(RuntimeError, match="MCP client is not connected"):
@@ -285,7 +286,7 @@ class TestStdioConnectorOperations:
         mock_result = MagicMock()
         mock_result.resources = [MagicMock()]
         mock_client.list_resources = AsyncMock(return_value=mock_result)
-        connector.client = mock_client
+        connector.session = mock_client
 
         # List resources
         result = await connector.list_resources()
@@ -298,7 +299,7 @@ class TestStdioConnectorOperations:
     async def test_list_resources_no_client(self):
         """Test listing resources without a client."""
         connector = StdioConnector()
-        connector.client = None
+        connector.session = None
 
         # Expect RuntimeError
         with pytest.raises(RuntimeError, match="MCP client is not connected"):
@@ -307,7 +308,7 @@ class TestStdioConnectorOperations:
     @pytest.mark.asyncio
     async def test_read_resource(self):
         """Test reading a resource."""
-        # Mocked return for connector.client.read_resource().
+        # Mocked return for connector.session.read_resource().
         # Needs the structure StdioConnector.read_resource expects.
         mock_client_return_value = (
             MagicMock()
@@ -333,7 +334,7 @@ class TestStdioConnectorOperations:
         # If other client methods are called by StdioConnector.read_resource,
         # ensure they are AsyncMocks.
 
-        connector.client = mock_stdio_client
+        connector.session = mock_stdio_client
         # If connector relies on state from connect/initialize (e.g., _connected = True),
         # set it manually for this unit test.
 
@@ -354,7 +355,7 @@ class TestStdioConnectorOperations:
     async def test_read_resource_no_client(self):
         """Test reading a resource without a client."""
         connector = StdioConnector()
-        connector.client = None
+        connector.session = None
 
         # Expect RuntimeError
         with pytest.raises(RuntimeError, match="MCP client is not connected"):
@@ -367,7 +368,7 @@ class TestStdioConnectorOperations:
         mock_client = Mock()
         mock_result = {"result": "success"}
         mock_client.request = AsyncMock(return_value=mock_result)
-        connector.client = mock_client
+        connector.session = mock_client
 
         # Send request
         method = "test_method"
@@ -385,7 +386,7 @@ class TestStdioConnectorOperations:
         mock_client = Mock()
         mock_result = {"result": "success"}
         mock_client.request = AsyncMock(return_value=mock_result)
-        connector.client = mock_client
+        connector.session = mock_client
 
         # Send request without params
         method = "test_method"
@@ -399,7 +400,7 @@ class TestStdioConnectorOperations:
     async def test_request_no_client(self):
         """Test sending a raw request without a client."""
         connector = StdioConnector()
-        connector.client = None
+        connector.session = None
 
         # Expect RuntimeError
         with pytest.raises(RuntimeError, match="MCP client is not connected"):

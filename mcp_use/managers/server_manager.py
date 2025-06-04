@@ -66,7 +66,7 @@ class ServerManager:
 
                 # Fetch tools if session is available
                 if session:
-                    connector = session.connector
+                    connector = session
                     tools = await self.adapter._create_tools_from_connectors([connector])
 
                     # Check if this server's tools have changed

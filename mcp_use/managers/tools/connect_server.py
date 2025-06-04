@@ -49,7 +49,7 @@ class ConnectServerTool(MCPServerTool):
 
             # Initialize server tools if not already initialized
             if server_name not in self.server_manager._server_tools:
-                connector = session.connector
+                connector = session
                 self.server_manager._server_tools[
                     server_name
                 ] = await self.server_manager.adapter._create_tools_from_connectors([connector])

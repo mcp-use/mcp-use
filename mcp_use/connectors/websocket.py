@@ -11,7 +11,7 @@ import uuid
 from typing import Any
 
 from mcp.types import Tool
-from websockets.client import WebSocketClientProtocol
+from websockets.asyncio.client import ClientConnection
 
 from ..logging import logger
 from ..task_managers import ConnectionManager, WebSocketConnectionManager
@@ -44,7 +44,7 @@ class WebSocketConnector(BaseConnector):
         if auth_token:
             self.headers["Authorization"] = f"Bearer {auth_token}"
 
-        self.ws: WebSocketClientProtocol | None = None
+        self.ws: ClientConnection | None = None
         self._connection_manager: ConnectionManager | None = None
         self._receiver_task: asyncio.Task | None = None
         self.pending_requests: dict[str, asyncio.Future] = {}

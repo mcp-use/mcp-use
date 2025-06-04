@@ -24,7 +24,7 @@ class TestHttpConnectorInitialization(unittest.TestCase):
         self.assertEqual(connector.base_url, "http://localhost:8000")
         self.assertIsNone(connector.auth_token)
         self.assertEqual(connector.headers, {})
-        self.assertIsNone(connector.client)
+        self.assertIsNone(connector.session)
         self.assertIsNone(connector._connection_manager)
         self.assertIsNone(connector._tools)
         self.assertFalse(connector._connected)
@@ -36,7 +36,7 @@ class TestHttpConnectorInitialization(unittest.TestCase):
         self.assertEqual(connector.base_url, "http://localhost:8000")
         self.assertEqual(connector.auth_token, "test_token")
         self.assertEqual(connector.headers, {"Authorization": "Bearer test_token"})
-        self.assertIsNone(connector.client)
+        self.assertIsNone(connector.session)
         self.assertIsNone(connector._connection_manager)
         self.assertIsNone(connector._tools)
         self.assertFalse(connector._connected)
@@ -49,7 +49,7 @@ class TestHttpConnectorInitialization(unittest.TestCase):
         self.assertEqual(connector.base_url, "http://localhost:8000")
         self.assertIsNone(connector.auth_token)
         self.assertEqual(connector.headers, headers)
-        self.assertIsNone(connector.client)
+        self.assertIsNone(connector.session)
         self.assertIsNone(connector._connection_manager)
         self.assertIsNone(connector._tools)
         self.assertFalse(connector._connected)
@@ -67,7 +67,7 @@ class TestHttpConnectorInitialization(unittest.TestCase):
         self.assertEqual(connector.base_url, "http://localhost:8000")
         self.assertEqual(connector.auth_token, "test_token")
         self.assertEqual(connector.headers, expected_headers)
-        self.assertIsNone(connector.client)
+        self.assertIsNone(connector.session)
         self.assertIsNone(connector._connection_manager)
         self.assertIsNone(connector._tools)
         self.assertFalse(connector._connected)
@@ -121,7 +121,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_client_session_instance.__aenter__.assert_called_once()
 
         # Verify state changes
-        self.assertEqual(self.connector.client, mock_client_session_instance)
+        self.assertEqual(self.connector.session, mock_client_session_instance)
         self.assertEqual(self.connector._connection_manager, mock_cm_instance)
         self.assertTrue(self.connector._connected)
 
@@ -155,7 +155,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_cm_instance.stop.assert_called_once()
 
         # Verify state remains unchanged
-        self.assertIsNone(self.connector.client)
+        self.assertIsNone(self.connector.session)
         self.assertIsNone(self.connector._connection_manager)
         self.assertFalse(self.connector._connected)
 
@@ -199,23 +199,23 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.connector._connected = True
         # Mock the internal client that HttpConnector methods will call.
         # Client methods are async, so AsyncMock is appropriate.
-        self.connector.client = AsyncMock()
+        self.connector.session = AsyncMock()
         # _tools is populated by initialize(). Tests that rely on _tools
         # should either call a mocked initialize() or set _tools directly.
         self.connector._tools = None  # Ensure clean state for _tools
 
     async def test_call_tool(self, _):
         """Test calling a tool."""
-        self.connector.client.call_tool.return_value = {"result": "success"}
+        self.connector.session.call_tool.return_value = {"result": "success"}
 
         result = await self.connector.call_tool("test_tool", {"param": "value"})
 
-        self.connector.client.call_tool.assert_called_once_with("test_tool", {"param": "value"})
+        self.connector.session.call_tool.assert_called_once_with("test_tool", {"param": "value"})
         self.assertEqual(result, {"result": "success"})
 
     async def test_call_tool_no_client(self, _):
         """Test calling a tool when not connected."""
-        self.connector.client = None
+        self.connector.session = None
 
         with self.assertRaises(RuntimeError) as context:
             await self.connector.call_tool("test_tool", {})
@@ -228,14 +228,14 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         mock_init_result = MagicMock()
         mock_init_result.session_id = "test_session"
         mock_init_result.capabilities = MagicMock(tools=True, resources=True, prompts=True)
-        self.connector.client.initialize.return_value = mock_init_result
+        self.connector.session.initialize.return_value = mock_init_result
 
         # Setup mocks for list_tools, list_resources, and list_prompts
-        self.connector.client.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
-        self.connector.client.list_resources.return_value = MagicMock(
+        self.connector.session.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
+        self.connector.session.list_resources.return_value = MagicMock(
             resources=[MagicMock(spec=Resource)]
         )
-        self.connector.client.list_prompts.return_value = MagicMock(
+        self.connector.session.list_prompts.return_value = MagicMock(
             prompts=[MagicMock(spec=Prompt)]
         )
 
@@ -243,10 +243,10 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         result_session_info = await self.connector.initialize()
 
         # Verify calls
-        self.connector.client.initialize.assert_called_once()
-        self.connector.client.list_tools.assert_called_once()
-        self.connector.client.list_resources.assert_called_once()
-        self.connector.client.list_prompts.assert_called_once()
+        self.connector.session.initialize.assert_called_once()
+        self.connector.session.list_tools.assert_called_once()
+        self.connector.session.list_resources.assert_called_once()
+        self.connector.session.list_prompts.assert_called_once()
 
         # Verify connector state
         self.assertEqual(result_session_info, mock_init_result)
@@ -256,7 +256,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
 
     async def test_initialize_no_client(self, _):
         """Test initializing without a client."""
-        self.connector.client = None
+        self.connector.session = None
 
         with self.assertRaises(RuntimeError) as context:
             await self.connector.initialize()
@@ -288,19 +288,19 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         # that has a .resources attribute, as expected by the connector.
         mock_client_response = MagicMock()
         mock_client_response.resources = expected_resources_list
-        self.connector.client.list_resources.return_value = mock_client_response
+        self.connector.session.list_resources.return_value = mock_client_response
 
         # Call the connector's list_resources method
         result = await self.connector.list_resources()
 
         # Verify the client's method was called correctly by the connector
-        self.connector.client.list_resources.assert_called_once_with()
+        self.connector.session.list_resources.assert_called_once_with()
         # The connector's list_resources method should return the list of resources directly.
         self.assertEqual(result, expected_resources_list)
 
     async def test_list_resources_no_client(self, _):
         """Test listing resources when not connected."""
-        self.connector.client = None
+        self.connector.session = None
 
         with self.assertRaises(RuntimeError) as context:
             await self.connector.list_resources()
@@ -319,18 +319,18 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         mock_result_obj = MagicMock()
         mock_result_obj.contents = [mock_content_part]
 
-        # This is the object returned by self.connector.client.read_resource()
+        # This is the object returned by self.connector.session.read_resource()
         mock_client_return = MagicMock()
         mock_client_return.result = mock_result_obj  # Actual data is nested under 'result'
 
-        self.connector.client.read_resource.return_value = mock_client_return
+        self.connector.session.read_resource.return_value = mock_client_return
 
         # Act: Call the connector's method
         # The connector's read_resource method returns a ReadResourceResult object
         read_resource_result = await self.connector.read_resource("test/resource")
 
         # Assert: Verify client interaction and the processed result
-        self.connector.client.read_resource.assert_called_once_with("test/resource")
+        self.connector.session.read_resource.assert_called_once_with("test/resource")
         # Now, assert the attributes of the returned ReadResourceResult object
         # based on the mocked client_return object's structure.
         self.assertIsNotNone(read_resource_result.result)
@@ -341,7 +341,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
 
     async def test_read_resource_no_client(self, _):
         """Test reading a resource when not connected."""
-        self.connector.client = None
+        self.connector.session = None
 
         with self.assertRaises(RuntimeError) as context:
             await self.connector.read_resource("test/resource")
@@ -350,29 +350,29 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
 
     async def test_request(self, _):
         """Test sending a request."""
-        self.connector.client.request.return_value = {"result": "success"}
+        self.connector.session.request.return_value = {"result": "success"}
 
         result = await self.connector.request("test_method", {"param": "value"})
 
-        self.connector.client.request.assert_called_once_with(
+        self.connector.session.request.assert_called_once_with(
             {"method": "test_method", "params": {"param": "value"}}
         )
         self.assertEqual(result, {"result": "success"})
 
     async def test_request_no_params(self, _):
         """Test sending a request without params."""
-        self.connector.client.request.return_value = {"result": "success"}
+        self.connector.session.request.return_value = {"result": "success"}
 
         result = await self.connector.request("test_method")
 
-        self.connector.client.request.assert_called_once_with(
+        self.connector.session.request.assert_called_once_with(
             {"method": "test_method", "params": {}}
         )
         self.assertEqual(result, {"result": "success"})
 
     async def test_request_no_client(self, _):
         """Test sending a request when not connected."""
-        self.connector.client = None
+        self.connector.session = None
 
         with self.assertRaises(RuntimeError) as context:
             await self.connector.request("test_method")

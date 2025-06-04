@@ -55,7 +55,7 @@ class UseToolFromServerTool(MCPServerTool):
 
                 # Check if we have tools for this server, if not get them
                 if server_name not in self.server_manager._server_tools:
-                    connector = session.connector
+                    connector = session
                     self.server_manager._server_tools[
                         server_name
                     ] = await self.server_manager.adapter._create_tools_from_connectors([connector])

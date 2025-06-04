@@ -90,7 +90,7 @@ class SandboxConnector(BaseConnector):
 
         self.sandbox: Sandbox | None = None
         self.process: CommandHandle | None = None
-        self.client: ClientSession | None = None
+        self.session: ClientSession | None = None
         self.errlog = sys.stderr
         self.base_url: str | None = None
         self._connected = False
@@ -226,8 +226,8 @@ class SandboxConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
-            await self.client.__aenter__()
+            self.session = ClientSession(read_stream, write_stream, sampling_callback=None)
+            await self.session.__aenter__()
 
             # Mark as connected
             self._connected = True

@@ -10,16 +10,16 @@ import warnings
 from typing import Any
 
 from .config import create_connector_from_config, load_config_file
+from .connectors.base import BaseConnector
 from .logging import logger
-from .session import MCPSession
 from .types.clientoptions import ClientOptions
 
 
 class MCPClient:
-    """Client for managing MCP servers and sessions.
+    """Client for managing MCP servers and connectors.
 
     This class provides a unified interface for working with MCP servers,
-    handling configuration, connector creation, and session management.
+    handling configuration, connector creation, and connection management.
     """
 
     def __init__(
@@ -36,8 +36,8 @@ class MCPClient:
         """
         self.config: dict[str, Any] = {}
         self.options = options or {}
-        self.sessions: dict[str, MCPSession] = {}
-        self.active_sessions: list[str] = []
+        self.connectors: dict[str, BaseConnector] = {}
+        self.active_connectors: list[str] = []
 
         # Load configuration if provided
         if config is not None:
@@ -91,9 +91,9 @@ class MCPClient:
         if "mcpServers" in self.config and name in self.config["mcpServers"]:
             del self.config["mcpServers"][name]
 
-            # If we removed an active session, remove it from active_sessions
-            if name in self.active_sessions:
-                self.active_sessions.remove(name)
+            # If we removed an active connector, remove it from active_connectors
+            if name in self.active_connectors:
+                self.active_connectors.remove(name)
 
     def get_server_names(self) -> list[str]:
         """Get the list of configured server names.
@@ -112,15 +112,17 @@ class MCPClient:
         with open(filepath, "w") as f:
             json.dump(self.config, f, indent=2)
 
-    async def create_session(self, server_name: str, auto_initialize: bool = True) -> MCPSession:
-        """Create a session for the specified server.
+    async def create_connector(
+        self, server_name: str, auto_initialize: bool = True
+    ) -> BaseConnector:
+        """Create a connector for the specified server.
 
         Args:
-            server_name: The name of the server to create a session for.
-            auto_initialize: Whether to automatically initialize the session.
+            server_name: The name of the server to create a connector for.
+            auto_initialize: Whether to automatically initialize the connector.
 
         Returns:
-            The created MCPSession.
+            The created BaseConnector.
 
         Raises:
             ValueError: If the specified server doesn't exist.
@@ -139,29 +141,28 @@ class MCPClient:
         # Create connector with options
         connector = create_connector_from_config(server_config, options=self.options)
 
-        # Create the session
-        session = MCPSession(connector)
+        # Initialize the connector if requested
         if auto_initialize:
-            await session.initialize()
-        self.sessions[server_name] = session
+            await connector.initialize()
+        self.connectors[server_name] = connector
 
-        # Add to active sessions
-        if server_name not in self.active_sessions:
-            self.active_sessions.append(server_name)
+        # Add to active connectors
+        if server_name not in self.active_connectors:
+            self.active_connectors.append(server_name)
 
-        return session
+        return connector
 
-    async def create_all_sessions(
+    async def create_all_connectors(
         self,
         auto_initialize: bool = True,
-    ) -> dict[str, MCPSession]:
-        """Create sessions for all configured servers.
+    ) -> dict[str, BaseConnector]:
+        """Create connectors for all configured servers.
 
         Args:
-            auto_initialize: Whether to automatically initialize the sessions.
+            auto_initialize: Whether to automatically initialize the connectors.
 
         Returns:
-            Dictionary mapping server names to their MCPSession instances.
+            Dictionary mapping server names to their BaseConnector instances.
 
         Warns:
             UserWarning: If no servers are configured.
@@ -172,92 +173,130 @@ class MCPClient:
             warnings.warn("No MCP servers defined in config", UserWarning, stacklevel=2)
             return {}
 
-        # Create sessions for all servers
+        # Create connectors for all servers
         for name in servers:
-            session = await self.create_session(name, auto_initialize)
+            connector = await self.create_connector(name, auto_initialize)
             if auto_initialize:
-                await session.initialize()
+                await connector.initialize()
 
-        return self.sessions
+        return self.connectors
 
-    def get_session(self, server_name: str) -> MCPSession:
-        """Get an existing session.
-
-        Args:
-            server_name: The name of the server to get the session for.
-                        If None, uses the first active session.
-
-        Returns:
-            The MCPSession for the specified server.
-
-        Raises:
-            ValueError: If no active sessions exist or the specified session doesn't exist.
-        """
-        if server_name not in self.sessions:
-            raise ValueError(f"No session exists for server '{server_name}'")
-
-        return self.sessions[server_name]
-
-    def get_all_active_sessions(self) -> dict[str, MCPSession]:
-        """Get all active sessions.
-
-        Returns:
-            Dictionary mapping server names to their MCPSession instances.
-        """
-        return {name: self.sessions[name] for name in self.active_sessions if name in self.sessions}
-
-    async def close_session(self, server_name: str) -> None:
-        """Close a session.
+    def get_connector(self, server_name: str) -> BaseConnector:
+        """Get an existing connector.
 
         Args:
-            server_name: The name of the server to close the session for.
-                        If None, uses the first active session.
+            server_name: The name of the server to get the connector for.
+
+        Returns:
+            The BaseConnector for the specified server.
 
         Raises:
-            ValueError: If no active sessions exist or the specified session doesn't exist.
+            ValueError: If no active connectors exist or the specified connector doesn't exist.
         """
-        # Check if the session exists
-        if server_name not in self.sessions:
-            logger.warning(f"No session exists for server '{server_name}', nothing to close")
+        if server_name not in self.connectors:
+            raise ValueError(f"No connector exists for server '{server_name}'")
+
+        return self.connectors[server_name]
+
+    def get_all_active_connectors(self) -> dict[str, BaseConnector]:
+        """Get all active connectors.
+
+        Returns:
+            Dictionary mapping server names to their BaseConnector instances.
+        """
+        return {
+            name: self.connectors[name]
+            for name in self.active_connectors
+            if name in self.connectors
+        }
+
+    async def close_connector(self, server_name: str) -> None:
+        """Close a connector.
+
+        Args:
+            server_name: The name of the server to close the connector for.
+
+        Raises:
+            ValueError: If no active connectors exist or the specified connector doesn't exist.
+        """
+        # Check if the connector exists
+        if server_name not in self.connectors:
+            logger.warning(f"No connector exists for server '{server_name}', nothing to close")
             return
 
-        # Get the session
-        session = self.sessions[server_name]
+        # Get the connector
+        connector = self.connectors[server_name]
 
         try:
-            # Disconnect from the session
-            logger.debug(f"Closing session for server '{server_name}'")
-            await session.disconnect()
+            # Disconnect from the connector
+            logger.debug(f"Closing connector for server '{server_name}'")
+            await connector.disconnect()
         except Exception as e:
-            logger.error(f"Error closing session for server '{server_name}': {e}")
+            logger.error(f"Error closing connector for server '{server_name}': {e}")
         finally:
-            # Remove the session regardless of whether disconnect succeeded
-            del self.sessions[server_name]
+            # Remove the connector regardless of whether disconnect succeeded
+            del self.connectors[server_name]
 
-            # Remove from active_sessions
-            if server_name in self.active_sessions:
-                self.active_sessions.remove(server_name)
+            # Remove from active_connectors
+            if server_name in self.active_connectors:
+                self.active_connectors.remove(server_name)
 
-    async def close_all_sessions(self) -> None:
-        """Close all active sessions.
+    async def close_all_connectors(self) -> None:
+        """Close all active connectors.
 
-        This method ensures all sessions are closed even if some fail.
+        This method ensures all connectors are closed even if some fail.
         """
-        # Get a list of all session names first to avoid modification during iteration
-        server_names = list(self.sessions.keys())
+        # Get a list of all connector names first to avoid modification during iteration
+        server_names = list(self.connectors.keys())
         errors = []
 
         for server_name in server_names:
             try:
-                logger.debug(f"Closing session for server '{server_name}'")
-                await self.close_session(server_name)
+                logger.debug(f"Closing connector for server '{server_name}'")
+                await self.close_connector(server_name)
             except Exception as e:
-                error_msg = f"Failed to close session for server '{server_name}': {e}"
+                error_msg = f"Failed to close connector for server '{server_name}': {e}"
                 logger.error(error_msg)
                 errors.append(error_msg)
 
         # Log summary if there were errors
         if errors:
-            logger.error(f"Encountered {len(errors)} errors while closing sessions")
+            logger.error(f"Encountered {len(errors)} errors while closing connectors")
         else:
-            logger.debug("All sessions closed successfully")
+            logger.debug("All connectors closed successfully")
+
+    # Backward compatibility methods for session-based API
+    async def create_session(self, server_name: str, auto_initialize: bool = True) -> BaseConnector:
+        """Create a session (now returns a connector for backward compatibility)."""
+        return await self.create_connector(server_name, auto_initialize)
+
+    async def create_all_sessions(self, auto_initialize: bool = True) -> dict[str, BaseConnector]:
+        """Create all sessions (now returns connectors for backward compatibility)."""
+        return await self.create_all_connectors(auto_initialize)
+
+    def get_session(self, server_name: str) -> BaseConnector:
+        """Get a session (now returns a connector for backward compatibility)."""
+        return self.get_connector(server_name)
+
+    def get_all_active_sessions(self) -> dict[str, BaseConnector]:
+        """Get all active sessions (now returns connectors for backward compatibility)."""
+        return self.get_all_active_connectors()
+
+    async def close_session(self, server_name: str) -> None:
+        """Close a session (now closes a connector for backward compatibility)."""
+        await self.close_connector(server_name)
+
+    async def close_all_sessions(self) -> None:
+        """Close all sessions (now closes connectors for backward compatibility)."""
+        await self.close_all_connectors()
+
+    # Legacy property for backward compatibility
+    @property
+    def sessions(self) -> dict[str, BaseConnector]:
+        """Legacy property that returns connectors for backward compatibility."""
+        return self.connectors
+
+    @property
+    def active_sessions(self) -> list[str]:
+        """Legacy property that returns active connectors for backward compatibility."""
+        return self.active_connectors
