@@ -1,5 +1,3 @@
-# GitHub Dependents Info workflow
-# More info at https://github.com/nvuillam/github-dependents-info/
 name: Update README
 
 on:
@@ -7,6 +5,7 @@ on:
   workflow_dispatch:
   # On every push on selected branches
   push:
+    branches: [main]
   # Scheduled interval: Use CRON format https://crontab.guru/
   schedule:
     - cron: "0 0 * * 0" # Every sunday at midnight
@@ -19,7 +18,7 @@ concurrency:
 
 jobs:
   update-dependents:
-    name: GitHub Dependents Info
+    name: Update GitHub Dependents Info
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,21 +31,22 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      # Collect data & generate markdown
-      - name: GitHub Dependents Info
-        uses: nvuillam/github-dependents-info@v1.5.1
+      # Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          repo: ${{ github.repository }}
-          outputrepo: ${{ github.repository }}
-          badgemarkdownfile: README.md
-          sort: stars
-          minstars: "1"
+          python-version: '3.11'
+
+      # Install github-dependents-info
+      - name: Install github-dependents-info
+        run: pip install -U github-dependents-info
+
+      # Generate dependents info
+      - name: Generate GitHub Dependents Info
+        run: |
+          github-dependents-info --repo ${{ github.repository }} --badgemarkdownfile README.md --sort stars --minstars 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Workaround for git issues
-      - name: Prepare commit
-        run: sudo chown -R $USER:$USER .
 
       # Check for changes and commit directly
       - name: Check for changes
@@ -72,15 +72,3 @@ jobs:
 
           Co-Authored-By: Claude <noreply@anthropic.com>"
           git push
-
-  contrib-readme-job:
-    runs-on: ubuntu-latest
-    name: Update contributors in readme
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Contribute List
-        uses: akhilmhdh/contributors-readme-action@v2.3.10
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

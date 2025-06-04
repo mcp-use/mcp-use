@@ -782,5 +782,6 @@ If you use MCP-Use in your research or project, please cite:
 
 Thanks to all our amazing contributors!
 
-<!-- readme: contributors -start -->
-<!-- readme: contributors -end -->
+<a href="https://github.com/mcp-use/mcp-use/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=mcp-use/mcp-use" />
+</a>
