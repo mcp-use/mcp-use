@@ -5,7 +5,6 @@ on:
   workflow_dispatch:
   # On every push on selected branches
   push:
-    branches: [main]
   # Scheduled interval: Use CRON format https://crontab.guru/
   schedule:
     - cron: "0 0 * * 0" # Every sunday at midnight
