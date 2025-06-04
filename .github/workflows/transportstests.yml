@@ -24,11 +24,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install uv
+        run: |
+          pip install uv
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           # Install project with dev and optional extras similar to unit tests environment
-          pip install .[dev,anthropic,openai,search,e2b]
+          uv pip install .[dev,anthropic,openai,search,e2b]
 
       - name: Lint with ruff
         run: |
