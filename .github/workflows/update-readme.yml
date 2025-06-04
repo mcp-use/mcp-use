@@ -1,107 +1,141 @@
-name: Update README with Contributors and Dependents
+name: Update README
 
 on:
   push:
   schedule:
-    - cron: '0 0 * * 0'  # Weekly on Sunday
-  workflow_dispatch:  # Manual trigger
+    # Run every Sunday at 6 AM UTC
+    - cron: '0 6 * * 0'
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
-  update-readme:
+  update-dependents:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
 
-      - name: Get contributors
-        id: contributors
-        run: |
-          echo "Fetching contributors..."
-          contributors=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/contributors?per_page=100" | \
-            jq -r '.[]? | select(.type == "User") | "[![" + .login + "](" + .avatar_url + "&s=50)](" + .html_url + ")"' | \
-            head -20 | tr '\n' ' ' || echo "")
-          echo "contributors=$contributors" >> $GITHUB_OUTPUT
+    - name: Install github-dependents-info
+      run: npm install -g github-dependents-info
 
-      - name: Get top starred dependents
-        id: dependents
-        run: |
-          echo "Fetching dependents..."
-          # Search for repositories that depend on this package
-          dependents=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=%22mcp-use%22+in:file+NOT+repo:${{ github.repository }}&sort=stars&order=desc&per_page=10" | \
-            jq -r '.items[]? | "- [" + .full_name + "](" + .html_url + ") ⭐ " + (.stargazers_count | tostring)' | \
-            head -10 || echo "")
-          echo "dependents<<EOF" >> $GITHUB_OUTPUT
-          echo "$dependents" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+    - name: Get dependents data
+      id: dependents
+      run: |
+        # Get dependents data in JSON format
+        github-dependents-info --repo pietrozullo/mcp-use --minstars 1 --sort stars --json > dependents.json
 
-      - name: Update README
-        run: |
-          # Backup original README
-          cp README.md README.md.bak
+        # Extract total count and stars
+        TOTAL_REPOS=$(jq -r '.total_dependents_number' dependents.json)
+        PUBLIC_REPOS=$(jq -r '.public_dependents_number' dependents.json)
+        TOTAL_STARS=$(jq -r '[.all_public_dependent_repos[].stars] | add' dependents.json)
 
-          # Update contributors section
-          if grep -q "## Contributors" README.md; then
-            # Update existing section
-            awk '/## Contributors/{flag=1} /^## / && flag && !/## Contributors/{flag=0} !flag{print}' README.md > README.tmp
-            echo "## Contributors" >> README.tmp
-            echo "" >> README.tmp
-            echo "Thanks to all our amazing contributors!" >> README.tmp
-            echo "" >> README.tmp
-            echo "${{ steps.contributors.outputs.contributors }}" >> README.tmp
-            echo "" >> README.tmp
-            awk '/^## / && !/## Contributors/{flag=1} flag{print}' README.md >> README.tmp
-            mv README.tmp README.md
-          else
-            # Add new section before License
-            sed -i '/## License/i\\n## Contributors\n\nThanks to all our amazing contributors!\n\n${{ steps.contributors.outputs.contributors }}\n' README.md
-          fi
+        echo "total_repos=$TOTAL_REPOS" >> $GITHUB_OUTPUT
+        echo "public_repos=$PUBLIC_REPOS" >> $GITHUB_OUTPUT
+        echo "total_stars=$TOTAL_STARS" >> $GITHUB_OUTPUT
 
-          # Update dependents section
-          if grep -q "## Top Starred Dependents" README.md; then
-            # Update existing section
-            awk '/## Top Starred Dependents/{flag=1} /^## / && flag && !/## Top Starred Dependents/{flag=0} !flag{print}' README.md > README.tmp
-            echo "## Top Starred Dependents" >> README.tmp
-            echo "" >> README.tmp
-            echo "Projects using mcp-use:" >> README.tmp
-            echo "" >> README.tmp
-            echo "${{ steps.dependents.outputs.dependents }}" >> README.tmp
-            echo "" >> README.tmp
-            awk '/^## / && !/## Top Starred Dependents/{flag=1} flag{print}' README.md >> README.tmp
-            mv README.tmp README.md
-          else
-            # Add new section before Contributors
-            sed -i '/## Contributors/i\\n## Top Starred Dependents\n\nProjects using mcp-use:\n\n${{ steps.dependents.outputs.dependents }}\n' README.md
-          fi
+    - name: Update README with dependents
+      run: |
+        # Create the new dependents section
+        cat > dependents_section.md << 'EOF'
+        ## Top Starred Dependents
 
-      - name: Check for changes
-        id: changes
-        run: |
-          if ! cmp -s README.md README.md.bak; then
-            echo "changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "changes=false" >> $GITHUB_OUTPUT
-          fi
+        Projects using mcp-use:
 
-      - name: Commit and push changes
-        if: steps.changes.outputs.changes == 'true'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add README.md
-          git commit -m "Update README with latest contributors and dependents"
-          git push
+        | Repository | Stars |
+        |------------|-------|
+        EOF
+
+        # Add top 8 repositories to the table
+        jq -r '.all_public_dependent_repos[:8] | .[] | "| [\(.owner)/\(.repo_name)](https://github.com/\(.name)) | ⭐ \(.stars) |"' dependents.json >> dependents_section.md
+
+        # Add summary and footer
+        cat >> dependents_section.md << EOF
+
+        **Total: ${{ steps.dependents.outputs.total_repos }} repositories using mcp-use** | **Public repositories: ${{ steps.dependents.outputs.public_repos }}** | **Combined stars: ${{ steps.dependents.outputs.total_stars }}**
+
+        *This section is automatically updated weekly*
+        EOF
+
+        # Create a temporary file with the updated README
+        awk '
+        /^## Top Starred Dependents$/ {
+          print "## Top Starred Dependents"
+          print ""
+          print "Projects using mcp-use:"
+          print ""
+          print "| Repository | Stars |"
+          print "|------------|-------|"
+          # Skip to the end of the current dependents section
+          while (getline && !/^## Contributors$/) {
+            if (/^\*This section is automatically updated weekly\*$/) {
+              break
+            }
+          }
+          # Insert the new dependents data
+          while ((getline line < "dependents.json") > 0) {
+            break
+          }
+          close("dependents.json")
+          system("jq -r \".all_public_dependent_repos[:8] | .[] | \\\"| [\\(.owner)/\\(.repo_name)](https://github.com/\\(.name)) | ⭐ \\(.stars) |\\\"\" dependents.json")
+          print ""
+          print "**Total: ${{ steps.dependents.outputs.total_repos }} repositories using mcp-use** | **Public repositories: ${{ steps.dependents.outputs.public_repos }}** | **Combined stars: ${{ steps.dependents.outputs.total_stars }}** "
+          print ""
+          print "*This section is automatically updated weekly*"
+          print ""
+          print "## Contributors"
+          next
+        }
+        { print }
+        ' README.md > README_updated.md
+
+        # Replace the original README
+        mv README_updated.md README.md
+
+    - name: Check for changes
+      id: changes
+      run: |
+        if git diff --quiet README.md; then
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Commit and push changes
+      if: steps.changes.outputs.has_changes == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add README.md
+        git commit -m "chore: update dependents list (automated)
+
+        - Updated with ${{ steps.dependents.outputs.total_repos }} total repositories
+        - Combined stars: ${{ steps.dependents.outputs.total_stars }}
+
+        🤖 Generated with [Claude Code](https://claude.ai/code)
+
+        Co-Authored-By: Claude <noreply@anthropic.com>"
+        git push
+
+    - name: Clean up
+      run: |
+        rm -f dependents.json dependents_section.md
+
+  contrib-readme-job:
+    runs-on: ubuntu-latest
+    name: A job to automate contrib in readme
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Contribute List
+        uses: akhilmhdh/contributors-readme-action@v2.3.10
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -3006,13 +3006,27 @@ If you use MCP-Use in your research or project, please cite:
 
 Projects using mcp-use:
 
+| Repository | Stars |
+|------------|-------|
+| [tavily-ai/meeting-prep-agent](https://github.com/tavily-ai/meeting-prep-agent) | ⭐ 112 |
+| [krishnaik06/MCP-CRASH-Course](https://github.com/krishnaik06/MCP-CRASH-Course) | ⭐ 37 |
+| [truemagic-coder/solana-agent-app](https://github.com/truemagic-coder/solana-agent-app) | ⭐ 29 |
+| [schogini/techietalksai](https://github.com/schogini/techietalksai) | ⭐ 21 |
+| [autometa-dev/whatsapp-mcp-voice-agent](https://github.com/autometa-dev/whatsapp-mcp-voice-agent) | ⭐ 18 |
+| [Deniscartin/mcp-cli](https://github.com/Deniscartin/mcp-cli) | ⭐ 17 |
+| [elastic/genai-workshops](https://github.com/elastic/genai-workshops) | ⭐ 9 |
+| [innovaccer/Healthcare-MCP](https://github.com/innovaccer/Healthcare-MCP) | ⭐ 6 |
+
+**Total: 42 repositories using mcp-use** | **Public repositories: 42** | **Combined stars: 261**
+
 *This section is automatically updated weekly*
 
 ## Contributors
 
 Thanks to all our amazing contributors!
 
-*This section is automatically updated weekly*
+<!-- readme: contributors -start -->
+<!-- readme: contributors -end -->
 
 # License
 
