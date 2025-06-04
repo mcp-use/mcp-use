@@ -773,6 +773,18 @@ If you use MCP-Use in your research or project, please cite:
 }
 ```
 
+## Top Starred Dependents
+
+Projects using mcp-use:
+
+*This section is automatically updated weekly*
+
+## Contributors
+
+Thanks to all our amazing contributors!
+
+*This section is automatically updated weekly*
+
 # License
 
 MIT

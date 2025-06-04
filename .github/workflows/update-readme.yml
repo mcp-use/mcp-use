@@ -1,0 +1,106 @@
+name: Update README with Contributors and Dependents
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Get contributors
+        id: contributors
+        run: |
+          echo "Fetching contributors..."
+          contributors=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/contributors?per_page=100" | \
+            jq -r '.[]? | select(.type == "User") | "[![" + .login + "](" + .avatar_url + "&s=50)](" + .html_url + ")"' | \
+            head -20 | tr '\n' ' ' || echo "")
+          echo "contributors=$contributors" >> $GITHUB_OUTPUT
+
+      - name: Get top starred dependents
+        id: dependents
+        run: |
+          echo "Fetching dependents..."
+          # Search for repositories that depend on this package
+          dependents=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/search/repositories?q=%22mcp-use%22+in:file+NOT+repo:${{ github.repository }}&sort=stars&order=desc&per_page=10" | \
+            jq -r '.items[]? | "- [" + .full_name + "](" + .html_url + ") ⭐ " + (.stargazers_count | tostring)' | \
+            head -10 || echo "")
+          echo "dependents<<EOF" >> $GITHUB_OUTPUT
+          echo "$dependents" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update README
+        run: |
+          # Backup original README
+          cp README.md README.md.bak
+
+          # Update contributors section
+          if grep -q "## Contributors" README.md; then
+            # Update existing section
+            awk '/## Contributors/{flag=1} /^## / && flag && !/## Contributors/{flag=0} !flag{print}' README.md > README.tmp
+            echo "## Contributors" >> README.tmp
+            echo "" >> README.tmp
+            echo "Thanks to all our amazing contributors!" >> README.tmp
+            echo "" >> README.tmp
+            echo "${{ steps.contributors.outputs.contributors }}" >> README.tmp
+            echo "" >> README.tmp
+            awk '/^## / && !/## Contributors/{flag=1} flag{print}' README.md >> README.tmp
+            mv README.tmp README.md
+          else
+            # Add new section before License
+            sed -i '/## License/i\\n## Contributors\n\nThanks to all our amazing contributors!\n\n${{ steps.contributors.outputs.contributors }}\n' README.md
+          fi
+
+          # Update dependents section
+          if grep -q "## Top Starred Dependents" README.md; then
+            # Update existing section
+            awk '/## Top Starred Dependents/{flag=1} /^## / && flag && !/## Top Starred Dependents/{flag=0} !flag{print}' README.md > README.tmp
+            echo "## Top Starred Dependents" >> README.tmp
+            echo "" >> README.tmp
+            echo "Projects using mcp-use:" >> README.tmp
+            echo "" >> README.tmp
+            echo "${{ steps.dependents.outputs.dependents }}" >> README.tmp
+            echo "" >> README.tmp
+            awk '/^## / && !/## Top Starred Dependents/{flag=1} flag{print}' README.md >> README.tmp
+            mv README.tmp README.md
+          else
+            # Add new section before Contributors
+            sed -i '/## Contributors/i\\n## Top Starred Dependents\n\nProjects using mcp-use:\n\n${{ steps.dependents.outputs.dependents }}\n' README.md
+          fi
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if ! cmp -s README.md README.md.bak; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          git commit -m "Update README with latest contributors and dependents"
+          git push
