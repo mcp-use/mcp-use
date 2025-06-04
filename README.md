@@ -753,25 +753,14 @@ This is useful when you only need to see the agent's steps and decision-making p
 
 We love contributions! Feel free to open issues for bugs or feature requests. Look at [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-# Requirements
+## Contributors
 
-- Python 3.11+
-- MCP implementation (like Playwright MCP)
-- LangChain and appropriate model libraries (OpenAI, Anthropic, etc.)
+Thanks to all our amazing contributors!
 
-# Citation
+<a href="https://github.com/mcp-use/mcp-use/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=mcp-use/mcp-use" />
+</a>
 
-If you use MCP-Use in your research or project, please cite:
-
-```bibtex
-@software{mcp_use2025,
-  author = {Zullo, Pietro},
-  title = {MCP-Use: MCP Library for Python},
-  year = {2025},
-  publisher = {GitHub},
-  url = {https://github.com/pietrozullo/mcp-use}
-}
-```
 
 ## Top Starred Dependents
 
@@ -825,10 +814,26 @@ If you use MCP-Use in your research or project, please cite:
 </table>
 
 <!-- gh-dependents-info-used-by-end -->
-## Contributors
 
-Thanks to all our amazing contributors!
+# Requirements
 
-<a href="https://github.com/mcp-use/mcp-use/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=mcp-use/mcp-use" />
-</a>
+- Python 3.11+
+- MCP implementation (like Playwright MCP)
+- LangChain and appropriate model libraries (OpenAI, Anthropic, etc.)
+
+# License
+
+MIT
+# Citation
+
+If you use MCP-Use in your research or project, please cite:
+
+```bibtex
+@software{mcp_use2025,
+  author = {Zullo, Pietro},
+  title = {MCP-Use: MCP Library for Python},
+  year = {2025},
+  publisher = {GitHub},
+  url = {https://github.com/pietrozullo/mcp-use}
+}
+```
