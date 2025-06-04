@@ -57,8 +57,8 @@ jobs:
           |------------|-------|
           EOF
 
-          # Add top repositories to the table (limit to top 10)
-          jq -r '.all_public_dependent_repos[:10] | .[] | "| [\(.owner)/\(.repo_name)](https://github.com/\(.name)) | ⭐ \(.stars) |"' dependents.json >> dependents_table.md
+          # Add top repositories to the table (limit to top 10) with avatars
+          jq -r '.all_public_dependent_repos[:10] | .[] | "| <img src=\"\(.img)\" width=\"20\" height=\"20\"> [\(.owner)/\(.repo_name)](https://github.com/\(.name)) | ⭐ \(.stars) |"' dependents.json >> dependents_table.md
 
           # Update README by replacing content between tags
           awk '
