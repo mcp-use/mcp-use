@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           # Install project with dev and optional extras similar to unit tests environment
-          uv pip install .[dev,anthropic,openai,search,e2b]
+          uv pip install --system .[dev,anthropic,openai,search,e2b]
 
       - name: Lint with ruff
         run: |
