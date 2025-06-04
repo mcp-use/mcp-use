@@ -11,6 +11,7 @@ jobs:
     name: "Transport: ${{ matrix.transport }}"
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         transport: [stdio, sse, streamableHttp]
         python-version: ["3.11", "3.12"]
