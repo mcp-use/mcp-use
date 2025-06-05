@@ -100,7 +100,7 @@ class BaseConnector(ABC):
             await self.connect()
 
         if not self.session:
-            raise RuntimeError("MCP client is not connected")
+            raise RuntimeError("MCP session is not connected")
 
         logger.debug("Initializing MCP session")
 
