@@ -9,10 +9,11 @@ import json
 import warnings
 from typing import Any
 
+from mcp_use.types.sandbox import SandboxOptions
+
 from .config import create_connector_from_config, load_config_file
 from .connectors.base import BaseConnector
 from .logging import logger
-from .types.clientoptions import ClientOptions
 
 
 class MCPClient:
@@ -25,17 +26,20 @@ class MCPClient:
     def __init__(
         self,
         config: str | dict[str, Any] | None = None,
-        options: ClientOptions | None = None,
+        sandbox: bool = False,
+        sandbox_options: SandboxOptions | None = None,
     ) -> None:
         """Initialize a new MCP client.
 
         Args:
             config: Either a dict containing configuration or a path to a JSON config file.
                    If None, an empty configuration is used.
-            options: Configuration options for the client.
+            sandbox: Whether to use sandboxed execution mode for running MCP servers.
+            sandbox_options: Optional sandbox configuration options.
         """
         self.config: dict[str, Any] = {}
-        self.options = options or {}
+        self.sandbox = sandbox
+        self.sandbox_options = sandbox_options
         self.connectors: dict[str, BaseConnector] = {}
         self.active_connectors: list[str] = []
 
@@ -47,24 +51,35 @@ class MCPClient:
                 self.config = config
 
     @classmethod
-    def from_dict(cls, config: dict[str, Any], options: ClientOptions | None = None) -> "MCPClient":
+    def from_dict(
+        cls,
+        config: dict[str, Any],
+        sandbox: bool = False,
+        sandbox_options: SandboxOptions | None = None,
+    ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
         Args:
             config: The configuration dictionary.
-            options: Optional client configuration options.
+            sandbox: Whether to use sandboxed execution mode for running MCP servers.
+            sandbox_options: Optional sandbox configuration options.
         """
-        return cls(config=config, options=options)
+        return cls(config=config, sandbox=sandbox, sandbox_options=sandbox_options)
 
     @classmethod
-    def from_config_file(cls, filepath: str, options: ClientOptions | None = None) -> "MCPClient":
+    def from_config_file(
+        cls, filepath: str, sandbox: bool = False, sandbox_options: SandboxOptions | None = None
+    ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
         Args:
             filepath: The path to the configuration file.
-            options: Optional client configuration options.
+            sandbox: Whether to use sandboxed execution mode for running MCP servers.
+            sandbox_options: Optional sandbox configuration options.
         """
-        return cls(config=load_config_file(filepath), options=options)
+        return cls(
+            config=load_config_file(filepath), sandbox=sandbox, sandbox_options=sandbox_options
+        )
 
     def add_server(
         self,
@@ -139,7 +154,9 @@ class MCPClient:
         server_config = servers[server_name]
 
         # Create connector with options
-        connector = create_connector_from_config(server_config, options=self.options)
+        connector = create_connector_from_config(
+            server_config, sandbox=self.sandbox, sandbox_options=self.sandbox_options
+        )
 
         # Initialize the connector if requested
         if auto_initialize:

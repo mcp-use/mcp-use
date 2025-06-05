@@ -4,10 +4,11 @@ Unit tests for the HttpConnector class.
 
 import unittest
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import aiohttp
-from mcp.types import Prompt, Resource, Tool
+from mcp import McpError
+from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
 
 from mcp_use.connectors.http import HttpConnector
 from mcp_use.task_managers import SseConnectionManager
@@ -96,37 +97,102 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.mock_client_session.__aenter__ = AsyncMock()
 
     @patch("mcp_use.connectors.http.SseConnectionManager")
+    @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
     @patch("mcp_use.connectors.http.ClientSession")
-    async def test_connect(self, mock_client_session_class, mock_cm_class, _):
-        """Test connecting to the MCP implementation."""
-        # Setup mocks
-        mock_cm_instance = self.mock_cm
-        mock_cm_class.return_value = mock_cm_instance
-        mock_cm_instance.start.return_value = ("read_stream", "write_stream")
+    async def test_connect_with_sse(
+        self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, _
+    ):
+        """Test connecting to the MCP implementation using SSE fallback."""
+        # Setup streamable HTTP to fail during initialization
+        mock_streamable_cm_instance = MagicMock()
+        mock_streamable_cm_instance.start = AsyncMock()
+        mock_streamable_cm_instance.start.return_value = ("read_stream", "write_stream")
+        mock_streamable_cm_instance.close = AsyncMock()
+        mock_streamable_cm_class.return_value = mock_streamable_cm_instance
 
-        mock_client_session_instance = self.mock_client_session
-        mock_client_session_class.return_value = mock_client_session_instance
+        # Setup SSE to succeed
+        mock_sse_cm_instance = MagicMock()
+        mock_sse_cm_instance.start = AsyncMock()
+        mock_sse_cm_instance.start.return_value = ("sse_read_stream", "sse_write_stream")
+        mock_sse_cm_class.return_value = mock_sse_cm_instance
 
-        # Test connect
+        # Setup client sessions
+        call_count = 0
+
+        def mock_client_session_factory(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_instance = MagicMock()
+            mock_instance.__aenter__ = AsyncMock()
+            mock_instance.__aexit__ = AsyncMock()
+            mock_instance.initialize = AsyncMock()
+
+            if call_count == 1:
+                # First call (streamable HTTP) - initialization fails
+                mock_instance.initialize.side_effect = McpError(
+                    ErrorData(code=1, message="Connection closed")
+                )
+            else:
+                # Second call (SSE) - succeeds
+                mock_instance.initialize.return_value = EmptyResult()
+
+            return mock_instance
+
+        mock_client_session_class.side_effect = mock_client_session_factory
+
+        # Test connect - should try streamable HTTP, fail, then succeed with SSE
         await self.connector.connect()
 
-        # Verify connection manager was created and started
+        # Verify both connection managers were attempted
+        mock_streamable_cm_class.assert_called_once()
+        mock_sse_cm_class.assert_called_once()
+
+        # Verify client sessions were created for both attempts
+        self.assertEqual(mock_client_session_class.call_count, 2)
+
+        # Verify final state uses SSE
+        self.assertEqual(self.connector._connection_manager, mock_sse_cm_instance)
+        self.assertTrue(self.connector._connected)
+        self.assertIsNotNone(self.connector.client)
+
+    @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
+    @patch("mcp_use.connectors.http.ClientSession")
+    async def test_connect_with_streamable_http(self, mock_client_session_class, mock_cm_class, _):
+        """Test connecting to the MCP implementation using streamable HTTP."""
+        # Setup streamable HTTP connection manager
+        mock_cm_instance = MagicMock()
+        mock_cm_instance.start = AsyncMock()
+        mock_cm_instance.start.return_value = ("read_stream", "write_stream")
+        mock_cm_class.return_value = mock_cm_instance
+
+        # Setup client session that succeeds on initialize
+        mock_client_session_instance = MagicMock()
+        mock_client_session_instance.__aenter__ = AsyncMock()
+        mock_client_session_instance.initialize = AsyncMock()
+        mock_client_session_instance.initialize.return_value = EmptyResult()  # Success
+        mock_client_session_class.return_value = mock_client_session_instance
+
+        # Test connect with streamable HTTP
+        await self.connector.connect()
+
+        # Verify streamable HTTP connection manager was used
         mock_cm_class.assert_called_once_with("http://localhost:8000", {}, 5, 300)
         mock_cm_instance.start.assert_called_once()
 
-        # Verify client session was created
+        # Verify client session was created and initialized
         mock_client_session_class.assert_called_once_with(
             "read_stream", "write_stream", sampling_callback=None
         )
         mock_client_session_instance.__aenter__.assert_called_once()
+        mock_client_session_instance.initialize.assert_called_once()
 
         # Verify state changes
         self.assertEqual(self.connector.session, mock_client_session_instance)
         self.assertEqual(self.connector._connection_manager, mock_cm_instance)
         self.assertTrue(self.connector._connected)
 
-    @patch("mcp_use.connectors.http.SseConnectionManager")
-    async def test_connect_already_connected(self, mock_cm_class, _):
+    @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
+    async def test_sse_connect_already_connected(self, mock_cm_class, _):
         """Test connecting when already connected."""
         # Set up the connector as already connected
         self.connector._connected = True
@@ -138,28 +204,40 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_cm_class.assert_not_called()
 
     @patch("mcp_use.connectors.http.SseConnectionManager")
-    async def test_connect_failure(self, mock_cm_class, _):
+    @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
+    async def test_connect_failure(self, mock_streamable_cm_class, mock_sse_cm_class, _):
         """Test handling connection failures."""
-        # Setup mocks
-        mock_cm_instance = self.mock_cm
-        mock_cm_class.return_value = mock_cm_instance
-        mock_cm_instance.start.side_effect = Exception("Connection failed")
+        # Setup mocks for streamable HTTP failure
+        mock_streamable_cm_instance = MagicMock()
+        mock_streamable_cm_instance.start = AsyncMock()
+        mock_streamable_cm_instance.close = AsyncMock()
+        mock_streamable_cm_instance.start.side_effect = Exception("Streamable HTTP failed")
+        mock_streamable_cm_class.return_value = mock_streamable_cm_instance
 
-        # Test connect failure
+        # Setup mocks for SSE failure (fallback)
+        mock_sse_cm_instance = MagicMock()
+        mock_sse_cm_instance.start = AsyncMock()
+        mock_sse_cm_instance.close = AsyncMock()
+        mock_sse_cm_instance.start.side_effect = Exception("SSE failed")
+        mock_sse_cm_class.return_value = mock_sse_cm_instance
+
+        # Test connect failure - should try both transports and fail
         with self.assertRaises(Exception) as context:
             await self.connector.connect()
 
-        self.assertEqual(str(context.exception), "Connection failed")
+        # Should get the SSE error since that's the final fallback
+        self.assertEqual(str(context.exception), "SSE failed")
 
-        # Verify cleanup was called
-        mock_cm_instance.stop.assert_called_once()
+        # Verify both connection managers were attempted
+        mock_streamable_cm_class.assert_called_once()
+        mock_sse_cm_class.assert_called_once()
 
         # Verify state remains unchanged
         self.assertIsNone(self.connector.session)
         self.assertIsNone(self.connector._connection_manager)
         self.assertFalse(self.connector._connected)
 
-    async def test_disconnect(self, mock_logger):
+    async def test_disconnect(self, _):
         """Test disconnecting from the MCP implementation."""
         # Set up the connector as connected
         self.connector._connected = True

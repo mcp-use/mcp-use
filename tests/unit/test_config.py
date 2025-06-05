@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from mcp_use.config import create_connector_from_config, load_config_file
 from mcp_use.connectors import HttpConnector, SandboxConnector, StdioConnector, WebSocketConnector
-from mcp_use.types.clientoptions import ClientOptions
+from mcp_use.types.sandbox import SandboxOptions
 
 
 class TestConfigLoading(unittest.TestCase):
@@ -67,9 +67,14 @@ class TestConnectorCreation(unittest.TestCase):
             "headers": {"Content-Type": "application/json"},
             "auth_token": "test_token",
         }
-        options: ClientOptions = {"is_sandboxed": False}
+        options: SandboxOptions = {
+            "api_key": "test_key",
+            "sandbox_template_id": "test_template",
+        }
 
-        connector = create_connector_from_config(server_config, options)
+        connector = create_connector_from_config(
+            server_config, sandbox=True, sandbox_options=options
+        )
 
         self.assertIsInstance(connector, HttpConnector)
         self.assertEqual(connector.base_url, "http://test.com")
@@ -115,9 +120,14 @@ class TestConnectorCreation(unittest.TestCase):
             "headers": {"Content-Type": "application/json"},
             "auth_token": "test_token",
         }
-        options: ClientOptions = {"is_sandboxed": False}
+        options: SandboxOptions = {
+            "api_key": "test_key",
+            "sandbox_template_id": "test_template",
+        }
 
-        connector = create_connector_from_config(server_config, options)
+        connector = create_connector_from_config(
+            server_config, sandbox=True, sandbox_options=options
+        )
 
         self.assertIsInstance(connector, WebSocketConnector)
         self.assertEqual(connector.url, "ws://test.com")
@@ -160,9 +170,15 @@ class TestConnectorCreation(unittest.TestCase):
             "args": ["-m", "mcp_server"],
             "env": {"DEBUG": "1"},
         }
-        options: ClientOptions = {"is_sandboxed": False}
 
-        connector = create_connector_from_config(server_config, options)
+        connector = create_connector_from_config(
+            server_config,
+            sandbox=False,
+            sandbox_options=SandboxOptions(
+                api_key="test_key",
+                sandbox_template_id="test_template",
+            ),
+        )
 
         self.assertIsInstance(connector, StdioConnector)
         self.assertEqual(connector.command, "python")
@@ -176,14 +192,16 @@ class TestConnectorCreation(unittest.TestCase):
             "args": ["-m", "mcp_server"],
             "env": {"DEBUG": "1"},
         }
-        options: ClientOptions = {
-            "is_sandboxed": True,
-            "sandbox_options": {"api_key": "test_key", "sandbox_template_id": "test_template"},
+        options: SandboxOptions = {
+            "api_key": "test_key",
+            "sandbox_template_id": "test_template",
         }
 
         # Use patch to avoid the actual E2B SDK import check
         with patch("mcp_use.connectors.sandbox.AsyncSandbox", create=True):
-            connector = create_connector_from_config(server_config, options)
+            connector = create_connector_from_config(
+                server_config, sandbox=True, sandbox_options=options
+            )
 
             self.assertIsInstance(connector, SandboxConnector)
             self.assertEqual(connector.user_command, "python")
