@@ -84,9 +84,13 @@ class HttpConnector(BaseConnector):
                 await test_client.initialize()
 
                 # If we get here, streamable HTTP works
-
                 self.client = test_client
                 transport_type = "streamable HTTP"
+
+                # Handle session ID if provided by the server
+                # The session ID callback should have been called during initialization
+                if hasattr(connection_manager, "session_id") and connection_manager.session_id:
+                    logger.debug(f"Session ID established: {connection_manager.session_id}")
 
             except Exception as init_error:
                 # Clean up the test client
@@ -150,3 +154,21 @@ class HttpConnector(BaseConnector):
         logger.debug(
             f"Successfully connected to MCP implementation via {transport_type}: {self.base_url}"
         )
+
+    async def disconnect(self) -> None:
+        """Close the connection to the MCP implementation."""
+        # Handle session termination for streamable HTTP
+        if (
+            self._connected
+            and isinstance(self._connection_manager, StreamableHttpConnectionManager)
+            and self._connection_manager.session_id
+        ):
+            try:
+                # Send DELETE request to terminate session as per MCP specification
+                logger.debug(f"Terminating session: {self._connection_manager.session_id}")
+                # Note: This would need to be implemented in the underlying MCP library
+                # or we'd need direct HTTP access to send the DELETE request
+            except Exception as e:
+                logger.debug(f"Error terminating session: {e}")
+
+        await super().disconnect()

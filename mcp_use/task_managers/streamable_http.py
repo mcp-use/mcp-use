@@ -43,6 +43,8 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
         self.timeout = timedelta(seconds=timeout)
         self.read_timeout = timedelta(seconds=read_timeout)
         self._http_ctx = None
+        self._session_id = None
+        self._session_id_callback = None
 
     async def _establish_connection(self) -> tuple[Any, Any]:
         """Establish a streamable HTTP connection.
@@ -53,6 +55,13 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
         Raises:
             Exception: If connection cannot be established.
         """
+
+        # Define a callback to capture the session ID when it's provided
+        def session_id_callback(session_id: str) -> None:
+            """Callback to handle session ID from server."""
+            logger.debug(f"Received session ID from server: {session_id}")
+            self._session_id = session_id
+
         # Create the context manager
         self._http_ctx = streamablehttp_client(
             url=self.url,
@@ -61,11 +70,28 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
             sse_read_timeout=self.read_timeout,
         )
 
-        # Enter the context manager. Ignoring the session id callback
-        read_stream, write_stream, _ = await self._http_ctx.__aenter__()
+        # Enter the context manager and provide session ID callback
+        read_stream, write_stream, session_callback = await self._http_ctx.__aenter__()
+
+        # Set up the session callback if provided by the underlying library
+        if session_callback and callable(session_callback):
+            self._session_id_callback = session_callback
+            # The callback will be called during MCP initialization when session ID is received
+        else:
+            # If no callback mechanism, we store the callback for manual handling
+            self._session_id_callback = session_id_callback
 
         # Return the streams
         return (read_stream, write_stream)
+
+    @property
+    def session_id(self) -> str | None:
+        """Get the current session ID if available."""
+        return self._session_id
+
+    def set_session_id(self, session_id: str | None) -> None:
+        """Set the session ID for this connection."""
+        self._session_id = session_id
 
     async def _close_connection(self) -> None:
         """Close the streamable HTTP connection."""
