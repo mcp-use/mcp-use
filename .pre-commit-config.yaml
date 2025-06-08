@@ -19,6 +19,12 @@ repos:
     -   id: check-added-large-files
     -   id: debug-statements
 
+-   repo: https://github.com/codespell-project/codespell
+    # Configuration for codespell is in .pre-commit-config.yaml
+    rev: v2.4.1
+    hooks:
+    -   id: codespell
+
 # Define configuration for the Python checks
 default_language_version:
     python: python3.11
