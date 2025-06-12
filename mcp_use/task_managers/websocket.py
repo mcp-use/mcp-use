@@ -22,14 +22,17 @@ class WebSocketConnectionManager(ConnectionManager[tuple[Any, Any]]):
     def __init__(
         self,
         url: str,
+        headers: dict[str, str] | None = None,
     ):
         """Initialize a new WebSocket connection manager.
 
         Args:
             url: The WebSocket URL to connect to
+            headers: Optional HTTP headers
         """
         super().__init__()
         self.url = url
+        self.headers = headers or {}
 
     async def _establish_connection(self) -> tuple[Any, Any]:
         """Establish a WebSocket connection.
@@ -42,6 +45,8 @@ class WebSocketConnectionManager(ConnectionManager[tuple[Any, Any]]):
         """
         logger.debug(f"Connecting to WebSocket: {self.url}")
         # Create the context manager
+        # Note: The current MCP websocket_client implementation doesn't support headers
+        # If headers need to be passed, this would need to be updated when MCP supports it
         self._ws_ctx = websocket_client(self.url)
 
         # Enter the context manager
