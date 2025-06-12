@@ -141,7 +141,7 @@ class MCPAgent:
                 connectors_to_use = self.connectors
                 logger.info(f"🔗 Connecting to {len(connectors_to_use)} direct connectors...")
                 for connector in connectors_to_use:
-                    if not hasattr(connector, "client") or connector.client_session is None:
+                    if not hasattr(connector, "client_session") or connector.client_session is None:
                         await connector.connect()
 
                 # Create LangChain tools using the adapter with connectors
