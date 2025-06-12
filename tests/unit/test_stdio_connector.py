@@ -81,9 +81,7 @@ class TestStdioConnectorConnection:
         mock_manager_instance.start.assert_called_once()
 
         # Verify client session creation
-        mock_client_session.assert_called_once_with(
-            "read_stream", "write_stream", sampling_callback=None
-        )
+        mock_client_session.assert_called_once_with("read_stream", "write_stream", sampling_callback=None)
         mock_client_instance.__aenter__.assert_called_once()
 
         # Verify state
@@ -180,9 +178,7 @@ class TestStdioConnectorOperations:
         mock_client = MagicMock()
         # Mock client.initialize() to return capabilities
         mock_init_result = MagicMock()
-        mock_init_result.status = (
-            "success"  # Or whatever structure the Stdio connector expects to return
-        )
+        mock_init_result.status = "success"  # Or whatever structure the Stdio connector expects to return
         mock_init_result.capabilities = MagicMock(tools=True, resources=True, prompts=True)
         mock_client.initialize = AsyncMock(return_value=mock_init_result)
 
@@ -258,6 +254,17 @@ class TestStdioConnectorOperations:
         mock_client.call_tool = AsyncMock(return_value=mock_result)
         connector.client_session = mock_client
 
+        # Mock the connection state to simulate being properly connected
+        connector._connected = True
+
+        # Mock a connection manager to simulate active connection
+        mock_connection_manager = Mock()
+        mock_task = Mock()
+        mock_task.done.return_value = False  # Task is still running (connection active)
+        mock_connection_manager._task = mock_task
+        mock_connection_manager.get_streams.return_value = ("read_stream", "write_stream")
+        connector._connection_manager = mock_connection_manager
+
         # Call tool
         tool_name = "test_tool"
         arguments = {"param": "value"}
@@ -309,9 +316,7 @@ class TestStdioConnectorOperations:
         """Test reading a resource."""
         # Mocked return for connector.client.read_resource().
         # Needs the structure StdioConnector.read_resource expects.
-        mock_client_return_value = (
-            MagicMock()
-        )  # spec=ReadResourceResult optional with MagicMock if defining manually
+        mock_client_return_value = MagicMock()  # spec=ReadResourceResult optional with MagicMock if defining manually
 
         # Define the nested structure
         content_item_mock = MagicMock()
