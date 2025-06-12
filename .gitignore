@@ -122,3 +122,7 @@ dmypy.json
 
 # macOS
 .DS_Store
+
+# AI
+.cursor
+.claude
