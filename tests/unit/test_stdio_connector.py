@@ -196,6 +196,8 @@ class TestStdioConnectorOperations:
         mock_client.list_prompts = AsyncMock(return_value=mock_list_prompts_response)
 
         connector.client_session = mock_client
+        # IMPORTANT: Mark as connected to prevent _ensure_connected from trying to reconnect
+        connector._connected = True
 
         # Initialize
         result_session_info = await connector.initialize()
@@ -293,6 +295,8 @@ class TestStdioConnectorOperations:
         mock_result.resources = [MagicMock()]
         mock_client.list_resources = AsyncMock(return_value=mock_result)
         connector.client_session = mock_client
+        # Mark as connected to prevent _ensure_connected from trying to reconnect
+        connector._connected = True
 
         # List resources
         result = await connector.list_resources()
@@ -373,6 +377,8 @@ class TestStdioConnectorOperations:
         mock_result = {"result": "success"}
         mock_client.request = AsyncMock(return_value=mock_result)
         connector.client_session = mock_client
+        # Mark as connected to prevent _ensure_connected from trying to reconnect
+        connector._connected = True
 
         # Send request
         method = "test_method"
@@ -391,6 +397,8 @@ class TestStdioConnectorOperations:
         mock_result = {"result": "success"}
         mock_client.request = AsyncMock(return_value=mock_result)
         connector.client_session = mock_client
+        # Mark as connected to prevent _ensure_connected from trying to reconnect
+        connector._connected = True
 
         # Send request without params
         method = "test_method"

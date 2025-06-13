@@ -30,6 +30,7 @@ class BaseConnector(ABC):
         self._resources: list[Resource] | None = None
         self._prompts: list[Prompt] | None = None
         self._connected = False
+        self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now), may be made configurable through the connector_config
 
     @abstractmethod
     async def connect(self) -> None:
@@ -151,14 +152,15 @@ class BaseConnector(ABC):
         Returns:
             True if the connector is connected and the connection is alive, False otherwise.
         """
-        # First check the basic connected flag
-        if not self._connected:
-            return False
 
         # Check if we have a client session
         if not self.client_session:
             # Update the connected flag since we don't have a client session
             self._connected = False
+            return False
+
+        # First check the basic connected flag
+        if not self._connected:
             return False
 
         # Check if we have a connection manager and if its task is still running
@@ -196,14 +198,42 @@ class BaseConnector(ABC):
 
         return True
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> CallToolResult:
-        """Call an MCP tool with the given arguments."""
+    async def _ensure_connected(self) -> None:
+        """Ensure the connector is connected, reconnecting if necessary.
+
+        Raises:
+            RuntimeError: If connection cannot be established and auto_reconnect is False.
+        """
         if not self.client_session:
             raise RuntimeError("MCP client is not connected")
 
-        # Check if we're actually connected before attempting the call
         if not self.is_connected:
-            raise RuntimeError("MCP connection has been lost. The connection manager task has completed " "or the underlying streams have been closed by the server.")
+            if self.auto_reconnect:
+                logger.debug("Connection lost, attempting to reconnect...")
+                try:
+                    await self.connect()
+                    logger.debug("Reconnection successful")
+                except Exception as e:
+                    raise RuntimeError(f"Failed to reconnect to MCP server: {e}") from e
+            else:
+                raise RuntimeError("Connection to MCP server has been lost. " "Auto-reconnection is disabled. Please reconnect manually.")
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> CallToolResult:
+        """Call an MCP tool with automatic reconnection handling.
+
+        Args:
+            name: The name of the tool to call.
+            arguments: The arguments to pass to the tool.
+
+        Returns:
+            The result of the tool call.
+
+        Raises:
+            RuntimeError: If the connection is lost and cannot be reestablished.
+        """
+
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug(f"Calling tool '{name}' with arguments: {arguments}")
         try:
@@ -211,17 +241,18 @@ class BaseConnector(ABC):
             logger.debug(f"Tool '{name}' called with result: {result}")
             return result
         except Exception as e:
-            # If the call fails, check if it might be due to connection loss
+            # Check if the error might be due to connection loss
             if not self.is_connected:
                 raise RuntimeError(f"Tool call '{name}' failed due to connection loss: {e}") from e
             else:
-                # Re-raise the original exception if it's not connection-related
+                # Re-raise the original error if it's not connection-related
                 raise
 
     async def list_tools(self) -> list[Tool]:
         """List all available tools from the MCP implementation."""
-        if not self.client_session:
-            raise RuntimeError("MCP client is not connected")
+
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug("Listing tools")
         try:
@@ -233,8 +264,8 @@ class BaseConnector(ABC):
 
     async def list_resources(self) -> list[Resource]:
         """List all available resources from the MCP implementation."""
-        if not self.client_session:
-            raise RuntimeError("MCP client is not connected")
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug("Listing resources")
         try:
@@ -255,8 +286,8 @@ class BaseConnector(ABC):
 
     async def list_prompts(self) -> list[Prompt]:
         """List all available prompts from the MCP implementation."""
-        if not self.client_session:
-            raise RuntimeError("MCP client is not connected")
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug("Listing prompts")
         try:
@@ -268,8 +299,8 @@ class BaseConnector(ABC):
 
     async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> GetPromptResult:
         """Get a prompt by name."""
-        if not self.client_session:
-            raise RuntimeError("MCP client is not connected")
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug(f"Getting prompt: {name}")
         result = await self.client_session.get_prompt(name, arguments)
@@ -277,8 +308,8 @@ class BaseConnector(ABC):
 
     async def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Send a raw request to the MCP implementation."""
-        if not self.client_session:
-            raise RuntimeError("MCP client is not connected")
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug(f"Sending request: {method} with params: {params}")
         return await self.client_session.request({"method": method, "params": params or {}})

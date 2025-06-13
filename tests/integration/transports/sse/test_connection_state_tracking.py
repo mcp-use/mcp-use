@@ -116,7 +116,7 @@ async def test_github_issue_120_fixed_behavior(long_timeout_server_process):
         print(f"is_connected: {session.is_connected}")
 
         # Verify tool works initially
-        result1 = await session.call_tool(test_tool.name, {})
+        result1 = await session.connector.call_tool(test_tool.name, {})
         assert result1 is not None, "Tool call should succeed while connected"
         print("✓ Tool call succeeded while connected")
 
@@ -133,7 +133,7 @@ async def test_github_issue_120_fixed_behavior(long_timeout_server_process):
         # Step 5: Attempt to call a tool - should either work (auto-reconnect) or give clear error
         print("Attempting tool call after timeout...")
         try:
-            result2 = await session.call_tool(test_tool.name, {})
+            result2 = await session.connector.call_tool(test_tool.name, {})
             # If auto-reconnection works, this should succeed
             if result2 is not None:
                 print("✓ Tool call succeeded - auto-reconnection worked")
@@ -190,7 +190,7 @@ async def test_github_issue_120_auto_connect_disabled(long_timeout_server_proces
         print(f"is_connected: {session.is_connected}")
 
         # Verify tool works initially
-        result1 = await session.call_tool(test_tool.name, {})
+        result1 = await session.connector.call_tool(test_tool.name, {})
         assert result1 is not None, "Tool call should succeed while connected"
         print("✓ Tool call succeeded while connected")
 
@@ -204,7 +204,7 @@ async def test_github_issue_120_auto_connect_disabled(long_timeout_server_proces
         # Attempt to call a tool - should fail with clear error message since auto_connect is disabled
         print("Attempting tool call after timeout (auto_connect=False)...")
         try:
-            result2 = await session.call_tool(test_tool.name, {})
+            result2 = await session.connector.call_tool(test_tool.name, {})
             # If this succeeds, the connection may still be active or there's an issue
             if result2 is not None:
                 print("⚠ Tool call succeeded unexpectedly - connection may still be active")
@@ -257,7 +257,7 @@ async def test_connection_state_after_server_timeout(timeout_server_process):
         print(f"Initial connection established, testing tool: {test_tool.name}")
 
         # Call tool successfully while connected
-        result1 = await session.call_tool(test_tool.name, {})
+        result1 = await session.connector.call_tool(test_tool.name, {})
         assert result1 is not None, "Tool call should succeed while connected"
         print("✓ Tool call succeeded while connected")
 
@@ -270,7 +270,7 @@ async def test_connection_state_after_server_timeout(timeout_server_process):
 
         # Try to call tool after timeout
         try:
-            result2 = await session.call_tool(test_tool.name, {})
+            result2 = await session.connector.call_tool(test_tool.name, {})
             if result2 is not None:
                 print("✓ Tool call succeeded - auto-reconnection worked")
             else:
@@ -369,7 +369,7 @@ async def test_multiple_reconnection_attempts(timeout_server_process):
 
             # Use the connection
             try:
-                result = await session.call_tool(test_tool.name, {})
+                result = await session.connector.call_tool(test_tool.name, {})
                 print(f"Tool call succeeded: {result is not None}")
             except Exception as e:
                 print(f"Tool call failed: {e}")
@@ -383,7 +383,7 @@ async def test_multiple_reconnection_attempts(timeout_server_process):
 
             # Try using connection after timeout
             try:
-                result2 = await session.call_tool(test_tool.name, {})
+                result2 = await session.connector.call_tool(test_tool.name, {})
                 print(f"Tool call after timeout succeeded: {result2 is not None}")
             except RuntimeError as e:
                 error_msg = str(e)

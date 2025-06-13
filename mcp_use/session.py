@@ -8,7 +8,6 @@ which handles authentication, initialization, and tool discovery.
 from typing import Any
 
 from .connectors.base import BaseConnector
-from .logging import logger
 
 
 class MCPSession:
@@ -83,52 +82,3 @@ class MCPSession:
             True if the connector is connected, False otherwise.
         """
         return self.connector.is_connected
-
-    async def _ensure_connected(self) -> None:
-        """Ensure the session is connected, reconnecting if necessary.
-
-        Raises:
-            RuntimeError: If connection cannot be established and auto_connect is False.
-        """
-        if not self.is_connected:
-            if self.auto_connect:
-                logger.debug("Connection lost, attempting to reconnect...")
-                try:
-                    await self.connect()
-                    logger.debug("Reconnection successful")
-                except Exception as e:
-                    raise RuntimeError(f"Failed to reconnect to MCP server: {e}") from e
-            else:
-                raise RuntimeError("Connection to MCP server has been lost. " "Auto-reconnection is disabled. Please reconnect manually.")
-
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
-        """Call a tool with automatic reconnection handling.
-
-        Args:
-            name: The name of the tool to call.
-            arguments: The arguments to pass to the tool.
-
-        Returns:
-            The result of the tool call.
-
-        Raises:
-            RuntimeError: If the connection is lost and cannot be reestablished.
-        """
-        # Ensure we're connected before calling the tool
-        await self._ensure_connected()
-
-        try:
-            return await self.connector.call_tool(name, arguments)
-        except Exception as e:
-            # Check if the error might be due to connection loss
-            if not self.is_connected:
-                logger.debug(f"Tool call failed, connection lost: {e}")
-                # Try to reconnect and retry once
-                await self._ensure_connected()
-                try:
-                    return await self.connector.call_tool(name, arguments)
-                except Exception as retry_error:
-                    raise RuntimeError(f"Tool call '{name}' failed after reconnection: {retry_error}") from retry_error
-            else:
-                # Re-raise the original error if it's not connection-related
-                raise
