@@ -6,6 +6,7 @@ to provide a simple interface for using MCP tools with different LLMs.
 """
 
 import logging
+import time
 from collections.abc import AsyncIterator
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
@@ -22,6 +23,8 @@ from langchain_core.utils.input import get_color_mapping
 
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
+from mcp_use.telemetry.posthog import Telemetry
+from mcp_use.telemetry.utils import extract_model_info
 
 from ..adapters.langchain_adapter import LangChainAdapter
 from ..logging import logger
@@ -93,6 +96,9 @@ class MCPAgent:
         # Create the adapter for tool conversion
         self.adapter = LangChainAdapter(disallowed_tools=self.disallowed_tools)
 
+        # Initialize telemetry
+        self.telemetry = Telemetry()
+
         # Initialize server manager if requested
         self.server_manager = None
         if self.use_server_manager:
@@ -103,6 +109,9 @@ class MCPAgent:
         # State tracking
         self._agent_executor: AgentExecutor | None = None
         self._system_message: SystemMessage | None = None
+
+        # Track model info for telemetry
+        self._model_provider, self._model_name = extract_model_info(self.llm)
 
     async def initialize(self) -> None:
         """Initialize the MCP client and agent."""
@@ -130,6 +139,7 @@ class MCPAgent:
                 if not self._sessions:
                     logger.info("🔄 No active sessions found, creating new ones...")
                     self._sessions = await self.client.create_all_sessions()
+                    self.connectors = [session.connector for session in self._sessions.values()]
                     logger.info(f"✅ Created {len(self._sessions)} new sessions")
 
                 # Create LangChain tools directly from the client using the adapter
@@ -374,13 +384,58 @@ class MCPAgent:
             async for chunk in agent.astream("hello"):
                 print(chunk, end="|", flush=True)
         """
-        async for chunk in self._generate_response_chunks_async(
-            query=query,
-            max_steps=max_steps,
-            manage_connector=manage_connector,
-            external_history=external_history,
-        ):
-            yield chunk
+        start_time = time.time()
+        success = False
+        chunk_count = 0
+        total_response_length = 0
+
+        try:
+            async for chunk in self._generate_response_chunks_async(
+                query=query,
+                max_steps=max_steps,
+                manage_connector=manage_connector,
+                external_history=external_history,
+            ):
+                chunk_count += 1
+                if isinstance(chunk, str):
+                    total_response_length += len(chunk)
+                yield chunk
+            success = True
+        finally:
+            # Track comprehensive execution data for streaming
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
+            server_count = 0
+            if self.client:
+                server_count = len(self.client.get_all_active_sessions())
+            elif self.connectors:
+                server_count = len(self.connectors)
+
+            conversation_history_length = (
+                len(self._conversation_history) if self.memory_enabled else 0
+            )
+
+            self.telemetry.track_agent_execution(
+                execution_method="astream",
+                query=query,
+                success=success,
+                model_provider=self._model_provider,
+                model_name=self._model_name,
+                server_count=server_count,
+                server_identifiers=[connector.public_identifier for connector in self.connectors],
+                total_tools_available=len(self._tools) if self._tools else 0,
+                tools_available_names=[tool.name for tool in self._tools],
+                max_steps_configured=self.max_steps,
+                memory_enabled=self.memory_enabled,
+                use_server_manager=self.use_server_manager,
+                max_steps_used=max_steps,
+                manage_connector=manage_connector,
+                external_history_used=external_history is not None,
+                response=f"[STREAMED RESPONSE - {total_response_length} chars]",
+                execution_time_ms=execution_time_ms,
+                error_type=None if success else "streaming_error",
+                conversation_history_length=conversation_history_length,
+            )
 
     async def run(
         self,
@@ -409,6 +464,10 @@ class MCPAgent:
         """
         result = ""
         initialized_here = False
+        start_time = time.time()
+        tools_used_names = []
+        steps_taken = 0
+        success = False
 
         try:
             # Initialize if needed
@@ -464,6 +523,7 @@ class MCPAgent:
             logger.info(f"🏁 Starting agent execution with max_steps={steps}")
 
             for step_num in range(steps):
+                steps_taken = step_num + 1
                 # --- Check for tool updates if using server manager ---
                 if self.use_server_manager and self.server_manager:
                     current_tools = self.server_manager.tools
@@ -510,9 +570,10 @@ class MCPAgent:
                     # If it's actions/steps, add to intermediate steps
                     intermediate_steps.extend(next_step_output)
 
-                    # Log tool calls
+                    # Log tool calls and track tool usage
                     for action, output in next_step_output:
                         tool_name = action.tool
+                        tools_used_names.append(tool_name)
                         tool_input_str = str(action.tool_input)
                         # Truncate long inputs for readability
                         if len(tool_input_str) > 100:
@@ -555,7 +616,8 @@ class MCPAgent:
             if self.memory_enabled:
                 self.add_to_history(AIMessage(content=result))
 
-            logger.info("🎉 Agent execution complete")
+            logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
+            success = True
             return result
 
         except Exception as e:
@@ -566,6 +628,43 @@ class MCPAgent:
             raise
 
         finally:
+            # Track comprehensive execution data
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
+            server_count = 0
+            if self.client:
+                server_count = len(self.client.get_all_active_sessions())
+            elif self.connectors:
+                server_count = len(self.connectors)
+
+            conversation_history_length = (
+                len(self._conversation_history) if self.memory_enabled else 0
+            )
+            self.telemetry.track_agent_execution(
+                execution_method="run",
+                query=query,
+                success=success,
+                model_provider=self._model_provider,
+                model_name=self._model_name,
+                server_count=server_count,
+                server_identifiers=[connector.public_identifier for connector in self.connectors],
+                total_tools_available=len(self._tools) if self._tools else 0,
+                tools_available_names=[tool.name for tool in self._tools],
+                max_steps_configured=self.max_steps,
+                memory_enabled=self.memory_enabled,
+                use_server_manager=self.use_server_manager,
+                max_steps_used=max_steps,
+                manage_connector=manage_connector,
+                external_history_used=external_history is not None,
+                steps_taken=steps_taken,
+                tools_used_count=len(tools_used_names),
+                tools_used_names=tools_used_names,
+                response=result,
+                execution_time_ms=execution_time_ms,
+                error_type=None if success else "execution_error",
+                conversation_history_length=conversation_history_length,
+            )
+
             # Clean up if necessary (e.g., if not using client-managed sessions)
             if manage_connector and not self.client and not initialized_here:
                 logger.info("🧹 Closing agent after query completion")
