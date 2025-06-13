@@ -243,3 +243,8 @@ class WebSocketConnector(BaseConnector):
         """Send a raw request to the MCP implementation."""
         logger.debug(f"Sending request: {method} with params: {params}")
         return await self._send_request(method, params)
+
+    @property
+    def public_identifier(self) -> str:
+        """Get the identifier for the connector."""
+        return {"type": "websocket", "url": self.url}

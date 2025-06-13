@@ -76,3 +76,8 @@ class StdioConnector(BaseConnector):
 
             # Re-raise the original exception
             raise
+
+    @property
+    def public_identifier(self) -> str:
+        """Get the identifier for the connector."""
+        return {"type": "stdio", "command&args": f"{self.command} {' '.join(self.args)}"}

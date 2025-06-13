@@ -62,7 +62,7 @@ class HttpConnector(BaseConnector):
 
         # Try streamable HTTP first (new transport), fall back to SSE (old transport)
         # This implements backwards compatibility per MCP specification
-        transport_type = None
+        self.transport_type = None
         connection_manager = None
 
         try:
@@ -86,7 +86,7 @@ class HttpConnector(BaseConnector):
                 # If we get here, streamable HTTP works
 
                 self.client_session = test_client
-                transport_type = "streamable HTTP"
+                self.transport_type = "streamable HTTP"
 
             except Exception as init_error:
                 # Clean up the test client
@@ -135,7 +135,7 @@ class HttpConnector(BaseConnector):
                         read_stream, write_stream, sampling_callback=None
                     )
                     await self.client_session.__aenter__()
-                    transport_type = "SSE"
+                    self.transport_type = "SSE"
 
                 except Exception as sse_error:
                     logger.error(
@@ -150,5 +150,11 @@ class HttpConnector(BaseConnector):
         self._connection_manager = connection_manager
         self._connected = True
         logger.debug(
-            f"Successfully connected to MCP implementation via {transport_type}: {self.base_url}"
+            f"Successfully connected to MCP implementation via"
+            f" {self.transport_type}: {self.base_url}"
         )
+
+    @property
+    def public_identifier(self) -> str:
+        """Get the identifier for the connector."""
+        return {"type": self.transport_type, "base_url": self.base_url}

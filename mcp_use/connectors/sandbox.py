@@ -289,3 +289,8 @@ class SandboxConnector(BaseConnector):
         await self._cleanup_resources()
         self._connected = False
         logger.debug("Disconnected from MCP implementation")
+
+    @property
+    def public_identifier(self) -> str:
+        """Get the identifier for the connector."""
+        return {"type": "sandbox", "command": self.user_command, "args": self.user_args}

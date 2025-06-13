@@ -36,6 +36,12 @@ class BaseConnector(ABC):
         """Establish a connection to the MCP implementation."""
         pass
 
+    @property
+    @abstractmethod
+    def public_identifier(self) -> str:
+        """Get the identifier for the connector."""
+        pass
+
     async def disconnect(self) -> None:
         """Close the connection to the MCP implementation."""
         if not self._connected:
