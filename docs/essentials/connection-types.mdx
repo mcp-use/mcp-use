@@ -142,8 +142,8 @@ client = MCPClient.from_config_file(
 
 For example:
 
-- If your configuration includes `command` and `args` and sandbox parmater is False` (default), a local STDIO connection will be used
-- If your configuration includes `command` and `args` and sandbox parmater is True`, a sandboxed execution connection will be used
+- If your configuration includes `command` and `args` and sandbox parameter is False` (default), a local STDIO connection will be used
+- If your configuration includes `command` and `args` and sandbox parameter is True`, a sandboxed execution connection will be used
 - If your configuration has a `url` starting with `http://` or `https://`, an HTTP connection will be used
 
 This automatic inference simplifies the configuration process and ensures the appropriate connection type is used without requiring explicit specification.
