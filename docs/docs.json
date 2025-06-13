@@ -40,7 +40,8 @@
           {
             "group": "Development",
             "pages": [
-              "development"
+              "development",
+              "development/telemetry"
             ]
           }
         ]
