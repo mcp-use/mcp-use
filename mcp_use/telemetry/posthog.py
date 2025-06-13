@@ -12,12 +12,9 @@ from posthog import Posthog
 from mcp_use.logging import MCP_USE_DEBUG
 from mcp_use.telemetry.events import (
     BaseTelemetryEvent,
-    MCPAgentQueryEvent,
-    ServerConnectionEvent,
-    SessionEndEvent,
-    SessionStartEvent,
-    ToolUsageEvent,
+    MCPAgentExecutionEvent,
 )
+from mcp_use.telemetry.utils import get_package_version
 from mcp_use.utils import singleton
 
 logger = logging.getLogger(__name__)
@@ -121,8 +118,12 @@ class Telemetry:
     def capture(self, event: BaseTelemetryEvent) -> None:
         """Capture a telemetry event"""
         try:
+            # Add package version to all events
+            properties = event.properties.copy()
+            properties["mcp_use_version"] = get_package_version()
+
             self._posthog_client.capture(
-                distinct_id=self.user_id, event=event.name, properties=event.properties
+                distinct_id=self.user_id, event=event.name, properties=properties
             )
         except Exception as e:
             logger.debug(f"Failed to track event {event.name}: {e}")
@@ -131,53 +132,66 @@ class Telemetry:
     def track_event(self, event_name: str, properties: dict[str, Any] | None = None) -> None:
         """Track a telemetry event with optional properties (legacy method)"""
         try:
+            # Add package version to all events
+            event_properties = (properties or {}).copy()
+            event_properties["mcp_use_version"] = get_package_version()
+
             self._posthog_client.capture(
-                distinct_id=self.user_id, event=event_name, properties=properties or {}
+                distinct_id=self.user_id, event=event_name, properties=event_properties
             )
         except Exception as e:
             logger.debug(f"Failed to track event {event_name}: {e}")
 
     @requires_telemetry
-    def track_agent_query(self, query_type: str, server_count: int, tools_used: int) -> None:
-        """Track MCP agent query usage"""
-        event = MCPAgentQueryEvent(
-            query_type=query_type, server_count=server_count, tools_used=tools_used
-        )
-        self.capture(event)
-
-    @requires_telemetry
-    def track_server_connection(
-        self, server_type: str, connection_type: str, success: bool
+    def track_agent_execution(
+        self,
+        execution_method: str,
+        query: str,
+        success: bool,
+        model_provider: str,
+        model_name: str,
+        server_count: int,
+        server_identifiers: list[dict[str, str]],
+        total_tools_available: int,
+        tools_available_names: list[str],
+        max_steps_configured: int,
+        memory_enabled: bool,
+        use_server_manager: bool,
+        max_steps_used: int | None,
+        manage_connector: bool,
+        external_history_used: bool,
+        steps_taken: int | None = None,
+        tools_used_count: int | None = None,
+        tools_used_names: list[str] | None = None,
+        response: str | None = None,
+        execution_time_ms: int | None = None,
+        error_type: str | None = None,
+        conversation_history_length: int | None = None,
     ) -> None:
-        """Track MCP server connection attempts"""
-        event = ServerConnectionEvent(
-            server_type=server_type, connection_type=connection_type, success=success
-        )
-        self.capture(event)
-
-    @requires_telemetry
-    def track_tool_usage(self, tool_name: str, server_name: str) -> None:
-        """Track individual MCP tool usage"""
-        event = ToolUsageEvent(tool_name=tool_name, server_name=server_name)
-        self.capture(event)
-
-    @requires_telemetry
-    def track_session_start(self, client_version: str, python_version: str, platform: str) -> None:
-        """Track session start"""
-        event = SessionStartEvent(
-            client_version=client_version, python_version=python_version, platform=platform
-        )
-        self.capture(event)
-
-    @requires_telemetry
-    def track_session_end(
-        self, duration_seconds: int, total_queries: int, total_servers_connected: int
-    ) -> None:
-        """Track session end"""
-        event = SessionEndEvent(
-            duration_seconds=duration_seconds,
-            total_queries=total_queries,
-            total_servers_connected=total_servers_connected,
+        """Track comprehensive agent execution"""
+        event = MCPAgentExecutionEvent(
+            execution_method=execution_method,
+            query=query,
+            success=success,
+            model_provider=model_provider,
+            model_name=model_name,
+            server_count=server_count,
+            server_identifiers=server_identifiers,
+            total_tools_available=total_tools_available,
+            tools_available_names=tools_available_names,
+            max_steps_configured=max_steps_configured,
+            memory_enabled=memory_enabled,
+            use_server_manager=use_server_manager,
+            max_steps_used=max_steps_used,
+            manage_connector=manage_connector,
+            external_history_used=external_history_used,
+            steps_taken=steps_taken,
+            tools_used_count=tools_used_count,
+            tools_used_names=tools_used_names,
+            response=response,
+            execution_time_ms=execution_time_ms,
+            error_type=error_type,
+            conversation_history_length=conversation_history_length,
         )
         self.capture(event)
 

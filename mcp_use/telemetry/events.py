@@ -20,100 +20,74 @@ class BaseTelemetryEvent(ABC):
 
 
 @dataclass
-class MCPAgentQueryEvent(BaseTelemetryEvent):
-    """Event for tracking MCP agent query usage"""
+class MCPAgentExecutionEvent(BaseTelemetryEvent):
+    """Comprehensive event for tracking complete MCP agent execution"""
 
-    query_type: str
-    server_count: int
-    tools_used: int
-
-    @property
-    def name(self) -> str:
-        return "mcp_agent_query"
-
-    @property
-    def properties(self) -> dict[str, Any]:
-        return {
-            "query_type": self.query_type,
-            "server_count": self.server_count,
-            "tools_used": self.tools_used,
-        }
-
-
-@dataclass
-class ServerConnectionEvent(BaseTelemetryEvent):
-    """Event for tracking MCP server connection attempts"""
-
-    server_type: str
-    connection_type: str
+    # Execution method and context
+    execution_method: str  # "run" or "astream"
+    query: str  # The actual user query
     success: bool
 
+    # Agent configuration
+    model_provider: str
+    model_name: str
+    server_count: int
+    server_identifiers: list[dict[str, str]]
+    total_tools_available: int
+    tools_available_names: list[str]
+    max_steps_configured: int
+    memory_enabled: bool
+    use_server_manager: bool
+
+    # Execution PARAMETERS
+    max_steps_used: int | None
+    manage_connector: bool
+    external_history_used: bool
+
+    # Execution results
+    steps_taken: int | None = None
+    tools_used_count: int | None = None
+    tools_used_names: list[str] | None = None
+    response: str | None = None  # The actual response
+    execution_time_ms: int | None = None
+    error_type: str | None = None
+
+    # Context
+    conversation_history_length: int | None = None
+
     @property
     def name(self) -> str:
-        return "server_connection"
+        return "mcp_agent_execution"
 
     @property
     def properties(self) -> dict[str, Any]:
         return {
-            "server_type": self.server_type,
-            "connection_type": self.connection_type,
+            # Core execution info
+            "execution_method": self.execution_method,
+            "query": self.query,
+            "query_length": len(self.query),
             "success": self.success,
-        }
-
-
-@dataclass
-class ToolUsageEvent(BaseTelemetryEvent):
-    """Event for tracking individual MCP tool usage"""
-
-    tool_name: str
-    server_name: str
-
-    @property
-    def name(self) -> str:
-        return "tool_usage"
-
-    @property
-    def properties(self) -> dict[str, Any]:
-        return {"tool_name": self.tool_name, "server_name": self.server_name}
-
-
-@dataclass
-class SessionStartEvent(BaseTelemetryEvent):
-    """Event for tracking session starts"""
-
-    client_version: str
-    python_version: str
-    platform: str
-
-    @property
-    def name(self) -> str:
-        return "session_start"
-
-    @property
-    def properties(self) -> dict[str, Any]:
-        return {
-            "client_version": self.client_version,
-            "python_version": self.python_version,
-            "platform": self.platform,
-        }
-
-
-@dataclass
-class SessionEndEvent(BaseTelemetryEvent):
-    """Event for tracking session ends"""
-
-    duration_seconds: int
-    total_queries: int
-    total_servers_connected: int
-
-    @property
-    def name(self) -> str:
-        return "session_end"
-
-    @property
-    def properties(self) -> dict[str, Any]:
-        return {
-            "duration_seconds": self.duration_seconds,
-            "total_queries": self.total_queries,
-            "total_servers_connected": self.total_servers_connected,
+            # Agent configuration
+            "model_provider": self.model_provider,
+            "model_name": self.model_name,
+            "server_count": self.server_count,
+            "server_identifiers": self.server_identifiers,
+            "total_tools_available": self.total_tools_available,
+            "tools_available_names": self.tools_available_names,
+            "max_steps_configured": self.max_steps_configured,
+            "memory_enabled": self.memory_enabled,
+            "use_server_manager": self.use_server_manager,
+            # Execution parameters (always include, even if None)
+            "max_steps_used": self.max_steps_used,
+            "manage_connector": self.manage_connector,
+            "external_history_used": self.external_history_used,
+            # Execution results (always include, even if None)
+            "steps_taken": self.steps_taken,
+            "tools_used_count": self.tools_used_count,
+            "tools_used_names": self.tools_used_names,
+            "response": self.response,
+            "response_length": len(self.response) if self.response else None,
+            "execution_time_ms": self.execution_time_ms,
+            "error_type": self.error_type,
+            "conversation_history_length": self.conversation_history_length,
         }
