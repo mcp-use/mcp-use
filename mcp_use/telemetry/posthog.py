@@ -9,6 +9,7 @@ from typing import Any
 
 from posthog import Posthog
 
+from mcp_use.logging import MCP_USE_DEBUG
 from mcp_use.telemetry.events import (
     BaseTelemetryEvent,
     MCPAgentQueryEvent,
@@ -69,7 +70,6 @@ class Telemetry:
 
     def __init__(self):
         telemetry_disabled = os.getenv("MCP_USE_ANONYMIZED_TELEMETRY", "true").lower() == "false"
-        self.debug_logging = os.getenv("MCP_USE_LOGGING_LEVEL", "info").lower() == "debug"
 
         if telemetry_disabled:
             self._posthog_client = None
@@ -86,8 +86,8 @@ class Telemetry:
                     enable_exception_autocapture=True,
                 )
 
-                # Silence posthog's logging unless debug mode
-                if not self.debug_logging:
+                # Silence posthog's logging unless debug mode (level 2)
+                if MCP_USE_DEBUG < 2:
                     posthog_logger = logging.getLogger("posthog")
                     posthog_logger.disabled = True
 
