@@ -180,12 +180,12 @@ class BaseConnector(ABC):
                     # Connection should be a tuple of (read_stream, write_stream)
                     if isinstance(streams, tuple) and len(streams) == 2:
                         read_stream, write_stream = streams
-                        # Check if streams have _closed attribute and are closed
-                        if hasattr(read_stream, "_closed") and read_stream._closed:
+                        # Check if streams are closed using getattr with default value
+                        if getattr(read_stream, "_closed", False):
                             logger.debug("Read stream is closed, marking as disconnected")
                             self._connected = False
                             return False
-                        if hasattr(write_stream, "_closed") and write_stream._closed:
+                        if getattr(write_stream, "_closed", False):
                             logger.debug("Write stream is closed, marking as disconnected")
                             self._connected = False
                             return False
