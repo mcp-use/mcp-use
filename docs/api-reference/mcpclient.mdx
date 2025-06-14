@@ -1,0 +1,451 @@
+---
+title: "MCPClient"
+description: "MCPClient API Documentation"
+icon: "plug"
+---
+
+# MCPClient API Reference
+
+The `MCPClient` class is the core component for managing connections to MCP servers and orchestrating tool access.
+
+## Constructor
+
+### MCPClient(config_dict, debug=False)
+
+Creates a new MCPClient instance from a configuration dictionary.
+
+**Parameters:**
+- `config_dict` (dict): Configuration dictionary containing server definitions
+- `debug` (bool, optional): Enable debug logging. Defaults to False.
+
+**Example:**
+```python
+config = {
+    "mcpServers": {
+        "filesystem": {
+            "command": "mcp-server-filesystem",
+            "args": ["/workspace"]
+        }
+    }
+}
+
+client = MCPClient(config, debug=True)
+```
+
+## Class Methods
+
+### from_config_file(config_file_path, debug=False)
+
+Creates an MCPClient instance from a JSON configuration file.
+
+**Parameters:**
+- `config_file_path` (str): Path to the JSON configuration file
+- `debug` (bool, optional): Enable debug logging. Defaults to False.
+
+**Returns:**
+- `MCPClient`: Configured client instance
+
+**Example:**
+```python
+client = MCPClient.from_config_file("mcp_config.json")
+```
+
+### from_dict(config_dict, debug=False)
+
+Creates an MCPClient instance from a configuration dictionary.
+
+**Parameters:**
+- `config_dict` (dict): Configuration dictionary
+- `debug` (bool, optional): Enable debug logging. Defaults to False.
+
+**Returns:**
+- `MCPClient`: Configured client instance
+
+**Example:**
+```python
+config = {
+    "mcpServers": {
+        "playwright": {
+            "command": "npx",
+            "args": ["@playwright/mcp@latest"]
+        }
+    }
+}
+
+client = MCPClient.from_dict(config)
+```
+
+## Instance Methods
+
+### async connect_all()
+
+Establishes connections to all configured MCP servers.
+
+**Returns:**
+- `None`
+
+**Raises:**
+- `ConnectionError`: If any server fails to connect
+- `TimeoutError`: If connection timeout is exceeded
+
+**Example:**
+```python
+await client.connect_all()
+```
+
+### async disconnect_all()
+
+Closes all active server connections.
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+await client.disconnect_all()
+```
+
+### async list_tools(server_name=None)
+
+Lists available tools from connected servers.
+
+**Parameters:**
+- `server_name` (str, optional): Name of specific server. If None, lists tools from all servers.
+
+**Returns:**
+- `List[Dict]`: List of tool definitions
+
+**Example:**
+```python
+# List all tools
+all_tools = await client.list_tools()
+
+# List tools from specific server
+fs_tools = await client.list_tools("filesystem")
+```
+
+### async call_tool(tool_name, arguments, server_name=None)
+
+Executes a tool with the given arguments.
+
+**Parameters:**
+- `tool_name` (str): Name of the tool to execute
+- `arguments` (dict): Tool arguments
+- `server_name` (str, optional): Specific server to use. If None, searches all servers.
+
+**Returns:**
+- `Any`: Tool execution result
+
+**Raises:**
+- `ToolNotFoundError`: If tool is not available
+- `ToolExecutionError`: If tool execution fails
+
+**Example:**
+```python
+result = await client.call_tool(
+    "file_read",
+    {"path": "/workspace/file.txt"},
+    server_name="filesystem"
+)
+```
+
+### async get_server_status(server_name=None)
+
+Gets the connection status of servers.
+
+**Parameters:**
+- `server_name` (str, optional): Specific server name. If None, returns status for all servers.
+
+**Returns:**
+- `Dict`: Server status information
+
+**Example:**
+```python
+# Get all server statuses
+all_status = await client.get_server_status()
+
+# Get specific server status
+fs_status = await client.get_server_status("filesystem")
+```
+
+### async reconnect_server(server_name)
+
+Reconnects a specific server.
+
+**Parameters:**
+- `server_name` (str): Name of the server to reconnect
+
+**Returns:**
+- `None`
+
+**Raises:**
+- `ConnectionError`: If reconnection fails
+
+**Example:**
+```python
+await client.reconnect_server("filesystem")
+```
+
+### async reconnect_all()
+
+Reconnects all servers.
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+await client.reconnect_all()
+```
+
+## Properties
+
+### servers
+
+**Type:** `Dict[str, ServerConnection]`
+
+Dictionary of configured server connections.
+
+**Example:**
+```python
+print(f"Configured servers: {list(client.servers.keys())}")
+```
+
+### config
+
+**Type:** `Dict`
+
+The configuration dictionary used to initialize the client.
+
+**Example:**
+```python
+print(f"Client config: {client.config}")
+```
+
+### debug
+
+**Type:** `bool`
+
+Debug mode status.
+
+**Example:**
+```python
+if client.debug:
+    print("Debug mode enabled")
+```
+
+## Configuration Format
+
+The MCPClient expects a configuration dictionary with the following structure:
+
+```json
+{
+  "mcpServers": {
+    "server_name": {
+      "command": "executable_command",
+      "args": ["arg1", "arg2"],
+      "env": {
+        "ENV_VAR": "value"
+      },
+      "cwd": "/working/directory"
+    }
+  }
+}
+```
+
+### Configuration Fields
+
+- **command** (required): The executable command to run the server
+- **args** (optional): List of command line arguments
+- **env** (optional): Environment variables for the server process
+- **cwd** (optional): Working directory for the server process
+
+## Error Handling
+
+The MCPClient can raise several types of exceptions:
+
+### ConnectionError
+Raised when server connection fails.
+
+```python
+try:
+    await client.connect_all()
+except ConnectionError as e:
+    print(f"Connection failed: {e}")
+```
+
+### TimeoutError
+Raised when operations exceed timeout limits.
+
+```python
+try:
+    result = await asyncio.wait_for(
+        client.call_tool("slow_tool", {}),
+        timeout=30
+    )
+except TimeoutError:
+    print("Tool execution timed out")
+```
+
+### ToolNotFoundError
+Raised when a requested tool is not available.
+
+```python
+try:
+    await client.call_tool("nonexistent_tool", {})
+except ToolNotFoundError:
+    print("Tool not found")
+```
+
+### ToolExecutionError
+Raised when tool execution fails.
+
+```python
+try:
+    await client.call_tool("file_read", {"path": "/nonexistent"})
+except ToolExecutionError as e:
+    print(f"Tool execution failed: {e}")
+```
+
+## Context Manager Usage
+
+MCPClient supports async context manager protocol:
+
+```python
+async with MCPClient.from_config_file("config.json") as client:
+    tools = await client.list_tools()
+    result = await client.call_tool("some_tool", {})
+    # Client automatically disconnects on exit
+```
+
+## Best Practices
+
+### Connection Management
+```python
+# Good: Use context manager
+async with MCPClient.from_config_file("config.json") as client:
+    result = await client.call_tool("tool_name", {})
+
+# Alternative: Manual management
+client = MCPClient.from_config_file("config.json")
+try:
+    await client.connect_all()
+    result = await client.call_tool("tool_name", {})
+finally:
+    await client.disconnect_all()
+```
+
+### Error Handling
+```python
+async def robust_tool_call(client, tool_name, args):
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            return await client.call_tool(tool_name, args)
+        except (ConnectionError, TimeoutError) as e:
+            if attempt == max_retries - 1:
+                raise
+            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            await client.reconnect_all()
+```
+
+### Performance Optimization
+```python
+# Pre-connect for better performance
+client = MCPClient.from_config_file("config.json")
+await client.connect_all()
+
+# Reuse client for multiple operations
+tools = await client.list_tools()
+for tool in tools:
+    if tool["name"] == "target_tool":
+        result = await client.call_tool(tool["name"], {})
+```
+
+## Examples
+
+### Basic Usage
+```python
+import asyncio
+from mcp_use import MCPClient
+
+async def main():
+    # Create client from config file
+    client = MCPClient.from_config_file("mcp_config.json")
+
+    # Connect to servers
+    await client.connect_all()
+
+    # List available tools
+    tools = await client.list_tools()
+    print(f"Available tools: {[t['name'] for t in tools]}")
+
+    # Execute a tool
+    result = await client.call_tool(
+        "file_read",
+        {"path": "/workspace/README.md"}
+    )
+    print(f"File contents: {result}")
+
+    # Clean up
+    await client.disconnect_all()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Multi-Server Configuration
+```python
+config = {
+    "mcpServers": {
+        "filesystem": {
+            "command": "mcp-server-filesystem",
+            "args": ["/workspace"]
+        },
+        "playwright": {
+            "command": "npx",
+            "args": ["@playwright/mcp@latest"],
+            "env": {
+                "DISPLAY": ":1"
+            }
+        },
+        "sqlite": {
+            "command": "mcp-server-sqlite",
+            "args": ["--db", "/data/app.db"]
+        }
+    }
+}
+
+async def multi_server_example():
+    client = MCPClient.from_dict(config)
+    await client.connect_all()
+
+    # Use filesystem tools
+    file_content = await client.call_tool(
+        "file_read",
+        {"path": "/workspace/data.txt"},
+        server_name="filesystem"
+    )
+
+    # Use web scraping tools
+    page_content = await client.call_tool(
+        "playwright_goto",
+        {"url": "https://example.com"},
+        server_name="playwright"
+    )
+
+    # Use database tools
+    query_result = await client.call_tool(
+        "sqlite_query",
+        {"query": "SELECT * FROM users LIMIT 10"},
+        server_name="sqlite"
+    )
+
+    await client.disconnect_all()
+```
+
+## See Also
+
+- [MCPAgent API Reference](/api-reference/mcpagent) - High-level agent interface
+- [Configuration Guide](/essentials/configuration) - Detailed configuration options
+- [Connection Types](/essentials/connection-types) - Understanding different server types

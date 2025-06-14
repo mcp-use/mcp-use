@@ -1,57 +1,110 @@
 ---
-title: 'Debugging'
-description: 'Learn how to debug and log in mcp-use'
+title: "Debugging"
+description: "Learn how to debug and log in mcp-use"
+icon: "bug"
 ---
 
 # Debugging MCP-Use
 
+<Info>
 MCP-Use provides built-in debugging functionality that increases log verbosity and helps diagnose issues in your agent implementation.
+</Info>
 
 ## Enabling Debug Mode
+
+<Note>
+Choose the debug method that best fits your workflow - environment variables for one-off debugging or programmatic control for conditional debugging.
+</Note>
 
 There are two primary ways to enable debug mode:
 
 ### 1. Environment Variable (Recommended for One-off Runs)
 
-Run your script with the `DEBUG` environment variable set to the desired level:
+<Tabs>
+  <Tab title="Inline (Temporary)">
+    Run your script with the `DEBUG` environment variable:
 
-```bash
-# Level 1: Show INFO level messages
-DEBUG=1 python3.11 examples/browser_use.py
+    ```bash
+    # Level 1: Show INFO level messages
+    DEBUG=1 python3.11 examples/browser_use.py
 
-# Level 2: Show DEBUG level messages (full verbose output)
-DEBUG=2 python3.11 examples/browser_use.py
-```
+    # Level 2: Show DEBUG level messages (full verbose output)
+    DEBUG=2 python3.11 examples/browser_use.py
+    ```
 
-This sets the debug level only for the duration of that specific Python process. This is particularly useful for quickly troubleshooting issues without modifying your code.
-Alternatively you can set the environment variable MCP_USE_DEBUG as such:
-```bash
-export MCP_USE_DEBUG=1 # or 2
-```
+    <Tip>
+    This sets the debug level only for that specific Python process - perfect for quick troubleshooting.
+    </Tip>
+  </Tab>
+
+  <Tab title="Persistent">
+    Set the environment variable in your shell:
+
+    ```bash
+    export MCP_USE_DEBUG=1  # or 2
+    ```
+
+    Or add it to your `.env` file:
+    ```bash .env
+    MCP_USE_DEBUG=2
+    ```
+  </Tab>
+</Tabs>
 
 ### 2. Setting the Debug Flag Programmatically
 
-You can set the global debug flag directly in your code, which is useful for debugging specific parts of your application or conditionally enabling debug mode based on your application state:
+<Note>
+Programmatic control is useful for debugging specific parts of your application or conditionally enabling debug mode based on your application state.
+</Note>
 
 ```python
 import mcp_use
 
+# Different debug levels
 mcp_use.set_debug(1)  # INFO level
-# or
 mcp_use.set_debug(2)  # DEBUG level (full verbose output)
-# or
 mcp_use.set_debug(0)  # Turn off debug (WARNING level)
 ```
 
+<Tip>
+You can conditionally enable debugging based on environment or configuration:
+
+```python
+import os
+import mcp_use
+
+if os.getenv("ENVIRONMENT") == "development":
+    mcp_use.set_debug(2)
+```
+</Tip>
+
 ## Debug Levels
 
-MCP-Use supports different levels of debugging:
+<CardGroup cols={3}>
+  <Card title="Level 0 - Normal" icon="volume-off">
+    **Default Operation**
 
-| Level | Environment Variable | Program Setting | Description |
-|-------|---------------------|-----------------|-------------|
-| 0     | (not set)           | `set_debug(0)`  | Normal operation, only WARNING and above messages are shown |
-| 1     | `DEBUG=1`           | `set_debug(1)`  | INFO level messages are shown - useful for basic operational information. Shows tool calls.|
-| 2     | `DEBUG=2`           | `set_debug(2)`  | Full DEBUG level - all detailed debugging information is shown |
+    Only WARNING and above messages are shown
+
+    `set_debug(0)` or no debug setting
+  </Card>
+
+  <Card title="Level 1 - Info" icon="volume-low">
+    **Basic Information**
+
+    Shows INFO level messages and tool calls - useful for basic operational information
+
+    `DEBUG=1` or `set_debug(1)`
+  </Card>
+
+  <Card title="Level 2 - Full Debug" icon="volume-high">
+    **Maximum Verbosity**
+
+    Shows all detailed debugging information including internal operations
+
+    `DEBUG=2` or `set_debug(2)`
+  </Card>
+</CardGroup>
 
 ## Agent-Specific Verbosity
 
@@ -83,10 +136,29 @@ When debug mode is enabled, you'll see more detailed information about:
 
 This can be extremely helpful when diagnosing issues with custom MCP servers or understanding why an agent might be behaving unexpectedly.
 
-## Langsmith
+## LangSmith Integration
 
-Langchain offers a very nice tool to debug agent behaviour which integrates seamlessly with mcp-use. You can visit https://smith.langchain.com/ and login, they will give you a set of variables to copy in an .env file
-you will be then able to visualize the agent behaviour on their platform.
+<Info>
+**Advanced Debugging**: LangChain offers LangSmith, a powerful tool for debugging agent behavior that integrates seamlessly with mcp-use.
+</Info>
+
+<Steps>
+  <Step title="Sign Up">
+    Visit [smith.langchain.com](https://smith.langchain.com/) and create an account
+  </Step>
+
+  <Step title="Get API Keys">
+    After login, you'll receive environment variables to add to your `.env` file
+  </Step>
+
+  <Step title="Visualize">
+    You'll be able to visualize agent behavior, tool calls, and decision-making processes on their platform
+  </Step>
+</Steps>
+
+<Tip>
+LangSmith provides detailed traces of your agent's execution, making it easier to understand complex multi-step workflows.
+</Tip>
 
 ## Troubleshooting Common Issues
 

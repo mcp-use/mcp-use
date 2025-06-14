@@ -1,0 +1,24 @@
+/*
+ * Adding Inter Variable from Adobe Fonts
+ * © 2009-2025 Adobe Systems Incorporated. All Rights Reserved.
+ */
+
+@import url('https://p.typekit.net/p.css?s=1&k=zmy3zmk&ht=tk&f=55314&a=164646275&app=typekit&e=css');
+
+@font-face {
+  font-family: 'inter-variable';
+  src: url('https://use.typekit.net/af/250efc/00000000000000007750957d/31/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3')
+      format('woff2'),
+    url('https://use.typekit.net/af/250efc/00000000000000007750957d/31/d?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3')
+      format('woff'),
+    url('https://use.typekit.net/af/250efc/00000000000000007750957d/31/a?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3')
+      format('opentype');
+  font-display: auto;
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: normal;
+}
+
+body {
+  font-family: 'inter-variable', sans-serif;
+}

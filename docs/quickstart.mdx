@@ -1,51 +1,74 @@
 ---
-title: Quickstart
+title: "Quickstart"
 description: "Get started with mcp_use in minutes"
+icon: "rocket"
 ---
 
 # Quickstart Guide
 
-This guide will help you get started with mcp_use quickly. We'll cover installation, basic configuration, and running your first agent.
+<Info>
+This guide will get you started with mcp_use in **under 5 minutes**. We'll cover installation, basic configuration, and running your first agent.
+</Info>
 
 ## Installation
 
-You can install mcp_use using pip:
+<CodeGroup>
+  ```bash pip
+  pip install mcp-use
+  ```
 
-```bash
-pip install mcp-use
-```
+  ```bash from source
+  git clone https://github.com/mcp-use/mcp-use.git
+  cd mcp-use
+  pip install -e .
+  ```
+</CodeGroup>
 
-Or install from source:
-
-```bash
-git clone https://github.com/pietrozullo/mcp-use.git
-cd mcp-use
-pip install -e .
-```
+<Tip>
+Installing from source gives you access to the latest features and examples!
+</Tip>
 
 ## Installing LangChain Providers
 
-mcp_use works with various LLM providers through LangChain. You'll need to install the appropriate LangChain provider package for your chosen LLM. For example:
+mcp_use works with various LLM providers through LangChain. You'll need to install the appropriate LangChain provider package for your chosen LLM:
 
-```bash
-# For OpenAI
-pip install langchain-openai
+<CodeGroup>
+  ```bash OpenAI
+  pip install langchain-openai
+  ```
 
-# For Anthropic
-pip install langchain-anthropic
+  ```bash Anthropic
+  pip install langchain-anthropic
+  ```
 
-# For other providers, check the [LangChain chat models documentation](https://python.langchain.com/docs/integrations/chat/)
-```
+  ```bash Google
+  pip install langchain-google-genai
+  ```
 
-> **Important**: Only models with tool calling capabilities can be used with mcp_use. Make sure your chosen model supports function calling or tool use.
+  ```bash Groq
+  pip install langchain-groq
+  ```
+</CodeGroup>
+
+<Warning>
+**Tool Calling Required**: Only models with tool calling capabilities can be used with mcp_use. Make sure your chosen model supports function calling or tool use.
+</Warning>
+
+<Tip>
+For other providers, check the [LangChain chat models documentation](https://python.langchain.com/docs/integrations/chat/)
+</Tip>
 
 ## Environment Setup
 
-Set up your environment variables in a `.env` file:
+<Note>
+Set up your environment variables in a `.env` file for secure API key management:
+</Note>
 
-```bash
+```bash .env
 OPENAI_API_KEY=your_api_key_here
 ANTHROPIC_API_KEY=your_api_key_here
+GROQ_API_KEY=your_api_key_here
+GOOGLE_API_KEY=your_api_key_here
 ```
 
 ## Your First Agent
@@ -282,9 +305,18 @@ if __name__ == "__main__":
 
 ## Available MCP Servers
 
-mcp_use supports any MCP server, allowing you to connect to a wide range of server implementations. For a comprehensive list of available servers, check out the [awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) repository.
+<CardGroup cols={2}>
+  <Card title="Awesome MCP Servers" icon="star" href="https://github.com/punkpeye/awesome-mcp-servers">
+    Comprehensive list of available MCP servers from the community
+  </Card>
+  <Card title="Configuration Guide" icon="gear" href="/essentials/configuration">
+    Learn how to configure different types of MCP servers
+  </Card>
+</CardGroup>
 
-Each server requires its own configuration. Check the [Configuration Guide](/essentials/configuration) for details.
+<Info>
+mcp_use supports **any MCP server**, allowing you to connect to a wide range of server implementations for different use cases.
+</Info>
 
 ## Streaming Agent Output
 
@@ -307,6 +339,18 @@ We will also post a guide soon on how this can be done in a semi-elegant way wit
 
 ## Next Steps
 
-- Learn about [Configuration Options](/essentials/configuration)
-- Explore [Example Use Cases](/examples)
-- Check out [Advanced Features](/essentials/advanced)
+<CardGroup cols={3}>
+  <Card title="Configuration" icon="gear" href="/essentials/configuration">
+    Learn advanced configuration options and multi-server setups
+  </Card>
+  <Card title="LLM Integration" icon="brain" href="/essentials/llm-integration">
+    Discover all supported LLM providers and optimization tips
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
+    Explore real-world examples and use cases
+  </Card>
+</CardGroup>
+
+<Tip>
+**Need Help?** Join our community discussions on GitHub or check out the comprehensive examples in our repository!
+</Tip>

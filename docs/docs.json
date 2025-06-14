@@ -1,40 +1,48 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "maple",
   "name": "mcp_use",
   "colors": {
-    "primary": "#062c24",
-    "light": "#55e4c8",
+    "primary": "#ffffff",
+    "light": "#ffffff",
     "dark": "#000000"
   },
   "favicon": "/favicon.svg",
+  "icons": {
+    "library": "lucide"
+  },
   "navigation": {
-    "tabs": [
+    "dropdowns": [
       {
-        "tab": "Documentation",
+        "dropdown": "Documentation",
+        "icon": "book",
+        "description": "Complete guide to using mcp_use",
         "groups": [
           {
             "group": "Getting Started",
             "pages": [
-              "introduction",
-              "quickstart"
+              "index",
+              "quickstart",
+              "installation"
             ]
           },
           {
-            "group": "Essentials",
+            "group": "Core Configuration",
             "pages": [
               "essentials/configuration",
               "essentials/llm-integration",
-              "essentials/debugging",
               "essentials/connection-types",
-              "essentials/server-manager",
-              "building-custom-agents"
+              "essentials/server-manager"
             ]
           },
           {
-            "group": "API Reference",
+            "group": "Advanced Usage",
             "pages": [
-              "api-reference/introduction"
+              "building-custom-agents",
+              "essentials/debugging",
+              "guides/multi-server-setup",
+              "guides/streaming",
+              "guides/security"
             ]
           },
           {
@@ -42,6 +50,30 @@
             "pages": [
               "development",
               "development/telemetry"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/performance",
+              "troubleshooting/connection-errors"
+            ]
+          }
+        ]
+      },
+      {
+        "dropdown": "API Reference",
+        "description": "Complete API documentation",
+        "icon": "terminal",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/mcpagent",
+              "api-reference/mcpclient",
+              "api-reference/adapters"
             ]
           }
         ]
@@ -55,35 +87,93 @@
   "navbar": {
     "links": [
       {
-        "label": "GitHub",
-        "href": "https://github.com/pietrozullo/mcp-use"
+        "label": "Community",
+        "href": "https://github.com/mcp-use/mcp-use/discussions"
+      },
+      {
+        "label": "Examples",
+        "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
       }
-    ]
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://github.com/mcp-use/mcp-use"
+    }
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/pietrozullo/mcp-use"
-    }
+      "x": "https://x.com/mcp_use",
+      "linkedin": "https://www.linkedin.com/company/mcp-use",
+      "github": "https://github.com/mcp-use",
+      "discord": "https://discord.gg/XkNkSkMz3V"
+    },
+    "links": [
+      {
+        "header": "Linktree",
+        "items": [
+          {
+            "label": "Website",
+            "href": "https://mcp-use.io"
+          },
+          {
+            "label": "Cloud Chat",
+            "href": "https://chat.mcp-use.io"
+          },
+          {
+            "label": "GitHub",
+            "href": "https://github.com/mcp-use"
+          }
+        ]
+      },
+      {
+        "header": "Resources",
+        "items": [
+          {
+            "label": "Examples",
+            "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
+          },
+          {
+            "label": "MCP Servers",
+            "href": "https://github.com/punkpeye/awesome-mcp-servers"
+          },
+          {
+            "label": "LangChain Docs",
+            "href": "https://python.langchain.com/"
+          }
+        ]
+      },
+      {
+        "header": "Community",
+        "items": [
+          {
+            "label": "GitHub Discussions",
+            "href": "https://github.com/mcp-use/mcp-use/discussions"
+          },
+          {
+            "label": "Issues",
+            "href": "https://github.com/mcp-use/mcp-use/issues"
+          },
+          {
+            "label": "Contribute",
+            "href": "https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md"
+          },
+          {
+            "label": "Discord",
+            "href": "https://discord.gg/XkNkSkMz3V"
+          }
+        ]
+      }
+    ]
   },
-  "anchors": [
-    {
-      "name": "Documentation",
-      "icon": "book-open",
-      "url": "/"
-    },
-    {
-      "name": "API Reference",
-      "icon": "code",
-      "url": "/api-reference"
-    },
-    {
-      "name": "Development",
-      "icon": "code-branch",
-      "url": "/development"
-    }
-  ],
   "feedback": {
     "suggestEdit": true,
     "raiseIssue": true
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view"
+    ]
   }
 }

@@ -1,50 +1,72 @@
 ---
-title: Configuration
+title: "Configuration"
 description: "Configure your mcp_use environment"
+icon: "cog"
 ---
 
 # Configuration Guide
 
-This guide covers all the configuration options available in mcp_use.
+<Info>
+This guide covers all the configuration options available in mcp_use, from basic API key setup to advanced multi-server configurations.
+</Info>
 
 ## API Keys
 
-Make sure to have the api key relative to the provider of your choice available in the environment you can either:
+<Warning>
+Never hardcode API keys in your source code. Always use environment variables for security.
+</Warning>
 
-1 - Create `.env` file with your keys as:
+You have several options for managing API keys:
 
-```bash
-# OpenAI
-OPENAI_API_KEY=your_api_key_here
-# Anthropic
-ANTHROPIC_API_KEY=your_api_key_here
-# Groq
-GROQ_API_KEY=your_api_key_here
-```
+<Tabs>
+  <Tab title=".env File (Recommended)">
+    Create a `.env` file in your project root:
 
-and load it in python using
+    ```bash .env
+    # OpenAI
+    OPENAI_API_KEY=your_api_key_here
+    # Anthropic
+    ANTHROPIC_API_KEY=your_api_key_here
+    # Groq
+    GROQ_API_KEY=your_api_key_here
+    # Google
+    GOOGLE_API_KEY=your_api_key_here
+    ```
 
-```python
-from dotenv import load_dotenv
-load_dotenv()
-```
+    Load it in Python:
+    ```python
+    from dotenv import load_dotenv
+    load_dotenv()
+    ```
 
-this will make all the keys defibned in `.env` available in yout python runtime, granted that you run from where the .env is located.
+    <Tip>
+    This method keeps your keys organized and makes them available to your Python runtime.
+    </Tip>
+  </Tab>
 
-2 - Set it in your environment by running in your terminal the following command, e.g. for openai:
+  <Tab title="Environment Variables">
+    Set environment variables directly in your terminal:
 
-```bash
-export OPENAI_API_KEY='..."
-```
+    ```bash
+    export OPENAI_API_KEY="your_api_key_here"
+    export ANTHROPIC_API_KEY="your_api_key_here"
+    ```
 
-and then import it in your python code as:
+    Access them in Python:
+    ```python
+    import os
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    ```
+  </Tab>
 
-```python
-import os
-OPENAI_API_KEY = os.getenv(OPENAI_API_KEY,"")
-```
-
-or any other method you might prefer.
+  <Tab title="System Configuration">
+    For production environments, consider using:
+    - Docker secrets
+    - Kubernetes secrets
+    - Cloud provider secret managers (AWS Secrets Manager, etc.)
+    - System environment configuration
+  </Tab>
+</Tabs>
 
 ## MCP Server Configuration
 
@@ -133,7 +155,7 @@ You can configure multiple MCP servers in a single configuration file, allowing 
 }
 ```
 
-For a complete example of using multiple servers, see the [multi-server example](https://github.com/pietrozullo/mcp-use/blob/main/examples/multi_server_example.py) in our repository.
+For a complete example of using multiple servers, see the [multi-server example](https://github.com/mcp-use/mcp-use/blob/main/examples/multi_server_example.py) in our repository.
 
 ## Sandboxed Execution
 
