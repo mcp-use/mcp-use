@@ -27,12 +27,19 @@
             ]
           },
           {
-            "group": "Core Configuration",
+            "group": "Client Configuration",
             "pages": [
               "essentials/configuration",
-              "essentials/llm-integration",
-              "essentials/connection-types",
-              "essentials/server-manager"
+              "essentials/client-configuration",
+              "essentials/connection-types"
+            ]
+          },
+          {
+            "group": "Agent Configuration",
+            "pages": [
+              "essentials/agent-configuration",
+              "essentials/server-manager",
+              "essentials/llm-integration"
             ]
           },
           {

@@ -1,0 +1,473 @@
+---
+title: "Agent Configuration"
+description: "Configure MCPAgent behavior and LLM integration"
+icon: "brain"
+---
+
+# Agent Configuration
+
+<Info>
+This guide covers MCPAgent configuration options for customizing agent behavior and LLM integration. For client configuration, see the [Client Configuration](/essentials/client-configuration) guide.
+</Info>
+
+## API Keys
+
+<Warning>
+Never hardcode API keys in your source code. Always use environment variables for security.
+</Warning>
+
+Since agents use LLM providers that require API keys, you need to configure them properly:
+
+<Tabs>
+  <Tab title=".env File (Recommended)">
+    Create a `.env` file in your project root:
+
+    ```bash .env
+    # OpenAI
+    OPENAI_API_KEY=your_api_key_here
+    # Anthropic
+    ANTHROPIC_API_KEY=your_api_key_here
+    # Groq
+    GROQ_API_KEY=your_api_key_here
+    # Google
+    GOOGLE_API_KEY=your_api_key_here
+    ```
+
+    Load it in Python:
+    ```python
+    from dotenv import load_dotenv
+    load_dotenv()
+    ```
+
+    <Tip>
+    This method keeps your keys organized and makes them available to your Python runtime.
+    </Tip>
+  </Tab>
+
+  <Tab title="Environment Variables">
+    Set environment variables directly in your terminal:
+
+    ```bash
+    export OPENAI_API_KEY="your_api_key_here"
+    export ANTHROPIC_API_KEY="your_api_key_here"
+    ```
+
+    Access them in Python:
+    ```python
+    import os
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    ```
+  </Tab>
+
+  <Tab title="System Configuration">
+    For production environments, consider using:
+    - Docker secrets
+    - Kubernetes secrets
+    - Cloud provider secret managers (AWS Secrets Manager, etc.)
+    - System environment configuration
+  </Tab>
+</Tabs>
+
+## Agent Parameters
+
+When creating an MCPAgent, you can configure several parameters to customize its behavior:
+
+```python
+from mcp_use import MCPAgent, MCPClient
+from langchain_openai import ChatOpenAI
+
+# Basic configuration
+agent = MCPAgent(
+    llm=ChatOpenAI(model="gpt-4o", temperature=0.7),
+    client=MCPClient.from_config_file("config.json"),
+    max_steps=30
+)
+
+# Advanced configuration
+agent = MCPAgent(
+    llm=ChatOpenAI(model="gpt-4o", temperature=0.7),
+    client=MCPClient.from_config_file("config.json"),
+    max_steps=30,
+    server_name=None,
+    auto_initialize=True,
+    memory_enabled=True,
+    system_prompt="Custom instructions for the agent",
+    additional_instructions="Additional guidelines for specific tasks",
+    disallowed_tools=["file_system", "network", "shell"]  # Restrict potentially dangerous tools
+)
+```
+
+### Available Parameters
+
+- `llm`: Any LangChain-compatible language model (required)
+- `client`: The MCPClient instance (optional if connectors are provided)
+- `connectors`: List of connectors if not using client (optional)
+- `server_name`: Name of the server to use (optional)
+- `max_steps`: Maximum number of steps the agent can take (default: 5)
+- `auto_initialize`: Whether to initialize automatically (default: False)
+- `memory_enabled`: Whether to enable memory (default: True)
+- `system_prompt`: Custom system prompt (optional)
+- `system_prompt_template`: Custom system prompt template (optional)
+- `additional_instructions`: Additional instructions for the agent (optional)
+- `disallowed_tools`: List of tool names that should not be available to the agent (optional)
+- `use_server_manager`: Enable dynamic server selection (default: False)
+
+## Tool Access Control
+
+You can restrict which tools are available to the agent for security or to limit its capabilities. Here's a complete example showing how to set up an agent with restricted tool access:
+
+```python
+import asyncio
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def main():
+    # Load environment variables
+    load_dotenv()
+
+    # Create configuration dictionary
+    config = {
+      "mcpServers": {
+        "playwright": {
+          "command": "npx",
+          "args": ["@playwright/mcp@latest"],
+          "env": {
+            "DISPLAY": ":1"
+          }
+        }
+      }
+    }
+
+    # Create MCPClient from configuration dictionary
+    client = MCPClient.from_dict(config)
+
+    # Create LLM
+    llm = ChatOpenAI(model="gpt-4o")
+
+    # Create agent with restricted tools
+    agent = MCPAgent(
+        llm=llm,
+        client=client,
+        max_steps=30,
+        disallowed_tools=["file_system", "network"]  # Restrict potentially dangerous tools
+    )
+
+    # Run the query
+    result = await agent.run(
+        "Find the best restaurant in San Francisco USING GOOGLE SEARCH",
+    )
+    print(f"\nResult: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+You can also manage tool restrictions dynamically:
+
+```python
+# Update restrictions after initialization
+agent.set_disallowed_tools(["file_system", "network", "shell", "database"])
+await agent.initialize()  # Reinitialize to apply changes
+
+# Check current restrictions
+restricted_tools = agent.get_disallowed_tools()
+print(f"Restricted tools: {restricted_tools}")
+```
+
+This feature is useful for:
+
+- Restricting access to sensitive operations
+- Limiting agent capabilities for specific tasks
+- Preventing the agent from using potentially dangerous tools
+- Focusing the agent on specific functionality
+
+## Working with Adapters Directly
+
+If you want more control over how tools are created, you can work with the adapters directly. The `BaseAdapter` class provides a unified interface for converting MCP tools to various framework formats, with `LangChainAdapter` being the most commonly used implementation.
+
+```python
+import asyncio
+from langchain_openai import ChatOpenAI
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+from mcp_use.client import MCPClient
+from mcp_use.adapters import LangChainAdapter
+
+async def main():
+    # Initialize client
+    client = MCPClient.from_config_file("browser_mcp.json")
+
+    # Create an adapter instance
+    adapter = LangChainAdapter()
+
+    # Get tools directly from the client
+    tools = await adapter.create_tools(client)
+
+    # Use the tools with any LangChain agent
+    llm = ChatOpenAI(model="gpt-4o")
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful assistant with access to powerful tools."),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("human", "{input}"),
+        MessagesPlaceholder(variable_name="agent_scratchpad"),
+    ])
+
+    agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+    result = await agent_executor.ainvoke({"input": "Search for information about climate change"})
+    print(result["output"])
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+The adapter pattern makes it easy to:
+
+1. Create tools directly from an MCPClient
+2. Filter or customize which tools are available
+3. Integrate with different agent frameworks
+
+**Benefits of Direct Adapter Usage:**
+- **Flexibility**: More control over tool creation and management
+- **Custom Integration**: Easier to integrate with existing LangChain workflows
+- **Advanced Filtering**: Apply custom logic to tool selection and configuration
+- **Framework Agnostic**: Potential for future adapters to other frameworks
+
+## Server Manager
+
+The Server Manager is an agent-level feature that enables dynamic server selection for improved performance with multi-server setups.
+
+### Enabling Server Manager
+
+To improve efficiency and potentially reduce agent confusion when many tools are available, you can enable the Server Manager by setting `use_server_manager=True` when creating the `MCPAgent`.
+
+```python
+# Enable server manager for automatic server selection
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    use_server_manager=True  # Enable dynamic server selection
+)
+```
+
+### How It Works
+
+When enabled, the agent will automatically select the appropriate server based on the tool chosen by the LLM for each step. This avoids connecting to unnecessary servers and can improve performance with large numbers of available servers.
+
+```python
+# Multi-server setup with server manager
+client = MCPClient.from_config_file("multi_server_config.json")
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    use_server_manager=True
+)
+
+# The agent automatically selects servers based on tool usage
+result = await agent.run(
+    "Search for a place in Barcelona on Airbnb, then Google nearby restaurants."
+)
+```
+
+### Benefits
+
+- **Performance**: Only connects to servers when their tools are actually needed
+- **Reduced Confusion**: Agents work better with focused tool sets rather than many tools at once
+- **Resource Efficiency**: Saves memory and connection overhead
+- **Automatic Selection**: No need to manually specify `server_name` for most use cases
+- **Scalability**: Better performance with large numbers of servers
+
+### When to Use
+
+- **Multi-server environments**: Essential for setups with 3+ servers
+- **Resource-constrained environments**: When memory or connection limits are a concern
+- **Complex workflows**: When agents need to dynamically choose between different tool categories
+- **Production deployments**: For better resource management and performance
+
+For more details on server manager implementation, see the [Server Manager](./server-manager) guide.
+
+## Memory Configuration
+
+MCPAgent supports conversation memory to maintain context across interactions:
+
+```python
+# Enable memory (default)
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    memory_enabled=True
+)
+
+# Disable memory for stateless interactions
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    memory_enabled=False
+)
+```
+
+## System Prompt Customization
+
+You can customize the agent's behavior through system prompts:
+
+### Custom System Prompt
+
+```python
+custom_prompt = """
+You are a helpful assistant specialized in data analysis.
+Always provide detailed explanations for your reasoning.
+When working with data, prioritize accuracy over speed.
+"""
+
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    system_prompt=custom_prompt
+)
+```
+
+### Additional Instructions
+
+Add task-specific instructions without replacing the base system prompt:
+
+```python
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    additional_instructions="Focus on finding recent information from the last 6 months."
+)
+```
+
+### System Prompt Templates
+
+For more advanced customization, you can provide a custom system prompt template:
+
+```python
+from langchain.prompts import ChatPromptTemplate
+
+custom_template = ChatPromptTemplate.from_messages([
+    ("system", "You are an expert {domain} assistant. {instructions}"),
+    ("human", "{input}"),
+    # ... other message templates
+])
+
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    system_prompt_template=custom_template
+)
+```
+
+## Performance Configuration
+
+Configure agent performance characteristics:
+
+```python
+# Limit execution steps
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    max_steps=10  # Prevent runaway execution
+)
+
+# Enable server manager for better performance with multiple servers
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    use_server_manager=True  # Only connects servers when needed
+)
+
+# Limit concurrent servers (if not using server manager)
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    max_concurrent_servers=3
+)
+```
+
+## Debugging Configuration
+
+Enable debugging features during development:
+
+```python
+# Enable verbose logging
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    verbose=True,
+    debug=True
+)
+
+# Set debug level programmatically
+import mcp_use
+mcp_use.set_debug(2)  # Full verbose logging
+```
+
+## Agent Initialization
+
+Control when and how the agent initializes:
+
+```python
+# Auto-initialize on creation
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    auto_initialize=True
+)
+
+# Manual initialization for more control
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    auto_initialize=False
+)
+
+# Initialize manually when ready
+await agent.initialize()
+```
+
+## Error Handling
+
+Configure how the agent handles errors:
+
+```python
+# Set timeout for agent operations
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    timeout=60  # 60 seconds timeout
+)
+
+# Configure retry behavior (if supported by LLM)
+llm = ChatOpenAI(
+    model="gpt-4o",
+    max_retries=3,
+    retry_delay=2
+)
+
+agent = MCPAgent(llm=llm, client=client)
+```
+
+## Best Practices
+
+1. **LLM Selection**: Use models with tool calling capabilities
+2. **Step Limits**: Set reasonable `max_steps` to prevent runaway execution
+3. **Tool Restrictions**: Use `disallowed_tools` for security
+4. **Memory Management**: Disable memory for stateless use cases
+5. **Server Manager**: Enable for multi-server setups
+6. **System Prompts**: Customize for domain-specific tasks
+7. **Error Handling**: Implement proper timeout and retry logic
+8. **Testing**: Test agent configurations in development environments
+
+## Common Issues
+
+1. **No Tools Available**: Check client configuration and server connections
+2. **Tool Execution Failures**: Enable verbose logging and check tool arguments
+3. **Memory Issues**: Disable memory or limit concurrent servers
+4. **Timeout Errors**: Increase `max_steps` or agent timeout values
+
+For detailed troubleshooting, see the [Common Issues](../troubleshooting/common-issues) guide.

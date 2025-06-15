@@ -1,459 +1,162 @@
 ---
-title: "Configuration"
-description: "Configure your mcp_use environment"
+title: "Configuration Overview"
+description: "Complete guide to configuring mcp_use"
 icon: "cog"
 ---
 
-# Configuration Guide
+# Configuration Overview
 
 <Info>
-This guide covers all the configuration options available in mcp_use, from basic API key setup to advanced multi-server configurations. For a basic getting started example, see the [Quickstart Guide](/quickstart).
+mcp_use configuration is organized into two main areas: **Client Configuration** for connecting to MCP servers, and **Agent Configuration** for customizing agent behavior and LLM integration.
 </Info>
 
-## API Keys
+## Configuration Architecture
 
-<Warning>
-Never hardcode API keys in your source code. Always use environment variables for security.
-</Warning>
+mcp_use follows a clear separation between client-side and agent-side concerns:
 
-You have several options for managing API keys:
+<CardGroup cols={2}>
+  <Card title="Client Configuration" icon="server" href="/essentials/client-configuration">
+    **MCPClient Setup**
+    - MCP server connections
+    - Multi-server configurations
+    - Sandboxed execution
+    - Connection types
+  </Card>
+  <Card title="Agent Configuration" icon="brain" href="/essentials/agent-configuration">
+    **MCPAgent Setup**
+    - API key management
+    - LLM integration
+    - Server manager
+    - Tool access control
+    - Memory and prompts
+    - Adapter usage
+  </Card>
+</CardGroup>
 
-<Tabs>
-  <Tab title=".env File (Recommended)">
-    Create a `.env` file in your project root:
+## Quick Start Configuration
 
-    ```bash .env
-    # OpenAI
-    OPENAI_API_KEY=your_api_key_here
-    # Anthropic
-    ANTHROPIC_API_KEY=your_api_key_here
-    # Groq
-    GROQ_API_KEY=your_api_key_here
-    # Google
-    GOOGLE_API_KEY=your_api_key_here
-    ```
+For a basic setup, you need both client and agent configuration:
 
-    Load it in Python:
-    ```python
-    from dotenv import load_dotenv
-    load_dotenv()
-    ```
-
-    <Tip>
-    This method keeps your keys organized and makes them available to your Python runtime.
-    </Tip>
-  </Tab>
-
-  <Tab title="Environment Variables">
-    Set environment variables directly in your terminal:
-
-    ```bash
-    export OPENAI_API_KEY="your_api_key_here"
-    export ANTHROPIC_API_KEY="your_api_key_here"
-    ```
-
-    Access them in Python:
-    ```python
-    import os
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    ```
-  </Tab>
-
-  <Tab title="System Configuration">
-    For production environments, consider using:
-    - Docker secrets
-    - Kubernetes secrets
-    - Cloud provider secret managers (AWS Secrets Manager, etc.)
-    - System environment configuration
-  </Tab>
-</Tabs>
-
-## MCP Server Configuration
-
-mcp_use supports any MCP server through a flexible configuration system. (For a list of awesome servers you can visit https://github.com/punkpeye/awesome-mcp-servers or https://github.com/appcypher/awesome-mcp-servers which have an amazing collection of them)
-
-The configuration is defined in a JSON file with the following structure:
-
-```json
-{
-  "mcpServers": {
-    "server_name": {
-      "command": "command_to_run",
-      "args": ["arg1", "arg2"],
-      "env": {
-        "ENV_VAR": "value"
-      }
-    }
-  }
-}
-```
-
-MCP servers can use different connection types (STDIO, HTTP). For details on these connection types and how to configure them, see the [Connection Types](./connection-types) guide.
-Each server entry in the `mcpServers` object has a `server_name` and then specific options depending on how `mcp-use` should connect to and/or manage the server.
-
-- `server_name`: (Required) A unique string identifier for this MCP server configuration. This name is used to select the server, for example, in `agent.run(..., server_name="your_server_name")`.
-
-**For STDIO-based servers (local):**
-These are servers that `mcp-use` will start and manage as local child processes, communicating via their standard input/output streams.
-
-- `command`: (Required) The executable command to start the server (e.g., `"npx"`, `"python"`).
-- `args`: (Optional) An array of string arguments to pass to the `command` (e.g., `["-y", "@playwright/mcp@latest"]`).
-- `env`: (Optional) An object defining environment variables to set for the server's process (e.g., `{"DISPLAY": ":1"}`).
-
-**For HTTP/HTTPS-based servers (SSE and Streamable HTTP)**
-
-These are servers that are typically already running and accessible via an HTTP(S) endpoint. `mcp-use` acts as an HTTP client to communicate with them.
-
-- `url`: (Required) The full URL where the MCP server is listening (e.g., `"http://localhost:7777/mcp"`, `"https://api.example.com/mcp"`).
-- `headers`: (Optional) An object containing custom HTTP headers to be sent with every request to this server (e.g., for authentication: `{"Authorization": "Bearer your_api_token"}`).
-
-Additional options might be available depending on the specific connection type or wrappers used. Always refer to the [Connection Types](./connection-types) documentation for the most detailed and up-to-date specifications for each type.
-
-### Example Configuration
-
-Here's a basic example of how to configure an MCP server:
-
-```json
-{
-  "mcpServers": {
-    "my_server": {
-      "command": "npx",
-      "args": ["@my-mcp/server"],
-      "env": {
-        "PORT": "3000"
-      }
-    }
-  }
-}
-```
-
-### Multiple Server Configuration
-
-You can configure multiple MCP servers in a single configuration file, allowing you to use different servers for different tasks or combine their capabilities (e.g.):
-
-```json
-{
-  "mcpServers": {
-    "airbnb": {
-      "command": "npx",
-      "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]
-    },
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"],
-      "env": { "DISPLAY": ":1" }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/home/pietro/projects/mcp-use/"
-      ]
-    }
-  }
-}
-```
-
-For a complete example of using multiple servers, see the [multi-server example](https://github.com/mcp-use/mcp-use/blob/main/examples/multi_server_example.py) in our repository.
-
-### Working with Multiple Servers
-
-The `MCPClient` can be configured with multiple MCP servers, allowing your agent to access tools from different sources. This capability enables complex workflows spanning various domains (e.g., web browsing and API interaction).
-
-When an `MCPClient` with multiple servers is passed to an `MCPAgent`, the agent gains access to tools from all configured servers. By default, you might need to guide the agent or explicitly specify which server to use for a given task using the `server_name` parameter in the `agent.run()` method.
-
-```python
-# Assuming MCPClient is initialized with the multi_server_config.json
-client = MCPClient.from_config_file("multi_server_config.json")
-agent = MCPAgent(llm=llm, client=client) # Server manager not enabled by default
-
-# Manually specify the server if needed
-result = await agent.run(
-    "Search for Airbnb listings in Barcelona",
-    server_name="airbnb"
-)
-```
-
-### Dynamic Server Selection (Server Manager)
-
-To improve efficiency and potentially reduce agent confusion when many tools are available, you can enable the Server Manager. Set `use_server_manager=True` when creating the `MCPAgent`.
-
-When enabled, the agent will automatically select the appropriate server based on the tool chosen by the LLM for each step. This avoids connecting to unnecessary servers and can improve performance with large numbers of available servers.
-
-```python
-# Assuming MCPClient is initialized with the multi_server_config.json
-client = MCPClient.from_config_file("multi_server_config.json")
-agent = MCPAgent(llm=llm, client=client, use_server_manager=True) # Enable server manager
-
-# The agent can now use tools from both airbnb and playwright servers
-result = await agent.run(
-    "Search for a place in Barcelona on Airbnb, then Google nearby restaurants."
-)
-```
-
-**Benefits of Server Manager:**
-- **Performance**: Only connects to servers when their tools are actually needed
-- **Reduced Confusion**: Agents work better with focused tool sets rather than many tools at once
-- **Resource Efficiency**: Saves memory and connection overhead
-- **Automatic Selection**: No need to manually specify `server_name` for most use cases
-
-## Sandboxed Execution
-
-mcp_use supports running MCP servers in a sandboxed cloud environment using E2B. This is useful when you want to run MCP servers without having to install their dependencies locally.
-
-### Installation
-
-To use sandboxed execution, you need to install the E2B dependency:
-
-```bash
-# Install mcp-use with E2B support
-pip install "mcp-use[e2b]"
-
-# Or install the dependency directly
-pip install e2b-code-interpreter
-```
-
-You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) to get your API key.
-
-### Configuration Example
-
-To enable sandboxed execution, use the sandbox parameter when creating the MCPClient:
+### 1. Client Setup
 
 ```python
 from mcp_use import MCPClient
-from mcp_use.types.sandbox import SandboxOptions
 
-# Define sandbox options
-sandbox_options: SandboxOptions = {
-    "api_key": "your_e2b_api_key",  # Or use E2B_API_KEY environment variable
-    "sandbox_template_id": "code-interpreter-v1",
-    "supergateway_command": "npx -y supergateway"  # Optional, this is the default
+# Configure your MCP servers
+config = {
+    "mcpServers": {
+        "playwright": {
+            "command": "npx",
+            "args": ["@playwright/mcp@latest"],
+            "env": {"DISPLAY": ":1"}
+        }
+    }
 }
 
-# Create client with sandboxed execution enabled
-client = MCPClient.from_dict(
-    {
-        "mcpServers": {
-            "command_line": {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-everything"]
-            }
-        }
-    },
-    sandbox=True,
-    sandbox_options=sandbox_options
-)
+client = MCPClient.from_dict(config)
 ```
 
-### Available Sandbox Options
-
-The `SandboxOptions` type provides the following configuration options:
-
-| Option                 | Description                                                                              | Default               |
-| ---------------------- | ---------------------------------------------------------------------------------------- | --------------------- |
-| `api_key`              | E2B API key. Required - can be provided directly or via E2B_API_KEY environment variable | None                  |
-| `sandbox_template_id`  | Template ID for the sandbox environment                                                  | "base"                |
-| `supergateway_command` | Command to run supergateway                                                              | "npx -y supergateway" |
-
-### E2B API Key
-
-To use sandboxed execution, you need an E2B API key. You can provide it in two ways:
-
-1. Directly in the sandbox options:
-
-   ```python
-   sandbox_options = {"api_key": "your_e2b_api_key"}
-   ```
-
-2. Through the environment variable:
-   ```bash
-   # In your .env file or environment
-   E2B_API_KEY=your_e2b_api_key
-   ```
-
-For more details on connection types and sandbox configuration, see the [Connection Types](./connection-types) guide.
-
-## Agent Configuration
-
-When creating an MCPAgent, you can configure several parameters:
+### 2. Agent Setup
 
 ```python
-from mcp_use import MCPAgent, MCPClient
+from mcp_use import MCPAgent
 from langchain_openai import ChatOpenAI
 
-# Basic configuration
-agent = MCPAgent(
-    llm=ChatOpenAI(model="gpt-4o", temperature=0.7),
-    client=MCPClient.from_config_file("config.json"),
-    max_steps=30
-)
-
-# Advanced configuration
-agent = MCPAgent(
-    llm=ChatOpenAI(model="gpt-4o", temperature=0.7),
-    client=MCPClient.from_config_file("config.json"),
-    max_steps=30,
-    server_name=None,
-    auto_initialize=True,
-    memory_enabled=True,
-    system_prompt="Custom instructions for the agent",
-    additional_instructions="Additional guidelines for specific tasks",
-    disallowed_tools=["file_system", "network", "shell"]  # Restrict potentially dangerous tools
-)
+# Configure your agent with an LLM
+llm = ChatOpenAI(model="gpt-4o")
+agent = MCPAgent(llm=llm, client=client)
 ```
 
-### Available Parameters
-
-- `llm`: Any LangChain-compatible language model (required)
-- `client`: The MCPClient instance (optional if connectors are provided)
-- `connectors`: List of connectors if not using client (optional)
-- `server_name`: Name of the server to use (optional)
-- `max_steps`: Maximum number of steps the agent can take (default: 5)
-- `auto_initialize`: Whether to initialize automatically (default: False)
-- `memory_enabled`: Whether to enable memory (default: True)
-- `system_prompt`: Custom system prompt (optional)
-- `system_prompt_template`: Custom system prompt template (optional)
-- `additional_instructions`: Additional instructions for the agent (optional)
-- `disallowed_tools`: List of tool names that should not be available to the agent (optional)
-
-### Tool Access Control
-
-You can restrict which tools are available to the agent for security or to limit its capabilities. Here's a complete example showing how to set up an agent with restricted tool access:
+### 3. Basic Usage
 
 ```python
 import asyncio
-import os
+
+async def main():
+    result = await agent.run("Search for information about climate change")
+    print(result)
+
+asyncio.run(main())
+```
+
+## Configuration Paths
+
+<Steps>
+  <Step title="Client Configuration">
+    Set up your MCPClient to connect to MCP servers. This includes configuring server connections, managing API keys, and setting up multi-server environments.
+
+    **Start here:** [Client Configuration Guide →](/essentials/client-configuration)
+  </Step>
+
+  <Step title="Agent Configuration">
+    Configure your MCPAgent's behavior, including LLM integration, tool restrictions, memory settings, and custom prompts.
+
+    **Continue with:** [Agent Configuration Guide →](/essentials/agent-configuration)
+  </Step>
+
+  <Step title="Advanced Topics">
+    Explore connection types, server management, and LLM integration patterns for complex use cases.
+
+    **Learn more:** [Connection Types](/essentials/connection-types) | [Server Manager](/essentials/server-manager) | [LLM Integration](/essentials/llm-integration)
+  </Step>
+</Steps>
+
+## Common Configuration Patterns
+
+### Development Setup
+```python
+# Simple development configuration
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from mcp_use import MCPAgent, MCPClient
+load_dotenv()
 
-async def main():
-    # Load environment variables
-    load_dotenv()
-
-    # Create configuration dictionary
-    config = {
-      "mcpServers": {
-        "playwright": {
-          "command": "npx",
-          "args": ["@playwright/mcp@latest"],
-          "env": {
-            "DISPLAY": ":1"
-          }
-        }
-      }
-    }
-
-    # Create MCPClient from configuration dictionary
-    client = MCPClient.from_dict(config)
-
-    # Create LLM
-    llm = ChatOpenAI(model="gpt-4o")
-
-    # Create agent with restricted tools
-    agent = MCPAgent(
-        llm=llm,
-        client=client,
-        max_steps=30,
-        disallowed_tools=["file_system", "network"]  # Restrict potentially dangerous tools
-    )
-
-    # Run the query
-    result = await agent.run(
-        "Find the best restaurant in San Francisco USING GOOGLE SEARCH",
-    )
-    print(f"\nResult: {result}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
+client = MCPClient.from_config_file("dev-config.json")
+agent = MCPAgent(
+    llm=ChatOpenAI(model="gpt-4o"),
+    client=client,
+    max_steps=10,
+    verbose=True
+)
 ```
 
-You can also manage tool restrictions dynamically:
-
+### Production Setup
 ```python
-# Update restrictions after initialization
-agent.set_disallowed_tools(["file_system", "network", "shell", "database"])
-await agent.initialize()  # Reinitialize to apply changes
-
-# Check current restrictions
-restricted_tools = agent.get_disallowed_tools()
-print(f"Restricted tools: {restricted_tools}")
+# Production configuration with restrictions
+agent = MCPAgent(
+    llm=ChatOpenAI(model="gpt-4o", temperature=0.1),
+    client=client,
+    max_steps=30,
+    disallowed_tools=["file_system", "shell"],
+    use_server_manager=True,
+    memory_enabled=True
+)
 ```
 
-This feature is useful for:
-
-- Restricting access to sensitive operations
-- Limiting agent capabilities for specific tasks
-- Preventing the agent from using potentially dangerous tools
-- Focusing the agent on specific functionality
-
-## Working with Adapters Directly
-
-If you want more control over how tools are created, you can work with the adapters directly. The `BaseAdapter` class provides a unified interface for converting MCP tools to various framework formats, with `LangChainAdapter` being the most commonly used implementation.
-
+### Multi-Server Setup
 ```python
-import asyncio
-from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-
-from mcp_use.client import MCPClient
-from mcp_use.adapters import LangChainAdapter
-
-async def main():
-    # Initialize client
-    client = MCPClient.from_config_file("browser_mcp.json")
-
-    # Create an adapter instance
-    adapter = LangChainAdapter()
-
-    # Get tools directly from the client
-    tools = await adapter.create_tools(client)
-
-    # Use the tools with any LangChain agent
-    llm = ChatOpenAI(model="gpt-4o")
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant with access to powerful tools."),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
-
-    agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-
-    result = await agent_executor.ainvoke({"input": "Search for information about climate change"})
-    print(result["output"])
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# Complex multi-server configuration
+client = MCPClient.from_config_file("multi-server.json")
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    use_server_manager=True,  # Auto-select servers
+    system_prompt="You have access to web browsing, file operations, and API tools."
+)
 ```
 
-The adapter pattern makes it easy to:
+## What's Next?
 
-1. Create tools directly from an MCPClient
-2. Filter or customize which tools are available
-3. Integrate with different agent frameworks
+<CardGroup cols={3}>
+  <Card title="Client Configuration" icon="server" href="/essentials/client-configuration">
+    Learn how to configure MCPClient and connect to MCP servers
+  </Card>
+  <Card title="Agent Configuration" icon="brain" href="/essentials/agent-configuration">
+    Discover how to customize MCPAgent behavior and LLM integration
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
+    Explore real-world configuration examples
+  </Card>
+</CardGroup>
 
-**Benefits of Direct Adapter Usage:**
-- **Flexibility**: More control over tool creation and management
-- **Custom Integration**: Easier to integrate with existing LangChain workflows
-- **Advanced Filtering**: Apply custom logic to tool selection and configuration
-- **Framework Agnostic**: Potential for future adapters to other frameworks
-
-## Error Handling
-
-mcp_use provides several ways to handle errors:
-
-1. **Connection Errors**: Check your MCP server configuration and ensure the server is running
-2. **Authentication Errors**: Verify your API keys are correctly set in the environment
-3. **Timeout Errors**: Adjust the `max_steps` parameter if operations are timing out
-
-## Best Practices
-
-1. Always use environment variables for sensitive information
-2. Keep configuration files in version control (without sensitive data)
-3. Use appropriate timeouts for different types of operations
-4. Enable verbose logging during development
-5. Test configurations in a development environment before production
+<Tip>
+**New to mcp_use?** Start with the [Quickstart Guide](/quickstart) for a basic introduction, then return here for detailed configuration options.
+</Tip>

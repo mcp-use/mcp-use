@@ -1,0 +1,270 @@
+---
+title: "Client Configuration"
+description: "Configure MCPClient for connecting to MCP servers"
+icon: "server"
+---
+
+# Client Configuration
+
+<Info>
+This guide covers MCPClient configuration options for connecting to MCP servers. For agent configuration, see the [Agent Configuration](/essentials/agent-configuration) guide.
+</Info>
+
+
+## MCP Server Configuration
+
+mcp_use supports any MCP server through a flexible configuration system. (For a list of awesome servers you can visit https://github.com/punkpeye/awesome-mcp-servers or https://github.com/appcypher/awesome-mcp-servers which have an amazing collection of them)
+
+The configuration is defined in a JSON file with the following structure:
+
+```json
+{
+  "mcpServers": {
+    "server_name": {
+      "command": "command_to_run",
+      "args": ["arg1", "arg2"],
+      "env": {
+        "ENV_VAR": "value"
+      }
+    }
+  }
+}
+```
+
+MCP servers can use different connection types (STDIO, HTTP). For details on these connection types and how to configure them, see the [Connection Types](./connection-types) guide.
+Each server entry in the `mcpServers` object has a `server_name` and then specific options depending on how `mcp-use` should connect to and/or manage the server.
+
+- `server_name`: (Required) A unique string identifier for this MCP server configuration. This name is used to select the server, for example, in `agent.run(..., server_name="your_server_name")`.
+
+**For STDIO-based servers (local):**
+These are servers that `mcp-use` will start and manage as local child processes, communicating via their standard input/output streams.
+
+- `command`: (Required) The executable command to start the server (e.g., `"npx"`, `"python"`).
+- `args`: (Optional) An array of string arguments to pass to the `command` (e.g., `["-y", "@playwright/mcp@latest"]`).
+- `env`: (Optional) An object defining environment variables to set for the server's process (e.g., `{"DISPLAY": ":1"}`).
+
+**For HTTP/HTTPS-based servers (SSE and Streamable HTTP)**
+
+These are servers that are typically already running and accessible via an HTTP(S) endpoint. `mcp-use` acts as an HTTP client to communicate with them.
+
+- `url`: (Required) The full URL where the MCP server is listening (e.g., `"http://localhost:7777/mcp"`, `"https://api.example.com/mcp"`).
+- `headers`: (Optional) An object containing custom HTTP headers to be sent with every request to this server (e.g., for authentication: `{"Authorization": "Bearer your_api_token"}`).
+
+Additional options might be available depending on the specific connection type or wrappers used. Always refer to the [Connection Types](./connection-types) documentation for the most detailed and up-to-date specifications for each type.
+
+### Example Configuration
+
+Here's a basic example of how to configure an MCP server:
+
+```json
+{
+  "mcpServers": {
+    "my_server": {
+      "command": "npx",
+      "args": ["@my-mcp/server"],
+      "env": {
+        "PORT": "3000"
+      }
+    }
+  }
+}
+```
+
+### Multiple Server Configuration
+
+You can configure multiple MCP servers in a single configuration file, allowing you to use different servers for different tasks or combine their capabilities (e.g.):
+
+```json
+{
+  "mcpServers": {
+    "airbnb": {
+      "command": "npx",
+      "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": { "DISPLAY": ":1" }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/pietro/projects/mcp-use/"
+      ]
+    }
+  }
+}
+```
+
+For a complete example of using multiple servers, see the [multi-server example](https://github.com/mcp-use/mcp-use/blob/main/examples/multi_server_example.py) in our repository.
+
+### Working with Multiple Servers
+
+The `MCPClient` can be configured with multiple MCP servers, allowing your agent to access tools from different sources. This capability enables complex workflows spanning various domains (e.g., web browsing and API interaction).
+
+When an `MCPClient` with multiple servers is passed to an `MCPAgent`, the agent gains access to tools from all configured servers. By default, you might need to guide the agent or explicitly specify which server to use for a given task using the `server_name` parameter in the `agent.run()` method.
+
+```python
+# Assuming MCPClient is initialized with the multi_server_config.json
+client = MCPClient.from_config_file("multi_server_config.json")
+agent = MCPAgent(llm=llm, client=client) # Server manager not enabled by default
+
+# Manually specify the server if needed
+result = await agent.run(
+    "Search for Airbnb listings in Barcelona",
+    server_name="airbnb"
+)
+```
+
+
+## Sandboxed Execution
+
+mcp_use supports running MCP servers in a sandboxed cloud environment using E2B. This is useful when you want to run MCP servers without having to install their dependencies locally.
+
+### Installation
+
+To use sandboxed execution, you need to install the E2B dependency:
+
+```bash
+# Install mcp-use with E2B support
+pip install "mcp-use[e2b]"
+
+# Or install the dependency directly
+pip install e2b-code-interpreter
+```
+
+You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) to get your API key.
+
+### Configuration Example
+
+To enable sandboxed execution, use the sandbox parameter when creating the MCPClient:
+
+```python
+from mcp_use import MCPClient
+from mcp_use.types.sandbox import SandboxOptions
+
+# Define sandbox options
+sandbox_options: SandboxOptions = {
+    "api_key": "your_e2b_api_key",  # Or use E2B_API_KEY environment variable
+    "sandbox_template_id": "code-interpreter-v1",
+    "supergateway_command": "npx -y supergateway"  # Optional, this is the default
+}
+
+# Create client with sandboxed execution enabled
+client = MCPClient.from_dict(
+    {
+        "mcpServers": {
+            "command_line": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-everything"]
+            }
+        }
+    },
+    sandbox=True,
+    sandbox_options=sandbox_options
+)
+```
+
+### Available Sandbox Options
+
+The `SandboxOptions` type provides the following configuration options:
+
+| Option                 | Description                                                                              | Default               |
+| ---------------------- | ---------------------------------------------------------------------------------------- | --------------------- |
+| `api_key`              | E2B API key. Required - can be provided directly or via E2B_API_KEY environment variable | None                  |
+| `sandbox_template_id`  | Template ID for the sandbox environment                                                  | "base"                |
+| `supergateway_command` | Command to run supergateway                                                              | "npx -y supergateway" |
+
+### E2B API Key
+
+To use sandboxed execution, you need an E2B API key. You can provide it in two ways:
+
+1. Directly in the sandbox options:
+
+   ```python
+   sandbox_options = {"api_key": "your_e2b_api_key"}
+   ```
+
+2. Through the environment variable:
+   ```bash
+   # In your .env file or environment
+   E2B_API_KEY=your_e2b_api_key
+   ```
+
+For more details on connection types and sandbox configuration, see the [Connection Types](./connection-types) guide.
+
+## Client Creation Methods
+
+There are several ways to create an MCPClient:
+
+### From Configuration File
+
+Load configuration from a JSON file:
+
+```python
+from mcp_use import MCPClient
+
+client = MCPClient.from_config_file("config.json")
+```
+
+### From Dictionary
+
+Create configuration programmatically:
+
+```python
+from mcp_use import MCPClient
+
+config = {
+    "mcpServers": {
+        "playwright": {
+            "command": "npx",
+            "args": ["@playwright/mcp@latest"],
+            "env": {"DISPLAY": ":1"}
+        }
+    }
+}
+
+client = MCPClient.from_dict(config)
+```
+
+### With Sandbox Options
+
+Enable sandboxed execution:
+
+```python
+from mcp_use import MCPClient
+from mcp_use.types.sandbox import SandboxOptions
+
+sandbox_options: SandboxOptions = {
+    "api_key": "your_e2b_api_key",
+    "sandbox_template_id": "code-interpreter-v1"
+}
+
+client = MCPClient.from_dict(
+    config,
+    sandbox=True,
+    sandbox_options=sandbox_options
+)
+```
+
+## Best Practices
+
+1. **API Keys**: Always use environment variables for sensitive information
+2. **Configuration Files**: Keep configuration files in version control (without sensitive data)
+3. **Server Naming**: Use descriptive names for your MCP servers
+4. **Environment Variables**: Set appropriate environment variables for each server
+5. **Testing**: Test server connections independently before using with agents
+6. **Monitoring**: Enable logging to monitor server connection health
+
+## Error Handling
+
+Common client configuration errors and solutions:
+
+1. **Server Not Found**: Check if the server command is installed and accessible
+2. **Connection Timeout**: Verify server is running and network connectivity
+3. **Permission Denied**: Ensure proper file permissions and environment setup
+4. **Invalid Configuration**: Validate JSON syntax and required fields
+
+For detailed troubleshooting, see the [Connection Errors](../troubleshooting/connection-errors) guide.
