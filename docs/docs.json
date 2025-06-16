@@ -45,8 +45,8 @@
           {
             "group": "Advanced Usage",
             "pages": [
-              "building-custom-agents",
-              "essentials/debugging",
+              "guides/building-custom-agents",
+              "guides/debugging",
               "guides/multi-server-setup",
               "guides/streaming",
               "guides/security"
@@ -71,8 +71,8 @@
       },
       {
         "dropdown": "API Reference",
-        "description": "Complete API documentation",
         "icon": "terminal",
+        "description": "Complete API documentation",
         "groups": [
           {
             "group": "API Reference",
@@ -173,14 +173,12 @@
       }
     ]
   },
-  "feedback": {
-    "suggestEdit": true,
-    "raiseIssue": true
-  },
   "contextual": {
     "options": [
       "copy",
-      "view"
+      "view",
+      "chatgpt",
+      "claude"
     ]
   }
 }
