@@ -3,7 +3,7 @@
   "theme": "maple",
   "name": "mcp_use",
   "colors": {
-    "primary": "#ffffff",
+    "primary": "#000000",
     "light": "#ffffff",
     "dark": "#000000"
   },
@@ -81,6 +81,19 @@
               "api-reference/mcpagent",
               "api-reference/mcpclient",
               "api-reference/adapters"
+            ]
+          }
+        ]
+      },
+      {
+        "dropdown": "Changelog",
+        "icon": "history",
+        "description": "Updates and changes",
+        "groups": [
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog"
             ]
           }
         ]
@@ -180,5 +193,57 @@
       "chatgpt",
       "claude"
     ]
+  },
+  "seo": {
+    "metatags": {
+      "charset": "UTF-8",
+      "viewport": "width=device-width, initial-scale=1.0",
+      "description": "mcp_use is an open source library that enables developers to connect any LLM to any MCP server, allowing the creation of custom agents with tool access without relying on closed-source clients.",
+      "keywords": "MCP, Model Context Protocol, LLM, AI agents, open source, API integration, Claude, ChatGPT, artificial intelligence, custom agents, tool access",
+      "author": "mcp-use Team",
+      "robots": "index, follow",
+      "googlebot": "index, follow",
+      "google": "notranslate",
+      "google-site-verification": "verification_token_here",
+      "generator": "mcp-use",
+      "theme-color": "#1a1a1a",
+      "color-scheme": "light dark",
+      "format-detection": "telephone=no",
+      "referrer": "origin",
+      "language": "en",
+      "copyright": "Copyright 2025 mcp-use",
+      "reply-to": "dev@mcp-use.io",
+      "distribution": "global",
+      "coverage": "Worldwide",
+      "category": "Technology",
+      "target": "developers",
+      "HandheldFriendly": "True",
+      "MobileOptimized": "320",
+      "apple-mobile-web-app-capable": "yes",
+      "apple-mobile-web-app-status-bar-style": "black-translucent",
+      "apple-mobile-web-app-title": "mcp-use",
+      "application-name": "mcp-use",
+      "msapplication-TileColor": "#1a1a1a",
+      "msapplication-TileImage": "/images/mstile-144x144.png",
+      "msapplication-config": "/browserconfig.xml",
+      "og:title": "mcp-use - Connect Any LLM to Any MCP Server",
+      "og:type": "website",
+      "og:url": "https://mcp-use.io",
+      "og:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
+      "og:site_name": "mcp-use",
+      "og:locale": "en_US",
+      "twitter:card": "summary_large_image",
+      "twitter:site": "@mcpuse",
+      "twitter:creator": "@mcpuse",
+      "twitter:title": "mcp-use - Connect Any LLM to Any MCP Server",
+      "twitter:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
+      "twitter:image": "https://mcp-use.io/images/twitter-card.jpg",
+      "twitter:image:alt": "mcp-use logo and interface showing LLM to MCP server connections",
+      "article:published_time": "2024-12-01T00:00:00+00:00",
+      "article:modified_time": "2025-06-16T00:00:00+00:00",
+      "article:author": "mcp-use Team",
+      "article:section": "Technology",
+      "article:tag": "MCP, LLM, AI, open source, developers, API"
+    }
   }
 }
