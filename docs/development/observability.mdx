@@ -98,6 +98,9 @@ result = await agent.run("Your query")  # Automatically traced!
 LANGFUSE_PUBLIC_KEY="pk-lf-..."
 LANGFUSE_SECRET_KEY="sk-lf-..."
 
+# Optional - for self-hosted instances
+LANGFUSE_HOST="https://your-langfuse-instance.com"
+
 # Optional - disable Langfuse
 MCP_USE_LANGFUSE="false"
 ```
@@ -210,7 +213,10 @@ echo $LAMINAR_PROJECT_API_KEY
 - Enable debug logging: `logging.basicConfig(level=logging.DEBUG)`
 
 **Self-hosted Langfuse connection issues**
-Currently, Langfuse host configuration is not supported via environment variables. The integration uses the default Langfuse Cloud host.
+For self-hosted Langfuse instances, set the `LANGFUSE_HOST` environment variable:
+```bash
+export LANGFUSE_HOST="https://your-langfuse-instance.com"
+```
 
 ## Benefits
 
