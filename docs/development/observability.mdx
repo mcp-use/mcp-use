@@ -218,6 +218,31 @@ For self-hosted Langfuse instances, set the `LANGFUSE_HOST` environment variable
 export LANGFUSE_HOST="https://your-langfuse-instance.com"
 ```
 
+# LangSmith Integration
+
+<Info>
+**Advanced Debugging**: LangChain offers LangSmith, a powerful tool for debugging agent behavior that integrates seamlessly with mcp-use.
+</Info>
+
+<Steps>
+  <Step title="Sign Up">
+    Visit [smith.langchain.com](https://smith.langchain.com/) and create an account
+  </Step>
+
+  <Step title="Get API Keys">
+    After login, you'll receive environment variables to add to your `.env` file
+  </Step>
+
+  <Step title="Visualize">
+    You'll be able to visualize agent behavior, tool calls, and decision-making processes on their platform
+  </Step>
+</Steps>
+
+<Tip>
+LangSmith provides detailed traces of your agent's execution, making it easier to understand complex multi-step workflows.
+</Tip>
+
+
 ## Benefits
 
 ### For Development
@@ -241,6 +266,7 @@ Need help with observability setup?
 
 - **Langfuse Documentation**: [langfuse.com/docs](https://langfuse.com/docs)
 - **Laminar Documentation**: [lmnr.ai/docs](https://www.lmnr.ai/docs)
+- **LangSmith Documentation**: [smith.langchain.com](https://smith.langchain.com/)
 - **MCP-use Issues**: [GitHub Issues](https://github.com/mcp-use/mcp-use/issues)
 
 <Tip>
