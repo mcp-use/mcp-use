@@ -175,32 +175,6 @@ class Telemetry:
             except Exception as e:
                 logger.debug(f"Failed to track Scarf event {event.name}: {e}")
 
-    @requires_telemetry
-    def track_event(self, event_name: str, properties: dict[str, Any] | None = None) -> None:
-        """Track a telemetry event with optional properties (legacy method)"""
-        # Send to PostHog
-        if self._posthog_client:
-            try:
-                # Add package version to all events
-                event_properties = (properties or {}).copy()
-                event_properties["mcp_use_version"] = get_package_version()
-
-                self._posthog_client.capture(distinct_id=self.user_id, event=event_name, properties=event_properties)
-            except Exception as e:
-                logger.debug(f"Failed to track PostHog event {event_name}: {e}")
-
-        # Send to Scarf
-        if self._scarf_client:
-            try:
-                # Add package version and user_id to all events
-                event_properties = {}
-                event_properties["mcp_use_version"] = get_package_version()
-                event_properties["user_id"] = self.user_id
-                event_properties["event"] = event_name
-
-                self._scarf_client.log_event(properties=event_properties)
-            except Exception as e:
-                logger.debug(f"Failed to track Scarf event {event_name}: {e}")
 
     @requires_telemetry
     def track_package_download(self, properties: dict[str, Any] | None = None) -> None:
