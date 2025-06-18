@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Setup
+
 ```bash
 # Install for development
 pip install -e ".[dev,search]"
@@ -18,6 +19,7 @@ pip install -e ".[dev,anthropic,openai,e2b,search]"
 ```
 
 ### Code Quality
+
 ```bash
 # Run linting and formatting
 ruff check --fix
@@ -31,6 +33,7 @@ pre-commit run --all-files
 ```
 
 ### Testing
+
 ```bash
 # Run all tests
 pytest
@@ -50,6 +53,7 @@ DEBUG=2 pytest tests/unit/test_client.py -v -s
 ```
 
 ### Local Development
+
 ```bash
 # Debug mode environment variable
 export DEBUG=1  # INFO level
@@ -64,23 +68,27 @@ export MCP_USE_DEBUG=2
 ### Core Components
 
 **MCPClient** (`mcp_use/client.py`)
+
 - Main entry point for MCP server management
 - Handles configuration loading from files or dictionaries
 - Manages multiple MCP server sessions
 - Supports sandboxed execution via E2B
 
 **MCPAgent** (`mcp_use/agents/mcpagent.py`)
+
 - High-level agent interface using LangChain's agent framework
 - Integrates LLMs with MCP tools
 - Supports streaming responses and conversation memory
 - Can use ServerManager for dynamic server selection
 
 **MCPSession** (`mcp_use/session.py`)
+
 - Manages individual MCP server connections
 - Handles tool discovery and resource management
 - Maintains connection state and lifecycle
 
 **Connectors** (`mcp_use/connectors/`)
+
 - Abstraction layer for different MCP transport protocols
 - `StdioConnector`: Process-based MCP servers
 - `HttpConnector`: HTTP-based MCP servers
@@ -88,6 +96,7 @@ export MCP_USE_DEBUG=2
 - `SandboxConnector`: E2B sandboxed execution
 
 **ServerManager** (`mcp_use/managers/server_manager.py`)
+
 - Provides dynamic server selection capabilities
 - Allows agents to choose appropriate servers for tasks
 - Manages server tool discovery and activation
@@ -102,24 +111,26 @@ export MCP_USE_DEBUG=2
 
 **Multi-Transport Support**: Supports stdio, HTTP, WebSocket, and sandboxed connections to MCP servers.
 
-**Telemetry**: Built-in telemetry using PostHog for usage analytics (can be disabled).
+**Telemetry**: Built-in telemetry using PostHog and Scarf.sh for usage analytics (can be disabled).
 
 ## Configuration Examples
 
 ### Basic Server Configuration
+
 ```json
 {
   "mcpServers": {
     "playwright": {
       "command": "npx",
       "args": ["@playwright/mcp@latest"],
-      "env": {"DISPLAY": ":1"}
+      "env": { "DISPLAY": ":1" }
     }
   }
 }
 ```
 
 ### HTTP Server Configuration
+
 ```json
 {
   "mcpServers": {
@@ -131,6 +142,7 @@ export MCP_USE_DEBUG=2
 ```
 
 ### Multi-Server Configuration
+
 ```json
 {
   "mcpServers": {
@@ -159,17 +171,20 @@ export MCP_USE_DEBUG=2
 ## Testing Strategy
 
 ### Unit Tests (`tests/unit/`)
+
 - Test individual components in isolation
 - Mock external dependencies
 - Focus on business logic and edge cases
 
 ### Integration Tests (`tests/integration/`)
+
 - Test component interactions
 - Include real MCP server integrations
 - Organized by transport type (stdio, sse, websocket, etc.)
 - Custom test servers in `tests/integration/servers_for_testing/`
 
 ### Test Configuration
+
 - Uses pytest with asyncio mode
 - Fixtures defined in `conftest.py`
 - Test servers provide controlled MCP environments
@@ -187,18 +202,21 @@ export MCP_USE_DEBUG=2
 ## Common Development Tasks
 
 ### Adding a New Connector
+
 1. Extend `BaseConnector` in `mcp_use/connectors/`
 2. Implement required async methods
 3. Add connector to factory in `config.py`
 4. Write integration tests
 
 ### Adding New Agent Features
+
 1. Modify `MCPAgent` class in `mcp_use/agents/mcpagent.py`
 2. Update system prompt templates if needed
 3. Add comprehensive tests
 4. Update documentation
 
 ### Testing with Custom MCP Servers
+
 1. Create test server in `tests/integration/servers_for_testing/`
 2. Add integration test in appropriate transport directory
 3. Use custom servers for controlled testing scenarios
