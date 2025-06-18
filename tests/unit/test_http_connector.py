@@ -58,9 +58,7 @@ class TestHttpConnectorInitialization(unittest.TestCase):
     def test_init_with_auth_token_and_headers(self, _):
         """Test initialization with both auth token and headers."""
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        connector = HttpConnector(
-            base_url="http://localhost:8000", auth_token="test_token", headers=headers
-        )
+        connector = HttpConnector(base_url="http://localhost:8000", auth_token="test_token", headers=headers)
 
         expected_headers = headers.copy()
         expected_headers["Authorization"] = "Bearer test_token"
@@ -99,9 +97,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
     @patch("mcp_use.connectors.http.SseConnectionManager")
     @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
     @patch("mcp_use.connectors.http.ClientSession")
-    async def test_connect_with_sse(
-        self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, _
-    ):
+    async def test_connect_with_sse(self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, _):
         """Test connecting to the MCP implementation using SSE fallback."""
         # Setup streamable HTTP to fail during initialization
         mock_streamable_cm_instance = MagicMock()
@@ -129,9 +125,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
 
             if call_count == 1:
                 # First call (streamable HTTP) - initialization fails
-                mock_instance.initialize.side_effect = McpError(
-                    ErrorData(code=1, message="Connection closed")
-                )
+                mock_instance.initialize.side_effect = McpError(ErrorData(code=1, message="Connection closed"))
             else:
                 # Second call (SSE) - succeeds
                 mock_instance.initialize.return_value = EmptyResult()
@@ -180,9 +174,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_cm_instance.start.assert_called_once()
 
         # Verify client session was created and initialized
-        mock_client_session_class.assert_called_once_with(
-            "read_stream", "write_stream", sampling_callback=None
-        )
+        mock_client_session_class.assert_called_once_with("read_stream", "write_stream", sampling_callback=None)
         mock_client_session_instance.__aenter__.assert_called_once()
         mock_client_session_instance.initialize.assert_called_once()
 
@@ -288,9 +280,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
 
         result = await self.connector.call_tool("test_tool", {"param": "value"})
 
-        self.connector.client_session.call_tool.assert_called_once_with(
-            "test_tool", {"param": "value"}
-        )
+        self.connector.client_session.call_tool.assert_called_once_with("test_tool", {"param": "value"})
         self.assertEqual(result, {"result": "success"})
 
     async def test_call_tool_no_client(self, _):
@@ -311,15 +301,9 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.connector.client_session.initialize.return_value = mock_init_result
 
         # Setup mocks for list_tools, list_resources, and list_prompts
-        self.connector.client_session.list_tools.return_value = MagicMock(
-            tools=[MagicMock(spec=Tool)]
-        )
-        self.connector.client_session.list_resources.return_value = MagicMock(
-            resources=[MagicMock(spec=Resource)]
-        )
-        self.connector.client_session.list_prompts.return_value = MagicMock(
-            prompts=[MagicMock(spec=Prompt)]
-        )
+        self.connector.client_session.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
+        self.connector.client_session.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)])
+        self.connector.client_session.list_prompts.return_value = MagicMock(prompts=[MagicMock(spec=Prompt)])
 
         # Initialize
         result_session_info = await self.connector.initialize()
@@ -447,9 +431,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
 
         result = await self.connector.request("test_method")
 
-        self.connector.client_session.request.assert_called_once_with(
-            {"method": "test_method", "params": {}}
-        )
+        self.connector.client_session.request.assert_called_once_with({"method": "test_method", "params": {}})
         self.assertEqual(result, {"result": "success"})
 
     async def test_request_no_client(self, _):

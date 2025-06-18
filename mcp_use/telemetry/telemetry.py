@@ -175,7 +175,6 @@ class Telemetry:
             except Exception as e:
                 logger.debug(f"Failed to track Scarf event {event.name}: {e}")
 
-
     @requires_telemetry
     def track_package_download(self, properties: dict[str, Any] | None = None) -> None:
         """Track package download event specifically for Scarf analytics"""

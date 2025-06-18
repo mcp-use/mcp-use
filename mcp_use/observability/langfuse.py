@@ -12,7 +12,9 @@ if _langfuse_disabled:
     langfuse = None
     langfuse_handler = None
 elif not os.getenv("LANGFUSE_PUBLIC_KEY") or not os.getenv("LANGFUSE_SECRET_KEY"):
-    logger.debug("Langfuse API keys not found - tracing disabled. Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY to enable")
+    logger.debug(
+        "Langfuse API keys not found - tracing disabled. Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY to enable"
+    )
     langfuse = None
     langfuse_handler = None
 else:
@@ -20,7 +22,11 @@ else:
         from langfuse import Langfuse
         from langfuse.langchain import CallbackHandler
 
-        langfuse = Langfuse(public_key=os.getenv("LANGFUSE_PUBLIC_KEY"), secret_key=os.getenv("LANGFUSE_SECRET_KEY"), host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"))
+        langfuse = Langfuse(
+            public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+            secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+            host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+        )
         langfuse_handler = CallbackHandler()
         logger.debug("Langfuse observability initialized successfully")
     except ImportError:

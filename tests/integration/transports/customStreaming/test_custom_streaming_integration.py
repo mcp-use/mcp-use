@@ -228,7 +228,10 @@ async def test_mcp_resources_and_prompts(streaming_server_process):
             for field in expected_fields:
                 assert field in metrics_data, f"Metrics should contain {field}"
 
-            print(f"✓ Metrics resource data: CPU={metrics_data['cpu_percent']:.1f}%, Memory={metrics_data['memory_percent']:.1f}%")
+            print(
+                f"✓ Metrics resource data: CPU={metrics_data['cpu_percent']:.1f}%, "
+                f"Memory={metrics_data['memory_percent']:.1f}%"
+            )
         except Exception as e:
             print(f"⚠ Resource reading test skipped due to FastMCP implementation issue: {e}")
             # Just verify the resource is listed - that's sufficient for this test

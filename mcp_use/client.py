@@ -77,9 +77,7 @@ class MCPClient:
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
         """
-        return cls(
-            config=load_config_file(filepath), sandbox=sandbox, sandbox_options=sandbox_options
-        )
+        return cls(config=load_config_file(filepath), sandbox=sandbox, sandbox_options=sandbox_options)
 
     def add_server(
         self,

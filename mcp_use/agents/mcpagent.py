@@ -507,7 +507,10 @@ class MCPAgent:
                     existing_tool_names = {tool.name for tool in self._tools}
 
                     if current_tool_names != existing_tool_names:
-                        logger.info(f"🔄 Tools changed before step {step_num + 1}, updating agent. New tools: {', '.join(current_tool_names)}")
+                        logger.info(
+                            f"🔄 Tools changed before step {step_num + 1}, updating agent. "
+                            f"New tools: {', '.join(current_tool_names)}"
+                        )
                         self._tools = current_tools
                         # Regenerate system message with ALL current tools
                         await self._create_system_message_from_tools(self._tools)
@@ -516,7 +519,9 @@ class MCPAgent:
                         self._agent_executor.max_iterations = steps
                         # Update maps for this iteration
                         name_to_tool_map = {tool.name: tool for tool in self._tools}
-                        color_mapping = get_color_mapping([tool.name for tool in self._tools], excluded_colors=["green", "red"])
+                        color_mapping = get_color_mapping(
+                            [tool.name for tool in self._tools], excluded_colors=["green", "red"]
+                        )
 
                 logger.info(f"👣 Step {step_num + 1}/{steps}")
 

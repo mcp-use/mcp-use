@@ -64,9 +64,7 @@ class WebSocketConnector(BaseConnector):
             self.ws = await self._connection_manager.start()
 
             # Start the message receiver task
-            self._receiver_task = asyncio.create_task(
-                self._receive_messages(), name="websocket_receiver_task"
-            )
+            self._receiver_task = asyncio.create_task(self._receive_messages(), name="websocket_receiver_task")
 
             # Mark as connected
             self._connected = True

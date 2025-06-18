@@ -31,7 +31,12 @@ def ping() -> dict[str, Any]:
 @mcp.tool()
 def get_server_info() -> dict[str, Any]:
     """Get server information"""
-    return {"name": "TimeoutTestServer", "purpose": "Testing connection timeouts for issue #120", "timeout_seconds": 5, "timestamp": datetime.now().isoformat()}
+    return {
+        "name": "TimeoutTestServer",
+        "purpose": "Testing connection timeouts for issue #120",
+        "timeout_seconds": 5,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 @mcp.tool()
@@ -92,7 +97,12 @@ async def custom_sse_endpoint(request):
                 if current_time - start_time > timeout_seconds:
                     print(f"Timing out connection {connection_id} after {timeout_seconds} seconds")
                     # Send timeout event before closing
-                    yield f"data: {json.dumps({'type': 'timeout', 'id': connection_id, 'message': 'Connection timed out'})}\n\n"
+                    timeout_event = {
+                        "type": "timeout",
+                        "id": connection_id,
+                        "message": "Connection timed out",
+                    }
+                    yield f"data: {json.dumps(timeout_event)}\n\n"
                     break
 
                 # Send periodic heartbeat
@@ -108,7 +118,11 @@ async def custom_sse_endpoint(request):
                 del connection_times[connection_id]
             print(f"Connection {connection_id} closed")
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "Access-Control-Allow-Origin": "*"})
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "Access-Control-Allow-Origin": "*"},
+    )
 
 
 @mcp.custom_route("/health", methods=["GET"])

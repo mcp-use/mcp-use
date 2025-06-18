@@ -17,9 +17,7 @@ class DisconnectServerTool(MCPServerTool):
     """Tool for disconnecting from the currently active MCP server."""
 
     name: ClassVar[str] = "disconnect_from_mcp_server"
-    description: ClassVar[str] = (
-        "Disconnect from the currently active MCP (Model Context Protocol) server"
-    )
+    description: ClassVar[str] = "Disconnect from the currently active MCP (Model Context Protocol) server"
     args_schema: ClassVar[type[BaseModel]] = DisconnectServerInput
 
     def _run(self, **kwargs) -> str:

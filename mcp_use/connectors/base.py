@@ -30,7 +30,7 @@ class BaseConnector(ABC):
         self._resources: list[Resource] | None = None
         self._prompts: list[Prompt] | None = None
         self._connected = False
-        self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now), may be made configurable through the connector_config
+        self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now)
 
     @abstractmethod
     async def connect(self) -> None:
@@ -123,7 +123,11 @@ class BaseConnector(ABC):
         else:
             self._prompts = []
 
-        logger.debug(f"MCP session initialized with {len(self._tools)} tools, " f"{len(self._resources)} resources, " f"and {len(self._prompts)} prompts")
+        logger.debug(
+            f"MCP session initialized with {len(self._tools)} tools, "
+            f"{len(self._resources)} resources, "
+            f"and {len(self._prompts)} prompts"
+        )
 
         return result
 
@@ -222,7 +226,10 @@ class BaseConnector(ABC):
                 except Exception as e:
                     raise RuntimeError(f"Failed to reconnect to MCP server: {e}") from e
             else:
-                raise RuntimeError("Connection to MCP server has been lost. " "Auto-reconnection is disabled. Please reconnect manually.")
+                raise RuntimeError(
+                    "Connection to MCP server has been lost. "
+                    "Auto-reconnection is disabled. Please reconnect manually."
+                )
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> CallToolResult:
         """Call an MCP tool with automatic reconnection handling.

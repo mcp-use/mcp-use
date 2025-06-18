@@ -72,9 +72,7 @@ class TestConnectorCreation(unittest.TestCase):
             "sandbox_template_id": "test_template",
         }
 
-        connector = create_connector_from_config(
-            server_config, sandbox=True, sandbox_options=options
-        )
+        connector = create_connector_from_config(server_config, sandbox=True, sandbox_options=options)
 
         self.assertIsInstance(connector, HttpConnector)
         self.assertEqual(connector.base_url, "http://test.com")
@@ -125,9 +123,7 @@ class TestConnectorCreation(unittest.TestCase):
             "sandbox_template_id": "test_template",
         }
 
-        connector = create_connector_from_config(
-            server_config, sandbox=True, sandbox_options=options
-        )
+        connector = create_connector_from_config(server_config, sandbox=True, sandbox_options=options)
 
         self.assertIsInstance(connector, WebSocketConnector)
         self.assertEqual(connector.url, "ws://test.com")
@@ -199,9 +195,7 @@ class TestConnectorCreation(unittest.TestCase):
 
         # Use patch to avoid the actual E2B SDK import check
         with patch("mcp_use.connectors.sandbox.AsyncSandbox", create=True):
-            connector = create_connector_from_config(
-                server_config, sandbox=True, sandbox_options=options
-            )
+            connector = create_connector_from_config(server_config, sandbox=True, sandbox_options=options)
 
             self.assertIsInstance(connector, SandboxConnector)
             self.assertEqual(connector.user_command, "python")
