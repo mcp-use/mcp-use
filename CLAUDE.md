@@ -11,6 +11,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Setup
 
 ```bash
+# Activate virtual environment (if it exists)
+source env/bin/activate
+
+# Create virtual environment if it doesn't exist
+# python -m venv env && source env/bin/activate
+
 # Install for development
 pip install -e ".[dev,search]"
 

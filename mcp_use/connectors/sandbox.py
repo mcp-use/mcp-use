@@ -136,9 +136,7 @@ class SandboxConnector(BaseConnector):
                         async with session.get(ping_url, timeout=2) as response:
                             if response.status == 200:
                                 elapsed = time.time() - start_time
-                                logger.info(
-                                    f"Server is ready! " f"SSE endpoint responded with 200 after {elapsed:.1f}s"
-                                )
+                                logger.info(f"Server is ready! SSE endpoint responded with 200 after {elapsed:.1f}s")
                                 return True
                     except Exception:
                         # If sse endpoint doesn't work, try the base URL
@@ -146,8 +144,7 @@ class SandboxConnector(BaseConnector):
                             if response.status < 500:  # Accept any non-server error
                                 elapsed = time.time() - start_time
                                 logger.info(
-                                    f"Server is ready! Base URL responded with "
-                                    f"{response.status} after {elapsed:.1f}s"
+                                    f"Server is ready! Base URL responded with {response.status} after {elapsed:.1f}s"
                                 )
                                 return True
             except Exception:

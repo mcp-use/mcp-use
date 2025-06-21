@@ -135,7 +135,7 @@ class HttpConnector(BaseConnector):
 
                 except Exception as sse_error:
                     logger.error(
-                        f"Both transport methods failed. Streamable HTTP: {streamable_error}, " f"SSE: {sse_error}"
+                        f"Both transport methods failed. Streamable HTTP: {streamable_error}, SSE: {sse_error}"
                     )
                     raise sse_error
             else:
@@ -144,7 +144,7 @@ class HttpConnector(BaseConnector):
         # Store the successful connection manager and mark as connected
         self._connection_manager = connection_manager
         self._connected = True
-        logger.debug(f"Successfully connected to MCP implementation via" f" {self.transport_type}: {self.base_url}")
+        logger.debug(f"Successfully connected to MCP implementation via {self.transport_type}: {self.base_url}")
 
     @property
     def public_identifier(self) -> str:

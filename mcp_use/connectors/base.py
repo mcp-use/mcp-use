@@ -227,8 +227,7 @@ class BaseConnector(ABC):
                     raise RuntimeError(f"Failed to reconnect to MCP server: {e}") from e
             else:
                 raise RuntimeError(
-                    "Connection to MCP server has been lost. "
-                    "Auto-reconnection is disabled. Please reconnect manually."
+                    "Connection to MCP server has been lost. Auto-reconnection is disabled. Please reconnect manually."
                 )
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> CallToolResult:

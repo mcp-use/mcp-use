@@ -131,14 +131,14 @@ def monitoring_prompt() -> str:
     return f"""Based on the current system metrics and status, please analyze the system health:
 
 Current Metrics:
-- CPU Usage: {metrics['cpu_percent']:.1f}%
-- Memory Usage: {metrics['memory_percent']:.1f}%
-- Network In: {metrics['network_in']} KB/s
-- Network Out: {metrics['network_out']} KB/s
-- Active Processes: {metrics['active_processes']}
+- CPU Usage: {metrics["cpu_percent"]:.1f}%
+- Memory Usage: {metrics["memory_percent"]:.1f}%
+- Network In: {metrics["network_in"]} KB/s
+- Network Out: {metrics["network_out"]} KB/s
+- Active Processes: {metrics["active_processes"]}
 
 System Status:
-{json.dumps(status['services'], indent=2)}
+{json.dumps(status["services"], indent=2)}
 
 Please provide insights on:
 1. Overall system health
@@ -154,12 +154,12 @@ def performance_analysis_prompt() -> str:
 
     return f"""Analyze the current system performance metrics:
 
-CPU: {metrics['cpu_percent']:.1f}%
-Memory: {metrics['memory_percent']:.1f}%
-Disk I/O Read: {metrics['disk_io_read']} KB/s
-Disk I/O Write: {metrics['disk_io_write']} KB/s
-Network In: {metrics['network_in']} KB/s
-Network Out: {metrics['network_out']} KB/s
+CPU: {metrics["cpu_percent"]:.1f}%
+Memory: {metrics["memory_percent"]:.1f}%
+Disk I/O Read: {metrics["disk_io_read"]} KB/s
+Disk I/O Write: {metrics["disk_io_write"]} KB/s
+Network In: {metrics["network_in"]} KB/s
+Network Out: {metrics["network_out"]} KB/s
 
 Please evaluate:
 1. Current performance bottlenecks
