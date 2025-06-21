@@ -351,9 +351,11 @@ class MCPAgent:
                         if not isinstance(message, ToolAgentAction):
                             self.add_to_history(message)
             yield event
-
         # 5. House-keeping -------------------------------------------------------
-        if initialised_here and manage_connector:
+        # Restrict agent cleanup in _generate_response_chunks_async to only occur when the agent was initialized in this generator and is not client-managed.
+        # No need to check manage_connector as its already checked when setting initialised_here
+        if not self.client and initialised_here:
+            logger.info("🧹 Closing agent after generator completion")
             await self.close()
 
     async def astream(
@@ -507,10 +509,7 @@ class MCPAgent:
                     existing_tool_names = {tool.name for tool in self._tools}
 
                     if current_tool_names != existing_tool_names:
-                        logger.info(
-                            f"🔄 Tools changed before step {step_num + 1}, updating agent. "
-                            f"New tools: {', '.join(current_tool_names)}"
-                        )
+                        logger.info(f"🔄 Tools changed before step {step_num + 1}, updating agent. " f"New tools: {', '.join(current_tool_names)}")
                         self._tools = current_tools
                         # Regenerate system message with ALL current tools
                         await self._create_system_message_from_tools(self._tools)
@@ -519,9 +518,7 @@ class MCPAgent:
                         self._agent_executor.max_iterations = steps
                         # Update maps for this iteration
                         name_to_tool_map = {tool.name: tool for tool in self._tools}
-                        color_mapping = get_color_mapping(
-                            [tool.name for tool in self._tools], excluded_colors=["green", "red"]
-                        )
+                        color_mapping = get_color_mapping([tool.name for tool in self._tools], excluded_colors=["green", "red"])
 
                 logger.info(f"👣 Step {step_num + 1}/{steps}")
 
