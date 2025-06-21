@@ -154,42 +154,39 @@ Use patterns for flexible filtering:
 
 ```python
 import re
+from typing import Any
+from mcp.types import Tool
+from ..connectors.base import BaseConnector
 
 class PatternLangChainAdapter(LangChainAdapter):
-    async def create_tools(self, client, allowed_patterns=None, disallowed_patterns=None):
-        # Get tools from all sessions
-        await client.create_all_sessions()
-        all_tools = []
-        for session in client.get_all_active_sessions().values():
-            session_tools = await session.list_tools()
-            all_tools.extend(session_tools)
-        filtered_tools = []
+    def __init__(self, allowed_patterns=None, disallowed_patterns=None):
+        super().__init__()
+        self.allowed_patterns = allowed_patterns or []
+        self.disallowed_patterns = disallowed_patterns or []
 
-        for tool_def in all_tools:
-            tool_name = tool_def["name"]
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> Any:
+        """Override to add pattern-based filtering."""
+        tool_name = mcp_tool.name
 
-            # Check allowed patterns
-            if allowed_patterns:
-                if not any(re.match(pattern, tool_name) for pattern in allowed_patterns):
-                    continue
+        # Check allowed patterns
+        if self.allowed_patterns:
+            if not any(re.match(pattern, tool_name) for pattern in self.allowed_patterns):
+                return None
 
-            # Check disallowed patterns
-            if disallowed_patterns:
-                if any(re.match(pattern, tool_name) for pattern in disallowed_patterns):
-                    continue
+        # Check disallowed patterns
+        if self.disallowed_patterns:
+            if any(re.match(pattern, tool_name) for pattern in self.disallowed_patterns):
+                return None
 
-            tool = await self.create_tool(client, tool_def)
-            filtered_tools.append(tool)
-
-        return filtered_tools
+        # Use parent class conversion
+        return super()._convert_tool(mcp_tool, connector)
 
 # Usage
-adapter = PatternLangChainAdapter()
-tools = await adapter.create_tools(
-    client,
+adapter = PatternLangChainAdapter(
     allowed_patterns=[r"file_.*", r"sqlite_.*"],  # Only file and sqlite tools
     disallowed_patterns=[r".*_delete", r".*_execute"]  # No delete or execute tools
 )
+tools = await PatternLangChainAdapter.create_tools(client)
 ```
 
 ## Custom Adapters
@@ -202,83 +199,60 @@ Create custom adapters for other frameworks:
 from mcp_use.adapters import BaseAdapter
 
 class CrewAIAdapter(BaseAdapter):
-    async def create_tools(self, client, **kwargs):
-        # Get tools from all sessions
-        await client.create_all_sessions()
-        mcp_tools = []
-        for session in client.get_all_active_sessions().values():
-            session_tools = await session.list_tools()
-            mcp_tools.extend(session_tools)
-        crewai_tools = []
-
-        for tool_def in mcp_tools:
-            crewai_tool = self._convert_to_crewai(client, tool_def)
-            crewai_tools.append(crewai_tool)
-
-        return crewai_tools
-
-    def _convert_to_crewai(self, client, tool_def):
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Convert MCP tool to CrewAI format."""
         from crewai_tools import BaseTool as CrewAIBaseTool
 
         class MCPCrewAITool(CrewAIBaseTool):
-            name = tool_def["name"]
-            description = tool_def["description"]
+            name = mcp_tool.name
+            description = mcp_tool.description
 
             async def _run(self, **kwargs):
-                # Find the session that has this tool
-                for session in client.get_all_active_sessions().values():
-                    tools = await session.list_tools()
-                    if any(tool['name'] == self.name for tool in tools):
-                        return await session.call_tool(self.name, kwargs)
-                raise RuntimeError(f"Tool {self.name} not found in any session")
+                return await connector.call_tool(self.name, kwargs)
 
         return MCPCrewAITool()
 
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector):
+        """Convert MCP resource to CrewAI format - implement as needed."""
+        return None  # Skip resources for this example
+
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector):
+        """Convert MCP prompt to CrewAI format - implement as needed."""
+        return None  # Skip prompts for this example
+
 # Usage
-adapter = CrewAIAdapter()
-tools = await adapter.create_tools(client)
+tools = await CrewAIAdapter.create_tools(client)
 ```
 
 ### AutoGen Adapter Example
 
 ```python
 class AutoGenAdapter(BaseAdapter):
-    async def create_tools(self, client, **kwargs):
-        # Get tools from all sessions
-        await client.create_all_sessions()
-        mcp_tools = []
-        for session in client.get_all_active_sessions().values():
-            session_tools = await session.list_tools()
-            mcp_tools.extend(session_tools)
-        autogen_tools = []
-
-        for tool_def in mcp_tools:
-            autogen_tool = {
-                "type": "function",
-                "function": {
-                    "name": tool_def["name"],
-                    "description": tool_def["description"],
-                    "parameters": tool_def.get("inputSchema", {}),
-                    "implementation": self._create_implementation(client, tool_def["name"])
-                }
-            }
-            autogen_tools.append(autogen_tool)
-
-        return autogen_tools
-
-    def _create_implementation(self, client, tool_name):
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Convert MCP tool to AutoGen format."""
         async def implementation(**kwargs):
-            # Find the session that has this tool
-            for session in client.get_all_active_sessions().values():
-                tools = await session.list_tools()
-                if any(tool['name'] == tool_name for tool in tools):
-                    return await session.call_tool(tool_name, kwargs)
-            raise RuntimeError(f"Tool {tool_name} not found in any session")
-        return implementation
+            return await connector.call_tool(mcp_tool.name, kwargs)
+
+        return {
+            "type": "function",
+            "function": {
+                "name": mcp_tool.name,
+                "description": mcp_tool.description,
+                "parameters": mcp_tool.inputSchema or {},
+                "implementation": implementation
+            }
+        }
+
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector):
+        """Convert MCP resource to AutoGen format - implement as needed."""
+        return None  # Skip resources for this example
+
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector):
+        """Convert MCP prompt to AutoGen format - implement as needed."""
+        return None  # Skip prompts for this example
 
 # Usage
-adapter = AutoGenAdapter()
-tools = await adapter.create_tools(client)
+tools = await AutoGenAdapter.create_tools(client)
 ```
 
 ## Tool Metadata
@@ -336,56 +310,55 @@ Adapters handle various error conditions:
 
 ```python
 class RobustLangChainAdapter(LangChainAdapter):
-    async def create_tools(self, client, **kwargs):
-        tools = []
-        # Get tools from all sessions
-        await client.create_all_sessions()
-        tool_definitions = []
-        for session in client.get_all_active_sessions().values():
-            session_tools = await session.list_tools()
-            tool_definitions.extend(session_tools)
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Override with error handling for individual tool conversion."""
+        try:
+            return super()._convert_tool(mcp_tool, connector)
+        except Exception as e:
+            logger.error(f"Failed to create tool {mcp_tool.name}: {e}")
+            return None  # Skip this tool
 
-        for tool_def in tool_definitions:
-            try:
-                tool = await self.create_tool(client, tool_def)
-                tools.append(tool)
-            except Exception as e:
-                print(f"Failed to create tool {tool_def['name']}: {e}")
-                # Continue with other tools
-                continue
-
-        if not tools:
-            raise RuntimeError("No tools could be created")
-
-        return tools
+    async def load_tools_for_connector(self, connector: BaseConnector):
+        """Override to add robust error handling."""
+        try:
+            return await super().load_tools_for_connector(connector)
+        except Exception as e:
+            logger.error(f"Failed to load tools for connector: {e}")
+            return []  # Return empty list on failure
 ```
 
 ### Runtime Error Handling
 
 ```python
-class SafeLangChainTool(BaseTool):
-    def __init__(self, client, tool_def):
-        self.client = client
-        self.tool_def = tool_def
-        super().__init__(
-            name=tool_def["name"],
-            description=tool_def["description"]
-        )
+class SafeLangChainAdapter(LangChainAdapter):
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Override to create tools with enhanced error handling."""
+        if mcp_tool.name in self.disallowed_tools:
+            return None
 
-    async def _arun(self, **kwargs):
-        try:
-            # Find the session that has this tool
-            for session in self.client.get_all_active_sessions().values():
-                tools = await session.list_tools()
-                if any(tool['name'] == self.name for tool in tools):
-                    return await session.call_tool(self.name, kwargs)
-            raise RuntimeError(f"Tool {self.name} not found in any session")
-        except ToolExecutionError as e:
-            return f"Tool execution failed: {e}"
-        except TimeoutError:
-            return "Tool execution timed out"
-        except Exception as e:
-            return f"Unexpected error: {e}"
+        adapter_self = self
+
+        class SafeMcpTool(BaseTool):
+            name: str = mcp_tool.name
+            description: str = mcp_tool.description
+            tool_connector: BaseConnector = connector
+            handle_tool_error: bool = True
+
+            def _run(self, **kwargs):
+                raise NotImplementedError("MCP tools only support async operations")
+
+            async def _arun(self, **kwargs):
+                try:
+                    result = await self.tool_connector.call_tool(self.name, kwargs)
+                    return adapter_self._parse_mcp_tool_result(result)
+                except ToolExecutionError as e:
+                    return f"Tool execution failed: {e}"
+                except TimeoutError:
+                    return "Tool execution timed out"
+                except Exception as e:
+                    return f"Unexpected error: {e}"
+
+        return SafeMcpTool()
 ```
 
 ## Performance Optimization
@@ -394,65 +367,77 @@ class SafeLangChainTool(BaseTool):
 
 ```python
 class LazyLangChainAdapter(LangChainAdapter):
-    def __init__(self):
+    def __init__(self, disallowed_tools=None):
+        super().__init__(disallowed_tools)
         self._tool_cache = {}
 
-    async def create_tools(self, client, **kwargs):
-        # Get tools from all sessions
-        await client.create_all_sessions()
-        tool_definitions = []
-        for session in client.get_all_active_sessions().values():
-            session_tools = await session.list_tools()
-            tool_definitions.extend(session_tools)
-        tools = []
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Override to create lazy-loading tools."""
+        if mcp_tool.name in self.disallowed_tools:
+            return None
 
-        for tool_def in tool_definitions:
-            tool = LazyTool(client, tool_def, self._tool_cache)
-            tools.append(tool)
+        adapter_self = self
 
-        return tools
+        class LazyMcpTool(BaseTool):
+            name: str = mcp_tool.name
+            description: str = mcp_tool.description
+            tool_connector: BaseConnector = connector
 
-class LazyTool(BaseTool):
-    def __init__(self, client, tool_def, cache):
-        self.client = client
-        self.tool_def = tool_def
-        self.cache = cache
-        super().__init__(
-            name=tool_def["name"],
-            description=tool_def["description"]
-        )
+            def _run(self, **kwargs):
+                raise NotImplementedError("MCP tools only support async operations")
 
-    async def _arun(self, **kwargs):
-        # Create actual tool on first use
-        if self.name not in self.cache:
-            self.cache[self.name] = await self._create_actual_tool()
+            async def _arun(self, **kwargs):
+                # Create actual tool on first use
+                if self.name not in adapter_self._tool_cache:
+                    adapter_self._tool_cache[self.name] = await self._create_actual_tool()
 
-        return await self.cache[self.name].execute(**kwargs)
+                return await adapter_self._tool_cache[self.name].execute(**kwargs)
+
+            async def _create_actual_tool(self):
+                # Create the actual tool implementation
+                result = await self.tool_connector.call_tool(self.name, {})
+                return adapter_self._parse_mcp_tool_result(result)
+
+        return LazyMcpTool()
 ```
 
 ### Batch Tool Creation
 
 ```python
 class BatchLangChainAdapter(LangChainAdapter):
-    async def create_tools(self, client, batch_size=10, **kwargs):
-        # Get tools from all sessions
-        await client.create_all_sessions()
-        tool_definitions = []
-        for session in client.get_all_active_sessions().values():
-            session_tools = await session.list_tools()
-            tool_definitions.extend(session_tools)
-        tools = []
+    def __init__(self, batch_size=10, disallowed_tools=None):
+        super().__init__(disallowed_tools)
+        self.batch_size = batch_size
+
+    async def load_tools_for_connector(self, connector: BaseConnector):
+        """Override to process tools in batches."""
+        # Check if we already have tools for this connector
+        if connector in self._connector_tool_map:
+            return self._connector_tool_map[connector]
+
+        # Ensure connector is initialized
+        success = await self._ensure_connector_initialized(connector)
+        if not success:
+            return []
+
+        connector_tools = []
+        all_tools = connector.tools or []
 
         # Process tools in batches
-        for i in range(0, len(tool_definitions), batch_size):
-            batch = tool_definitions[i:i + batch_size]
-            batch_tools = await asyncio.gather(*[
-                self.create_tool(client, tool_def)
-                for tool_def in batch
-            ])
-            tools.extend(batch_tools)
+        for i in range(0, len(all_tools), self.batch_size):
+            batch = all_tools[i:i + self.batch_size]
+            batch_tools = []
 
-        return tools
+            for tool in batch:
+                converted_tool = self._convert_tool(tool, connector)
+                if converted_tool:
+                    batch_tools.append(converted_tool)
+
+            connector_tools.extend(batch_tools)
+
+        # Store the tools for this connector
+        self._connector_tool_map[connector] = connector_tools
+        return connector_tools
 ```
 
 ## Integration Examples
@@ -467,8 +452,7 @@ from langchain_openai import ChatOpenAI
 async def create_langchain_agent():
     # Create MCP client and adapter
     client = MCPClient.from_config_file("config.json")
-    adapter = LangChainAdapter()
-    tools = await adapter.create_tools(client)
+    tools = await LangChainAdapter.create_tools(client)
 
     # Create LLM and prompt
     llm = ChatOpenAI(model="gpt-4")
@@ -502,38 +486,27 @@ class CustomFrameworkTool:
         return await self.execute_fn(**kwargs)
 
 class CustomFrameworkAdapter(BaseAdapter):
-    async def create_tools(self, client, **kwargs):
-        # Get tools from all sessions
-        await client.create_all_sessions()
-        mcp_tools = []
-        for session in client.get_all_active_sessions().values():
-            session_tools = await session.list_tools()
-            mcp_tools.extend(session_tools)
-        custom_tools = []
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Convert MCP tool to custom framework format."""
+        async def executor(**kwargs):
+            return await connector.call_tool(mcp_tool.name, kwargs)
 
-        for tool_def in mcp_tools:
-            def create_executor(tool_name):
-                async def executor(**kwargs):
-                    # Find the session that has this tool
-                    for session in client.get_all_active_sessions().values():
-                        tools = await session.list_tools()
-                        if any(tool['name'] == tool_name for tool in tools):
-                            return await session.call_tool(tool_name, kwargs)
-                    raise RuntimeError(f"Tool {tool_name} not found in any session")
-                return executor
+        return CustomFrameworkTool(
+            name=mcp_tool.name,
+            description=mcp_tool.description,
+            execute_fn=executor
+        )
 
-            custom_tool = CustomFrameworkTool(
-                name=tool_def["name"],
-                description=tool_def["description"],
-                execute_fn=create_executor(tool_def["name"])
-            )
-            custom_tools.append(custom_tool)
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector):
+        """Convert MCP resource to custom framework format."""
+        return None  # Skip resources for this example
 
-        return custom_tools
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector):
+        """Convert MCP prompt to custom framework format."""
+        return None  # Skip prompts for this example
 
 # Usage
-adapter = CustomFrameworkAdapter()
-tools = await adapter.create_tools(client)
+tools = await CustomFrameworkAdapter.create_tools(client)
 
 for tool in tools:
     result = await tool.execute(param1="value1")
