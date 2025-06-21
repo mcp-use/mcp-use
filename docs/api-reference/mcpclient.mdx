@@ -77,138 +77,173 @@ client = MCPClient.from_dict(config)
 
 ## Instance Methods
 
-### async connect_all()
+### add_server(name, server_config)
 
-Establishes connections to all configured MCP servers.
+Adds a new server configuration to the client.
+
+**Parameters:**
+- `name` (str): Name for the server
+- `server_config` (dict): Server configuration dictionary
 
 **Returns:**
 - `None`
+
+**Example:**
+```python
+client.add_server("filesystem", {
+    "command": "mcp-server-filesystem",
+    "args": ["/workspace"]
+})
+```
+
+### remove_server(name)
+
+Removes a server configuration from the client.
+
+**Parameters:**
+- `name` (str): Name of the server to remove
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+client.remove_server("filesystem")
+```
+
+### get_server_names()
+
+Gets the names of all configured servers.
+
+**Returns:**
+- `List[str]`: List of server names
+
+**Example:**
+```python
+servers = client.get_server_names()
+print(f"Configured servers: {servers}")
+```
+
+### save_config(filepath)
+
+Saves the current client configuration to a JSON file.
+
+**Parameters:**
+- `filepath` (str): Path where to save the configuration file
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+client.save_config("updated_config.json")
+```
+
+### async create_session(server_name, auto_initialize=True)
+
+Creates a new session with the specified server.
+
+**Parameters:**
+- `server_name` (str): Name of the server to create a session with
+- `auto_initialize` (bool, optional): Whether to automatically initialize the session. Defaults to True.
+
+**Returns:**
+- `MCPSession`: The created session object
 
 **Raises:**
-- `ConnectionError`: If any server fails to connect
-- `TimeoutError`: If connection timeout is exceeded
+- `ValueError`: If server is not configured
+- `ConnectionError`: If session creation fails
 
 **Example:**
 ```python
-await client.connect_all()
+session = await client.create_session("filesystem")
 ```
 
-### async disconnect_all()
+### async create_all_sessions(auto_initialize=True)
 
-Closes all active server connections.
+Creates sessions with all configured servers.
+
+**Parameters:**
+- `auto_initialize` (bool, optional): Whether to automatically initialize sessions. Defaults to True.
 
 **Returns:**
 - `None`
 
 **Example:**
 ```python
-await client.disconnect_all()
+await client.create_all_sessions()
 ```
 
-### async list_tools(server_name=None)
+### get_session(server_name)
 
-Lists available tools from connected servers.
-
-**Parameters:**
-- `server_name` (str, optional): Name of specific server. If None, lists tools from all servers.
-
-**Returns:**
-- `List[Dict]`: List of tool definitions
-
-**Example:**
-```python
-# List all tools
-all_tools = await client.list_tools()
-
-# List tools from specific server
-fs_tools = await client.list_tools("filesystem")
-```
-
-### async call_tool(tool_name, arguments, server_name=None)
-
-Executes a tool with the given arguments.
+Gets an existing session for the specified server.
 
 **Parameters:**
-- `tool_name` (str): Name of the tool to execute
-- `arguments` (dict): Tool arguments
-- `server_name` (str, optional): Specific server to use. If None, searches all servers.
+- `server_name` (str): Name of the server
 
 **Returns:**
-- `Any`: Tool execution result
+- `MCPSession`: The session object
 
 **Raises:**
-- `ToolNotFoundError`: If tool is not available
-- `ToolExecutionError`: If tool execution fails
+- `ValueError`: If session does not exist
 
 **Example:**
 ```python
-result = await client.call_tool(
-    "file_read",
-    {"path": "/workspace/file.txt"},
-    server_name="filesystem"
-)
+session = client.get_session("filesystem")
 ```
 
-### async get_server_status(server_name=None)
+### get_all_active_sessions()
 
-Gets the connection status of servers.
-
-**Parameters:**
-- `server_name` (str, optional): Specific server name. If None, returns status for all servers.
+Gets all currently active sessions.
 
 **Returns:**
-- `Dict`: Server status information
+- `Dict[str, MCPSession]`: Dictionary mapping server names to session objects
 
 **Example:**
 ```python
-# Get all server statuses
-all_status = await client.get_server_status()
-
-# Get specific server status
-fs_status = await client.get_server_status("filesystem")
+active_sessions = client.get_all_active_sessions()
+for name, session in active_sessions.items():
+    print(f"Active session: {name}")
 ```
 
-### async reconnect_server(server_name)
+### async close_session(server_name)
 
-Reconnects a specific server.
+Closes the session with the specified server.
 
 **Parameters:**
-- `server_name` (str): Name of the server to reconnect
-
-**Returns:**
-- `None`
-
-**Raises:**
-- `ConnectionError`: If reconnection fails
-
-**Example:**
-```python
-await client.reconnect_server("filesystem")
-```
-
-### async reconnect_all()
-
-Reconnects all servers.
+- `server_name` (str): Name of the server whose session to close
 
 **Returns:**
 - `None`
 
 **Example:**
 ```python
-await client.reconnect_all()
+await client.close_session("filesystem")
+```
+
+### async close_all_sessions()
+
+Closes all active sessions.
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+await client.close_all_sessions()
 ```
 
 ## Properties
 
-### servers
+### sessions
 
-**Type:** `Dict[str, ServerConnection]`
+**Type:** `Dict[str, MCPSession]`
 
-Dictionary of configured server connections.
+Dictionary of active sessions by server name.
 
 **Example:**
 ```python
-print(f"Configured servers: {list(client.servers.keys())}")
+print(f"Active sessions: {list(client.sessions.keys())}")
 ```
 
 ### config
@@ -222,16 +257,28 @@ The configuration dictionary used to initialize the client.
 print(f"Client config: {client.config}")
 ```
 
-### debug
+### sandbox
 
 **Type:** `bool`
 
-Debug mode status.
+Whether sandbox mode is enabled for server execution.
 
 **Example:**
 ```python
-if client.debug:
-    print("Debug mode enabled")
+if client.sandbox:
+    print("Sandbox mode enabled")
+```
+
+### sandbox_options
+
+**Type:** `SandboxOptions | None`
+
+Configuration options for sandbox execution.
+
+**Example:**
+```python
+if client.sandbox_options:
+    print(f"Sandbox options: {client.sandbox_options}")
 ```
 
 ## Configuration Format
@@ -265,101 +312,91 @@ The MCPClient expects a configuration dictionary with the following structure:
 The MCPClient can raise several types of exceptions:
 
 ### ConnectionError
-Raised when server connection fails.
+Raised when session creation or server connection fails.
 
 ```python
 try:
-    await client.connect_all()
+    session = await client.create_session("filesystem")
 except ConnectionError as e:
-    print(f"Connection failed: {e}")
+    print(f"Session creation failed: {e}")
+```
+
+### ValueError
+Raised when trying to access a non-existent session or server.
+
+```python
+try:
+    session = client.get_session("nonexistent_server")
+except ValueError as e:
+    print(f"Session not found: {e}")
 ```
 
 ### TimeoutError
-Raised when operations exceed timeout limits.
+Raised when session operations exceed timeout limits.
 
 ```python
 try:
-    result = await asyncio.wait_for(
-        client.call_tool("slow_tool", {}),
+    session = await asyncio.wait_for(
+        client.create_session("slow_server"),
         timeout=30
     )
 except TimeoutError:
-    print("Tool execution timed out")
-```
-
-### ToolNotFoundError
-Raised when a requested tool is not available.
-
-```python
-try:
-    await client.call_tool("nonexistent_tool", {})
-except ToolNotFoundError:
-    print("Tool not found")
-```
-
-### ToolExecutionError
-Raised when tool execution fails.
-
-```python
-try:
-    await client.call_tool("file_read", {"path": "/nonexistent"})
-except ToolExecutionError as e:
-    print(f"Tool execution failed: {e}")
+    print("Session creation timed out")
 ```
 
 ## Context Manager Usage
 
-MCPClient supports async context manager protocol:
+MCPClient supports async context manager protocol for automatic session cleanup:
 
 ```python
 async with MCPClient.from_config_file("config.json") as client:
-    tools = await client.list_tools()
-    result = await client.call_tool("some_tool", {})
-    # Client automatically disconnects on exit
+    session = await client.create_session("filesystem")
+    # Use session for operations
+    # Client automatically closes sessions on exit
 ```
 
 ## Best Practices
 
-### Connection Management
+### Session Management
 ```python
 # Good: Use context manager
 async with MCPClient.from_config_file("config.json") as client:
-    result = await client.call_tool("tool_name", {})
+    session = await client.create_session("filesystem")
+    # Use session for tool operations
 
 # Alternative: Manual management
 client = MCPClient.from_config_file("config.json")
 try:
-    await client.connect_all()
-    result = await client.call_tool("tool_name", {})
+    await client.create_all_sessions()
+    session = client.get_session("filesystem")
+    # Use session for operations
 finally:
-    await client.disconnect_all()
+    await client.close_all_sessions()
 ```
 
 ### Error Handling
 ```python
-async def robust_tool_call(client, tool_name, args):
+async def robust_session_creation(client, server_name):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            return await client.call_tool(tool_name, args)
-        except (ConnectionError, TimeoutError) as e:
+            return await client.create_session(server_name)
+        except ConnectionError as e:
             if attempt == max_retries - 1:
                 raise
             await asyncio.sleep(2 ** attempt)  # Exponential backoff
-            await client.reconnect_all()
+            # Try again
 ```
 
 ### Performance Optimization
 ```python
-# Pre-connect for better performance
+# Pre-create all sessions for better performance
 client = MCPClient.from_config_file("config.json")
-await client.connect_all()
+await client.create_all_sessions()
 
-# Reuse client for multiple operations
-tools = await client.list_tools()
-for tool in tools:
-    if tool["name"] == "target_tool":
-        result = await client.call_tool(tool["name"], {})
+# Reuse sessions for multiple operations
+session = client.get_session("filesystem")
+# Use session multiple times without reconnecting
 ```
 
 ## Examples
@@ -373,22 +410,22 @@ async def main():
     # Create client from config file
     client = MCPClient.from_config_file("mcp_config.json")
 
-    # Connect to servers
-    await client.connect_all()
+    # Create session with a server
+    session = await client.create_session("filesystem")
 
-    # List available tools
-    tools = await client.list_tools()
+    # List available tools from the session
+    tools = await session.list_tools()
     print(f"Available tools: {[t['name'] for t in tools]}")
 
-    # Execute a tool
-    result = await client.call_tool(
+    # Execute a tool using the session
+    result = await session.call_tool(
         "file_read",
         {"path": "/workspace/README.md"}
     )
     print(f"File contents: {result}")
 
     # Clean up
-    await client.disconnect_all()
+    await client.close_all_sessions()
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -418,30 +455,34 @@ config = {
 
 async def multi_server_example():
     client = MCPClient.from_dict(config)
-    await client.connect_all()
+
+    # Create sessions with multiple servers
+    await client.create_all_sessions()
+
+    # Get sessions for different servers
+    fs_session = client.get_session("filesystem")
+    playwright_session = client.get_session("playwright")
+    sqlite_session = client.get_session("sqlite")
 
     # Use filesystem tools
-    file_content = await client.call_tool(
+    file_content = await fs_session.call_tool(
         "file_read",
-        {"path": "/workspace/data.txt"},
-        server_name="filesystem"
+        {"path": "/workspace/data.txt"}
     )
 
     # Use web scraping tools
-    page_content = await client.call_tool(
+    page_content = await playwright_session.call_tool(
         "playwright_goto",
-        {"url": "https://example.com"},
-        server_name="playwright"
+        {"url": "https://example.com"}
     )
 
     # Use database tools
-    query_result = await client.call_tool(
+    query_result = await sqlite_session.call_tool(
         "sqlite_query",
-        {"query": "SELECT * FROM users LIMIT 10"},
-        server_name="sqlite"
+        {"query": "SELECT * FROM users LIMIT 10"}
     )
 
-    await client.disconnect_all()
+    await client.close_all_sessions()
 ```
 
 ## See Also

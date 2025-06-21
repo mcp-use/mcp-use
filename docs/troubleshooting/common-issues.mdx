@@ -185,7 +185,9 @@ pip install langchain-groq  # for Groq
 1. Verify server connection:
    ```python
    client = MCPClient.from_config_file("config.json")
-   tools = await client.list_tools()
+   await client.create_all_sessions()
+   session = client.get_session("server_name")  # Replace with actual server name
+   tools = await session.list_tools()
    print(f"Available tools: {len(tools)}")
    ```
 

@@ -157,7 +157,12 @@ import re
 
 class PatternLangChainAdapter(LangChainAdapter):
     async def create_tools(self, client, allowed_patterns=None, disallowed_patterns=None):
-        all_tools = await client.list_tools()
+        # Get tools from all sessions
+        await client.create_all_sessions()
+        all_tools = []
+        for session in client.get_all_active_sessions().values():
+            session_tools = await session.list_tools()
+            all_tools.extend(session_tools)
         filtered_tools = []
 
         for tool_def in all_tools:
@@ -198,7 +203,12 @@ from mcp_use.adapters import BaseAdapter
 
 class CrewAIAdapter(BaseAdapter):
     async def create_tools(self, client, **kwargs):
-        mcp_tools = await client.list_tools()
+        # Get tools from all sessions
+        await client.create_all_sessions()
+        mcp_tools = []
+        for session in client.get_all_active_sessions().values():
+            session_tools = await session.list_tools()
+            mcp_tools.extend(session_tools)
         crewai_tools = []
 
         for tool_def in mcp_tools:
@@ -215,7 +225,12 @@ class CrewAIAdapter(BaseAdapter):
             description = tool_def["description"]
 
             async def _run(self, **kwargs):
-                return await client.call_tool(self.name, kwargs)
+                # Find the session that has this tool
+                for session in client.get_all_active_sessions().values():
+                    tools = await session.list_tools()
+                    if any(tool['name'] == self.name for tool in tools):
+                        return await session.call_tool(self.name, kwargs)
+                raise RuntimeError(f"Tool {self.name} not found in any session")
 
         return MCPCrewAITool()
 
@@ -229,7 +244,12 @@ tools = await adapter.create_tools(client)
 ```python
 class AutoGenAdapter(BaseAdapter):
     async def create_tools(self, client, **kwargs):
-        mcp_tools = await client.list_tools()
+        # Get tools from all sessions
+        await client.create_all_sessions()
+        mcp_tools = []
+        for session in client.get_all_active_sessions().values():
+            session_tools = await session.list_tools()
+            mcp_tools.extend(session_tools)
         autogen_tools = []
 
         for tool_def in mcp_tools:
@@ -248,7 +268,12 @@ class AutoGenAdapter(BaseAdapter):
 
     def _create_implementation(self, client, tool_name):
         async def implementation(**kwargs):
-            return await client.call_tool(tool_name, kwargs)
+            # Find the session that has this tool
+            for session in client.get_all_active_sessions().values():
+                tools = await session.list_tools()
+                if any(tool['name'] == tool_name for tool in tools):
+                    return await session.call_tool(tool_name, kwargs)
+            raise RuntimeError(f"Tool {tool_name} not found in any session")
         return implementation
 
 # Usage
@@ -313,7 +338,12 @@ Adapters handle various error conditions:
 class RobustLangChainAdapter(LangChainAdapter):
     async def create_tools(self, client, **kwargs):
         tools = []
-        tool_definitions = await client.list_tools()
+        # Get tools from all sessions
+        await client.create_all_sessions()
+        tool_definitions = []
+        for session in client.get_all_active_sessions().values():
+            session_tools = await session.list_tools()
+            tool_definitions.extend(session_tools)
 
         for tool_def in tool_definitions:
             try:
@@ -344,7 +374,12 @@ class SafeLangChainTool(BaseTool):
 
     async def _arun(self, **kwargs):
         try:
-            return await self.client.call_tool(self.name, kwargs)
+            # Find the session that has this tool
+            for session in self.client.get_all_active_sessions().values():
+                tools = await session.list_tools()
+                if any(tool['name'] == self.name for tool in tools):
+                    return await session.call_tool(self.name, kwargs)
+            raise RuntimeError(f"Tool {self.name} not found in any session")
         except ToolExecutionError as e:
             return f"Tool execution failed: {e}"
         except TimeoutError:
@@ -363,7 +398,12 @@ class LazyLangChainAdapter(LangChainAdapter):
         self._tool_cache = {}
 
     async def create_tools(self, client, **kwargs):
-        tool_definitions = await client.list_tools()
+        # Get tools from all sessions
+        await client.create_all_sessions()
+        tool_definitions = []
+        for session in client.get_all_active_sessions().values():
+            session_tools = await session.list_tools()
+            tool_definitions.extend(session_tools)
         tools = []
 
         for tool_def in tool_definitions:
@@ -395,7 +435,12 @@ class LazyTool(BaseTool):
 ```python
 class BatchLangChainAdapter(LangChainAdapter):
     async def create_tools(self, client, batch_size=10, **kwargs):
-        tool_definitions = await client.list_tools()
+        # Get tools from all sessions
+        await client.create_all_sessions()
+        tool_definitions = []
+        for session in client.get_all_active_sessions().values():
+            session_tools = await session.list_tools()
+            tool_definitions.extend(session_tools)
         tools = []
 
         # Process tools in batches
@@ -458,13 +503,23 @@ class CustomFrameworkTool:
 
 class CustomFrameworkAdapter(BaseAdapter):
     async def create_tools(self, client, **kwargs):
-        mcp_tools = await client.list_tools()
+        # Get tools from all sessions
+        await client.create_all_sessions()
+        mcp_tools = []
+        for session in client.get_all_active_sessions().values():
+            session_tools = await session.list_tools()
+            mcp_tools.extend(session_tools)
         custom_tools = []
 
         for tool_def in mcp_tools:
             def create_executor(tool_name):
                 async def executor(**kwargs):
-                    return await client.call_tool(tool_name, kwargs)
+                    # Find the session that has this tool
+                    for session in client.get_all_active_sessions().values():
+                        tools = await session.list_tools()
+                        if any(tool['name'] == tool_name for tool in tools):
+                            return await session.call_tool(tool_name, kwargs)
+                    raise RuntimeError(f"Tool {tool_name} not found in any session")
                 return executor
 
             custom_tool = CustomFrameworkTool(

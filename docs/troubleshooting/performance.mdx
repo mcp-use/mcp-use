@@ -346,7 +346,7 @@ class AgentPool:
     async def initialize(self):
         for _ in range(self.pool_size):
             client = MCPClient.from_config_file("config.json")
-            await client.connect_all()  # Pre-connect servers
+            await client.create_all_sessions()  # Pre-create sessions
             self.clients.append(client)
             await self.available_clients.put(client)
 
