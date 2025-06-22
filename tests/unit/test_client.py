@@ -254,9 +254,7 @@ class TestMCPClientSessionManagement:
     @pytest.mark.asyncio
     @patch("mcp_use.client.create_connector_from_config")
     @patch("mcp_use.client.MCPSession")
-    async def test_create_session_no_auto_initialize(
-        self, mock_session_class, mock_create_connector
-    ):
+    async def test_create_session_no_auto_initialize(self, mock_session_class, mock_create_connector):
         """Test creating a session without auto-initializing."""
         config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
         client = MCPClient(config=config)

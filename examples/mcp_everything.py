@@ -11,9 +11,7 @@ from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 
 everything_server = {
-    "mcpServers": {
-        "everything": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-everything"]}
-    }
+    "mcpServers": {"everything": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-everything"]}}
 }
 
 

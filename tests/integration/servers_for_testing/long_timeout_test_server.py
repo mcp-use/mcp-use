@@ -32,7 +32,12 @@ def ping() -> dict[str, Any]:
 @mcp.tool()
 def get_server_info() -> dict[str, Any]:
     """Get server information"""
-    return {"name": "LongTimeoutTestServer", "purpose": "Testing connection timeouts for issue #120 with 30+ seconds", "timeout_seconds": 30, "timestamp": datetime.now().isoformat()}
+    return {
+        "name": "LongTimeoutTestServer",
+        "purpose": "Testing connection timeouts for issue #120 with 30+ seconds",
+        "timeout_seconds": 30,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 @mcp.tool()
@@ -94,12 +99,22 @@ async def custom_sse_endpoint(request):
                 if current_time - start_time > timeout_seconds:
                     print(f"Timing out connection {connection_id} after {timeout_seconds} seconds")
                     # Send timeout event before closing
-                    yield f"data: {json.dumps({'type': 'timeout', 'id': connection_id, 'message': 'Connection timed out after 30 seconds'})}\n\n"
+                    timeout_event = {
+                        "type": "timeout",
+                        "id": connection_id,
+                        "message": "Connection timed out after 30 seconds",
+                    }
+                    yield f"data: {json.dumps(timeout_event)}\n\n"
                     break
 
                 # Send periodic heartbeat every 5 seconds
                 if heartbeat_count % 5 == 0:
-                    yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat(), 'elapsed': int(current_time - start_time)})}\n\n"
+                    heartbeat_event = {
+                        "type": "heartbeat",
+                        "timestamp": datetime.now().isoformat(),
+                        "elapsed": int(current_time - start_time),
+                    }
+                    yield f"data: {json.dumps(heartbeat_event)}\n\n"
 
                 await asyncio.sleep(1)
                 heartbeat_count += 1
@@ -111,15 +126,27 @@ async def custom_sse_endpoint(request):
             # Clean up connection tracking
             if connection_id in connection_times:
                 del connection_times[connection_id]
-            print(f"Connection {connection_id} closed - this should trigger the disconnection logs mentioned in issue #120")
+            print(
+                f"Connection {connection_id} closed - "
+                "this should trigger the disconnection logs mentioned in issue #120"
+            )
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "Access-Control-Allow-Origin": "*"})
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "Access-Control-Allow-Origin": "*"},
+    )
 
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request) -> dict:
     """Health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat(), "active_connections": len(connection_times), "timeout_seconds": 30}
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "active_connections": len(connection_times),
+        "timeout_seconds": 30,
+    }
 
 
 if __name__ == "__main__":

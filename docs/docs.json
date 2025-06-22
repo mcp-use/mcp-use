@@ -45,7 +45,7 @@
             "group": "Advanced Usage",
             "pages": [
               "guides/building-custom-agents",
-              "guides/debugging",
+              "guides/logging",
               "guides/multi-server-setup",
               "guides/streaming",
               "guides/security"
@@ -79,6 +79,18 @@
               "api-reference/mcpagent",
               "api-reference/mcpclient",
               "api-reference/adapters"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Community",
+        "icon": "users",
+        "groups": [
+          {
+            "group": "Community",
+            "pages": [
+              "community/showcase"
             ]
           }
         ]

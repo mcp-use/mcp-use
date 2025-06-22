@@ -23,7 +23,7 @@ from langchain_core.utils.input import get_color_mapping
 
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
-from mcp_use.telemetry.posthog import Telemetry
+from mcp_use.telemetry.telemetry import Telemetry
 from mcp_use.telemetry.utils import extract_model_info
 
 from ..adapters.langchain_adapter import LangChainAdapter

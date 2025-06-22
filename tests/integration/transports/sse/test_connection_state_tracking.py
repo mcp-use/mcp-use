@@ -147,7 +147,9 @@ async def test_github_issue_120_fixed_behavior(long_timeout_server_process):
 
             # With the fix, we should get a clear error message (not empty)
             assert error_msg != "", "Error message should not be empty (GitHub Issue #120 fixed)"
-            assert "reconnect" in error_msg.lower() or "connection" in error_msg.lower(), "Error message should mention connection/reconnection issues"
+            assert (
+                "reconnect" in error_msg.lower() or "connection" in error_msg.lower()
+            ), "Error message should mention connection/reconnection issues"
             print("✓ Clear error message provided instead of empty error")
         except Exception as e:
             # Any other exception should also have a clear message

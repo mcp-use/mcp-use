@@ -32,6 +32,7 @@ When you use `MCPAgent.run()` or `MCPAgent.astream()`, we collect:
 ### System Information
 - **Package version** (for version adoption tracking)
 - **Error types** (for debugging and improvement)
+- **Package download analytics** (via Scarf for distribution insights)
 
 ### What We DON'T Collect
 - **Personal information** (no names, emails, or identifiers)
@@ -75,9 +76,9 @@ INFO: Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to di
 - **Windows**: `%LOCALAPPDATA%\mcp_use\telemetry_user_id`
 
 ### Data Transmission
-- All data is sent to PostHog (EU servers: `https://eu.i.posthog.com`)
+- Data is sent to both **PostHog** (EU servers: `https://eu.i.posthog.com`) and **Scarf** (`https://mcpuse.gateway.scarf.sh/simple/`)
 - **No personal information** is ever transmitted
-- Data is used only for **aggregate analysis**
+- Data is used only for **aggregate analysis** and **package usage analytics**
 
 ## Example Telemetry Event
 
@@ -123,8 +124,9 @@ Here's what a typical telemetry event looks like:
 ### Clean Architecture
 The telemetry system uses a **decorator pattern** that ensures:
 - **Zero overhead** when disabled
-- **No exceptions** if PostHog is unavailable
+- **No exceptions** if PostHog or Scarf services are unavailable
 - **Graceful degradation** in all failure scenarios
+- **Dual telemetry** to both PostHog and Scarf for comprehensive analytics
 
 ### Code Example
 ```python

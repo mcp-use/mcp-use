@@ -12,7 +12,7 @@ import sys
 from langchain.globals import set_debug as langchain_set_debug
 
 # Global debug flag - can be set programmatically or from environment
-MCP_USE_DEBUG = False
+MCP_USE_DEBUG = 1
 
 
 class Logger:

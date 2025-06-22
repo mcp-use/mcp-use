@@ -84,9 +84,7 @@ class SandboxConnector(BaseConnector):
             )
 
         self.sandbox_template_id = _e2b_options.get("sandbox_template_id", "base")
-        self.supergateway_cmd_parts = _e2b_options.get(
-            "supergateway_command", "npx -y supergateway"
-        )
+        self.supergateway_cmd_parts = _e2b_options.get("supergateway_command", "npx -y supergateway")
 
         self.sandbox: Sandbox | None = None
         self.process: CommandHandle | None = None
@@ -139,8 +137,7 @@ class SandboxConnector(BaseConnector):
                             if response.status == 200:
                                 elapsed = time.time() - start_time
                                 logger.info(
-                                    f"Server is ready! "
-                                    f"SSE endpoint responded with 200 after {elapsed:.1f}s"
+                                    f"Server is ready! " f"SSE endpoint responded with 200 after {elapsed:.1f}s"
                                 )
                                 return True
                     except Exception:
@@ -220,9 +217,7 @@ class SandboxConnector(BaseConnector):
             sse_url = f"{self.base_url}/sse"
 
             # Create and start the connection manager
-            self._connection_manager = SseConnectionManager(
-                sse_url, self.headers, self.timeout, self.sse_read_timeout
-            )
+            self._connection_manager = SseConnectionManager(sse_url, self.headers, self.timeout, self.sse_read_timeout)
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
@@ -231,9 +226,7 @@ class SandboxConnector(BaseConnector):
 
             # Mark as connected
             self._connected = True
-            logger.debug(
-                f"Successfully connected to MCP implementation via HTTP/SSE: {self.base_url}"
-            )
+            logger.debug(f"Successfully connected to MCP implementation via HTTP/SSE: {self.base_url}")
 
         except Exception as e:
             logger.error(f"Failed to connect to MCP implementation: {e}")

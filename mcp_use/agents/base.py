@@ -48,9 +48,7 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    async def step(
-        self, query: str, previous_steps: list[dict[str, Any]] | None = None
-    ) -> dict[str, Any]:
+    async def step(self, query: str, previous_steps: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Perform a single step of the agent.
 
         Args:

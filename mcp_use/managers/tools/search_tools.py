@@ -72,9 +72,7 @@ class SearchToolsTool(MCPServerTool):
             formatted_output += f"    Description: {tool.description}\n\n"
 
         # Add footer with information about how to use the results
-        formatted_output += (
-            "\nTo use a tool, connect to the appropriate server first, then invoke the tool."
-        )
+        formatted_output += "\nTo use a tool, connect to the appropriate server first, then invoke the tool."
 
         return formatted_output
 
@@ -282,11 +280,7 @@ class ToolSearchEngine:
                 )
 
         # If the server manager has an active server but it wasn't provided, use it
-        if (
-            active_server is None
-            and self.server_manager
-            and hasattr(self.server_manager, "active_server")
-        ):
+        if active_server is None and self.server_manager and hasattr(self.server_manager, "active_server"):
             active_server = self.server_manager.active_server
 
         results = self.search(query, top_k=top_k)
@@ -303,9 +297,7 @@ class ToolSearchEngine:
             marked_results = []
             for tool, server_name, score in results:
                 # If this is the active server, add "(ACTIVE)" marker
-                display_server = (
-                    f"{server_name} (ACTIVE)" if server_name == active_server else server_name
-                )
+                display_server = f"{server_name} (ACTIVE)" if server_name == active_server else server_name
                 marked_results.append((tool, display_server, score))
             results = marked_results
 

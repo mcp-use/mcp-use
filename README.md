@@ -31,7 +31,7 @@
     <a href="https://x.com/pederzh" alt="Twitter Follow - Luigi">
         <img src="https://img.shields.io/twitter/follow/Luigi?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
-        <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/XkNkSkMz3V?style=flat" /></a>
+        <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
 🌐 MCP-Use is the open source way to connect **any LLM to any MCP server** and build custom agents that have tool access, without using closed source or application clients.
 

@@ -1,13 +1,13 @@
 ---
-title: "Debugging"
+title: "Logging"
 description: "Learn how to debug and log in mcp-use"
 icon: "bug"
 ---
 
-# Debugging MCP-Use
+# Logging MCP-Use
 
 <Info>
-MCP-Use provides built-in debugging functionality that increases log verbosity and helps diagnose issues in your agent implementation.
+MCP-Use provides built-in logging functionality that helps diagnose issues in your agent implementation.
 </Info>
 
 ## Enabling Debug Mode
@@ -82,19 +82,19 @@ if os.getenv("ENVIRONMENT") == "development":
 
 <CardGroup cols={3}>
   <Card title="Level 0 - Normal" icon="volume-off">
-    **Default Operation**
+    **Minimal Output**
 
     Only WARNING and above messages are shown
 
-    `set_debug(0)` or no debug setting
+    `set_debug(0)`
   </Card>
 
   <Card title="Level 1 - Info" icon="volume-low">
-    **Basic Information**
+    **Default Operation**
 
     Shows INFO level messages and tool calls - useful for basic operational information
 
-    `DEBUG=1` or `set_debug(1)`
+    `DEBUG=1` or `set_debug(1)` (default)
   </Card>
 
   <Card title="Level 2 - Full Debug" icon="volume-high">
@@ -136,29 +136,6 @@ When debug mode is enabled, you'll see more detailed information about:
 
 This can be extremely helpful when diagnosing issues with custom MCP servers or understanding why an agent might be behaving unexpectedly.
 
-## LangSmith Integration
-
-<Info>
-**Advanced Debugging**: LangChain offers LangSmith, a powerful tool for debugging agent behavior that integrates seamlessly with mcp-use.
-</Info>
-
-<Steps>
-  <Step title="Sign Up">
-    Visit [smith.langchain.com](https://smith.langchain.com/) and create an account
-  </Step>
-
-  <Step title="Get API Keys">
-    After login, you'll receive environment variables to add to your `.env` file
-  </Step>
-
-  <Step title="Visualize">
-    You'll be able to visualize agent behavior, tool calls, and decision-making processes on their platform
-  </Step>
-</Steps>
-
-<Tip>
-LangSmith provides detailed traces of your agent's execution, making it easier to understand complex multi-step workflows.
-</Tip>
 
 ## Troubleshooting Common Issues
 

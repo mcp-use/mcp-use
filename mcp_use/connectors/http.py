@@ -111,9 +111,7 @@ class HttpConnector(BaseConnector):
             if isinstance(streamable_error, httpx.HTTPStatusError):
                 if streamable_error.response.status_code in [404, 405]:
                     should_fallback = True
-            elif "405 Method Not Allowed" in str(streamable_error) or "404 Not Found" in str(
-                streamable_error
-            ):
+            elif "405 Method Not Allowed" in str(streamable_error) or "404 Not Found" in str(streamable_error):
                 should_fallback = True
             else:
                 # For other errors, still try fallback but they might indicate
@@ -131,16 +129,13 @@ class HttpConnector(BaseConnector):
                     read_stream, write_stream = await connection_manager.start()
 
                     # Create the client session for SSE
-                    self.client_session = ClientSession(
-                        read_stream, write_stream, sampling_callback=None
-                    )
+                    self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
                     await self.client_session.__aenter__()
                     self.transport_type = "SSE"
 
                 except Exception as sse_error:
                     logger.error(
-                        f"Both transport methods failed. Streamable HTTP: {streamable_error}, "
-                        f"SSE: {sse_error}"
+                        f"Both transport methods failed. Streamable HTTP: {streamable_error}, " f"SSE: {sse_error}"
                     )
                     raise sse_error
             else:
@@ -149,10 +144,7 @@ class HttpConnector(BaseConnector):
         # Store the successful connection manager and mark as connected
         self._connection_manager = connection_manager
         self._connected = True
-        logger.debug(
-            f"Successfully connected to MCP implementation via"
-            f" {self.transport_type}: {self.base_url}"
-        )
+        logger.debug(f"Successfully connected to MCP implementation via" f" {self.transport_type}: {self.base_url}")
 
     @property
     def public_identifier(self) -> str:
