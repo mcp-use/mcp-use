@@ -352,7 +352,9 @@ class MCPAgent:
                             self.add_to_history(message)
             yield event
         # 5. House-keeping -------------------------------------------------------
-        # Restrict agent cleanup in _generate_response_chunks_async to only occur when the agent was initialized in this generator and is not client-managed and the user does want us to manage the connection.
+        # Restrict agent cleanup in _generate_response_chunks_async to only occur
+        #  when the agent was initialized in this generator and is not client-managed
+        #  and the user does want us to manage the connection.
         if not self.client and initialised_here and manage_connector:
             logger.info("🧹 Closing agent after generator completion")
             await self.close()
