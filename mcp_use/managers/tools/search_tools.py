@@ -113,13 +113,18 @@ class ToolSearchEngine:
 
         try:
             from fastembed import TextEmbedding  # optional dependency install with [search]
-        except ImportError:
+        except ImportError as exc:
             logger.error(
                 "The 'fastembed' library is not installed. "
                 "To use the search functionality, please install it by running: "
                 "pip install mcp-use[search]"
             )
-            return False
+            raise ImportError(
+                "The 'fastembed' library is not installed. "
+                "To use the server_manager functionality, please install it by running: "
+                "pip install mcp-use[search]"
+                "or disable the server_manager by setting use_server_manager=False in the MCPAgent constructor."
+            ) from exc
 
         try:
             self.model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
