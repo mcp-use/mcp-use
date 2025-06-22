@@ -122,7 +122,7 @@ class ToolSearchEngine:
             raise ImportError(
                 "The 'fastembed' library is not installed. "
                 "To use the server_manager functionality, please install it by running: "
-                "pip install mcp-use[search]"
+                "pip install mcp-use[search] "
                 "or disable the server_manager by setting use_server_manager=False in the MCPAgent constructor."
             ) from exc
 
