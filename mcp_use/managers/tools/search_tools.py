@@ -54,28 +54,6 @@ class SearchToolsTool(MCPServerTool):
         """Synchronous version that raises a NotImplementedError - use _arun instead."""
         raise NotImplementedError("SearchToolsTool requires async execution. Use _arun instead.")
 
-    def format_search_results(self, results: list[tuple[BaseTool, str, float]]) -> str:
-        """Format search results in a consistent format."""
-
-        # Only show top_k results
-        results = results
-
-        formatted_output = "Search results\n\n"
-
-        for i, (tool, server_name, score) in enumerate(results):
-            # Format score as percentage
-            if i < 5:
-                score_pct = f"{score * 100:.1f}%"
-                logger.info(f"{i}: {tool.name} ({score_pct} match)")
-            formatted_output += f"[{i + 1}] Tool: {tool.name} ({score_pct} match)\n"
-            formatted_output += f"    Server: {server_name}\n"
-            formatted_output += f"    Description: {tool.description}\n\n"
-
-        # Add footer with information about how to use the results
-        formatted_output += "\nTo use a tool, connect to the appropriate server first, then invoke the tool."
-
-        return formatted_output
-
 
 class ToolSearchEngine:
     """
