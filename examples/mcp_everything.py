@@ -24,7 +24,7 @@ async def main():
 
     result = await agent.run(
         """
-        Hello, you are a tester can you please answer the follwing questions:
+        Hello, you are a tester can you please answer the following questions:
         - Which resources do you have access to?
         - Which prompts do you have access to?
         - Which tools do you have access to?
