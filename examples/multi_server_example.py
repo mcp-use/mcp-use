@@ -56,7 +56,7 @@ async def run_multi_server_example():
     result = await agent.run(
         "Search for a nice place to stay in Barcelona on Airbnb, "
         "then use Google to find nearby restaurants and attractions."
-        "Write the result in the current directory in restarant.txt",
+        "Write the result in the current directory in restaurant.txt",
         max_steps=30,
     )
     print(result)
