@@ -1,5 +1,4 @@
 """Type definitions for sandbox-related configurations."""
-
 from typing import NotRequired, TypedDict
 
 
