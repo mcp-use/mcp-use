@@ -47,17 +47,11 @@
 </div>
 
 🌐 MCP-Use is the open source way to connect **any LLM to any MCP server** and build custom MCP agents that have tool access, without using closed source or application clients.
-🌐 MCP-Use is the open source way to connect **any LLM to any MCP server** and build custom MCP agents that have tool access, without using closed source or application clients.
 
 💡 Let developers easily connect any LLM to tools like web browsing, file operations, and more.
 
 - Visit the [mcp-use.com website](https://mcp-use.com/) to know how to build and deploy MCP agents.
-- Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use libraryò
-
-💬 Get started quickly - chat with your servers on our <b>hosted version</b>! [Try mcp-use chat (beta)](https://chat.mcp-use.com).
-
-- Visit the [mcp-use.com website](https://mcp-use.com/) to know how to build and deploy MCP agents.
-- Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use libraryò
+- Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use library
 
 💬 Get started quickly - chat with your servers on our <b>hosted version</b>! [Try mcp-use chat (beta)](https://chat.mcp-use.com).
 
@@ -846,7 +840,5 @@ If you use MCP-Use in your research or project, please cite:
   url = {https://github.com/pietrozullo/mcp-use}
 }
 ```
-
-<img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=732589b6-6850-4b8c-aa25-906c0979e426&page=README.md" />
 
 <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=732589b6-6850-4b8c-aa25-906c0979e426&page=README.md" />
