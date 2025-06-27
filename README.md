@@ -11,18 +11,28 @@
 
 # Connect any LLM to any MCP server
 
+<br>
+
+# Connect any LLM to any MCP server
+
 <p align="center">
+    <a href="https://github.com/pietrozullo/mcp-use/stargazers" alt="GitHub stars">
+        <img src="https://img.shields.io/github/stars/pietrozullo/mcp-use?style=social" /></a>
     <a href="https://github.com/pietrozullo/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/pietrozullo/mcp-use?style=social" /></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
         <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
     <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
+    <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
+        <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
         <img src="https://static.pepy.tech/badge/mcp-use" /></a>
     <a href="https://docs.mcp-use.com" alt="Documentation">
         <img src="https://img.shields.io/badge/docs-mcp--use.com-blue" /></a>
+        <img src="https://img.shields.io/badge/docs-mcp--use.com-blue" /></a>
     <a href="https://mcp-use.com" alt="Website">
+        <img src="https://img.shields.io/badge/website-mcp--use.com-blue" /></a>
         <img src="https://img.shields.io/badge/website-mcp--use.com-blue" /></a>
     </p>
     <p align="center">
@@ -34,10 +44,17 @@
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
 </div>
+</div>
 
+🌐 MCP-Use is the open source way to connect **any LLM to any MCP server** and build custom MCP agents that have tool access, without using closed source or application clients.
 🌐 MCP-Use is the open source way to connect **any LLM to any MCP server** and build custom MCP agents that have tool access, without using closed source or application clients.
 
 💡 Let developers easily connect any LLM to tools like web browsing, file operations, and more.
+
+- Visit the [mcp-use.com website](https://mcp-use.com/) to know how to build and deploy MCP agents.
+- Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use libraryò
+
+💬 Get started quickly - chat with your servers on our <b>hosted version</b>! [Try mcp-use chat (beta)](https://chat.mcp-use.com).
 
 - Visit the [mcp-use.com website](https://mcp-use.com/) to know how to build and deploy MCP agents.
 - Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use libraryò
@@ -829,5 +846,7 @@ If you use MCP-Use in your research or project, please cite:
   url = {https://github.com/pietrozullo/mcp-use}
 }
 ```
+
+<img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=732589b6-6850-4b8c-aa25-906c0979e426&page=README.md" />
 
 <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=732589b6-6850-4b8c-aa25-906c0979e426&page=README.md" />
