@@ -1,0 +1,110 @@
+name: Update README
+
+on:
+  # On manual launch
+  workflow_dispatch:
+  # Scheduled interval: Use CRON format https://crontab.guru/
+  schedule:
+    - cron: "0 0 * * 0" # Every sunday at midnight
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  update-dependents:
+    name: Update GitHub Dependents Info
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # Git Checkout
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      # Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Install github-dependents-info
+      - name: Install github-dependents-info
+        run: pip install -U github-dependents-info
+
+      # Generate dependents info
+      - name: Generate GitHub Dependents Info
+        run: |
+          # Get dependents data in JSON format
+          github-dependents-info --repo ${{ github.repository }} --sort stars --minstars 1 --json > dependents.json
+
+          # Extract total count and stars
+          TOTAL_REPOS=$(jq -r '.total_dependents_number' dependents.json)
+          PUBLIC_REPOS=$(jq -r '.public_dependents_number' dependents.json)
+          TOTAL_STARS=$(jq -r '[.all_public_dependent_repos[].stars] | add' dependents.json)
+
+          # Create the dependents table using HTML for full width
+          cat > dependents_table.md << 'EOF'
+          <table>
+            <tr>
+              <th width="400">Repository</th>
+              <th>Stars</th>
+            </tr>
+          EOF
+
+          # Add top repositories to the table (limit to top 10) with avatars
+          jq -r '.all_public_dependent_repos[:10] | .[] | "  <tr>\n    <td><img src=\"\(.img)\" width=\"20\" height=\"20\" style=\"vertical-align: middle; margin-right: 8px;\"> <a href=\"https://github.com/\(.name)\"><strong>\(.owner)/\(.repo_name)</strong></a></td>\n    <td>⭐ \(.stars)</td>\n  </tr>"' dependents.json >> dependents_table.md
+
+          # Close the table
+          echo "</table>" >> dependents_table.md
+
+          # Update README by replacing content between tags
+          awk '
+          BEGIN { in_section = 0 }
+          /<!-- gh-dependents-info-used-by-start -->/ {
+            print $0
+            print ""
+            system("cat dependents_table.md")
+            print ""
+            in_section = 1
+            next
+          }
+          /<!-- gh-dependents-info-used-by-end -->/ {
+            in_section = 0
+            print $0
+            next
+          }
+          !in_section { print }
+          ' README.md > README_updated.md
+
+          mv README_updated.md README.md
+          rm dependents_table.md dependents.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Check for changes and commit directly
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet README.md; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update dependents info (automated)"
+          title: "chore: update dependents info (automated)"
+          body: "This PR updates the README with the latest dependents information."
+          branch: chore/update-dependents-info-${{ github.run_id }}
+          delete-branch: true

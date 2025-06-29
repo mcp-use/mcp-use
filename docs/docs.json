@@ -1,46 +1,109 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "maple",
   "name": "mcp_use",
   "colors": {
-    "primary": "#062c24",
-    "light": "#55e4c8",
+    "primary": "#000000",
+    "light": "#ffffff",
     "dark": "#000000"
   },
   "favicon": "/favicon.svg",
+  "icons": {
+    "library": "lucide"
+  },
   "navigation": {
     "tabs": [
       {
         "tab": "Documentation",
+        "icon": "book",
         "groups": [
           {
             "group": "Getting Started",
             "pages": [
-              "introduction",
-              "quickstart"
+              "index",
+              "quickstart",
+              "installation"
             ]
           },
           {
-            "group": "Essentials",
+            "group": "Client Configuration",
             "pages": [
               "essentials/configuration",
-              "essentials/llm-integration",
-              "essentials/debugging",
-              "essentials/connection-types",
-              "essentials/server-manager",
-              "building-custom-agents"
+              "essentials/client-configuration",
+              "essentials/connection-types"
             ]
           },
           {
-            "group": "API Reference",
+            "group": "Agent Configuration",
             "pages": [
-              "api-reference/introduction"
+              "essentials/agent-configuration",
+              "essentials/server-manager",
+              "essentials/llm-integration"
+            ]
+          },
+          {
+            "group": "Advanced Usage",
+            "pages": [
+              "guides/building-custom-agents",
+              "guides/logging",
+              "guides/multi-server-setup",
+              "guides/streaming",
+              "guides/security"
             ]
           },
           {
             "group": "Development",
             "pages": [
-              "development"
+              "development",
+              "development/telemetry",
+              "development/observability"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/performance",
+              "troubleshooting/connection-errors"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "terminal",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/mcpagent",
+              "api-reference/mcpclient",
+              "api-reference/adapters"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Community",
+        "icon": "users",
+        "groups": [
+          {
+            "group": "Community",
+            "pages": [
+              "community/showcase"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "icon": "history",
+        "groups": [
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog"
             ]
           }
         ]
@@ -54,35 +117,144 @@
   "navbar": {
     "links": [
       {
-        "label": "GitHub",
-        "href": "https://github.com/pietrozullo/mcp-use"
+        "label": "Community",
+        "href": "https://github.com/mcp-use/mcp-use/discussions"
+      },
+      {
+        "label": "Examples",
+        "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
       }
-    ]
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://github.com/mcp-use/mcp-use"
+    }
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/pietrozullo/mcp-use"
-    }
+      "x": "https://x.com/mcp_use",
+      "linkedin": "https://www.linkedin.com/company/mcp-use",
+      "github": "https://github.com/mcp-use",
+      "discord": "https://discord.gg/XkNkSkMz3V"
+    },
+    "links": [
+      {
+        "header": "Linktree",
+        "items": [
+          {
+            "label": "Website",
+            "href": "https://mcp-use.com"
+          },
+          {
+            "label": "Cloud Chat",
+            "href": "https://chat.mcp-use.com"
+          },
+          {
+            "label": "GitHub",
+            "href": "https://github.com/mcp-use"
+          }
+        ]
+      },
+      {
+        "header": "Resources",
+        "items": [
+          {
+            "label": "Examples",
+            "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
+          },
+          {
+            "label": "MCP Servers",
+            "href": "https://github.com/punkpeye/awesome-mcp-servers"
+          },
+          {
+            "label": "LangChain Docs",
+            "href": "https://python.langchain.com/"
+          }
+        ]
+      },
+      {
+        "header": "Community",
+        "items": [
+          {
+            "label": "GitHub Discussions",
+            "href": "https://github.com/mcp-use/mcp-use/discussions"
+          },
+          {
+            "label": "Issues",
+            "href": "https://github.com/mcp-use/mcp-use/issues"
+          },
+          {
+            "label": "Contribute",
+            "href": "https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md"
+          },
+          {
+            "label": "Discord",
+            "href": "https://discord.gg/XkNkSkMz3V"
+          }
+        ]
+      }
+    ]
   },
-  "anchors": [
-    {
-      "name": "Documentation",
-      "icon": "book-open",
-      "url": "/"
-    },
-    {
-      "name": "API Reference",
-      "icon": "code",
-      "url": "/api-reference"
-    },
-    {
-      "name": "Development",
-      "icon": "code-branch",
-      "url": "/development"
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude"
+    ]
+  },
+  "seo": {
+    "metatags": {
+      "charset": "UTF-8",
+      "viewport": "width=device-width, initial-scale=1.0",
+      "description": "mcp_use is an open source library that enables developers to connect any LLM to any MCP server, allowing the creation of custom agents with tool access without relying on closed-source clients.",
+      "keywords": "MCP, Model Context Protocol, LLM, AI agents, open source, API integration, Claude, ChatGPT, artificial intelligence, custom agents, tool access",
+      "author": "mcp-use Team",
+      "robots": "index, follow",
+      "googlebot": "index, follow",
+      "google": "notranslate",
+      "google-site-verification": "verification_token_here",
+      "generator": "mcp-use",
+      "theme-color": "#1a1a1a",
+      "color-scheme": "light dark",
+      "format-detection": "telephone=no",
+      "referrer": "origin",
+      "language": "en",
+      "copyright": "Copyright 2025 mcp-use",
+      "reply-to": "dev@mcp-use.com",
+      "distribution": "global",
+      "coverage": "Worldwide",
+      "category": "Technology",
+      "target": "developers",
+      "HandheldFriendly": "True",
+      "MobileOptimized": "320",
+      "apple-mobile-web-app-capable": "yes",
+      "apple-mobile-web-app-status-bar-style": "black-translucent",
+      "apple-mobile-web-app-title": "mcp-use",
+      "application-name": "mcp-use",
+      "msapplication-TileColor": "#1a1a1a",
+      "msapplication-TileImage": "/images/mstile-144x144.png",
+      "msapplication-config": "/browserconfig.xml",
+      "og:title": "mcp-use - Connect Any LLM to Any MCP Server",
+      "og:type": "website",
+      "og:url": "https://mcp-use.com",
+      "og:image": "https://repository-images.githubusercontent.com/956472076/d2b369ee-1bf9-466c-9ecc-e96c2f95b81a",
+      "og:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
+      "og:site_name": "mcp-use",
+      "og:locale": "en_US",
+      "twitter:card": "summary_large_image",
+      "twitter:site": "@mcpuse",
+      "twitter:creator": "@mcpuse",
+      "twitter:title": "mcp-use - Connect Any LLM to Any MCP Server",
+      "twitter:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
+      "twitter:image": "https://repository-images.githubusercontent.com/956472076/d2b369ee-1bf9-466c-9ecc-e96c2f95b81a",
+      "twitter:image:alt": "mcp-use logo and interface showing LLM to MCP server connections",
+      "article:published_time": "2024-12-01T00:00:00+00:00",
+      "article:modified_time": "2025-06-16T00:00:00+00:00",
+      "article:author": "mcp-use Team",
+      "article:section": "Technology",
+      "article:tag": "MCP, LLM, AI, open source, developers, API"
     }
-  ],
-  "feedback": {
-    "suggestEdit": true,
-    "raiseIssue": true
   }
 }

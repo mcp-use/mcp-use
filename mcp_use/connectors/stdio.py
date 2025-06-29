@@ -52,17 +52,15 @@ class StdioConnector(BaseConnector):
         logger.debug(f"Connecting to MCP implementation: {self.command}")
         try:
             # Create server parameters
-            server_params = StdioServerParameters(
-                command=self.command, args=self.args, env=self.env
-            )
+            server_params = StdioServerParameters(command=self.command, args=self.args, env=self.env)
 
             # Create and start the connection manager
             self._connection_manager = StdioConnectionManager(server_params, self.errlog)
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
-            await self.client.__aenter__()
+            self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
+            await self.client_session.__aenter__()
 
             # Mark as connected
             self._connected = True
@@ -76,3 +74,8 @@ class StdioConnector(BaseConnector):
 
             # Re-raise the original exception
             raise
+
+    @property
+    def public_identifier(self) -> str:
+        """Get the identifier for the connector."""
+        return {"type": "stdio", "command&args": f"{self.command} {' '.join(self.args)}"}

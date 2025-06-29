@@ -70,9 +70,7 @@ class ConnectionManager(Generic[T], ABC):
         self._exception = None
 
         # Create a task to establish and maintain the connection
-        self._task = asyncio.create_task(
-            self._connection_task(), name=f"{self.__class__.__name__}_task"
-        )
+        self._task = asyncio.create_task(self._connection_task(), name=f"{self.__class__.__name__}_task")
 
         # Wait for the connection to be ready or fail
         await self._ready_event.wait()
@@ -104,6 +102,14 @@ class ConnectionManager(Generic[T], ABC):
         # Wait for the connection to be done
         await self._done_event.wait()
         logger.debug(f"{self.__class__.__name__} task completed")
+
+    def get_streams(self) -> T | None:
+        """Get the current connection streams.
+
+        Returns:
+            The current connection (typically a tuple of read_stream, write_stream) or None if not connected.
+        """
+        return self._connection
 
     async def _connection_task(self) -> None:
         """Run the connection task.
@@ -137,7 +143,7 @@ class ConnectionManager(Generic[T], ABC):
             self._ready_event.set()
 
         finally:
-            # Close the connection if it was establishedSUPABASE_URL
+            # Close the connection if it was established
             if self._connection is not None:
                 try:
                     await self._close_connection()

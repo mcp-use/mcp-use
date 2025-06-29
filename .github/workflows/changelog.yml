@@ -1,0 +1,74 @@
+name: "Update Changelogs"
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the
+      # updated CHANGELOG back to the repository.
+      # https://github.blog/changelog/2023-02-02-github-actions-updating-the-default-github_token-permissions-to-read-only/
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.target_commitish }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Changelog
+        uses: stefanzweifel/changelog-updater-action@v1
+        with:
+          latest-version: ${{ github.event.release.tag_name }}
+          release-notes: ${{ github.event.release.body }}
+
+      - name: Update Docs Changelog
+        run: |
+          # Get current date in the required format
+          CURRENT_DATE=$(date +"%Y‑%m‑%d")
+
+          # Create the new changelog entry
+          NEW_ENTRY="<Update label=\"$CURRENT_DATE\">
+            ## ${{ github.event.release.tag_name }}
+            ${{ github.event.release.body }}
+          </Update>
+
+          "
+
+          # Read the current changelog and insert the new entry after the front matter
+          python -c "
+          import re
+
+          # Read the current changelog
+          with open('docs/changelog.mdx', 'r') as f:
+              content = f.read()
+
+          # Find the end of the front matter
+          front_matter_end = content.find('---', content.find('---') + 1) + 3
+
+          # Split content into front matter and body
+          front_matter = content[:front_matter_end]
+          body = content[front_matter_end:]
+
+          # Create new entry
+          new_entry = '''$NEW_ENTRY'''
+
+          # Combine and write back
+          new_content = front_matter + '\n\n' + new_entry + body.lstrip()
+
+          with open('docs/changelog.mdx', 'w') as f:
+              f.write(new_content)
+          "
+
+      - name: Commit updated CHANGELOG
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: ${{ github.event.release.target_commitish }}
+          commit_message: Update CHANGELOG and docs changelog
+          file_pattern: CHANGELOG.md docs/changelog.mdx

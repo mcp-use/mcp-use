@@ -89,9 +89,7 @@ class LangChainAdapter(BaseAdapter):
                     elif hasattr(resource, "blob"):
                         # Assuming blob needs decoding or specific handling; adjust as needed
                         decoded_result += (
-                            resource.blob.decode()
-                            if isinstance(resource.blob, bytes)
-                            else str(resource.blob)
+                            resource.blob.decode() if isinstance(resource.blob, bytes) else str(resource.blob)
                         )
                     else:
                         raise ToolException(f"Unexpected resource type: {resource.type}")
@@ -154,9 +152,7 @@ class LangChainAdapter(BaseAdapter):
                 logger.debug(f'MCP tool: "{self.name}" received input: {kwargs}')
 
                 try:
-                    tool_result: CallToolResult = await self.tool_connector.call_tool(
-                        self.name, kwargs
-                    )
+                    tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     try:
                         # Use the helper function to parse the result
                         return adapter_self._parse_mcp_tool_result(tool_result)
@@ -185,8 +181,7 @@ class LangChainAdapter(BaseAdapter):
         class ResourceTool(BaseTool):
             name: str = _sanitize(mcp_resource.name or f"resource_{mcp_resource.uri}")
             description: str = (
-                mcp_resource.description
-                or f"Return the content of the resource located at URI {mcp_resource.uri}."
+                mcp_resource.description or f"Return the content of the resource located at URI {mcp_resource.uri}."
             )
             args_schema: type[BaseModel] = ReadResourceRequestParams
             tool_connector: BaseConnector = connector
@@ -243,9 +238,7 @@ class LangChainAdapter(BaseAdapter):
                         Field(None, description=arg.description),
                     )
 
-            InputSchema = create_model(
-                dynamic_model_name, **field_definitions_for_create, __base__=BaseModel
-            )
+            InputSchema = create_model(dynamic_model_name, **field_definitions_for_create, __base__=BaseModel)
         else:
             # Create an empty Pydantic model if there are no arguments
             InputSchema = create_model(dynamic_model_name, __base__=BaseModel)

@@ -1,0 +1,303 @@
+---
+title: "Installation"
+description: "Install mcp_use and get your development environment ready"
+icon: "download"
+---
+
+<img
+  className="block dark:hidden my-0 pointer-events-none"
+  src="/images/hero-light.png"
+  alt="mcp_use Installation"
+/>
+<img
+  className="hidden dark:block my-0 pointer-events-none"
+  src="/images/hero-dark.png"
+  alt="mcp_use Installation"
+/>
+
+## Installing mcp_use
+
+<Info>
+  **Prerequisites**: Please install [Python](https://python.org/) (version 3.11 or higher) before proceeding.
+</Info>
+
+<Steps>
+  <Step title="Install the library">
+    Install mcp_use using your preferred package manager:
+    <CodeGroup>
+
+    ```bash pip
+    pip install mcp-use
+    ```
+
+    ```bash Poetry
+    poetry add mcp-use
+    ```
+
+    ```bash Conda
+    conda install -c conda-forge mcp-use
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Install LLM provider">
+    Choose and install your preferred LangChain provider:
+    <CodeGroup>
+
+    ```bash OpenAI
+    pip install langchain-openai
+    ```
+
+    ```bash Anthropic
+    pip install langchain-anthropic
+    ```
+
+    ```bash Google
+    pip install langchain-google-genai
+    ```
+
+    ```bash Groq
+    pip install langchain-groq
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Set up environment">
+    Create a `.env` file for your API keys:
+
+    ```bash
+    OPENAI_API_KEY=your_openai_key_here
+    ANTHROPIC_API_KEY=your_anthropic_key_here
+    GROQ_API_KEY=your_groq_key_here
+    GOOGLE_API_KEY=your_google_key_here
+    ```
+  </Step>
+  <Step title="Verify installation">
+    Test your installation with a simple script:
+
+    ```python test_install.py
+    from mcp_use import MCPAgent, MCPClient
+    print("mcp_use installed successfully!")
+    ```
+  </Step>
+</Steps>
+
+## Development Installation
+
+If you want to contribute or use the latest features, install from source:
+
+<CodeGroup>
+
+```bash Git Clone
+git clone https://github.com/mcp-use/mcp-use.git
+cd mcp-use
+pip install -e .
+```
+
+```bash Development Mode
+git clone https://github.com/mcp-use/mcp-use.git
+cd mcp-use
+pip install -e ".[dev]"
+```
+
+</CodeGroup>
+
+## Installing MCP Servers
+
+mcp_use connects to MCP servers that provide the actual tools. Here are some popular ones:
+
+### Playwright (Web Scraping)
+
+<CodeGroup>
+
+```bash NPM
+npx @playwright/mcp@latest
+```
+
+```bash Global Install
+npm install -g @playwright/mcp
+```
+
+</CodeGroup>
+
+### Filesystem Server
+
+<CodeGroup>
+
+```bash Python
+pip install mcp-server-filesystem
+```
+
+```bash From Source
+git clone https://github.com/modelcontextprotocol/servers.git
+cd servers/src/filesystem
+pip install -e .
+```
+
+</CodeGroup>
+
+### SQLite Server
+
+<CodeGroup>
+
+```bash Python
+pip install mcp-server-sqlite
+```
+
+```bash NPM
+npm install -g @modelcontextprotocol/server-sqlite
+```
+
+</CodeGroup>
+
+<Tip>
+  Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) repository for a comprehensive list of available servers.
+</Tip>
+
+## Environment Setup
+
+### Using Virtual Environments
+
+It's recommended to use virtual environments to avoid dependency conflicts:
+
+<CodeGroup>
+
+```bash venv
+python -m venv mcp_env
+source mcp_env/bin/activate  # On Windows: mcp_env\Scripts\activate
+pip install mcp-use langchain-openai
+```
+
+```bash conda
+conda create -n mcp_env python=3.9
+conda activate mcp_env
+pip install mcp-use langchain-openai
+```
+
+```bash Poetry
+poetry init
+poetry add mcp-use langchain-openai
+poetry shell
+```
+
+</CodeGroup>
+
+### Environment Variables
+
+Create a `.env` file in your project root:
+
+```bash .env
+# LLM Provider Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GROQ_API_KEY=gsk_...
+GOOGLE_API_KEY=AI...
+
+# Optional: Logging level
+LOG_LEVEL=INFO
+
+# Optional: MCP server paths
+MCP_SERVER_PATH=/path/to/mcp/servers
+```
+
+Load environment variables in your Python scripts:
+
+```python
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+# Your API keys are now available as environment variables
+openai_key = os.getenv("OPENAI_API_KEY")
+```
+
+## Verification
+
+Verify your installation works correctly:
+
+```python verify_setup.py
+import asyncio
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def verify_installation():
+    load_dotenv()
+
+    # Simple configuration for testing
+    config = {
+        "mcpServers": {
+            "test": {
+                "command": "echo",
+                "args": ["Hello from MCP!"]
+            }
+        }
+    }
+
+    try:
+        client = MCPClient.from_dict(config)
+        print("✅ MCPClient created successfully")
+
+        llm = ChatOpenAI(model="gpt-3.5-turbo")
+        print("✅ LLM initialized successfully")
+
+        agent = MCPAgent(llm=llm, client=client)
+        print("✅ MCPAgent created successfully")
+
+        print("\n🎉 Installation verified! You're ready to use mcp_use.")
+
+    except Exception as e:
+        print(f"❌ Verification failed: {e}")
+        print("Please check your installation and API keys.")
+
+if __name__ == "__main__":
+    asyncio.run(verify_installation())
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Follow our quickstart guide to build your first agent
+  </Card>
+  <Card title="Configuration" icon="gear" href="/essentials/configuration">
+    Learn how to configure MCP servers
+  </Card>
+  <Card title="LLM Integration" icon="brain" href="/essentials/llm-integration">
+    Explore different LLM providers and their setup
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
+    Browse real-world examples and use cases
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Import errors or module not found">
+    Make sure you're in the correct virtual environment and that mcp_use is installed:
+    ```bash
+    pip list | grep mcp-use
+    ```
+  </Accordion>
+  <Accordion title="API key errors">
+    Verify your `.env` file is in the correct location and your API keys are valid:
+    ```bash
+    cat .env  # Check file contents
+    python -c "import os; from dotenv import load_dotenv; load_dotenv(); print(os.getenv('OPENAI_API_KEY'))"
+    ```
+  </Accordion>
+  <Accordion title="MCP server not found">
+    Ensure your MCP servers are properly installed and accessible:
+    ```bash
+    which npx  # For Node.js-based servers
+    pip list | grep mcp-server  # For Python-based servers
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  **Tool Calling Required**: Only models with tool calling capabilities can be used with mcp_use. Make sure your chosen model supports function calling or tool use.
+</Warning>

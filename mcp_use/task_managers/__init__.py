@@ -8,12 +8,13 @@ through different transport mechanisms.
 from .base import ConnectionManager
 from .sse import SseConnectionManager
 from .stdio import StdioConnectionManager
+from .streamable_http import StreamableHttpConnectionManager
 from .websocket import WebSocketConnectionManager
 
 __all__ = [
     "ConnectionManager",
-    "HttpConnectionManager",
     "StdioConnectionManager",
     "WebSocketConnectionManager",
     "SseConnectionManager",
+    "StreamableHttpConnectionManager",
 ]

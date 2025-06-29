@@ -11,7 +11,7 @@ import uuid
 from typing import Any
 
 from mcp.types import Tool
-from websockets.client import WebSocketClientProtocol
+from websockets import ClientConnection
 
 from ..logging import logger
 from ..task_managers import ConnectionManager, WebSocketConnectionManager
@@ -44,7 +44,7 @@ class WebSocketConnector(BaseConnector):
         if auth_token:
             self.headers["Authorization"] = f"Bearer {auth_token}"
 
-        self.ws: WebSocketClientProtocol | None = None
+        self.ws: ClientConnection | None = None
         self._connection_manager: ConnectionManager | None = None
         self._receiver_task: asyncio.Task | None = None
         self.pending_requests: dict[str, asyncio.Future] = {}
@@ -64,9 +64,7 @@ class WebSocketConnector(BaseConnector):
             self.ws = await self._connection_manager.start()
 
             # Start the message receiver task
-            self._receiver_task = asyncio.create_task(
-                self._receive_messages(), name="websocket_receiver_task"
-            )
+            self._receiver_task = asyncio.create_task(self._receive_messages(), name="websocket_receiver_task")
 
             # Mark as connected
             self._connected = True
@@ -243,3 +241,8 @@ class WebSocketConnector(BaseConnector):
         """Send a raw request to the MCP implementation."""
         logger.debug(f"Sending request: {method} with params: {params}")
         return await self._send_request(method, params)
+
+    @property
+    def public_identifier(self) -> str:
+        """Get the identifier for the connector."""
+        return {"type": "websocket", "url": self.url}

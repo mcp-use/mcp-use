@@ -49,19 +49,13 @@ class ServerManager:
                 session = None
                 try:
                     session = self.client.get_session(server_name)
-                    logger.debug(
-                        f"Using existing session for server '{server_name}' to prefetch tools."
-                    )
+                    logger.debug(f"Using existing session for server '{server_name}' to prefetch tools.")
                 except ValueError:
                     try:
                         session = await self.client.create_session(server_name)
-                        logger.debug(
-                            f"Temporarily created session for '{server_name}' to prefetch tools"
-                        )
+                        logger.debug(f"Temporarily created session for '{server_name}' to prefetch tools")
                     except Exception:
-                        logger.warning(
-                            f"Could not create session for '{server_name}' during prefetch"
-                        )
+                        logger.warning(f"Could not create session for '{server_name}' during prefetch")
                         continue
 
                 # Fetch tools if session is available
@@ -70,17 +64,12 @@ class ServerManager:
                     tools = await self.adapter._create_tools_from_connectors([connector])
 
                     # Check if this server's tools have changed
-                    if (
-                        server_name not in self._server_tools
-                        or self._server_tools[server_name] != tools
-                    ):
+                    if server_name not in self._server_tools or self._server_tools[server_name] != tools:
                         self._server_tools[server_name] = tools  # Cache tools
                         self.initialized_servers[server_name] = True  # Mark as initialized
                         logger.debug(f"Prefetched {len(tools)} tools for server '{server_name}'.")
                     else:
-                        logger.debug(
-                            f"Tools for server '{server_name}' unchanged, using cached version."
-                        )
+                        logger.debug(f"Tools for server '{server_name}' unchanged, using cached version.")
             except Exception as e:
                 logger.error(f"Error prefetching tools for server '{server_name}': {e}")
 

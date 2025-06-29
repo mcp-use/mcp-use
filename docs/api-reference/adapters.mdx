@@ -1,0 +1,519 @@
+---
+title: "Adapters"
+description: "Adapter classes for framework integration"
+icon: "plug-2"
+---
+
+# Adapters API Reference
+
+Adapters provide a bridge between MCP tools and different agent frameworks. They convert MCP tool definitions into framework-specific formats.
+
+## BaseAdapter
+
+The abstract base class for all adapters.
+
+### BaseAdapter()
+
+Base adapter class that defines the interface for tool conversion.
+
+**Methods:**
+
+#### async create_tools(client: MCPClient, **kwargs) -> List[Any]
+
+Converts MCP tools to framework-specific tool format.
+
+**Parameters:**
+- `client` (MCPClient): The MCP client instance
+- `**kwargs`: Additional framework-specific parameters
+
+**Returns:**
+- `List[Any]`: List of framework-specific tool objects
+
+**Raises:**
+- `NotImplementedError`: Must be implemented by subclasses
+
+## LangChainAdapter
+
+Adapter for LangChain framework integration.
+
+### LangChainAdapter()
+
+Creates tools compatible with LangChain agents and runnables.
+
+**Example:**
+```python
+from mcp_use import MCPClient
+from mcp_use.adapters import LangChainAdapter
+
+client = MCPClient.from_config_file("config.json")
+adapter = LangChainAdapter()
+tools = await adapter.create_tools(client)
+```
+
+### Methods
+
+#### async create_tools(client: MCPClient, allowed_tools=None, disallowed_tools=None) -> List[BaseTool]
+
+Converts MCP tools to LangChain BaseTool objects.
+
+**Parameters:**
+- `client` (MCPClient): The MCP client instance
+- `allowed_tools` (List[str], optional): Whitelist of tool names to include
+- `disallowed_tools` (List[str], optional): Blacklist of tool names to exclude
+
+**Returns:**
+- `List[BaseTool]`: List of LangChain tool objects
+
+**Example:**
+```python
+# Create all available tools
+tools = await adapter.create_tools(client)
+
+# Create only specific tools
+tools = await adapter.create_tools(
+    client,
+    allowed_tools=["file_read", "file_write"]
+)
+
+# Exclude dangerous tools
+tools = await adapter.create_tools(
+    client,
+    disallowed_tools=["system_execute", "file_delete"]
+)
+```
+
+#### async create_tool(client: MCPClient, tool_definition: dict) -> BaseTool
+
+Creates a single LangChain tool from an MCP tool definition.
+
+**Parameters:**
+- `client` (MCPClient): The MCP client instance
+- `tool_definition` (dict): MCP tool definition
+
+**Returns:**
+- `BaseTool`: LangChain tool object
+
+**Example:**
+```python
+tool_def = {
+    "name": "file_read",
+    "description": "Read file contents",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string"}
+        },
+        "required": ["path"]
+    }
+}
+
+tool = await adapter.create_tool(client, tool_def)
+```
+
+## Tool Filtering
+
+Adapters support various filtering mechanisms to control which tools are available.
+
+### Whitelist Filtering
+
+Only include specified tools:
+
+```python
+adapter = LangChainAdapter()
+tools = await adapter.create_tools(
+    client,
+    allowed_tools=[
+        "file_read",
+        "file_write",
+        "web_search",
+        "sqlite_query"
+    ]
+)
+```
+
+### Blacklist Filtering
+
+Exclude potentially dangerous tools:
+
+```python
+adapter = LangChainAdapter()
+tools = await adapter.create_tools(
+    client,
+    disallowed_tools=[
+        "system_execute",
+        "file_delete",
+        "network_request",
+        "process_kill"
+    ]
+)
+```
+
+### Pattern-Based Filtering
+
+Use patterns for flexible filtering:
+
+```python
+import re
+from typing import Any
+from mcp.types import Tool
+from ..connectors.base import BaseConnector
+
+class PatternLangChainAdapter(LangChainAdapter):
+    def __init__(self, allowed_patterns=None, disallowed_patterns=None):
+        super().__init__()
+        self.allowed_patterns = allowed_patterns or []
+        self.disallowed_patterns = disallowed_patterns or []
+
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> Any:
+        """Override to add pattern-based filtering."""
+        tool_name = mcp_tool.name
+
+        # Check allowed patterns
+        if self.allowed_patterns:
+            if not any(re.match(pattern, tool_name) for pattern in self.allowed_patterns):
+                return None
+
+        # Check disallowed patterns
+        if self.disallowed_patterns:
+            if any(re.match(pattern, tool_name) for pattern in self.disallowed_patterns):
+                return None
+
+        # Use parent class conversion
+        return super()._convert_tool(mcp_tool, connector)
+
+# Usage
+adapter = PatternLangChainAdapter(
+    allowed_patterns=[r"file_.*", r"sqlite_.*"],  # Only file and sqlite tools
+    disallowed_patterns=[r".*_delete", r".*_execute"]  # No delete or execute tools
+)
+tools = await PatternLangChainAdapter.create_tools(client)
+```
+
+## Custom Adapters
+
+Create custom adapters for other frameworks:
+
+### CrewAI Adapter Example
+
+```python
+from mcp_use.adapters import BaseAdapter
+
+class CrewAIAdapter(BaseAdapter):
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Convert MCP tool to CrewAI format."""
+        from crewai_tools import BaseTool as CrewAIBaseTool
+
+        class MCPCrewAITool(CrewAIBaseTool):
+            name = mcp_tool.name
+            description = mcp_tool.description
+
+            async def _run(self, **kwargs):
+                return await connector.call_tool(self.name, kwargs)
+
+        return MCPCrewAITool()
+
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector):
+        """Convert MCP resource to CrewAI format - implement as needed."""
+        return None  # Skip resources for this example
+
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector):
+        """Convert MCP prompt to CrewAI format - implement as needed."""
+        return None  # Skip prompts for this example
+
+# Usage
+tools = await CrewAIAdapter.create_tools(client)
+```
+
+### AutoGen Adapter Example
+
+```python
+class AutoGenAdapter(BaseAdapter):
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Convert MCP tool to AutoGen format."""
+        async def implementation(**kwargs):
+            return await connector.call_tool(mcp_tool.name, kwargs)
+
+        return {
+            "type": "function",
+            "function": {
+                "name": mcp_tool.name,
+                "description": mcp_tool.description,
+                "parameters": mcp_tool.inputSchema or {},
+                "implementation": implementation
+            }
+        }
+
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector):
+        """Convert MCP resource to AutoGen format - implement as needed."""
+        return None  # Skip resources for this example
+
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector):
+        """Convert MCP prompt to AutoGen format - implement as needed."""
+        return None  # Skip prompts for this example
+
+# Usage
+tools = await AutoGenAdapter.create_tools(client)
+```
+
+## Tool Metadata
+
+Adapters preserve and enhance tool metadata:
+
+### Accessing Tool Information
+
+```python
+adapter = LangChainAdapter()
+tools = await adapter.create_tools(client)
+
+for tool in tools:
+    print(f"Name: {tool.name}")
+    print(f"Description: {tool.description}")
+    print(f"Args Schema: {tool.args}")
+
+    # Access MCP-specific metadata
+    if hasattr(tool, '_mcp_server'):
+        print(f"Server: {tool._mcp_server}")
+    if hasattr(tool, '_mcp_original_schema'):
+        print(f"Original Schema: {tool._mcp_original_schema}")
+```
+
+### Enhanced Tool Descriptions
+
+```python
+class EnhancedLangChainAdapter(LangChainAdapter):
+    async def create_tool(self, client, tool_def):
+        tool = await super().create_tool(client, tool_def)
+
+        # Enhance description with usage examples
+        if "examples" in tool_def:
+            enhanced_description = f"{tool.description}\n\nExamples:\n"
+            for example in tool_def["examples"]:
+                enhanced_description += f"- {example}\n"
+            tool.description = enhanced_description
+
+        # Add safety warnings
+        if self._is_dangerous_tool(tool_def["name"]):
+            tool.description += "\n⚠️ WARNING: This tool performs potentially dangerous operations."
+
+        return tool
+
+    def _is_dangerous_tool(self, tool_name):
+        dangerous_patterns = ["delete", "execute", "kill", "remove", "destroy"]
+        return any(pattern in tool_name.lower() for pattern in dangerous_patterns)
+```
+
+## Error Handling
+
+Adapters handle various error conditions:
+
+### Tool Creation Errors
+
+```python
+class RobustLangChainAdapter(LangChainAdapter):
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Override with error handling for individual tool conversion."""
+        try:
+            return super()._convert_tool(mcp_tool, connector)
+        except Exception as e:
+            logger.error(f"Failed to create tool {mcp_tool.name}: {e}")
+            return None  # Skip this tool
+
+    async def load_tools_for_connector(self, connector: BaseConnector):
+        """Override to add robust error handling."""
+        try:
+            return await super().load_tools_for_connector(connector)
+        except Exception as e:
+            logger.error(f"Failed to load tools for connector: {e}")
+            return []  # Return empty list on failure
+```
+
+### Runtime Error Handling
+
+```python
+class SafeLangChainAdapter(LangChainAdapter):
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Override to create tools with enhanced error handling."""
+        if mcp_tool.name in self.disallowed_tools:
+            return None
+
+        adapter_self = self
+
+        class SafeMcpTool(BaseTool):
+            name: str = mcp_tool.name
+            description: str = mcp_tool.description
+            tool_connector: BaseConnector = connector
+            handle_tool_error: bool = True
+
+            def _run(self, **kwargs):
+                raise NotImplementedError("MCP tools only support async operations")
+
+            async def _arun(self, **kwargs):
+                try:
+                    result = await self.tool_connector.call_tool(self.name, kwargs)
+                    return adapter_self._parse_mcp_tool_result(result)
+                except ToolExecutionError as e:
+                    return f"Tool execution failed: {e}"
+                except TimeoutError:
+                    return "Tool execution timed out"
+                except Exception as e:
+                    return f"Unexpected error: {e}"
+
+        return SafeMcpTool()
+```
+
+## Performance Optimization
+
+### Lazy Tool Creation
+
+```python
+class LazyLangChainAdapter(LangChainAdapter):
+    def __init__(self, disallowed_tools=None):
+        super().__init__(disallowed_tools)
+        self._tool_cache = {}
+
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Override to create lazy-loading tools."""
+        if mcp_tool.name in self.disallowed_tools:
+            return None
+
+        adapter_self = self
+
+        class LazyMcpTool(BaseTool):
+            name: str = mcp_tool.name
+            description: str = mcp_tool.description
+            tool_connector: BaseConnector = connector
+
+            def _run(self, **kwargs):
+                raise NotImplementedError("MCP tools only support async operations")
+
+            async def _arun(self, **kwargs):
+                # Create actual tool on first use
+                if self.name not in adapter_self._tool_cache:
+                    adapter_self._tool_cache[self.name] = await self._create_actual_tool()
+
+                return await adapter_self._tool_cache[self.name].execute(**kwargs)
+
+            async def _create_actual_tool(self):
+                # Create the actual tool implementation
+                result = await self.tool_connector.call_tool(self.name, {})
+                return adapter_self._parse_mcp_tool_result(result)
+
+        return LazyMcpTool()
+```
+
+### Batch Tool Creation
+
+```python
+class BatchLangChainAdapter(LangChainAdapter):
+    def __init__(self, batch_size=10, disallowed_tools=None):
+        super().__init__(disallowed_tools)
+        self.batch_size = batch_size
+
+    async def load_tools_for_connector(self, connector: BaseConnector):
+        """Override to process tools in batches."""
+        # Check if we already have tools for this connector
+        if connector in self._connector_tool_map:
+            return self._connector_tool_map[connector]
+
+        # Ensure connector is initialized
+        success = await self._ensure_connector_initialized(connector)
+        if not success:
+            return []
+
+        connector_tools = []
+        all_tools = connector.tools or []
+
+        # Process tools in batches
+        for i in range(0, len(all_tools), self.batch_size):
+            batch = all_tools[i:i + self.batch_size]
+            batch_tools = []
+
+            for tool in batch:
+                converted_tool = self._convert_tool(tool, connector)
+                if converted_tool:
+                    batch_tools.append(converted_tool)
+
+            connector_tools.extend(batch_tools)
+
+        # Store the tools for this connector
+        self._connector_tool_map[connector] = connector_tools
+        return connector_tools
+```
+
+## Integration Examples
+
+### LangChain Agent
+
+```python
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+
+async def create_langchain_agent():
+    # Create MCP client and adapter
+    client = MCPClient.from_config_file("config.json")
+    tools = await LangChainAdapter.create_tools(client)
+
+    # Create LLM and prompt
+    llm = ChatOpenAI(model="gpt-4")
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful assistant with access to tools."),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
+
+    # Create agent
+    agent = create_tool_calling_agent(llm, tools, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools)
+
+    return agent_executor
+
+# Usage
+agent = await create_langchain_agent()
+result = await agent.ainvoke({"input": "Read the contents of README.md"})
+```
+
+### Custom Framework Integration
+
+```python
+class CustomFrameworkTool:
+    def __init__(self, name, description, execute_fn):
+        self.name = name
+        self.description = description
+        self.execute_fn = execute_fn
+
+    async def execute(self, **kwargs):
+        return await self.execute_fn(**kwargs)
+
+class CustomFrameworkAdapter(BaseAdapter):
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):
+        """Convert MCP tool to custom framework format."""
+        async def executor(**kwargs):
+            return await connector.call_tool(mcp_tool.name, kwargs)
+
+        return CustomFrameworkTool(
+            name=mcp_tool.name,
+            description=mcp_tool.description,
+            execute_fn=executor
+        )
+
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector):
+        """Convert MCP resource to custom framework format."""
+        return None  # Skip resources for this example
+
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector):
+        """Convert MCP prompt to custom framework format."""
+        return None  # Skip prompts for this example
+
+# Usage
+tools = await CustomFrameworkAdapter.create_tools(client)
+
+for tool in tools:
+    result = await tool.execute(param1="value1")
+```
+
+## See Also
+
+- [MCPClient API Reference](/api-reference/mcpclient) - Core client functionality
+- [MCPAgent API Reference](/api-reference/mcpagent) - High-level agent interface
+- [Building Custom Agents](/building-custom-agents) - Creating custom agent implementations

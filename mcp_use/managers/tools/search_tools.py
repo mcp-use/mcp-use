@@ -48,35 +48,11 @@ class SearchToolsTool(MCPServerTool):
         results = await self._search_tool.search_tools(
             query, top_k=top_k, active_server=self.server_manager.active_server
         )
-        return self.format_search_results(results)
+        return results
 
     def _run(self, query: str, top_k: int = 100) -> str:
         """Synchronous version that raises a NotImplementedError - use _arun instead."""
         raise NotImplementedError("SearchToolsTool requires async execution. Use _arun instead.")
-
-    def format_search_results(self, results: list[tuple[BaseTool, str, float]]) -> str:
-        """Format search results in a consistent format."""
-
-        # Only show top_k results
-        results = results
-
-        formatted_output = "Search results\n\n"
-
-        for i, (tool, server_name, score) in enumerate(results):
-            # Format score as percentage
-            if i < 5:
-                score_pct = f"{score * 100:.1f}%"
-                logger.info(f"{i}: {tool.name} ({score_pct} match)")
-            formatted_output += f"[{i + 1}] Tool: {tool.name} ({score_pct} match)\n"
-            formatted_output += f"    Server: {server_name}\n"
-            formatted_output += f"    Description: {tool.description}\n\n"
-
-        # Add footer with information about how to use the results
-        formatted_output += (
-            "\nTo use a tool, connect to the appropriate server first, then invoke the tool."
-        )
-
-        return formatted_output
 
 
 class ToolSearchEngine:
@@ -115,13 +91,18 @@ class ToolSearchEngine:
 
         try:
             from fastembed import TextEmbedding  # optional dependency install with [search]
-        except ImportError:
+        except ImportError as exc:
             logger.error(
                 "The 'fastembed' library is not installed. "
                 "To use the search functionality, please install it by running: "
                 "pip install mcp-use[search]"
             )
-            return False
+            raise ImportError(
+                "The 'fastembed' library is not installed. "
+                "To use the server_manager functionality, please install it by running: "
+                "pip install mcp-use[search] "
+                "or disable the server_manager by setting use_server_manager=False in the MCPAgent constructor."
+            ) from exc
 
         try:
             self.model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
@@ -282,11 +263,7 @@ class ToolSearchEngine:
                 )
 
         # If the server manager has an active server but it wasn't provided, use it
-        if (
-            active_server is None
-            and self.server_manager
-            and hasattr(self.server_manager, "active_server")
-        ):
+        if active_server is None and self.server_manager and hasattr(self.server_manager, "active_server"):
             active_server = self.server_manager.active_server
 
         results = self.search(query, top_k=top_k)
@@ -303,11 +280,27 @@ class ToolSearchEngine:
             marked_results = []
             for tool, server_name, score in results:
                 # If this is the active server, add "(ACTIVE)" marker
-                display_server = (
-                    f"{server_name} (ACTIVE)" if server_name == active_server else server_name
-                )
+                display_server = f"{server_name} (ACTIVE)" if server_name == active_server else server_name
                 marked_results.append((tool, display_server, score))
             results = marked_results
 
         # Format and return the results
-        return results
+        return self._format_search_results(results)
+
+    def _format_search_results(self, results: list[tuple[BaseTool, str, float]]) -> str:
+        """Format search results in a consistent format."""
+        formatted_output = "Search results\n\n"
+
+        for i, (tool, server_name, score) in enumerate(results):
+            # Format score as percentage
+            score_pct = f"{score * 100:.1f}%"
+            if i < 5:
+                logger.info(f"{i}: {tool.name} ({score_pct} match)")
+            formatted_output += f"[{i + 1}] Tool: {tool.name} ({score_pct} match)\n"
+            formatted_output += f"    Server: {server_name}\n"
+            formatted_output += f"    Description: {tool.description}\n\n"
+
+        # Add footer with information about how to use the results
+        formatted_output += "\nTo use a tool, connect to the appropriate server first, then invoke the tool."
+
+        return formatted_output

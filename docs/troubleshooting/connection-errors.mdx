@@ -1,0 +1,667 @@
+---
+title: "Connection Errors"
+description: "Diagnose and resolve MCP server connection issues"
+icon: "wifi"
+---
+
+This guide helps you diagnose and resolve connection issues between mcp_use and MCP servers.
+
+## Understanding MCP Connections
+
+MCP servers can use different connection types, each with unique failure modes:
+
+- **Stdio**: Communication through stdin/stdout
+- **HTTP**: RESTful API communication
+- **WebSocket**: Real-time bidirectional communication
+
+## Common Connection Errors
+
+### Server Not Found
+
+**Error**: `FileNotFoundError: [Errno 2] No such file or directory: 'command'`
+
+**Diagnosis**:
+```python
+import shutil
+
+# Check if command exists
+command = "npx"  # or your server command
+if shutil.which(command):
+    print(f"✅ {command} found at: {shutil.which(command)}")
+else:
+    print(f"❌ {command} not found in PATH")
+```
+
+**Solutions**:
+
+<Tabs>
+  <Tab title="Node.js Servers">
+    ```bash
+    # Install Node.js and npm
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+
+    # Verify installation
+    node --version
+    npm --version
+
+    # Install MCP server globally
+    npm install -g @playwright/mcp
+    ```
+  </Tab>
+  <Tab title="Python Servers">
+    ```bash
+    # Install Python server
+    pip install mcp-server-filesystem
+
+    # Verify installation
+    which mcp-server-filesystem
+
+    # Test server
+    mcp-server-filesystem --help
+    ```
+  </Tab>
+  <Tab title="Use Full Paths">
+    ```json
+    {
+      "mcpServers": {
+        "playwright": {
+          "command": "/usr/local/bin/npx",
+          "args": ["@playwright/mcp@latest"]
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Connection Timeout
+
+**Error**: `TimeoutError: Server connection timed out after 30 seconds`
+
+**Diagnosis**:
+```python
+import asyncio
+import time
+
+async def test_server_startup():
+    start_time = time.time()
+    try:
+        client = MCPClient.from_config_file("config.json")
+        await asyncio.wait_for(client.create_all_sessions(), timeout=10)
+        elapsed = time.time() - start_time
+        print(f"✅ Sessions created in {elapsed:.2f}s")
+    except asyncio.TimeoutError:
+        elapsed = time.time() - start_time
+        print(f"❌ Session creation timed out after {elapsed:.2f}s")
+
+# Run test
+await test_server_startup()
+```
+
+**Solutions**:
+
+1. **Increase timeout**:
+   ```python
+   agent = MCPAgent(
+       llm=llm,
+       client=client,
+       timeout=60,  # Increase from default 30s
+       server_startup_timeout=45
+   )
+   ```
+
+2. **Check server logs**:
+   ```python
+   import logging
+   logging.basicConfig(level=logging.DEBUG)
+
+   # This will show detailed server startup logs
+   client = MCPClient.from_config_file("config.json", debug=True)
+   ```
+
+3. **Test server manually**:
+   ```bash
+   # Test Node.js server
+   timeout 30 npx @playwright/mcp@latest
+
+   # Test Python server
+   timeout 30 mcp-server-filesystem /workspace
+   ```
+
+### Permission Denied
+
+**Error**: `PermissionError: [Errno 13] Permission denied`
+
+**Diagnosis**:
+```bash
+# Check file permissions
+ls -la /path/to/server/executable
+
+# Check directory permissions
+ls -ld /path/to/workspace/directory
+
+# Check current user
+whoami
+id
+```
+
+**Solutions**:
+
+1. **Fix file permissions**:
+   ```bash
+   # Make server executable
+   chmod +x /path/to/mcp-server
+
+   # Fix directory permissions
+   chmod 755 /workspace/directory
+
+   # Change ownership if needed
+   chown $USER:$USER /workspace/directory
+   ```
+
+2. **Use accessible directories**:
+   ```json
+   {
+     "mcpServers": {
+       "filesystem": {
+         "command": "mcp-server-filesystem",
+         "args": ["/home/$USER/workspace"]  // Use home directory
+       }
+     }
+   }
+   ```
+
+3. **Run with appropriate user**:
+   ```bash
+   # Don't run as root unless necessary
+   sudo -u $USER python your_script.py
+   ```
+
+### Server Crash on Startup
+
+**Error**: `ConnectionError: Server process exited with code 1`
+
+**Diagnosis**:
+```python
+import subprocess
+import json
+
+def test_server_manually(config_file):
+    with open(config_file) as f:
+        config = json.load(f)
+
+    for name, server_config in config["mcpServers"].items():
+        print(f"\nTesting server: {name}")
+        command = [server_config["command"]] + server_config.get("args", [])
+
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            print(f"Return code: {result.returncode}")
+            if result.stdout:
+                print(f"Stdout: {result.stdout}")
+            if result.stderr:
+                print(f"Stderr: {result.stderr}")
+        except Exception as e:
+            print(f"Error: {e}")
+
+# Test all servers
+test_server_manually("config.json")
+```
+
+**Solutions**:
+
+1. **Check server dependencies**:
+   ```bash
+   # For Playwright server
+   npx playwright install
+
+   # For filesystem server
+   pip install --upgrade mcp-server-filesystem
+   ```
+
+2. **Validate server arguments**:
+   ```json
+   {
+     "mcpServers": {
+       "filesystem": {
+         "command": "mcp-server-filesystem",
+         "args": [
+           "/existing/directory",  // Make sure this exists
+           "--readonly=false"      // Valid argument format
+         ]
+       }
+     }
+   }
+   ```
+
+3. **Check environment variables**:
+   ```json
+   {
+     "mcpServers": {
+       "playwright": {
+         "command": "npx",
+         "args": ["@playwright/mcp@latest"],
+         "env": {
+           "DISPLAY": ":0",           // Required for GUI apps
+           "HOME": "/home/user",      // Sometimes needed
+           "PATH": "/usr/local/bin:/usr/bin:/bin"
+         }
+       }
+     }
+   }
+   ```
+
+## Protocol-Specific Issues
+
+### Stdio Connection Issues
+
+**Problem**: Server starts but communication fails.
+
+**Diagnosis**:
+```python
+async def test_stdio_communication():
+    import subprocess
+    import json
+
+    # Start server process
+    process = subprocess.Popen(
+        ["npx", "@playwright/mcp@latest"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+
+    # Send initialization message
+    init_msg = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {"capabilities": {}}
+    }
+
+    try:
+        process.stdin.write(json.dumps(init_msg) + "\n")
+        process.stdin.flush()
+
+        # Read response with timeout
+        import select
+        ready, _, _ = select.select([process.stdout], [], [], 5)
+
+        if ready:
+            response = process.stdout.readline()
+            print(f"✅ Server responded: {response}")
+        else:
+            print("❌ No response from server")
+
+    finally:
+        process.terminate()
+
+await test_stdio_communication()
+```
+
+**Solutions**:
+1. Ensure server supports stdio mode
+2. Check for buffer flushing issues
+3. Verify JSON-RPC message format
+
+### HTTP Connection Issues
+
+**Problem**: Cannot connect to HTTP-based MCP server.
+
+**Diagnosis**:
+```python
+import aiohttp
+import asyncio
+
+async def test_http_server(url="http://localhost:8000"):
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(f"{url}/health") as response:
+                print(f"✅ HTTP server responding: {response.status}")
+                text = await response.text()
+                print(f"Response: {text}")
+        except Exception as e:
+            print(f"❌ HTTP connection failed: {e}")
+
+await test_http_server()
+```
+
+**Solutions**:
+1. Verify server is listening on correct port
+2. Check firewall settings
+3. Ensure HTTP server is properly configured
+
+### WebSocket Connection Issues
+
+**Problem**: WebSocket connection fails or drops.
+
+**Diagnosis**:
+```python
+import websockets
+import asyncio
+
+async def test_websocket(uri="ws://localhost:8000/ws"):
+    try:
+        async with websockets.connect(uri) as websocket:
+            print("✅ WebSocket connected")
+
+            # Send ping
+            await websocket.send("ping")
+            response = await asyncio.wait_for(websocket.recv(), timeout=5)
+            print(f"Response: {response}")
+
+    except Exception as e:
+        print(f"❌ WebSocket failed: {e}")
+
+await test_websocket()
+```
+
+**Solutions**:
+1. Check WebSocket server implementation
+2. Verify network connectivity
+3. Handle connection drops gracefully
+
+## Network and Firewall Issues
+
+### Port Conflicts
+
+**Problem**: Server cannot bind to port.
+
+**Diagnosis**:
+```bash
+# Check what's using port 8000
+lsof -i :8000
+netstat -tulpn | grep 8000
+
+# Find available ports
+python -c "import socket; s=socket.socket(); s.bind(('',0)); print(s.getsockname()[1]); s.close()"
+```
+
+**Solutions**:
+1. Use different port in configuration
+2. Stop conflicting services
+3. Use port range for multiple servers
+
+### Firewall Blocking
+
+**Problem**: Firewall blocking server connections.
+
+**Diagnosis**:
+```bash
+# Check firewall status
+sudo ufw status
+sudo iptables -L
+
+# Test connection
+telnet localhost 8000
+nc -zv localhost 8000
+```
+
+**Solutions**:
+```bash
+# Open port in firewall
+sudo ufw allow 8000
+sudo iptables -A INPUT -p tcp --dport 8000 -j ACCEPT
+
+# Or disable firewall for testing
+sudo ufw disable
+```
+
+## Docker and Container Issues
+
+### Container Networking
+
+**Problem**: MCP servers not accessible from container.
+
+**Solutions**:
+```dockerfile
+# Expose necessary ports
+EXPOSE 8000
+
+# Install required dependencies
+RUN apt-get update && apt-get install -y nodejs npm
+
+# Set proper networking
+CMD ["python", "main.py", "--host", "0.0.0.0"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  mcp-use:
+    build: .
+    ports:
+      - "8000:8000"
+    network_mode: "host"  # For localhost server access
+```
+
+### Volume Mounting
+
+**Problem**: Servers cannot access mounted files.
+
+**Solutions**:
+```bash
+# Mount with proper permissions
+docker run -v /host/workspace:/container/workspace:rw myapp
+
+# Check mounted volume permissions
+docker exec -it container ls -la /container/workspace
+```
+
+## Advanced Debugging
+
+### Connection Logging
+
+Enable detailed connection logging:
+
+```python
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Enable specific loggers
+logging.getLogger("mcp_use").setLevel(logging.DEBUG)
+logging.getLogger("asyncio").setLevel(logging.INFO)
+
+# Create client with debug mode
+client = MCPClient.from_config_file("config.json", debug=True)
+```
+
+### Network Traffic Analysis
+
+Monitor network traffic for HTTP/WebSocket servers:
+
+```bash
+# Monitor network traffic
+sudo tcpdump -i lo port 8000 -A
+
+# Monitor with netstat
+watch -n 1 'netstat -tulpn | grep 8000'
+
+# Use curl for HTTP testing
+curl -v http://localhost:8000/health
+```
+
+### Process Monitoring
+
+Monitor server processes:
+
+```python
+import psutil
+import subprocess
+
+def monitor_server_process(command_name):
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            if command_name in proc.info['name'] or \
+               any(command_name in arg for arg in proc.info['cmdline']):
+                print(f"Found process: PID={proc.info['pid']}")
+                print(f"Command: {' '.join(proc.info['cmdline'])}")
+                print(f"Status: {proc.status()}")
+                print(f"Memory: {proc.memory_info().rss / 1024 / 1024:.1f}MB")
+                return proc.info['pid']
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+    print(f"No process found for: {command_name}")
+    return None
+
+# Monitor specific server
+pid = monitor_server_process("npx")
+```
+
+## Recovery Strategies
+
+### Automatic Retry
+
+Implement connection retry logic:
+
+```python
+import asyncio
+from typing import Optional
+
+class ResilientMCPClient:
+    def __init__(self, config_file: str, max_retries: int = 3):
+        self.config_file = config_file
+        self.max_retries = max_retries
+        self._client: Optional[MCPClient] = None
+
+    async def connect_with_retry(self):
+        for attempt in range(self.max_retries):
+            try:
+                self._client = MCPClient.from_config_file(self.config_file)
+                await self._client.create_all_sessions()
+                print(f"✅ Connected on attempt {attempt + 1}")
+                return self._client
+            except Exception as e:
+                print(f"❌ Attempt {attempt + 1} failed: {e}")
+                if attempt < self.max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    print(f"Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise
+
+    async def ensure_connected(self):
+        if not self._client:
+            return await self.connect_with_retry()
+
+        # Test connection
+        try:
+            # Test if sessions are active
+            active_sessions = self._client.get_all_active_sessions()
+            if len(active_sessions) > 0:
+                return self._client
+        except:
+            print("Connection lost, reconnecting...")
+            return await self.connect_with_retry()
+
+# Usage
+resilient_client = ResilientMCPClient("config.json", max_retries=3)
+client = await resilient_client.ensure_connected()
+```
+
+### Health Checks
+
+Implement server health monitoring:
+
+```python
+import asyncio
+from datetime import datetime, timedelta
+
+class ServerHealthMonitor:
+    def __init__(self, client: MCPClient, check_interval: int = 30):
+        self.client = client
+        self.check_interval = check_interval
+        self.last_check = datetime.now()
+        self.is_healthy = True
+
+    async def health_check(self):
+        try:
+            # Check if we have active sessions
+            active_sessions = self.client.get_all_active_sessions()
+            self.is_healthy = len(active_sessions) > 0
+            self.last_check = datetime.now()
+            return self.is_healthy
+        except Exception as e:
+            print(f"Health check failed: {e}")
+            self.is_healthy = False
+            return False
+
+    async def start_monitoring(self):
+        while True:
+            await self.health_check()
+            if not self.is_healthy:
+                print("⚠️ Server unhealthy, attempting reconnection...")
+                try:
+                    await self.client.close_all_sessions()
+                    await self.client.create_all_sessions()
+                    await self.health_check()
+                except Exception as e:
+                    print(f"Reconnection failed: {e}")
+
+            await asyncio.sleep(self.check_interval)
+
+# Usage
+monitor = ServerHealthMonitor(client, check_interval=30)
+asyncio.create_task(monitor.start_monitoring())
+```
+
+## Getting Help
+
+If connection issues persist:
+
+1. **Collect diagnostic information**:
+   ```bash
+   # System info
+   uname -a
+   python --version
+   node --version
+
+   # Network info
+   ip addr show
+   netstat -tulpn
+
+   # Process info
+   ps aux | grep mcp
+   ```
+
+2. **Create minimal reproduction**:
+   ```python
+   # Simplest possible test case
+   async def minimal_test():
+       client = MCPClient.from_dict({
+           "mcpServers": {
+               "test": {
+                   "command": "echo",
+                   "args": ["hello"]
+               }
+           }
+       })
+       await client.create_all_sessions()
+
+   await minimal_test()
+   ```
+
+3. **Report with details**:
+   - Operating system and version
+   - Python and Node.js versions
+   - Complete error messages
+   - Server configuration (remove sensitive data)
+   - Steps to reproduce
+
+<Tip>
+Most connection issues are environment-related. Always test server commands manually before using them with mcp_use.
+</Tip>

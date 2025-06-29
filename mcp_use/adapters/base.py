@@ -34,9 +34,7 @@ class BaseAdapter(ABC):
         self._connector_tool_map: dict[BaseConnector, list[T]] = {}
 
     @classmethod
-    async def create_tools(
-        cls, client: "MCPClient", disallowed_tools: list[str] | None = None
-    ) -> list[T]:
+    async def create_tools(cls, client: "MCPClient", disallowed_tools: list[str] | None = None) -> list[T]:
         """Create tools from an MCPClient instance.
 
         This is the recommended way to create tools from an MCPClient, as it handles
@@ -86,9 +84,7 @@ class BaseAdapter(ABC):
         """
         # Check if we already have tools for this connector
         if connector in self._connector_tool_map:
-            logger.debug(
-                f"Returning {len(self._connector_tool_map[connector])} existing tools for connector"
-            )
+            logger.debug(f"Returning {len(self._connector_tool_map[connector])} existing tools for connector")
             return self._connector_tool_map[connector]
 
         # Create tools for this connector

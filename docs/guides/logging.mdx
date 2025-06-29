@@ -1,0 +1,152 @@
+---
+title: "Logging"
+description: "Learn how to debug and log in mcp-use"
+icon: "bug"
+---
+
+# Logging MCP-Use
+
+<Info>
+MCP-Use provides built-in logging functionality that helps diagnose issues in your agent implementation.
+</Info>
+
+## Enabling Debug Mode
+
+<Note>
+Choose the debug method that best fits your workflow - environment variables for one-off debugging or programmatic control for conditional debugging.
+</Note>
+
+There are two primary ways to enable debug mode:
+
+### 1. Environment Variable (Recommended for One-off Runs)
+
+<Tabs>
+  <Tab title="Inline (Temporary)">
+    Run your script with the `DEBUG` environment variable:
+
+    ```bash
+    # Level 1: Show INFO level messages
+    DEBUG=1 python3.11 examples/browser_use.py
+
+    # Level 2: Show DEBUG level messages (full verbose output)
+    DEBUG=2 python3.11 examples/browser_use.py
+    ```
+
+    <Tip>
+    This sets the debug level only for that specific Python process - perfect for quick troubleshooting.
+    </Tip>
+  </Tab>
+
+  <Tab title="Persistent">
+    Set the environment variable in your shell:
+
+    ```bash
+    export MCP_USE_DEBUG=1  # or 2
+    ```
+
+    Or add it to your `.env` file:
+    ```bash .env
+    MCP_USE_DEBUG=2
+    ```
+  </Tab>
+</Tabs>
+
+### 2. Setting the Debug Flag Programmatically
+
+<Note>
+Programmatic control is useful for debugging specific parts of your application or conditionally enabling debug mode based on your application state.
+</Note>
+
+```python
+import mcp_use
+
+# Different debug levels
+mcp_use.set_debug(1)  # INFO level
+mcp_use.set_debug(2)  # DEBUG level (full verbose output)
+mcp_use.set_debug(0)  # Turn off debug (WARNING level)
+```
+
+<Tip>
+You can conditionally enable debugging based on environment or configuration:
+
+```python
+import os
+import mcp_use
+
+if os.getenv("ENVIRONMENT") == "development":
+    mcp_use.set_debug(2)
+```
+</Tip>
+
+## Debug Levels
+
+<CardGroup cols={3}>
+  <Card title="Level 0 - Normal" icon="volume-off">
+    **Minimal Output**
+
+    Only WARNING and above messages are shown
+
+    `set_debug(0)`
+  </Card>
+
+  <Card title="Level 1 - Info" icon="volume-low">
+    **Default Operation**
+
+    Shows INFO level messages and tool calls - useful for basic operational information
+
+    `DEBUG=1` or `set_debug(1)` (default)
+  </Card>
+
+  <Card title="Level 2 - Full Debug" icon="volume-high">
+    **Maximum Verbosity**
+
+    Shows all detailed debugging information including internal operations
+
+    `DEBUG=2` or `set_debug(2)`
+  </Card>
+</CardGroup>
+
+## Agent-Specific Verbosity
+
+If you only want to increase verbosity for the agent component without enabling full debug mode for the entire package, you can use the `verbose` parameter when creating an MCPAgent:
+
+```python
+from mcp_use import MCPAgent
+
+# Create agent with increased verbosity
+agent = MCPAgent(
+    llm=your_llm,
+    client=your_client,
+    verbose=True  # Only shows debug messages from the agent
+)
+```
+
+This option is useful when you want to see the agent's steps and decision-making process without all the low-level debug information from other components.
+
+## Debug Information
+
+When debug mode is enabled, you'll see more detailed information about:
+
+- Server initialization and connection details
+- Tool registration and resolution
+- Agent steps and decision-making
+- Request and response formats
+- Communication with MCP servers
+- Error details and stack traces
+
+This can be extremely helpful when diagnosing issues with custom MCP servers or understanding why an agent might be behaving unexpectedly.
+
+
+## Troubleshooting Common Issues
+
+### Server Connection Problems
+
+If you're having issues connecting to MCP servers, enabling debug mode will show detailed information about the connection attempts, server initialization, and any errors encountered.
+
+### Agent Not Using Expected Tools
+
+When debug mode is enabled, you'll see each tool registration and the exact prompts being sent to the LLM, which can help diagnose why certain tools might not be used as expected.
+
+### Performance Issues
+
+Debug logs can help identify potential bottlenecks in your implementation by showing timing information for various operations.

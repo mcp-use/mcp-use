@@ -1,0 +1,492 @@
+---
+title: "MCPClient"
+description: "MCPClient API Documentation"
+icon: "router"
+---
+
+# MCPClient API Reference
+
+The `MCPClient` class is the core component for managing connections to MCP servers and orchestrating tool access.
+
+## Constructor
+
+### MCPClient(config_dict, debug=False)
+
+Creates a new MCPClient instance from a configuration dictionary.
+
+**Parameters:**
+- `config_dict` (dict): Configuration dictionary containing server definitions
+- `debug` (bool, optional): Enable debug logging. Defaults to False.
+
+**Example:**
+```python
+config = {
+    "mcpServers": {
+        "filesystem": {
+            "command": "mcp-server-filesystem",
+            "args": ["/workspace"]
+        }
+    }
+}
+
+client = MCPClient(config, debug=True)
+```
+
+## Class Methods
+
+### from_config_file(config_file_path, debug=False)
+
+Creates an MCPClient instance from a JSON configuration file.
+
+**Parameters:**
+- `config_file_path` (str): Path to the JSON configuration file
+- `debug` (bool, optional): Enable debug logging. Defaults to False.
+
+**Returns:**
+- `MCPClient`: Configured client instance
+
+**Example:**
+```python
+client = MCPClient.from_config_file("mcp_config.json")
+```
+
+### from_dict(config_dict, debug=False)
+
+Creates an MCPClient instance from a configuration dictionary.
+
+**Parameters:**
+- `config_dict` (dict): Configuration dictionary
+- `debug` (bool, optional): Enable debug logging. Defaults to False.
+
+**Returns:**
+- `MCPClient`: Configured client instance
+
+**Example:**
+```python
+config = {
+    "mcpServers": {
+        "playwright": {
+            "command": "npx",
+            "args": ["@playwright/mcp@latest"]
+        }
+    }
+}
+
+client = MCPClient.from_dict(config)
+```
+
+## Instance Methods
+
+### add_server(name, server_config)
+
+Adds a new server configuration to the client.
+
+**Parameters:**
+- `name` (str): Name for the server
+- `server_config` (dict): Server configuration dictionary
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+client.add_server("filesystem", {
+    "command": "mcp-server-filesystem",
+    "args": ["/workspace"]
+})
+```
+
+### remove_server(name)
+
+Removes a server configuration from the client.
+
+**Parameters:**
+- `name` (str): Name of the server to remove
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+client.remove_server("filesystem")
+```
+
+### get_server_names()
+
+Gets the names of all configured servers.
+
+**Returns:**
+- `List[str]`: List of server names
+
+**Example:**
+```python
+servers = client.get_server_names()
+print(f"Configured servers: {servers}")
+```
+
+### save_config(filepath)
+
+Saves the current client configuration to a JSON file.
+
+**Parameters:**
+- `filepath` (str): Path where to save the configuration file
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+client.save_config("updated_config.json")
+```
+
+### async create_session(server_name, auto_initialize=True)
+
+Creates a new session with the specified server.
+
+**Parameters:**
+- `server_name` (str): Name of the server to create a session with
+- `auto_initialize` (bool, optional): Whether to automatically initialize the session. Defaults to True.
+
+**Returns:**
+- `MCPSession`: The created session object
+
+**Raises:**
+- `ValueError`: If server is not configured
+- `ConnectionError`: If session creation fails
+
+**Example:**
+```python
+session = await client.create_session("filesystem")
+```
+
+### async create_all_sessions(auto_initialize=True)
+
+Creates sessions with all configured servers.
+
+**Parameters:**
+- `auto_initialize` (bool, optional): Whether to automatically initialize sessions. Defaults to True.
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+await client.create_all_sessions()
+```
+
+### get_session(server_name)
+
+Gets an existing session for the specified server.
+
+**Parameters:**
+- `server_name` (str): Name of the server
+
+**Returns:**
+- `MCPSession`: The session object
+
+**Raises:**
+- `ValueError`: If session does not exist
+
+**Example:**
+```python
+session = client.get_session("filesystem")
+```
+
+### get_all_active_sessions()
+
+Gets all currently active sessions.
+
+**Returns:**
+- `Dict[str, MCPSession]`: Dictionary mapping server names to session objects
+
+**Example:**
+```python
+active_sessions = client.get_all_active_sessions()
+for name, session in active_sessions.items():
+    print(f"Active session: {name}")
+```
+
+### async close_session(server_name)
+
+Closes the session with the specified server.
+
+**Parameters:**
+- `server_name` (str): Name of the server whose session to close
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+await client.close_session("filesystem")
+```
+
+### async close_all_sessions()
+
+Closes all active sessions.
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+await client.close_all_sessions()
+```
+
+## Properties
+
+### sessions
+
+**Type:** `Dict[str, MCPSession]`
+
+Dictionary of active sessions by server name.
+
+**Example:**
+```python
+print(f"Active sessions: {list(client.sessions.keys())}")
+```
+
+### config
+
+**Type:** `Dict`
+
+The configuration dictionary used to initialize the client.
+
+**Example:**
+```python
+print(f"Client config: {client.config}")
+```
+
+### sandbox
+
+**Type:** `bool`
+
+Whether sandbox mode is enabled for server execution.
+
+**Example:**
+```python
+if client.sandbox:
+    print("Sandbox mode enabled")
+```
+
+### sandbox_options
+
+**Type:** `SandboxOptions | None`
+
+Configuration options for sandbox execution.
+
+**Example:**
+```python
+if client.sandbox_options:
+    print(f"Sandbox options: {client.sandbox_options}")
+```
+
+## Configuration Format
+
+The MCPClient expects a configuration dictionary with the following structure:
+
+```json
+{
+  "mcpServers": {
+    "server_name": {
+      "command": "executable_command",
+      "args": ["arg1", "arg2"],
+      "env": {
+        "ENV_VAR": "value"
+      },
+      "cwd": "/working/directory"
+    }
+  }
+}
+```
+
+### Configuration Fields
+
+- **command** (required): The executable command to run the server
+- **args** (optional): List of command line arguments
+- **env** (optional): Environment variables for the server process
+- **cwd** (optional): Working directory for the server process
+
+## Error Handling
+
+The MCPClient can raise several types of exceptions:
+
+### ConnectionError
+Raised when session creation or server connection fails.
+
+```python
+try:
+    session = await client.create_session("filesystem")
+except ConnectionError as e:
+    print(f"Session creation failed: {e}")
+```
+
+### ValueError
+Raised when trying to access a non-existent session or server.
+
+```python
+try:
+    session = client.get_session("nonexistent_server")
+except ValueError as e:
+    print(f"Session not found: {e}")
+```
+
+### TimeoutError
+Raised when session operations exceed timeout limits.
+
+```python
+try:
+    session = await asyncio.wait_for(
+        client.create_session("slow_server"),
+        timeout=30
+    )
+except TimeoutError:
+    print("Session creation timed out")
+```
+
+## Context Manager Usage
+
+MCPClient supports async context manager protocol for automatic session cleanup:
+
+```python
+async with MCPClient.from_config_file("config.json") as client:
+    session = await client.create_session("filesystem")
+    # Use session for operations
+    # Client automatically closes sessions on exit
+```
+
+## Best Practices
+
+### Session Management
+```python
+# Good: Use context manager
+async with MCPClient.from_config_file("config.json") as client:
+    session = await client.create_session("filesystem")
+    # Use session for tool operations
+
+# Alternative: Manual management
+client = MCPClient.from_config_file("config.json")
+try:
+    await client.create_all_sessions()
+    session = client.get_session("filesystem")
+    # Use session for operations
+finally:
+    await client.close_all_sessions()
+```
+
+### Error Handling
+```python
+async def robust_session_creation(client, server_name):
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            return await client.create_session(server_name)
+        except ConnectionError as e:
+            if attempt == max_retries - 1:
+                raise
+            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            # Try again
+```
+
+### Performance Optimization
+```python
+# Pre-create all sessions for better performance
+client = MCPClient.from_config_file("config.json")
+await client.create_all_sessions()
+
+# Reuse sessions for multiple operations
+session = client.get_session("filesystem")
+# Use session multiple times without reconnecting
+```
+
+## Examples
+
+### Basic Usage
+```python
+import asyncio
+from mcp_use import MCPClient
+
+async def main():
+    # Create client from config file
+    client = MCPClient.from_config_file("mcp_config.json")
+
+    # Create session with a server
+    session = await client.create_session("filesystem")
+
+    # List available tools from the session
+    tools = await session.list_tools()
+    print(f"Available tools: {[t['name'] for t in tools]}")
+
+    # Execute a tool using the session
+    result = await session.call_tool(
+        "file_read",
+        {"path": "/workspace/README.md"}
+    )
+    print(f"File contents: {result}")
+
+    # Clean up
+    await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Multi-Server Configuration
+```python
+config = {
+    "mcpServers": {
+        "filesystem": {
+            "command": "mcp-server-filesystem",
+            "args": ["/workspace"]
+        },
+        "playwright": {
+            "command": "npx",
+            "args": ["@playwright/mcp@latest"],
+            "env": {
+                "DISPLAY": ":1"
+            }
+        },
+        "sqlite": {
+            "command": "mcp-server-sqlite",
+            "args": ["--db", "/data/app.db"]
+        }
+    }
+}
+
+async def multi_server_example():
+    client = MCPClient.from_dict(config)
+
+    # Create sessions with multiple servers
+    await client.create_all_sessions()
+
+    # Get sessions for different servers
+    fs_session = client.get_session("filesystem")
+    playwright_session = client.get_session("playwright")
+    sqlite_session = client.get_session("sqlite")
+
+    # Use filesystem tools
+    file_content = await fs_session.call_tool(
+        "file_read",
+        {"path": "/workspace/data.txt"}
+    )
+
+    # Use web scraping tools
+    page_content = await playwright_session.call_tool(
+        "playwright_goto",
+        {"url": "https://example.com"}
+    )
+
+    # Use database tools
+    query_result = await sqlite_session.call_tool(
+        "sqlite_query",
+        {"query": "SELECT * FROM users LIMIT 10"}
+    )
+
+    await client.close_all_sessions()
+```
+
+## See Also
+
+- [MCPAgent API Reference](/api-reference/mcpagent) - High-level agent interface
+- [Configuration Guide](/essentials/configuration) - Detailed configuration options
+- [Connection Types](/essentials/connection-types) - Understanding different server types

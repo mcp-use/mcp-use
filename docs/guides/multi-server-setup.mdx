@@ -1,0 +1,451 @@
+---
+title: "Multi-Server Setup"
+description: "Configure and manage multiple MCP servers for complex workflows"
+icon: "server"
+---
+
+This guide shows you how to configure and use multiple MCP servers simultaneously with mcp_use, enabling complex workflows that span different domains.
+
+## Overview
+
+Using multiple MCP servers allows your agent to access a diverse set of tools from different sources. For example, you might want to:
+
+- **Web scraping** with Playwright + **File operations** with filesystem server
+- **Database queries** with SQLite + **API calls** with HTTP server
+- **Code execution** with Python server + **Git operations** with GitHub server
+
+<Info>
+The `MCPClient` can manage multiple servers, and the optional `ServerManager` can dynamically select the appropriate server for each task.
+</Info>
+
+## Basic Multi-Server Configuration
+
+Create a configuration file that defines multiple servers:
+
+```json multi_server_config.json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": {
+        "DISPLAY": ":1",
+        "PLAYWRIGHT_HEADLESS": "true"
+      }
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["/safe/workspace/directory"],
+      "env": {
+        "FILESYSTEM_READONLY": "false"
+      }
+    },
+    "sqlite": {
+      "command": "mcp-server-sqlite",
+      "args": ["--db", "/path/to/database.db"],
+      "env": {
+        "SQLITE_READONLY": "false"
+      }
+    },
+    "github": {
+      "command": "mcp-server-github",
+      "args": ["--token", "${GITHUB_TOKEN}"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+## Using Multiple Servers
+
+### Basic Approach (Manual Server Selection)
+
+```python
+import asyncio
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def main():
+    # Load multi-server configuration
+    client = MCPClient.from_config_file("multi_server_config.json")
+
+    # Create agent (all servers will be connected)
+    llm = ChatOpenAI(model="gpt-4")
+    agent = MCPAgent(llm=llm, client=client)
+
+    # Agent has access to tools from all servers
+    result = await agent.run(
+        "Search for Python tutorials online, save the best ones to a file, "
+        "then create a database table to track my learning progress"
+    )
+    print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Advanced Approach (Server Manager)
+
+Enable the server manager for more efficient resource usage:
+
+```python
+import asyncio
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def main():
+    client = MCPClient.from_config_file("multi_server_config.json")
+
+    # Enable server manager for dynamic server selection
+    agent = MCPAgent(
+        llm=llm,
+        client=client,
+        use_server_manager=True,  # Only connects to servers as needed
+        max_steps=30
+    )
+
+    # The agent will automatically choose appropriate servers
+    result = await agent.run(
+        "Research the latest AI papers, summarize them in a markdown file, "
+        "and commit the file to my research repository on GitHub"
+    )
+    print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Configuration Patterns
+
+### Web Scraping + Data Processing
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": {
+        "PLAYWRIGHT_HEADLESS": "true"
+      }
+    },
+    "pandas": {
+      "command": "mcp-server-pandas",
+      "args": ["--allow-file-access"],
+      "env": {
+        "PANDAS_SAFE_MODE": "true"
+      }
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["/data/workspace"]
+    }
+  }
+}
+```
+
+Usage example:
+```python
+result = await agent.run(
+    "Scrape product data from example-store.com, "
+    "clean and analyze it with pandas, "
+    "then save the results as CSV and Excel files"
+)
+```
+
+### Development Workflow
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["/home/user/projects"]
+    },
+    "github": {
+      "command": "mcp-server-github",
+      "args": ["--token", "${GITHUB_TOKEN}"]
+    },
+    "python": {
+      "command": "mcp-server-python",
+      "args": ["--safe-mode"]
+    },
+    "git": {
+      "command": "mcp-server-git",
+      "args": ["--repo-path", "/home/user/projects"]
+    }
+  }
+}
+```
+
+Usage example:
+```python
+result = await agent.run(
+    "Create a new Python function to calculate fibonacci numbers, "
+    "write unit tests for it, run the tests, "
+    "and if they pass, commit the changes to the current git branch"
+)
+```
+
+### Research and Documentation
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "arxiv": {
+      "command": "mcp-server-arxiv",
+      "args": ["--max-results", "10"]
+    },
+    "wikipedia": {
+      "command": "mcp-server-wikipedia",
+      "args": ["--language", "en"]
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["/research/notes"]
+    }
+  }
+}
+```
+
+## Managing Server Dependencies
+
+### Environment Variables
+
+Use environment variables for sensitive information:
+
+```bash .env
+GITHUB_TOKEN=ghp_...
+DATABASE_URL=postgresql://user:pass@localhost/db
+API_KEY=sk-...
+WORKSPACE_PATH=/safe/workspace
+```
+
+Reference them in your configuration:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "mcp-server-github",
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["${WORKSPACE_PATH}"]
+    }
+  }
+}
+```
+
+### Conditional Server Loading
+
+You can conditionally include servers based on availability:
+
+```python
+import os
+import asyncio
+from mcp_use import MCPClient, MCPAgent
+
+async def create_agent_with_available_servers():
+    config = {"mcpServers": {}}
+
+    # Always include filesystem
+    config["mcpServers"]["filesystem"] = {
+        "command": "mcp-server-filesystem",
+        "args": ["/workspace"]
+    }
+
+    # Include GitHub server if token is available
+    if os.getenv("GITHUB_TOKEN"):
+        config["mcpServers"]["github"] = {
+            "command": "mcp-server-github",
+            "env": {"GITHUB_TOKEN": os.getenv("GITHUB_TOKEN")}
+        }
+
+    # Include database server if URL is available
+    if os.getenv("DATABASE_URL"):
+        config["mcpServers"]["postgres"] = {
+            "command": "mcp-server-postgres",
+            "env": {"DATABASE_URL": os.getenv("DATABASE_URL")}
+        }
+
+    client = MCPClient.from_dict(config)
+    return MCPAgent(llm=ChatOpenAI(model="gpt-4"), client=client)
+```
+
+## Performance Optimization
+
+### Server Manager Benefits
+
+The server manager provides several performance benefits:
+
+<Tabs>
+  <Tab title="Lazy Loading">
+    ```python
+    # Without server manager - all servers start immediately
+    agent = MCPAgent(llm=llm, client=client, use_server_manager=False)
+    # Result: All 5 servers start, consuming resources
+
+    # With server manager - servers start only when needed
+    agent = MCPAgent(llm=llm, client=client, use_server_manager=True)
+    # Result: Only the required servers start for each task
+    ```
+  </Tab>
+  <Tab title="Resource Management">
+    ```python
+    # Server manager automatically manages connections
+    agent = MCPAgent(
+        llm=llm,
+        client=client,
+        use_server_manager=True,
+        max_concurrent_servers=3  # Limit concurrent connections
+    )
+    ```
+  </Tab>
+  <Tab title="Error Isolation">
+    ```python
+    # If one server fails, others continue working
+    agent = MCPAgent(
+        llm=llm,
+        client=client,
+        use_server_manager=True,
+        ignore_server_errors=True  # Continue on server failures
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Tool Filtering
+
+Control which tools are available to prevent confusion:
+
+```python
+# Restrict to specific tool types
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    allowed_tools=["file_read", "file_write", "web_search"],
+    disallowed_tools=["system_exec", "network_request"]
+)
+
+# Or filter by server
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    allowed_servers=["filesystem", "playwright"],
+    use_server_manager=True
+)
+```
+
+## Troubleshooting Multi-Server Setups
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Server startup failures">
+    Check server logs and ensure all dependencies are installed:
+    ```python
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+
+    # Enable detailed logging
+    client = MCPClient.from_config_file("config.json", debug=True)
+    ```
+  </Accordion>
+
+  <Accordion title="Tool name conflicts">
+    Different servers might provide tools with the same name:
+    ```python
+    # Use server prefixes to avoid conflicts
+    agent = MCPAgent(
+        llm=llm,
+        client=client,
+        use_tool_prefixes=True  # Tools become "server_name.tool_name"
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Performance issues">
+    Too many servers can slow down the agent:
+    ```python
+    # Limit concurrent servers
+    agent = MCPAgent(
+        llm=llm,
+        client=client,
+        use_server_manager=True,
+        max_concurrent_servers=3
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Debug Configuration
+
+Enable comprehensive debugging:
+
+```python
+import logging
+from mcp_use import MCPAgent, MCPClient
+
+# Enable debug logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Create client with debug mode
+client = MCPClient.from_config_file(
+    "multi_server_config.json",
+    debug=True,
+    timeout=30  # Increase timeout for debugging
+)
+
+# Create agent with verbose output
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    use_server_manager=True,
+    debug=True,
+    verbose=True
+)
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start Simple" icon="seedling">
+    Begin with 2-3 servers and add more as needed. Too many servers can overwhelm the LLM.
+  </Card>
+  <Card title="Use Server Manager" icon="gear">
+    Enable `use_server_manager=True` for better performance and resource management.
+  </Card>
+  <Card title="Environment Variables" icon="lock">
+    Store sensitive configuration like API keys in environment variables, not config files.
+  </Card>
+  <Card title="Error Handling" icon="shield">
+    Implement graceful degradation when servers are unavailable or fail.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Server Manager" icon="server" href="/essentials/server-manager">
+    Learn more about dynamic server selection and management
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/guides/security">
+    Best practices for secure multi-server configurations
+  </Card>
+  <Card title="Performance" icon="zap" href="/troubleshooting/performance">
+    Optimize your multi-server setup for better performance
+  </Card>
+</CardGroup>

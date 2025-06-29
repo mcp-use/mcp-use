@@ -1,0 +1,60 @@
+---
+title: "Library Updates"
+description: "New updates and improvements"
+mode: "center"
+---
+
+<Update label="2025‑06‑19">
+  ## v1.3.3
+  - Set default logging level to info
+  - Fix: prevent double async cleanup and event loop errors in astream
+  - Fix: Raise import error for fastembed, server manager does not silently fail
+  - Fix: search tools tuple unpacking error
+</Update>
+
+<Update label="2025‑06‑10">
+  ## v1.3.1
+  - Remove client options for easier usage
+  - Add streamable HTTP support
+  - Fix websocket error positional arguments (headers were missing)
+  - Fix connection state tracking after SSE disconnection
+  - Add CLAUDE.md for development guidance
+</Update>
+
+<Update label="2025‑05‑27">
+  ## v1.3.0
+  - Added optional E2B sandbox execution so MCP servers can run in secure cloud sandboxes.
+  - `MCPAgent.astream()` now lets you stream results **and** automatically log full conversation history.
+</Update>
+
+
+<Update label="2025‑05‑19">
+  ## v1.2.13
+  - Alpha support for **Resources** & **Prompts** exposed by remote servers.
+  - Routine version bump and stability tweaks across task / connection managers.
+</Update>
+
+<Update label="2025‑05‑11">
+  ## v1.2.10
+  - Hot‑fix: patched **FastEmbed** import failure that could break vector search.
+</Update>
+
+<Update label="2025‑04‑11">
+  ## v1.1.5
+  - Maintenance release – internal refactors, doc clean‑ups, and incremental API polish.
+</Update>
+
+<Update label="2025‑04‑07">
+  ## v1.0.1
+  - Introduced HTTP transport layer and dynamic multi‑server selection.
+</Update>
+
+<Update label="2025‑04‑03">
+  ## v1.0.0
+  - First stable release of the unified Python client after the 0.0.x preview series.
+</Update>
+
+<Update label="2025‑04‑02">
+  ## v0.0.6
+  - Initial public preview published to PyPI; automated publish workflow enabled.
+</Update>

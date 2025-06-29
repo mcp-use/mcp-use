@@ -24,16 +24,23 @@ class BaseConnector(ABC):
 
     def __init__(self):
         """Initialize base connector with common attributes."""
-        self.client: ClientSession | None = None
+        self.client_session: ClientSession | None = None
         self._connection_manager: ConnectionManager | None = None
         self._tools: list[Tool] | None = None
         self._resources: list[Resource] | None = None
         self._prompts: list[Prompt] | None = None
         self._connected = False
+        self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now)
 
     @abstractmethod
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
+        pass
+
+    @property
+    @abstractmethod
+    def public_identifier(self) -> str:
+        """Get the identifier for the connector."""
         pass
 
     async def disconnect(self) -> None:
@@ -52,16 +59,16 @@ class BaseConnector(ABC):
         errors = []
 
         # First close the client session
-        if self.client:
+        if self.client_session:
             try:
                 logger.debug("Closing client session")
-                await self.client.__aexit__(None, None, None)
+                await self.client_session.__aexit__(None, None, None)
             except Exception as e:
                 error_msg = f"Error closing client session: {e}"
                 logger.warning(error_msg)
                 errors.append(error_msg)
             finally:
-                self.client = None
+                self.client_session = None
 
         # Then stop the connection manager
         if self._connection_manager:
@@ -85,13 +92,13 @@ class BaseConnector(ABC):
 
     async def initialize(self) -> dict[str, Any]:
         """Initialize the MCP session and return session information."""
-        if not self.client:
+        if not self.client_session:
             raise RuntimeError("MCP client is not connected")
 
         logger.debug("Initializing MCP session")
 
         # Initialize the session
-        result = await self.client.initialize()
+        result = await self.client_session.initialize()
 
         server_capabilities = result.capabilities
 
@@ -145,24 +152,123 @@ class BaseConnector(ABC):
             raise RuntimeError("MCP client is not initialized")
         return self._prompts
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> CallToolResult:
-        """Call an MCP tool with the given arguments."""
-        if not self.client:
+    @property
+    def is_connected(self) -> bool:
+        """Check if the connector is actually connected and the connection is alive.
+
+        This property checks not only the connected flag but also verifies that
+        the underlying connection manager and streams are still active.
+
+        Returns:
+            True if the connector is connected and the connection is alive, False otherwise.
+        """
+
+        # Check if we have a client session
+        if not self.client_session:
+            # Update the connected flag since we don't have a client session
+            self._connected = False
+            return False
+
+        # First check the basic connected flag
+        if not self._connected:
+            return False
+
+        # Check if we have a connection manager and if its task is still running
+        if self._connection_manager:
+            try:
+                # Check if the connection manager task is done (indicates disconnection)
+                if hasattr(self._connection_manager, "_task") and self._connection_manager._task:
+                    if self._connection_manager._task.done():
+                        logger.debug("Connection manager task is done, marking as disconnected")
+                        self._connected = False
+                        return False
+
+                # For HTTP-based connectors, also check if streams are still open
+                # Use the get_streams method to get the current connection
+                streams = self._connection_manager.get_streams()
+                if streams:
+                    # Connection should be a tuple of (read_stream, write_stream)
+                    if isinstance(streams, tuple) and len(streams) == 2:
+                        read_stream, write_stream = streams
+                        # Check if streams are closed using getattr with default value
+                        if getattr(read_stream, "_closed", False):
+                            logger.debug("Read stream is closed, marking as disconnected")
+                            self._connected = False
+                            return False
+                        if getattr(write_stream, "_closed", False):
+                            logger.debug("Write stream is closed, marking as disconnected")
+                            self._connected = False
+                            return False
+
+            except Exception as e:
+                # If we can't check the connection state, assume disconnected for safety
+                logger.debug(f"Error checking connection state: {e}, marking as disconnected")
+                self._connected = False
+                return False
+
+        return True
+
+    async def _ensure_connected(self) -> None:
+        """Ensure the connector is connected, reconnecting if necessary.
+
+        Raises:
+            RuntimeError: If connection cannot be established and auto_reconnect is False.
+        """
+        if not self.client_session:
             raise RuntimeError("MCP client is not connected")
 
+        if not self.is_connected:
+            if self.auto_reconnect:
+                logger.debug("Connection lost, attempting to reconnect...")
+                try:
+                    await self.connect()
+                    logger.debug("Reconnection successful")
+                except Exception as e:
+                    raise RuntimeError(f"Failed to reconnect to MCP server: {e}") from e
+            else:
+                raise RuntimeError(
+                    "Connection to MCP server has been lost. Auto-reconnection is disabled. Please reconnect manually."
+                )
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> CallToolResult:
+        """Call an MCP tool with automatic reconnection handling.
+
+        Args:
+            name: The name of the tool to call.
+            arguments: The arguments to pass to the tool.
+
+        Returns:
+            The result of the tool call.
+
+        Raises:
+            RuntimeError: If the connection is lost and cannot be reestablished.
+        """
+
+        # Ensure we're connected
+        await self._ensure_connected()
+
         logger.debug(f"Calling tool '{name}' with arguments: {arguments}")
-        result = await self.client.call_tool(name, arguments)
-        logger.debug(f"Tool '{name}' called with result: {result}")
-        return result
+        try:
+            result = await self.client_session.call_tool(name, arguments)
+            logger.debug(f"Tool '{name}' called with result: {result}")
+            return result
+        except Exception as e:
+            # Check if the error might be due to connection loss
+            if not self.is_connected:
+                raise RuntimeError(f"Tool call '{name}' failed due to connection loss: {e}") from e
+            else:
+                # Re-raise the original error if it's not connection-related
+                raise
 
     async def list_tools(self) -> list[Tool]:
         """List all available tools from the MCP implementation."""
-        if not self.client:
-            raise RuntimeError("MCP client is not connected")
+
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug("Listing tools")
         try:
-            result = await self.client.list_tools()
+            result = await self.client_session.list_tools()
             return result.tools
         except McpError as e:
             logger.error(f"Error listing tools: {e}")
@@ -170,12 +276,12 @@ class BaseConnector(ABC):
 
     async def list_resources(self) -> list[Resource]:
         """List all available resources from the MCP implementation."""
-        if not self.client:
-            raise RuntimeError("MCP client is not connected")
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug("Listing resources")
         try:
-            result = await self.client.list_resources()
+            result = await self.client_session.list_resources()
             return result.resources
         except McpError as e:
             logger.error(f"Error listing resources: {e}")
@@ -183,41 +289,39 @@ class BaseConnector(ABC):
 
     async def read_resource(self, uri: str) -> ReadResourceResult:
         """Read a resource by URI."""
-        if not self.client:
+        if not self.client_session:
             raise RuntimeError("MCP client is not connected")
 
         logger.debug(f"Reading resource: {uri}")
-        result = await self.client.read_resource(uri)
+        result = await self.client_session.read_resource(uri)
         return result
 
     async def list_prompts(self) -> list[Prompt]:
         """List all available prompts from the MCP implementation."""
-        if not self.client:
-            raise RuntimeError("MCP client is not connected")
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug("Listing prompts")
         try:
-            result = await self.client.list_prompts()
+            result = await self.client_session.list_prompts()
             return result.prompts
         except McpError as e:
             logger.error(f"Error listing prompts: {e}")
             return []
 
-    async def get_prompt(
-        self, name: str, arguments: dict[str, Any] | None = None
-    ) -> GetPromptResult:
+    async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> GetPromptResult:
         """Get a prompt by name."""
-        if not self.client:
-            raise RuntimeError("MCP client is not connected")
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug(f"Getting prompt: {name}")
-        result = await self.client.get_prompt(name, arguments)
+        result = await self.client_session.get_prompt(name, arguments)
         return result
 
     async def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Send a raw request to the MCP implementation."""
-        if not self.client:
-            raise RuntimeError("MCP client is not connected")
+        # Ensure we're connected
+        await self._ensure_connected()
 
         logger.debug(f"Sending request: {method} with params: {params}")
-        return await self.client.request({"method": method, "params": params or {}})
+        return await self.client_session.request({"method": method, "params": params or {}})

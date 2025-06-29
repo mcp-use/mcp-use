@@ -7,8 +7,6 @@ which handles authentication, initialization, and tool discovery.
 
 from typing import Any
 
-from mcp.types import Tool
-
 from .connectors.base import BaseConnector
 
 
@@ -32,7 +30,6 @@ class MCPSession:
         """
         self.connector = connector
         self.session_info: dict[str, Any] | None = None
-        self.tools: list[Tool] = []
         self.auto_connect = auto_connect
 
     async def __aenter__(self) -> "MCPSession":
@@ -84,4 +81,4 @@ class MCPSession:
         Returns:
             True if the connector is connected, False otherwise.
         """
-        return hasattr(self.connector, "client") and self.connector.client is not None
+        return self.connector.is_connected

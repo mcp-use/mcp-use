@@ -30,9 +30,7 @@ class UseToolFromServerTool(MCPServerTool):
     )
     args_schema: ClassVar[type[BaseModel]] = UseToolInput
 
-    async def _arun(
-        self, server_name: str, tool_name: str, tool_input: dict[str, Any] | str
-    ) -> str:
+    async def _arun(self, server_name: str, tool_name: str, tool_input: dict[str, Any] | str) -> str:
         """Execute a tool from a specific server."""
         # Check if server exists
         servers = self.server_manager.client.get_server_names()
@@ -78,20 +76,14 @@ class UseToolFromServerTool(MCPServerTool):
 
         if not target_tool:
             tool_names = [t.name for t in server_tools]
-            return (
-                f"Tool '{tool_name}' not found on server '{server_name}'. "
-                f"Available tools: {', '.join(tool_names)}"
-            )
+            return f"Tool '{tool_name}' not found on server '{server_name}'. Available tools: {', '.join(tool_names)}"
 
         # Execute the tool with the provided input
         try:
             # Parse the input based on target tool's schema
             structured_input = self._parse_tool_input(target_tool, tool_input)
             if structured_input is None:
-                return (
-                    f"Could not parse input for tool '{tool_name}'."
-                    " Please check the input format and try again."
-                )
+                return f"Could not parse input for tool '{tool_name}'. Please check the input format and try again."
 
             # Store the previous active server
             previous_active = self.server_manager.active_server
@@ -100,10 +92,7 @@ class UseToolFromServerTool(MCPServerTool):
             self.server_manager.active_server = server_name
 
             # Execute the tool
-            logger.info(
-                f"Executing tool '{tool_name}' on server '{server_name}'"
-                "with input: {structured_input}"
-            )
+            logger.info(f"Executing tool '{tool_name}' on server '{server_name}'with input: {{structured_input}}")
             result = await target_tool._arun(**structured_input)
 
             # Restore the previous active server
@@ -162,6 +151,4 @@ class UseToolFromServerTool(MCPServerTool):
 
     def _run(self, server_name: str, tool_name: str, tool_input: dict[str, Any] | str) -> str:
         """Synchronous version that raises a NotImplementedError."""
-        raise NotImplementedError(
-            "UseToolFromServerTool requires async execution. Use _arun instead."
-        )
+        raise NotImplementedError("UseToolFromServerTool requires async execution. Use _arun instead.")

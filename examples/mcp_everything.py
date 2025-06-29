@@ -11,9 +11,7 @@ from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 
 everything_server = {
-    "mcpServers": {
-        "everything": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-everything"]}
-    }
+    "mcpServers": {"everything": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-everything"]}}
 }
 
 
@@ -26,7 +24,7 @@ async def main():
 
     result = await agent.run(
         """
-        Hello, you are a tester can you please answer the follwing questions:
+        Hello, you are a tester can you please answer the following questions:
         - Which resources do you have access to?
         - Which prompts do you have access to?
         - Which tools do you have access to?

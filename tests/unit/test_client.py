@@ -218,7 +218,9 @@ class TestMCPClientSessionManagement:
         await client.create_session("server1")
 
         # Verify behavior
-        mock_create_connector.assert_called_once_with({"url": "http://server1.com"}, options={})
+        mock_create_connector.assert_called_once_with(
+            {"url": "http://server1.com"}, sandbox=False, sandbox_options=None
+        )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_called_once()
 
@@ -252,9 +254,7 @@ class TestMCPClientSessionManagement:
     @pytest.mark.asyncio
     @patch("mcp_use.client.create_connector_from_config")
     @patch("mcp_use.client.MCPSession")
-    async def test_create_session_no_auto_initialize(
-        self, mock_session_class, mock_create_connector
-    ):
+    async def test_create_session_no_auto_initialize(self, mock_session_class, mock_create_connector):
         """Test creating a session without auto-initializing."""
         config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
         client = MCPClient(config=config)
@@ -271,7 +271,9 @@ class TestMCPClientSessionManagement:
         await client.create_session("server1", auto_initialize=False)
 
         # Verify behavior
-        mock_create_connector.assert_called_once_with({"url": "http://server1.com"}, options={})
+        mock_create_connector.assert_called_once_with(
+            {"url": "http://server1.com"}, sandbox=False, sandbox_options=None
+        )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_not_called()
 

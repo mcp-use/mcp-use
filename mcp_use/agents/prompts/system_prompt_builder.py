@@ -2,9 +2,7 @@ from langchain.schema import SystemMessage
 from langchain_core.tools import BaseTool
 
 
-def generate_tool_descriptions(
-    tools: list[BaseTool], disallowed_tools: list[str] | None = None
-) -> list[str]:
+def generate_tool_descriptions(tools: list[BaseTool], disallowed_tools: list[str] | None = None) -> list[str]:
     """
     Generates a list of formatted tool descriptions, excluding disallowed tools.
 

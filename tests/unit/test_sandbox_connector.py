@@ -118,9 +118,7 @@ class TestSandboxConnectorConnection:
     @pytest.mark.asyncio
     @patch("mcp_use.connectors.sandbox.SseConnectionManager")
     @patch("mcp_use.connectors.sandbox.ClientSession")
-    async def test_connect(
-        self, mock_client_session, mock_connection_manager, mock_sandbox_modules
-    ):
+    async def test_connect(self, mock_client_session, mock_connection_manager, mock_sandbox_modules):
         """Test connecting to the MCP implementation in sandbox."""
         # Setup mocks
         mock_manager_instance = Mock(spec=SseConnectionManager)
@@ -132,9 +130,7 @@ class TestSandboxConnectorConnection:
         mock_client_session.return_value = mock_client_instance
 
         # Mock wait_for_server_response to avoid actual HTTP calls
-        with patch.object(
-            SandboxConnector, "wait_for_server_response", new_callable=AsyncMock, return_value=True
-        ):
+        with patch.object(SandboxConnector, "wait_for_server_response", new_callable=AsyncMock, return_value=True):
             # Create connector and connect
             sandbox_options = SandboxOptions(api_key="test-api-key")
             connector = SandboxConnector("npx", ["test-command"], e2b_options=sandbox_options)
@@ -148,9 +144,7 @@ class TestSandboxConnectorConnection:
             mock_manager_instance.start.assert_called_once()
 
             # Verify client session creation
-            mock_client_session.assert_called_once_with(
-                "read_stream", "write_stream", sampling_callback=None
-            )
+            mock_client_session.assert_called_once_with("read_stream", "write_stream", sampling_callback=None)
             mock_client_instance.__aenter__.assert_called_once()
 
             # Verify state

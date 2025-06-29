@@ -1,10 +1,9 @@
-name: Check Version Bump and Publish to PyPI
+name: Release
 
 on:
   workflow_run:
-    workflows: ["Python Tests"]
-    branches:
-      - main
+    workflows: ["Python Tests", "Transports"]
+    branches: [main]
     types:
       - completed
 
@@ -15,9 +14,8 @@ permissions:
 
 jobs:
   check-version-and-publish:
-    # Only proceed if the referenced workflow completed successfully
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -66,14 +64,14 @@ jobs:
       - name: Create Release
         if: steps.check-version.outputs.is_new_version == 'true'
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: v${{ steps.check-version.outputs.new_version }}
-          release_name: Release v${{ steps.check-version.outputs.new_version }}
+          tag: v${{ steps.check-version.outputs.new_version }}
+          name: Release v${{ steps.check-version.outputs.new_version }}
           draft: false
           prerelease: false
+          generateReleaseNotes: false
+          omitBodyDuringUpdate: true
 
       - name: Publish to PyPI
         if: steps.check-version.outputs.is_new_version == 'true'

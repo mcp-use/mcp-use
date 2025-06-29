@@ -1,6 +1,7 @@
 ---
-title: Connection Types
+title: "Connection Types"
 description: "Understanding the different connection types for MCP servers"
+icon: "cable"
 ---
 
 # Connection Types for MCP Servers
@@ -89,18 +90,11 @@ You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) t
 ```python
 from mcp_use import MCPClient
 from mcp_use.types.sandbox import SandboxOptions
-from mcp_use.types.clientoptions import ClientOptions
 
 # Define sandbox options
 sandbox_options: SandboxOptions = {
     "api_key": "your_e2b_api_key",  # Or use E2B_API_KEY environment variable
     "sandbox_template_id": "code-interpreter-v1"
-}
-
-# Create client options for sandboxed execution
-client_options: ClientOptions = {
-    "is_sandboxed": True,
-    "sandbox_options": sandbox_options
 }
 
 # Create client with sandboxed execution enabled
@@ -114,7 +108,8 @@ client = MCPClient.from_dict(
             }
         }
     },
-    options=client_options
+    sandbox=True,
+    sandbox_options=sandbox_options
 )
 ```
 
@@ -136,16 +131,10 @@ Connection types are automatically inferred from your configuration file based o
 
 ```python
 from mcp_use import MCPClient
-from mcp_use.types.clientoptions import ClientOptions
 
 # The connection type is automatically inferred based on your config file
 client = MCPClient.from_config_file("config.json", server_name="my_server")
 
-# For sandboxed execution, use ClientOptions
-client_options: ClientOptions = {
-    "is_sandboxed": True,
-    "sandbox_options": {"api_key": "your_e2b_api_key"}
-}
 client = MCPClient.from_config_file(
     "config.json",
     options=client_options
@@ -154,8 +143,8 @@ client = MCPClient.from_config_file(
 
 For example:
 
-- If your configuration includes `command` and `args` and client_options has `"is_sandboxed": False` (default), a local STDIO connection will be used
-- If your configuration includes `command` and `args` and client_options has `"is_sandboxed": True`, a sandboxed execution connection will be used
+- If your configuration includes `command` and `args` and sandbox parameter is False` (default), a local STDIO connection will be used
+- If your configuration includes `command` and `args` and sandbox parameter is True`, a sandboxed execution connection will be used
 - If your configuration has a `url` starting with `http://` or `https://`, an HTTP connection will be used
 
 This automatic inference simplifies the configuration process and ensures the appropriate connection type is used without requiring explicit specification.

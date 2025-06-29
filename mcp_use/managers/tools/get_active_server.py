@@ -21,10 +21,7 @@ class GetActiveServerTool(MCPServerTool):
     def _run(self, **kwargs) -> str:
         """Get the currently active MCP server."""
         if not self.server_manager.active_server:
-            return (
-                "No MCP server is currently active. "
-                "Use connect_to_mcp_server to connect to a server."
-            )
+            return "No MCP server is currently active. Use connect_to_mcp_server to connect to a server."
         return f"Currently active MCP server: {self.server_manager.active_server}"
 
     async def _arun(self, **kwargs) -> str:
