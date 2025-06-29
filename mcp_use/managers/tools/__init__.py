@@ -1,3 +1,4 @@
+from .add_server import AddMCPServerTool
 from .base_tool import MCPServerTool
 from .connect_server import ConnectServerTool
 from .disconnect_server import DisconnectServerTool
@@ -8,6 +9,7 @@ from .use_tool import UseToolFromServerTool
 
 __all__ = [
     "MCPServerTool",
+    "AddMCPServerTool",
     "ListServersTool",
     "ConnectServerTool",
     "GetActiveServerTool",
