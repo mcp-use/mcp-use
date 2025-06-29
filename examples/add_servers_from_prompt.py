@@ -32,6 +32,7 @@ async def main():
         client=client,
         llm=llm,
         use_server_manager=True,
+        max_steps=30,
     )
 
     # Define the server configurations that the agent will be asked to add
@@ -77,17 +78,6 @@ async def main():
 
         print("\n=== Agent Response ===")
         print(result)
-
-        # Display final server state
-        print("\n=== Final Server State ===")
-        server_names = client.get_server_names()
-        print(f"Total servers: {len(server_names)}")
-        for server_name in server_names:
-            try:
-                client.get_session(server_name)
-                print(f"  - {server_name}: connected")
-            except ValueError:
-                print(f"  - {server_name}: not connected")
 
     finally:
         # Clean up

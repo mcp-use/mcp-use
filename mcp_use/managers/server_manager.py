@@ -1,3 +1,5 @@
+import logging
+
 from langchain_core.tools import BaseTool
 
 from mcp_use.client import MCPClient
@@ -5,7 +7,7 @@ from mcp_use.logging import logger
 
 from ..adapters.base import BaseAdapter
 from .tools import (
-    AddMCPServerTool,
+    AddMCPServerFromConfigTool,
     ConnectServerTool,
     DisconnectServerTool,
     GetActiveServerTool,
@@ -119,12 +121,12 @@ class ServerManager:
             Combined list of management tools and active server tools
         """
         # Log current state for debugging
-        if logger.level <= 10:  # DEBUG level
+        if logger.isEnabledFor(logging.DEBUG):
             self.log_state("tools getter")
 
         # Base management tools
         management_tools = [
-            AddMCPServerTool(self),
+            AddMCPServerFromConfigTool(self),
             ListServersTool(self),
             ConnectServerTool(self),
             GetActiveServerTool(self),
