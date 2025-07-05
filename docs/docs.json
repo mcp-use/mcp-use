@@ -38,7 +38,8 @@
             "pages": [
               "essentials/agent-configuration",
               "essentials/server-manager",
-              "essentials/llm-integration"
+              "essentials/llm-integration",
+              "guides/streaming"
             ]
           },
           {
@@ -47,7 +48,6 @@
               "guides/building-custom-agents",
               "guides/logging",
               "guides/multi-server-setup",
-              "guides/streaming",
               "guides/security"
             ]
           },
