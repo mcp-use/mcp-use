@@ -638,7 +638,7 @@ class MCPAgent:
             logger.info("🧹 Closing agent after generator completion")
             await self.close()
 
-    async def astream(
+    async def stream_events(
         self,
         query: str,
         max_steps: int | None = None,
