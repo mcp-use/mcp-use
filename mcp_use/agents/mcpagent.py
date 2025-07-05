@@ -7,7 +7,7 @@ to provide a simple interface for using MCP tools with different LLMs.
 
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
@@ -106,9 +106,10 @@ class MCPAgent:
                 raise ValueError("Client must be provided when using server manager")
             self.server_manager = ServerManager(self.client, self.adapter)
 
-        # State tracking
+        # State tracking - initialize _tools as empty list
         self._agent_executor: AgentExecutor | None = None
         self._system_message: SystemMessage | None = None
+        self._tools: list[BaseTool] = []
 
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
@@ -304,6 +305,284 @@ class MCPAgent:
         """
         return self.disallowed_tools
 
+    async def _consume_and_return(
+        self,
+        generator: AsyncGenerator[tuple[AgentAction, str], str],
+    ) -> str:
+        """Consume the generator and return the final result.
+
+        This method manually iterates through the generator to consume the steps.
+        In Python, async generators cannot return values directly, so we expect
+        the final result to be yielded as a special marker.
+
+        Args:
+            generator: The async generator that yields steps and a final result.
+
+        Returns:
+            The final result from the generator.
+        """
+        final_result = ""
+        async for item in generator:
+            # If it's a string, it's the final result
+            if isinstance(item, str):
+                final_result = item
+                break
+            # Otherwise it's a step tuple, just consume it
+        return final_result
+
+    async def stream(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        manage_connector: bool = True,
+        external_history: list[BaseMessage] | None = None,
+    ) -> AsyncGenerator[tuple[AgentAction, str] | str, None]:
+        """Run the agent and yield intermediate steps as an async generator.
+
+        Args:
+            query: The query to run.
+            max_steps: Optional maximum number of steps to take.
+            manage_connector: Whether to handle the connector lifecycle internally.
+            external_history: Optional external history to use instead of the
+                internal conversation history.
+
+        Yields:
+            Intermediate steps as (AgentAction, str) tuples, followed by the final result as a string.
+        """
+        result = ""
+        initialized_here = False
+        start_time = time.time()
+        tools_used_names = []
+        steps_taken = 0
+        success = False
+
+        try:
+            # Initialize if needed
+            if manage_connector and not self._initialized:
+                await self.initialize()
+                initialized_here = True
+            elif not self._initialized and self.auto_initialize:
+                await self.initialize()
+                initialized_here = True
+
+            # Check if initialization succeeded
+            if not self._agent_executor:
+                raise RuntimeError("MCP agent failed to initialize")
+
+            steps = max_steps or self.max_steps
+            if self._agent_executor:
+                self._agent_executor.max_iterations = steps
+
+            display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
+            logger.info(f"💬 Received query: '{display_query}'")
+
+            # Add the user query to conversation history if memory is enabled
+            if self.memory_enabled:
+                self.add_to_history(HumanMessage(content=query))
+
+            # Use the provided history or the internal history
+            history_to_use = external_history if external_history is not None else self._conversation_history
+
+            # Convert messages to format expected by LangChain agent input
+            # Exclude the main system message as it's part of the agent's prompt
+            langchain_history = []
+            for msg in history_to_use:
+                if isinstance(msg, HumanMessage):
+                    langchain_history.append(msg)
+                elif isinstance(msg, AIMessage):
+                    langchain_history.append(msg)
+
+            intermediate_steps: list[tuple[AgentAction, str]] = []
+            inputs = {"input": query, "chat_history": langchain_history}
+
+            # Construct a mapping of tool name to tool for easy lookup
+            name_to_tool_map = {tool.name: tool for tool in self._tools}
+            color_mapping = get_color_mapping([tool.name for tool in self._tools], excluded_colors=["green", "red"])
+
+            logger.info(f"🏁 Starting agent execution with max_steps={steps}")
+
+            for step_num in range(steps):
+                steps_taken = step_num + 1
+                # --- Check for tool updates if using server manager ---
+                if self.use_server_manager and self.server_manager:
+                    current_tools = self.server_manager.tools
+                    current_tool_names = {tool.name for tool in current_tools}
+                    existing_tool_names = {tool.name for tool in self._tools}
+
+                    if current_tool_names != existing_tool_names:
+                        logger.info(
+                            f"🔄 Tools changed before step {step_num + 1}, updating agent."
+                            f"New tools: {', '.join(current_tool_names)}"
+                        )
+                        self._tools = current_tools
+                        # Regenerate system message with ALL current tools
+                        await self._create_system_message_from_tools(self._tools)
+                        # Recreate the agent executor with the new tools and system message
+                        self._agent_executor = self._create_agent()
+                        self._agent_executor.max_iterations = steps
+                        # Update maps for this iteration
+                        name_to_tool_map = {tool.name: tool for tool in self._tools}
+                        color_mapping = get_color_mapping(
+                            [tool.name for tool in self._tools], excluded_colors=["green", "red"]
+                        )
+
+                logger.info(f"👣 Step {step_num + 1}/{steps}")
+
+                # --- Plan and execute the next step ---
+                try:
+                    # Use the internal _atake_next_step which handles planning and execution
+                    # This requires providing the necessary context like maps and intermediate steps
+                    next_step_output = await self._agent_executor._atake_next_step(
+                        name_to_tool_map=name_to_tool_map,
+                        color_mapping=color_mapping,
+                        inputs=inputs,
+                        intermediate_steps=intermediate_steps,
+                        run_manager=None,
+                    )
+
+                    # Process the output
+                    if isinstance(next_step_output, AgentFinish):
+                        logger.info(f"✅ Agent finished at step {step_num + 1}")
+                        result = next_step_output.return_values.get("output", "No output generated")
+                        break
+
+                    # If it's actions/steps, add to intermediate steps and yield them
+                    intermediate_steps.extend(next_step_output)
+
+                    # Yield each step and track tool usage
+                    for agent_step in next_step_output:
+                        yield agent_step
+                        action, observation = agent_step
+                        tool_name = action.tool
+                        tools_used_names.append(tool_name)
+                        tool_input_str = str(action.tool_input)
+                        # Truncate long inputs for readability
+                        if len(tool_input_str) > 100:
+                            tool_input_str = tool_input_str[:97] + "..."
+                        logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
+                        # Truncate long outputs for readability
+                        observation_str = str(observation)
+                        if len(observation_str) > 100:
+                            observation_str = observation_str[:97] + "..."
+                        observation_str = observation_str.replace("\n", " ")
+                        logger.info(f"📄 Tool result: {observation_str}")
+
+                    # Check for return_direct on the last action taken
+                    if len(next_step_output) > 0:
+                        last_step: tuple[AgentAction, str] = next_step_output[-1]
+                        tool_return = self._agent_executor._get_tool_return(last_step)
+                        if tool_return is not None:
+                            logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
+                            result = tool_return.return_values.get("output", "No output generated")
+                            break
+
+                except OutputParserException as e:
+                    logger.error(f"❌ Output parsing error during step {step_num + 1}: {e}")
+                    result = f"Agent stopped due to a parsing error: {str(e)}"
+                    break
+                except Exception as e:
+                    logger.error(f"❌ Error during agent execution step {step_num + 1}: {e}")
+                    import traceback
+
+                    traceback.print_exc()
+                    result = f"Agent stopped due to an error: {str(e)}"
+                    break
+
+            # --- Loop finished ---
+            if not result:
+                logger.warning(f"⚠️ Agent stopped after reaching max iterations ({steps})")
+                result = f"Agent stopped after reaching the maximum number of steps ({steps})."
+
+            # Add the final response to conversation history if memory is enabled
+            if self.memory_enabled:
+                self.add_to_history(AIMessage(content=result))
+
+            logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
+            success = True
+
+            # Yield the final result as a string
+            yield result
+
+        except Exception as e:
+            logger.error(f"❌ Error running query: {e}")
+            if initialized_here and manage_connector:
+                logger.info("🧹 Cleaning up resources after initialization error in stream")
+                await self.close()
+            raise
+
+        finally:
+            # Track comprehensive execution data
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
+            server_count = 0
+            if self.client:
+                server_count = len(self.client.get_all_active_sessions())
+            elif self.connectors:
+                server_count = len(self.connectors)
+
+            conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
+
+            # Safely access _tools in case initialization failed
+            tools_available = getattr(self, "_tools", [])
+
+            self.telemetry.track_agent_execution(
+                execution_method="stream",
+                query=query,
+                success=success,
+                model_provider=self._model_provider,
+                model_name=self._model_name,
+                server_count=server_count,
+                server_identifiers=[connector.public_identifier for connector in self.connectors],
+                total_tools_available=len(tools_available),
+                tools_available_names=[tool.name for tool in tools_available],
+                max_steps_configured=self.max_steps,
+                memory_enabled=self.memory_enabled,
+                use_server_manager=self.use_server_manager,
+                max_steps_used=max_steps,
+                manage_connector=manage_connector,
+                external_history_used=external_history is not None,
+                steps_taken=steps_taken,
+                tools_used_count=len(tools_used_names),
+                tools_used_names=tools_used_names,
+                response=result,
+                execution_time_ms=execution_time_ms,
+                error_type=None if success else "execution_error",
+                conversation_history_length=conversation_history_length,
+            )
+
+            # Clean up if necessary (e.g., if not using client-managed sessions)
+            if manage_connector and not self.client and initialized_here:
+                logger.info("🧹 Closing agent after stream completion")
+                await self.close()
+
+    async def run(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        manage_connector: bool = True,
+        external_history: list[BaseMessage] | None = None,
+    ) -> str:
+        """Run a query using the MCP tools and return the final result.
+
+        This method uses the streaming implementation internally and returns
+        the final result after consuming all intermediate steps.
+
+        Args:
+            query: The query to run.
+            max_steps: Optional maximum number of steps to take.
+            manage_connector: Whether to handle the connector lifecycle internally.
+                If True, this method will connect, initialize, and disconnect from
+                the connector automatically. If False, the caller is responsible
+                for managing the connector lifecycle.
+            external_history: Optional external history to use instead of the
+                internal conversation history.
+
+        Returns:
+            The result of running the query.
+        """
+        generator = self.stream(query, max_steps, manage_connector, external_history)
+        return await self._consume_and_return(generator)
+
     async def _generate_response_chunks_async(
         self,
         query: str,
@@ -424,229 +703,6 @@ class MCPAgent:
                 conversation_history_length=conversation_history_length,
             )
 
-    async def run(
-        self,
-        query: str,
-        max_steps: int | None = None,
-        manage_connector: bool = True,
-        external_history: list[BaseMessage] | None = None,
-    ) -> str:
-        """Run a query using the MCP tools with unified step-by-step execution.
-
-        This method handles connecting to the MCP server, initializing the agent,
-        running the query, and then cleaning up the connection.
-
-        Args:
-            query: The query to run.
-            max_steps: Optional maximum number of steps to take.
-            manage_connector: Whether to handle the connector lifecycle internally.
-                If True, this method will connect, initialize, and disconnect from
-                the connector automatically. If False, the caller is responsible
-                for managing the connector lifecycle.
-            external_history: Optional external history to use instead of the
-                internal conversation history.
-
-        Returns:
-            The result of running the query.
-        """
-        result = ""
-        initialized_here = False
-        start_time = time.time()
-        tools_used_names = []
-        steps_taken = 0
-        success = False
-
-        try:
-            # Initialize if needed
-            if manage_connector and not self._initialized:
-                await self.initialize()
-                initialized_here = True
-            elif not self._initialized and self.auto_initialize:
-                await self.initialize()
-                initialized_here = True
-
-            # Check if initialization succeeded
-            if not self._agent_executor:
-                raise RuntimeError("MCP agent failed to initialize")
-
-            steps = max_steps or self.max_steps
-            if self._agent_executor:
-                self._agent_executor.max_iterations = steps
-
-            display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
-            logger.info(f"💬 Received query: '{display_query}'")
-
-            # Add the user query to conversation history if memory is enabled
-            if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
-
-            # Use the provided history or the internal history
-            history_to_use = external_history if external_history is not None else self._conversation_history
-
-            # Convert messages to format expected by LangChain agent input
-            # Exclude the main system message as it's part of the agent's prompt
-            langchain_history = []
-            for msg in history_to_use:
-                if isinstance(msg, HumanMessage):
-                    langchain_history.append(msg)
-                elif isinstance(msg, AIMessage):
-                    langchain_history.append(msg)
-
-            intermediate_steps: list[tuple[AgentAction, str]] = []
-            inputs = {"input": query, "chat_history": langchain_history}
-
-            # Construct a mapping of tool name to tool for easy lookup
-            name_to_tool_map = {tool.name: tool for tool in self._tools}
-            color_mapping = get_color_mapping([tool.name for tool in self._tools], excluded_colors=["green", "red"])
-
-            logger.info(f"🏁 Starting agent execution with max_steps={steps}")
-
-            for step_num in range(steps):
-                steps_taken = step_num + 1
-                # --- Check for tool updates if using server manager ---
-                if self.use_server_manager and self.server_manager:
-                    current_tools = self.server_manager.tools
-                    current_tool_names = {tool.name for tool in current_tools}
-                    existing_tool_names = {tool.name for tool in self._tools}
-
-                    if current_tool_names != existing_tool_names:
-                        logger.info(
-                            f"🔄 Tools changed before step {step_num + 1}, updating agent."
-                            f"New tools: {', '.join(current_tool_names)}"
-                        )
-                        self._tools = current_tools
-                        # Regenerate system message with ALL current tools
-                        await self._create_system_message_from_tools(self._tools)
-                        # Recreate the agent executor with the new tools and system message
-                        self._agent_executor = self._create_agent()
-                        self._agent_executor.max_iterations = steps
-                        # Update maps for this iteration
-                        name_to_tool_map = {tool.name: tool for tool in self._tools}
-                        color_mapping = get_color_mapping(
-                            [tool.name for tool in self._tools], excluded_colors=["green", "red"]
-                        )
-
-                logger.info(f"👣 Step {step_num + 1}/{steps}")
-
-                # --- Plan and execute the next step ---
-                try:
-                    # Use the internal _atake_next_step which handles planning and execution
-                    # This requires providing the necessary context like maps and intermediate steps
-                    next_step_output = await self._agent_executor._atake_next_step(
-                        name_to_tool_map=name_to_tool_map,
-                        color_mapping=color_mapping,
-                        inputs=inputs,
-                        intermediate_steps=intermediate_steps,
-                        run_manager=None,
-                    )
-
-                    # Process the output
-                    if isinstance(next_step_output, AgentFinish):
-                        logger.info(f"✅ Agent finished at step {step_num + 1}")
-                        result = next_step_output.return_values.get("output", "No output generated")
-                        break
-
-                    # If it's actions/steps, add to intermediate steps
-                    intermediate_steps.extend(next_step_output)
-
-                    # Log tool calls and track tool usage
-                    for action, output in next_step_output:
-                        tool_name = action.tool
-                        tools_used_names.append(tool_name)
-                        tool_input_str = str(action.tool_input)
-                        # Truncate long inputs for readability
-                        if len(tool_input_str) > 100:
-                            tool_input_str = tool_input_str[:97] + "..."
-                        logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
-                        # Truncate long outputs for readability
-                        output_str = str(output)
-                        if len(output_str) > 100:
-                            output_str = output_str[:97] + "..."
-                        output_str = output_str.replace("\n", " ")
-                        logger.info(f"📄 Tool result: {output_str}")
-
-                    # Check for return_direct on the last action taken
-                    if len(next_step_output) > 0:
-                        last_step: tuple[AgentAction, str] = next_step_output[-1]
-                        tool_return = self._agent_executor._get_tool_return(last_step)
-                        if tool_return is not None:
-                            logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
-                            result = tool_return.return_values.get("output", "No output generated")
-                            break
-
-                except OutputParserException as e:
-                    logger.error(f"❌ Output parsing error during step {step_num + 1}: {e}")
-                    result = f"Agent stopped due to a parsing error: {str(e)}"
-                    break
-                except Exception as e:
-                    logger.error(f"❌ Error during agent execution step {step_num + 1}: {e}")
-                    import traceback
-
-                    traceback.print_exc()
-                    result = f"Agent stopped due to an error: {str(e)}"
-                    break
-
-            # --- Loop finished ---
-            if not result:
-                logger.warning(f"⚠️ Agent stopped after reaching max iterations ({steps})")
-                result = f"Agent stopped after reaching the maximum number of steps ({steps})."
-
-            # Add the final response to conversation history if memory is enabled
-            if self.memory_enabled:
-                self.add_to_history(AIMessage(content=result))
-
-            logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
-            success = True
-            return result
-
-        except Exception as e:
-            logger.error(f"❌ Error running query: {e}")
-            if initialized_here and manage_connector:
-                logger.info("🧹 Cleaning up resources after initialization error in run")
-                await self.close()
-            raise
-
-        finally:
-            # Track comprehensive execution data
-            execution_time_ms = int((time.time() - start_time) * 1000)
-
-            server_count = 0
-            if self.client:
-                server_count = len(self.client.get_all_active_sessions())
-            elif self.connectors:
-                server_count = len(self.connectors)
-
-            conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
-            self.telemetry.track_agent_execution(
-                execution_method="run",
-                query=query,
-                success=success,
-                model_provider=self._model_provider,
-                model_name=self._model_name,
-                server_count=server_count,
-                server_identifiers=[connector.public_identifier for connector in self.connectors],
-                total_tools_available=len(self._tools) if self._tools else 0,
-                tools_available_names=[tool.name for tool in self._tools],
-                max_steps_configured=self.max_steps,
-                memory_enabled=self.memory_enabled,
-                use_server_manager=self.use_server_manager,
-                max_steps_used=max_steps,
-                manage_connector=manage_connector,
-                external_history_used=external_history is not None,
-                steps_taken=steps_taken,
-                tools_used_count=len(tools_used_names),
-                tools_used_names=tools_used_names,
-                response=result,
-                execution_time_ms=execution_time_ms,
-                error_type=None if success else "execution_error",
-                conversation_history_length=conversation_history_length,
-            )
-
-            # Clean up if necessary (e.g., if not using client-managed sessions)
-            if manage_connector and not self.client and not initialized_here:
-                logger.info("🧹 Closing agent after query completion")
-                await self.close()
-
     async def close(self) -> None:
         """Close the MCP connection with improved error handling."""
         logger.info("🔌 Closing agent and cleaning up resources...")
@@ -659,7 +715,8 @@ class MCPAgent:
             if self.client:
                 logger.info("🔄 Closing sessions through client")
                 await self.client.close_all_sessions()
-                self._sessions = {}
+                if hasattr(self, "_sessions"):
+                    self._sessions = {}
             # If using direct connector, disconnect
             elif self.connectors:
                 for connector in self.connectors:
@@ -677,6 +734,8 @@ class MCPAgent:
             logger.error(f"❌ Error during agent closure: {e}")
             # Still try to clean up references even if there was an error
             self._agent_executor = None
-            self._tools = []
-            self._sessions = {}
+            if hasattr(self, "_tools"):
+                self._tools = []
+            if hasattr(self, "_sessions"):
+                self._sessions = {}
             self._initialized = False
