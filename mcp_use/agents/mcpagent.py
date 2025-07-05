@@ -5,6 +5,7 @@ This module provides the main MCPAgent class that integrates all components
 to provide a simple interface for using MCP tools with different LLMs.
 """
 
+import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -56,6 +57,10 @@ class MCPAgent:
         disallowed_tools: list[str] | None = None,
         use_server_manager: bool = False,
         verbose: bool = False,
+        max_retries: int = 0,
+        retry_delay: float = 1.0,
+        continue_on_error: bool = False,
+        retryable_errors: list[type[Exception]] | None = None,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -71,6 +76,10 @@ class MCPAgent:
             additional_instructions: Extra instructions to append to the system prompt.
             disallowed_tools: List of tool names that should not be available to the agent.
             use_server_manager: Whether to use server manager mode instead of exposing all tools.
+            max_retries: Maximum number of retries for failed tool calls (default: 0).
+            retry_delay: Delay between retries in seconds (default: 1.0).
+            continue_on_error: Whether to continue execution after failed tool calls (default: False).
+            retryable_errors: List of error types that should trigger retries (default: [Exception]).
         """
         self.llm = llm
         self.client = client
@@ -88,6 +97,12 @@ class MCPAgent:
         # User can provide a template override, otherwise use the imported default
         self.system_prompt_template_override = system_prompt_template
         self.additional_instructions = additional_instructions
+        
+        # Retry/continue configuration
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.continue_on_error = continue_on_error
+        self.retryable_errors = retryable_errors or [Exception]
 
         # Either client or connector must be provided
         if not client and len(self.connectors) == 0:
@@ -529,61 +544,102 @@ class MCPAgent:
                 logger.info(f"👣 Step {step_num + 1}/{steps}")
 
                 # --- Plan and execute the next step ---
-                try:
-                    # Use the internal _atake_next_step which handles planning and execution
-                    # This requires providing the necessary context like maps and intermediate steps
-                    next_step_output = await self._agent_executor._atake_next_step(
-                        name_to_tool_map=name_to_tool_map,
-                        color_mapping=color_mapping,
-                        inputs=inputs,
-                        intermediate_steps=intermediate_steps,
-                        run_manager=None,
-                    )
+                step_success = False
+                retry_count = 0
+                
+                while not step_success and retry_count <= self.max_retries:
+                    try:
+                        # Use the internal _atake_next_step which handles planning and execution
+                        # This requires providing the necessary context like maps and intermediate steps
+                        next_step_output = await self._agent_executor._atake_next_step(
+                            name_to_tool_map=name_to_tool_map,
+                            color_mapping=color_mapping,
+                            inputs=inputs,
+                            intermediate_steps=intermediate_steps,
+                            run_manager=None,
+                        )
 
-                    # Process the output
-                    if isinstance(next_step_output, AgentFinish):
-                        logger.info(f"✅ Agent finished at step {step_num + 1}")
-                        result = next_step_output.return_values.get("output", "No output generated")
-                        break
-
-                    # If it's actions/steps, add to intermediate steps
-                    intermediate_steps.extend(next_step_output)
-
-                    # Log tool calls and track tool usage
-                    for action, output in next_step_output:
-                        tool_name = action.tool
-                        tools_used_names.append(tool_name)
-                        tool_input_str = str(action.tool_input)
-                        # Truncate long inputs for readability
-                        if len(tool_input_str) > 100:
-                            tool_input_str = tool_input_str[:97] + "..."
-                        logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
-                        # Truncate long outputs for readability
-                        output_str = str(output)
-                        if len(output_str) > 100:
-                            output_str = output_str[:97] + "..."
-                        output_str = output_str.replace("\n", " ")
-                        logger.info(f"📄 Tool result: {output_str}")
-
-                    # Check for return_direct on the last action taken
-                    if len(next_step_output) > 0:
-                        last_step: tuple[AgentAction, str] = next_step_output[-1]
-                        tool_return = self._agent_executor._get_tool_return(last_step)
-                        if tool_return is not None:
-                            logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
-                            result = tool_return.return_values.get("output", "No output generated")
+                        # Process the output
+                        if isinstance(next_step_output, AgentFinish):
+                            logger.info(f"✅ Agent finished at step {step_num + 1}")
+                            result = next_step_output.return_values.get("output", "No output generated")
+                            step_success = True
                             break
 
-                except OutputParserException as e:
-                    logger.error(f"❌ Output parsing error during step {step_num + 1}: {e}")
-                    result = f"Agent stopped due to a parsing error: {str(e)}"
-                    break
-                except Exception as e:
-                    logger.error(f"❌ Error during agent execution step {step_num + 1}: {e}")
-                    import traceback
+                        # If it's actions/steps, add to intermediate steps
+                        intermediate_steps.extend(next_step_output)
 
-                    traceback.print_exc()
-                    result = f"Agent stopped due to an error: {str(e)}"
+                        # Log tool calls and track tool usage
+                        for action, output in next_step_output:
+                            tool_name = action.tool
+                            tools_used_names.append(tool_name)
+                            tool_input_str = str(action.tool_input)
+                            # Truncate long inputs for readability
+                            if len(tool_input_str) > 100:
+                                tool_input_str = tool_input_str[:97] + "..."
+                            logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
+                            # Truncate long outputs for readability
+                            output_str = str(output)
+                            if len(output_str) > 100:
+                                output_str = output_str[:97] + "..."
+                            output_str = output_str.replace("\n", " ")
+                            logger.info(f"📄 Tool result: {output_str}")
+
+                        # Check for return_direct on the last action taken
+                        if len(next_step_output) > 0:
+                            last_step: tuple[AgentAction, str] = next_step_output[-1]
+                            tool_return = self._agent_executor._get_tool_return(last_step)
+                            if tool_return is not None:
+                                logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
+                                result = tool_return.return_values.get("output", "No output generated")
+                                step_success = True
+                                break
+
+                        # If we reach here, the step completed successfully
+                        step_success = True
+
+                    except OutputParserException as e:
+                        error_is_retryable = any(isinstance(e, error_type) for error_type in self.retryable_errors)
+                        
+                        if error_is_retryable and retry_count < self.max_retries:
+                            retry_count += 1
+                            logger.warning(f"⚠️ Output parsing error during step {step_num + 1} (attempt {retry_count}/{self.max_retries + 1}): {e}")
+                            if self.retry_delay > 0:
+                                await asyncio.sleep(self.retry_delay)
+                            continue
+                        else:
+                            logger.error(f"❌ Output parsing error during step {step_num + 1}: {e}")
+                            if self.continue_on_error:
+                                logger.info(f"🔄 Continuing execution despite error in step {step_num + 1}")
+                                step_success = True
+                                break
+                            else:
+                                result = f"Agent stopped due to a parsing error: {str(e)}"
+                                break
+                                
+                    except Exception as e:
+                        error_is_retryable = any(isinstance(e, error_type) for error_type in self.retryable_errors)
+                        
+                        if error_is_retryable and retry_count < self.max_retries:
+                            retry_count += 1
+                            logger.warning(f"⚠️ Error during agent execution step {step_num + 1} (attempt {retry_count}/{self.max_retries + 1}): {e}")
+                            if self.retry_delay > 0:
+                                await asyncio.sleep(self.retry_delay)
+                            continue
+                        else:
+                            logger.error(f"❌ Error during agent execution step {step_num + 1}: {e}")
+                            if self.continue_on_error:
+                                logger.info(f"🔄 Continuing execution despite error in step {step_num + 1}")
+                                step_success = True
+                                break
+                            else:
+                                import traceback
+                                traceback.print_exc()
+                                result = f"Agent stopped due to an error: {str(e)}"
+                                break
+                
+                # If step failed and we've exhausted retries, break out of the main loop
+                if not step_success:
                     break
 
             # --- Loop finished ---
