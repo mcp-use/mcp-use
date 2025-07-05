@@ -7,6 +7,7 @@ that ensures proper task isolation and resource cleanup.
 
 from typing import Any
 
+import httpx
 from mcp.client.sse import sse_client
 
 from ..logging import logger
@@ -27,6 +28,7 @@ class SseConnectionManager(ConnectionManager[tuple[Any, Any]]):
         headers: dict[str, str] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        auth: httpx.Auth | None = None,
     ):
         """Initialize a new SSE connection manager.
 
@@ -35,12 +37,14 @@ class SseConnectionManager(ConnectionManager[tuple[Any, Any]]):
             headers: Optional HTTP headers
             timeout: Timeout for HTTP operations in seconds
             sse_read_timeout: Timeout for SSE read operations in seconds
+            auth: Optional httpx.Auth instance for authentication
         """
         super().__init__()
         self.url = url
         self.headers = headers or {}
         self.timeout = timeout
         self.sse_read_timeout = sse_read_timeout
+        self.auth = auth
         self._sse_ctx = None
 
     async def _establish_connection(self) -> tuple[Any, Any]:
@@ -58,6 +62,7 @@ class SseConnectionManager(ConnectionManager[tuple[Any, Any]]):
             headers=self.headers,
             timeout=self.timeout,
             sse_read_timeout=self.sse_read_timeout,
+            auth=self.auth,
         )
 
         # Enter the context manager
