@@ -322,13 +322,17 @@ class MCPAgent:
             The final result from the generator.
         """
         final_result = ""
+        steps_taken = 0
+        tools_used_names = []
         async for item in generator:
             # If it's a string, it's the final result
             if isinstance(item, str):
                 final_result = item
                 break
             # Otherwise it's a step tuple, just consume it
-        return final_result
+            steps_taken += 1
+            tools_used_names.append(item[0].tool)
+        return final_result, steps_taken, tools_used_names
 
     async def stream(
         self,
@@ -336,6 +340,7 @@ class MCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
+        track_execution: bool = True,
     ) -> AsyncGenerator[tuple[AgentAction, str] | str, None]:
         """Run the agent and yield intermediate steps as an async generator.
 
@@ -525,30 +530,31 @@ class MCPAgent:
             # Safely access _tools in case initialization failed
             tools_available = getattr(self, "_tools", [])
 
-            self.telemetry.track_agent_execution(
-                execution_method="stream",
-                query=query,
-                success=success,
-                model_provider=self._model_provider,
-                model_name=self._model_name,
-                server_count=server_count,
-                server_identifiers=[connector.public_identifier for connector in self.connectors],
-                total_tools_available=len(tools_available),
-                tools_available_names=[tool.name for tool in tools_available],
-                max_steps_configured=self.max_steps,
-                memory_enabled=self.memory_enabled,
-                use_server_manager=self.use_server_manager,
-                max_steps_used=max_steps,
-                manage_connector=manage_connector,
-                external_history_used=external_history is not None,
-                steps_taken=steps_taken,
-                tools_used_count=len(tools_used_names),
-                tools_used_names=tools_used_names,
-                response=result,
-                execution_time_ms=execution_time_ms,
-                error_type=None if success else "execution_error",
-                conversation_history_length=conversation_history_length,
-            )
+            if track_execution:
+                self.telemetry.track_agent_execution(
+                    execution_method="stream",
+                    query=query,
+                    success=success,
+                    model_provider=self._model_provider,
+                    model_name=self._model_name,
+                    server_count=server_count,
+                    server_identifiers=[connector.public_identifier for connector in self.connectors],
+                    total_tools_available=len(tools_available),
+                    tools_available_names=[tool.name for tool in tools_available],
+                    max_steps_configured=self.max_steps,
+                    memory_enabled=self.memory_enabled,
+                    use_server_manager=self.use_server_manager,
+                    max_steps_used=max_steps,
+                    manage_connector=manage_connector,
+                    external_history_used=external_history is not None,
+                    steps_taken=steps_taken,
+                    tools_used_count=len(tools_used_names),
+                    tools_used_names=tools_used_names,
+                    response=result,
+                    execution_time_ms=execution_time_ms,
+                    error_type=None if success else "execution_error",
+                    conversation_history_length=conversation_history_length,
+                )
 
             # Clean up if necessary (e.g., if not using client-managed sessions)
             if manage_connector and not self.client and initialized_here:
@@ -580,8 +586,42 @@ class MCPAgent:
         Returns:
             The result of running the query.
         """
-        generator = self.stream(query, max_steps, manage_connector, external_history)
-        return await self._consume_and_return(generator)
+        success = True
+        start_time = time.time()
+        generator = self.stream(query, max_steps, manage_connector, external_history, track_execution=False)
+        try:
+            result, steps_taken, tools_used_names = await self._consume_and_return(generator)
+        except Exception as e:
+            success = False
+            error = str(e)
+            logger.error(f"❌ Error during agent execution: {e}")
+            raise
+        finally:
+            self.telemetry.track_agent_execution(
+                execution_method="run",
+                query=query,
+                success=success,
+                model_provider=self._model_provider,
+                model_name=self._model_name,
+                server_count=len(self.client.get_all_active_sessions()) if self.client else len(self.connectors),
+                server_identifiers=[connector.public_identifier for connector in self.connectors],
+                total_tools_available=len(self._tools) if self._tools else 0,
+                tools_available_names=[tool.name for tool in self._tools],
+                max_steps_configured=self.max_steps,
+                memory_enabled=self.memory_enabled,
+                use_server_manager=self.use_server_manager,
+                max_steps_used=max_steps,
+                manage_connector=manage_connector,
+                external_history_used=external_history is not None,
+                steps_taken=steps_taken,
+                tools_used_count=len(tools_used_names),
+                tools_used_names=tools_used_names,
+                response=result,
+                execution_time_ms=int((time.time() - start_time) * 1000),
+                error_type=error,
+                conversation_history_length=len(self._conversation_history),
+            )
+        return result
 
     async def _generate_response_chunks_async(
         self,
@@ -682,7 +722,7 @@ class MCPAgent:
             conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
 
             self.telemetry.track_agent_execution(
-                execution_method="astream",
+                execution_method="stream_events",
                 query=query,
                 success=success,
                 model_provider=self._model_provider,
