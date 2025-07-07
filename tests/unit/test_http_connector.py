@@ -128,7 +128,17 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
                 mock_instance.initialize.side_effect = McpError(ErrorData(code=1, message="Connection closed"))
             else:
                 # Second call (SSE) - succeeds
-                mock_instance.initialize.return_value = EmptyResult()
+                mock_init_result = MagicMock()
+                mock_init_result.capabilities = MagicMock(tools=True, resources=True, prompts=True)
+                mock_instance.initialize.return_value = mock_init_result
+
+            # Add mocks for list_tools, list_resources, and list_prompts since HttpConnector calls these
+            mock_instance.list_tools = AsyncMock()
+            mock_instance.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
+            mock_instance.list_resources = AsyncMock()
+            mock_instance.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)])
+            mock_instance.list_prompts = AsyncMock()
+            mock_instance.list_prompts.return_value = MagicMock(prompts=[MagicMock(spec=Prompt)])
 
             return mock_instance
 
@@ -163,7 +173,18 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_client_session_instance = MagicMock()
         mock_client_session_instance.__aenter__ = AsyncMock()
         mock_client_session_instance.initialize = AsyncMock()
-        mock_client_session_instance.initialize.return_value = EmptyResult()  # Success
+        mock_init_result = MagicMock()
+        mock_init_result.capabilities = MagicMock(tools=True, resources=True, prompts=True)
+        mock_client_session_instance.initialize.return_value = mock_init_result
+
+        # Add mocks for list_tools, list_resources, and list_prompts since HttpConnector calls these
+        mock_client_session_instance.list_tools = AsyncMock()
+        mock_client_session_instance.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
+        mock_client_session_instance.list_resources = AsyncMock()
+        mock_client_session_instance.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)])
+        mock_client_session_instance.list_prompts = AsyncMock()
+        mock_client_session_instance.list_prompts.return_value = MagicMock(prompts=[MagicMock(spec=Prompt)])
+
         mock_client_session_class.return_value = mock_client_session_instance
 
         # Test connect with streamable HTTP
@@ -178,10 +199,19 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_client_session_instance.__aenter__.assert_called_once()
         mock_client_session_instance.initialize.assert_called_once()
 
+        # Verify tools/resources/prompts were populated during connect
+        mock_client_session_instance.list_tools.assert_called_once()
+        mock_client_session_instance.list_resources.assert_called_once()
+        mock_client_session_instance.list_prompts.assert_called_once()
+
         # Verify final state
         self.assertEqual(self.connector.client_session, mock_client_session_instance)
         self.assertEqual(self.connector._connection_manager, mock_cm_instance)
         self.assertTrue(self.connector._connected)
+        self.assertTrue(self.connector._initialized)
+        self.assertEqual(len(self.connector._tools), 1)
+        self.assertEqual(len(self.connector._resources), 1)
+        self.assertEqual(len(self.connector._prompts), 1)
 
     @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
     async def test_sse_connect_already_connected(self, mock_cm_class, _):
@@ -300,7 +330,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         mock_init_result.capabilities = MagicMock(tools=True, resources=True, prompts=True)
         self.connector.client_session.initialize.return_value = mock_init_result
 
-        # Setup mocks for list_tools, list_resources, and list_prompts
+        # Setup mocks for client session methods directly (not connector wrapper methods)
         self.connector.client_session.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
         self.connector.client_session.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)])
         self.connector.client_session.list_prompts.return_value = MagicMock(prompts=[MagicMock(spec=Prompt)])
@@ -308,7 +338,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         # Initialize
         result_session_info = await self.connector.initialize()
 
-        # Verify calls
+        # Verify calls to client session methods directly
         self.connector.client_session.initialize.assert_called_once()
         self.connector.client_session.list_tools.assert_called_once()
         self.connector.client_session.list_resources.assert_called_once()

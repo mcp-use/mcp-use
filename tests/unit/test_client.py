@@ -456,10 +456,9 @@ class TestMCPClientSessionManagement:
         assert mock_create_connector.call_count == 2
         assert mock_session_class.call_count == 2
 
-        # In the implementation, initialize is called twice for each session:
-        # Once in create_session and once in the explicit initialize call
-        assert mock_session1.initialize.call_count == 2
-        assert mock_session2.initialize.call_count == 2
+        # Initialize is called once per session during create_session
+        assert mock_session1.initialize.call_count == 1
+        assert mock_session2.initialize.call_count == 1
 
         # Verify state changes
         assert len(client.sessions) == 2
