@@ -149,7 +149,7 @@ class TestSandboxConnectorConnection:
 
             # Verify state
             assert connector._connected is True
-            assert connector.client == mock_client_instance
+            assert connector.client_session == mock_client_instance
             assert connector._connection_manager == mock_manager_instance
             assert connector.base_url == "https://test-host.sandbox.e2b.dev"
 
@@ -164,7 +164,7 @@ class TestSandboxConnectorConnection:
 
         # Verify no connection established since already connected
         assert connector._connection_manager is None
-        assert connector.client is None
+        assert connector.client_session is None
         assert connector.sandbox is None
 
     @pytest.mark.asyncio
@@ -191,7 +191,7 @@ class TestSandboxConnectorConnection:
         # Verify resources were cleaned up
         connector._cleanup_resources.assert_called_once()
         assert connector._connected is False
-        assert connector.client is None
+        assert connector.client_session is None
 
     @pytest.mark.asyncio
     async def test_disconnect(self, mock_sandbox_modules):

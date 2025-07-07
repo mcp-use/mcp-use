@@ -65,9 +65,8 @@ class SandboxConnector(BaseConnector):
         super().__init__()
         if Sandbox is None:
             raise ImportError(
-                "E2B SDK (e2b-code-interpreter) not found. "
-                "Please install it with 'pip install mcp-use[e2b]' "
-                "(or 'pip install e2b-code-interpreter')."
+                "E2B SDK (e2b-code-interpreter) not found. Please install it with "
+                "'pip install mcp-use[e2b]' (or 'pip install e2b-code-interpreter')."
             )
 
         self.user_command = command
@@ -79,8 +78,8 @@ class SandboxConnector(BaseConnector):
         self.api_key = _e2b_options.get("api_key") or os.environ.get("E2B_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "E2B API key is required. Provide it via 'sandbox_options.api_key' "
-                "or the E2B_API_KEY environment variable."
+                "E2B API key is required. Provide it via 'sandbox_options.api_key'"
+                " or the E2B_API_KEY environment variable."
             )
 
         self.sandbox_template_id = _e2b_options.get("sandbox_template_id", "base")
@@ -88,7 +87,7 @@ class SandboxConnector(BaseConnector):
 
         self.sandbox: Sandbox | None = None
         self.process: CommandHandle | None = None
-        self.client: ClientSession | None = None
+        self.client_session: ClientSession | None = None
         self.errlog = sys.stderr
         self.base_url: str | None = None
         self._connected = False
@@ -218,8 +217,8 @@ class SandboxConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
-            await self.client.__aenter__()
+            self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
+            await self.client_session.__aenter__()
 
             # Mark as connected
             self._connected = True
