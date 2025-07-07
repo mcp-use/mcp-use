@@ -30,7 +30,8 @@
             "pages": [
               "essentials/configuration",
               "essentials/client-configuration",
-              "essentials/connection-types"
+              "essentials/connection-types",
+              "essentials/authentication"
             ]
           },
           {

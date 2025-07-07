@@ -36,6 +36,7 @@ def create_connector_from_config(
     server_config: dict[str, Any],
     sandbox: bool = False,
     sandbox_options: SandboxOptions | None = None,
+    client_auth: Any = None,
 ) -> BaseConnector:
     """Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
@@ -44,6 +45,10 @@ def create_connector_from_config(
         server_config: The server configuration section
         sandbox: Whether to use sandboxed execution mode for running MCP servers.
         sandbox_options: Optional sandbox configuration options.
+        client_auth: Default authentication from the client level - can be:
+            - A string token: Use Bearer token authentication
+            - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
+            - An httpx.Auth object: Use custom authentication
 
     Returns:
         A configured connector instance
@@ -71,7 +76,7 @@ def create_connector_from_config(
         return HttpConnector(
             base_url=server_config["url"],
             headers=server_config.get("headers", None),
-            auth_token=server_config.get("auth_token", None),
+            auth=client_auth,
         )
 
     # WebSocket connector
@@ -79,7 +84,7 @@ def create_connector_from_config(
         return WebSocketConnector(
             url=server_config["ws_url"],
             headers=server_config.get("headers", None),
-            auth_token=server_config.get("auth_token", None),
+            auth=client_auth,
         )
 
     raise ValueError("Cannot determine connector type from config")
