@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from mcp.types import CallToolResult, Tool
+from pydantic import AnyUrl
 
 from mcp_use.connectors.stdio import StdioConnector
 from mcp_use.task_managers.stdio import StdioConnectionManager
@@ -343,12 +344,20 @@ class TestStdioConnectorOperations:
         # ensure they are AsyncMocks.
 
         connector.client_session = mock_stdio_client
-        # If connector relies on state from connect/initialize (e.g., _connected = True),
-        # set it manually for this unit test.
+        # Mark as connected to prevent _ensure_connected from trying to reconnect
+        connector._connected = True
+
+        # Mock a connection manager to simulate active connection
+        mock_connection_manager = Mock()
+        mock_task = Mock()
+        mock_task.done.return_value = False  # Task is still running (connection active)
+        mock_connection_manager._task = mock_task
+        mock_connection_manager.get_streams.return_value = ("read_stream", "write_stream")
+        connector._connection_manager = mock_connection_manager
 
         # Act: Call the connector's method
         # connector.read_resource returns a ReadResourceResult object.
-        read_resource_result = await connector.read_resource("test/resource")
+        read_resource_result = await connector.read_resource(uri=AnyUrl("file:///test/resource"))
 
         # Assert: Verify the outcome and client interaction
         # Assert attributes of ReadResourceResult against mock_client_return_value.
@@ -357,7 +366,7 @@ class TestStdioConnectorOperations:
         assert len(read_resource_result.result.contents) == 1
         assert read_resource_result.result.contents[0].content == b"test content"
         assert read_resource_result.result.contents[0].mimeType == "text/plain"
-        mock_stdio_client.read_resource.assert_called_once_with("test/resource")
+        mock_stdio_client.read_resource.assert_called_once_with(AnyUrl("file:///test/resource"))
 
     @pytest.mark.asyncio
     async def test_read_resource_no_client(self):

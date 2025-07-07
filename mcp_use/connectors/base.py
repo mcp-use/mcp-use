@@ -11,6 +11,7 @@ from typing import Any
 from mcp import ClientSession
 from mcp.shared.exceptions import McpError
 from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
+from pydantic import AnyUrl
 
 from ..logging import logger
 from ..task_managers import ConnectionManager
@@ -287,7 +288,7 @@ class BaseConnector(ABC):
             logger.error(f"Error listing resources: {e}")
             return []
 
-    async def read_resource(self, uri: str) -> ReadResourceResult:
+    async def read_resource(self, uri: AnyUrl) -> ReadResourceResult:
         """Read a resource by URI."""
         await self._ensure_connected()
 
