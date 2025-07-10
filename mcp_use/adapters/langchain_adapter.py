@@ -28,14 +28,16 @@ from .base import BaseAdapter
 class LangChainAdapter(BaseAdapter):
     """Adapter for converting MCP tools to LangChain tools."""
 
-    def __init__(self, disallowed_tools: list[str] | None = None) -> None:
+    def __init__(self, disallowed_tools: list[str] | None = None, callbacks: dict | None = None) -> None:
         """Initialize a new LangChain adapter.
 
         Args:
             disallowed_tools: list of tool names that should not be available.
+            callbacks: Optional callback functions for tool execution lifecycle events.
         """
         super().__init__(disallowed_tools)
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
+        self.callbacks = callbacks or {}
 
     def fix_schema(self, schema: dict) -> dict:
         """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format.
@@ -151,17 +153,49 @@ class LangChainAdapter(BaseAdapter):
                 """
                 logger.debug(f'MCP tool: "{self.name}" received input: {kwargs}')
 
+                # Call on_tool_start callback if provided
+                if "on_tool_start" in adapter_self.callbacks:
+                    try:
+                        adapter_self.callbacks["on_tool_start"](self.name, kwargs)
+                    except Exception as e:
+                        logger.warning(f"Error in on_tool_start callback: {e}")
+
                 try:
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     try:
                         # Use the helper function to parse the result
-                        return adapter_self._parse_mcp_tool_result(tool_result)
+                        result = adapter_self._parse_mcp_tool_result(tool_result)
+
+                        # Call on_tool_complete callback if provided
+                        if "on_tool_complete" in adapter_self.callbacks:
+                            try:
+                                adapter_self.callbacks["on_tool_complete"](self.name, kwargs, result)
+                            except Exception as e:
+                                logger.warning(f"Error in on_tool_complete callback: {e}")
+
+                        return result
                     except Exception as e:
                         # Log the exception for debugging
                         logger.error(f"Error parsing tool result: {e}")
-                        return f"Error parsing result: {e!s}; Raw content: {tool_result.content!r}"
+                        error_result = f"Error parsing result: {e!s}; Raw content: {tool_result.content!r}"
+
+                        # Call on_tool_error callback if provided
+                        if "on_tool_error" in adapter_self.callbacks:
+                            try:
+                                adapter_self.callbacks["on_tool_error"](self.name, kwargs, e)
+                            except Exception as callback_error:
+                                logger.warning(f"Error in on_tool_error callback: {callback_error}")
+
+                        return error_result
 
                 except Exception as e:
+                    # Call on_tool_error callback if provided
+                    if "on_tool_error" in adapter_self.callbacks:
+                        try:
+                            adapter_self.callbacks["on_tool_error"](self.name, kwargs, e)
+                        except Exception as callback_error:
+                            logger.warning(f"Error in on_tool_error callback: {callback_error}")
+
                     if self.handle_tool_error:
                         return f"Error executing MCP tool: {str(e)}"
                     raise

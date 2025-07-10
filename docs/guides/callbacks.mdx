@@ -1,0 +1,302 @@
+---
+title: "Tool Execution Callbacks"
+description: "Monitor and respond to tool execution lifecycle events with callback functions"
+icon: "bell"
+---
+
+## Overview
+
+The callback mechanism in MCP-use allows you to monitor and respond to tool execution lifecycle events in real-time. This feature is useful for:
+
+- **Debugging and monitoring** tool execution
+- **Performance tracking** and analytics
+- **Custom logging** and error handling
+- **User interface updates** during long-running operations
+- **Integration with external monitoring systems**
+
+## Basic Usage
+
+Callbacks are configured through the `options` parameter when creating an `MCPAgent`:
+
+```python
+from mcp_use.agents import MCPAgent
+from mcp_use.types import AgentOptions
+
+def on_tool_start(tool_name: str, tool_input: dict) -> None:
+    print(f"🚀 Starting tool: {tool_name}")
+
+def on_tool_complete(tool_name: str, tool_input: dict, tool_result: any) -> None:
+    print(f"✅ Completed tool: {tool_name}")
+
+def on_tool_error(tool_name: str, tool_input: dict, error: Exception) -> None:
+    print(f"❌ Tool failed: {tool_name} - {error}")
+
+# Configure callbacks
+options: AgentOptions = {
+    "callbacks": {
+        "on_tool_start": on_tool_start,
+        "on_tool_complete": on_tool_complete,
+        "on_tool_error": on_tool_error,
+    }
+}
+
+# Create agent with callbacks
+agent = MCPAgent(
+    llm=your_llm,
+    client=your_client,
+    options=options
+)
+```
+
+## Available Callbacks
+
+### `on_tool_start`
+
+Called when a tool execution begins.
+
+**Signature:**
+
+```python
+def on_tool_start(tool_name: str, tool_input: dict[str, Any]) -> None
+```
+
+**Parameters:**
+
+- `tool_name`: Name of the tool being executed
+- `tool_input`: Input arguments passed to the tool
+
+### `on_tool_complete`
+
+Called when a tool execution completes successfully.
+
+**Signature:**
+
+```python
+def on_tool_complete(tool_name: str, tool_input: dict[str, Any], tool_result: Any) -> None
+```
+
+**Parameters:**
+
+- `tool_name`: Name of the tool that was executed
+- `tool_input`: Input arguments that were passed to the tool
+- `tool_result`: The result returned by the tool
+
+### `on_tool_error`
+
+Called when a tool execution fails with an error.
+
+**Signature:**
+
+```python
+def on_tool_error(tool_name: str, tool_input: dict[str, Any], error: Exception) -> None
+```
+
+**Parameters:**
+
+- `tool_name`: Name of the tool that failed
+- `tool_input`: Input arguments that were passed to the tool
+- `error`: The exception that occurred during execution
+
+## Advanced Examples
+
+### Performance Monitoring
+
+```python
+import time
+from typing import Dict, List
+
+class PerformanceMonitor:
+    def __init__(self):
+        self.tool_stats: Dict[str, List[float]] = {}
+        self.start_times: Dict[str, float] = {}
+
+    def on_tool_start(self, tool_name: str, tool_input: dict) -> None:
+        # Track start time for this execution
+        self.start_times[f"{tool_name}_{id(tool_input)}"] = time.time()
+
+    def on_tool_complete(self, tool_name: str, tool_input: dict, tool_result: any) -> None:
+        # Calculate execution time
+        key = f"{tool_name}_{id(tool_input)}"
+        if key in self.start_times:
+            duration = time.time() - self.start_times[key]
+            if tool_name not in self.tool_stats:
+                self.tool_stats[tool_name] = []
+            self.tool_stats[tool_name].append(duration)
+            del self.start_times[key]
+            print(f"📊 {tool_name} completed in {duration:.2f}s")
+
+    def get_stats(self) -> Dict[str, Dict[str, float]]:
+        stats = {}
+        for tool_name, durations in self.tool_stats.items():
+            stats[tool_name] = {
+                "count": len(durations),
+                "avg_duration": sum(durations) / len(durations),
+                "min_duration": min(durations),
+                "max_duration": max(durations),
+            }
+        return stats
+
+monitor = PerformanceMonitor()
+
+options: AgentOptions = {
+    "callbacks": {
+        "on_tool_start": monitor.on_tool_start,
+        "on_tool_complete": monitor.on_tool_complete,
+    }
+}
+```
+
+### Custom Logging
+
+```python
+import logging
+import json
+
+# Configure custom logger
+logger = logging.getLogger("mcp_tools")
+logger.setLevel(logging.INFO)
+handler = logging.FileHandler("tool_execution.log")
+handler.setFormatter(logging.Formatter(
+    '%(asctime)s - %(levelname)s - %(message)s'
+))
+logger.addHandler(handler)
+
+def log_tool_start(tool_name: str, tool_input: dict) -> None:
+    logger.info(f"Tool started: {tool_name}", extra={
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "event": "tool_start"
+    })
+
+def log_tool_complete(tool_name: str, tool_input: dict, tool_result: any) -> None:
+    logger.info(f"Tool completed: {tool_name}", extra={
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "result_length": len(str(tool_result)),
+        "event": "tool_complete"
+    })
+
+def log_tool_error(tool_name: str, tool_input: dict, error: Exception) -> None:
+    logger.error(f"Tool failed: {tool_name}", extra={
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "error": str(error),
+        "error_type": type(error).__name__,
+        "event": "tool_error"
+    })
+
+options: AgentOptions = {
+    "callbacks": {
+        "on_tool_start": log_tool_start,
+        "on_tool_complete": log_tool_complete,
+        "on_tool_error": log_tool_error,
+    }
+}
+```
+
+### Integration with External Systems
+
+```python
+import requests
+from typing import Optional
+
+class ExternalMonitoring:
+    def __init__(self, webhook_url: str, api_key: Optional[str] = None):
+        self.webhook_url = webhook_url
+        self.api_key = api_key
+
+    def send_event(self, event_type: str, data: dict) -> None:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "event_type": event_type,
+            "timestamp": time.time(),
+            "data": data
+        }
+
+        try:
+            requests.post(self.webhook_url, json=payload, headers=headers, timeout=5)
+        except requests.RequestException as e:
+            print(f"Failed to send monitoring event: {e}")
+
+    def on_tool_start(self, tool_name: str, tool_input: dict) -> None:
+        self.send_event("tool_start", {
+            "tool_name": tool_name,
+            "input_size": len(str(tool_input))
+        })
+
+    def on_tool_complete(self, tool_name: str, tool_input: dict, tool_result: any) -> None:
+        self.send_event("tool_complete", {
+            "tool_name": tool_name,
+            "result_size": len(str(tool_result))
+        })
+
+    def on_tool_error(self, tool_name: str, tool_input: dict, error: Exception) -> None:
+        self.send_event("tool_error", {
+            "tool_name": tool_name,
+            "error_type": type(error).__name__,
+            "error_message": str(error)
+        })
+
+monitoring = ExternalMonitoring("https://your-monitoring-service.com/webhook")
+
+options: AgentOptions = {
+    "callbacks": {
+        "on_tool_start": monitoring.on_tool_start,
+        "on_tool_complete": monitoring.on_tool_complete,
+        "on_tool_error": monitoring.on_tool_error,
+    }
+}
+```
+
+## Error Handling
+
+Callbacks are designed to be robust and non-intrusive:
+
+- **Callback errors are caught** and logged as warnings, but don't interrupt tool execution
+- **Tool execution continues** even if callbacks fail
+- **All callbacks are optional** - you can provide only the ones you need
+
+```python
+def potentially_failing_callback(tool_name: str, tool_input: dict) -> None:
+    # This might raise an exception, but it won't break tool execution
+    risky_operation(tool_name)
+
+# Even if the callback fails, your agent will continue working
+options: AgentOptions = {
+    "callbacks": {
+        "on_tool_start": potentially_failing_callback,
+    }
+}
+```
+
+## Best Practices
+
+1. **Keep callbacks lightweight** - They run synchronously and can slow down tool execution
+2. **Handle exceptions** within your callbacks to avoid log spam
+3. **Use async operations sparingly** - Callbacks are synchronous by design
+4. **Avoid modifying tool inputs/outputs** - Callbacks are for observation, not modification
+5. **Consider performance impact** - Complex callbacks can affect agent performance
+
+## Type Safety
+
+All callback types are fully typed for better IDE support and error detection:
+
+```python
+from mcp_use.types import AgentCallbacks, AgentOptions
+
+# Fully typed callbacks
+callbacks: AgentCallbacks = {
+    "on_tool_start": my_start_callback,
+    "on_tool_complete": my_complete_callback,
+    "on_tool_error": my_error_callback,
+}
+
+options: AgentOptions = {
+    "callbacks": callbacks
+}
+```
+
+This ensures your callbacks have the correct signatures and helps catch errors at development time.
