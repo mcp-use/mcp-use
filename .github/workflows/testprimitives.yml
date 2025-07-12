@@ -1,4 +1,4 @@
-name: Test Primitives
+name: Primitives
 on:
   push:
     branches: [main]
@@ -6,8 +6,8 @@ on:
     branches: [main]
 
 jobs:
-  test-primitives:
-    name: "Test Primitives"
+  primitives:
+    name: ${{ matrix.primitive }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
