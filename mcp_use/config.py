@@ -47,7 +47,7 @@ def create_connector_from_config(
         server_config: The server configuration section
         sandbox: Whether to use sandboxed execution mode for running MCP servers.
         sandbox_options: Optional sandbox configuration options.
-
+        sampling_callback: Optional sampling callback function.
     Returns:
         A configured connector instance
     """
@@ -86,7 +86,6 @@ def create_connector_from_config(
             url=server_config["ws_url"],
             headers=server_config.get("headers", None),
             auth_token=server_config.get("auth_token", None),
-            sampling_callback=sampling_callback,
         )
 
     raise ValueError("Cannot determine connector type from config")

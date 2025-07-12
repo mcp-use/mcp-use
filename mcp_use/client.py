@@ -39,6 +39,7 @@ class MCPClient:
                    If None, an empty configuration is used.
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
+            sampling_callback: Optional sampling callback function.
         """
         self.config: dict[str, Any] = {}
         self.sandbox = sandbox
