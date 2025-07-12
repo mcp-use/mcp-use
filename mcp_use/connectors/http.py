@@ -9,7 +9,7 @@ import httpx
 from mcp import ClientSession
 
 from ..logging import logger
-from ..task_managers import ConnectionManager, SseConnectionManager, StreamableHttpConnectionManager
+from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
 from .base import BaseConnector
 
 
@@ -45,14 +45,6 @@ class HttpConnector(BaseConnector):
             self.headers["Authorization"] = f"Bearer {auth_token}"
         self.timeout = timeout
         self.sse_read_timeout = sse_read_timeout
-
-    async def _setup_client(self, connection_manager: ConnectionManager) -> None:
-        """Set up the client session with the provided connection manager."""
-
-        self._connection_manager = connection_manager
-        read_stream, write_stream = await self._connection_manager.start()
-        self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
-        await self.client_session.__aenter__()
 
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
