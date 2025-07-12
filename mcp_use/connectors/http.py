@@ -7,6 +7,7 @@ through HTTP APIs with SSE or Streamable HTTP for transport.
 
 import httpx
 from mcp import ClientSession
+from mcp.client.session import SamplingFnT
 
 from ..logging import logger
 from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
@@ -27,6 +28,7 @@ class HttpConnector(BaseConnector):
         headers: dict[str, str] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        sampling_callback: SamplingFnT | None = None,
     ):
         """Initialize a new HTTP connector.
 
@@ -36,8 +38,9 @@ class HttpConnector(BaseConnector):
             headers: Optional additional headers.
             timeout: Timeout for HTTP operations in seconds.
             sse_read_timeout: Timeout for SSE read operations in seconds.
+            sampling_callback: Optional sampling callback.
         """
-        super().__init__()
+        super().__init__(sampling_callback=sampling_callback)
         self.base_url = base_url.rstrip("/")
         self.auth_token = auth_token
         self.headers = headers or {}
@@ -68,7 +71,9 @@ class HttpConnector(BaseConnector):
             read_stream, write_stream = await connection_manager.start()
 
             # Test if this actually works by trying to create a client session and initialize it
-            test_client = ClientSession(read_stream, write_stream, sampling_callback=None)
+            test_client = ClientSession(
+                read_stream, write_stream, sampling_callback=self.sampling_callback, client_info=self.client_info
+            )
             await test_client.__aenter__()
 
             try:
@@ -146,7 +151,12 @@ class HttpConnector(BaseConnector):
                     read_stream, write_stream = await connection_manager.start()
 
                     # Create the client session for SSE
-                    self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
+                    self.client_session = ClientSession(
+                        read_stream,
+                        write_stream,
+                        sampling_callback=self.sampling_callback,
+                        client_info=self.client_info,
+                    )
                     await self.client_session.__aenter__()
                     self.transport_type = "SSE"
 

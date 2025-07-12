@@ -12,6 +12,7 @@ import time
 
 import aiohttp
 from mcp import ClientSession
+from mcp.client.session import SamplingFnT
 
 from ..logging import logger
 from ..task_managers import SseConnectionManager
@@ -50,6 +51,7 @@ class SandboxConnector(BaseConnector):
         e2b_options: SandboxOptions | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        sampling_callback: SamplingFnT | None = None,
     ):
         """Initialize a new sandbox connector.
 
@@ -61,8 +63,9 @@ class SandboxConnector(BaseConnector):
                         See SandboxOptions for available options and defaults.
             timeout: Timeout for the sandbox process in seconds.
             sse_read_timeout: Timeout for the SSE connection in seconds.
+            sampling_callback: Optional sampling callback.
         """
-        super().__init__()
+        super().__init__(sampling_callback=sampling_callback)
         if Sandbox is None:
             raise ImportError(
                 "E2B SDK (e2b-code-interpreter) not found. Please install it with "
@@ -217,7 +220,9 @@ class SandboxConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
+            self.client_session = ClientSession(
+                read_stream, write_stream, sampling_callback=self.sampling_callback, client_info=self.client_info
+            )
             await self.client_session.__aenter__()
 
             # Mark as connected

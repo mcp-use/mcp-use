@@ -8,6 +8,7 @@ through the standard input/output streams.
 import sys
 
 from mcp import ClientSession, StdioServerParameters
+from mcp.client.session import SamplingFnT
 
 from ..logging import logger
 from ..task_managers import StdioConnectionManager
@@ -28,6 +29,7 @@ class StdioConnector(BaseConnector):
         args: list[str] | None = None,
         env: dict[str, str] | None = None,
         errlog=sys.stderr,
+        sampling_callback: SamplingFnT | None = None,
     ):
         """Initialize a new stdio connector.
 
@@ -36,8 +38,9 @@ class StdioConnector(BaseConnector):
             args: Optional command line arguments.
             env: Optional environment variables.
             errlog: Stream to write error output to.
+            sampling_callback: Optional callback to sample the client.
         """
-        super().__init__()
+        super().__init__(sampling_callback=sampling_callback)
         self.command = command
         self.args = args or []  # Ensure args is never None
         self.env = env
@@ -59,7 +62,9 @@ class StdioConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
+            self.client_session = ClientSession(
+                read_stream, write_stream, sampling_callback=self.sampling_callback, client_info=self.client_info
+            )
             await self.client_session.__aenter__()
 
             # Mark as connected
