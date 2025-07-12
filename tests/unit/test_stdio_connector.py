@@ -3,7 +3,7 @@ Unit tests for the StdioConnector class.
 """
 
 import sys
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from mcp.types import CallToolResult, Tool
@@ -82,7 +82,9 @@ class TestStdioConnectorConnection:
         mock_manager_instance.start.assert_called_once()
 
         # Verify client session creation
-        mock_client_session.assert_called_once_with("read_stream", "write_stream", sampling_callback=None)
+        mock_client_session.assert_called_once_with(
+            "read_stream", "write_stream", sampling_callback=None, client_info=ANY
+        )
         mock_client_instance.__aenter__.assert_called_once()
 
         # Verify state
