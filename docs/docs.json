@@ -30,7 +30,14 @@
             "pages": [
               "essentials/configuration",
               "essentials/client-configuration",
-              "essentials/connection-types"
+              {
+                "group": "Client Features",
+                "icon": "list-plus",
+                "pages": [
+                  "essentials/connection-types",
+                  "essentials/sampling"
+                ]
+              }
             ]
           },
           {
