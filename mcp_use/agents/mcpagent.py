@@ -25,6 +25,7 @@ from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
 from mcp_use.telemetry.telemetry import Telemetry
 from mcp_use.telemetry.utils import extract_model_info
+from mcp_use.types import AgentOptions
 
 from ..adapters.langchain_adapter import LangChainAdapter
 from ..logging import logger
@@ -56,6 +57,7 @@ class MCPAgent:
         disallowed_tools: list[str] | None = None,
         use_server_manager: bool = False,
         verbose: bool = False,
+        options: "AgentOptions | None" = None,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -71,6 +73,8 @@ class MCPAgent:
             additional_instructions: Extra instructions to append to the system prompt.
             disallowed_tools: List of tool names that should not be available to the agent.
             use_server_manager: Whether to use server manager mode instead of exposing all tools.
+            verbose: Whether to enable verbose logging.
+            options: Optional configuration including callback functions for tool execution events.
         """
         self.llm = llm
         self.client = client
@@ -89,12 +93,16 @@ class MCPAgent:
         self.system_prompt_template_override = system_prompt_template
         self.additional_instructions = additional_instructions
 
+        # Initialize options and callbacks
+        self.options = options or {}
+        self.callbacks = self.options.get("callbacks", {})
+
         # Either client or connector must be provided
         if not client and len(self.connectors) == 0:
             raise ValueError("Either client or connector must be provided")
 
         # Create the adapter for tool conversion
-        self.adapter = LangChainAdapter(disallowed_tools=self.disallowed_tools)
+        self.adapter = LangChainAdapter(disallowed_tools=self.disallowed_tools, callbacks=self.callbacks)
 
         # Initialize telemetry
         self.telemetry = Telemetry()

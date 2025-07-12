@@ -14,6 +14,7 @@ from .config import load_config_file
 from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
 from .logging import MCP_USE_DEBUG, Logger, logger
 from .session import MCPSession
+from .types import AgentCallbacks, AgentOptions
 
 __version__ = version("mcp-use")
 
@@ -32,6 +33,8 @@ __all__ = [
     "Logger",
     "set_debug",
     "observability",
+    "AgentCallbacks",
+    "AgentOptions",
 ]
 
 
