@@ -110,22 +110,34 @@ class BaseConnector(ABC):
 
         if server_capabilities.tools:
             # Get available tools directly from client session
-            tools_result = await self.client_session.list_tools()
-            self._tools = tools_result.tools if tools_result else []
+            try:
+                tools_result = await self.client_session.list_tools()
+                self._tools = tools_result.tools if tools_result else []
+            except Exception as e:
+                logger.error(f"Error listing tools: {e}")
+                self._tools = []
         else:
             self._tools = []
 
         if server_capabilities.resources:
             # Get available resources directly from client session
-            resources_result = await self.client_session.list_resources()
-            self._resources = resources_result.resources if resources_result else []
+            try:
+                resources_result = await self.client_session.list_resources()
+                self._resources = resources_result.resources if resources_result else []
+            except Exception as e:
+                logger.error(f"Error listing resources: {e}")
+                self._resources = []
         else:
             self._resources = []
 
         if server_capabilities.prompts:
             # Get available prompts directly from client session
-            prompts_result = await self.client_session.list_prompts()
-            self._prompts = prompts_result.prompts if prompts_result else []
+            try:
+                prompts_result = await self.client_session.list_prompts()
+                self._prompts = prompts_result.prompts if prompts_result else []
+            except Exception as e:
+                logger.error(f"Error listing prompts: {e}")
+                self._prompts = []
         else:
             self._prompts = []
 
