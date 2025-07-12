@@ -1,0 +1,41 @@
+name: Primitives
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  primitives:
+    name: ${{ matrix.primitive }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        primitive: [sampling, tools, resources, prompts]
+        python-version: ["3.11"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: |
+          pip install uv
+
+      - name: Install dependencies
+        run: |
+          # Install project with dev and optional extras similar to unit tests environment
+          uv pip install --system .[dev,anthropic,openai,search,e2b]
+
+      - name: Lint with ruff
+        run: |
+          ruff check .
+
+      - name: Run integration tests for ${{ matrix.primitive }} primitive
+        run: |
+          pytest tests/integration/primitives/test_${{ matrix.primitive }}.py

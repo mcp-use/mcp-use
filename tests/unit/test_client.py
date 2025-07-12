@@ -5,7 +5,7 @@ Unit tests for the MCPClient class.
 import json
 import os
 import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -219,7 +219,10 @@ class TestMCPClientSessionManagement:
 
         # Verify behavior
         mock_create_connector.assert_called_once_with(
-            {"url": "http://server1.com"}, sandbox=False, sandbox_options=None
+            {"url": "http://server1.com"},
+            sandbox=False,
+            sandbox_options=None,
+            sampling_callback=None,
         )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_called_once()
@@ -255,7 +258,7 @@ class TestMCPClientSessionManagement:
     @patch("mcp_use.client.create_connector_from_config")
     @patch("mcp_use.client.MCPSession")
     async def test_create_session_no_auto_initialize(self, mock_session_class, mock_create_connector):
-        """Test creating a session without auto-initializing."""
+        """Test creating a session without auto-initialization."""
         config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
         client = MCPClient(config=config)
 
@@ -264,15 +267,17 @@ class TestMCPClientSessionManagement:
         mock_create_connector.return_value = mock_connector
 
         mock_session = MagicMock()
-        mock_session.initialize = AsyncMock()
         mock_session_class.return_value = mock_session
 
-        # Test create_session
+        # Test create_session with auto_initialize=False
         await client.create_session("server1", auto_initialize=False)
 
         # Verify behavior
         mock_create_connector.assert_called_once_with(
-            {"url": "http://server1.com"}, sandbox=False, sandbox_options=None
+            {"url": "http://server1.com"},
+            sandbox=False,
+            sandbox_options=None,
+            sampling_callback=None,
         )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_not_called()
@@ -452,8 +457,21 @@ class TestMCPClientSessionManagement:
         # Test create_all_sessions
         sessions = await client.create_all_sessions()
 
-        # Verify behavior - connectors and sessions are created for each server
+        # Verify behavior
         assert mock_create_connector.call_count == 2
+        mock_create_connector.assert_any_call(
+            {"url": "http://server1.com"},
+            sandbox=False,
+            sandbox_options=None,
+            sampling_callback=None,
+        )
+        mock_create_connector.assert_any_call(
+            {"url": "http://server2.com"},
+            sandbox=False,
+            sandbox_options=None,
+            sampling_callback=None,
+        )
+
         assert mock_session_class.call_count == 2
 
         # Initialize is called once per session during create_session
