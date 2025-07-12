@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import subprocess
-from pathlib import Path
 
 import pytest
 from mcp.client.session import ClientSession
@@ -10,41 +8,6 @@ from mcp.types import CreateMessageRequestParams, CreateMessageResult, ErrorData
 from mcp_use.client import MCPClient
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture
-async def streaming_server_process():
-    """Start the custom streaming server process for testing"""
-    server_path = Path(__file__).parent.parent / "servers_for_testing" / "primitive_server.py"
-
-    logger.info(f"Starting custom streaming server: python {server_path}")
-
-    # Start the server process
-    process = subprocess.Popen(
-        ["python", str(server_path)],
-        cwd=str(server_path.parent),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-
-    # Give the server more time to start (it's more complex)
-    server_url = "http://127.0.0.1:8080"
-    await asyncio.sleep(2)
-    yield server_url
-
-    # Cleanup
-    logger.info("Cleaning up streaming server process")
-    if process.poll() is None:
-        process.terminate()
-        try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            logger.info("Process didn't terminate gracefully, killing it")
-            process.kill()
-            process.wait()
-
-    print("Streaming server cleanup complete")
 
 
 async def sampling_callback(
@@ -56,8 +19,8 @@ async def sampling_callback(
 
 
 @pytest.mark.asyncio
-async def test_sampling(streaming_server_process):
-    config = {"mcpServers": {"PrimitiveServer": {"url": f"{streaming_server_process}/mcp"}}}
+async def test_sampling(primitive_server):
+    config = {"mcpServers": {"PrimitiveServer": {"url": f"{primitive_server}/mcp"}}}
     client = MCPClient(config, sampling_callback=sampling_callback)
     try:
         await client.create_all_sessions()
@@ -71,9 +34,9 @@ async def test_sampling(streaming_server_process):
 
 
 @pytest.mark.asyncio
-async def test_sampling_with_no_callback(streaming_server_process):
+async def test_sampling_with_no_callback(primitive_server):
     try:
-        config = {"mcpServers": {"PrimitiveServer": {"url": f"{streaming_server_process}/mcp"}}}
+        config = {"mcpServers": {"PrimitiveServer": {"url": f"{primitive_server}/mcp"}}}
         client = MCPClient(config)
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")

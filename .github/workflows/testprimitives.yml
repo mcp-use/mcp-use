@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        primitive: [sampling]
+        primitive: [sampling, tools, resources, prompts]
         python-version: ["3.11"]
 
     steps:
@@ -38,4 +38,4 @@ jobs:
 
       - name: Run integration tests for ${{ matrix.primitive }} primitive
         run: |
-          pytest tests/integration/primitives/${{ matrix.primitive }}.py
+          pytest tests/integration/primitives/test_${{ matrix.primitive }}.py
