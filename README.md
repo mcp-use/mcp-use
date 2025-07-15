@@ -40,11 +40,16 @@
 💡 Let developers easily connect any LLM to tools like web browsing, file operations, and more.
 
 - Visit the [mcp-use.com website](https://mcp-use.com/) to know how to build and deploy MCP agents.
-- Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use libraryò
+- Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use library
 
 💬 Get started quickly - chat with your servers on our <b>hosted version</b>! [Try mcp-use chat (beta)](https://chat.mcp-use.com).
 
-# Features
+| Supports  | |
+| :--- | :--- |
+| **Primitives** | [![Tools](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/testprimitives.yml?job=tools&label=Tools&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/testprimitives.yml) [![Resources](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/testprimitives.yml?job=resources&label=Resources&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/testprimitives.yml) [![Prompts](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/testprimitives.yml?job=prompts&label=Prompts&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/testprimitives.yml) [![Sampling](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/testprimitives.yml?job=sampling&label=Sampling&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/testprimitives.yml) |
+| **Transports** | [![Stdio](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/transportstests.yml?job=stdio&label=Stdio&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/transportstests.yml) [![SSE](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/transportstests.yml?job=sse&label=SSE&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/transportstests.yml) [![Streamable HTTP](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/transportstests.yml?job=streamableHttp&label=Streamable%20HTTP&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/transportstests.yml) |
+
+## Features
 
 <table>
   <tr>

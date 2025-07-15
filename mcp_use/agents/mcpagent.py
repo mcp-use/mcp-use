@@ -7,7 +7,7 @@ to provide a simple interface for using MCP tools with different LLMs.
 
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
@@ -106,9 +106,10 @@ class MCPAgent:
                 raise ValueError("Client must be provided when using server manager")
             self.server_manager = ServerManager(self.client, self.adapter)
 
-        # State tracking
+        # State tracking - initialize _tools as empty list
         self._agent_executor: AgentExecutor | None = None
         self._system_message: SystemMessage | None = None
+        self._tools: list[BaseTool] = []
 
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
@@ -304,150 +305,54 @@ class MCPAgent:
         """
         return self.disallowed_tools
 
-    async def _generate_response_chunks_async(
+    async def _consume_and_return(
         self,
-        query: str,
-        max_steps: int | None = None,
-        manage_connector: bool = True,
-        external_history: list[BaseMessage] | None = None,
-    ) -> AsyncIterator[StreamEvent]:
-        """Internal async generator yielding response chunks.
-
-        The implementation purposefully keeps the logic compact:
-        1. Ensure the agent is initialised (optionally handling connector
-           lifecycle).
-        2. Forward the *same* inputs we use for ``run`` to LangChain's
-           ``AgentExecutor.astream``.
-        3. Diff the growing ``output`` field coming from LangChain and yield
-           only the new part so the caller receives *incremental* chunks.
-        4. Persist conversation history when memory is enabled.
-        """
-
-        # 1. Initialise on-demand ------------------------------------------------
-        initialised_here = False
-        if (manage_connector and not self._initialized) or (not self._initialized and self.auto_initialize):
-            await self.initialize()
-            initialised_here = True
-
-        if not self._agent_executor:
-            raise RuntimeError("MCP agent failed to initialise – call initialise() first?")
-
-        # 2. Build inputs --------------------------------------------------------
-        effective_max_steps = max_steps or self.max_steps
-        self._agent_executor.max_iterations = effective_max_steps
-
-        if self.memory_enabled:
-            self.add_to_history(HumanMessage(content=query))
-
-        history_to_use = external_history if external_history is not None else self._conversation_history
-        inputs = {"input": query, "chat_history": history_to_use}
-
-        # 3. Stream & diff -------------------------------------------------------
-        async for event in self._agent_executor.astream_events(inputs):
-            if event.get("event") == "on_chain_end":
-                output = event["data"]["output"]
-                if isinstance(output, list):
-                    for message in output:
-                        if not isinstance(message, ToolAgentAction):
-                            self.add_to_history(message)
-            yield event
-        # 5. House-keeping -------------------------------------------------------
-        # Restrict agent cleanup in _generate_response_chunks_async to only occur
-        #  when the agent was initialized in this generator and is not client-managed
-        #  and the user does want us to manage the connection.
-        if not self.client and initialised_here and manage_connector:
-            logger.info("🧹 Closing agent after generator completion")
-            await self.close()
-
-    async def astream(
-        self,
-        query: str,
-        max_steps: int | None = None,
-        manage_connector: bool = True,
-        external_history: list[BaseMessage] | None = None,
-    ) -> AsyncIterator[str]:
-        """Asynchronous streaming interface.
-
-        Example::
-
-            async for chunk in agent.astream("hello"):
-                print(chunk, end="|", flush=True)
-        """
-        start_time = time.time()
-        success = False
-        chunk_count = 0
-        total_response_length = 0
-
-        try:
-            async for chunk in self._generate_response_chunks_async(
-                query=query,
-                max_steps=max_steps,
-                manage_connector=manage_connector,
-                external_history=external_history,
-            ):
-                chunk_count += 1
-                if isinstance(chunk, str):
-                    total_response_length += len(chunk)
-                yield chunk
-            success = True
-        finally:
-            # Track comprehensive execution data for streaming
-            execution_time_ms = int((time.time() - start_time) * 1000)
-
-            server_count = 0
-            if self.client:
-                server_count = len(self.client.get_all_active_sessions())
-            elif self.connectors:
-                server_count = len(self.connectors)
-
-            conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
-
-            self.telemetry.track_agent_execution(
-                execution_method="astream",
-                query=query,
-                success=success,
-                model_provider=self._model_provider,
-                model_name=self._model_name,
-                server_count=server_count,
-                server_identifiers=[connector.public_identifier for connector in self.connectors],
-                total_tools_available=len(self._tools) if self._tools else 0,
-                tools_available_names=[tool.name for tool in self._tools],
-                max_steps_configured=self.max_steps,
-                memory_enabled=self.memory_enabled,
-                use_server_manager=self.use_server_manager,
-                max_steps_used=max_steps,
-                manage_connector=manage_connector,
-                external_history_used=external_history is not None,
-                response=f"[STREAMED RESPONSE - {total_response_length} chars]",
-                execution_time_ms=execution_time_ms,
-                error_type=None if success else "streaming_error",
-                conversation_history_length=conversation_history_length,
-            )
-
-    async def run(
-        self,
-        query: str,
-        max_steps: int | None = None,
-        manage_connector: bool = True,
-        external_history: list[BaseMessage] | None = None,
+        generator: AsyncGenerator[tuple[AgentAction, str], str],
     ) -> str:
-        """Run a query using the MCP tools with unified step-by-step execution.
+        """Consume the generator and return the final result.
 
-        This method handles connecting to the MCP server, initializing the agent,
-        running the query, and then cleaning up the connection.
+        This method manually iterates through the generator to consume the steps.
+        In Python, async generators cannot return values directly, so we expect
+        the final result to be yielded as a special marker.
+
+        Args:
+            generator: The async generator that yields steps and a final result.
+
+        Returns:
+            The final result from the generator.
+        """
+        final_result = ""
+        steps_taken = 0
+        tools_used_names = []
+        async for item in generator:
+            # If it's a string, it's the final result
+            if isinstance(item, str):
+                final_result = item
+                break
+            # Otherwise it's a step tuple, just consume it
+            steps_taken += 1
+            tools_used_names.append(item[0].tool)
+        return final_result, steps_taken, tools_used_names
+
+    async def stream(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        manage_connector: bool = True,
+        external_history: list[BaseMessage] | None = None,
+        track_execution: bool = True,
+    ) -> AsyncGenerator[tuple[AgentAction, str] | str, None]:
+        """Run the agent and yield intermediate steps as an async generator.
 
         Args:
             query: The query to run.
             max_steps: Optional maximum number of steps to take.
             manage_connector: Whether to handle the connector lifecycle internally.
-                If True, this method will connect, initialize, and disconnect from
-                the connector automatically. If False, the caller is responsible
-                for managing the connector lifecycle.
             external_history: Optional external history to use instead of the
                 internal conversation history.
 
-        Returns:
-            The result of running the query.
+        Yields:
+            Intermediate steps as (AgentAction, str) tuples, followed by the final result as a string.
         """
         result = ""
         initialized_here = False
@@ -546,11 +451,13 @@ class MCPAgent:
                         result = next_step_output.return_values.get("output", "No output generated")
                         break
 
-                    # If it's actions/steps, add to intermediate steps
+                    # If it's actions/steps, add to intermediate steps and yield them
                     intermediate_steps.extend(next_step_output)
 
-                    # Log tool calls and track tool usage
-                    for action, output in next_step_output:
+                    # Yield each step and track tool usage
+                    for agent_step in next_step_output:
+                        yield agent_step
+                        action, observation = agent_step
                         tool_name = action.tool
                         tools_used_names.append(tool_name)
                         tool_input_str = str(action.tool_input)
@@ -559,11 +466,11 @@ class MCPAgent:
                             tool_input_str = tool_input_str[:97] + "..."
                         logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
                         # Truncate long outputs for readability
-                        output_str = str(output)
-                        if len(output_str) > 100:
-                            output_str = output_str[:97] + "..."
-                        output_str = output_str.replace("\n", " ")
-                        logger.info(f"📄 Tool result: {output_str}")
+                        observation_str = str(observation)
+                        if len(observation_str) > 100:
+                            observation_str = observation_str[:97] + "..."
+                        observation_str = observation_str.replace("\n", " ")
+                        logger.info(f"📄 Tool result: {observation_str}")
 
                     # Check for return_direct on the last action taken
                     if len(next_step_output) > 0:
@@ -597,12 +504,14 @@ class MCPAgent:
 
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
             success = True
-            return result
+
+            # Yield the final result as a string
+            yield result
 
         except Exception as e:
             logger.error(f"❌ Error running query: {e}")
             if initialized_here and manage_connector:
-                logger.info("🧹 Cleaning up resources after initialization error in run")
+                logger.info("🧹 Cleaning up resources after initialization error in stream")
                 await self.close()
             raise
 
@@ -617,8 +526,207 @@ class MCPAgent:
                 server_count = len(self.connectors)
 
             conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
+
+            # Safely access _tools in case initialization failed
+            tools_available = getattr(self, "_tools", [])
+
+            if track_execution:
+                self.telemetry.track_agent_execution(
+                    execution_method="stream",
+                    query=query,
+                    success=success,
+                    model_provider=self._model_provider,
+                    model_name=self._model_name,
+                    server_count=server_count,
+                    server_identifiers=[connector.public_identifier for connector in self.connectors],
+                    total_tools_available=len(tools_available),
+                    tools_available_names=[tool.name for tool in tools_available],
+                    max_steps_configured=self.max_steps,
+                    memory_enabled=self.memory_enabled,
+                    use_server_manager=self.use_server_manager,
+                    max_steps_used=max_steps,
+                    manage_connector=manage_connector,
+                    external_history_used=external_history is not None,
+                    steps_taken=steps_taken,
+                    tools_used_count=len(tools_used_names),
+                    tools_used_names=tools_used_names,
+                    response=result,
+                    execution_time_ms=execution_time_ms,
+                    error_type=None if success else "execution_error",
+                    conversation_history_length=conversation_history_length,
+                )
+
+            # Clean up if necessary (e.g., if not using client-managed sessions)
+            if manage_connector and not self.client and initialized_here:
+                logger.info("🧹 Closing agent after stream completion")
+                await self.close()
+
+    async def run(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        manage_connector: bool = True,
+        external_history: list[BaseMessage] | None = None,
+    ) -> str:
+        """Run a query using the MCP tools and return the final result.
+
+        This method uses the streaming implementation internally and returns
+        the final result after consuming all intermediate steps.
+
+        Args:
+            query: The query to run.
+            max_steps: Optional maximum number of steps to take.
+            manage_connector: Whether to handle the connector lifecycle internally.
+                If True, this method will connect, initialize, and disconnect from
+                the connector automatically. If False, the caller is responsible
+                for managing the connector lifecycle.
+            external_history: Optional external history to use instead of the
+                internal conversation history.
+
+        Returns:
+            The result of running the query.
+        """
+        success = True
+        start_time = time.time()
+        generator = self.stream(query, max_steps, manage_connector, external_history, track_execution=False)
+        error = None
+        steps_taken = 0
+        tools_used_names = []
+        result = None
+        try:
+            result, steps_taken, tools_used_names = await self._consume_and_return(generator)
+        except Exception as e:
+            success = False
+            error = str(e)
+            logger.error(f"❌ Error during agent execution: {e}")
+            raise
+        finally:
             self.telemetry.track_agent_execution(
                 execution_method="run",
+                query=query,
+                success=success,
+                model_provider=self._model_provider,
+                model_name=self._model_name,
+                server_count=len(self.client.get_all_active_sessions()) if self.client else len(self.connectors),
+                server_identifiers=[connector.public_identifier for connector in self.connectors],
+                total_tools_available=len(self._tools) if self._tools else 0,
+                tools_available_names=[tool.name for tool in self._tools],
+                max_steps_configured=self.max_steps,
+                memory_enabled=self.memory_enabled,
+                use_server_manager=self.use_server_manager,
+                max_steps_used=max_steps,
+                manage_connector=manage_connector,
+                external_history_used=external_history is not None,
+                steps_taken=steps_taken,
+                tools_used_count=len(tools_used_names),
+                tools_used_names=tools_used_names,
+                response=result,
+                execution_time_ms=int((time.time() - start_time) * 1000),
+                error_type=error,
+                conversation_history_length=len(self._conversation_history),
+            )
+        return result
+
+    async def _generate_response_chunks_async(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        manage_connector: bool = True,
+        external_history: list[BaseMessage] | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """Internal async generator yielding response chunks.
+
+        The implementation purposefully keeps the logic compact:
+        1. Ensure the agent is initialised (optionally handling connector
+           lifecycle).
+        2. Forward the *same* inputs we use for ``run`` to LangChain's
+           ``AgentExecutor.astream``.
+        3. Diff the growing ``output`` field coming from LangChain and yield
+           only the new part so the caller receives *incremental* chunks.
+        4. Persist conversation history when memory is enabled.
+        """
+
+        # 1. Initialise on-demand ------------------------------------------------
+        initialised_here = False
+        if (manage_connector and not self._initialized) or (not self._initialized and self.auto_initialize):
+            await self.initialize()
+            initialised_here = True
+
+        if not self._agent_executor:
+            raise RuntimeError("MCP agent failed to initialise – call initialise() first?")
+
+        # 2. Build inputs --------------------------------------------------------
+        effective_max_steps = max_steps or self.max_steps
+        self._agent_executor.max_iterations = effective_max_steps
+
+        if self.memory_enabled:
+            self.add_to_history(HumanMessage(content=query))
+
+        history_to_use = external_history if external_history is not None else self._conversation_history
+        inputs = {"input": query, "chat_history": history_to_use}
+
+        # 3. Stream & diff -------------------------------------------------------
+        async for event in self._agent_executor.astream_events(inputs):
+            if event.get("event") == "on_chain_end":
+                output = event["data"]["output"]
+                if isinstance(output, list):
+                    for message in output:
+                        if not isinstance(message, ToolAgentAction):
+                            self.add_to_history(message)
+            yield event
+        # 5. House-keeping -------------------------------------------------------
+        # Restrict agent cleanup in _generate_response_chunks_async to only occur
+        #  when the agent was initialized in this generator and is not client-managed
+        #  and the user does want us to manage the connection.
+        if not self.client and initialised_here and manage_connector:
+            logger.info("🧹 Closing agent after generator completion")
+            await self.close()
+
+    async def stream_events(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        manage_connector: bool = True,
+        external_history: list[BaseMessage] | None = None,
+    ) -> AsyncIterator[str]:
+        """Asynchronous streaming interface.
+
+        Example::
+
+            async for chunk in agent.astream("hello"):
+                print(chunk, end="|", flush=True)
+        """
+        start_time = time.time()
+        success = False
+        chunk_count = 0
+        total_response_length = 0
+
+        try:
+            async for chunk in self._generate_response_chunks_async(
+                query=query,
+                max_steps=max_steps,
+                manage_connector=manage_connector,
+                external_history=external_history,
+            ):
+                chunk_count += 1
+                if isinstance(chunk, str):
+                    total_response_length += len(chunk)
+                yield chunk
+            success = True
+        finally:
+            # Track comprehensive execution data for streaming
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
+            server_count = 0
+            if self.client:
+                server_count = len(self.client.get_all_active_sessions())
+            elif self.connectors:
+                server_count = len(self.connectors)
+
+            conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
+
+            self.telemetry.track_agent_execution(
+                execution_method="stream_events",
                 query=query,
                 success=success,
                 model_provider=self._model_provider,
@@ -633,19 +741,11 @@ class MCPAgent:
                 max_steps_used=max_steps,
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
-                steps_taken=steps_taken,
-                tools_used_count=len(tools_used_names),
-                tools_used_names=tools_used_names,
-                response=result,
+                response=f"[STREAMED RESPONSE - {total_response_length} chars]",
                 execution_time_ms=execution_time_ms,
-                error_type=None if success else "execution_error",
+                error_type=None if success else "streaming_error",
                 conversation_history_length=conversation_history_length,
             )
-
-            # Clean up if necessary (e.g., if not using client-managed sessions)
-            if manage_connector and not self.client and not initialized_here:
-                logger.info("🧹 Closing agent after query completion")
-                await self.close()
 
     async def close(self) -> None:
         """Close the MCP connection with improved error handling."""
@@ -659,7 +759,8 @@ class MCPAgent:
             if self.client:
                 logger.info("🔄 Closing sessions through client")
                 await self.client.close_all_sessions()
-                self._sessions = {}
+                if hasattr(self, "_sessions"):
+                    self._sessions = {}
             # If using direct connector, disconnect
             elif self.connectors:
                 for connector in self.connectors:
@@ -677,6 +778,8 @@ class MCPAgent:
             logger.error(f"❌ Error during agent closure: {e}")
             # Still try to clean up references even if there was an error
             self._agent_executor = None
-            self._tools = []
-            self._sessions = {}
+            if hasattr(self, "_tools"):
+                self._tools = []
+            if hasattr(self, "_sessions"):
+                self._sessions = {}
             self._initialized = False

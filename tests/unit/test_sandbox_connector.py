@@ -4,7 +4,7 @@ Unit tests for the SandboxConnector class.
 
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -144,12 +144,14 @@ class TestSandboxConnectorConnection:
             mock_manager_instance.start.assert_called_once()
 
             # Verify client session creation
-            mock_client_session.assert_called_once_with("read_stream", "write_stream", sampling_callback=None)
+            mock_client_session.assert_called_once_with(
+                "read_stream", "write_stream", sampling_callback=None, client_info=ANY
+            )
             mock_client_instance.__aenter__.assert_called_once()
 
             # Verify state
             assert connector._connected is True
-            assert connector.client == mock_client_instance
+            assert connector.client_session == mock_client_instance
             assert connector._connection_manager == mock_manager_instance
             assert connector.base_url == "https://test-host.sandbox.e2b.dev"
 
@@ -164,7 +166,7 @@ class TestSandboxConnectorConnection:
 
         # Verify no connection established since already connected
         assert connector._connection_manager is None
-        assert connector.client is None
+        assert connector.client_session is None
         assert connector.sandbox is None
 
     @pytest.mark.asyncio
@@ -191,7 +193,7 @@ class TestSandboxConnectorConnection:
         # Verify resources were cleaned up
         connector._cleanup_resources.assert_called_once()
         assert connector._connected is False
-        assert connector.client is None
+        assert connector.client_session is None
 
     @pytest.mark.asyncio
     async def test_disconnect(self, mock_sandbox_modules):

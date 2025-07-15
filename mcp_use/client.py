@@ -9,6 +9,8 @@ import json
 import warnings
 from typing import Any
 
+from mcp.client.session import SamplingFnT
+
 from mcp_use.types.sandbox import SandboxOptions
 
 from .config import create_connector_from_config, load_config_file
@@ -28,6 +30,7 @@ class MCPClient:
         config: str | dict[str, Any] | None = None,
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
+        sampling_callback: SamplingFnT | None = None,
     ) -> None:
         """Initialize a new MCP client.
 
@@ -36,13 +39,14 @@ class MCPClient:
                    If None, an empty configuration is used.
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
+            sampling_callback: Optional sampling callback function.
         """
         self.config: dict[str, Any] = {}
         self.sandbox = sandbox
         self.sandbox_options = sandbox_options
         self.sessions: dict[str, MCPSession] = {}
         self.active_sessions: list[str] = []
-
+        self.sampling_callback = sampling_callback
         # Load configuration if provided
         if config is not None:
             if isinstance(config, str):
@@ -151,7 +155,10 @@ class MCPClient:
 
         # Create connector with options
         connector = create_connector_from_config(
-            server_config, sandbox=self.sandbox, sandbox_options=self.sandbox_options
+            server_config,
+            sandbox=self.sandbox,
+            sandbox_options=self.sandbox_options,
+            sampling_callback=self.sampling_callback,
         )
 
         # Create the session
@@ -189,9 +196,7 @@ class MCPClient:
 
         # Create sessions for all servers
         for name in servers:
-            session = await self.create_session(name, auto_initialize)
-            if auto_initialize:
-                await session.initialize()
+            await self.create_session(name, auto_initialize)
 
         return self.sessions
 

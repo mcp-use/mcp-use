@@ -12,6 +12,7 @@ import time
 
 import aiohttp
 from mcp import ClientSession
+from mcp.client.session import SamplingFnT
 
 from ..logging import logger
 from ..task_managers import SseConnectionManager
@@ -50,6 +51,7 @@ class SandboxConnector(BaseConnector):
         e2b_options: SandboxOptions | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        sampling_callback: SamplingFnT | None = None,
     ):
         """Initialize a new sandbox connector.
 
@@ -61,13 +63,13 @@ class SandboxConnector(BaseConnector):
                         See SandboxOptions for available options and defaults.
             timeout: Timeout for the sandbox process in seconds.
             sse_read_timeout: Timeout for the SSE connection in seconds.
+            sampling_callback: Optional sampling callback.
         """
-        super().__init__()
+        super().__init__(sampling_callback=sampling_callback)
         if Sandbox is None:
             raise ImportError(
-                "E2B SDK (e2b-code-interpreter) not found. "
-                "Please install it with 'pip install mcp-use[e2b]' "
-                "(or 'pip install e2b-code-interpreter')."
+                "E2B SDK (e2b-code-interpreter) not found. Please install it with "
+                "'pip install mcp-use[e2b]' (or 'pip install e2b-code-interpreter')."
             )
 
         self.user_command = command
@@ -79,8 +81,8 @@ class SandboxConnector(BaseConnector):
         self.api_key = _e2b_options.get("api_key") or os.environ.get("E2B_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "E2B API key is required. Provide it via 'sandbox_options.api_key' "
-                "or the E2B_API_KEY environment variable."
+                "E2B API key is required. Provide it via 'sandbox_options.api_key'"
+                " or the E2B_API_KEY environment variable."
             )
 
         self.sandbox_template_id = _e2b_options.get("sandbox_template_id", "base")
@@ -88,7 +90,7 @@ class SandboxConnector(BaseConnector):
 
         self.sandbox: Sandbox | None = None
         self.process: CommandHandle | None = None
-        self.client: ClientSession | None = None
+        self.client_session: ClientSession | None = None
         self.errlog = sys.stderr
         self.base_url: str | None = None
         self._connected = False
@@ -218,8 +220,10 @@ class SandboxConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client = ClientSession(read_stream, write_stream, sampling_callback=None)
-            await self.client.__aenter__()
+            self.client_session = ClientSession(
+                read_stream, write_stream, sampling_callback=self.sampling_callback, client_info=self.client_info
+            )
+            await self.client_session.__aenter__()
 
             # Mark as connected
             self._connected = True

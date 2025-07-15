@@ -30,7 +30,14 @@
             "pages": [
               "essentials/configuration",
               "essentials/client-configuration",
-              "essentials/connection-types"
+              {
+                "group": "Client Features",
+                "icon": "list-plus",
+                "pages": [
+                  "essentials/connection-types",
+                  "essentials/sampling"
+                ]
+              }
             ]
           },
           {
@@ -38,7 +45,8 @@
             "pages": [
               "essentials/agent-configuration",
               "essentials/server-manager",
-              "essentials/llm-integration"
+              "essentials/llm-integration",
+              "guides/streaming"
             ]
           },
           {
@@ -47,7 +55,6 @@
               "guides/building-custom-agents",
               "guides/logging",
               "guides/multi-server-setup",
-              "guides/streaming",
               "guides/security"
             ]
           },
