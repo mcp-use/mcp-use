@@ -13,7 +13,7 @@ linear_config = {"mcpServers": {"linear": {"url": "https://mcp.linear.app/sse"}}
 async def main():
     # Create client with OAuth-enabled configuration at the client level
     # Option 1: Dynamic Client Registration (empty dict)
-    client = MCPClient(config=linear_config, auth={})
+    client = MCPClient(config=linear_config)
 
     # Option 2: If you already have a registered client_id, you can use it:
     # client = MCPClient(

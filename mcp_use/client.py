@@ -48,7 +48,7 @@ class MCPClient:
         self.config: dict[str, Any] = {}
         self.sandbox = sandbox
         self.sandbox_options = sandbox_options
-        self.auth = auth
+        self.auth = auth if auth is not None else {}
         self.sessions: dict[str, MCPSession] = {}
         self.active_sessions: list[str] = []
 
