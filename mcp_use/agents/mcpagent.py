@@ -5,10 +5,13 @@ This module provides the main MCPAgent class that integrates all components
 to provide a simple interface for using MCP tools with different LLMs.
 """
 
+import json
 import logging
 import time
 from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator as AsyncGeneratorType
 
+import httpx
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
 from langchain.globals import set_debug
@@ -20,6 +23,17 @@ from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
 from langchain_core.utils.input import get_color_mapping
+
+try:
+    from rich.console import Console
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
 
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
@@ -35,6 +49,305 @@ from .prompts.templates import DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SY
 set_debug(logger.level == logging.DEBUG)
 
 
+async def run_remote_agent_stream(agent_id: str, query: str) -> AsyncGeneratorType[str, None]:
+    """Stream responses from a remote agent with nice terminal formatting using Rich."""
+    url = f"http://localhost:3000/api/agents/{agent_id}/stream"
+
+    if RICH_AVAILABLE:
+        console = Console()
+
+        # Pretty header
+        console.print(
+            Panel.fit(
+                f"🤖 [bold blue]Remote Agent Stream[/bold blue]\n"
+                f"[dim]Agent ID:[/dim] {agent_id}\n"
+                f"[dim]Query:[/dim] {query[:80]}{'...' if len(query) > 80 else ''}",
+                border_style="blue",
+                title="[bold]MCP Agent[/bold]",
+            )
+        )
+        console.print()
+
+    else:
+        # Fallback to ANSI colors
+        TOOL_CALL_COLOR = "\033[94m"  # Blue
+        TOOL_RESULT_COLOR = "\033[92m"  # Green
+        FINAL_RESPONSE_COLOR = "\033[95m"  # Magenta
+        RESET_COLOR = "\033[0m"
+        BOLD = "\033[1m"
+        DIM = "\033[2m"
+
+        print(f"\n{BOLD}🤖 Starting remote agent stream...{RESET_COLOR}")
+        print(f"{DIM}Agent ID: {agent_id}{RESET_COLOR}")
+        print(f"{DIM}Query: {query[:100]}{'...' if len(query) > 100 else ''}{RESET_COLOR}\n")
+
+    async with httpx.AsyncClient(timeout=10000000) as client:
+        async with client.stream("POST", url, json={"query": query}) as response:
+            response.raise_for_status()
+
+            buffer = ""
+            tool_count = 0
+
+            async for chunk in response.aiter_text():
+                buffer += chunk
+
+                # Process complete lines
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    line = line.strip()
+
+                    if not line:
+                        continue
+
+                    try:
+                        # Parse the event type and data
+                        if line.startswith("9:"):
+                            # Tool call event
+                            tool_call_data = json.loads(line[2:])
+                            tool_count += 1
+
+                            if RICH_AVAILABLE:
+                                tool_name = tool_call_data.get("toolName", "Unknown")
+                                tool_id = tool_call_data.get("toolCallId", "Unknown")
+                                args = tool_call_data.get("args", {})
+
+                                # Create a nice table for tool call info
+                                table = Table(show_header=False, box=None, padding=(0, 1))
+                                table.add_column("Key", style="dim")
+                                table.add_column("Value")
+
+                                table.add_row("Tool", f"[bold blue]{tool_name}[/bold blue]")
+                                if args:
+                                    args_str = str(args)
+                                    if len(args_str) > 100:
+                                        args_str = args_str[:97] + "..."
+                                    table.add_row("Args", f"[dim]{args_str}[/dim]")
+                                table.add_row("ID", f"[dim]{tool_id[:8]}...[/dim]")
+
+                                console.print(
+                                    Panel(
+                                        table,
+                                        title=f"[bold]🔧 Tool Call #{tool_count}[/bold]",
+                                        border_style="blue",
+                                        width=80,
+                                    )
+                                )
+                            else:
+                                print(f"{TOOL_CALL_COLOR}{BOLD}🔧 Tool Call #{tool_count}{RESET_COLOR}")
+                                print(
+                                    f"{TOOL_CALL_COLOR}   Tool: {tool_call_data.get('toolName', 'Unknown')}{RESET_COLOR}"
+                                )
+
+                                args = tool_call_data.get("args", {})
+                                if args:
+                                    args_str = str(args)
+                                    if len(args_str) > 100:
+                                        args_str = args_str[:97] + "..."
+                                    print(f"{DIM}   Args: {args_str}{RESET_COLOR}")
+
+                                print(f"{DIM}   ID: {tool_call_data.get('toolCallId', 'Unknown')}{RESET_COLOR}")
+
+                        elif line.startswith("a:"):
+                            # Tool result event
+                            tool_result_data = json.loads(line[2:])
+                            result = tool_result_data.get("result", "")
+                            tool_id = tool_result_data.get("toolCallId", "Unknown")
+
+                            if RICH_AVAILABLE:
+                                # Check if result looks like markdown
+                                if any(marker in result for marker in ["#", "**", "*", "-", "`", "|", "```"]):
+                                    # Render as markdown
+                                    try:
+                                        markdown = Markdown(result)
+                                        console.print(
+                                            Panel(
+                                                markdown,
+                                                title="[bold]📄 Tool Result[/bold]",
+                                                border_style="green",
+                                                width=100,
+                                            )
+                                        )
+                                    except Exception:
+                                        # Fallback to plain text if markdown parsing fails
+                                        console.print(
+                                            Panel(
+                                                Text(result, style="green"),
+                                                title="[bold]📄 Tool Result[/bold]",
+                                                border_style="green",
+                                                width=100,
+                                            )
+                                        )
+                                else:
+                                    # Plain text result
+                                    if len(result) > 300:
+                                        result_preview = result[:297] + "..."
+                                        console.print(
+                                            Panel(
+                                                f"[green]{result_preview}[/green]\n[dim]Result truncated - {len(result)} chars total[/dim]",
+                                                title="[bold]📄 Tool Result[/bold]",
+                                                border_style="green",
+                                                width=100,
+                                            )
+                                        )
+                                    else:
+                                        console.print(
+                                            Panel(
+                                                f"[green]{result}[/green]",
+                                                title="[bold]📄 Tool Result[/bold]",
+                                                border_style="green",
+                                                width=100,
+                                            )
+                                        )
+
+                                console.print(f"[dim]Tool ID: {tool_id[:8]}...[/dim]")
+                                console.print()
+                            else:
+                                print(f"\n{TOOL_RESULT_COLOR}{BOLD}📄 Tool Result{RESET_COLOR}")
+
+                                if len(result) > 200:
+                                    lines = result.split("\n")
+                                    if len(lines) > 5:
+                                        preview = "\n".join(lines[:3])
+                                        print(f"{TOOL_RESULT_COLOR}{preview}...{RESET_COLOR}")
+                                        print(f"{DIM}   [Result truncated - {len(result)} chars total]{RESET_COLOR}")
+                                    else:
+                                        print(f"{TOOL_RESULT_COLOR}{result}{RESET_COLOR}")
+                                else:
+                                    print(f"{TOOL_RESULT_COLOR}{result}{RESET_COLOR}")
+
+                                print(f"{DIM}   ID: {tool_result_data.get('toolCallId', 'Unknown')}{RESET_COLOR}\n")
+
+                        elif line.startswith("0:"):
+                            # Final response
+                            final_response = line[2:]
+
+                            if RICH_AVAILABLE:
+                                # Render final response as markdown if it looks like markdown
+                                if any(marker in final_response for marker in ["#", "**", "*", "-", "`", "|", "```"]):
+                                    try:
+                                        markdown = Markdown(final_response)
+                                        console.print(
+                                            Panel(
+                                                markdown,
+                                                title="[bold magenta]🎯 Final Response[/bold magenta]",
+                                                border_style="magenta",
+                                                width=120,
+                                            )
+                                        )
+                                    except Exception:
+                                        console.print(
+                                            Panel(
+                                                Text(final_response, style="magenta"),
+                                                title="[bold magenta]🎯 Final Response[/bold magenta]",
+                                                border_style="magenta",
+                                                width=120,
+                                            )
+                                        )
+                                else:
+                                    console.print(
+                                        Panel(
+                                            f"[magenta]{final_response}[/magenta]",
+                                            title="[bold magenta]🎯 Final Response[/bold magenta]",
+                                            border_style="magenta",
+                                            width=120,
+                                        )
+                                    )
+                            else:
+                                print(f"{FINAL_RESPONSE_COLOR}{BOLD}🎯 Final Response:{RESET_COLOR}\n")
+                                print(f"{FINAL_RESPONSE_COLOR}{final_response}{RESET_COLOR}\n")
+
+                            yield final_response
+
+                        else:
+                            # Unknown format
+                            if RICH_AVAILABLE:
+                                console.print(f"[dim]Unknown event: {line}[/dim]")
+                            else:
+                                print(f"{DIM}Unknown event: {line}{RESET_COLOR}")
+
+                    except json.JSONDecodeError as e:
+                        if RICH_AVAILABLE:
+                            console.print(f"[dim red]Failed to parse line: {line} - {e}[/dim red]")
+                        else:
+                            print(f"{DIM}Failed to parse line: {line} - {e}{RESET_COLOR}")
+                    except Exception as e:
+                        if RICH_AVAILABLE:
+                            console.print(f"[dim red]Error processing line: {line} - {e}[/dim red]")
+                        else:
+                            print(f"{DIM}Error processing line: {line} - {e}{RESET_COLOR}")
+
+            # Process any remaining buffer
+            if buffer.strip():
+                try:
+                    if buffer.startswith("0:"):
+                        final_response = buffer[2:].strip()
+
+                        if RICH_AVAILABLE:
+                            if any(marker in final_response for marker in ["#", "**", "*", "-", "`", "|", "```"]):
+                                try:
+                                    markdown = Markdown(final_response)
+                                    console.print(
+                                        Panel(
+                                            markdown,
+                                            title="[bold magenta]🎯 Final Response[/bold magenta]",
+                                            border_style="magenta",
+                                            width=120,
+                                        )
+                                    )
+                                except Exception:
+                                    console.print(
+                                        Panel(
+                                            Text(final_response, style="magenta"),
+                                            title="[bold magenta]🎯 Final Response[/bold magenta]",
+                                            border_style="magenta",
+                                            width=120,
+                                        )
+                                    )
+                            else:
+                                console.print(
+                                    Panel(
+                                        f"[magenta]{final_response}[/magenta]",
+                                        title="[bold magenta]🎯 Final Response[/bold magenta]",
+                                        border_style="magenta",
+                                        width=120,
+                                    )
+                                )
+                        else:
+                            print(f"{FINAL_RESPONSE_COLOR}{BOLD}🎯 Final Response:{RESET_COLOR}\n")
+                            print(f"{FINAL_RESPONSE_COLOR}{final_response}{RESET_COLOR}\n")
+
+                        yield final_response
+                    else:
+                        if RICH_AVAILABLE:
+                            console.print(f"[dim]Remaining buffer: {buffer.strip()}[/dim]")
+                        else:
+                            print(f"{DIM}Remaining buffer: {buffer.strip()}{RESET_COLOR}")
+                except Exception as e:
+                    if RICH_AVAILABLE:
+                        console.print(f"[dim red]Error processing remaining buffer: {e}[/dim red]")
+                    else:
+                        print(f"{DIM}Error processing remaining buffer: {e}{RESET_COLOR}")
+
+    if RICH_AVAILABLE:
+        console.print(
+            Panel.fit(
+                f"✅ [bold green]Stream completed[/bold green]\n[dim]Total tools used:[/dim] {tool_count}",
+                border_style="green",
+                title="[bold]Completed[/bold]",
+            )
+        )
+    else:
+        print(f"\n{BOLD}✅ Stream completed. Total tools used: {tool_count}{RESET_COLOR}\n")
+
+
+async def run(agent_id: str, query: str) -> str:
+    """Run a remote agent and return the final result."""
+    final_result = ""
+    async for result in run_remote_agent_stream(agent_id, query):
+        final_result = result
+    return final_result
+
+
 class MCPAgent:
     """Main class for using MCP tools with various LLM providers.
 
@@ -44,7 +357,8 @@ class MCPAgent:
 
     def __init__(
         self,
-        llm: BaseLanguageModel,
+        agent_id: str,
+        llm: BaseLanguageModel | None = None,
         client: MCPClient | None = None,
         connectors: list[BaseConnector] | None = None,
         max_steps: int = 5,
@@ -56,10 +370,13 @@ class MCPAgent:
         disallowed_tools: list[str] | None = None,
         use_server_manager: bool = False,
         verbose: bool = False,
+        api_key: str | None = None,
+        remote_agent_title: str = "Chat with Web Search",
     ):
         """Initialize a new MCPAgent instance.
 
         Args:
+            agent_id: The agent ID for remote agents, or None for local agents.
             llm: The LangChain LLM to use.
             client: The MCPClient to use. If provided, connector is ignored.
             connectors: A list of MCP connectors to use if client is not provided.
@@ -71,27 +388,66 @@ class MCPAgent:
             additional_instructions: Extra instructions to append to the system prompt.
             disallowed_tools: List of tool names that should not be available to the agent.
             use_server_manager: Whether to use server manager mode instead of exposing all tools.
+            remote_agent_title: Title for remote agent initialization.
         """
-        self.llm = llm
-        self.client = client
-        self.connectors = connectors or []
+        self.agent_id = agent_id
+        self.api_key = api_key
+        self.remote_agent_title = remote_agent_title
+        self.is_remote_agent = bool(agent_id)
+        self._remote_initialized = False
+
+        # Set up common properties for both remote and local agents
         self.max_steps = max_steps
         self.auto_initialize = auto_initialize
         self.memory_enabled = memory_enabled
-        self._initialized = False
         self._conversation_history: list[BaseMessage] = []
         self.disallowed_tools = disallowed_tools or []
         self.use_server_manager = use_server_manager
         self.verbose = verbose
+
         # System prompt configuration
-        self.system_prompt = system_prompt  # User-provided full prompt override
-        # User can provide a template override, otherwise use the imported default
+        self.system_prompt = system_prompt
         self.system_prompt_template_override = system_prompt_template
         self.additional_instructions = additional_instructions
 
-        # Either client or connector must be provided
+        # For remote agents, we don't need most of the local agent setup
+        if self.is_remote_agent:
+            # Minimal setup for remote agents
+            self.llm = None
+            self.client = None
+            self.connectors = []
+            self.adapter = None
+            self.telemetry = Telemetry()
+            self.server_manager = None
+            self._initialized = False
+            self._agent_executor = None
+            self._system_message = None
+            self._tools = []
+            self._model_provider = "remote"
+            self._model_name = f"remote_agent_{agent_id}"
+
+            # Initialize remote agent asynchronously if auto_initialize is True
+            if auto_initialize:
+                import asyncio
+
+                try:
+                    # Try to run in existing event loop
+                    asyncio.create_task(self._initialize_remote_agent())
+                except RuntimeError:
+                    # No event loop running, create one
+                    asyncio.run(self._initialize_remote_agent())
+
+            return
+
+        # Local agent setup (existing logic)
+        self.llm = llm
+        self.client = client
+        self.connectors = connectors or []
+        self._initialized = False
+
+        # Either client or connector must be provided for local agents
         if not client and len(self.connectors) == 0:
-            raise ValueError("Either client or connector must be provided")
+            raise ValueError("Either client or connector must be provided for local agents")
 
         # Create the adapter for tool conversion
         self.adapter = LangChainAdapter(disallowed_tools=self.disallowed_tools)
@@ -114,8 +470,44 @@ class MCPAgent:
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
 
+    async def _initialize_remote_agent(self) -> None:
+        """Initialize the remote agent by calling the initialization endpoint."""
+        if not self.is_remote_agent or self._remote_initialized:
+            return
+
+        agent_initialize_url = "http://localhost:8000/api/v1/chats"
+
+        # Retrieve API key for Bearer token, if available
+        api_key = self.api_key
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                init_response = await client.post(
+                    agent_initialize_url,
+                    json={"agent_id": self.agent_id, "title": self.remote_agent_title},
+                    headers=headers if headers else None,
+                )
+                init_response.raise_for_status()
+
+                self._remote_initialized = True
+                self._initialized = True
+
+        except Exception as e:
+            error_msg = f"Failed to initialize remote agent: {e}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
     async def initialize(self) -> None:
         """Initialize the MCP client and agent."""
+        if self.is_remote_agent:
+            # For remote agents, just call the remote initialization
+            await self._initialize_remote_agent()
+            return
+
+        # Local agent initialization (existing logic)
         logger.info("🚀 Initializing MCP agent and connecting to services...")
         # If using server manager, initialize it
         if self.use_server_manager and self.server_manager:
@@ -164,8 +556,9 @@ class MCPAgent:
             # Create the system message based on available tools
             await self._create_system_message_from_tools(all_tools)
 
-        # Create the agent
-        self._agent_executor = self._create_agent()
+        # Create the agent (only for local agents)
+        if not self.is_remote_agent:
+            self._agent_executor = self._create_agent()
         self._initialized = True
         logger.info("✨ Agent initialization complete")
 
@@ -416,8 +809,7 @@ class MCPAgent:
 
                     if current_tool_names != existing_tool_names:
                         logger.info(
-                            f"🔄 Tools changed before step {step_num + 1}, updating agent."
-                            f"New tools: {', '.join(current_tool_names)}"
+                            f"🔄 Tools changed before step {step_num + 1}, updating agent.New tools: {', '.join(current_tool_names)}"
                         )
                         self._tools = current_tools
                         # Regenerate system message with ALL current tools
@@ -561,7 +953,16 @@ class MCPAgent:
                 logger.info("🧹 Closing agent after stream completion")
                 await self.close()
 
-    async def run(
+    async def run(self, query: str) -> AsyncGenerator[str, None]:
+        """Run a remote agent and return the final result."""
+        # Ensure the agent is initialized
+        if not self._initialized:
+            await self.initialize()
+
+        async for result in run_remote_agent_stream(self.agent_id, query):
+            yield result
+
+    async def xrun(
         self,
         query: str,
         max_steps: int | None = None,

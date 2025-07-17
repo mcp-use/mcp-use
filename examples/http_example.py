@@ -29,7 +29,7 @@ async def main():
     # Load environment variables
     load_dotenv()
 
-    config = {"mcpServers": {"http": {"url": "http://localhost:8931/sse"}}}
+    config = {"mcpServers": {"http": {"url": "https://mcp.linear.app/sse"}}}
 
     # Create MCPClient from config file
     client = MCPClient.from_dict(config)
