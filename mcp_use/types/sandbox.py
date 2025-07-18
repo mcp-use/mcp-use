@@ -1,6 +1,8 @@
 """Type definitions for sandbox-related configurations."""
 
-from typing import NotRequired, TypedDict
+from typing import NotRequired
+
+from typing_extensions import TypedDict
 
 
 class SandboxOptions(TypedDict):
