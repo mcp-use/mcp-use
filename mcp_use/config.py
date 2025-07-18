@@ -7,7 +7,7 @@ This module provides functionality to load MCP configuration from JSON files.
 import json
 from typing import Any
 
-from mcp.client.session import SamplingFnT
+from mcp.client.session import ElicitationFnT, SamplingFnT
 
 from mcp_use.types.sandbox import SandboxOptions
 
@@ -39,6 +39,7 @@ def create_connector_from_config(
     sandbox: bool = False,
     sandbox_options: SandboxOptions | None = None,
     sampling_callback: SamplingFnT | None = None,
+    elicitation_callback: ElicitationFnT | None = None,
 ) -> BaseConnector:
     """Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
@@ -59,6 +60,7 @@ def create_connector_from_config(
             args=server_config["args"],
             env=server_config.get("env", None),
             sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
         )
 
     # Sandboxed connector
@@ -69,6 +71,7 @@ def create_connector_from_config(
             env=server_config.get("env", None),
             e2b_options=sandbox_options,
             sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
         )
 
     # HTTP connector
@@ -78,6 +81,7 @@ def create_connector_from_config(
             headers=server_config.get("headers", None),
             auth_token=server_config.get("auth_token", None),
             sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
         )
 
     # WebSocket connector

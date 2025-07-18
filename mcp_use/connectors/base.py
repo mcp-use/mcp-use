@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from mcp import ClientSession, Implementation
-from mcp.client.session import SamplingFnT
+from mcp.client.session import ElicitationFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
 from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
 from pydantic import AnyUrl
@@ -26,7 +26,11 @@ class BaseConnector(ABC):
     This class defines the interface that all MCP connectors must implement.
     """
 
-    def __init__(self, sampling_callback: SamplingFnT | None = None):
+    def __init__(
+        self,
+        sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
+    ):
         """Initialize base connector with common attributes."""
         self.client_session: ClientSession | None = None
         self._connection_manager: ConnectionManager | None = None
@@ -37,6 +41,7 @@ class BaseConnector(ABC):
         self._initialized = False  # Track if client_session.initialize() has been called
         self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now)
         self.sampling_callback = sampling_callback
+        self.elicitation_callback = elicitation_callback
 
     @property
     def client_info(self) -> Implementation:

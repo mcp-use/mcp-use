@@ -9,7 +9,7 @@ import json
 import warnings
 from typing import Any
 
-from mcp.client.session import SamplingFnT
+from mcp.client.session import ElicitationFnT, SamplingFnT
 
 from mcp_use.types.sandbox import SandboxOptions
 
@@ -31,6 +31,7 @@ class MCPClient:
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
     ) -> None:
         """Initialize a new MCP client.
 
@@ -47,6 +48,7 @@ class MCPClient:
         self.sessions: dict[str, MCPSession] = {}
         self.active_sessions: list[str] = []
         self.sampling_callback = sampling_callback
+        self.elicitation_callback = elicitation_callback
         # Load configuration if provided
         if config is not None:
             if isinstance(config, str):
@@ -159,6 +161,7 @@ class MCPClient:
             sandbox=self.sandbox,
             sandbox_options=self.sandbox_options,
             sampling_callback=self.sampling_callback,
+            elicitation_callback=self.elicitation_callback,
         )
 
         # Create the session
