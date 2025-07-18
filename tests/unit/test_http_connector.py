@@ -196,7 +196,11 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
 
         # Verify client session was created and initialized
         mock_client_session_class.assert_called_once_with(
-            "read_stream", "write_stream", sampling_callback=None, client_info=ANY
+            "read_stream",
+            "write_stream",
+            sampling_callback=None,
+            elicitation_callback=None,
+            client_info=ANY,
         )
         mock_client_session_instance.__aenter__.assert_called_once()
         mock_client_session_instance.initialize.assert_called_once()

@@ -145,7 +145,11 @@ class TestSandboxConnectorConnection:
 
             # Verify client session creation
             mock_client_session.assert_called_once_with(
-                "read_stream", "write_stream", sampling_callback=None, client_info=ANY
+                "read_stream",
+                "write_stream",
+                sampling_callback=None,
+                elicitation_callback=None,
+                client_info=ANY,
             )
             mock_client_instance.__aenter__.assert_called_once()
 
