@@ -48,7 +48,7 @@ jobs:
 
   transport-tests:
     needs: lint
-    name: "transport-${{ matrix.transport }}"
+    name: "transport/${{ matrix.transport }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -72,7 +72,7 @@ jobs:
 
   primitive-tests:
     needs: lint
-    name: "primitive-${{ matrix.primitive }}"
+    name: "primitive/${{ matrix.primitive }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
