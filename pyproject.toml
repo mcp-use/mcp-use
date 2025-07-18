@@ -39,7 +39,7 @@ dev = [
     "isort>=5.12.0",
     "mypy>=1.5.0",
     "ruff>=0.1.0",
-    "fastmcp==2.8.0",
+    "fastmcp==2.10.5",
     "fastapi",
 ]
 anthropic = [
