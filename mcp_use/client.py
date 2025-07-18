@@ -63,6 +63,7 @@ class MCPClient:
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
@@ -70,8 +71,16 @@ class MCPClient:
             config: The configuration dictionary.
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
+            sampling_callback: Optional sampling callback function.
+            elicitation_callback: Optional elicitation callback function.
         """
-        return cls(config=config, sandbox=sandbox, sandbox_options=sandbox_options, sampling_callback=sampling_callback)
+        return cls(
+            config=config,
+            sandbox=sandbox,
+            sandbox_options=sandbox_options,
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+        )
 
     @classmethod
     def from_config_file(
@@ -80,6 +89,7 @@ class MCPClient:
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
@@ -87,12 +97,15 @@ class MCPClient:
             filepath: The path to the configuration file.
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
+            sampling_callback: Optional sampling callback function.
+            elicitation_callback: Optional elicitation callback function.
         """
         return cls(
             config=load_config_file(filepath),
             sandbox=sandbox,
             sandbox_options=sandbox_options,
             sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
         )
 
     def add_server(
