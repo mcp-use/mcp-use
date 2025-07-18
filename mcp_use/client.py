@@ -62,6 +62,7 @@ class MCPClient:
         config: dict[str, Any],
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
+        sampling_callback: SamplingFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
@@ -70,11 +71,15 @@ class MCPClient:
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
         """
-        return cls(config=config, sandbox=sandbox, sandbox_options=sandbox_options)
+        return cls(config=config, sandbox=sandbox, sandbox_options=sandbox_options, sampling_callback=sampling_callback)
 
     @classmethod
     def from_config_file(
-        cls, filepath: str, sandbox: bool = False, sandbox_options: SandboxOptions | None = None
+        cls,
+        filepath: str,
+        sandbox: bool = False,
+        sandbox_options: SandboxOptions | None = None,
+        sampling_callback: SamplingFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
@@ -83,7 +88,12 @@ class MCPClient:
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
         """
-        return cls(config=load_config_file(filepath), sandbox=sandbox, sandbox_options=sandbox_options)
+        return cls(
+            config=load_config_file(filepath),
+            sandbox=sandbox,
+            sandbox_options=sandbox_options,
+            sampling_callback=sampling_callback,
+        )
 
     def add_server(
         self,
