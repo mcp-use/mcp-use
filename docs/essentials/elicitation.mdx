@@ -1,0 +1,263 @@
+---
+title: "Elicitation"
+description: "Enable user input requests for MCP tools"
+icon: "user-question"
+---
+
+# Elicitation
+
+<Info>
+Elicitation allows MCP tools to request additional information from users during their execution.
+</Info>
+
+## Configuration
+
+To enable elicitation, provide an `elicitation_callback` function when initializing the MCPClient:
+
+```python
+from mcp_use.client import MCPClient
+from mcp.client.session import RequestContext
+from mcp.types import ElicitRequestParams, ElicitResult
+
+async def elicitation_callback(
+    context: RequestContext,
+    params: ElicitRequestParams
+) -> ElicitResult:
+    """
+    Your elicitation callback implementation.
+    This function receives a request for user input and returns the user's response.
+    """
+    # Display the message to the user and collect their input
+    print(f"Server requests: {params.message}")
+
+    # Example: Get user input (replace with your UI logic)
+    if hasattr(params, 'requestedSchema'):
+        # Handle structured input based on the schema
+        user_input = await collect_structured_input(params.requestedSchema)
+    else:
+        # Handle simple text input
+        user_input = input("Please provide your response: ")
+
+    # Return the result
+    return ElicitResult(
+        action="accept",  # or "decline" or "cancel"
+        content=user_input
+    )
+
+# Initialize client with elicitation support
+client = MCPClient(
+    config="config.json",
+    elicitation_callback=elicitation_callback
+)
+```
+
+## Response Actions
+
+Elicitation responses use a three-action model to clearly distinguish between different user intentions:
+
+### Accept
+User explicitly approved and submitted data:
+```python
+return ElicitResult(
+    action="accept",
+    content={"name": "John Doe", "email": "john@example.com"}
+)
+```
+
+### Decline
+User explicitly declined the request:
+```python
+return ElicitResult(
+    action="decline"
+    # content field is typically omitted
+)
+```
+
+### Cancel
+User dismissed without making an explicit choice:
+```python
+return ElicitResult(
+    action="cancel"
+    # content field is typically omitted
+)
+```
+
+## Structured Data Requests
+
+MCP tools can request structured data using JSON schemas. The schema defines the expected format and validation rules:
+
+```python
+async def advanced_elicitation_callback(
+    context: RequestContext,
+    params: ElicitRequestParams
+) -> ElicitResult:
+    """Handle structured data requests with validation."""
+
+    # Check if a schema is provided
+    if hasattr(params, 'requestedSchema') and params.requestedSchema:
+        schema = params.requestedSchema
+
+        # Example: Handle different schema types
+        if schema.get('type') == 'object':
+            properties = schema.get('properties', {})
+            required_fields = schema.get('required', [])
+
+            # Collect data for each property
+            user_data = {}
+            for field_name, field_schema in properties.items():
+                field_type = field_schema.get('type', 'string')
+                field_description = field_schema.get('description', '')
+
+                print(f"{field_name} ({field_type}): {field_description}")
+
+                # Collect input based on field type
+                if field_type == 'string':
+                    value = input(f"Enter {field_name}: ")
+                elif field_type == 'number':
+                    value = float(input(f"Enter {field_name}: "))
+                elif field_type == 'boolean':
+                    value = input(f"Enter {field_name} (true/false): ").lower() == 'true'
+                elif field_type == 'integer':
+                    value = int(input(f"Enter {field_name}: "))
+                else:
+                    value = input(f"Enter {field_name}: ")
+
+                user_data[field_name] = value
+
+            # Basic validation for required fields
+            missing_fields = [field for field in required_fields if field not in user_data or not user_data[field]]
+            if missing_fields:
+                print(f"Missing required fields: {missing_fields}")
+                return ElicitResult(action="cancel")
+
+            return ElicitResult(action="accept", content=user_data)
+
+    # Fallback to simple text input
+    response = input(f"{params.message}: ")
+    return ElicitResult(action="accept", content=response)
+```
+
+## Creating Elicitation-Enabled Tools
+
+When building MCP servers, tools can request user input using the context parameter:
+
+```python
+from fastmcp import Context, FastMCP
+
+mcp = FastMCP(name="MyServer")
+
+@mcp.tool
+async def purchase_item(ctx: Context) -> str:
+    """Purchase an item with user-provided details."""
+
+    # Define the schema for purchase information
+    purchase_schema = {
+        "type": "object",
+        "properties": {
+            "quantity": {
+                "type": "number",
+                "minimum": 1,
+                "description": "Number of items to purchase"
+            },
+            "unit": {
+                "type": "string",
+                "enum": ["kg", "lbs", "pieces"],
+                "description": "Unit of measurement"
+            },
+            "item_name": {
+                "type": "string",
+                "description": "Name of the item to purchase"
+            }
+        },
+        "required": ["quantity", "unit", "item_name"]
+    }
+
+    # Request purchase details from the user
+    result = await ctx.elicit(
+        message="Please provide purchase details",
+        response_type=purchase_schema
+    )
+
+    # Handle different response actions
+    if result.action == "accept":
+        data = result.data
+        return f"Purchasing {data['quantity']} {data['unit']} of {data['item_name']}"
+    elif result.action == "decline":
+        return "Purchase declined by user"
+    else:
+        return "Purchase cancelled"
+
+@mcp.tool
+async def collect_feedback(ctx: Context) -> str:
+    """Collect user feedback with a simple text request."""
+
+    result = await ctx.elicit(
+        message="Please provide your feedback about our service"
+    )
+
+    if result.action == "accept":
+        return f"Thank you for your feedback: {result.data}"
+    else:
+        return "No feedback provided"
+```
+
+## Integration with MCPAgent
+
+When using elicitation with MCPAgent, the elicitation callback is automatically used during tool execution:
+
+```python
+import asyncio
+from mcp_use import MCPAgent, MCPClient
+from langchain_openai import ChatOpenAI
+
+async def main():
+    # Define elicitation callback
+    async def handle_user_input(ctx, params):
+        # Your UI logic here - this example uses simple input
+        print(f"\n🤖 Server Request: {params.message}")
+
+        if hasattr(params, 'requestedSchema') and params.requestedSchema:
+            # Handle structured input
+            schema = params.requestedSchema
+            if schema.get('type') == 'object':
+                data = {}
+                for field, field_schema in schema.get('properties', {}).items():
+                    value = input(f"Enter {field}: ")
+                    data[field] = value
+                return ElicitResult(action="accept", content=data)
+
+        # Simple text input
+        response = input("Your response: ")
+        return ElicitResult(action="accept", content=response)
+
+    # Create client with elicitation support
+    client = MCPClient.from_config_file(
+        "config.json",
+        elicitation_callback=handle_user_input
+    )
+
+    # Create agent
+    llm = ChatOpenAI(model="gpt-4")
+    agent = MCPAgent(llm=llm, client=client)
+
+    # Run agent - tools can now request user input
+    result = await agent.run("Help me purchase some items from the store")
+    print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Error Handling
+
+If no elicitation callback is provided but a tool requests user input:
+
+```python
+# Without elicitation callback
+client = MCPClient(config="config.json")  # No elicitation_callback
+
+# Tool that requires elicitation will return an error
+session = client.get_session("server_name")
+result = await session.connector.call_tool("purchase_item", {})
+# This will fail because no elicitation callback is configured
+```
