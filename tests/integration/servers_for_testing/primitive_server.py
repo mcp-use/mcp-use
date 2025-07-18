@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 
 from fastmcp import Context, FastMCP
 
@@ -46,6 +47,25 @@ async def analyze_sentiment(text: str, ctx: Context) -> str:
     response = await ctx.sample(prompt)
 
     return response.text.strip()
+
+
+@dataclass
+class Info:
+    quantity: int
+    unit: str
+
+
+@mcp.tool
+async def purchase_item(ctx: Context) -> str:
+    """Elicit the user to provide information about a purchase."""
+    result = await ctx.elicit(message="Please provide your information", response_type=Info)
+    if result.action == "accept":
+        info = result.data
+        return f"You are buying {info.quantity} {info.unit} of the item"
+    elif result.action == "decline":
+        return "Information not provided"
+    else:
+        return "Operation cancelled"
 
 
 if __name__ == "__main__":

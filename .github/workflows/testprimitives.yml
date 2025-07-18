@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        primitive: [sampling, tools, resources, prompts]
+        primitive: [sampling, tools, resources, prompts, elicitation]
         python-version: ["3.11"]
 
     steps:
