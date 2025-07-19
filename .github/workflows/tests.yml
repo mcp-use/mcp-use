@@ -1,0 +1,95 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+      - name: Lint with ruff
+        run: |
+          ruff check .
+      - name: Format check with ruff
+        run: |
+          ruff format --check .
+
+  unit-tests:
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev,anthropic,openai,search,e2b]
+      - name: Test with pytest
+        run: |
+          pytest tests/unit
+
+  transport-tests:
+    needs: lint
+    name: "transport/${{ matrix.transport }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        transport: [stdio, sse, streamableHttp]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: |
+          pip install uv
+      - name: Install dependencies
+        run: |
+          uv pip install --system .[dev,anthropic,openai,search,e2b]
+      - name: Run integration tests for ${{ matrix.transport }} transport
+        run: |
+          pytest tests/integration/transports/${{ matrix.transport }}
+
+  primitive-tests:
+    needs: lint
+    name: "primitive/${{ matrix.primitive }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        primitive: [sampling, tools, resources, prompts, elicitation]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: |
+          pip install uv
+      - name: Install dependencies
+        run: |
+          uv pip install --system .[dev,anthropic,openai,search,e2b]
+      - name: Run integration tests for ${{ matrix.primitive }} primitive
+        run: |
+          pytest tests/integration/primitives/test_${{ matrix.primitive }}.py
