@@ -8,10 +8,32 @@
     "dark": "#000000"
   },
   "favicon": "/favicon.svg",
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude"
+    ]
+  },
   "icons": {
     "library": "lucide"
   },
   "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Website",
+          "href": "https://mcp-use.com",
+          "icon": "globe"
+        },
+        {
+          "anchor": "Forum",
+          "href": "https://discord.gg/XkNkSkMz3V",
+          "icon": "discord"
+        }
+      ]
+    },
     "tabs": [
       {
         "tab": "Documentation",
@@ -202,14 +224,6 @@
           }
         ]
       }
-    ]
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude"
     ]
   },
   "seo": {

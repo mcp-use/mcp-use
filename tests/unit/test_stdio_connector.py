@@ -280,7 +280,7 @@ class TestStdioConnectorOperations:
         result = await connector.call_tool(tool_name, arguments)
 
         # Verify
-        mock_client.call_tool.assert_called_once_with(tool_name, arguments)
+        mock_client.call_tool.assert_called_once_with(tool_name, arguments, None)
         assert result == mock_result
 
     @pytest.mark.asyncio

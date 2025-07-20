@@ -316,7 +316,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
 
         result = await self.connector.call_tool("test_tool", {"param": "value"})
 
-        self.connector.client_session.call_tool.assert_called_once_with("test_tool", {"param": "value"})
+        self.connector.client_session.call_tool.assert_called_once_with("test_tool", {"param": "value"}, None)
         self.assertEqual(result, {"result": "success"})
 
     async def test_call_tool_no_client(self, _):

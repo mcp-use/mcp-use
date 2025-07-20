@@ -6,6 +6,7 @@ must implement.
 """
 
 from abc import ABC, abstractmethod
+from datetime import timedelta
 from typing import Any
 
 from mcp import ClientSession, Implementation
@@ -266,12 +267,15 @@ class BaseConnector(ABC):
                     "Connection to MCP server has been lost. Auto-reconnection is disabled. Please reconnect manually."
                 )
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> CallToolResult:
+    async def call_tool(
+        self, name: str, arguments: dict[str, Any], read_timeout_seconds: timedelta | None = None
+    ) -> CallToolResult:
         """Call an MCP tool with automatic reconnection handling.
 
         Args:
             name: The name of the tool to call.
             arguments: The arguments to pass to the tool.
+            read_timeout_seconds: timeout seconds when calling tool
 
         Returns:
             The result of the tool call.
@@ -285,7 +289,7 @@ class BaseConnector(ABC):
 
         logger.debug(f"Calling tool '{name}' with arguments: {arguments}")
         try:
-            result = await self.client_session.call_tool(name, arguments)
+            result = await self.client_session.call_tool(name, arguments, read_timeout_seconds)
             logger.debug(f"Tool '{name}' called with result: {result}")
             return result
         except Exception as e:
