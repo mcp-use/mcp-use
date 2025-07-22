@@ -1,0 +1,211 @@
+{
+  "description": "The `mcp-use` project provides a modular and extensible framework for building and interacting with LLM agents. Users initiate interactions through the Client & Session Management component, which establishes and maintains connections to MCP servers via the Communication Layer. Once a session is active, the Agent Core takes over, orchestrating LLM interactions, managing conversation flow, and deciding when to leverage external capabilities. The Tooling Layer supports the Agent Core by providing mechanisms to discover, adapt, and execute various tools, often communicating with tool servers through the Communication Layer. Throughout this process, the Framework Services component provides essential cross-cutting functionalities such as configuration management, telemetry collection, and logging, ensuring the framework operates efficiently and provides valuable insights.",
+  "components": [
+    {
+      "name": "Client & Session Management",
+      "description": "Serves as the primary entry point for users, managing the creation, lifecycle, and closure of multiple sessions with MCP servers. It orchestrates the establishment and termination of connections, providing the core interface for user interaction with the framework.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.client.MCPClient",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.session.MCPSession",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "Agent Core",
+      "description": "The central intelligence unit of the framework, responsible for orchestrating LLM interactions. It manages conversational history, generates system messages based on available tools, and makes decisions on when and how to utilize tools to fulfill user requests.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.agents.prompts",
+          "reference_file": "mcp_use/agents/prompts.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "Communication Layer",
+      "description": "Provides a standardized, abstract interface (`BaseConnector`) for all communication protocols (e.g., WebSocket, Sandbox, HTTP, StdIO). It handles the low-level details of sending and receiving data and manages asynchronous operations and persistent connections to ensure non-blocking I/O.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.http.HttpConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.stdio.StdioConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/stdio.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.base.ConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.websocket.WebSocketConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.stdio.StdioConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/stdio.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.sse.SseConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/sse.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.streamable_http.StreamableHttpConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/streamable_http.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "Tooling Layer",
+      "description": "Oversees the registration, discovery, adaptation, and execution of various tools available to the agent. It includes a `ToolSearchEngine` for efficient tool discovery and `Tool Adapters` to convert tools between the MCP framework's internal representation and external frameworks like LangChain.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools",
+          "reference_file": "mcp_use/managers/tools.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.ToolSearchEngine",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 57,
+          "reference_end_line": 327
+        },
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 16,
+          "reference_end_line": 89
+        },
+        {
+          "qualified_name": "mcp_use.adapters.base.BaseAdapter",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "Framework Services",
+      "description": "Provides essential cross-cutting functionalities for the entire framework. This includes loading and managing application-wide configuration settings, collecting anonymous usage data and agent execution metrics via the `Telemetry System`, and offering a centralized `Logging System` for operational insights and debugging.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.config",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/config.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.utils",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/utils.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.telemetry.telemetry.Telemetry",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/telemetry/telemetry.py",
+          "reference_start_line": 55,
+          "reference_end_line": 305
+        },
+        {
+          "qualified_name": "mcp_use.telemetry.events.BaseTelemetryEvent",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/telemetry/events.py",
+          "reference_start_line": 5,
+          "reference_end_line": 18
+        },
+        {
+          "qualified_name": "mcp_use.logging",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/logging.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "uses",
+      "src_name": "Client & Session Management",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "uses",
+      "src_name": "Client & Session Management",
+      "dst_name": "Communication Layer"
+    },
+    {
+      "relation": "uses",
+      "src_name": "Client & Session Management",
+      "dst_name": "Framework Services"
+    },
+    {
+      "relation": "uses",
+      "src_name": "Agent Core",
+      "dst_name": "Tooling Layer"
+    },
+    {
+      "relation": "uses",
+      "src_name": "Agent Core",
+      "dst_name": "Framework Services"
+    },
+    {
+      "relation": "uses",
+      "src_name": "Tooling Layer",
+      "dst_name": "Communication Layer"
+    }
+  ]
+}

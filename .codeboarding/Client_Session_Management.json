@@ -1,0 +1,182 @@
+{
+  "description": "One paragraph explaining the functionality which is represented by this graph. What the main flow is and what is its purpose.",
+  "components": [
+    {
+      "name": "MCPClient",
+      "description": "Serves as the primary entry point for users. It is responsible for loading and managing configurations, adding/removing MCP server definitions, and crucially, creating and managing multiple `MCPSession` instances. It acts as the central hub for client-side server and session orchestration.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.client",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "MCPSession",
+      "description": "Encapsulates a single, active connection to an MCP server. It handles the low-level details of connecting, disconnecting, and initializing the session, which includes discovering available tools from the connected server. It acts as a wrapper around various `BaseConnector` implementations for actual network communication.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.session",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "BaseConnector",
+      "description": "An abstract base class that defines the interface for various network communication protocols (e.g., HTTP, WebSocket, StdIO, Sandbox). Concrete connector implementations inherit from this class, providing the actual mechanism for `MCPSession` to communicate with MCP servers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.base",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "ServerManager",
+      "description": "Manages the registry of active MCP servers and their exposed tools. It provides functionalities to register, retrieve, and manage server definitions, which are then utilized by `MCPClient` and `MCPAgent`.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.server_manager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "MCPAgent",
+      "description": "Represents the core LLM agent within the framework. It interacts with `MCPSession` to establish and manage its connection to the MCP server, enabling it to utilize the tools and functionalities exposed by the server for task execution.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "mcp_use.config",
+      "description": "This module is responsible for managing configuration settings for the `mcp-use` framework, including server definitions and other operational parameters. It provides mechanisms for loading, saving, and accessing these settings.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.config",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/config.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "mcp_use.logging",
+      "description": "Provides a centralized logging utility for the entire `mcp-use` framework. It ensures consistent and configurable logging of events, errors, and debugging information across various components, including client and session activities.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.logging",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/logging.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "BaseAdapter",
+      "description": "An abstract base class for adapters that convert between `mcp-use`'s internal tool representation and external frameworks (e.g., LangChain). While not directly part of session management, it's crucial for the discoverability and usability of tools exposed through sessions.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.base",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "Telemetry",
+      "description": "This component is responsible for collecting and reporting telemetry data and events related to the framework's operation, including agent executions and client interactions. It provides insights into usage and performance.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.telemetry.telemetry",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/telemetry/telemetry.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    },
+    {
+      "name": "WebSocketConnectionManager",
+      "description": "Manages the lifecycle of WebSocket connections, handling the low-level details of establishing, maintaining, and closing WebSocket communication channels. It works in conjunction with `WebSocketConnector`.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.task_managers.websocket",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ]
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "creates and manages",
+      "src_name": "MCPClient",
+      "dst_name": "MCPSession"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPClient",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPClient",
+      "dst_name": "mcp_use.config"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPClient",
+      "dst_name": "mcp_use.logging"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPClient",
+      "dst_name": "Telemetry"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPSession",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPSession",
+      "dst_name": "mcp_use.logging"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPAgent",
+      "dst_name": "MCPSession"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPAgent",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPAgent",
+      "dst_name": "Telemetry"
+    },
+    {
+      "relation": "uses",
+      "src_name": "ServerManager",
+      "dst_name": "BaseAdapter"
+    }
+  ]
+}

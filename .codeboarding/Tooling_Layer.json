@@ -1,0 +1,148 @@
+{
+  "description": "The Tooling Layer is a critical subsystem within the `mcp_use` project, designed to provide a robust and extensible mechanism for agents to discover, adapt, and execute various tools. It embodies the project's architectural bias towards modularity and extensibility, leveraging patterns like the Adapter Pattern and Service Locator/Registry.",
+  "components": [
+    {
+      "name": "ServerManager",
+      "description": "The central orchestrator for tool servers. It manages the lifecycle of connections to external tool providers, maintaining a registry of active servers and enabling agents to interact with the broader tool ecosystem. It acts as a service locator for available tools and servers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 16,
+          "reference_end_line": 89
+        }
+      ]
+    },
+    {
+      "name": "ToolSearchEngine",
+      "description": "Responsible for efficient discovery of available tools. It indexes tools and provides semantic search capabilities, allowing agents to find relevant tools based on natural language queries, crucial for dynamic tool selection in an LLM agent framework.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.ToolSearchEngine",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 57,
+          "reference_end_line": 327
+        }
+      ]
+    },
+    {
+      "name": "BaseAdapter",
+      "description": "An abstract base class that defines the common interface for adapting tools from various external frameworks into the MCP framework's internal representation. It ensures consistency in how tools are converted and loaded, supporting the \"adaptation\" aspect.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.base.BaseAdapter",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/base.py",
+          "reference_start_line": 1,
+          "reference_end_line": 100
+        }
+      ]
+    },
+    {
+      "name": "LangChainAdapter",
+      "description": "A concrete implementation of BaseAdapter specifically designed to integrate tools from the LangChain framework. It handles the conversion of LangChain tool definitions into a format usable by mcp_use agents.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 1,
+          "reference_end_line": 100
+        }
+      ]
+    },
+    {
+      "name": "BaseConnector",
+      "description": "The abstract base class for all connectors, defining the interface for establishing and managing connections to external tool providers (e.g., HTTP, WebSocket, Sandbox, Stdio). It's essential for the underlying communication with tool sources.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 1,
+          "reference_end_line": 100
+        }
+      ]
+    },
+    {
+      "name": "MCPServerTool",
+      "description": "The abstract base class for all tools that agents use to interact with the ServerManager and the broader tooling ecosystem. Subclasses (e.g., ConnectServerTool, ListServersTool, SearchToolsTool, UseToolFromServerTool) provide specific functionalities like connecting to servers, listing available tools, or executing tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.base_tool.MCPServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": 5,
+          "reference_end_line": 18
+        }
+      ]
+    },
+    {
+      "name": "MCPSession",
+      "description": "Manages the overall session context for an agent, including the lifecycle of tool connections and interactions. It orchestrates the use of connectors and tools within a specific agent's operational scope.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.session.MCPSession",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
+          "reference_start_line": 1,
+          "reference_end_line": 100
+        }
+      ]
+    },
+    {
+      "name": "MCPClient",
+      "description": "Represents the client-side interface for interacting with the ServerManager. It facilitates communication between the agent's environment and the tool servers, enabling the agent to send requests and receive responses from tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.client.MCPClient",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
+          "reference_start_line": 1,
+          "reference_end_line": 100
+        }
+      ]
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "manages",
+      "src_name": "ServerManager",
+      "dst_name": "MCPServerTool"
+    },
+    {
+      "relation": "uses",
+      "src_name": "ServerManager",
+      "dst_name": "BaseAdapter"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "ServerManager",
+      "dst_name": "MCPClient"
+    },
+    {
+      "relation": "provides search capabilities for",
+      "src_name": "ToolSearchEngine",
+      "dst_name": "MCPServerTool"
+    },
+    {
+      "relation": "implements",
+      "src_name": "LangChainAdapter",
+      "dst_name": "BaseAdapter"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "BaseAdapter",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPSession",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "orchestrates",
+      "src_name": "MCPSession",
+      "dst_name": "MCPServerTool"
+    },
+    {
+      "relation": "communicates with",
+      "src_name": "MCPClient",
+      "dst_name": "ServerManager"
+    }
+  ]
+}
