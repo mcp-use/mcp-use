@@ -30,7 +30,7 @@ on:
       output_directory:
         description: 'Output directory for documentation files'
         required: false
-        default: 'docs/api-reference/auto-generated'
+        default: '.codeboarding'
         type: string
 
 jobs:
@@ -70,7 +70,7 @@ jobs:
           repository_url: ${{ github.event.inputs.repository_url }}
           source_branch: ${{ steps.set-branches.outputs.source_branch }}
           target_branch: ${{ steps.set-branches.outputs.target_branch }}
-          output_directory: ${{ github.event.inputs.output_directory || 'docs/api-reference/auto-generated' }}
+          output_directory: ${{ github.event.inputs.output_directory || '.codeboarding' }}
           output_format: ${{ github.event.inputs.output_format || '.mdx' }}
 
       - name: Display Action Results
@@ -91,70 +91,42 @@ jobs:
             echo "has_git_changes=false" >> $GITHUB_OUTPUT
           fi
 
-      # Update documentation to include the generated files
-      - name: Update documentation structure with generated docs
+      # Append generated MDX files to development.mdx
+      - name: Append generated docs to development.mdx
         if: steps.git-changes.outputs.has_git_changes == 'true' && steps.codeboarding.outputs.has_changes == 'true'
         run: |
-          # Install jq for JSON manipulation
-          sudo apt-get update && sudo apt-get install -y jq
-          
-          # Update docs.json to include auto-generated files in API Reference
+          # Check if the output directory exists and has .mdx files
           if [ -d "${{ steps.codeboarding.outputs.output_directory }}" ]; then
-            # Create a list of generated files for docs.json
-            generated_files=""
-            find "${{ steps.codeboarding.outputs.output_directory }}" -name "*.mdx" -type f | while read file; do
-              # Get relative path from docs root without extension
-              rel_path=$(echo "$file" | sed 's|^docs/||' | sed 's|\.mdx$||')
-              if [ -z "$generated_files" ]; then
-                generated_files="\"$rel_path\""
-              else
-                generated_files="$generated_files,\"$rel_path\""
+            # Add a section header for auto-generated documentation
+            echo "" >> docs/development.mdx
+            echo "## Auto-Generated API Documentation" >> docs/development.mdx
+            echo "" >> docs/development.mdx
+            echo "The following documentation was automatically generated from the codebase:" >> docs/development.mdx
+            echo "" >> docs/development.mdx
+            
+            # Find all .mdx files in the output directory and append their content
+            find "${{ steps.codeboarding.outputs.output_directory }}" -name "*.mdx" -type f | sort | while read file; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file" .mdx)
+                
+                # Add a header for each file
+                echo "### $(echo "$filename" | sed 's/_/ /g' | sed 's/\b\w/\U&/g')" >> docs/development.mdx
+                echo "" >> docs/development.mdx
+                
+                # Append the content of the file (skip frontmatter if present)
+                if head -n 1 "$file" | grep -q "^---"; then
+                  # Skip frontmatter (from first --- to second ---)
+                  sed -n '/^---$/,/^---$/d; /^---$/,$p' "$file" >> docs/development.mdx
+                else
+                  # No frontmatter, append entire file
+                  cat "$file" >> docs/development.mdx
+                fi
+                
+                echo "" >> docs/development.mdx
+                echo "---" >> docs/development.mdx
+                echo "" >> docs/development.mdx
               fi
-              echo "$rel_path" >> generated_files_list.txt
             done
-            
-            # Update docs.json to include auto-generated files
-            if [ -s generated_files_list.txt ]; then
-              # Create a new group for auto-generated docs
-              temp_json=$(mktemp)
-              jq --argjson new_group '{
-                "group": "Auto-Generated API Documentation", 
-                "pages": []
-              }' '
-              .navigation[0].groups |= map(
-                if .group == "API Reference" then
-                  .groups += [$new_group] |
-                  .groups[-1].pages = (input | split("\n") | map(select(length > 0)))
-                else . end
-              )' docs/docs.json generated_files_list.txt > "$temp_json"
-              
-              # If the above doesn't work, try a simpler approach
-              if [ $? -ne 0 ]; then
-                # Simple insertion: add auto-generated files to existing API Reference group
-                while read -r file_path; do
-                  if [ -n "$file_path" ]; then
-                    jq --arg path "$file_path" '
-                    (.navigation[] | select(.tab == "API Reference") | .groups[] | select(.group == "API Reference") | .pages) += [$path]
-                    ' docs/docs.json > "$temp_json" && mv "$temp_json" docs/docs.json
-                  fi
-                done < generated_files_list.txt
-              else
-                mv "$temp_json" docs/docs.json
-              fi
-              
-              rm -f generated_files_list.txt
-            fi
-            
-            # Update development.mdx to mention auto-generated documentation
-            # Insert before the Project Structure section
-            sed -i '/## Project Structure/i \
-## Auto-Generated API Documentation\
-\
-This project includes automatically generated API documentation files created by the CodeBoarding documentation workflow. These files provide detailed documentation for the codebase and are updated automatically when changes are made to the source code.\
-\
-The auto-generated documentation files are located in the **API Reference** section of this documentation site under "Auto-Generated API Documentation".\
-\
-' docs/development.mdx
           fi
 
       - name: Create Pull Request
@@ -175,7 +147,7 @@ The auto-generated documentation files are located in the **API Reference** sect
             - **Output format**: `${{ github.event.inputs.output_format || '.mdx' }}`
             - **Repository analyzed**: `${{ steps.codeboarding.outputs.repo_url }}`
             
-            The generated .mdx files have been automatically integrated into the development documentation.
+            The generated .mdx files have been automatically appended to the development documentation.
             
             🤖 This PR was automatically generated by the CodeBoarding documentation update workflow.
           branch: docs/codeboarding-update
