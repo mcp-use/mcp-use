@@ -99,9 +99,6 @@ jobs:
           mkdir -p docs/development
           
           # Initialize the architecture.mdx file
-          echo "# Architecture Documentation" > docs/development/architecture.mdx
-          echo "" >> docs/development/architecture.mdx
-          echo "This document contains the complete architecture documentation generated from CodeBoarding analysis." >> docs/development/architecture.mdx
           echo "" >> docs/development/architecture.mdx
           
           # First, add on_boarding.mdx if it exists
