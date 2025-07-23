@@ -18,7 +18,7 @@ graph LR
 
 Abstract Components Overview
 
-### External Integration Layer [[Expand]](./External_Integration_Layer)
+
 The overarching component responsible for abstracting and managing interactions with external AI frameworks and systems. It acts as the primary interface for `mcp-use` to leverage external functionalities, ensuring loose coupling and adaptability.
 
 
@@ -28,7 +28,7 @@ The overarching component responsible for abstracting and managing interactions 
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py" target="_blank" rel="noopener noreferrer">`mcp_use.adapters.langchain_adapter.LangChainAdapter`</a>
 
 
-### Base Adapter
+
 Defines the abstract interface and contract for all external integrations. It establishes the common methods and properties that any concrete adapter must implement, ensuring a consistent approach to integrating diverse external systems. It also orchestrates the lifecycle of connectors.
 
 
@@ -37,7 +37,7 @@ Defines the abstract interface and contract for all external integrations. It es
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/adapters/base.py" target="_blank" rel="noopener noreferrer">`mcp_use.adapters.base.BaseAdapter`</a>
 
 
-### LangChain Adapter
+
 A concrete implementation of the `BaseAdapter` specifically tailored for integrating with the LangChain framework. It translates `mcp-use`'s internal requests and data structures into LangChain-compatible formats and vice-versa, enabling the use of LangChain's agents, tools, and chains.
 
 
@@ -46,7 +46,7 @@ A concrete implementation of the `BaseAdapter` specifically tailored for integra
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py" target="_blank" rel="noopener noreferrer">`mcp_use.adapters.langchain_adapter.LangChainAdapter`</a>
 
 
-### Connector Management Logic
+
 An internal helper component responsible for the initialization, configuration, and lifecycle management of connectors to external systems. It ensures that the necessary connections are established and maintained for adapters to function correctly.
 
 
@@ -60,7 +60,7 @@ An internal helper component responsible for the initialization, configuration, 
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/session.py" target="_blank" rel="noopener noreferrer">`mcp_use.session.MCPSession`</a>
 
 
-### Tool/Resource/Prompt Conversion Helpers
+
 An internal helper component that performs specific data transformations, such as converting `mcp-use`'s internal tool definitions, resources, or prompt templates into formats compatible with external frameworks (e.g., LangChain's tool schema or prompt templates), and vice-versa.
 
 
