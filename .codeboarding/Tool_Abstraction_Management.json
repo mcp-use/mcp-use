@@ -11,8 +11,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "LLM Integration Layer",
@@ -24,8 +23,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "Tool Abstraction & Management",
@@ -73,8 +71,7 @@
           "reference_start_line": 16,
           "reference_end_line": 89
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "MCP Server Communication Layer",
@@ -104,8 +101,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "Configuration Management",
@@ -117,8 +113,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": false
+      ]
     },
     {
       "name": "Asynchronous Execution Engine",
@@ -148,8 +143,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     }
   ],
   "components_relations": [

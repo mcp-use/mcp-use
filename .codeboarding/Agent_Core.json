@@ -11,8 +11,7 @@
           "reference_start_line": 1,
           "reference_end_line": 1
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "Base Agent",
@@ -24,8 +23,7 @@
           "reference_start_line": 1,
           "reference_end_line": 1
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "MCP Server Registry/Connector",
@@ -37,8 +35,7 @@
           "reference_start_line": 16,
           "reference_end_line": 89
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "LLM Integration Layer",
@@ -50,8 +47,7 @@
           "reference_start_line": 1,
           "reference_end_line": 1
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "Telemetry",
@@ -63,8 +59,7 @@
           "reference_start_line": 55,
           "reference_end_line": 305
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "MCP Session",
@@ -76,8 +71,7 @@
           "reference_start_line": 1,
           "reference_end_line": 1
         }
-      ],
-      "can_expand": true
+      ]
     }
   ],
   "components_relations": [

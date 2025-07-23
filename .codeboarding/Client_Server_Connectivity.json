@@ -11,8 +11,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "MCP Session Manager",
@@ -24,8 +23,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "Base Connector Abstraction",
@@ -37,8 +35,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "Sandbox Connector",
@@ -50,8 +47,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "WebSocket Connector",
@@ -63,8 +59,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": false
+      ]
     },
     {
       "name": "Connection Task Manager",
@@ -76,8 +71,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "Server Manager",
@@ -89,8 +83,7 @@
           "reference_start_line": 16,
           "reference_end_line": 89
         }
-      ],
-      "can_expand": true
+      ]
     },
     {
       "name": "Base Agent Abstraction",
@@ -102,8 +95,7 @@
           "reference_start_line": 0,
           "reference_end_line": 0
         }
-      ],
-      "can_expand": true
+      ]
     }
   ],
   "components_relations": [
