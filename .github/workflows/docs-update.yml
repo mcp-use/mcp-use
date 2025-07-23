@@ -98,23 +98,49 @@ jobs:
           # Create docs/development directory if it doesn't exist
           mkdir -p docs/development
           
+          # Log the files found in the CodeBoarding directory
+          echo "📁 Scanning CodeBoarding directory for .mdx files..."
+          ls -la .codeboarding/ || echo "⚠️  CodeBoarding directory not found"
+          
           # Initialize the architecture.mdx file
           echo "" >> docs/development/architecture.mdx
           
           # First, add on_boarding.mdx if it exists
           if [ -f ".codeboarding/on_boarding.mdx" ]; then
+            echo "✅ Found and adding: on_boarding.mdx"
             cat .codeboarding/on_boarding.mdx >> docs/development/architecture.mdx
             echo "" >> docs/development/architecture.mdx
+          else
+            echo "ℹ️  on_boarding.mdx not found, skipping"
           fi
+          
+          # Count and log other .mdx files
+          other_files_count=0
           
           # Then add all other .mdx files (excluding on_boarding.mdx)
           for file in .codeboarding/*.mdx; do
             if [ -f "$file" ] && [ "$(basename "$file")" != "on_boarding.mdx" ]; then
+              filename=$(basename "$file")
+              echo "✅ Found and adding: $filename"
               echo "" >> docs/development/architecture.mdx
               cat "$file" >> docs/development/architecture.mdx
               echo "" >> docs/development/architecture.mdx
+              other_files_count=$((other_files_count + 1))
             fi
           done
+          
+          # Summary logging
+          echo ""
+          echo "📊 Architecture generation summary:"
+          echo "   - on_boarding.mdx: $([ -f ".codeboarding/on_boarding.mdx" ] && echo "included" || echo "not found")"
+          echo "   - Other .mdx files: $other_files_count files processed"
+          echo "   - Output: docs/development/architecture.mdx"
+          
+          # Show final file size
+          if [ -f "docs/development/architecture.mdx" ]; then
+            file_size=$(wc -c < docs/development/architecture.mdx)
+            echo "   - Final file size: $file_size bytes"
+          fi
           
           echo "Architecture documentation generated at docs/development/architecture.mdx"
 
