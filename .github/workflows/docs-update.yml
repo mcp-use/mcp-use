@@ -95,216 +95,31 @@ jobs:
       - name: Generate architecture documentation
         if: steps.git-changes.outputs.has_git_changes == 'true' && steps.codeboarding.outputs.has_changes == 'true'
         run: |
-          # Create the architecture.mdx file from CodeBoarding files
-          python3 << 'EOF'
-          import json
-          import os
-          import re
-          from pathlib import Path
+          # Create docs/development directory if it doesn't exist
+          mkdir -p docs/development
           
-          def extract_mermaid_diagram(mdx_content):
-              """Extract mermaid diagram from MDX content."""
-              mermaid_pattern = r'```mermaid\n(.*?)\n```'
-              match = re.search(mermaid_pattern, mdx_content, re.DOTALL)
-              return match.group(1) if match else ""
+          # Initialize the architecture.mdx file
+          echo "# Architecture Documentation" > docs/development/architecture.mdx
+          echo "" >> docs/development/architecture.mdx
+          echo "This document contains the complete architecture documentation generated from CodeBoarding analysis." >> docs/development/architecture.mdx
+          echo "" >> docs/development/architecture.mdx
           
-          def load_codeboarding_files(codeboarding_dir):
-              """Load all CodeBoarding files."""
-              files = {}
-              
-              # Load JSON files
-              for json_file in Path(codeboarding_dir).glob("*.json"):
-                  if json_file.name == "codeboarding_version.json":
-                      continue
-                  with open(json_file, 'r') as f:
-                      files[json_file.stem] = json.load(f)
-              
-              # Load MDX files
-              for mdx_file in Path(codeboarding_dir).glob("*.mdx"):
-                  if mdx_file.name == "on_boarding.mdx":
-                      continue
-                  with open(mdx_file, 'r') as f:
-                      files[mdx_file.stem] = f.read()
-              
-              return files
-          
-          def generate_architecture_mdx(codeboarding_files):
-              """Generate the complete architecture.mdx content."""
-              
-              # Get analysis data
-              analysis = codeboarding_files.get("analysis", {})
-              components = analysis.get("components", [])
-              
-              # Start building the MDX content
-              content = """---
-          title: "Architecture"
-          description: "Overview of mcp-use architecture and design patterns"
-          ---
-          
-          # Architecture
-          
-          This document provides an overview of the mcp-use library architecture, including its core components, design patterns, and how different modules interact with each other.
-          
-          <Info>
-          This documentation is automatically generated from [CodeBoarding](https://github.com/CodeBoarding/GeneratedOnBoardings) analysis files located in the `.codeboarding` directory.
-          </Info>
-          
-          ## System Overview
-          
-          """
-              
-              # Add system description from analysis
-              if "description" in analysis:
-                  content += f"{analysis['description']}\n\n"
-              
-              # Add component architecture diagrams
-              content += "## Component Architecture\n\n"
-              
-              # Add diagrams from each component
-              component_layers = ["Communication_Layer", "Client_Session_Management", "Framework_Services", "Tooling_Layer"]
-              
-              for layer in component_layers:
-                  if layer in codeboarding_files:
-                      mdx_content = codeboarding_files[layer]
-                      # Extract title from MDX frontmatter
-                      title_match = re.search(r'title: "([^"]*)"', mdx_content)
-                      layer_title = title_match.group(1) if title_match else layer.replace("_", " ")
-                      
-                      content += f"### {layer_title}\n\n"
-                      
-                      # Extract and add mermaid diagram
-                      mermaid_diagram = extract_mermaid_diagram(mdx_content)
-                      if mermaid_diagram:
-                          content += f"```mermaid\n{mermaid_diagram}\n```\n\n"
-              
-              # Add detailed component descriptions
-              content += "## Core Components\n\n"
-              
-              for component in components:
-                  content += f"### {component.get('name', '')}\n\n"
-                  content += f"{component.get('description', '')}\n\n"
-                  
-                  source_files = [ref.get("reference_file", "") for ref in component.get("referenced_source_code", [])]
-                  if source_files:
-                      content += "**Key Implementation Files:**\n"
-                      for file_path in source_files:
-                          if file_path:
-                              # Convert absolute path to relative
-                              rel_path = file_path.replace("/Users/imilev/StartUp/forks/mcp-use/", "").replace(os.getcwd() + "/", "")
-                              content += f"- `{rel_path}`\n"
-                      content += "\n"
-              
-              # Add design patterns and architecture principles
-              content += """## Design Patterns
-          
-          ### Modular Architecture
-          The library follows a modular design where each component can be used independently or combined for complex workflows. Each layer is clearly separated with well-defined interfaces.
-          
-          ### Protocol Abstraction
-          Communication protocols are abstracted through connector interfaces, allowing easy extension for new transport methods without affecting other components.
-          
-          ### Async-First Design
-          All components are built with async/await patterns for optimal performance and scalability, ensuring non-blocking operations throughout the system.
-          
-          ### Configuration-Driven
-          Behavior is controlled through configuration objects, enabling flexible deployment scenarios and easy customization.
-          
-          ## Data Flow
-          
-          The typical data flow through the system follows this pattern:
-          
-          1. **Session Initialization**: `MCPClient` creates and manages `MCPSession` instances
-          2. **Connection Establishment**: Sessions use appropriate `Connector` implementations to establish communication
-          3. **Agent Orchestration**: `MCPAgent` coordinates LLM interactions and tool usage
-          4. **Tool Discovery & Execution**: The tooling layer discovers available tools and executes them as needed
-          5. **Response Processing**: Results are processed and returned through the session management layer
-          
-          ## Extension Points
-          
-          The architecture provides several extension points for customization:
-          
-          - **Custom Connectors**: Implement `BaseConnector` for new communication protocols
-          - **Custom Adapters**: Create adapters for integration with additional LLM frameworks
-          - **Custom Agents**: Extend base agent classes for specialized workflows
-          - **Custom Tools**: Add new tool implementations for domain-specific functionality
-          - **Observability Providers**: Integrate custom monitoring and telemetry solutions
-          
-          ## Framework Services
-          
-          The framework includes comprehensive cross-cutting services:
-          
-          - **Configuration Management**: Centralized configuration handling across all components
-          - **Logging & Telemetry**: Built-in observability with support for external providers
-          - **Error Handling**: Consistent error handling patterns throughout the system
-          - **Resource Management**: Efficient resource allocation and cleanup
-          
-          ---
-          
-          *This documentation is automatically generated from the codebase analysis. For the most up-to-date information, refer to the source code and inline documentation.*
-          """
-              
-              return content
-          
-          # Main execution
-          codeboarding_dir = "${{ steps.codeboarding.outputs.output_directory }}"
-          output_file = "docs/development/architecture.mdx"
-          
-          if os.path.exists(codeboarding_dir):
-              print("Loading CodeBoarding files...")
-              codeboarding_files = load_codeboarding_files(codeboarding_dir)
-              
-              print("Generating architecture documentation...")
-              architecture_content = generate_architecture_mdx(codeboarding_files)
-              
-              # Ensure output directory exists
-              os.makedirs(os.path.dirname(output_file), exist_ok=True)
-              
-              # Write the generated content
-              with open(output_file, 'w') as f:
-                  f.write(architecture_content)
-              
-              print(f"Successfully generated architecture documentation at {output_file}")
-          else:
-              print(f"CodeBoarding directory not found at {codeboarding_dir}")
-          EOF
-      
-      # Append generated MDX files to development.mdx
-      - name: Append generated docs to development.mdx
-        if: steps.git-changes.outputs.has_git_changes == 'true' && steps.codeboarding.outputs.has_changes == 'true'
-        run: |
-          # Check if the output directory exists and has .mdx files
-          if [ -d "${{ steps.codeboarding.outputs.output_directory }}" ]; then
-            # Add a section header for auto-generated documentation
-            echo "" >> docs/development.mdx
-            echo "## Auto-Generated API Documentation" >> docs/development.mdx
-            echo "" >> docs/development.mdx
-            echo "The following documentation was automatically generated from the codebase:" >> docs/development.mdx
-            echo "" >> docs/development.mdx
-            
-            # Find all .mdx files in the output directory and append their content
-            find "${{ steps.codeboarding.outputs.output_directory }}" -name "*.mdx" -type f | sort | while read file; do
-              if [ -f "$file" ]; then
-                filename=$(basename "$file" .mdx)
-                
-                # Add a header for each file
-                echo "### $(echo "$filename" | sed 's/_/ /g' | sed 's/\b\w/\U&/g')" >> docs/development.mdx
-                echo "" >> docs/development.mdx
-                
-                # Append the content of the file (skip frontmatter if present)
-                if head -n 1 "$file" | grep -q "^---"; then
-                  # Skip frontmatter (from first --- to second ---)
-                  sed -n '/^---$/,/^---$/d; /^---$/,$p' "$file" >> docs/development.mdx
-                else
-                  # No frontmatter, append entire file
-                  cat "$file" >> docs/development.mdx
-                fi
-                
-                echo "" >> docs/development.mdx
-                echo "---" >> docs/development.mdx
-                echo "" >> docs/development.mdx
-              fi
-            done
+          # First, add on_boarding.mdx if it exists
+          if [ -f ".codeboarding/on_boarding.mdx" ]; then
+            cat .codeboarding/on_boarding.mdx >> docs/development/architecture.mdx
+            echo "" >> docs/development/architecture.mdx
           fi
+          
+          # Then add all other .mdx files (excluding on_boarding.mdx)
+          for file in .codeboarding/*.mdx; do
+            if [ -f "$file" ] && [ "$(basename "$file")" != "on_boarding.mdx" ]; then
+              echo "" >> docs/development/architecture.mdx
+              cat "$file" >> docs/development/architecture.mdx
+              echo "" >> docs/development/architecture.mdx
+            fi
+          done
+          
+          echo "Architecture documentation generated at docs/development/architecture.mdx"
 
       - name: Commit and push changes
         if: steps.git-changes.outputs.has_git_changes == 'true' && steps.codeboarding.outputs.has_changes == 'true'
