@@ -103,7 +103,7 @@ jobs:
           ls -la .codeboarding/ || echo "⚠️  CodeBoarding directory not found"
           
           # Initialize the architecture.mdx file
-          echo "" >> docs/development/architecture.mdx
+          echo "" > docs/development/architecture.mdx
           
           # First, add on_boarding.mdx if it exists
           if [ -f ".codeboarding/on_boarding.mdx" ]; then
