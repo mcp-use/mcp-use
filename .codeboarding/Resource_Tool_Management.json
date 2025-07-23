@@ -1,0 +1,165 @@
+{
+  "description": "Updated analysis of MCP components, correcting source code references for ServerManager and validating ToolSearchEngine interaction.",
+  "components": [
+    {
+      "name": "ServerManager",
+      "description": "The central registry and orchestrator for MCP servers. It manages the connection, registration, and overall lifecycle of external MCP servers, ensuring the agent can keep track of and interact with available services. It initializes with an `MCPClient` and a `BaseAdapter`, manages an `active_server`, and caches initialized servers and their tools. It provides a `tools` property that returns a list of server management tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 16,
+          "reference_end_line": 89
+        }
+      ]
+    },
+    {
+      "name": "ToolSearchEngine",
+      "description": "Provides the mechanism for discovering and semantically searching for tools exposed by registered servers. It enables the agent to find the most relevant tool for a given task, which is crucial for dynamic tool selection in an LLM agent. It uses vector similarity for semantic search and can cache results. It interacts with `ServerManager` to get tools for indexing.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.ToolSearchEngine",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 57,
+          "reference_end_line": 327
+        }
+      ]
+    },
+    {
+      "name": "MCPServerTool",
+      "description": "The abstract base class for all tools that are exposed by or interact with MCP servers. It defines the common interface and properties for these server-managed functionalities, ensuring a consistent way for the agent to interact with diverse tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.base_tool.MCPServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": 5,
+          "reference_end_line": 18
+        }
+      ]
+    },
+    {
+      "name": "ConnectServerTool",
+      "description": "A concrete implementation of `MCPServerTool` that encapsulates the logic for establishing a connection to an MCP server. It allows the `MCPAgent` to programmatically connect to new services.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.connect_server.ConnectServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/connect_server.py",
+          "reference_start_line": 15,
+          "reference_end_line": 68
+        }
+      ]
+    },
+    {
+      "name": "DisconnectServerTool",
+      "description": "A concrete implementation of `MCPServerTool` responsible for terminating a connection to an MCP server. This allows the `MCPAgent` to manage its active server connections.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.disconnect_server.DisconnectServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/disconnect_server.py",
+          "reference_start_line": 15,
+          "reference_end_line": 42
+        }
+      ]
+    },
+    {
+      "name": "ListServersTool",
+      "description": "A concrete implementation of `MCPServerTool` that provides the `MCPAgent` with the ability to list all currently registered and active MCP servers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.list_servers_tool.ListServersTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/list_servers_tool.py",
+          "reference_start_line": 15,
+          "reference_end_line": 51
+        }
+      ]
+    },
+    {
+      "name": "GetActiveServerTool",
+      "description": "A concrete implementation of `MCPServerTool` that allows the `MCPAgent` to retrieve information about the currently active or primary MCP server.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.get_active_server.GetActiveServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/get_active_server.py",
+          "reference_start_line": 13,
+          "reference_end_line": 28
+        }
+      ]
+    },
+    {
+      "name": "UseToolFromServerTool",
+      "description": "A concrete implementation of `MCPServerTool` that facilitates the invocation of a specific tool provided by a registered MCP server. This is the primary mechanism for the agent to utilize external functionalities.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.use_tool.UseToolFromServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/use_tool.py",
+          "reference_start_line": 21,
+          "reference_end_line": 153
+        }
+      ]
+    },
+    {
+      "name": "SearchToolsTool",
+      "description": "A concrete implementation of `MCPServerTool` that exposes the `ToolSearchEngine`'s capabilities to the `MCPAgent`, allowing the agent to perform semantic searches for available tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.SearchToolsTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 22,
+          "reference_end_line": 54
+        }
+      ]
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "interacts with",
+      "src_name": "MCPAgent",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "MCPAgent",
+      "dst_name": "MCPServerTool"
+    },
+    {
+      "relation": "manages",
+      "src_name": "ServerManager",
+      "dst_name": "MCPServerTool"
+    },
+    {
+      "relation": "provides search for",
+      "src_name": "ToolSearchEngine",
+      "dst_name": "MCPServerTool"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "SearchToolsTool",
+      "dst_name": "ToolSearchEngine"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "ConnectServerTool",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "DisconnectServerTool",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "queries",
+      "src_name": "ListServersTool",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "queries",
+      "src_name": "GetActiveServerTool",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "UseToolFromServerTool",
+      "dst_name": "ServerManager"
+    }
+  ]
+}
