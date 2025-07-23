@@ -7,7 +7,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.managers.server_manager.ServerManager",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/managers/server_manager.py",
           "reference_start_line": 16,
           "reference_end_line": 89
         }
@@ -19,7 +19,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.managers.tools.search_tools.ToolSearchEngine",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/managers/tools/search_tools.py",
           "reference_start_line": 57,
           "reference_end_line": 327
         }
@@ -31,7 +31,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.adapters.base.BaseAdapter",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/base.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/adapters/base.py",
           "reference_start_line": 1,
           "reference_end_line": 100
         }
@@ -43,7 +43,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/adapters/langchain_adapter.py",
           "reference_start_line": 1,
           "reference_end_line": 100
         }
@@ -55,7 +55,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.connectors.base.BaseConnector",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/connectors/base.py",
           "reference_start_line": 1,
           "reference_end_line": 100
         }
@@ -67,7 +67,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.managers.tools.base_tool.MCPServerTool",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/base_tool.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/managers/tools/base_tool.py",
           "reference_start_line": 5,
           "reference_end_line": 18
         }
@@ -79,7 +79,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.session.MCPSession",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/session.py",
           "reference_start_line": 1,
           "reference_end_line": 100
         }
@@ -91,7 +91,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.client.MCPClient",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/client.py",
           "reference_start_line": 1,
           "reference_end_line": 100
         }

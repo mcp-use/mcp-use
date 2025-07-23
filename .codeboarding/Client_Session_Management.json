@@ -7,7 +7,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.client",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/client.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -19,7 +19,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.session",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/session.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -31,7 +31,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.connectors.base",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/connectors/base.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -43,7 +43,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.managers.server_manager",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/managers/server_manager.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -55,7 +55,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.agents.mcpagent",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/agents/mcpagent.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -67,7 +67,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.config",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/config.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/config.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -79,7 +79,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.logging",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/logging.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/logging.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -91,7 +91,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.adapters.base",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/base.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/adapters/base.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -103,7 +103,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.telemetry.telemetry",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/telemetry/telemetry.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/telemetry/telemetry.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
@@ -115,7 +115,7 @@
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.task_managers.websocket",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/websocket.py",
+          "reference_file": "/Users/imilev/StartUp/forks/mcp-use/mcp_use/task_managers/websocket.py",
           "reference_start_line": 0,
           "reference_end_line": 0
         }
