@@ -28,7 +28,7 @@ graph LR
 
 Abstract Components Overview
 
-
+### Agent Core
 The central orchestrator of the AI agent framework. It interprets user requests, leverages the LLM Integration Layer for reasoning and decision-making, and utilizes the Tool Abstraction & Management component to dynamically select and execute appropriate tools to achieve its goals. This component embodies the "Agent-based Architecture" pattern.
 
 
@@ -37,7 +37,7 @@ The central orchestrator of the AI agent framework. It interprets user requests,
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/agents/mcpagent.py" target="_blank" rel="noopener noreferrer">`mcp_use.agents.mcpagent.MCPAgent`</a>
 
 
-
+### LLM Integration Layer
 Provides a standardized, abstract interface for interacting with various Large Language Models. It encapsulates the specifics of different LLM APIs, allowing the Agent Core to communicate with them seamlessly for tasks such as natural language understanding, generation, and complex reasoning.
 
 
@@ -46,7 +46,7 @@ Provides a standardized, abstract interface for interacting with various Large L
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py" target="_blank" rel="noopener noreferrer">`mcp_use.adapters.langchain_adapter.LangChainAdapter`</a>
 
 
-
+### Tool Abstraction & Management
 This component serves as the central Tool/Server Abstraction Layer. It provides a unified, high-level interface for agents to discover, manage, and execute tools exposed by connected MCP servers. It abstracts the complexities of tool interaction, server lifecycle management, and tool execution, aligning with the "Adapter Pattern" and "Client-Server Architecture (Internal)" principles. It is crucial for the framework's extensibility and modularity.
 
 
@@ -61,7 +61,7 @@ This component serves as the central Tool/Server Abstraction Layer. It provides 
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/managers/server_manager.py#L16-L89" target="_blank" rel="noopener noreferrer">`mcp_use.managers.server_manager.ServerManager` (16:89)</a>
 
 
-
+### MCP Server Communication Layer
 Responsible for the low-level, concrete communication with external MCP (Multi-Component Platform) servers. It handles network requests, data serialization/deserialization, and error handling specific to server interactions, translating abstract tool execution requests from the Tool Abstraction & Management component into concrete server API calls.
 
 
@@ -73,7 +73,7 @@ Responsible for the low-level, concrete communication with external MCP (Multi-C
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/connectors/websocket.py" target="_blank" rel="noopener noreferrer">`mcp_use.connectors.websocket.WebSocketConnector`</a>
 
 
-
+### Configuration Management
 Manages the loading, parsing, and access of configuration settings for the entire framework. This includes details about registered MCP servers, API keys, and other operational parameters. It ensures that various components can dynamically retrieve necessary settings, supporting the "Configuration-Driven Design" pattern.
 
 
@@ -82,7 +82,7 @@ Manages the loading, parsing, and access of configuration settings for the entir
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/config.py" target="_blank" rel="noopener noreferrer">`mcp_use.config.Config`</a>
 
 
-
+### Asynchronous Execution Engine
 Provides the core asynchronous capabilities for the framework, enabling non-blocking I/O operations and concurrent execution. It is fundamental for efficiently handling long-running tasks such as LLM API calls and external tool executions, leveraging asyncio throughout the system. This aligns with the "Asynchronous Processing" architectural pattern.
 
 
