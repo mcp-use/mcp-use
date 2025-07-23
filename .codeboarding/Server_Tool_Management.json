@@ -1,0 +1,112 @@
+{
+  "description": "The `Server & Tool Management` subsystem is crucial for enabling AI agents to interact with external environments and leverage a diverse set of tools. It embodies the \"Client-Server Architecture\" and \"Tool-Use/Function Calling Pattern\" by providing mechanisms for server connectivity, tool discovery, and tool execution.",
+  "components": [
+    {
+      "name": "Server Manager",
+      "description": "The `ServerManager` is the central orchestrator for managing the lifecycle of external MCP servers. It handles connecting to, disconnecting from, and maintaining a registry of active servers. It also provides the interface for accessing tools available on these connected servers. This component is fundamental as it acts as the primary control point for all server-related operations, ensuring that agents can reliably connect to and manage their external environments.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 16,
+          "reference_end_line": 89
+        }
+      ]
+    },
+    {
+      "name": "MCP Server Tool Base",
+      "description": "`MCPServerTool` is an abstract base class that defines a common interface and foundational methods for all tools designed to interact with MCP servers. It ensures consistency and reusability across various server-specific operations. This component is fundamental because it establishes the architectural pattern for all server-interacting tools, promoting modularity, extensibility, and a unified approach to tool development within the framework.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.base_tool.MCPServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": 5,
+          "reference_end_line": 18
+        }
+      ]
+    },
+    {
+      "name": "Tool Search Engine",
+      "description": "The `ToolSearchEngine` provides semantic search capabilities, allowing AI agents to discover relevant MCP tools available across connected servers based on natural language queries. It leverages vector embeddings and cosine similarity for intelligent tool retrieval. This component is fundamental for implementing the \"Tool-Use/Function Calling Pattern\" as it enables dynamic and intelligent tool discovery, allowing agents to adapt to new tasks and environments without explicit pre-configuration.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.ToolSearchEngine",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 57,
+          "reference_end_line": 327
+        }
+      ]
+    },
+    {
+      "name": "Direct Tool Executor",
+      "description": "The `UseToolFromServerTool` allows an agent to directly execute a specific tool on a given MCP server without requiring a prior explicit connection. It streamlines the process by handling session creation and input parsing for direct tool invocation. This component is fundamental for providing flexible and efficient tool execution, enabling agents to invoke tools on demand, which is critical for dynamic task execution in an AI agent framework.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.use_tool.UseToolFromServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/use_tool.py",
+          "reference_start_line": 21,
+          "reference_end_line": 153
+        }
+      ]
+    },
+    {
+      "name": "MCP Client",
+      "description": "The `MCPClient` serves as the primary client for managing MCP server configurations, creating and managing sessions, and handling underlying communication connectors. It provides the foundational layer for all interactions with MCP servers. This component is fundamental as it underpins all communication with external MCP servers, providing the necessary low-level connectivity and session management for the entire \"Client-Server Architecture\".",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.client.MCPClient",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "Manages",
+      "src_name": "Server Manager",
+      "dst_name": "MCP Server Tool Base"
+    },
+    {
+      "relation": "Utilizes",
+      "src_name": "Server Manager",
+      "dst_name": "MCP Client"
+    },
+    {
+      "relation": "Inherited by",
+      "src_name": "MCP Server Tool Base",
+      "dst_name": "Tool Search Engine"
+    },
+    {
+      "relation": "Inherited by",
+      "src_name": "MCP Server Tool Base",
+      "dst_name": "Direct Tool Executor"
+    },
+    {
+      "relation": "Inherits from",
+      "src_name": "Tool Search Engine",
+      "dst_name": "MCP Server Tool Base"
+    },
+    {
+      "relation": "Interacts with",
+      "src_name": "Tool Search Engine",
+      "dst_name": "Server Manager"
+    },
+    {
+      "relation": "Inherits from",
+      "src_name": "Direct Tool Executor",
+      "dst_name": "MCP Server Tool Base"
+    },
+    {
+      "relation": "Utilizes",
+      "src_name": "Direct Tool Executor",
+      "dst_name": "Server Manager"
+    },
+    {
+      "relation": "Supports",
+      "src_name": "MCP Client",
+      "dst_name": "Server Manager"
+    }
+  ]
+}

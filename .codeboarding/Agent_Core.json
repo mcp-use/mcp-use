@@ -1,0 +1,222 @@
+{
+  "description": "The `Agent Core` subsystem, centered around the `MCPAgent`, serves as the central intelligence and orchestration unit of the `mcp-use` system. It is responsible for processing user queries, making decisions, executing actions, and managing the agent's internal state and interactions with various external components and services.",
+  "components": [
+    {
+      "name": "MCPAgent",
+      "description": "The primary orchestrator and decision-maker of the `mcp-use` system. It processes inputs, manages the agent's state and history, interacts with LLMs, and coordinates the use of various tools and services to achieve its objectives.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "MCPAgent",
+          "reference_file": "mcp_use/agents/mcpagent.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    },
+    {
+      "name": "LangChainAdapter",
+      "description": "Acts as a bridge, converting `mcp-use`'s internal tool representations into a format compatible with LangChain's `BaseTool`. This enables `MCPAgent` to leverage LangChain's `AgentExecutor` for robust tool execution and interaction with various LLMs.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "LangChainAdapter",
+          "reference_file": "mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    },
+    {
+      "name": "ServerManager",
+      "description": "Responsible for managing connections to external servers and dynamically discovering tools exposed by those servers. It provides `MCPAgent` with access to a broader range of functionalities beyond locally defined tools, enabling distributed agent capabilities.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "ServerManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 16,
+          "reference_end_line": 89
+        }
+      ]
+    },
+    {
+      "name": "MCPClient",
+      "description": "Provides a higher-level abstraction for managing `MCPSession`s and the underlying connections. It simplifies the process for `MCPAgent` to establish and maintain communication channels and discover available tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "MCPClient",
+          "reference_file": "mcp_use/client/MCPClient.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    },
+    {
+      "name": "BaseConnector",
+      "description": "An abstract base class that defines the interface for various low-level communication protocols (e.g., WebSocket, HTTP, Stdio, Sandbox). Concrete implementations handle the specifics of establishing and maintaining connections, allowing `MCPAgent` to interact with diverse endpoints.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "BaseConnector",
+          "reference_file": "mcp_use/connectors/base.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    },
+    {
+      "name": "MCPSession",
+      "description": "Represents a single, continuous interaction session of the `MCPAgent`. It maintains the agent's state, conversation history, and manages the lifecycle of connections and tools relevant to that specific session, ensuring coherent and persistent interactions.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "MCPSession",
+          "reference_file": "mcp_use/session.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    },
+    {
+      "name": "Telemetry",
+      "description": "Provides observability into the `MCPAgent`'s operations by tracking and logging various execution events. This component is crucial for monitoring, debugging, performance analysis, and understanding the agent's behavior.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "Telemetry",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/telemetry/telemetry.py",
+          "reference_start_line": 55,
+          "reference_end_line": 305
+        }
+      ]
+    },
+    {
+      "name": "BaseAdapter",
+      "description": "An abstract base class that establishes a standardized interface for creating adapters. It defines how `mcp-use`'s internal representations can be converted to integrate with various external frameworks, promoting modularity and extensibility.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "BaseAdapter",
+          "reference_file": "mcp_use/adapters/base.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    },
+    {
+      "name": "ConnectionManager",
+      "description": "An abstract base class for managing different types of connections (e.g., SSE, Stdio, WebSocket). Concrete implementations handle the specifics of connection establishment, data flow, and lifecycle management for various communication protocols.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "ConnectionManager",
+          "reference_file": "mcp_use/task_managers/base.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    },
+    {
+      "name": "MCPServerTool",
+      "description": "An abstract base class for tools that are exposed and managed by the `ServerManager`. These tools represent functionalities available from external servers, allowing `MCPAgent` to discover and utilize remote capabilities.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "MCPServerTool",
+          "reference_file": "mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ]
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "utilizes",
+      "src_name": "MCPAgent",
+      "dst_name": "LangChainAdapter"
+    },
+    {
+      "relation": "manages",
+      "src_name": "MCPAgent",
+      "dst_name": "MCPSession"
+    },
+    {
+      "relation": "integrates with",
+      "src_name": "MCPAgent",
+      "dst_name": "Telemetry"
+    },
+    {
+      "relation": "can be initialized with",
+      "src_name": "MCPAgent",
+      "dst_name": "MCPClient"
+    },
+    {
+      "relation": "can accept",
+      "src_name": "MCPAgent",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "optionally uses",
+      "src_name": "MCPAgent",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "utilized by",
+      "src_name": "LangChainAdapter",
+      "dst_name": "MCPAgent"
+    },
+    {
+      "relation": "inherits from",
+      "src_name": "LangChainAdapter",
+      "dst_name": "BaseAdapter"
+    },
+    {
+      "relation": "optionally instantiates",
+      "src_name": "MCPAgent",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "ServerManager",
+      "dst_name": "MCPClient"
+    },
+    {
+      "relation": "manages",
+      "src_name": "ServerManager",
+      "dst_name": "MCPServerTool"
+    },
+    {
+      "relation": "manages",
+      "src_name": "MCPClient",
+      "dst_name": "MCPSession"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "MCPSession",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "uses",
+      "src_name": "ConnectionManager",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "provides context to",
+      "src_name": "MCPSession",
+      "dst_name": "MCPAgent"
+    },
+    {
+      "relation": "parent of",
+      "src_name": "BaseAdapter",
+      "dst_name": "LangChainAdapter"
+    },
+    {
+      "relation": "defines pattern for integrating with",
+      "src_name": "BaseAdapter",
+      "dst_name": "MCPAgent"
+    },
+    {
+      "relation": "manages data flow for",
+      "src_name": "ConnectionManager",
+      "dst_name": "MCPSession"
+    },
+    {
+      "relation": "represents external functionalities for",
+      "src_name": "MCPServerTool",
+      "dst_name": "MCPAgent"
+    }
+  ]
+}

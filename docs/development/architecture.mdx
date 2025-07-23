@@ -1,0 +1,130 @@
+---
+title: "Architecture"
+description: "Overview of mcp-use architecture and design patterns"
+---
+
+# Architecture
+
+This document provides an overview of the mcp-use library architecture, including its core components, design patterns, and how different modules interact with each other.
+
+<Info>
+This documentation is automatically generated from [CodeBoarding](https://github.com/CodeBoarding/GeneratedOnBoardings) analysis files located in the `.codeboarding` directory.
+</Info>
+
+## System Overview
+
+The `mcp-use` project is an AI Agent Framework/Library designed to enable agents to interact with various external environments and utilize diverse tools.
+
+## Component Architecture
+
+## Core Components
+
+### Agent Core
+
+The central intelligence unit, embodied by `MCPAgent`, responsible for orchestrating interactions, processing inputs, generating responses, and utilizing available tools. It manages the agent's internal state, history, and integrates with LLMs.
+
+**Key Implementation Files:**
+- `/mnt/e/StartUp/mcp-use/mcp_use/agents/mcpagent.py`
+
+### Client & Session Management
+
+Manages the lifecycle of user interactions and individual `MCPSession` instances. `MCPClient` provides the primary interface for users to create, configure, and close sessions, while `MCPSession` represents a single, active connection or interaction session with an external environment or server, handling the establishment, maintenance, and termination of connections.
+
+**Key Implementation Files:**
+- `/mnt/e/StartUp/mcp-use/mcp_use/client.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/session.py`
+
+### Connection & Task Management
+
+Handles the low-level details of establishing, maintaining, and managing asynchronous tasks for persistent connections to various external environments (e.g., WebSocket servers, sandboxed environments, HTTP endpoints, standard I/O). `BaseConnector` defines the interface for specific communication protocols, while `ConnectionManager` subclasses manage the connection lifecycle.
+
+**Key Implementation Files:**
+- `/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/connectors/websocket.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/connectors/sandbox.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/connectors/http.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/connectors/stdio.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/task_managers/base.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/task_managers/websocket.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/task_managers/sse.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/task_managers/stdio.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/task_managers/streamable_http.py`
+
+### Adapter Framework
+
+Provides an abstraction layer for integrating with different AI frameworks (e.g., LangChain). It defines the `BaseAdapter` interface for converting and managing tools, resources, and prompts from external systems into a format usable by the `MCPAgent`. `LangChainAdapter` is a concrete implementation.
+
+**Key Implementation Files:**
+- `/mnt/e/StartUp/mcp-use/mcp_use/adapters/base.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/adapters/langchain_adapter.py`
+
+### Server & Tool Management
+
+Manages the registration, activation, and disconnection of multiple external servers or environments, and facilitates the discovery, indexing, and execution of tools available across these connected servers. It includes a `ToolSearchEngine` for finding tools and base classes (`MCPServerTool`) for various server-related tools.
+
+**Key Implementation Files:**
+- `/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/base_tool.py`
+- `/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/use_tool.py`
+
+### Prompt Builder
+
+Constructs and formats system messages and prompts for the LLM, incorporating tool descriptions and other contextual information to guide the agent's reasoning.
+
+**Key Implementation Files:**
+- `/mnt/e/StartUp/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`
+
+### Telemetry
+
+Collects and tracks usage data and agent execution metrics for observability and analytics purposes, providing insights into the framework's performance and behavior.
+
+**Key Implementation Files:**
+- `/mnt/e/StartUp/mcp-use/mcp_use/telemetry/telemetry.py`
+
+## Design Patterns
+
+### Modular Architecture
+The library follows a modular design where each component can be used independently or combined for complex workflows. Each layer is clearly separated with well-defined interfaces.
+
+### Protocol Abstraction
+Communication protocols are abstracted through connector interfaces, allowing easy extension for new transport methods without affecting other components.
+
+### Async-First Design
+All components are built with async/await patterns for optimal performance and scalability, ensuring non-blocking operations throughout the system.
+
+### Configuration-Driven
+Behavior is controlled through configuration objects, enabling flexible deployment scenarios and easy customization.
+
+## Data Flow
+
+The typical data flow through the system follows this pattern:
+
+1. **Session Initialization**: `MCPClient` creates and manages `MCPSession` instances
+2. **Connection Establishment**: Sessions use appropriate `Connector` implementations to establish communication
+3. **Agent Orchestration**: `MCPAgent` coordinates LLM interactions and tool usage
+4. **Tool Discovery & Execution**: The tooling layer discovers available tools and executes them as needed
+5. **Response Processing**: Results are processed and returned through the session management layer
+
+## Extension Points
+
+The architecture provides several extension points for customization:
+
+- **Custom Connectors**: Implement `BaseConnector` for new communication protocols
+- **Custom Adapters**: Create adapters for integration with additional LLM frameworks
+- **Custom Agents**: Extend base agent classes for specialized workflows
+- **Custom Tools**: Add new tool implementations for domain-specific functionality
+- **Observability Providers**: Integrate custom monitoring and telemetry solutions
+
+## Framework Services
+
+The framework includes comprehensive cross-cutting services:
+
+- **Configuration Management**: Centralized configuration handling across all components
+- **Logging & Telemetry**: Built-in observability with support for external providers
+- **Error Handling**: Consistent error handling patterns throughout the system
+- **Resource Management**: Efficient resource allocation and cleanup
+
+---
+
+*This documentation is automatically generated from the codebase analysis. For the most up-to-date information, refer to the source code and inline documentation.*
