@@ -1,0 +1,146 @@
+{
+  "description": "One paragraph explaining the functionality which is represented by this graph. What the main flow is and what is its purpose.",
+  "components": [
+    {
+      "name": "MCP Client",
+      "description": "Serves as the primary client-side interface for initiating and managing interactions with MCP servers. It orchestrates the creation and lifecycle of communication sessions.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.client.MCPClient",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "MCP Session Manager",
+      "description": "Manages the state, lifecycle, and communication flow of an individual session with an MCP server. It acts as an intermediary, utilizing specific connectors for underlying communication.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.session.MCPSession",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Base Connector Abstraction",
+      "description": "Defines the abstract interface for all concrete connection types (e.g., WebSocket, Sandbox). It provides a unified contract for establishing and managing connections, enabling extensibility for new protocols.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Sandbox Connector",
+      "description": "A concrete implementation of the Base Connector Abstraction, specifically designed to handle connections and communication with Sandbox MCP servers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "WebSocket Connector",
+      "description": "A concrete implementation of the Base Connector Abstraction, responsible for establishing and managing connections using the WebSocket protocol with MCP servers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "Connection Task Manager",
+      "description": "Manages the asynchronous tasks and operational lifecycle associated with specific connector types, ensuring robust and efficient connection handling.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.task_managers.base.ConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Server Manager",
+      "description": "Manages the lifecycle and state of various MCP servers, providing an interface for clients to connect, disconnect, and retrieve server information. It orchestrates server-side operations and interacts with agents.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 16,
+          "reference_end_line": 89
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Base Agent Abstraction",
+      "description": "Defines the abstract interface for all agent types within the MCP system. It provides a common contract for agents to interact with sessions and execute operations.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.base.BaseAgent",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "initiates and manages",
+      "src_name": "MCP Client",
+      "dst_name": "MCP Session Manager"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "MCP Client",
+      "dst_name": "Server Manager"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "MCP Session Manager",
+      "dst_name": "Base Connector Abstraction"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "MCP Session Manager",
+      "dst_name": "Base Agent Abstraction"
+    },
+    {
+      "relation": "inherits from",
+      "src_name": "Sandbox Connector",
+      "dst_name": "Base Connector Abstraction"
+    },
+    {
+      "relation": "inherits from",
+      "src_name": "WebSocket Connector",
+      "dst_name": "Base Connector Abstraction"
+    },
+    {
+      "relation": "works in conjunction with",
+      "src_name": "Base Connector Abstraction",
+      "dst_name": "Connection Task Manager"
+    }
+  ]
+}

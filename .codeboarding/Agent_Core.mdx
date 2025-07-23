@@ -7,42 +7,43 @@ description: "Agent Core component details"
 ```mermaid
 graph LR
     Agent_Core["Agent Core"]
-    LangChain_Integration["LangChain Integration"]
-    Server_Management["Server Management"]
-    Session_Management["Session Management"]
-    Telemetry_Monitoring["Telemetry & Monitoring"]
-    Agent_Core -- "orchestrates" --> LangChain_Integration
-    Agent_Core -- "utilizes" --> Server_Management
-    LangChain_Integration -- "provides LLM and tool services to" --> Agent_Core
-    Session_Management -- "provides session context and state to" --> Agent_Core
-    Agent_Core -- "sends behavioral data to" --> Telemetry_Monitoring
+    Base_Agent["Base Agent"]
+    MCP_Server_Registry_Connector["MCP Server Registry/Connector"]
+    LLM_Integration_Layer["LLM Integration Layer"]
+    Telemetry["Telemetry"]
+    MCP_Session["MCP Session"]
+    Agent_Core -- "uses" --> MCP_Server_Registry_Connector
+    Agent_Core -- "uses" --> LLM_Integration_Layer
+    Agent_Core -- "uses" --> Telemetry
+    Agent_Core -- "is related to" --> MCP_Session
+    Agent_Core -- "inherits from" --> Base_Agent
     click Agent_Core href "/codeboarding/Agent_Core.md" "Details"
 ```
 
 ## Details
 
-One paragraph explaining the functionality which is represented by this graph. What the main flow is and what is its purpose.
+The `Agent Core` subsystem is the central orchestrator within the `mcp-use` framework, responsible for the agent's decision-making, lifecycle, and overall execution flow. It integrates various components to interact with the external environment and manage its operational state.
 
 ### Agent Core [[Expand]](./Agent_Core)
-The primary orchestration component responsible for managing the lifecycle, execution flow, and decision-making process of AI agents. It drives the overall agent behavior and coordinates interactions with other components.
+The primary intelligence and orchestration unit. It manages the agent's lifecycle, decision-making processes, and coordinates interactions with other components to execute tasks and communicate with external services.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/agents/mcpagent.py" target="_blank" rel="noopener noreferrer">`mcp_use.agents.mcpagent.MCPAgent`</a>
+- <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L1-L1" target="_blank" rel="noopener noreferrer">`mcp_use.agents.mcpagent.MCPAgent` (1:1)</a>
 
 
-### LangChain Integration
-Provides the necessary abstraction and adaptation layer for seamless integration with LangChain, enabling the Agent Core to leverage large language models (LLMs) and execute various tools defined within the LangChain ecosystem.
+### Base Agent
+Provides the foundational structure and common functionalities for all agents within the framework. It serves as an abstract base class that `Agent Core` extends.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py" target="_blank" rel="noopener noreferrer">`mcp_use.adapters.langchain_adapter.LangChainAdapter`</a>
+- <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/agents/base.py#L1-L1" target="_blank" rel="noopener noreferrer">`mcp_use.agents.base.BaseAgent` (1:1)</a>
 
 
-### Server Management
-Manages the lifecycle, communication, and operational aspects of the underlying MCP server infrastructure. It handles server startup, shutdown, and facilitates the agent's interaction with the server environment.
+### MCP Server Registry/Connector
+Manages connections and interactions with various MCP (Multi-Agent Communication Protocol) servers. It acts as an interface for the `Agent Core` to discover and communicate with available services.
 
 
 **Related Classes/Methods**:
@@ -50,19 +51,28 @@ Manages the lifecycle, communication, and operational aspects of the underlying 
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/managers/server_manager.py#L16-L89" target="_blank" rel="noopener noreferrer">`mcp_use.managers.server_manager.ServerManager` (16:89)</a>
 
 
-### Session Management
-Responsible for creating, maintaining, and managing individual agent sessions. It ensures state continuity, context isolation, and proper resource allocation for ongoing agent interactions.
+### LLM Integration Layer
+Facilitates the processing of outputs from Large Language Models (LLMs) and integrates with LangChain-based tools. It acts as an adapter, translating agent requests into LLM-compatible formats and vice-versa.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/session.py" target="_blank" rel="noopener noreferrer">`mcp_use.session.MCPSession`</a>
+- <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py#L1-L1" target="_blank" rel="noopener noreferrer">`mcp_use.adapters.langchain_adapter.LangChainAdapter` (1:1)</a>
 
 
-### Telemetry & Monitoring
-Collects, processes, and reports operational metrics, logs, and behavioral data related to agent activities. This component is vital for debugging, performance analysis, and understanding agent behavior.
+### Telemetry
+Responsible for emitting telemetry events, providing insights into the agent's operational status, performance, and interactions. This component supports observability within the `Agent Core` subsystem.
 
 
 **Related Classes/Methods**:
 
 - <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/telemetry/telemetry.py#L55-L305" target="_blank" rel="noopener noreferrer">`mcp_use.telemetry.telemetry.Telemetry` (55:305)</a>
+
+
+### MCP Session
+Manages the state and context of an agent's session. It encapsulates session-specific data and provides mechanisms for maintaining continuity across interactions.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/CodeBoarding/mcp-use/blob/main/mcp_use/session.py#L1-L1" target="_blank" rel="noopener noreferrer">`mcp_use.session.MCPSession` (1:1)</a>

@@ -1,0 +1,222 @@
+{
+  "description": "Abstract Components Overview",
+  "components": [
+    {
+      "name": "Agent Core",
+      "description": "The central orchestrator of the AI agent framework. It interprets user requests, leverages the LLM Integration Layer for reasoning and decision-making, and utilizes the Tool Abstraction & Management component to dynamically select and execute appropriate tools to achieve its goals. This component embodies the \"Agent-based Architecture\" pattern.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "LLM Integration Layer",
+      "description": "Provides a standardized, abstract interface for interacting with various Large Language Models. It encapsulates the specifics of different LLM APIs, allowing the Agent Core to communicate with them seamlessly for tasks such as natural language understanding, generation, and complex reasoning.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Tool Abstraction & Management",
+      "description": "This component serves as the central Tool/Server Abstraction Layer. It provides a unified, high-level interface for agents to discover, manage, and execute tools exposed by connected MCP servers. It abstracts the complexities of tool interaction, server lifecycle management, and tool execution, aligning with the \"Adapter Pattern\" and \"Client-Server Architecture (Internal)\" principles. It is crucial for the framework's extensibility and modularity.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.disconnect_server.DisconnectServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/disconnect_server.py",
+          "reference_start_line": 15,
+          "reference_end_line": 42
+        },
+        {
+          "qualified_name": "mcp_use.managers.tools.get_active_server.GetActiveServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/get_active_server.py",
+          "reference_start_line": 13,
+          "reference_end_line": 28
+        },
+        {
+          "qualified_name": "mcp_use.managers.tools.list_servers_tool.ListServersTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/list_servers_tool.py",
+          "reference_start_line": 15,
+          "reference_end_line": 51
+        },
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.SearchToolsTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 22,
+          "reference_end_line": 54
+        },
+        {
+          "qualified_name": "mcp_use.managers.tools.ToolSearchEngine",
+          "reference_file": "mcp_use/managers/tools/ToolSearchEngine.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.managers.tools.use_tool.UseToolFromServerTool",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/use_tool.py",
+          "reference_start_line": 21,
+          "reference_end_line": 153
+        },
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 16,
+          "reference_end_line": 89
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "MCP Server Communication Layer",
+      "description": "Responsible for the low-level, concrete communication with external MCP (Multi-Component Platform) servers. It handles network requests, data serialization/deserialization, and error handling specific to server interactions, translating abstract tool execution requests from the Tool Abstraction & Management component into concrete server API calls.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.http.HttpConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.stdio.StdioConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/stdio.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Configuration Management",
+      "description": "Manages the loading, parsing, and access of configuration settings for the entire framework. This includes details about registered MCP servers, API keys, and other operational parameters. It ensures that various components can dynamically retrieve necessary settings, supporting the \"Configuration-Driven Design\" pattern.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.config.Config",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/config.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "Asynchronous Execution Engine",
+      "description": "Provides the core asynchronous capabilities for the framework, enabling non-blocking I/O operations and concurrent execution. It is fundamental for efficiently handling long-running tasks such as LLM API calls and external tool executions, leveraging asyncio throughout the system. This aligns with the \"Asynchronous Processing\" architectural pattern.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.task_managers.sse.SseConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/sse.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.stdio.StdioConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/stdio.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.streamable_http.StreamableHttpConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/streamable_http.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.websocket.WebSocketConnectionManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "interacts with",
+      "src_name": "Agent Core",
+      "dst_name": "LLM Integration Layer"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "Agent Core",
+      "dst_name": "Tool Abstraction & Management"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "LLM Integration Layer",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "relies on",
+      "src_name": "LLM Integration Layer",
+      "dst_name": "Asynchronous Execution Engine"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "Tool Abstraction & Management",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "Tool Abstraction & Management",
+      "dst_name": "MCP Server Communication Layer"
+    },
+    {
+      "relation": "relies on",
+      "src_name": "Tool Abstraction & Management",
+      "dst_name": "Configuration Management"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "MCP Server Communication Layer",
+      "dst_name": "Tool Abstraction & Management"
+    },
+    {
+      "relation": "relies on",
+      "src_name": "MCP Server Communication Layer",
+      "dst_name": "Asynchronous Execution Engine"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "Configuration Management",
+      "dst_name": "Tool Abstraction & Management"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "Configuration Management",
+      "dst_name": "MCP Server Communication Layer"
+    },
+    {
+      "relation": "supports",
+      "src_name": "Asynchronous Execution Engine",
+      "dst_name": "LLM Integration Layer"
+    },
+    {
+      "relation": "supports",
+      "src_name": "Asynchronous Execution Engine",
+      "dst_name": "MCP Server Communication Layer"
+    }
+  ]
+}
