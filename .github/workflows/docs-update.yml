@@ -1,12 +1,14 @@
 name: CodeBoarding Documentation update workflow
 
 on:
+  schedule:
+    - cron: '0 20 * * 6'  # Every Saturday at 8:00 PM UTC
   workflow_dispatch:
     inputs:
       repository_url:
         description: 'Repository URL to test with'
         required: false
-        default: 'https://github.com/CodeBoarding/mcp-use'
+        default: 'https://github.com/mcp-use/mcp-use'
         type: string
       source_branch:
         description: 'Source branch for generation'
@@ -67,7 +69,7 @@ jobs:
         id: codeboarding
         uses: CodeBoarding/CodeBoarding-GHAction@0.1.2
         with:
-          repository_url: ${{ github.event.inputs.repository_url }}
+          repository_url: ${{ github.event.inputs.repository_url || 'https://github.com/mcp-use/mcp-use' }}
           source_branch: ${{ steps.set-branches.outputs.source_branch }}
           target_branch: ${{ steps.set-branches.outputs.target_branch }}
           output_directory: ${{ github.event.inputs.output_directory || '.codeboarding' }}
