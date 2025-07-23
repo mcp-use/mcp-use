@@ -108,7 +108,7 @@ jobs:
           # First, add on_boarding.mdx if it exists
           if [ -f ".codeboarding/on_boarding.mdx" ]; then
             echo "✅ Found and adding: on_boarding.mdx"
-            cat .codeboarding/on_boarding.mdx >> docs/development/architecture.mdx
+            cat .codeboarding/on_boarding.mdx > docs/development/architecture.mdx
             echo "" >> docs/development/architecture.mdx
           else
             echo "ℹ️  on_boarding.mdx not found, skipping"
