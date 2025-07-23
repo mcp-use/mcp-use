@@ -1,0 +1,130 @@
+{
+  "description": "The Connection & Transport Manager subsystem is a critical part of the mcp-use library, responsible for abstracting and managing the underlying network communication and transport protocols. It adheres to the Adapter/Plugin Pattern, allowing for flexible integration with various MCP server environments.",
+  "components": [
+    {
+      "name": "Connection & Transport Manager",
+      "description": "This is the overarching component that orchestrates and manages the various concrete connector implementations. It provides a unified interface for the rest of the system to establish and manage low-level connections to the MCP server or other external services, abstracting away the complexities of different transport mechanisms. It acts as a factory or registry for obtaining the appropriate BaseConnector instance based on the desired environment.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors",
+          "reference_file": "mcp_use/connectors/__init__.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "BaseConnector",
+      "description": "Defines the abstract interface and common lifecycle management (e.g., connect, disconnect, ensure_active_connection) for all concrete MCP connectors. It establishes a consistent API for core operations like call_tool, list_tools, list_resources, read_resource, list_prompts, get_prompt, and request, ensuring that any specific transport implementation adheres to a standard contract. This is the core of the Adapter pattern.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "HttpConnector",
+      "description": "Implements the BaseConnector interface specifically for HTTP-based communication with the MCP server. It handles the details of making HTTP requests and parsing responses, translating them into the standardized BaseConnector operations.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.http.HttpConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "SandboxConnector",
+      "description": "Implements the BaseConnector interface for interacting with a local or sandboxed MCP environment. This component is responsible for managing the lifecycle of a local MCP server process (e.g., starting, stopping, communicating via inter-process mechanisms) and translating these interactions into the BaseConnector API.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "StdioConnector",
+      "description": "Implements the BaseConnector interface for standard input/output (stdio) based communication. This is typically used for local, embedded, or command-line interactions where the MCP server communicates via stdin/stdout streams. It handles the serialization and deserialization of messages over these streams.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.stdio.StdioConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/stdio.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "WebSocketConnector",
+      "description": "Implements the BaseConnector interface for establishing and managing real-time, persistent communication with a remote MCP server via the WebSocket protocol. It handles WebSocket connection establishment, message framing, and asynchronous communication, translating these into the BaseConnector operations.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "uses",
+      "src_name": "Connection & Transport Manager",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "manages",
+      "src_name": "Connection & Transport Manager",
+      "dst_name": "HttpConnector"
+    },
+    {
+      "relation": "manages",
+      "src_name": "Connection & Transport Manager",
+      "dst_name": "SandboxConnector"
+    },
+    {
+      "relation": "manages",
+      "src_name": "Connection & Transport Manager",
+      "dst_name": "StdioConnector"
+    },
+    {
+      "relation": "manages",
+      "src_name": "Connection & Transport Manager",
+      "dst_name": "WebSocketConnector"
+    },
+    {
+      "relation": "implements",
+      "src_name": "HttpConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "implements",
+      "src_name": "SandboxConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "implements",
+      "src_name": "StdioConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "implements",
+      "src_name": "WebSocketConnector",
+      "dst_name": "BaseConnector"
+    }
+  ]
+}

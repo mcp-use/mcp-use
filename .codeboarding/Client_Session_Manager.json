@@ -1,0 +1,43 @@
+{
+  "description": "This subsystem is responsible for establishing, maintaining, and terminating communication sessions with the MCP server, providing a reliable interface for AI agent operations. It adheres to the \"Client-Server (Internal)\" and \"Transport Layer\" architectural patterns.",
+  "components": [
+    {
+      "name": "MCPClient",
+      "description": "This component serves as the high-level orchestration layer and primary interface for users or other agent components to interact with the MCP system. Its core responsibility is to manage the lifecycle of multiple `MCPSession` instances, including their creation (potentially from various configuration sources) and their controlled closure. It acts as the central entry point for initiating and managing connections to the MCP server.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.client.MCPClient",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "MCPSession",
+      "description": "This component represents a single, active, and asynchronous communication session with the MCP server. Its responsibility is to handle the low-level connection details, including establishing (`connect`) and tearing down (`disconnect`) the actual network link. The use of asynchronous context management (`__aenter__` and `__aexit__`) ensures proper resource allocation and deallocation for each session, making it resilient and efficient.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.session.MCPSession",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "manages/creates",
+      "src_name": "MCPClient",
+      "dst_name": "MCPSession"
+    },
+    {
+      "relation": "terminates/closes",
+      "src_name": "MCPClient",
+      "dst_name": "MCPSession"
+    }
+  ]
+}

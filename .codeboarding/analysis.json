@@ -1,212 +1,166 @@
 {
-  "description": "The `mcp-use` project functions as an LLM Agent Framework, enabling the creation, orchestration, and interaction of AI agents with various tools and services. At its core, it allows users to define agents that leverage large language models, integrate external tools (like LangChain), and communicate with diverse backend services (MCP servers) through a flexible, asynchronous communication layer. The framework manages the lifecycle of agent sessions, handles dynamic prompt generation, and provides mechanisms for discovering and utilizing available resources, all while abstracting away the complexities of underlying communication protocols and LLM integrations.",
+  "description": "One paragraph explaining the functionality which is represented by this graph. What the main flow is and what is its purpose.",
   "components": [
     {
-      "name": "Agent Core & Orchestration",
-      "description": "This is the central intelligence of the framework, responsible for orchestrating the LLM agent's behavior. It manages conversation flow, constructs dynamic prompts based on available tools and context, and decides on the next actions to be taken by the agent.",
+      "name": "Agent Core",
+      "description": "The central orchestration component responsible for managing the lifecycle and execution of AI agents. It drives the decision-making process, interacts with tools, and coordinates overall agent behavior, embodying the core intelligence and control flow.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "qualified_name": "mcp_use.agents.mcpagent",
           "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/mcpagent.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        },
-        {
-          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.SystemPromptBuilder",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
+          "reference_start_line": 0,
+          "reference_end_line": 0
         }
-      ]
+      ],
+      "can_expand": true
     },
     {
-      "name": "Client & Session Management",
-      "description": "Provides the primary interface for users to interact with the MCP framework. It manages the creation, lifecycle, and termination of individual MCP sessions, acting as the entry point for agent interactions and providing context to the core agent logic.",
+      "name": "Client & Session Manager",
+      "description": "Manages the client-side interface for interacting with the MCP server. It handles the establishment, maintenance, and termination of communication sessions, ensuring a persistent and reliable connection for agent operations.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.client.MCPClient",
+          "qualified_name": "mcp_use.client",
           "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/client.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
+          "reference_start_line": 0,
+          "reference_end_line": 0
         },
         {
-          "qualified_name": "mcp_use.session.MCPSession",
+          "qualified_name": "mcp_use.session",
           "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
+          "reference_start_line": 0,
+          "reference_end_line": 0
         }
-      ]
+      ],
+      "can_expand": true
     },
     {
-      "name": "Communication Connectors",
-      "description": "Defines and implements abstract interfaces for various communication protocols (e.g., WebSocket, HTTP, Sandbox, Stdio) used to interact with MCP servers and execute tools securely. It provides the concrete means of data exchange between the client and the server.",
+      "name": "Tool Adapter Layer",
+      "description": "Provides a standardized abstraction layer for integrating diverse external tools and primitives. It adapts various tool frameworks (e.g., LangChain) into a consistent interface that the Agent Core can utilize, promoting extensibility and tool interoperability.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.connectors.base.BaseConnector",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
+          "qualified_name": "mcp_use.adapters",
+          "reference_file": "mcp_use/adapters.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
         },
         {
-          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/websocket.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        },
-        {
-          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/sandbox.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        },
-        {
-          "qualified_name": "mcp_use.connectors.http.HttpConnector",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/http.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        },
-        {
-          "qualified_name": "mcp_use.connectors.stdio.StdioConnector",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/stdio.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        }
-      ]
-    },
-    {
-      "name": "Connection Management",
-      "description": "Manages the asynchronous tasks and lifecycle of establishing, maintaining, and closing connections with MCP servers across different communication protocols. It ensures robust and persistent communication channels for the framework.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.task_managers.base.ConnectionManager",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/base.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        },
-        {
-          "qualified_name": "mcp_use.task_managers.websocket.WebSocketConnectionManager",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/websocket.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        },
-        {
-          "qualified_name": "mcp_use.task_managers.sse.SseConnectionManager",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/sse.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        },
-        {
-          "qualified_name": "mcp_use.task_managers.stdio.StdioConnectionManager",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/stdio.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        },
-        {
-          "qualified_name": "mcp_use.task_managers.streamable_http.StreamableHttpConnectionManager",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/task_managers/streamable_http.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        }
-      ]
-    },
-    {
-      "name": "LLM Integration & Adapters",
-      "description": "Provides an abstract and concrete mechanism for integrating various external LLM frameworks (e.g., LangChain) and their components (tools, resources, prompts) into the MCP's internal representation. This ensures compatibility and extensibility with different LLM providers.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.adapters.base.BaseAdapter",
+          "qualified_name": "mcp_use.adapters.base",
           "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/base.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
+          "reference_start_line": 0,
+          "reference_end_line": 0
         },
         {
-          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
+          "qualified_name": "mcp_use.adapters.langchain_adapter",
           "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/langchain_adapter.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
+          "reference_start_line": 0,
+          "reference_end_line": 0
         }
-      ]
+      ],
+      "can_expand": true
     },
     {
-      "name": "Resource & Tool Management",
-      "description": "Manages the registration, discovery, and lifecycle of MCP servers and the tools they expose. This component enables the agent to find, list, and utilize available functionalities provided by various servers.",
+      "name": "Tool Management Services",
+      "description": "Facilitates the discovery, listing, and dynamic usage of available tools, primarily those exposed by the MCP server. This component interacts with the server to query for tools and manage their invocation by the agent, acting as a registry and dispatcher for server-side tools.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "qualified_name": "mcp_use.managers.tools",
+          "reference_file": "mcp_use/managers/tools.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.managers.server_manager",
           "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
-          "reference_start_line": 16,
-          "reference_end_line": 89
-        },
-        {
-          "qualified_name": "mcp_use.managers.tools.search_tools.ToolSearchEngine",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/search_tools.py",
-          "reference_start_line": 57,
-          "reference_end_line": 327
-        },
-        {
-          "qualified_name": "mcp_use.managers.tools.base_tool.MCPServerTool",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/tools/base_tool.py",
-          "reference_start_line": 5,
-          "reference_end_line": 18
+          "reference_start_line": null,
+          "reference_end_line": null
         }
-      ]
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Connection & Transport Manager",
+      "description": "Handles the underlying network communication and transport protocols. It provides the mechanisms for establishing and managing low-level connections (e.g., WebSockets, Sandbox environments) to the MCP server or other external services, abstracting network complexities.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors",
+          "reference_file": "mcp_use/connectors.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.http",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.sandbox",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.stdio",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/stdio.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
     }
   ],
   "components_relations": [
     {
-      "relation": "interacts with",
-      "src_name": "Agent Core & Orchestration",
-      "dst_name": "LLM Integration & Adapters"
+      "relation": "requests tool information from",
+      "src_name": "Agent Core",
+      "dst_name": "Tool Management Services"
     },
     {
-      "relation": "queries",
-      "src_name": "Agent Core & Orchestration",
-      "dst_name": "Resource & Tool Management"
+      "relation": "invokes tools through",
+      "src_name": "Agent Core",
+      "dst_name": "Tool Adapter Layer"
     },
     {
-      "relation": "initiates and manages",
-      "src_name": "Client & Session Management",
-      "dst_name": "Agent Core & Orchestration"
+      "relation": "communicates with",
+      "src_name": "Agent Core",
+      "dst_name": "Client & Session Manager"
     },
     {
-      "relation": "utilizes",
-      "src_name": "Client & Session Management",
-      "dst_name": "Communication Connectors"
+      "relation": "relies on",
+      "src_name": "Client & Session Manager",
+      "dst_name": "Connection & Transport Manager"
     },
     {
-      "relation": "interacts with",
-      "src_name": "Client & Session Management",
-      "dst_name": "Resource & Tool Management"
+      "relation": "communicates with",
+      "src_name": "Tool Management Services",
+      "dst_name": "Client & Session Manager"
     },
     {
-      "relation": "provides communication mechanisms for",
-      "src_name": "Communication Connectors",
-      "dst_name": "Client & Session Management"
+      "relation": "provides tools to",
+      "src_name": "Tool Management Services",
+      "dst_name": "Tool Adapter Layer"
     },
     {
-      "relation": "managed and orchestrated by",
-      "src_name": "Communication Connectors",
-      "dst_name": "Connection Management"
+      "relation": "is utilized by",
+      "src_name": "Tool Adapter Layer",
+      "dst_name": "Agent Core"
     },
     {
-      "relation": "manages and orchestrates",
-      "src_name": "Connection Management",
-      "dst_name": "Communication Connectors"
-    },
-    {
-      "relation": "used by",
-      "src_name": "LLM Integration & Adapters",
-      "dst_name": "Agent Core & Orchestration"
-    },
-    {
-      "relation": "provides information to",
-      "src_name": "Resource & Tool Management",
-      "dst_name": "Agent Core & Orchestration"
-    },
-    {
-      "relation": "interacts with",
-      "src_name": "Resource & Tool Management",
-      "dst_name": "Client & Session Management"
+      "relation": "receives tool definitions from",
+      "src_name": "Tool Adapter Layer",
+      "dst_name": "Tool Management Services"
     }
   ]
 }

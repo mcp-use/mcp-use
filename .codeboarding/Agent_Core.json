@@ -1,0 +1,97 @@
+{
+  "description": "One paragraph explaining the functionality which is represented by this graph. What the main flow is and what is its purpose.",
+  "components": [
+    {
+      "name": "Agent Core",
+      "description": "The primary orchestration component responsible for managing the lifecycle, execution flow, and decision-making process of AI agents. It drives the overall agent behavior and coordinates interactions with other components.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "LangChain Integration",
+      "description": "Provides the necessary abstraction and adaptation layer for seamless integration with LangChain, enabling the Agent Core to leverage large language models (LLMs) and execute various tools defined within the LangChain ecosystem.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Server Management",
+      "description": "Manages the lifecycle, communication, and operational aspects of the underlying MCP server infrastructure. It handles server startup, shutdown, and facilitates the agent's interaction with the server environment.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 16,
+          "reference_end_line": 89
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Session Management",
+      "description": "Responsible for creating, maintaining, and managing individual agent sessions. It ensures state continuity, context isolation, and proper resource allocation for ongoing agent interactions.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.session.MCPSession",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Telemetry & Monitoring",
+      "description": "Collects, processes, and reports operational metrics, logs, and behavioral data related to agent activities. This component is vital for debugging, performance analysis, and understanding agent behavior.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.telemetry.telemetry.Telemetry",
+          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/telemetry/telemetry.py",
+          "reference_start_line": 55,
+          "reference_end_line": 305
+        }
+      ],
+      "can_expand": true
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "orchestrates",
+      "src_name": "Agent Core",
+      "dst_name": "LangChain Integration"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "Agent Core",
+      "dst_name": "Server Management"
+    },
+    {
+      "relation": "provides LLM and tool services to",
+      "src_name": "LangChain Integration",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "provides session context and state to",
+      "src_name": "Session Management",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "sends behavioral data to",
+      "src_name": "Agent Core",
+      "dst_name": "Telemetry & Monitoring"
+    }
+  ]
+}
