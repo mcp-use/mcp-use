@@ -1,37 +1,29 @@
 """
-mcp_use - An MCP library for LLMs.
-
-This library provides a unified interface for connecting different LLMs
-to MCP tools through existing LangChain adapters.
+MCP Use - A library for using MCP servers with LLMs.
 """
 
 from importlib.metadata import version
 
-from . import observability
-from .agents.mcpagent import MCPAgent
+from .adapters import LangChainAdapter
+from .agents import MCPAgent
 from .client import MCPClient
-from .config import load_config_file
-from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
-from .logging import MCP_USE_DEBUG, Logger, logger
+from .config import load_config_file, load_dxt_file
+from .dxt import DXTError, DXTParser, load_dxt_config, validate_user_config
 from .session import MCPSession
 
 __version__ = version("mcp-use")
 
 __all__ = [
-    "MCPAgent",
     "MCPClient",
+    "MCPAgent",
     "MCPSession",
-    "BaseConnector",
-    "StdioConnector",
-    "WebSocketConnector",
-    "HttpConnector",
-    "create_session_from_config",
+    "LangChainAdapter", 
     "load_config_file",
-    "logger",
-    "MCP_USE_DEBUG",
-    "Logger",
-    "set_debug",
-    "observability",
+    "load_dxt_file",
+    "DXTError",
+    "DXTParser", 
+    "load_dxt_config",
+    "validate_user_config",
 ]
 
 

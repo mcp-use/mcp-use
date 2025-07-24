@@ -13,7 +13,7 @@ from mcp.client.session import ElicitationFnT, SamplingFnT
 
 from mcp_use.types.sandbox import SandboxOptions
 
-from .config import create_connector_from_config, load_config_file
+from .config import create_connector_from_config, load_config_file, load_dxt_file
 from .logging import logger
 from .session import MCPSession
 
@@ -102,6 +102,34 @@ class MCPClient:
         """
         return cls(
             config=load_config_file(filepath),
+            sandbox=sandbox,
+            sandbox_options=sandbox_options,
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+        )
+
+    @classmethod
+    def from_dxt_file(
+        cls,
+        filepath: str,
+        user_config: dict[str, Any] | None = None,
+        sandbox: bool = False,
+        sandbox_options: SandboxOptions | None = None,
+        sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
+    ) -> "MCPClient":
+        """Create a MCPClient from a DXT (Desktop Extension) file.
+
+        Args:
+            filepath: The path to the .dxt file.
+            user_config: Optional user configuration values for the DXT.
+            sandbox: Whether to use sandboxed execution mode for running MCP servers.
+            sandbox_options: Optional sandbox configuration options.
+            sampling_callback: Optional sampling callback function.
+            elicitation_callback: Optional elicitation callback function.
+        """
+        return cls(
+            config=load_dxt_file(filepath, user_config),
             sandbox=sandbox,
             sandbox_options=sandbox_options,
             sampling_callback=sampling_callback,
