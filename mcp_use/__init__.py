@@ -17,11 +17,11 @@ __all__ = [
     "MCPClient",
     "MCPAgent",
     "MCPSession",
-    "LangChainAdapter", 
+    "LangChainAdapter",
     "load_config_file",
     "load_dxt_file",
     "DXTError",
-    "DXTParser", 
+    "DXTParser",
     "load_dxt_config",
     "validate_user_config",
 ]
@@ -34,4 +34,6 @@ def set_debug(debug=2):
     Args:
         debug: Whether to enable debug mode (default: True)
     """
+    from .logging import Logger
+
     Logger.set_debug(debug)
