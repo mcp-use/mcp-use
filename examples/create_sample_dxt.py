@@ -215,7 +215,7 @@ main().catch(console.error);
     # Create the DXT file
     dxt_path = Path("sample-filesystem-server.dxt")
 
-    print(f"🏗️  Creating sample DXT file: {dxt_path}")
+    print(f"Creating sample DXT file: {dxt_path}")
 
     with zipfile.ZipFile(dxt_path, "w", zipfile.ZIP_DEFLATED) as dxt_file:
         # Add manifest
@@ -259,11 +259,11 @@ A real MCP server would need proper error handling, security checks, and more ro
 """
         dxt_file.writestr("README.md", readme_content)
 
-    print(f"✅ Created sample DXT file: {dxt_path.absolute()}")
-    print(f"📁 File size: {dxt_path.stat().st_size} bytes")
+    print(f"Created sample DXT file: {dxt_path.absolute()}")
+    print(f"File size: {dxt_path.stat().st_size} bytes")
 
     # Show how to use it
-    print("\n🚀 Usage example:")
+    print("\nUsage example:")
     print("```python")
     print("from mcp_use import MCPClient")
     print("")
