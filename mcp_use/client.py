@@ -306,4 +306,4 @@ class MCPClient:
         if errors:
             logger.error(f"Encountered {len(errors)} errors while closing sessions")
         else:
-            logger.debug("All sessions closed successfully")
+            logger.debug("[CLEANUP] All sessions closed successfully")
