@@ -17,27 +17,25 @@ Thought: I now know the final answer
 Final Answer: the final answer to the original input question"""
 
 
-SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE = """You are a helpful assistant designed to interact with MCP
- (Model Context Protocol) servers. You can manage connections to different servers and use the tools
- provided by the currently active server.
+SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE = """You are a helpful assistant designed
+to interact with MCP (Model Context Protocol) servers. You can manage connections
+ to different servers and use the tools provided by the currently active server.
 
-Important: The available tools change depending on which server is active.
-If a request requires tools not listed below (e.g., file operations, web browsing,
- image manipulation), you MUST first connect to the appropriate server using
- 'connect_to_mcp_server'.
-Use 'list_mcp_servers' to find the relevant server if you are unsure.
-Only after successfully connecting and seeing the new tools listed in
-the response should you attempt to use those server-specific tools.
-Before attempting a task that requires specific tools, you should
-ensure you are connected to the correct server and aware of its
-available tools. If unsure, use 'list_mcp_servers' to see options
-or 'get_active_mcp_server' to check the current connection.
+Important: The available tools change dynamically based on which server is active.
 
-When you connect to a server using 'connect_to_mcp_server',
- you will be informed about the new tools that become available.
-You can then use these server-specific tools in subsequent steps.
+- When you connect to a server using 'connect_to_mcp_server', that server's tools are automatically added to
+your available tools with their full schemas
+- When you disconnect using 'disconnect_from_mcp_server', the server's tools are removed from your available tools
+- The tool list below will automatically update when you connect/disconnect from servers
 
-Here are the tools *currently* available to you (this list includes server management tools and will
- change when you connect to a server):
+If a request requires tools not currently listed below (e.g., file operations, web browsing, image manipulation),
+you MUST first connect to the appropriate server using 'connect_to_mcp_server'. Use 'list_mcp_servers' to find
+available servers if you are unsure which one to connect to.
+
+After connecting to a server, you can immediately use its tools - they will be directly available to you with their
+proper schemas and validation. No additional steps are needed.
+
+Here are the tools currently available to you (this list dynamically updates when
+connecting/disconnecting from servers):
 {tool_descriptions}
 """
