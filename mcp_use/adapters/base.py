@@ -33,8 +33,7 @@ class BaseAdapter(ABC):
         self.disallowed_tools = disallowed_tools or []
         self._connector_tool_map: dict[BaseConnector, list[T]] = {}
 
-    @classmethod
-    async def create_tools(cls, client: "MCPClient", disallowed_tools: list[str] | None = None) -> list[T]:
+    async def create_tools(self, client: "MCPClient") -> list[T]:
         """Create tools from an MCPClient instance.
 
         This is the recommended way to create tools from an MCPClient, as it handles
@@ -42,7 +41,6 @@ class BaseAdapter(ABC):
 
         Args:
             client: The MCPClient to extract tools from.
-            disallowed_tools: Optional list of tool names to exclude.
 
         Returns:
             A list of tools in the target framework's format.
@@ -56,9 +54,6 @@ class BaseAdapter(ABC):
             tools = await YourAdapter.create_tools(client)
             ```
         """
-        # Create the adapter
-        adapter = cls(disallowed_tools=disallowed_tools)
-
         # Ensure we have active sessions
         if not client.active_sessions:
             logger.info("No active sessions found, creating new ones...")
@@ -71,7 +66,7 @@ class BaseAdapter(ABC):
         connectors = [session.connector for session in sessions.values()]
 
         # Create tools from connectors
-        return await adapter._create_tools_from_connectors(connectors)
+        return await self._create_tools_from_connectors(connectors)
 
     async def load_tools_for_connector(self, connector: BaseConnector) -> list[T]:
         """Dynamically load tools for a specific connector.

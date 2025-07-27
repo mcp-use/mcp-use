@@ -1,3 +1,4 @@
+<div align="center">
 <div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="static/logo_white.svg">
@@ -6,24 +7,23 @@
   </picture>
 </div>
 
-<h1 align="center">Unified MCP Client Library </h1>
+<br>
+
+# Connect any LLM to any MCP server
+
 <p align="center">
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
-        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
-        <img src="https://static.pepy.tech/badge/mcp-use" /></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="Python Versions">
-        <img src="https://img.shields.io/pypi/pyversions/mcp_use.svg" /></a>
-    <a href="https://docs.mcp-use.io" alt="Documentation">
-        <img src="https://img.shields.io/badge/docs-mcp--use.io-blue" /></a>
-    <a href="https://mcp-use.io" alt="Website">
-        <img src="https://img.shields.io/badge/website-mcp--use.io-blue" /></a>
-    <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
-    <a href="https://github.com/astral-sh/ruff" alt="Code style: Ruff">
-        <img src="https://img.shields.io/badge/code%20style-ruff-000000.svg" /></a>
     <a href="https://github.com/pietrozullo/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/pietrozullo/mcp-use?style=social" /></a>
+    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
+        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
+    <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
+        <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
+    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
+        <img src="https://static.pepy.tech/badge/mcp-use" /></a>
+    <a href="https://docs.mcp-use.com" alt="Documentation">
+        <img src="https://img.shields.io/badge/docs-mcp--use.com-blue" /></a>
+    <a href="https://mcp-use.com" alt="Website">
+        <img src="https://img.shields.io/badge/website-mcp--use.com-blue" /></a>
     </p>
     <p align="center">
     <a href="https://x.com/pietrozullo" alt="Twitter Follow - Pietro">
@@ -33,15 +33,24 @@
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
-🌐 MCP-Use is the open source way to connect **any LLM to any MCP server** and build custom agents that have tool access, without using closed source or application clients.
+</div>
 
-💬 Get started quickly - chat with your servers on our <b>hosted version</b>! <b>[Try mcp-use chat *(beta)* ](https://chat.mcp-use.io)</b>.
+🌐 MCP-Use is the open source way to connect **any LLM to any MCP server** and build custom MCP agents that have tool access, without using closed source or application clients.
 
 💡 Let developers easily connect any LLM to tools like web browsing, file operations, and more.
 
-# Features
+- Visit the [mcp-use.com website](https://mcp-use.com/) to know how to build and deploy MCP agents.
+- Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use library
 
-## ✨ Key Features
+💬 Get started quickly - chat with your servers on our <b>hosted version</b>! [Try mcp-use chat (beta)](https://chat.mcp-use.com).
+
+| Supports  | |
+| :--- | :--- |
+| **Primitives** | [![Tools](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-tools&label=Tools&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Resources](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-resources&label=Resources&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Prompts](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-prompts&label=Prompts&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Sampling](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-sampling&label=Sampling&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Elicitation](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-elicitation&label=Elicitation&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) |
+| **Transports** | [![Stdio](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-stdio&label=Stdio&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![SSE](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-sse&label=SSE&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Streamable HTTP](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-streamableHttp&label=Streamable%20HTTP&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) |
+
+## Features
+
 <table>
   <tr>
     <th width="400">Feature</th>
@@ -56,8 +65,8 @@
     <td>Works with any langchain supported LLM that supports tool calling (OpenAI, Anthropic, Groq, LLama etc.)</td>
   </tr>
   <tr>
-    <td>🌐 <a href="https://mcp-use.io/builder"><strong>Code Builder</strong></a></td>
-    <td>Explore MCP capabilities and generate starter code with the interactive <a href="https://mcp-use.io/builder">code builder</a>.</td>
+    <td>🌐 <a href="https://mcp-use.com/builder"><strong>Code Builder</strong></a></td>
+    <td>Explore MCP capabilities and generate starter code with the interactive <a href="https://mcp-use.com/builder">code builder</a>.</td>
   </tr>
   <tr>
     <td>🔗 <a href="#http-connection-example"><strong>HTTP Support</strong></a></td>
@@ -80,7 +89,7 @@
     <td>Build your own agents with any framework using the LangChain adapter or create new adapters</td>
   </tr>
   <tr>
-    <td>❓ <a href="https://mcp-use.io/what-should-we-build-next"><strong>What should we build next</strong></a></td>
+    <td>❓ <a href="https://mcp-use.com/what-should-we-build-next"><strong>What should we build next</strong></a></td>
     <td>Let us know what you'd like us to build next</td>
   </tr>
 </table>
@@ -112,6 +121,7 @@ pip install langchain-openai
 # For Anthropic
 pip install langchain-anthropic
 ```
+
 For other providers, check the [LangChain chat models documentation](https://python.langchain.com/docs/integrations/chat/) and add your API keys for the provider you want to use to your `.env` file.
 
 ```bash
@@ -667,7 +677,7 @@ async def main():
 
     # Create a custom LangChain agent
     llm_with_tools = llm.bind_tools(tools)
-    result = await llm_with_tools.ainvoke("What tools do you have avilable ? ")
+    result = await llm_with_tools.ainvoke("What tools do you have available ? ")
     print(result)
 
 
@@ -748,7 +758,6 @@ Thanks to all our amazing contributors!
   <img src="https://contrib.rocks/image?repo=mcp-use/mcp-use" />
 </a>
 
-
 ## Top Starred Dependents
 
 <!-- gh-dependents-info-used-by-start -->
@@ -760,43 +769,43 @@ Thanks to all our amazing contributors!
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/170207473?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/tavily-ai/meeting-prep-agent"><strong>tavily-ai/meeting-prep-agent</strong></a></td>
-    <td>⭐ 112</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/20041231?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/krishnaik06/MCP-CRASH-Course"><strong>krishnaik06/MCP-CRASH-Course</strong></a></td>
-    <td>⭐ 37</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/892404?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/truemagic-coder/solana-agent-app"><strong>truemagic-coder/solana-agent-app</strong></a></td>
-    <td>⭐ 29</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/8344498?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/schogini/techietalksai"><strong>schogini/techietalksai</strong></a></td>
-    <td>⭐ 21</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/201161342?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/autometa-dev/whatsapp-mcp-voice-agent"><strong>autometa-dev/whatsapp-mcp-voice-agent</strong></a></td>
-    <td>⭐ 18</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/100749943?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/Deniscartin/mcp-cli"><strong>Deniscartin/mcp-cli</strong></a></td>
-    <td>⭐ 17</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/6764390?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/elastic/genai-workshops"><strong>elastic/genai-workshops</strong></a></td>
-    <td>⭐ 9</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/6688805?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/innovaccer/Healthcare-MCP"><strong>innovaccer/Healthcare-MCP</strong></a></td>
-    <td>⭐ 6</td>
+    <td>⭐ 127</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/205593730?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/Qingyon-AI/Revornix"><strong>Qingyon-AI/Revornix</strong></a></td>
-    <td>⭐ 5</td>
+    <td>⭐ 108</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/20041231?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/krishnaik06/MCP-CRASH-Course"><strong>krishnaik06/MCP-CRASH-Course</strong></a></td>
+    <td>⭐ 57</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/892404?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/truemagic-coder/solana-agent-app"><strong>truemagic-coder/solana-agent-app</strong></a></td>
+    <td>⭐ 30</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/8344498?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/schogini/techietalksai"><strong>schogini/techietalksai</strong></a></td>
+    <td>⭐ 23</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/201161342?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/autometa-dev/whatsapp-mcp-voice-agent"><strong>autometa-dev/whatsapp-mcp-voice-agent</strong></a></td>
+    <td>⭐ 22</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/100749943?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/Deniscartin/mcp-cli"><strong>Deniscartin/mcp-cli</strong></a></td>
+    <td>⭐ 18</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/6688805?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/innovaccer/Healthcare-MCP"><strong>innovaccer/Healthcare-MCP</strong></a></td>
+    <td>⭐ 12</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/6764390?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/elastic/genai-workshops"><strong>elastic/genai-workshops</strong></a></td>
+    <td>⭐ 10</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/68845761?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/entbappy/MCP-Tutorials"><strong>entbappy/MCP-Tutorials</strong></a></td>
-    <td>⭐ 5</td>
+    <td>⭐ 6</td>
   </tr>
 </table>
 
@@ -811,6 +820,7 @@ Thanks to all our amazing contributors!
 # License
 
 MIT
+
 # Citation
 
 If you use MCP-Use in your research or project, please cite:
@@ -824,3 +834,5 @@ If you use MCP-Use in your research or project, please cite:
   url = {https://github.com/pietrozullo/mcp-use}
 }
 ```
+
+<img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=732589b6-6850-4b8c-aa25-906c0979e426&page=README.md" />

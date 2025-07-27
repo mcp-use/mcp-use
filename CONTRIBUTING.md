@@ -39,7 +39,7 @@ MCP-Use requires:
    ```
 3. Install the package in development mode:
    ```bash
-   pip install -e ".[dev,search]"
+   pip install -e ".[dev,search,e2b]"
    ```
 4. Set up pre-commit hooks:
    ```bash

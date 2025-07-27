@@ -8,7 +8,7 @@ from mcp_use import MCPClient
 @pytest.fixture
 def server_process():
     """Start the stdio server process for testing"""
-    server_path = Path(__file__).parent.parent.parent / "servers_for_testing" / "simple_server.py"
+    server_path = Path(__file__).parent.parent / "servers_for_testing" / "simple_server.py"
     # Start server process - stdio doesn't need a separate process since it's spawned by the client
     yield server_path
 

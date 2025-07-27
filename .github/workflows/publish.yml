@@ -1,28 +1,21 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: ["Python Tests"]
-    branches:
-      - main
-    types:
-      - completed
+  release:
+    types: [published]
 
 # Required for PyPI trusted publishing
 permissions:
   id-token: write
-  contents: write  # Required for creating tags and releases
+  contents: read
 
 jobs:
   check-version-and-publish:
-    # Only proceed if the referenced workflow completed successfully
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -34,48 +27,55 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine wheel tomli
 
-      - name: Check for version bump
+      - name: Verify version match
         id: check-version
         run: |
-          # Extract current version directly from pyproject.toml
-          # This is more reliable than using importlib.metadata
-          CURRENT_VERSION=$(python -c "
+          # Extract current version from pyproject.toml
+          PYPROJECT_VERSION=$(python -c "
           import tomli
           with open('pyproject.toml', 'rb') as f:
               data = tomli.load(f)
           print(data['project']['version'])
-                    ")
+          ")
 
-          echo "Current version: $CURRENT_VERSION"
+          # Get release tag version (remove 'v' prefix if present)
+          RELEASE_VERSION="${{ github.event.release.tag_name }}"
+          RELEASE_VERSION=${RELEASE_VERSION#v}
 
-          # Check if this version already has a tag
-          if git rev-parse "v$CURRENT_VERSION" >/dev/null 2>&1; then
-            echo "Version $CURRENT_VERSION already has a tag. Skipping release."
-            echo "is_new_version=false" >> $GITHUB_OUTPUT
+          echo "PyProject version: $PYPROJECT_VERSION"
+          echo "Release version: $RELEASE_VERSION"
+
+          if [ "$PYPROJECT_VERSION" = "$RELEASE_VERSION" ]; then
+            echo "✅ Versions match! Proceeding with PyPI publish"
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "version=$PYPROJECT_VERSION" >> $GITHUB_OUTPUT
           else
-            echo "New version detected: $CURRENT_VERSION"
-            echo "is_new_version=true" >> $GITHUB_OUTPUT
-            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "❌ Version mismatch! PyProject: $PYPROJECT_VERSION, Release: $RELEASE_VERSION"
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
       - name: Build package
-        if: steps.check-version.outputs.is_new_version == 'true'
+        if: steps.check-version.outputs.should_publish == 'true'
         run: |
           python -m build
 
-      - name: Create Release
-        if: steps.check-version.outputs.is_new_version == 'true'
-        id: create_release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: v${{ steps.check-version.outputs.new_version }}
-          name: Release v${{ steps.check-version.outputs.new_version }}
-          draft: false
-          prerelease: false
-          generateReleaseNotes: false
+      - name: Check if already published to PyPI
+        if: steps.check-version.outputs.should_publish == 'true'
+        id: check-pypi
+        run: |
+          # Check if this version exists on PyPI
+          VERSION="${{ steps.check-version.outputs.version }}"
+          if pip index versions mcp-use | grep -q "Available versions: .*$VERSION"; then
+            echo "Version $VERSION already exists on PyPI"
+            echo "publish_needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION not found on PyPI, will publish"
+            echo "publish_needed=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Publish to PyPI
-        if: steps.check-version.outputs.is_new_version == 'true'
+        if: steps.check-pypi.outputs.publish_needed == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}

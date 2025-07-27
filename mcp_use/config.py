@@ -7,6 +7,8 @@ This module provides functionality to load MCP configuration from JSON files.
 import json
 from typing import Any
 
+from mcp.client.session import ElicitationFnT, SamplingFnT
+
 from mcp_use.types.sandbox import SandboxOptions
 
 from .connectors import (
@@ -37,6 +39,8 @@ def create_connector_from_config(
     sandbox: bool = False,
     sandbox_options: SandboxOptions | None = None,
     client_auth: Any = None,
+    sampling_callback: SamplingFnT | None = None,
+    elicitation_callback: ElicitationFnT | None = None,
 ) -> BaseConnector:
     """Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
@@ -50,6 +54,7 @@ def create_connector_from_config(
             - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
             - An httpx.Auth object: Use custom authentication
 
+        sampling_callback: Optional sampling callback function.
     Returns:
         A configured connector instance
     """
@@ -60,6 +65,8 @@ def create_connector_from_config(
             command=server_config["command"],
             args=server_config["args"],
             env=server_config.get("env", None),
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
         )
 
     # Sandboxed connector
@@ -69,6 +76,8 @@ def create_connector_from_config(
             args=server_config["args"],
             env=server_config.get("env", None),
             e2b_options=sandbox_options,
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
         )
 
     # HTTP connector
@@ -77,6 +86,10 @@ def create_connector_from_config(
             base_url=server_config["url"],
             headers=server_config.get("headers", None),
             auth=client_auth,
+            timeout=server_config.get("timeout", 5),
+            sse_read_timeout=server_config.get("sse_read_timeout", 60 * 5),
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
         )
 
     # WebSocket connector

@@ -1,8 +1,8 @@
 import asyncio
+import math
 import time
 from typing import ClassVar
 
-import numpy as np
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -205,10 +205,8 @@ class ToolSearchEngine:
         # Calculate similarity scores
         scores = {}
         for tool_name, embedding in self.tool_embeddings.items():
-            # Calculate cosine similarity
-            similarity = np.dot(query_embedding, embedding) / (
-                np.linalg.norm(query_embedding) * np.linalg.norm(embedding)
-            )
+            # Calculate cosine similarity using pure Python
+            similarity = self._cosine_similarity(query_embedding, embedding)
             scores[tool_name] = float(similarity)
 
         # Sort by score and get top_k results
@@ -304,3 +302,27 @@ class ToolSearchEngine:
         formatted_output += "\nTo use a tool, connect to the appropriate server first, then invoke the tool."
 
         return formatted_output
+
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
+        """Calculate cosine similarity between two vectors.
+
+        Args:
+            vec1: First vector
+            vec2: Second vector
+
+        Returns:
+            Cosine similarity between the vectors
+        """
+        # Calculate dot product
+        dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=False))
+
+        # Calculate magnitudes
+        magnitude1 = math.sqrt(sum(a * a for a in vec1))
+        magnitude2 = math.sqrt(sum(b * b for b in vec2))
+
+        # Avoid division by zero
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+
+        # Calculate cosine similarity
+        return dot_product / (magnitude1 * magnitude2)

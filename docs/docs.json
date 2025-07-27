@@ -8,10 +8,32 @@
     "dark": "#000000"
   },
   "favicon": "/favicon.svg",
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude"
+    ]
+  },
   "icons": {
     "library": "lucide"
   },
   "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Website",
+          "href": "https://mcp-use.com",
+          "icon": "globe"
+        },
+        {
+          "anchor": "Forum",
+          "href": "https://discord.gg/XkNkSkMz3V",
+          "icon": "discord"
+        }
+      ]
+    },
     "tabs": [
       {
         "tab": "Documentation",
@@ -30,8 +52,16 @@
             "pages": [
               "essentials/configuration",
               "essentials/client-configuration",
-              "essentials/connection-types",
-              "essentials/authentication"
+              {
+                "group": "Client Features",
+                "icon": "list-plus",
+                "pages": [
+                  "essentials/connection-types",
+                  "essentials/authentication",
+                  "essentials/sampling",
+                  "essentials/elicitation"
+                ]
+              }
             ]
           },
           {
@@ -39,7 +69,8 @@
             "pages": [
               "essentials/agent-configuration",
               "essentials/server-manager",
-              "essentials/llm-integration"
+              "essentials/llm-integration",
+              "guides/streaming"
             ]
           },
           {
@@ -48,7 +79,6 @@
               "guides/building-custom-agents",
               "guides/logging",
               "guides/multi-server-setup",
-              "guides/streaming",
               "guides/security"
             ]
           },
@@ -56,7 +86,8 @@
             "group": "Development",
             "pages": [
               "development",
-              "development/telemetry"
+              "development/telemetry",
+              "development/observability"
             ]
           },
           {
@@ -144,11 +175,11 @@
         "items": [
           {
             "label": "Website",
-            "href": "https://mcp-use.io"
+            "href": "https://mcp-use.com"
           },
           {
             "label": "Cloud Chat",
-            "href": "https://chat.mcp-use.io"
+            "href": "https://chat.mcp-use.com"
           },
           {
             "label": "GitHub",
@@ -196,14 +227,6 @@
       }
     ]
   },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude"
-    ]
-  },
   "seo": {
     "metatags": {
       "charset": "UTF-8",
@@ -222,7 +245,7 @@
       "referrer": "origin",
       "language": "en",
       "copyright": "Copyright 2025 mcp-use",
-      "reply-to": "dev@mcp-use.io",
+      "reply-to": "dev@mcp-use.com",
       "distribution": "global",
       "coverage": "Worldwide",
       "category": "Technology",
@@ -238,7 +261,7 @@
       "msapplication-config": "/browserconfig.xml",
       "og:title": "mcp-use - Connect Any LLM to Any MCP Server",
       "og:type": "website",
-      "og:url": "https://mcp-use.io",
+      "og:url": "https://mcp-use.com",
       "og:image": "https://repository-images.githubusercontent.com/956472076/d2b369ee-1bf9-466c-9ecc-e96c2f95b81a",
       "og:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
       "og:site_name": "mcp-use",

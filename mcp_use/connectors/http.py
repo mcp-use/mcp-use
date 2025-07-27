@@ -9,10 +9,11 @@ from typing import Any
 
 import httpx
 from mcp import ClientSession
+from mcp.client.session import ElicitationFnT, SamplingFnT
 
 from ..auth import BearerAuth, OAuth
 from ..logging import logger
-from ..task_managers import ConnectionManager, SseConnectionManager, StreamableHttpConnectionManager
+from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
 from .base import BaseConnector
 
 
@@ -30,6 +31,8 @@ class HttpConnector(BaseConnector):
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
         auth: str | dict[str, Any] | httpx.Auth | None = None,
+        sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
     ):
         """Initialize a new HTTP connector.
 
@@ -42,8 +45,10 @@ class HttpConnector(BaseConnector):
                 - A string token: Use Bearer token authentication
                 - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
                 - An httpx.Auth object: Use custom authentication
+            sampling_callback: Optional sampling callback.
+            elicitation_callback: Optional elicitation callback.
         """
-        super().__init__()
+        super().__init__(sampling_callback=sampling_callback, elicitation_callback=elicitation_callback)
         self.base_url = base_url.rstrip("/")
         self.headers = headers or {}
         self.timeout = timeout
@@ -89,14 +94,6 @@ class HttpConnector(BaseConnector):
         else:
             raise ValueError(f"Invalid auth type: {type(auth)}")
 
-    async def _setup_client(self, connection_manager: ConnectionManager) -> None:
-        """Set up the client session with the provided connection manager."""
-
-        self._connection_manager = connection_manager
-        read_stream, write_stream = await self._connection_manager.start()
-        self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
-        await self.client_session.__aenter__()
-
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
         if self._connected:
@@ -133,17 +130,48 @@ class HttpConnector(BaseConnector):
             read_stream, write_stream = await connection_manager.start()
 
             # Test if this actually works by trying to create a client session and initialize it
-            test_client = ClientSession(read_stream, write_stream, sampling_callback=None)
+            test_client = ClientSession(
+                read_stream,
+                write_stream,
+                sampling_callback=self.sampling_callback,
+                elicitation_callback=self.elicitation_callback,
+                client_info=self.client_info,
+            )
             await test_client.__aenter__()
 
             try:
                 # Try to initialize - this is where streamable HTTP vs SSE difference should show up
-                await test_client.initialize()
+                result = await test_client.initialize()
 
                 # If we get here, streamable HTTP works
 
                 self.client_session = test_client
                 self.transport_type = "streamable HTTP"
+                self._initialized = True  # Mark as initialized since we just called initialize()
+
+                # Populate tools, resources, and prompts since we've initialized
+                server_capabilities = result.capabilities
+
+                if server_capabilities.tools:
+                    # Get available tools directly from client session
+                    tools_result = await self.client_session.list_tools()
+                    self._tools = tools_result.tools if tools_result else []
+                else:
+                    self._tools = []
+
+                if server_capabilities.resources:
+                    # Get available resources directly from client session
+                    resources_result = await self.client_session.list_resources()
+                    self._resources = resources_result.resources if resources_result else []
+                else:
+                    self._resources = []
+
+                if server_capabilities.prompts:
+                    # Get available prompts directly from client session
+                    prompts_result = await self.client_session.list_prompts()
+                    self._prompts = prompts_result.prompts if prompts_result else []
+                else:
+                    self._prompts = []
 
             except Exception as init_error:
                 # Clean up the test client
@@ -186,7 +214,13 @@ class HttpConnector(BaseConnector):
                     read_stream, write_stream = await connection_manager.start()
 
                     # Create the client session for SSE
-                    self.client_session = ClientSession(read_stream, write_stream, sampling_callback=None)
+                    self.client_session = ClientSession(
+                        read_stream,
+                        write_stream,
+                        sampling_callback=self.sampling_callback,
+                        elicitation_callback=self.elicitation_callback,
+                        client_info=self.client_info,
+                    )
                     await self.client_session.__aenter__()
                     self.transport_type = "SSE"
 
