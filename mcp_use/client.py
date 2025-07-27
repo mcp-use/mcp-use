@@ -157,6 +157,7 @@ class MCPClient:
         Returns:
             List of server names.
         """
+        return list(self.config.get("mcpServers", {}).keys())
 
     def save_config(self, filepath: str) -> None:
         """Save the current configuration to a file.
