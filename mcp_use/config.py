@@ -80,6 +80,8 @@ def create_connector_from_config(
             base_url=server_config["url"],
             headers=server_config.get("headers", None),
             auth_token=server_config.get("auth_token", None),
+            timeout=server_config.get("timeout", 5),
+            sse_read_timeout=server_config.get("sse_read_timeout", 60 * 5),
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
         )

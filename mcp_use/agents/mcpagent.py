@@ -54,6 +54,7 @@ class MCPAgent:
         system_prompt_template: str | None = None,  # User can still override the template
         additional_instructions: str | None = None,
         disallowed_tools: list[str] | None = None,
+        tools_used_names: list[str] | None = None,
         use_server_manager: bool = False,
         verbose: bool = False,
     ):
@@ -81,6 +82,7 @@ class MCPAgent:
         self._initialized = False
         self._conversation_history: list[BaseMessage] = []
         self.disallowed_tools = disallowed_tools or []
+        self.tools_used_names = tools_used_names or []
         self.use_server_manager = use_server_manager
         self.verbose = verbose
         # System prompt configuration
@@ -323,7 +325,6 @@ class MCPAgent:
         """
         final_result = ""
         steps_taken = 0
-        tools_used_names = []
         async for item in generator:
             # If it's a string, it's the final result
             if isinstance(item, str):
@@ -331,8 +332,7 @@ class MCPAgent:
                 break
             # Otherwise it's a step tuple, just consume it
             steps_taken += 1
-            tools_used_names.append(item[0].tool)
-        return final_result, steps_taken, tools_used_names
+        return final_result, steps_taken
 
     async def stream(
         self,
@@ -357,7 +357,6 @@ class MCPAgent:
         result = ""
         initialized_here = False
         start_time = time.time()
-        tools_used_names = []
         steps_taken = 0
         success = False
 
@@ -459,7 +458,7 @@ class MCPAgent:
                         yield agent_step
                         action, observation = agent_step
                         tool_name = action.tool
-                        tools_used_names.append(tool_name)
+                        self.tools_used_names.append(tool_name)
                         tool_input_str = str(action.tool_input)
                         # Truncate long inputs for readability
                         if len(tool_input_str) > 100:
@@ -548,8 +547,8 @@ class MCPAgent:
                     manage_connector=manage_connector,
                     external_history_used=external_history is not None,
                     steps_taken=steps_taken,
-                    tools_used_count=len(tools_used_names),
-                    tools_used_names=tools_used_names,
+                    tools_used_count=len(self.tools_used_names),
+                    tools_used_names=self.tools_used_names,
                     response=result,
                     execution_time_ms=execution_time_ms,
                     error_type=None if success else "execution_error",
@@ -591,10 +590,9 @@ class MCPAgent:
         generator = self.stream(query, max_steps, manage_connector, external_history, track_execution=False)
         error = None
         steps_taken = 0
-        tools_used_names = []
         result = None
         try:
-            result, steps_taken, tools_used_names = await self._consume_and_return(generator)
+            result, steps_taken = await self._consume_and_return(generator)
         except Exception as e:
             success = False
             error = str(e)
@@ -618,8 +616,8 @@ class MCPAgent:
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
                 steps_taken=steps_taken,
-                tools_used_count=len(tools_used_names),
-                tools_used_names=tools_used_names,
+                tools_used_count=len(self.tools_used_names),
+                tools_used_names=self.tools_used_names,
                 response=result,
                 execution_time_ms=int((time.time() - start_time) * 1000),
                 error_type=error,

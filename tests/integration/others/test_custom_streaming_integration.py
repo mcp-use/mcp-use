@@ -11,7 +11,7 @@ from mcp_use import MCPClient
 @pytest.fixture
 async def streaming_server_process():
     """Start the custom streaming server process for testing"""
-    server_path = Path(__file__).parent.parent.parent / "servers_for_testing" / "custom_streaming_server.py"
+    server_path = Path(__file__).parent.parent / "servers_for_testing" / "custom_streaming_server.py"
 
     print(f"Starting custom streaming server: python {server_path}")
 
