@@ -10,7 +10,7 @@ This example shows how to:
 import asyncio
 
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI 
+from langchain_google_genai import ChatGoogleGenerativeAI
 from mcp_use import MCPAgent, MCPClient
 
 
@@ -46,9 +46,8 @@ async def run_multi_server_example():
     client = MCPClient.from_dict(config)
 
     # Create LLM
-    llm = ChatGoogleGenerativeAI( 
-        model="gemini-2.5-flash",
-        model_kwargs={"api_version": "v1"}
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", model_kwargs={"api_version": "v1"}
     )
 
     # Create agent with the client
