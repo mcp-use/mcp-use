@@ -76,6 +76,7 @@
             "group": "Advanced Usage",
             "pages": [
               "guides/building-custom-agents",
+              "guides/callbacks",
               "guides/logging",
               "guides/multi-server-setup",
               "guides/security"
