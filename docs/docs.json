@@ -57,6 +57,7 @@
                 "icon": "list-plus",
                 "pages": [
                   "essentials/connection-types",
+                  "essentials/authentication",
                   "essentials/sampling",
                   "essentials/elicitation"
                 ]
