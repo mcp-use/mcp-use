@@ -8,6 +8,7 @@ to provide a simple interface for using MCP tools with different LLMs.
 import logging
 import time
 from collections.abc import AsyncGenerator, AsyncIterator
+from typing import TypeVar
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
@@ -20,6 +21,7 @@ from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
 from langchain_core.utils.input import get_color_mapping
+from pydantic import BaseModel
 
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
@@ -33,6 +35,9 @@ from .prompts.system_prompt_builder import create_system_message
 from .prompts.templates import DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE
 
 set_debug(logger.level == logging.DEBUG)
+
+# Type variable for structured output
+T = TypeVar("T", bound=BaseModel)
 
 
 class MCPAgent:
@@ -309,8 +314,8 @@ class MCPAgent:
 
     async def _consume_and_return(
         self,
-        generator: AsyncGenerator[tuple[AgentAction, str], str],
-    ) -> str:
+        generator: AsyncGenerator[tuple[AgentAction, str] | str | T, None],
+    ) -> tuple[str | T, int]:
         """Consume the generator and return the final result.
 
         This method manually iterates through the generator to consume the steps.
@@ -321,17 +326,23 @@ class MCPAgent:
             generator: The async generator that yields steps and a final result.
 
         Returns:
-            The final result from the generator.
+            A tuple of (final_result, steps_taken). final_result can be a string
+            for regular output or a Pydantic model instance for structured output.
         """
         final_result = ""
         steps_taken = 0
         async for item in generator:
-            # If it's a string, it's the final result
+            # If it's a string, it's the final result (regular output)
             if isinstance(item, str):
                 final_result = item
                 break
+            # If it's not a tuple, it might be structured output (Pydantic model)
+            elif not isinstance(item, tuple):
+                final_result = item
+                break
             # Otherwise it's a step tuple, just consume it
-            steps_taken += 1
+            else:
+                steps_taken += 1
         return final_result, steps_taken
 
     async def stream(
@@ -341,7 +352,8 @@ class MCPAgent:
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
         track_execution: bool = True,
-    ) -> AsyncGenerator[tuple[AgentAction, str] | str, None]:
+        output_schema: type[T] | None = None,
+    ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
         """Run the agent and yield intermediate steps as an async generator.
 
         Args:
@@ -350,15 +362,39 @@ class MCPAgent:
             manage_connector: Whether to handle the connector lifecycle internally.
             external_history: Optional external history to use instead of the
                 internal conversation history.
+            track_execution: Whether to track execution for telemetry.
+            output_schema: Optional Pydantic BaseModel class for structured output.
+                If provided, the agent will attempt structured output at finish points
+                and continue execution if required information is missing.
 
         Yields:
-            Intermediate steps as (AgentAction, str) tuples, followed by the final result as a string.
+            Intermediate steps as (AgentAction, str) tuples, followed by the final result.
+            If output_schema is provided, yields structured output as instance of the schema.
         """
         result = ""
         initialized_here = False
         start_time = time.time()
         steps_taken = 0
         success = False
+
+        # Schema-aware setup for structured output
+        structured_llm = None
+        schema_description = ""
+        if output_schema:
+            query = self._enhance_query_with_schema(query, output_schema)
+            structured_llm = self.llm.with_structured_output(output_schema)
+            # Get schema description for feedback
+            schema_fields = []
+            try:
+                for field_name, field_info in output_schema.model_fields.items():
+                    description = getattr(field_info, "description", "") or field_name
+                    required = not hasattr(field_info, "default") or field_info.default is None
+                    schema_fields.append(f"- {field_name}: {description} {'(required)' if required else '(optional)'}")
+
+                schema_description = "\n".join(schema_fields)
+            except Exception as e:
+                logger.warning(f"Could not extract schema details: {e}")
+                schema_description = f"Schema: {output_schema.__name__}"
 
         try:
             # Initialize if needed
@@ -448,7 +484,49 @@ class MCPAgent:
                     if isinstance(next_step_output, AgentFinish):
                         logger.info(f"✅ Agent finished at step {step_num + 1}")
                         result = next_step_output.return_values.get("output", "No output generated")
-                        break
+
+                        # If structured output is requested, attempt to create it
+                        if output_schema and structured_llm:
+                            try:
+                                logger.info("🔧 Attempting structured output...")
+                                structured_result = await self._attempt_structured_output(
+                                    result, structured_llm, output_schema, schema_description
+                                )
+
+                                # Add the final response to conversation history if memory is enabled
+                                if self.memory_enabled:
+                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+
+                                logger.info("✅ Structured output successful")
+                                success = True
+                                yield structured_result
+                                return
+
+                            except Exception as e:
+                                logger.warning(f"⚠️ Structured output failed: {e}")
+                                # Continue execution to gather missing information
+                                missing_info_prompt = f"""
+                                The current result cannot be formatted into the required structure.
+                                Error: {str(e)}
+
+                                Current information: {result}
+
+                                Please continue working to gather the missing information needed for:
+                                {schema_description}
+
+                                Focus on finding the specific missing details.
+                                """
+
+                                # Add this as feedback and continue the loop
+                                inputs["input"] = missing_info_prompt
+                                if self.memory_enabled:
+                                    self.add_to_history(HumanMessage(content=missing_info_prompt))
+
+                                logger.info("🔄 Continuing execution to gather missing information...")
+                                continue
+                        else:
+                            # Regular execution without structured output
+                            break
 
                     # If it's actions/steps, add to intermediate steps and yield them
                     intermediate_steps.extend(next_step_output)
@@ -497,15 +575,37 @@ class MCPAgent:
                 logger.warning(f"⚠️ Agent stopped after reaching max iterations ({steps})")
                 result = f"Agent stopped after reaching the maximum number of steps ({steps})."
 
-            # Add the final response to conversation history if memory is enabled
-            if self.memory_enabled:
+            # If structured output was requested but not achieved, attempt one final time
+            if output_schema and structured_llm and not success:
+                try:
+                    logger.info("🔧 Final attempt at structured output...")
+                    structured_result = await self._attempt_structured_output(
+                        result, structured_llm, output_schema, schema_description
+                    )
+
+                    # Add the final response to conversation history if memory is enabled
+                    if self.memory_enabled:
+                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+
+                    logger.info("✅ Final structured output successful")
+                    success = True
+                    yield structured_result
+                    return
+
+                except Exception as e:
+                    logger.error(f"❌ Final structured output attempt failed: {e}")
+                    raise RuntimeError(f"Failed to generate structured output after {steps} steps: {str(e)}") from e
+
+            if self.memory_enabled and not output_schema:
                 self.add_to_history(AIMessage(content=result))
 
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
-            success = True
+            if not success:
+                success = True
 
-            # Yield the final result as a string
-            yield result
+            # Yield the final result (only for non-structured output)
+            if not output_schema:
+                yield result
 
         except Exception as e:
             logger.error(f"❌ Error running query: {e}")
@@ -566,11 +666,13 @@ class MCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
-    ) -> str:
+        output_schema: type[T] | None = None,
+    ) -> str | T:
         """Run a query using the MCP tools and return the final result.
 
         This method uses the streaming implementation internally and returns
-        the final result after consuming all intermediate steps.
+        the final result after consuming all intermediate steps. If output_schema
+        is provided, the agent will be schema-aware and return structured output.
 
         Args:
             query: The query to run.
@@ -581,18 +683,43 @@ class MCPAgent:
                 for managing the connector lifecycle.
             external_history: Optional external history to use instead of the
                 internal conversation history.
+            output_schema: Optional Pydantic BaseModel class for structured output.
+                If provided, the agent will attempt to return an instance of this model.
 
         Returns:
-            The result of running the query.
+            The result of running the query as a string, or if output_schema is provided,
+            an instance of the specified Pydantic model.
+
+        Example:
+            ```python
+            # Regular usage
+            result = await agent.run("What's the weather like?")
+
+            # Structured output usage
+            from pydantic import BaseModel, Field
+
+            class WeatherInfo(BaseModel):
+                temperature: float = Field(description="Temperature in Celsius")
+                condition: str = Field(description="Weather condition")
+
+            weather: WeatherInfo = await agent.run(
+                "What's the weather like?",
+                output_schema=WeatherInfo
+            )
+            ```
         """
         success = True
         start_time = time.time()
-        generator = self.stream(query, max_steps, manage_connector, external_history, track_execution=False)
+
+        generator = self.stream(
+            query, max_steps, manage_connector, external_history, track_execution=False, output_schema=output_schema
+        )
         error = None
         steps_taken = 0
         result = None
         try:
             result, steps_taken = await self._consume_and_return(generator)
+
         except Exception as e:
             success = False
             error = str(e)
@@ -618,12 +745,76 @@ class MCPAgent:
                 steps_taken=steps_taken,
                 tools_used_count=len(self.tools_used_names),
                 tools_used_names=self.tools_used_names,
-                response=result,
+                response=str(result),
                 execution_time_ms=int((time.time() - start_time) * 1000),
                 error_type=error,
                 conversation_history_length=len(self._conversation_history),
             )
         return result
+
+    async def _attempt_structured_output(
+        self, raw_result: str, structured_llm, output_schema: type[T], schema_description: str
+    ) -> T:
+        """Attempt to create structured output from raw result with validation."""
+        format_prompt = f"""
+        Please format the following information according to the specified schema.
+        Extract and structure the relevant information from the content below.
+
+        Required schema fields:
+        {schema_description}
+
+        Content to format:
+        {raw_result}
+
+        Please provide the information in the requested structured format.
+        If any required information is missing, you must indicate this clearly.
+        """
+
+        structured_result = await structured_llm.ainvoke(format_prompt)
+
+        try:
+            for field_name, field_info in output_schema.model_fields.items():
+                required = not hasattr(field_info, "default") or field_info.default is None
+                if required:
+                    value = getattr(structured_result, field_name, None)
+                    if value is None or (isinstance(value, str) and not value.strip()):
+                        raise ValueError(f"Required field '{field_name}' is missing or empty")
+                    if isinstance(value, list) and len(value) == 0:
+                        raise ValueError(f"Required field '{field_name}' is an empty list")
+        except Exception as e:
+            logger.debug(f"Validation details: {e}")
+            raise  # Re-raise to trigger retry logic
+
+        return structured_result
+
+    def _enhance_query_with_schema(self, query: str, output_schema: type[T]) -> str:
+        """Enhance the query with schema information to make the agent aware of required fields."""
+        schema_fields = []
+
+        try:
+            for field_name, field_info in output_schema.model_fields.items():
+                description = getattr(field_info, "description", "") or field_name
+                required = not hasattr(field_info, "default") or field_info.default is None
+                schema_fields.append(f"- {field_name}: {description} {'(required)' if required else '(optional)'}")
+
+            schema_description = "\n".join(schema_fields)
+        except Exception as e:
+            logger.warning(f"Could not extract schema details: {e}")
+            schema_description = f"Schema: {output_schema.__name__}"
+
+        # Enhance the query with schema awareness
+        enhanced_query = f"""
+        {query}
+
+        IMPORTANT: Your response must include sufficient information to populate the following structured output:
+
+        {schema_description}
+
+        Make sure you gather ALL the required information during your task execution.
+        If any required information is missing, continue working to find it.
+        """
+
+        return enhanced_query
 
     async def _generate_response_chunks_async(
         self,
