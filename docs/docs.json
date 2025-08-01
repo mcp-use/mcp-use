@@ -42,23 +42,23 @@
           {
             "group": "Getting Started",
             "pages": [
-              "index",
-              "quickstart",
-              "installation"
+              "getting-started/index",
+              "getting-started/quickstart",
+              "getting-started/installation",
+              "getting-started/configuration"
             ]
           },
           {
             "group": "Client Configuration",
             "pages": [
-              "essentials/configuration",
-              "essentials/client-configuration",
+              "client/client-configuration",
               {
                 "group": "Client Features",
                 "icon": "list-plus",
                 "pages": [
-                  "essentials/connection-types",
-                  "essentials/sampling",
-                  "essentials/elicitation"
+                  "client/connection-types",
+                  "client/sampling",
+                  "client/elicitation"
                 ]
               }
             ]
@@ -66,20 +66,20 @@
           {
             "group": "Agent Configuration",
             "pages": [
-              "essentials/agent-configuration",
-              "essentials/server-manager",
-              "essentials/llm-integration",
-              "guides/streaming",
-              "essentials/agent-structured-output"
+              "agent/agent-configuration",
+              "agent/llm-integration",
+              "agent/server-manager",
+              "agent/streaming",
+              "agent/structured-output"
             ]
           },
           {
             "group": "Advanced Usage",
             "pages": [
-              "guides/building-custom-agents",
-              "guides/logging",
-              "guides/multi-server-setup",
-              "guides/security"
+              "advanced/building-custom-agents",
+              "advanced/logging",
+              "advanced/multi-server-setup",
+              "advanced/security"
             ]
           },
           {
