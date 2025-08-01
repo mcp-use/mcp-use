@@ -1,0 +1,61 @@
+---
+title: "Agent Structured Output"
+description: "Get strongly-typed Pydantic models with intelligent retry logic"
+icon: "shapes"
+---
+
+# Agent Structured Output
+
+The MCPAgent supports structured output, allowing you to get strongly-typed Pydantic models instead of plain text responses. The agent becomes **schema-aware** and will intelligently retry to gather missing information until all required fields can be populated.
+
+## How it Works
+
+When you provide an `output_schema` parameter, the agent:
+
+1. **Understands requirements** - The agent knows exactly what information it needs to collect
+2. **Attempts structured output** - At completion points, tries to format the result into your schema
+3. **Intelligently retries** - If required fields are missing, continues execution to gather the missing data
+4. **Validates completeness** - Only finishes when all required fields can be populated
+
+## Basic Example
+
+```python
+import asyncio
+from pydantic import BaseModel, Field
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+class WeatherInfo(BaseModel):
+    """Weather information for a location"""
+    city: str = Field(description="City name")
+    temperature: float = Field(description="Temperature in Celsius")
+    condition: str = Field(description="Weather condition")
+    humidity: int = Field(description="Humidity percentage")
+
+async def main():
+    # Setup client and agent
+    client = MCPClient(config={"mcpServers": {...}})
+    llm = ChatOpenAI(model="gpt-4o")
+    agent = MCPAgent(llm=llm, client=client)
+
+    # Get structured output
+    weather: WeatherInfo = await agent.run(
+        "Get the current weather in San Francisco",
+        output_schema=WeatherInfo
+    )
+
+    print(f"Temperature in {weather.city}: {weather.temperature}°C")
+    print(f"Condition: {weather.condition}")
+    print(f"Humidity: {weather.humidity}%")
+
+asyncio.run(main())
+```
+
+## Key Benefits
+
+- **Type Safety**: Get Pydantic models with full IDE support and validation
+- **Intelligent Gathering**: Agent knows what information is required and won't stop until it has everything
+- **Automatic Retry**: Missing fields trigger continued execution automatically
+- **Field Validation**: Built-in validation for required fields, data types, and constraints
+
+The agent will continue working until all required fields in your schema can be populated, ensuring you always get complete, structured data.

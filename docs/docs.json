@@ -69,7 +69,8 @@
               "essentials/agent-configuration",
               "essentials/server-manager",
               "essentials/llm-integration",
-              "guides/streaming"
+              "guides/streaming",
+              "essentials/agent-structured-output"
             ]
           },
           {
