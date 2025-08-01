@@ -8,7 +8,6 @@ Special thanks to https://github.com/microsoft/playwright-mcp for the server.
 """
 
 import asyncio
-import os
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -20,8 +19,12 @@ async def main():
     """Run the example using a configuration file."""
     # Load environment variables
     load_dotenv()
+
+    config = {
+        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
+    }
     # Create MCPClient from config file
-    client = MCPClient.from_config_file(os.path.join(os.path.dirname(__file__), "browser_mcp.json"))
+    client = MCPClient(config=config)
     # Create LLM
     llm = ChatOpenAI(model="gpt-4o")
     # Create agent with the client
