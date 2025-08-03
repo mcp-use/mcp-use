@@ -492,3 +492,55 @@ class TestMCPClientSessionManagement:
 
         # Verify return value
         assert sessions == client.sessions
+
+    @pytest.mark.asyncio
+    @patch("mcp_use.client.create_connector_from_config")
+    @patch("mcp_use.client.MCPSession")
+    async def test_create_allowed_sessions(self, mock_session_class, mock_create_connector):
+        """Test creating all sessions."""
+        config = {
+            "mcpServers": {
+                "server1": {"url": "http://server1.com"},
+                "server2": {"url": "http://server2.com"},
+            }
+        }
+        client = MCPClient(config=config, allowed_servers=['server1'])
+
+        # Set up mocks
+        mock_connector1 = MagicMock()
+        mock_connector2 = MagicMock()
+        mock_create_connector.side_effect = [mock_connector1, mock_connector2]
+
+        mock_session1 = MagicMock()
+        mock_session1.initialize = AsyncMock()
+        mock_session2 = MagicMock()
+        mock_session2.initialize = AsyncMock()
+        mock_session_class.side_effect = [mock_session1, mock_session2]
+
+        # Test create_all_sessions
+        sessions = await client.create_all_sessions()
+
+        # Verify behavior
+        assert mock_create_connector.call_count == 1
+        mock_create_connector.assert_any_call(
+            {"url": "http://server1.com"},
+            sandbox=False,
+            sandbox_options=None,
+            sampling_callback=None,
+            elicitation_callback=None,
+        )
+
+        assert mock_session_class.call_count == 1
+
+        # Initialize is called once per session during create_session
+        assert mock_session1.initialize.call_count == 1
+
+        # Verify state changes
+        assert len(client.sessions) == 1
+        assert client.sessions["server1"] == mock_session1
+        assert len(client.active_sessions) == 1
+        assert "server1" in client.active_sessions
+        assert "server2" not in client.active_sessions
+
+        # Verify return value
+        assert sessions == client.sessions
