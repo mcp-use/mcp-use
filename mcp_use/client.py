@@ -28,6 +28,7 @@ class MCPClient:
     def __init__(
         self,
         config: str | dict[str, Any] | None = None,
+        allowed_servers: list[str] | None = None,
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
@@ -43,6 +44,7 @@ class MCPClient:
             sampling_callback: Optional sampling callback function.
         """
         self.config: dict[str, Any] = {}
+        self.allowed_servers: list[str] = allowed_servers
         self.sandbox = sandbox
         self.sandbox_options = sandbox_options
         self.sessions: dict[str, MCPSession] = {}
@@ -220,9 +222,10 @@ class MCPClient:
             warnings.warn("No MCP servers defined in config", UserWarning, stacklevel=2)
             return {}
 
-        # Create sessions for all servers
+        # Create sessions only for allowed servers if applicable else create for all servers
         for name in servers:
-            await self.create_session(name, auto_initialize)
+            if self.allowed_servers is None or name in self.allowed_servers:
+                await self.create_session(name, auto_initialize)
 
         return self.sessions
 
