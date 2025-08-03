@@ -497,14 +497,14 @@ class TestMCPClientSessionManagement:
     @patch("mcp_use.client.create_connector_from_config")
     @patch("mcp_use.client.MCPSession")
     async def test_create_allowed_sessions(self, mock_session_class, mock_create_connector):
-        """Test creating all sessions."""
+        """Test creating only allowed sessions."""
         config = {
             "mcpServers": {
                 "server1": {"url": "http://server1.com"},
                 "server2": {"url": "http://server2.com"},
             }
         }
-        client = MCPClient(config=config, allowed_servers=['server1'])
+        client = MCPClient(config=config, allowed_servers=["server1"])
 
         # Set up mocks
         mock_connector1 = MagicMock()
