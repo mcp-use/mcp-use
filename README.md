@@ -767,16 +767,24 @@ Thanks to all our amazing contributors!
     <th>Stars</th>
   </tr>
   <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/170207473?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/tavily-ai/meeting-prep-agent"><strong>tavily-ai/meeting-prep-agent</strong></a></td>
-    <td>⭐ 127</td>
+    <td><img src="https://avatars.githubusercontent.com/u/38653995?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/patchy631/ai-engineering-hub"><strong>patchy631/ai-engineering-hub</strong></a></td>
+    <td>⭐ 15189</td>
   </tr>
   <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/205593730?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/Qingyon-AI/Revornix"><strong>Qingyon-AI/Revornix</strong></a></td>
-    <td>⭐ 108</td>
+    <td><img src="https://avatars.githubusercontent.com/u/170207473?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/tavily-ai/meeting-prep-agent"><strong>tavily-ai/meeting-prep-agent</strong></a></td>
+    <td>⭐ 129</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/187057607?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/hud-evals/hud-sdk"><strong>hud-evals/hud-sdk</strong></a></td>
+    <td>⭐ 75</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/20041231?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/krishnaik06/MCP-CRASH-Course"><strong>krishnaik06/MCP-CRASH-Course</strong></a></td>
-    <td>⭐ 57</td>
+    <td>⭐ 58</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/54944174?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/larksuite/lark-samples"><strong>larksuite/lark-samples</strong></a></td>
+    <td>⭐ 31</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/892404?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/truemagic-coder/solana-agent-app"><strong>truemagic-coder/solana-agent-app</strong></a></td>
@@ -784,7 +792,7 @@ Thanks to all our amazing contributors!
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/8344498?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/schogini/techietalksai"><strong>schogini/techietalksai</strong></a></td>
-    <td>⭐ 23</td>
+    <td>⭐ 24</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/201161342?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/autometa-dev/whatsapp-mcp-voice-agent"><strong>autometa-dev/whatsapp-mcp-voice-agent</strong></a></td>
@@ -796,15 +804,7 @@ Thanks to all our amazing contributors!
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/6688805?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/innovaccer/Healthcare-MCP"><strong>innovaccer/Healthcare-MCP</strong></a></td>
-    <td>⭐ 12</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/6764390?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/elastic/genai-workshops"><strong>elastic/genai-workshops</strong></a></td>
-    <td>⭐ 10</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/68845761?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/entbappy/MCP-Tutorials"><strong>entbappy/MCP-Tutorials</strong></a></td>
-    <td>⭐ 6</td>
+    <td>⭐ 15</td>
   </tr>
 </table>
 
