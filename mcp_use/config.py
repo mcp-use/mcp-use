@@ -24,14 +24,22 @@ from .connectors.utils import is_stdio_server
 def load_config_file(filepath: str) -> dict[str, Any]:
     """Load a configuration file.
 
+    Supports both JSON configuration files and DXT (Desktop Extension) files.
+
     Args:
-        filepath: Path to the configuration file
+        filepath: Path to the configuration file (.json or .dxt)
 
     Returns:
         The parsed configuration
     """
-    with open(filepath) as f:
-        return json.load(f)
+    if filepath.lower().endswith(".dxt"):
+        # Import here to avoid circular imports
+        from .dxt import load_dxt_file
+
+        return load_dxt_file(filepath)
+    else:
+        with open(filepath) as f:
+            return json.load(f)
 
 
 def create_connector_from_config(
