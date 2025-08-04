@@ -19,6 +19,7 @@ from .connectors import (
     WebSocketConnector,
 )
 from .connectors.utils import is_stdio_server
+from .dxt import load_dxt_config
 
 
 def load_config_file(filepath: str) -> dict[str, Any]:
@@ -32,6 +33,22 @@ def load_config_file(filepath: str) -> dict[str, Any]:
     """
     with open(filepath) as f:
         return json.load(f)
+
+
+def load_dxt_file(filepath: str, user_config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Load a DXT (Desktop Extension) file.
+
+    Args:
+        filepath: Path to the .dxt file
+        user_config: Optional user configuration values for the DXT
+
+    Returns:
+        The parsed configuration compatible with mcp-use
+
+    Raises:
+        DXTError: If the DXT file cannot be processed
+    """
+    return load_dxt_config(filepath, user_config)
 
 
 def create_connector_from_config(
