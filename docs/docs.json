@@ -51,12 +51,28 @@
           {
             "group": "Client Configuration",
             "pages": [
-              "client/client-configuration",
               {
-                "group": "Client Features",
+                "group": "Overview",
+                "icon": "globe",
+                "pages": [
+                  "client/client-configuration",
+                  "client/connection-types",
+                  "client/sandbox"
+                ]
+              },
+              {
+                "group": "Core Features",
                 "icon": "list-plus",
                 "pages": [
-                  "client/connection-types",
+                  "client/tools",
+                  "client/resources",
+                  "client/prompts"
+                ]
+              },
+              {
+                "group": "Advanced Features",
+                "icon": "sparkle",
+                "pages": [
                   "client/sampling",
                   "client/elicitation"
                 ]
