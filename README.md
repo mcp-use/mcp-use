@@ -374,7 +374,9 @@ if __name__ == "__main__":
 
 # Configuration File Support
 
-MCP-Use supports initialization from configuration files, making it easy to manage and switch between different MCP server setups:
+MCP-Use supports initialization from configuration files, making it easy to manage and switch between different MCP server setups. The library now supports both JSON configuration files and Anthropic's DXT (Desktop Extension) format.
+
+## JSON Configuration Files
 
 ```python
 import asyncio
@@ -395,6 +397,66 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+## DXT (Desktop Extension) Support
+
+MCP-Use now supports Anthropic's DXT format, which allows one-click installation of MCP servers. DXT files are zip archives containing an MCP server and its dependencies, making it easy to distribute and use MCP servers without manual setup.
+
+### Loading DXT Files
+
+```python
+import asyncio
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def main():
+    # Load environment variables
+    load_dotenv()
+
+    # Method 1: Automatic detection via from_config_file
+    client = MCPClient.from_config_file("example.dxt")
+
+    # Method 2: Explicit DXT loading (recommended)
+    client = MCPClient.from_dxt("example.dxt")
+
+    # Create agent and use as normal
+    llm = ChatOpenAI(model="gpt-4o")
+    agent = MCPAgent(llm=llm, client=client)
+
+    result = await agent.run("Use the tools from the DXT server")
+    print(result)
+
+    # Clean up
+    await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### DXT with Sandbox Mode
+
+For additional security, you can run DXT servers in sandboxed mode:
+
+```python
+from mcp_use.types.sandbox import SandboxOptions
+
+sandbox_options: SandboxOptions = {
+    "api_key": os.getenv("E2B_API_KEY"),
+    "sandbox_template_id": "base",
+}
+
+client = MCPClient.from_dxt(
+    "example.dxt",
+    sandbox=True,
+    sandbox_options=sandbox_options
+)
+```
+
+DXT files can be obtained from:
+- [Anthropic's DXT examples](https://github.com/anthropics/dxt/tree/main/examples)
+- MCP server authors who package their servers as DXT
+- By creating your own following the [DXT specification](https://github.com/anthropics/dxt/blob/main/MANIFEST.md)
 
 ## HTTP Connection Example
 

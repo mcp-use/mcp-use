@@ -95,8 +95,10 @@ class MCPClient:
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
+        Supports both JSON configuration files and DXT (Desktop Extension) files.
+
         Args:
-            filepath: The path to the configuration file.
+            filepath: The path to the configuration file (.json or .dxt).
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
             sampling_callback: Optional sampling callback function.
@@ -104,6 +106,39 @@ class MCPClient:
         """
         return cls(
             config=load_config_file(filepath),
+            sandbox=sandbox,
+            sandbox_options=sandbox_options,
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+        )
+
+    @classmethod
+    def from_dxt(
+        cls,
+        dxt_path: str,
+        sandbox: bool = False,
+        sandbox_options: SandboxOptions | None = None,
+        sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
+    ) -> "MCPClient":
+        """Create a MCPClient from a DXT (Desktop Extension) file.
+
+        This is a convenience method that's equivalent to from_config_file()
+        but makes it explicit that a DXT file is being loaded.
+
+        Args:
+            dxt_path: The path to the .dxt file.
+            sandbox: Whether to use sandboxed execution mode for running MCP servers.
+            sandbox_options: Optional sandbox configuration options.
+            sampling_callback: Optional sampling callback function.
+            elicitation_callback: Optional elicitation callback function.
+        """
+        if not dxt_path.lower().endswith(".dxt"):
+            warnings.warn(
+                f"File {dxt_path} does not have .dxt extension", UserWarning
+            )
+        return cls.from_config_file(
+            filepath=dxt_path,
             sandbox=sandbox,
             sandbox_options=sandbox_options,
             sampling_callback=sampling_callback,
