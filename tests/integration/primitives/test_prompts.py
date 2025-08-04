@@ -11,7 +11,7 @@ async def test_summarize_text_prompt(primitive_server):
     try:
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")
-        prompt = await session.connector.get_prompt(
+        prompt = await session.get_prompt(
             name="summarize_text", arguments={"text": "This is a long text to summarize."}
         )
         message = prompt.messages[0]
