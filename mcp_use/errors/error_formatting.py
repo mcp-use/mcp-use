@@ -26,3 +26,4 @@ def format_error(error: Exception, **context) -> dict:
 
     logger.error(f"Structured error: {formatted_context}") # For observability (maybe remove later)
     return formatted_context
+    
