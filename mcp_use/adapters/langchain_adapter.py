@@ -24,7 +24,7 @@ from ..connectors.base import BaseConnector
 from ..logging import logger
 from .base import BaseAdapter
 
-from ..utils.error_formatting import format_error
+from ..errors.error_formatting import format_error
 
 class LangChainAdapter(BaseAdapter):
     """Adapter for converting MCP tools to LangChain tools."""

@@ -3,7 +3,7 @@ from typing import ClassVar
 from pydantic import BaseModel
 
 from mcp_use.logging import logger
-from mcp_use.utils.error_formatting import format_error
+from mcp_use.errors.error_formatting import format_error
 
 from .base_tool import MCPServerTool
 
