@@ -3,6 +3,7 @@ from typing import ClassVar
 from pydantic import BaseModel
 
 from mcp_use.logging import logger
+from mcp_use.utils.error_formatting import format_error
 
 from .base_tool import MCPServerTool
 
@@ -44,6 +45,7 @@ class ListServersTool(MCPServerTool):
                     result += f"   {tool_count} tools available for this server\n"
             except Exception as e:
                 logger.error(f"Unexpected error listing tools for server '{server_name}': {e}")
+                return format_error(e, server=server_name, operation="list_tools")
 
         return result
 
