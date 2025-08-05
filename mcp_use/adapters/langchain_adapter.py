@@ -160,13 +160,11 @@ class LangChainAdapter(BaseAdapter):
                     except Exception as e:
                         # Log the exception for debugging
                         logger.error(f"Error parsing tool result: {e}")
-                        if self.handle_tool_error:
-                            return format_error(e)
-                        raise
+                        return format_error(e, tool_content=tool_result.content)
 
                 except Exception as e:
                     if self.handle_tool_error:
-                        return format_error(e)
+                        return format_error(e) # Format the error to make LLM understand it
                     raise
 
         return McpToLangChainAdapter()
@@ -207,7 +205,7 @@ class LangChainAdapter(BaseAdapter):
                     return content_decoded
                 except Exception as e:
                     if self.handle_tool_error:
-                        return format_error(e)
+                        return format_error(e) # Format the error to make LLM understand it
                     raise
 
         return ResourceTool()
@@ -264,7 +262,7 @@ class LangChainAdapter(BaseAdapter):
                     return result.messages
                 except Exception as e:
                     if self.handle_tool_error:
-                        return format_error(e)
+                        return format_error(e) # Format the error to make LLM understand it
                     raise
 
         return PromptTool()
