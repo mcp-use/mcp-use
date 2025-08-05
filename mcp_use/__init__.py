@@ -11,8 +11,7 @@ from . import observability
 from .agents.mcpagent import MCPAgent
 from .client import MCPClient
 from .config import load_config_file
-from .connectors import (BaseConnector, HttpConnector, StdioConnector,
-                         WebSocketConnector)
+from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
 from .logging import MCP_USE_DEBUG, Logger, logger
 from .session import MCPSession
 

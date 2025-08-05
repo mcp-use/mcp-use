@@ -90,8 +90,7 @@ class ToolSearchEngine:
             return True
 
         try:
-            from fastembed import \
-                TextEmbedding  # optional dependency install with [search]
+            from fastembed import TextEmbedding  # optional dependency install with [search]
         except ImportError as exc:
             logger.error(
                 "The 'fastembed' library is not installed. "

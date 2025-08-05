@@ -3,8 +3,7 @@ import logging
 
 import pytest
 from mcp.client.session import ClientSession
-from mcp.types import (CreateMessageRequestParams, CreateMessageResult,
-                       ErrorData, TextContent)
+from mcp.types import CreateMessageRequestParams, CreateMessageResult, ErrorData, TextContent
 
 from mcp_use.client import MCPClient
 

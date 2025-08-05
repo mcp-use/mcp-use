@@ -10,8 +10,7 @@ from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, SamplingFnT
 
 from ..logging import logger
-from ..task_managers import (SseConnectionManager,
-                             StreamableHttpConnectionManager)
+from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
 from .base import BaseConnector
 
 
