@@ -24,6 +24,7 @@ from ..connectors.base import BaseConnector
 from ..logging import logger
 from .base import BaseAdapter
 
+from ..utils.error_formatting import format_error
 
 class LangChainAdapter(BaseAdapter):
     """Adapter for converting MCP tools to LangChain tools."""
@@ -159,11 +160,13 @@ class LangChainAdapter(BaseAdapter):
                     except Exception as e:
                         # Log the exception for debugging
                         logger.error(f"Error parsing tool result: {e}")
-                        return f"Error parsing result: {e!s}; Raw content: {tool_result.content!r}"
+                        if self.handle_tool_error:
+                            return format_error(e)
+                        raise
 
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error executing MCP tool: {str(e)}"
+                        return format_error(e)
                     raise
 
         return McpToLangChainAdapter()
@@ -204,7 +207,7 @@ class LangChainAdapter(BaseAdapter):
                     return content_decoded
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error reading resource: {str(e)}"
+                        return format_error(e)
                     raise
 
         return ResourceTool()
@@ -261,7 +264,7 @@ class LangChainAdapter(BaseAdapter):
                     return result.messages
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error fetching prompt: {str(e)}"
+                        return format_error(e)
                     raise
 
         return PromptTool()
