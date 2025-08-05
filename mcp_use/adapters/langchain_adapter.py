@@ -164,7 +164,7 @@ class LangChainAdapter(BaseAdapter):
 
                 except Exception as e:
                     if self.handle_tool_error:
-                        return format_error(e, tool=self.name) # Format the error to make LLM understand it
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return McpToLangChainAdapter()
@@ -205,7 +205,7 @@ class LangChainAdapter(BaseAdapter):
                     return content_decoded
                 except Exception as e:
                     if self.handle_tool_error:
-                        return format_error(e, tool=self.name) # Format the error to make LLM understand it
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return ResourceTool()
@@ -262,7 +262,7 @@ class LangChainAdapter(BaseAdapter):
                     return result.messages
                 except Exception as e:
                     if self.handle_tool_error:
-                        return format_error(e, tool=self.name) # Format the error to make LLM understand it
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return PromptTool()

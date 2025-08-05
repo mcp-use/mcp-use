@@ -2,7 +2,8 @@ import traceback
 
 from ..logging import logger
 
-retryable_exceptions = (TimeoutError, ConnectionError) # We can add more exceptions here
+retryable_exceptions = (TimeoutError, ConnectionError)  # We can add more exceptions here
+
 
 def format_error(error: Exception, **context) -> dict:
     """
@@ -20,9 +21,9 @@ def format_error(error: Exception, **context) -> dict:
         "details": str(error),
         "isRetryable": isinstance(error, retryable_exceptions),
         "stack": traceback.format_exc(),
-        "code": getattr(error, "code", "UNKNOWN")
+        "code": getattr(error, "code", "UNKNOWN"),
     }
     formatted_context.update(context)
 
-    logger.error(f"Structured error: {formatted_context}") # For observability (maybe remove later)
+    logger.error(f"Structured error: {formatted_context}")  # For observability (maybe remove later)
     return formatted_context
