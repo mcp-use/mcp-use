@@ -2,8 +2,8 @@ from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
-from mcp_use.logging import logger
 from mcp_use.errors.error_formatting import format_error
+from mcp_use.logging import logger
 
 from .base_tool import MCPServerTool
 

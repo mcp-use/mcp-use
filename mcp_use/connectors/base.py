@@ -12,7 +12,8 @@ from typing import Any
 from mcp import ClientSession, Implementation
 from mcp.client.session import ElicitationFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
-from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
+from mcp.types import (CallToolResult, GetPromptResult, Prompt,
+                       ReadResourceResult, Resource, Tool)
 from pydantic import AnyUrl
 
 import mcp_use

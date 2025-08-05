@@ -9,22 +9,15 @@ from typing import Any, NoReturn
 
 from jsonschema_pydantic import jsonschema_to_pydantic
 from langchain_core.tools import BaseTool, ToolException
-from mcp.types import (
-    CallToolResult,
-    EmbeddedResource,
-    ImageContent,
-    Prompt,
-    ReadResourceRequestParams,
-    Resource,
-    TextContent,
-)
+from mcp.types import (CallToolResult, EmbeddedResource, ImageContent, Prompt,
+                       ReadResourceRequestParams, Resource, TextContent)
 from pydantic import BaseModel, Field, create_model
 
 from ..connectors.base import BaseConnector
+from ..errors.error_formatting import format_error
 from ..logging import logger
 from .base import BaseAdapter
 
-from ..errors.error_formatting import format_error
 
 class LangChainAdapter(BaseAdapter):
     """Adapter for converting MCP tools to LangChain tools."""

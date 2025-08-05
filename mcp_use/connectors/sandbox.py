@@ -20,10 +20,7 @@ from ..task_managers import SseConnectionManager
 # Import E2B SDK components (optional dependency)
 try:
     logger.debug("Attempting to import e2b_code_interpreter...")
-    from e2b_code_interpreter import (
-        CommandHandle,
-        Sandbox,
-    )
+    from e2b_code_interpreter import CommandHandle, Sandbox
 
     logger.debug("Successfully imported e2b_code_interpreter")
 except ImportError as e:

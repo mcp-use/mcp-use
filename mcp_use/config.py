@@ -11,13 +11,8 @@ from mcp.client.session import ElicitationFnT, SamplingFnT
 
 from mcp_use.types.sandbox import SandboxOptions
 
-from .connectors import (
-    BaseConnector,
-    HttpConnector,
-    SandboxConnector,
-    StdioConnector,
-    WebSocketConnector,
-)
+from .connectors import (BaseConnector, HttpConnector, SandboxConnector,
+                         StdioConnector, WebSocketConnector)
 from .connectors.utils import is_stdio_server
 
 

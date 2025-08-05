@@ -14,7 +14,8 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
 from langchain.globals import set_debug
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain.schema import (AIMessage, BaseMessage, HumanMessage,
+                              SystemMessage)
 from langchain.schema.language_model import BaseLanguageModel
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.exceptions import OutputParserException
@@ -32,7 +33,8 @@ from ..adapters.langchain_adapter import LangChainAdapter
 from ..logging import logger
 from ..managers.server_manager import ServerManager
 from .prompts.system_prompt_builder import create_system_message
-from .prompts.templates import DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE
+from .prompts.templates import (DEFAULT_SYSTEM_PROMPT_TEMPLATE,
+                                SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE)
 from .remote import RemoteAgent
 
 set_debug(logger.level == logging.DEBUG)
