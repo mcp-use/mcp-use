@@ -9,8 +9,9 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import Any
 
+
 from mcp import ClientSession, Implementation
-from mcp.client.session import ElicitationFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, LoggingFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
 from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
 from pydantic import AnyUrl
@@ -31,6 +32,7 @@ class BaseConnector(ABC):
         self,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        logging_callback: LoggingFnT | None = None,  # Add logging callback
     ):
         """Initialize base connector with common attributes."""
         self.client_session: ClientSession | None = None
@@ -43,6 +45,7 @@ class BaseConnector(ABC):
         self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now)
         self.sampling_callback = sampling_callback
         self.elicitation_callback = elicitation_callback
+        self.logging_callback = logging_callback
 
     @property
     def client_info(self) -> Implementation:
