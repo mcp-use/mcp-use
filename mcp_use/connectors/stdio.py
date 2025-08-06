@@ -8,7 +8,7 @@ through the standard input/output streams.
 import sys
 
 from mcp import ClientSession, StdioServerParameters
-from mcp.client.session import ElicitationFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, LoggingFnT, SamplingFnT
 
 from ..logging import logger
 from ..task_managers import StdioConnectionManager
@@ -31,6 +31,7 @@ class StdioConnector(BaseConnector):
         errlog=sys.stderr,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
     ):
         """Initialize a new stdio connector.
 
@@ -42,7 +43,7 @@ class StdioConnector(BaseConnector):
             sampling_callback: Optional callback to sample the client.
             elicitation_callback: Optional callback to elicit the client.
         """
-        super().__init__(sampling_callback=sampling_callback, elicitation_callback=elicitation_callback)
+        super().__init__(sampling_callback=sampling_callback, elicitation_callback=elicitation_callback, logging_callback=logging_callback)
         self.command = command
         self.args = args or []  # Ensure args is never None
         self.env = env

@@ -12,7 +12,7 @@ import time
 
 import aiohttp
 from mcp import ClientSession
-from mcp.client.session import ElicitationFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, LoggingFnT, SamplingFnT
 
 from ..logging import logger
 from ..task_managers import SseConnectionManager
@@ -53,6 +53,7 @@ class SandboxConnector(BaseConnector):
         sse_read_timeout: float = 60 * 5,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
     ):
         """Initialize a new sandbox connector.
 
@@ -67,7 +68,7 @@ class SandboxConnector(BaseConnector):
             sampling_callback: Optional sampling callback.
             elicitation_callback: Optional elicitation callback.
         """
-        super().__init__(sampling_callback=sampling_callback, elicitation_callback=elicitation_callback)
+        super().__init__(sampling_callback=sampling_callback, elicitation_callback=elicitation_callback, logging_callback=logging_callback)
         if Sandbox is None:
             raise ImportError(
                 "E2B SDK (e2b-code-interpreter) not found. Please install it with "
