@@ -8,6 +8,7 @@ through HTTP APIs with SSE or Streamable HTTP for transport.
 import httpx
 from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, SamplingFnT
+from mcp.shared.exceptions import McpError
 
 from ..logging import logger
 from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
@@ -116,6 +117,21 @@ class HttpConnector(BaseConnector):
                 else:
                     self._prompts = []
 
+            except McpError as mcp_error:
+                # This is a protocol error, not a transport error
+                # The server is reachable and speaking MCP, but rejecting our request
+                logger.error("MCP protocol error during initialization: %s", mcp_error)
+                
+                # Clean up the test client
+                try:
+                    await test_client.__aexit__(None, None, None)
+                except Exception:
+                    pass
+                
+                # Don't try SSE fallback for protocol errors - the server is working,
+                # it just doesn't like our request
+                raise mcp_error
+                
             except Exception as init_error:
                 # Clean up the test client
                 try:
@@ -124,6 +140,10 @@ class HttpConnector(BaseConnector):
                     pass
                 raise init_error
 
+        except McpError:
+            # Re-raise McpError without attempting fallback
+            raise
+            
         except Exception as streamable_error:
             logger.debug(f"Streamable HTTP failed: {streamable_error}")
 
