@@ -372,29 +372,7 @@ if __name__ == "__main__":
     asyncio.run(run_blender_example())
 ```
 
-# Configuration File Support
-
-MCP-Use supports initialization from configuration files, making it easy to manage and switch between different MCP server setups:
-
-```python
-import asyncio
-from mcp_use import create_session_from_config
-
-async def main():
-    # Create an MCP session from a config file
-    session = create_session_from_config("mcp-config.json")
-
-    # Initialize the session
-    await session.initialize()
-
-    # Use the session...
-
-    # Disconnect when done
-    await session.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+# Configuration Support
 
 ## HTTP Connection Example
 
