@@ -231,14 +231,24 @@ class MCPAgent:
         if self._system_message:
             system_content = self._system_message.content
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_content),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ]
-        )
+        if self.memory_enabled:
+            # Query already in chat_history — don't re-inject it
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system_content),
+                    MessagesPlaceholder(variable_name="chat_history"),
+                    MessagesPlaceholder(variable_name="agent_scratchpad"),
+                ]
+            )
+        else:
+            # No memory — inject input directly
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system_content),
+                    ("human", "{input}"),
+                    MessagesPlaceholder(variable_name="agent_scratchpad"),
+                ]
+            )
 
         tool_names = [tool.name for tool in self._tools]
         logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
