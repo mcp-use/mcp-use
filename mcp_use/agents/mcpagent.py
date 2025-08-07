@@ -23,6 +23,8 @@ from langchain_core.utils.input import get_color_mapping
 
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
+from mcp_use.observability import ObservabilityManager
+from mcp_use.observability.types import ObservabilityInput
 from mcp_use.telemetry.telemetry import Telemetry
 from mcp_use.telemetry.utils import extract_model_info
 
@@ -57,6 +59,7 @@ class MCPAgent:
         tools_used_names: list[str] | None = None,
         use_server_manager: bool = False,
         verbose: bool = False,
+        observability: ObservabilityInput = None,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -72,6 +75,7 @@ class MCPAgent:
             additional_instructions: Extra instructions to append to the system prompt.
             disallowed_tools: List of tool names that should not be available to the agent.
             use_server_manager: Whether to use server manager mode instead of exposing all tools.
+            observability: Configuration observability providers (e.g., {"langfuse": LangfuseObservabilityConfig(...)})
         """
         self.llm = llm
         self.client = client
@@ -100,6 +104,9 @@ class MCPAgent:
 
         # Initialize telemetry
         self.telemetry = Telemetry()
+
+        # Initialize observability
+        self.observability_manager = ObservabilityManager(observability)
 
         # Initialize server manager if requested
         self.server_manager = None
@@ -215,14 +222,38 @@ class MCPAgent:
             ]
         )
 
-        tool_names = [tool.name for tool in self._tools]
-        logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
+        try:
+            tool_names = [str(getattr(tool, "name", tool)) for tool in self._tools]
+            logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
+        except Exception:
+            pass
 
         # Use the standard create_tool_calling_agent
         agent = create_tool_calling_agent(llm=self.llm, tools=self._tools, prompt=prompt)
 
-        # Use the standard AgentExecutor
-        executor = AgentExecutor(agent=agent, tools=self._tools, max_iterations=self.max_steps, verbose=self.verbose)
+        # Get observability callbacks
+        callbacks = self.observability_manager.get_callbacks()
+        if callbacks:
+            try:
+                logger.info(f"🔍 Observability enabled: Using {len(callbacks)} callback(s)")
+                for i, callback in enumerate(callbacks):
+                    logger.debug(f"  - Callback {i+1}: {type(callback).__name__}")
+            except Exception:
+                pass
+        else:
+            try:
+                logger.debug("🔍 No observability callbacks configured")
+            except Exception:
+                pass
+
+        # Use the standard AgentExecutor with observability callbacks
+        executor = AgentExecutor(
+            agent=agent,
+            tools=self._tools,
+            max_iterations=self.max_steps,
+            verbose=self.verbose,
+            callbacks=callbacks if callbacks else None,
+        )
         logger.debug(f"Created agent executor with max_iterations={self.max_steps}")
         return executor
 
@@ -664,7 +695,11 @@ class MCPAgent:
         inputs = {"input": query, "chat_history": history_to_use}
 
         # 3. Stream & diff -------------------------------------------------------
-        async for event in self._agent_executor.astream_events(inputs):
+        # Get observability callbacks for streaming
+        stream_callbacks = self.observability_manager.get_callbacks()
+        config = {"callbacks": stream_callbacks} if stream_callbacks else {}
+
+        async for event in self._agent_executor.astream_events(inputs, config=config):
             if event.get("event") == "on_chain_end":
                 output = event["data"]["output"]
                 if isinstance(output, list):

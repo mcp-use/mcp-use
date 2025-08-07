@@ -13,6 +13,7 @@ from .client import MCPClient
 from .config import load_config_file
 from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
 from .logging import MCP_USE_DEBUG, Logger, logger
+from .observability import LangfuseObservabilityConfig, ObservabilityManager
 from .session import MCPSession
 
 __version__ = version("mcp-use")
@@ -32,6 +33,8 @@ __all__ = [
     "Logger",
     "set_debug",
     "observability",
+    "LangfuseObservabilityConfig",
+    "ObservabilityManager",
 ]
 
 

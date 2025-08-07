@@ -74,9 +74,16 @@ class Telemetry:
         if telemetry_disabled:
             self._posthog_client = None
             self._scarf_client = None
-            logger.debug("Telemetry disabled")
+            try:
+                logger.debug("Telemetry disabled")
+            except Exception:
+                pass
         else:
-            logger.info("Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable.")
+            try:
+                logger.info("Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable.")
+            except Exception:
+                # Swallow logging handler misconfigurations in tests
+                pass
 
             # Initialize PostHog
             try:
