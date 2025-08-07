@@ -1,0 +1,172 @@
+name: CodeBoarding Documentation update workflow
+
+on:
+  schedule:
+    - cron: '0 20 * * 6'  # Every Saturday at 8:00 PM UTC
+  workflow_dispatch:
+    inputs:
+      repository_url:
+        description: 'Repository URL to test with'
+        required: false
+        default: 'https://github.com/mcp-use/mcp-use'
+        type: string
+      source_branch:
+        description: 'Source branch for generation'
+        required: false
+        default: 'main'
+        type: string
+      target_branch:
+        description: 'Target branch for pull request'
+        required: false
+        default: 'main'
+        type: string
+      output_format:
+        description: 'Output format for documentation'
+        required: false
+        default: '.mdx'
+        type: choice
+        options:
+          - '.mdx'
+          - '.md'
+          - '.rst'
+      output_directory:
+        description: 'Output directory for documentation files'
+        required: false
+        default: '.codeboarding'
+        type: string
+
+jobs:
+  update-docs-action-usage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # Required to access branch history
+
+      # Determine branches based on context
+      - name: Set branch variables
+        id: set-branches
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "source_branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+            echo "target_branch=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.source_branch }}" != "" ] && [ "${{ github.event.inputs.target_branch }}" != "" ]; then
+            echo "source_branch=${{ github.event.inputs.source_branch }}" >> $GITHUB_OUTPUT
+            echo "target_branch=${{ github.event.inputs.target_branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "source_branch=main" >> $GITHUB_OUTPUT
+            echo "target_branch=main" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fetch CodeBoarding Documentation
+        timeout-minutes: 30
+        id: codeboarding
+        uses: CodeBoarding/CodeBoarding-GHAction@0.1.2
+        with:
+          repository_url: ${{ github.event.inputs.repository_url || 'https://github.com/mcp-use/mcp-use' }}
+          source_branch: ${{ steps.set-branches.outputs.source_branch }}
+          target_branch: ${{ steps.set-branches.outputs.target_branch }}
+          output_directory: ${{ github.event.inputs.output_directory || '.codeboarding' }}
+          output_format: ${{ github.event.inputs.output_format || '.mdx' }}
+
+      - name: Display Action Results
+        run: |
+          echo "Documentation files created: ${{ steps.codeboarding.outputs.markdown_files_created }}"
+          echo "JSON files created: ${{ steps.codeboarding.outputs.json_files_created }}"
+          echo "Documentation directory: ${{ steps.codeboarding.outputs.output_directory }}"
+          echo "JSON directory: ${{ steps.codeboarding.outputs.json_directory }}"
+          echo "Has changes: ${{ steps.codeboarding.outputs.has_changes }}"
+
+      # Check if we have any changes to commit
+      - name: Check for changes
+        id: git-changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_git_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_git_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Generate architecture.mdx from CodeBoarding files
+      - name: Generate architecture documentation
+        if: steps.git-changes.outputs.has_git_changes == 'true' && steps.codeboarding.outputs.has_changes == 'true'
+        run: |
+          # Create docs/development directory if it doesn't exist
+          mkdir -p docs/development
+          
+          # Log the files found in the CodeBoarding directory
+          echo "📁 Scanning CodeBoarding directory for .mdx files..."
+          ls -la .codeboarding/ || echo "⚠️  CodeBoarding directory not found"
+          
+          # Initialize the architecture.mdx file
+          echo "" > docs/development/architecture.mdx
+          
+          # First, add on_boarding.mdx if it exists
+          if [ -f ".codeboarding/on_boarding.mdx" ]; then
+            echo "✅ Found and adding: on_boarding.mdx"
+            cat .codeboarding/on_boarding.mdx > docs/development/architecture.mdx
+            echo "" >> docs/development/architecture.mdx
+          else
+            echo "ℹ️  on_boarding.mdx not found, skipping"
+          fi
+          
+          # Count and log other .mdx files
+          other_files_count=0
+          
+          # Then add all other .mdx files (excluding on_boarding.mdx)
+          for file in .codeboarding/*.mdx; do
+            if [ -f "$file" ] && [ "$(basename "$file")" != "on_boarding.mdx" ]; then
+              filename=$(basename "$file")
+              echo "✅ Found and adding: $filename"
+              echo "" >> docs/development/architecture.mdx
+              cat "$file" >> docs/development/architecture.mdx
+              echo "" >> docs/development/architecture.mdx
+              other_files_count=$((other_files_count + 1))
+            fi
+          done
+          
+          # Summary logging
+          echo ""
+          echo "📊 Architecture generation summary:"
+          echo "   - on_boarding.mdx: $([ -f ".codeboarding/on_boarding.mdx" ] && echo "included" || echo "not found")"
+          echo "   - Other .mdx files: $other_files_count files processed"
+          echo "   - Output: docs/development/architecture.mdx"
+          
+          # Show final file size
+          if [ -f "docs/development/architecture.mdx" ]; then
+            file_size=$(wc -c < docs/development/architecture.mdx)
+            echo "   - Final file size: $file_size bytes"
+          fi
+          
+          echo "Architecture documentation generated at docs/development/architecture.mdx"
+
+      - name: Commit and push changes
+        if: steps.git-changes.outputs.has_git_changes == 'true' && steps.codeboarding.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "docs: update codeboarding documentation and generate architecture
+
+          ## 📚 Documentation Update
+          This commit contains updated documentation files fetched from the CodeBoarding service and automatically generated architecture documentation.
+          
+          ### 📊 Summary
+          - Documentation files created/updated: ${{ steps.codeboarding.outputs.markdown_files_created }}
+          - JSON files created/updated: ${{ steps.codeboarding.outputs.json_files_created }}
+          - Documentation directory: ${{ steps.codeboarding.outputs.output_directory }}/
+          - JSON directory: ${{ steps.codeboarding.outputs.json_directory }}/
+          - Output format: ${{ github.event.inputs.output_format || '.mdx' }}
+          - Repository analyzed: ${{ steps.codeboarding.outputs.repo_url }}
+          - Architecture documentation: docs/development/architecture.mdx (auto-generated)
+          
+          The generated .mdx files have been automatically appended to the development documentation, and the architecture.mdx file has been generated from the CodeBoarding analysis files.
+          
+          🤖 This commit was automatically generated by the CodeBoarding documentation update workflow."
+          git push
