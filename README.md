@@ -1,25 +1,30 @@
 <div align="center">
 <div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="static/logo_white.svg">
-    <source media="(prefers-color-scheme: light)" srcset="static/logo_black.svg">
-    <img alt="mcp use logo" src="./static/logo-white.svg" width="80%" style="margin: 20px auto;">
+    <source media="(prefers-color-scheme: dark)" srcset="static/logo-gh.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/logo-gh.svg">
+    <img alt="mcp use logo" src="./static/logo-gh.svg" width="80%" style="margin: 20px auto;">
   </picture>
 </div>
 
 <br>
 
-# Connect any LLM to any MCP server
+# Create MCP Clients and Agents
 
+<p align="center">
+<a href="https://www.producthunt.com/products/mcp-use?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-mcp&#0045;use" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1002629&theme=neutral&t=1754609432704" alt="mcp&#0045;use - Open&#0032;source&#0032;SDK&#0032;and&#0032;infra&#0032;for&#0032;MCP&#0032;servers&#0032;&#0038;&#0032;agents | Product Hunt" style="width: 150px; height: 32px;" width="150" height="32" /></a>
+</p>
 <p align="center">
     <a href="https://github.com/pietrozullo/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/pietrozullo/mcp-use?style=social" /></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
-        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
-    <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
         <img src="https://static.pepy.tech/badge/mcp-use" /></a>
+    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
+        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
+    <a href="https://github.com/mcp-use/mcp-use-ts" alt="TypeScript">
+      <img src="https://img.shields.io/badge/TypeScript-mcp--use-3178C6?logo=typescript&logoColor=white" /></a>
+    <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
+        <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
     <a href="https://docs.mcp-use.com" alt="Documentation">
         <img src="https://img.shields.io/badge/docs-mcp--use.com-blue" /></a>
     <a href="https://mcp-use.com" alt="Website">
