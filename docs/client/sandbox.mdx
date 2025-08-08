@@ -1,0 +1,81 @@
+---
+title: "Sandbox"
+description: "Run your MCP in a secure remote sandbox."
+icon: "lock"
+---
+
+## Sandboxed Execution
+
+mcp_use supports running MCP servers in a sandboxed cloud environment using E2B. This is useful when you want to run MCP servers without having to install their dependencies locally.
+
+### Installation
+
+To use sandboxed execution, you need to install the E2B dependency:
+
+```bash
+# Install mcp-use with E2B support
+pip install "mcp-use[e2b]"
+
+# Or install the dependency directly
+pip install e2b-code-interpreter
+```
+
+You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) to get your API key.
+
+### Configuration Example
+
+To enable sandboxed execution, use the sandbox parameter when creating the MCPClient:
+
+```python
+from mcp_use import MCPClient
+from mcp_use.types.sandbox import SandboxOptions
+
+# Define sandbox options
+sandbox_options: SandboxOptions = {
+    "api_key": "your_e2b_api_key",  # Or use E2B_API_KEY environment variable
+    "sandbox_template_id": "code-interpreter-v1",
+    "supergateway_command": "npx -y supergateway"  # Optional, this is the default
+}
+
+# Create client with sandboxed execution enabled
+client = MCPClient.from_dict(
+    {
+        "mcpServers": {
+            "command_line": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-everything"]
+            }
+        }
+    },
+    sandbox=True,
+    sandbox_options=sandbox_options
+)
+```
+
+### Available Sandbox Options
+
+The `SandboxOptions` type provides the following configuration options:
+
+| Option                 | Description                                                                              | Default               |
+| ---------------------- | ---------------------------------------------------------------------------------------- | --------------------- |
+| `api_key`              | E2B API key. Required - can be provided directly or via E2B_API_KEY environment variable | None                  |
+| `sandbox_template_id`  | Template ID for the sandbox environment                                                  | "base"                |
+| `supergateway_command` | Command to run supergateway                                                              | "npx -y supergateway" |
+
+### E2B API Key
+
+To use sandboxed execution, you need an E2B API key. You can provide it in two ways:
+
+1. Directly in the sandbox options:
+
+   ```python
+   sandbox_options = {"api_key": "your_e2b_api_key"}
+   ```
+
+2. Through the environment variable:
+   ```bash
+   # In your .env file or environment
+   E2B_API_KEY=your_e2b_api_key
+   ```
+
+For more details on connection types and sandbox configuration, see the [Connection Types](./connection-types) guide.

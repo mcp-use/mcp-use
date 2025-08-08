@@ -5,7 +5,11 @@ This module provides a session manager for MCP connections,
 which handles authentication, initialization, and tool discovery.
 """
 
+from datetime import timedelta
 from typing import Any
+
+from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
+from pydantic import AnyUrl
 
 from .connectors.base import BaseConnector
 
@@ -82,3 +86,106 @@ class MCPSession:
             True if the connector is connected, False otherwise.
         """
         return self.connector.is_connected
+
+    # Convenience properties for accessing MCP capabilities
+    @property
+    def tools(self) -> list[Tool]:
+        """Get the list of available tools.
+
+        Returns:
+            List of available tools from the connected MCP server.
+
+        Raises:
+            RuntimeError: If the session is not initialized.
+        """
+        return self.connector.tools
+
+    @property
+    def resources(self) -> list[Resource]:
+        """Get the list of available resources.
+
+        Returns:
+            List of available resources from the connected MCP server.
+
+        Raises:
+            RuntimeError: If the session is not initialized.
+        """
+        return self.connector.resources
+
+    @property
+    def prompts(self) -> list[Prompt]:
+        """Get the list of available prompts.
+
+        Returns:
+            List of available prompts from the connected MCP server.
+
+        Raises:
+            RuntimeError: If the session is not initialized.
+        """
+        return self.connector.prompts
+
+    # Convenience methods for MCP operations
+    async def call_tool(
+        self, name: str, arguments: dict[str, Any], read_timeout_seconds: timedelta | None = None
+    ) -> CallToolResult:
+        """Call an MCP tool.
+
+        Args:
+            name: The name of the tool to call.
+            arguments: The arguments to pass to the tool.
+            read_timeout_seconds: Optional timeout for the tool call.
+
+        Returns:
+            The result of the tool call.
+
+        Raises:
+            RuntimeError: If the connection is lost and cannot be reestablished.
+        """
+        return await self.connector.call_tool(name, arguments, read_timeout_seconds)
+
+    async def list_tools(self) -> list[Tool]:
+        """List all available tools from the MCP server.
+
+        Returns:
+            List of available tools.
+        """
+        return await self.connector.list_tools()
+
+    async def list_resources(self) -> list[Resource]:
+        """List all available resources from the MCP server.
+
+        Returns:
+            List of available resources.
+        """
+        return await self.connector.list_resources()
+
+    async def read_resource(self, uri: AnyUrl) -> ReadResourceResult:
+        """Read a resource by URI.
+
+        Args:
+            uri: The URI of the resource to read.
+
+        Returns:
+            The resource content.
+        """
+        return await self.connector.read_resource(uri)
+
+    async def list_prompts(self) -> list[Prompt]:
+        """List all available prompts from the MCP server.
+
+        Returns:
+            List of available prompts.
+        """
+        return await self.connector.list_prompts()
+
+    async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> GetPromptResult:
+        """Get a prompt by name.
+
+        Args:
+            name: The name of the prompt to get.
+            arguments: Optional arguments for the prompt.
+
+        Returns:
+            The prompt result with messages.
+        """
+        return await self.connector.get_prompt(name, arguments)

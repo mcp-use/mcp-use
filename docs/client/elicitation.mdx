@@ -1,7 +1,7 @@
 ---
 title: "Elicitation"
 description: "Enable user input requests for MCP tools"
-icon: "user-question"
+icon: "circle-help"
 ---
 
 # Elicitation
@@ -358,6 +358,6 @@ client = MCPClient(config="config.json")  # No elicitation_callback
 
 # Tool that requires elicitation will return an error
 session = client.get_session("server_name")
-result = await session.connector.call_tool("purchase_item", {})
+result = await session.call_tool("purchase_item", {})
 # This will fail because no elicitation callback is configured
 ```
