@@ -100,38 +100,10 @@ You can configure multiple MCP servers in a single configuration file, allowing 
 
 For a complete example of using multiple servers, see the [multi-server example](https://github.com/mcp-use/mcp-use/blob/main/examples/multi_server_example.py) in our repository.
 
-### Working with Multiple Servers
-
-The `MCPClient` can be configured with multiple MCP servers, allowing your agent to access tools from different sources. This capability enables complex workflows spanning various domains (e.g., web browsing and API interaction).
-
-When an `MCPClient` with multiple servers is passed to an `MCPAgent`, the agent gains access to tools from all configured servers. By default, you might need to guide the agent or explicitly specify which server to use for a given task using the `server_name` parameter in the `agent.run()` method.
-
-```python
-# Assuming MCPClient is initialized with the multi_server_config.json
-client = MCPClient.from_config_file("multi_server_config.json")
-agent = MCPAgent(llm=llm, client=client) # Server manager not enabled by default
-
-# Manually specify the server if needed
-result = await agent.run(
-    "Search for Airbnb listings in Barcelona",
-    server_name="airbnb"
-)
-```
-
 
 ## Client Creation Methods
 
 There are several ways to create an MCPClient:
-
-### From Configuration File
-
-Load configuration from a JSON file:
-
-```python
-from mcp_use import MCPClient
-
-client = MCPClient.from_config_file("config.json")
-```
 
 ### From Dictionary
 
@@ -150,8 +122,19 @@ config = {
     }
 }
 
-client = MCPClient.from_dict(config)
+client = MCPClient(config)
 ```
+
+### From Configuration File
+
+Load configuration from a JSON file:
+
+```python
+from mcp_use import MCPClient
+
+client = MCPClient.from_config_file("config.json")
+```
+
 
 ### With Sandbox Options
 

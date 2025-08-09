@@ -37,13 +37,6 @@ STDIO connections run the MCP server as a child process and communicate through 
 
 HTTP connections communicate with MCP servers over standard HTTP/HTTPS protocols.
 
-### Characteristics:
-
-- **RESTful Architecture**: Follows familiar HTTP request/response patterns
-- **Statelessness**: Each request is independent
-- **Compatibility**: Works well with existing web infrastructure
-- **Firewall-Friendly**: Uses standard ports that are typically open
-
 ### Configuration Example:
 
 ```json
@@ -98,8 +91,8 @@ sandbox_options: SandboxOptions = {
 }
 
 # Create client with sandboxed execution enabled
-client = MCPClient.from_dict(
-    {
+client = MCPClient(
+    config={
         "mcpServers": {
             "sandboxed_server": {
                 "command": "npx",
@@ -128,18 +121,6 @@ When configuring your mcp_use environment, you can specify the connection type i
 ## Using Connection Types
 
 Connection types are automatically inferred from your configuration file based on the parameters provided:
-
-```python
-from mcp_use import MCPClient
-
-# The connection type is automatically inferred based on your config file
-client = MCPClient.from_config_file("config.json", server_name="my_server")
-
-client = MCPClient.from_config_file(
-    "config.json",
-    options=client_options
-)
-```
 
 For example:
 
