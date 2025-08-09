@@ -1,104 +1,74 @@
 {
-  "description": "The `Agent Core` subsystem is the central orchestrator within the `mcp-use` framework, responsible for the agent's decision-making, lifecycle, and overall execution flow. It integrates various components to interact with the external environment and manage its operational state.",
+  "description": "The Agent Core subsystem is the central intelligence unit responsible for orchestrating AI agent behavior, managing conversation flow, and coordinating tool usage within the mcp_use project. It is primarily encapsulated within the mcp_use.agents package.",
   "components": [
     {
-      "name": "Agent Core",
-      "description": "The primary intelligence and orchestration unit. It manages the agent's lifecycle, decision-making processes, and coordinates interactions with other components to execute tasks and communicate with external services.",
+      "name": "MCPAgent",
+      "description": "The central orchestrator and concrete implementation of an AI agent. It manages the agent's reasoning loop, maintains conversation history, integrates with Large Language Models (LLMs), handles tool execution, and processes structured outputs. It embodies the core intelligence and operational flow of the agent.",
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/mcpagent.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_start_line": 44,
+          "reference_end_line": 1011
         }
-      ]
+      ],
+      "can_expand": true
     },
     {
-      "name": "Base Agent",
-      "description": "Provides the foundational structure and common functionalities for all agents within the framework. It serves as an abstract base class that `Agent Core` extends.",
+      "name": "BaseAgent",
+      "description": "An abstract base class that defines the foundational interface and common behaviors for all agents within the framework. It establishes a contract for agent lifecycle management (e.g., initialization, execution, querying) and state tracking (e.g., maximum steps, previous steps).",
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.agents.base.BaseAgent",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/agents/base.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/base.py",
+          "reference_start_line": 13,
+          "reference_end_line": 61
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "SystemPromptBuilder",
+      "description": "A utility component responsible for dynamically constructing the system prompt provided to the LLM. It incorporates descriptions of available tools, additional instructions, and selects appropriate prompt templates based on the agent's configuration.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.SystemPromptBuilder",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py",
           "reference_start_line": 1,
-          "reference_end_line": 1
+          "reference_end_line": 1000
         }
-      ]
+      ],
+      "can_expand": true
     },
     {
-      "name": "MCP Server Registry/Connector",
-      "description": "Manages connections and interactions with various MCP (Multi-Agent Communication Protocol) servers. It acts as an interface for the `Agent Core` to discover and communicate with available services.",
+      "name": "RemoteAgent",
+      "description": "A specialized agent implementation or a component that facilitates communication with external, remotely hosted agent services. It handles the serialization of requests, deserialization of responses, and manages underlying network interactions (e.g., API keys, base URLs). It also includes logic for parsing structured output received from remote services.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/managers/server_manager.py",
-          "reference_start_line": 16,
-          "reference_end_line": 89
+          "qualified_name": "mcp_use.agents.remote.RemoteAgent",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/remote.py",
+          "reference_start_line": 18,
+          "reference_end_line": 239
         }
-      ]
-    },
-    {
-      "name": "LLM Integration Layer",
-      "description": "Facilitates the processing of outputs from Large Language Models (LLMs) and integrates with LangChain-based tools. It acts as an adapter, translating agent requests into LLM-compatible formats and vice-versa.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/adapters/langchain_adapter.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        }
-      ]
-    },
-    {
-      "name": "Telemetry",
-      "description": "Responsible for emitting telemetry events, providing insights into the agent's operational status, performance, and interactions. This component supports observability within the `Agent Core` subsystem.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.telemetry.telemetry.Telemetry",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/telemetry/telemetry.py",
-          "reference_start_line": 55,
-          "reference_end_line": 305
-        }
-      ]
-    },
-    {
-      "name": "MCP Session",
-      "description": "Manages the state and context of an agent's session. It encapsulates session-specific data and provides mechanisms for maintaining continuity across interactions.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.session.MCPSession",
-          "reference_file": "/mnt/e/StartUp/mcp-use/mcp_use/session.py",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        }
-      ]
+      ],
+      "can_expand": true
     }
   ],
   "components_relations": [
     {
-      "relation": "uses",
-      "src_name": "Agent Core",
-      "dst_name": "MCP Server Registry/Connector"
-    },
-    {
-      "relation": "uses",
-      "src_name": "Agent Core",
-      "dst_name": "LLM Integration Layer"
-    },
-    {
-      "relation": "uses",
-      "src_name": "Agent Core",
-      "dst_name": "Telemetry"
-    },
-    {
-      "relation": "is related to",
-      "src_name": "Agent Core",
-      "dst_name": "MCP Session"
-    },
-    {
       "relation": "inherits from",
-      "src_name": "Agent Core",
-      "dst_name": "Base Agent"
+      "src_name": "MCPAgent",
+      "dst_name": "BaseAgent"
+    },
+    {
+      "relation": "uses",
+      "src_name": "MCPAgent",
+      "dst_name": "SystemPromptBuilder"
+    },
+    {
+      "relation": "delegates to",
+      "src_name": "MCPAgent",
+      "dst_name": "RemoteAgent"
     }
   ]
 }

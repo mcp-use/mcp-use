@@ -1,73 +1,50 @@
 # Agent Core
 ```mermaid
 graph LR
-    Agent_Core["Agent Core"]
-    Base_Agent["Base Agent"]
-    MCP_Server_Registry_Connector["MCP Server Registry/Connector"]
-    LLM_Integration_Layer["LLM Integration Layer"]
-    Telemetry["Telemetry"]
-    MCP_Session["MCP Session"]
-    Agent_Core -- "uses" --> MCP_Server_Registry_Connector
-    Agent_Core -- "uses" --> LLM_Integration_Layer
-    Agent_Core -- "uses" --> Telemetry
-    Agent_Core -- "is related to" --> MCP_Session
-    Agent_Core -- "inherits from" --> Base_Agent
-    click Agent_Core href "/codeboarding/Agent_Core.md" "Details"
+    MCPAgent["MCPAgent"]
+    BaseAgent["BaseAgent"]
+    SystemPromptBuilder["SystemPromptBuilder"]
+    RemoteAgent["RemoteAgent"]
+    MCPAgent -- "inherits from" --> BaseAgent
+    MCPAgent -- "uses" --> SystemPromptBuilder
+    MCPAgent -- "delegates to" --> RemoteAgent
 ```
 
 ### Details
 
-The `Agent Core` subsystem is the central orchestrator within the `mcp-use` framework, responsible for the agent's decision-making, lifecycle, and overall execution flow. It integrates various components to interact with the external environment and manage its operational state.
+The Agent Core subsystem is the central intelligence unit responsible for orchestrating AI agent behavior, managing conversation flow, and coordinating tool usage within the mcp_use project. It is primarily encapsulated within the mcp_use.agents package.
 
-### Agent Core
-The primary intelligence and orchestration unit. It manages the agent's lifecycle, decision-making processes, and coordinates interactions with other components to execute tasks and communicate with external services.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L1-L1" target="_blank" rel="noopener noreferrer">`mcp_use.agents.mcpagent.MCPAgent` (1:1)</a>
-
-
-### Base Agent
-Provides the foundational structure and common functionalities for all agents within the framework. It serves as an abstract base class that `Agent Core` extends.
+### MCPAgent
+The central orchestrator and concrete implementation of an AI agent. It manages the agent's reasoning loop, maintains conversation history, integrates with Large Language Models (LLMs), handles tool execution, and processes structured outputs. It embodies the core intelligence and operational flow of the agent.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py#L1-L1" target="_blank" rel="noopener noreferrer">`mcp_use.agents.base.BaseAgent` (1:1)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L44-L1011" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.mcpagent.MCPAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py`, Lines:(44:1011)</a>
 
 
-### MCP Server Registry/Connector
-Manages connections and interactions with various MCP (Multi-Agent Communication Protocol) servers. It acts as an interface for the `Agent Core` to discover and communicate with available services.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/server_manager.py#L16-L89" target="_blank" rel="noopener noreferrer">`mcp_use.managers.server_manager.ServerManager` (16:89)</a>
-
-
-### LLM Integration Layer
-Facilitates the processing of outputs from Large Language Models (LLMs) and integrates with LangChain-based tools. It acts as an adapter, translating agent requests into LLM-compatible formats and vice-versa.
+### BaseAgent
+An abstract base class that defines the foundational interface and common behaviors for all agents within the framework. It establishes a contract for agent lifecycle management (e.g., initialization, execution, querying) and state tracking (e.g., maximum steps, previous steps).
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py#L1-L1" target="_blank" rel="noopener noreferrer">`mcp_use.adapters.langchain_adapter.LangChainAdapter` (1:1)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py#L13-L61" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.base.BaseAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/base.py`, Lines:(13:61)</a>
 
 
-### Telemetry
-Responsible for emitting telemetry events, providing insights into the agent's operational status, performance, and interactions. This component supports observability within the `Agent Core` subsystem.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/telemetry.py#L55-L305" target="_blank" rel="noopener noreferrer">`mcp_use.telemetry.telemetry.Telemetry` (55:305)</a>
-
-
-### MCP Session
-Manages the state and context of an agent's session. It encapsulates session-specific data and provides mechanisms for maintaining continuity across interactions.
+### SystemPromptBuilder
+A utility component responsible for dynamically constructing the system prompt provided to the LLM. It incorporates descriptions of available tools, additional instructions, and selects appropriate prompt templates based on the agent's configuration.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L1-L1" target="_blank" rel="noopener noreferrer">`mcp_use.session.MCPSession` (1:1)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py#L1-L1000" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.system_prompt_builder.SystemPromptBuilder` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`, Lines:(1:1000)</a>
+
+
+### RemoteAgent
+A specialized agent implementation or a component that facilitates communication with external, remotely hosted agent services. It handles the serialization of requests, deserialization of responses, and manages underlying network interactions (e.g., API keys, base URLs). It also includes logic for parsing structured output received from remote services.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py#L18-L239" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.remote.RemoteAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/remote.py`, Lines:(18:239)</a>
