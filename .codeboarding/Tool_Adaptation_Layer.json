@@ -1,0 +1,92 @@
+{
+  "description": "The `Tool Adaptation Layer` subsystem is primarily encapsulated within the `mcp_use.adapters` Python package. Its core responsibility is to provide a flexible and extensible mechanism for converting generic tool definitions from the MCP (Multi-Component Protocol) system into formats that can be directly consumed by various AI frameworks, such as LangChain.",
+  "components": [
+    {
+      "name": "BaseAdapter",
+      "description": "Serves as the foundational abstract interface for managing and converting generic tools, resources, and prompts from different \"connectors\" into a standardized, framework-agnostic format. It defines the common lifecycle and core methods for tool adaptation.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.base.BaseAdapter",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/base.py",
+          "reference_start_line": 20,
+          "reference_end_line": 190
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "LangChainAdapter",
+      "description": "A concrete implementation of `BaseAdapter` specifically designed to adapt MCP tools, resources, and and prompts for seamless consumption within the LangChain framework. It handles LangChain-specific schema transformations, result parsing, and orchestrates the adaptation of individual tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 29,
+          "reference_end_line": 268
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "McpToLangChainAdapter",
+      "description": "Acts as a specialized wrapper for individual MCP tools, making them directly compatible with LangChain's `Tool` interface. It encapsulates the logic for defining the tool's arguments and its execution within the LangChain agent's context.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.McpToLangChainAdapter",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 119,
+          "reference_end_line": 168
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "ResourceTool",
+      "description": "A specialized LangChain `Tool` representation specifically for interacting with MCP resources. It provides a LangChain-compatible interface to access or manipulate data resources exposed by the MCP system.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.ResourceTool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 182,
+          "reference_end_line": 209
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "PromptTool",
+      "description": "A specialized LangChain `Tool` representation for dynamically generating or retrieving prompts from the MCP system. It allows LangChain agents to interact with and utilize MCP-defined prompts as callable tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.PromptTool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 247,
+          "reference_end_line": 266
+        }
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "inherits from",
+      "src_name": "LangChainAdapter",
+      "dst_name": "BaseAdapter"
+    },
+    {
+      "relation": "instantiates and composes",
+      "src_name": "LangChainAdapter",
+      "dst_name": "McpToLangChainAdapter"
+    },
+    {
+      "relation": "creates",
+      "src_name": "LangChainAdapter",
+      "dst_name": "ResourceTool"
+    },
+    {
+      "relation": "creates",
+      "src_name": "LangChainAdapter",
+      "dst_name": "PromptTool"
+    }
+  ]
+}

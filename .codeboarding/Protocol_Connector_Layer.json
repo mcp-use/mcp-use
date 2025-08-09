@@ -1,0 +1,242 @@
+{
+  "description": "The `mcp_use.connectors` subsystem is designed to provide a flexible and extensible framework for various communication protocols. The core of this subsystem is the `BaseConnector` abstract class, which defines a unified interface for all connectors, ensuring consistent interaction patterns for operations like connecting, disconnecting, and handling agent requests (e.g., calling tools, listing resources, managing prompts). Concrete implementations like `SandboxConnector`, `StdioConnector`, `HttpConnector`, and `WebSocketConnector` extend this base, each specializing in a particular communication medium. The `Connectors Utility` module provides common helper functions that are leveraged by these concrete connectors, promoting code reuse and maintaining consistency across different protocol implementations.\n\nCritical interaction pathways within this subsystem revolve around the `BaseConnector`'s defined interface. All concrete connectors implement methods such as `connect`, `disconnect`, `call_tool`, and `request`, allowing the higher-level agent components to interact with them uniformly, regardless of the underlying communication protocol. For instance, an agent can initiate a `call_tool` operation, and the specific connector (e.g., `SandboxConnector` for sandboxed execution or `WebSocketConnector` for real-time communication) will handle the protocol-specific details. The `Connectors Utility` module supports these interactions by providing shared functionalities that streamline the implementation of these protocol-specific behaviors.\n\nThe architecture of the `mcp_use.connectors` subsystem is centered around a clear abstraction-implementation pattern. The `BaseConnector` serves as the central abstract component, establishing the contract for all communication. Specialized connectors like `SandboxConnector`, `StdioConnector`, `HttpConnector`, and `WebSocketConnector` inherit from `BaseConnector`, providing concrete implementations for different communication protocols. This inheritance ensures that all connectors adhere to a common interface, simplifying their integration with other parts of the system. The `Connectors Utility` module acts as a supporting component, offering reusable functions that aid in the development and operation of these diverse connectors, thereby promoting modularity and maintainability within the subsystem.",
+  "components": [
+    {
+      "name": "BaseConnector",
+      "description": "The foundational abstract base class that defines the common interface and core functionalities expected from any protocol connector. It establishes the contract for connecting, disconnecting, checking connection status, and performing core agent operations like calling tools, listing resources, and handling prompts, ensuring a consistent API across different communication protocols.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:connect",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:disconnect",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:is_connected",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:call_tool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:list_tools",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:list_resources",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:read_resource",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:list_prompts",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:get_prompt",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:request",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:_ensure_connected",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector:_cleanup_resources",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "SandboxConnector",
+      "description": "A concrete implementation responsible for managing the lifecycle, input/output, and execution within a sandboxed environment. This is crucial for securely running untrusted code or processes.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector:_handle_stderr",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector:_handle_stdout",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector:wait_for_server_response",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "StdioConnector",
+      "description": "A concrete implementation handling communication over standard I/O streams (stdin, stdout, stderr), typically used for interacting with local processes or command-line applications.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.stdio.StdioConnector:read_stream",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/stdio.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.stdio.StdioConnector:write_stream",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/stdio.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "HttpConnector",
+      "description": "A concrete implementation designed for HTTP-based communication, supporting both traditional RESTful requests and Server-Sent Events (SSE) for streaming data. This is vital for interacting with web services and APIs.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.http.HttpConnector:read_stream",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.http.HttpConnector:write_stream",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "WebSocketConnector",
+      "description": "A concrete implementation facilitating real-time, bidirectional communication using the WebSocket protocol. This is essential for interactive and low-latency agent-server communication.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector:_receive_messages",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector:_send_request",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector:initialize",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector:list_tools",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector:call_tool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector:list_resources",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector:read_resource",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector:request",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Connectors Utility",
+      "description": "A module providing shared utility functions and helper methods that support the operations of various connector implementations, promoting code reuse and consistency.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.utils",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/utils.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "inherits from",
+      "src_name": "SandboxConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "inherits from",
+      "src_name": "StdioConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "inherits from",
+      "src_name": "HttpConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "inherits from",
+      "src_name": "WebSocketConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "StdioConnector",
+      "dst_name": "Connectors Utility"
+    }
+  ]
+}
