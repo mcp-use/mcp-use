@@ -5,6 +5,8 @@ This module provides the base connector interface that all MCP connectors
 must implement.
 """
 
+import asyncio
+import warnings
 from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import Any
@@ -12,7 +14,18 @@ from typing import Any
 from mcp import ClientSession, Implementation
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
-from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
+from mcp.types import (
+    CallToolResult,
+    GetPromptResult,
+    Prompt,
+    PromptListChangedNotification,
+    ReadResourceResult,
+    Resource,
+    ResourceListChangedNotification,
+    ServerNotification,
+    Tool,
+    ToolListChangedNotification,
+)
 from pydantic import AnyUrl
 
 import mcp_use
@@ -56,6 +69,26 @@ class BaseConnector(ABC):
             version=mcp_use.__version__,
             url="https://github.com/mcp-use/mcp-use",
         )
+
+    async def _internal_message_handler(self, message: Any) -> None:
+        """Wrap the user-provided message handler to automatically refresh resources."""
+        if isinstance(message, ServerNotification):
+            if isinstance(message.root, ToolListChangedNotification):
+                logger.debug("Received tool list changed notification, scheduling tools refresh...")
+                # Schedule refresh in background - next list_tools() call will get fresh data
+                asyncio.create_task(self.list_tools())
+            elif isinstance(message.root, ResourceListChangedNotification):
+                logger.debug("Received resource list changed notification, scheduling resources refresh...")
+                # Schedule refresh in background - next list_resources() call will get fresh data
+                asyncio.create_task(self.list_resources())
+            elif isinstance(message.root, PromptListChangedNotification):
+                logger.debug("Received prompt list changed notification, scheduling prompts refresh...")
+                # Schedule refresh in background - next list_prompts() call will get fresh data
+                asyncio.create_task(self.list_prompts())
+
+        # Call the user's handler
+        if self.message_handler:
+            await self.message_handler(message)
 
     @abstractmethod
     async def connect(self) -> None:
@@ -174,21 +207,57 @@ class BaseConnector(ABC):
 
     @property
     def tools(self) -> list[Tool]:
-        """Get the list of available tools."""
+        """Get the list of available tools.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_tools()` instead to ensure
+            you always get the latest data.
+        """
+        warnings.warn(
+            "The 'tools' property is deprecated and may return stale data. "
+            "Use 'await list_tools()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self._tools is None:
             raise RuntimeError("MCP client is not initialized")
         return self._tools
 
     @property
     def resources(self) -> list[Resource]:
-        """Get the list of available resources."""
+        """Get the list of available resources.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_resources()` instead to ensure
+            you always get the latest data.
+        """
+        warnings.warn(
+            "The 'resources' property is deprecated and may return stale data. "
+            "Use 'await list_resources()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self._resources is None:
             raise RuntimeError("MCP client is not initialized")
         return self._resources
 
     @property
     def prompts(self) -> list[Prompt]:
-        """Get the list of available prompts."""
+        """Get the list of available prompts.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_prompts()' instead to ensure
+            you always get the latest data.
+        """
+        warnings.warn(
+            "The 'prompts' property is deprecated and may return stale data. "
+            "Use 'await list_prompts()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self._prompts is None:
             raise RuntimeError("MCP client is not initialized")
         return self._prompts
@@ -313,6 +382,7 @@ class BaseConnector(ABC):
         logger.debug("Listing tools")
         try:
             result = await self.client_session.list_tools()
+            self._tools = result.tools
             return result.tools
         except McpError as e:
             logger.error(f"Error listing tools: {e}")
@@ -326,6 +396,7 @@ class BaseConnector(ABC):
         logger.debug("Listing resources")
         try:
             result = await self.client_session.list_resources()
+            self._resources = result.resources
             return result.resources
         except McpError as e:
             logger.error(f"Error listing resources: {e}")
@@ -346,6 +417,7 @@ class BaseConnector(ABC):
         logger.debug("Listing prompts")
         try:
             result = await self.client_session.list_prompts()
+            self._prompts = result.prompts
             return result.prompts
         except McpError as e:
             logger.error(f"Error listing prompts: {e}")

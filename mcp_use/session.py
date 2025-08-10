@@ -5,6 +5,7 @@ This module provides a session manager for MCP connections,
 which handles authentication, initialization, and tool discovery.
 """
 
+import warnings
 from datetime import timedelta
 from typing import Any
 
@@ -92,17 +93,33 @@ class MCPSession:
     def tools(self) -> list[Tool]:
         """Get the list of available tools.
 
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_tools()` instead to ensure
+            you always get the latest data.
+
         Returns:
             List of available tools from the connected MCP server.
 
         Raises:
             RuntimeError: If the session is not initialized.
         """
+        warnings.warn(
+            "The 'tools' property is deprecated and may return stale data. "
+            "Use 'await list_tools()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.connector.tools
 
     @property
     def resources(self) -> list[Resource]:
         """Get the list of available resources.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_resources()` instead to ensure
+            you always get the latest data.
 
         Returns:
             List of available resources from the connected MCP server.
@@ -110,11 +127,22 @@ class MCPSession:
         Raises:
             RuntimeError: If the session is not initialized.
         """
+        warnings.warn(
+            "The 'resources' property is deprecated and may return stale data. "
+            "Use 'await list_resources()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.connector.resources
 
     @property
     def prompts(self) -> list[Prompt]:
         """Get the list of available prompts.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_prompts()` instead to ensure
+            you always get the latest data.
 
         Returns:
             List of available prompts from the connected MCP server.
@@ -122,6 +150,12 @@ class MCPSession:
         Raises:
             RuntimeError: If the session is not initialized.
         """
+        warnings.warn(
+            "The 'prompts' property is deprecated and may return stale data. "
+            "Use 'await list_prompts()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.connector.prompts
 
     # Convenience methods for MCP operations
