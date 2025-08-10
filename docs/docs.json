@@ -57,7 +57,8 @@
                 "pages": [
                   "client/client-configuration",
                   "client/connection-types",
-                  "client/sandbox"
+                  "client/sandbox",
+                  "client/direct-tool-calls"
                 ]
               },
               {

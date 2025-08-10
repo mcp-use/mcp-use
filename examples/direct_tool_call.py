@@ -31,7 +31,7 @@ async def call_tool_example() -> None:
         session = client.get_session("everything")
 
         # List available tools
-        tools = await session.connector.list_tools()
+        tools = await session.list_tools()
         tool_names = [t.name for t in tools]
         print(f"Available tools: {tool_names}")
 
