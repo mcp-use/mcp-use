@@ -633,6 +633,47 @@ The `SandboxOptions` type provides configuration for the sandbox environment:
 - **Consistent environment**: Ensure consistent behavior across different systems
 - **Resource efficiency**: Offload resource-intensive tasks to cloud infrastructure
 
+# Direct Tool Calls (Without LLM)
+
+You can call MCP server tools directly without an LLM when you need programmatic control:
+
+```python
+import asyncio
+from mcp_use import MCPClient
+
+async def call_tool_example():
+    config = {
+        "mcpServers": {
+            "everything": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-everything"],
+            }
+        }
+    }
+
+    client = MCPClient.from_dict(config)
+
+    try:
+        await client.create_all_sessions()
+        session = client.get_session("everything")
+
+        # Call tool directly
+        result = await session.connector.call_tool(
+            name="add",
+            arguments={"a": 1, "b": 2}
+        )
+
+        print(f"Result: {result.content[0].text}")  # Output: 3
+
+    finally:
+        await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(call_tool_example())
+```
+
+See the complete example: [examples/direct_tool_call.py](examples/direct_tool_call.py)
+
 # Build a Custom Agent:
 
 You can also build your own custom agent using the LangChain adapter:
