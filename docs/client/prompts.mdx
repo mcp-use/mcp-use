@@ -57,7 +57,7 @@ async def list_prompts():
     # Get a session for a specific server
     session = client.get_session("my_server")
 
-    # List all available prompts
+    # List all available prompts - always returns fresh data
     prompts = await session.list_prompts()
 
     for prompt in prompts:
@@ -75,12 +75,34 @@ async def list_prompts():
 asyncio.run(list_prompts())
 ```
 
-You can also access prompts synchronously after initialization:
+### Automatic Prompt List Update
+
+When servers send `PromptListChangedNotification`, it signals that the prompt list has changed. The `list_prompts()` method always fetches fresh data from the server, ensuring you get up-to-date information.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Note over Server: Server Changes State
+    Server->>Server: disable(prompt)
+    Server->>Client: PromptListChangedNotification
+    Client->>Client: Log notification
+
+    Note over Client: User Calls list_prompts()
+    Client->>Server: list_prompts()
+    Server-->>Client: [updated prompts]
+    Client->>Client: Return fresh data
+```
+
+**Important:** Always use `await session.list_prompts()` instead of the deprecated `session.prompts` property to ensure you get fresh data:
 
 ```python
-# After connecting and initializing
-session = client.get_session("my_server")
-prompts = session.prompts  # Property access to cached prompts
+# ✅ Recommended - always returns fresh data
+prompts = await session.list_prompts()
+
+# ⚠️ Deprecated - may return stale data
+# prompts = session.prompts
 ```
 
 ## Getting and Using Prompts

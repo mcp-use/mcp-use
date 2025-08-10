@@ -68,23 +68,41 @@ async def logging_tool(ctx: Context) -> str:
 
 
 @mcp.tool()
+async def tool_to_disable():
+    """A tool to disable."""
+    return "Tool to disable"
+
+
+@mcp.tool()
 async def change_tools(ctx: Context) -> str:
     """Disable the logging_tool."""
-    await logging_tool.disable()
+    await tool_to_disable.disable()
     return "Tools disabled"
+
+
+@mcp.resource("data://mock")
+def resource_to_disable():
+    """A resource to disable."""
+    pass
 
 
 @mcp.tool()
 async def change_resources(ctx: Context) -> str:
     """Disable the get_config resource."""
-    await get_config.disable()
+    await resource_to_disable.disable()
     return "Resources disabled"
+
+
+@mcp.prompt()
+def prompt_to_disable():
+    """A prompt to disable."""
+    pass
 
 
 @mcp.tool()
 async def change_prompts(ctx: Context) -> str:
     """Disable the summarize_text prompt."""
-    await summarize_text.disable()
+    await prompt_to_disable.disable()
     return "Prompts disabled"
 
 

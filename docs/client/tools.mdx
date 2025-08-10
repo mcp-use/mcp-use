@@ -45,7 +45,7 @@ async def list_tools():
     # Get a session for a specific server
     session = client.get_session("my_server")
 
-    # List all available tools
+    # List all available tools - always returns fresh data
     tools = await session.list_tools()
 
     for tool in tools:
@@ -60,12 +60,34 @@ async def list_tools():
 asyncio.run(list_tools())
 ```
 
-You can also access tools synchronously after initialization:
+### Automatic Tool List Update
+
+When servers send `ToolListChangedNotification`, it signals that the tool list has changed. The `list_tools()` method always fetches fresh data from the server, ensuring you get up-to-date information.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Note over Server: Server Changes State
+    Server->>Server: disable(tool)
+    Server->>Client: ToolListChangedNotification
+    Client->>Client: Log notification
+
+    Note over Client: User Calls list_tools()
+    Client->>Server: list_tools()
+    Server-->>Client: [updated tools]
+    Client->>Client: Return fresh data
+```
+
+**Important:** Always use `await session.list_tools()` instead of the deprecated `session.tools` property to ensure you get fresh data:
 
 ```python
-# After connecting and initializing
-session = client.get_session("my_server")
-tools = session.tools  # Property access to cached tools
+# ✅ Recommended - always returns fresh data
+tools = await session.list_tools()
+
+# ⚠️ Deprecated - may return stale data
+# tools = session.tools
 ```
 
 ## Calling Tools

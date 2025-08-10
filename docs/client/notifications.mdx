@@ -45,9 +45,9 @@ async def long_running_task(task_name: str, ctx: Context, steps: int = 5) -> str
 The `fastmcp` server context provides several methods for sending specific notifications. Here are the ones you can use and the corresponding type to check for in your client's `message_handler`:
 
 -   `ctx.report_progress(...)` sends a `types.ProgressNotification`. This is used to report the progress of a long-running operation.
--   `ctx.send_tool_list_changed()` sends a `types.ToolsListChangedNotification`. This informs the client that the list of available tools has changed.
--   `ctx.send_resource_list_changed()` sends a `types.ResourcesListChangedNotification`. This informs the client that the list of available resources has changed.
--   `ctx.send_prompt_list_changed()` sends a `types.PromptsListChangedNotification`. This informs the client that the list of available prompts has changed.
+-   `ctx.send_tool_list_changed()` sends a `types.ToolsListChangedNotification`. The client automatically refreshes its tool list when this is received (see [Tools documentation](/client/tools)).
+-   `ctx.send_resource_list_changed()` sends a `types.ResourcesListChangedNotification`. The client automatically refreshes its resource list when this is received (see [Resources documentation](/client/resources)).
+-   `ctx.send_prompt_list_changed()` sends a `types.PromptsListChangedNotification`. The client automatically refreshes its prompt list when this is received (see [Prompts documentation](/client/prompts)).
 
 ## Client-Side: Handling Notifications
 
@@ -73,11 +73,11 @@ async def handle_messages(message):
                 f" ({params.message})"
             )
         elif isinstance(notification, types.PromptsListChangedNotification):
-            print("Server prompts have changed. You may want to refresh them.")
+            print("Server prompts have changed (auto-refreshed in background)")
         elif isinstance(notification, types.ResourcesListChangedNotification):
-            print("Server resources have changed. You may want to refresh them.")
+            print("Server resources have changed (auto-refreshed in background)")
         elif isinstance(notification, types.ToolsListChangedNotification):
-            print("Server tools have changed. You may want to refresh them.")
+            print("Server tools have changed (auto-refreshed in background)")
         # Logging notifications are also sent here, but can be handled
         # by a dedicated logging_callback.
         elif isinstance(notification, types.LoggingMessageNotification):

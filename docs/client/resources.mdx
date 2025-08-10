@@ -54,7 +54,7 @@ async def list_resources():
     # Get a session for a specific server
     session = client.get_session("my_server")
 
-    # List all available resources
+    # List all available resources - always returns fresh data
     resources = await session.list_resources()
 
     for resource in resources:
@@ -70,12 +70,34 @@ async def list_resources():
 asyncio.run(list_resources())
 ```
 
-You can also access resources synchronously after initialization:
+### Automatic Resource List Update
+
+When servers send `ResourceListChangedNotification`, it signals that the resource list has changed. The `list_resources()` method always fetches fresh data from the server, ensuring you get up-to-date information.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Note over Server: Server Changes State
+    Server->>Server: disable(resource)
+    Server->>Client: ResourceListChangedNotification
+    Client->>Client: Log notification
+
+    Note over Client: User Calls list_resources()
+    Client->>Server: list_resources()
+    Server-->>Client: [updated resources]
+    Client->>Client: Return fresh data
+```
+
+**Important:** Always use `await session.list_resources()` instead of the deprecated `session.resources` property to ensure you get fresh data:
 
 ```python
-# After connecting and initializing
-session = client.get_session("my_server")
-resources = session.resources  # Property access to cached resources
+# ✅ Recommended - always returns fresh data
+resources = await session.list_resources()
+
+# ⚠️ Deprecated - may return stale data
+# resources = session.resources
 ```
 
 ## Reading Resources

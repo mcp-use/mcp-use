@@ -5,7 +5,6 @@ This module provides the base connector interface that all MCP connectors
 must implement.
 """
 
-import asyncio
 import warnings
 from abc import ABC, abstractmethod
 from datetime import timedelta
@@ -71,20 +70,14 @@ class BaseConnector(ABC):
         )
 
     async def _internal_message_handler(self, message: Any) -> None:
-        """Wrap the user-provided message handler to automatically refresh resources."""
+        """Wrap the user-provided message handler."""
         if isinstance(message, ServerNotification):
             if isinstance(message.root, ToolListChangedNotification):
-                logger.debug("Received tool list changed notification, scheduling tools refresh...")
-                # Schedule refresh in background - next list_tools() call will get fresh data
-                asyncio.create_task(self.list_tools())
+                logger.debug("Received tool list changed notification")
             elif isinstance(message.root, ResourceListChangedNotification):
-                logger.debug("Received resource list changed notification, scheduling resources refresh...")
-                # Schedule refresh in background - next list_resources() call will get fresh data
-                asyncio.create_task(self.list_resources())
+                logger.debug("Received resource list changed notification")
             elif isinstance(message.root, PromptListChangedNotification):
-                logger.debug("Received prompt list changed notification, scheduling prompts refresh...")
-                # Schedule refresh in background - next list_prompts() call will get fresh data
-                asyncio.create_task(self.list_prompts())
+                logger.debug("Received prompt list changed notification")
 
         # Call the user's handler
         if self.message_handler:

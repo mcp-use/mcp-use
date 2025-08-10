@@ -15,14 +15,14 @@ async def test_tool_list_update(primitive_server):
         session = client.get_session("PrimitiveServer")
         # Initial state: Check that all tools are present
         tools = await session.list_tools()
-        assert "logging_tool" in [tool.name for tool in tools]
+        assert "tool_to_disable" in [tool.name for tool in tools]
 
         # Trigger the change (this will disable the tool and send a notification)
         await session.call_tool(name="change_tools", arguments={})
 
         # The tool list should be refreshed automatically on next call
         tools = await session.list_tools()
-        assert "logging_tool" not in [tool.name for tool in tools]
+        assert "tool_to_disable" not in [tool.name for tool in tools]
     finally:
         await client.close_all_sessions()
 
@@ -37,15 +37,14 @@ async def test_resource_list_update(primitive_server):
         session = client.get_session("PrimitiveServer")
         # Initial state: Check that we have at least one resource
         resources = await session.list_resources()
-        initial_resource_count = len(resources)
-        assert initial_resource_count > 0, "Should have at least one resource initially"
+        assert "resource_to_disable" in [resource.name for resource in resources]
 
         # Trigger the change (this will disable a resource and send a notification)
         await session.call_tool(name="change_resources", arguments={})
 
         # The resource list should be refreshed automatically on next call
         resources = await session.list_resources()
-        assert len(resources) < initial_resource_count, "Should have fewer resources after disabling"
+        assert "resource_to_disable" not in [resource.name for resource in resources]
     finally:
         await client.close_all_sessions()
 
@@ -60,12 +59,12 @@ async def test_prompt_list_update(primitive_server):
         session = client.get_session("PrimitiveServer")
         # Initial state: Check that all prompts are present
         prompts = await session.list_prompts()
-        assert "summarize_text" in [prompt.name for prompt in prompts]
+        assert "prompt_to_disable" in [prompt.name for prompt in prompts]
 
         # Trigger the change (this will disable the prompt and send a notification)
         await session.call_tool(name="change_prompts", arguments={})
         # The prompt list should be refreshed automatically on next call
         prompts = await session.list_prompts()
-        assert "summarize_text" not in [prompt.name for prompt in prompts]
+        assert "prompt_to_disable" not in [prompt.name for prompt in prompts]
     finally:
         await client.close_all_sessions()
