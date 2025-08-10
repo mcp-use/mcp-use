@@ -7,7 +7,7 @@ through HTTP APIs with SSE or Streamable HTTP for transport.
 
 import httpx
 from mcp import ClientSession
-from mcp.client.session import ElicitationFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, MessageHandlerFnT, SamplingFnT
 
 from ..logging import logger
 from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
@@ -30,6 +30,7 @@ class HttpConnector(BaseConnector):
         sse_read_timeout: float = 60 * 5,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
     ):
         """Initialize a new HTTP connector.
 
@@ -42,7 +43,11 @@ class HttpConnector(BaseConnector):
             sampling_callback: Optional sampling callback.
             elicitation_callback: Optional elicitation callback.
         """
-        super().__init__(sampling_callback=sampling_callback, elicitation_callback=elicitation_callback)
+        super().__init__(
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
+        )
         self.base_url = base_url.rstrip("/")
         self.auth_token = auth_token
         self.headers = headers or {}
@@ -78,6 +83,7 @@ class HttpConnector(BaseConnector):
                 write_stream,
                 sampling_callback=self.sampling_callback,
                 elicitation_callback=self.elicitation_callback,
+                message_handler=self.message_handler,
                 client_info=self.client_info,
             )
             await test_client.__aenter__()
@@ -162,6 +168,7 @@ class HttpConnector(BaseConnector):
                         write_stream,
                         sampling_callback=self.sampling_callback,
                         elicitation_callback=self.elicitation_callback,
+                        message_handler=self.message_handler,
                         client_info=self.client_info,
                     )
                     await self.client_session.__aenter__()

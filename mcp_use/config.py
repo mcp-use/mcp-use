@@ -7,7 +7,7 @@ This module provides functionality to load MCP configuration from JSON files.
 import json
 from typing import Any
 
-from mcp.client.session import ElicitationFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, MessageHandlerFnT, SamplingFnT
 
 from mcp_use.types.sandbox import SandboxOptions
 
@@ -34,6 +34,7 @@ def create_connector_from_config(
     sandbox_options: SandboxOptions | None = None,
     sampling_callback: SamplingFnT | None = None,
     elicitation_callback: ElicitationFnT | None = None,
+    message_handler: MessageHandlerFnT | None = None,
 ) -> BaseConnector:
     """Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
@@ -55,6 +56,7 @@ def create_connector_from_config(
             env=server_config.get("env", None),
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
         )
 
     # Sandboxed connector
@@ -66,6 +68,7 @@ def create_connector_from_config(
             e2b_options=sandbox_options,
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
         )
 
     # HTTP connector
@@ -78,6 +81,7 @@ def create_connector_from_config(
             sse_read_timeout=server_config.get("sse_read_timeout", 60 * 5),
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
         )
 
     # WebSocket connector
@@ -86,6 +90,7 @@ def create_connector_from_config(
             url=server_config["ws_url"],
             headers=server_config.get("headers", None),
             auth_token=server_config.get("auth_token", None),
+            message_handler=message_handler,
         )
 
     raise ValueError("Cannot determine connector type from config")
