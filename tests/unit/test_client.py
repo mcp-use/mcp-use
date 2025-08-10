@@ -224,6 +224,8 @@ class TestMCPClientSessionManagement:
             sandbox_options=None,
             sampling_callback=None,
             elicitation_callback=None,
+            message_handler=None,
+            logging_callback=None,
         )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_called_once()
@@ -280,6 +282,8 @@ class TestMCPClientSessionManagement:
             sandbox_options=None,
             sampling_callback=None,
             elicitation_callback=None,
+            message_handler=None,
+            logging_callback=None,
         )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_not_called()
@@ -467,6 +471,8 @@ class TestMCPClientSessionManagement:
             sandbox_options=None,
             sampling_callback=None,
             elicitation_callback=None,
+            message_handler=None,
+            logging_callback=None,
         )
         mock_create_connector.assert_any_call(
             {"url": "http://server2.com"},
@@ -474,6 +480,8 @@ class TestMCPClientSessionManagement:
             sandbox_options=None,
             sampling_callback=None,
             elicitation_callback=None,
+            message_handler=None,
+            logging_callback=None,
         )
 
         assert mock_session_class.call_count == 2
@@ -528,6 +536,8 @@ class TestMCPClientSessionManagement:
             sandbox_options=None,
             sampling_callback=None,
             elicitation_callback=None,
+            message_handler=None,
+            logging_callback=None,
         )
 
         assert mock_session_class.call_count == 1
