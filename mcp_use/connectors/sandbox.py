@@ -12,7 +12,7 @@ import time
 
 import aiohttp
 from mcp import ClientSession
-from mcp.client.session import ElicitationFnT, MessageHandlerFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
 from ..logging import logger
 from ..task_managers import SseConnectionManager
@@ -51,6 +51,7 @@ class SandboxConnector(BaseConnector):
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
     ):
         """Initialize a new sandbox connector.
 
@@ -69,6 +70,7 @@ class SandboxConnector(BaseConnector):
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
+            logging_callback=logging_callback,
         )
         if Sandbox is None:
             raise ImportError(
@@ -230,6 +232,7 @@ class SandboxConnector(BaseConnector):
                 sampling_callback=self.sampling_callback,
                 elicitation_callback=self.elicitation_callback,
                 message_handler=self.message_handler,
+                logging_callback=self.logging_callback,
                 client_info=self.client_info,
             )
             await self.client_session.__aenter__()
