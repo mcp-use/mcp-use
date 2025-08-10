@@ -55,7 +55,7 @@ async def call_tool_example():
         print(f"Available tools: {tool_names}")
 
         # Call a specific tool with arguments
-        result = await session.connector.call_tool(
+        result = await session.call_tool(
             name="add",
             arguments={"a": 1, "b": 2}
         )
@@ -87,7 +87,7 @@ The `call_tool` method returns a `CallToolResult` object with the following attr
 
 ```python
 # Call a tool
-result = await session.connector.call_tool(
+result = await session.call_tool(
     name="get_weather",
     arguments={"location": "San Francisco"}
 )
@@ -136,7 +136,7 @@ async def multi_server_example():
 
         # Call tool from filesystem server
         fs_session = client.get_session("filesystem")
-        files = await fs_session.connector.call_tool(
+        files = await fs_session.call_tool(
             name="list_files",
             arguments={"path": "/tmp"}
         )
@@ -144,7 +144,7 @@ async def multi_server_example():
 
         # Call tool from time server
         time_session = client.get_session("time")
-        current_time = await time_session.connector.call_tool(
+        current_time = await time_session.call_tool(
             name="get_current_time",
             arguments={}
         )
@@ -192,7 +192,7 @@ Always handle potential errors when making direct tool calls:
 ```python
 async def safe_tool_call():
     try:
-        result = await session.connector.call_tool(
+        result = await session.call_tool(
             name="some_tool",
             arguments={"param": "value"}
         )

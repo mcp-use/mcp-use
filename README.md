@@ -658,7 +658,7 @@ async def call_tool_example():
         session = client.get_session("everything")
 
         # Call tool directly
-        result = await session.connector.call_tool(
+        result = await session.call_tool(
             name="add",
             arguments={"a": 1, "b": 2}
         )

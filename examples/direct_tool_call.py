@@ -41,7 +41,7 @@ async def call_tool_example() -> None:
         # - content is a list of ContentBlock objects
         # - structuredContent is a dictionary of the structured result of the tool call (only for non-sampling tools)
         # - isError is a boolean indicating if the tool call was successful
-        result_tool_add = await session.connector.call_tool(name="add", arguments={"a": 1, "b": 2})
+        result_tool_add = await session.call_tool(name="add", arguments={"a": 1, "b": 2})
 
         # Handle and print the result
         if getattr(result_tool_add, "isError", False):
