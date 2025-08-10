@@ -52,7 +52,7 @@ async def list_prompts():
     client = MCPClient(config)
 
     # Connect to servers
-    await client.connect()
+    await client.create_all_sessions()
 
     # Get a session for a specific server
     session = client.get_session("my_server")
@@ -69,7 +69,6 @@ async def list_prompts():
                 print(f"  - {arg.name}: {arg.description}")
         print("---")
 
-    await client.disconnect()
 
 # Run the example
 asyncio.run(list_prompts())
@@ -120,7 +119,7 @@ async def use_prompt_example():
         }
     }
     client = MCPClient(config)
-    await client.connect()
+    await client.create_all_sessions()
 
     session = client.get_session("planning_server")
 
@@ -141,7 +140,6 @@ async def use_prompt_example():
         print(f"Role: {message.role}")
         print(f"Content: {message.content.text}")
 
-    await client.disconnect()
 
 asyncio.run(use_prompt_example())
 ```
@@ -158,7 +156,7 @@ async def simple_prompt_example():
         }
     }
     client = MCPClient(config)
-    await client.connect()
+    await client.create_all_sessions()
 
     session = client.get_session("content_server")
 
@@ -169,7 +167,6 @@ async def simple_prompt_example():
     for message in result.messages:
         print(f"{message.role}: {message.content.text}")
 
-    await client.disconnect()
 
 asyncio.run(simple_prompt_example())
 ```
@@ -227,7 +224,7 @@ async def dynamic_prompt_example():
         }
     }
     client = MCPClient(config)
-    await client.connect()
+    await client.create_all_sessions()
 
     session = client.get_session("adaptive_server")
 
@@ -244,7 +241,6 @@ async def dynamic_prompt_example():
             print(f"  {message.content.text[:100]}...")
         print()
 
-    await client.disconnect()
 ```
 
 ## Error Handling

@@ -40,7 +40,7 @@ async def list_tools():
     client = MCPClient(config)
 
     # Connect to servers
-    await client.connect()
+    await client.create_all_sessions()
 
     # Get a session for a specific server
     session = client.get_session("my_server")
@@ -53,8 +53,6 @@ async def list_tools():
         print(f"Description: {tool.description}")
         print(f"Schema: {tool.inputSchema}")
         print("---")
-
-    await client.disconnect()
 
 # Run the example
 asyncio.run(list_tools())
@@ -105,7 +103,7 @@ async def call_tool_example():
         }
     }
     client = MCPClient(config)
-    await client.connect()
+    await client.create_all_sessions()
 
     session = client.get_session("filesystem_server")
 
@@ -123,8 +121,6 @@ async def call_tool_example():
         print(f"Error: {result.content}")
     else:
         print(f"File content: {result.content}")
-
-    await client.disconnect()
 
 asyncio.run(call_tool_example())
 ```

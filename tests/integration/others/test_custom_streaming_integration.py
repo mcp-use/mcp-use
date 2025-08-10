@@ -81,7 +81,7 @@ async def test_mcp_tools_availability(streaming_server_process):
         assert session is not None, "Session should be created"
 
         # Get tools and verify they exist
-        tools = session.tools
+        tools = await session.list_tools()
         assert tools is not None, "Tools should be available"
         assert len(tools) > 0, "At least one tool should be available"
 
@@ -191,7 +191,7 @@ async def test_mcp_resources_and_prompts(streaming_server_process):
         session = client.get_session("customStreaming")
 
         # Test resources
-        resources = session.resources
+        resources = await session.list_resources()
         assert resources is not None, "Resources should be available"
 
         resource_uris = [str(resource.uri) for resource in resources]
@@ -237,7 +237,7 @@ async def test_mcp_resources_and_prompts(streaming_server_process):
             # Just verify the resource is listed - that's sufficient for this test
 
         # Test prompts
-        prompts = session.prompts
+        prompts = await session.list_prompts()
         assert prompts is not None, "Prompts should be available"
         assert len(prompts) > 0, "At least one prompt should be available"
 

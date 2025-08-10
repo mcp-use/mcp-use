@@ -49,7 +49,7 @@ async def list_resources():
     client = MCPClient(config)
 
     # Connect to servers
-    await client.connect()
+    await client.create_all_sessions()
 
     # Get a session for a specific server
     session = client.get_session("my_server")
@@ -63,8 +63,6 @@ async def list_resources():
         print(f"Description: {resource.description}")
         print(f"MIME Type: {resource.mimeType}")
         print("---")
-
-    await client.disconnect()
 
 # Run the example
 asyncio.run(list_resources())
@@ -116,7 +114,7 @@ async def read_resource_example():
         }
     }
     client = MCPClient(config)
-    await client.connect()
+    await client.create_all_sessions()
 
     session = client.get_session("file_server")
 
@@ -133,7 +131,6 @@ async def read_resource_example():
         else:
             print(f"Binary content length: {len(content.blob)}")
 
-    await client.disconnect()
 
 asyncio.run(read_resource_example())
 ```
@@ -154,7 +151,7 @@ async def template_resource_example():
         }
     }
     client = MCPClient(config)
-    await client.connect()
+    await client.create_all_sessions()
 
     session = client.get_session("database_server")
 
@@ -166,8 +163,6 @@ async def template_resource_example():
     # Process the user profile data
     for content in result.contents:
         print(f"User profile: {content.text}")
-
-    await client.disconnect()
 
 asyncio.run(template_resource_example())
 ```
