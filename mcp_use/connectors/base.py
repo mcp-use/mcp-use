@@ -21,6 +21,7 @@ from mcp.types import (
     ReadResourceResult,
     Resource,
     ResourceListChangedNotification,
+    ServerCapabilities,
     ServerNotification,
     Tool,
     ToolListChangedNotification,
@@ -59,6 +60,7 @@ class BaseConnector(ABC):
         self.elicitation_callback = elicitation_callback
         self.message_handler = message_handler
         self.logging_callback = logging_callback
+        self.capabilities: ServerCapabilities | None = None
 
     @property
     def client_info(self) -> Implementation:
@@ -155,37 +157,37 @@ class BaseConnector(ABC):
         result = await self.client_session.initialize()
         self._initialized = True  # Mark as initialized
 
-        server_capabilities = result.capabilities
+        self.capabilities = result.capabilities
 
-        if server_capabilities.tools:
+        if self.capabilities.tools:
             # Get available tools directly from client session
             try:
                 tools_result = await self.client_session.list_tools()
                 self._tools = tools_result.tools if tools_result else []
             except Exception as e:
-                logger.error(f"Error listing tools: {e}")
+                logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
                 self._tools = []
         else:
             self._tools = []
 
-        if server_capabilities.resources:
+        if self.capabilities.resources:
             # Get available resources directly from client session
             try:
                 resources_result = await self.client_session.list_resources()
                 self._resources = resources_result.resources if resources_result else []
             except Exception as e:
-                logger.error(f"Error listing resources: {e}")
+                logger.error(f"Error listing resources for connector {self.public_identifier}: {e}")
                 self._resources = []
         else:
             self._resources = []
 
-        if server_capabilities.prompts:
+        if self.capabilities.prompts:
             # Get available prompts directly from client session
             try:
                 prompts_result = await self.client_session.list_prompts()
                 self._prompts = prompts_result.prompts if prompts_result else []
             except Exception as e:
-                logger.error(f"Error listing prompts: {e}")
+                logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
                 self._prompts = []
         else:
             self._prompts = []
@@ -369,6 +371,10 @@ class BaseConnector(ABC):
     async def list_tools(self) -> list[Tool]:
         """List all available tools from the MCP implementation."""
 
+        if self.capabilities and not self.capabilities.tools:
+            logger.debug(f"Server {self.public_identifier} does not support tools")
+            return []
+
         # Ensure we're connected
         await self._ensure_connected()
 
@@ -378,11 +384,16 @@ class BaseConnector(ABC):
             self._tools = result.tools
             return result.tools
         except McpError as e:
-            logger.error(f"Error listing tools: {e}")
+            logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
             return []
 
     async def list_resources(self) -> list[Resource]:
         """List all available resources from the MCP implementation."""
+
+        if self.capabilities and not self.capabilities.resources:
+            logger.debug(f"Server {self.public_identifier} does not support resources")
+            return []
+
         # Ensure we're connected
         await self._ensure_connected()
 
@@ -392,7 +403,7 @@ class BaseConnector(ABC):
             self._resources = result.resources
             return result.resources
         except McpError as e:
-            logger.error(f"Error listing resources: {e}")
+            logger.warning(f"Error listing resources for connector {self.public_identifier}: {e}")
             return []
 
     async def read_resource(self, uri: AnyUrl) -> ReadResourceResult:
@@ -405,6 +416,11 @@ class BaseConnector(ABC):
 
     async def list_prompts(self) -> list[Prompt]:
         """List all available prompts from the MCP implementation."""
+
+        if self.capabilities and not self.capabilities.prompts:
+            logger.debug(f"Server {self.public_identifier} does not support prompts")
+            return []
+
         await self._ensure_connected()
 
         logger.debug("Listing prompts")
@@ -413,7 +429,7 @@ class BaseConnector(ABC):
             self._prompts = result.prompts
             return result.prompts
         except McpError as e:
-            logger.error(f"Error listing prompts: {e}")
+            logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
             return []
 
     async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> GetPromptResult:
