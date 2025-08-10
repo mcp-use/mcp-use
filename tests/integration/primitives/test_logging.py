@@ -15,8 +15,7 @@ async def test_tool(primitive_server):
     try:
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")
-
-        result = await session.call_tool(name="long_running_task", arguments={"task_name": "test", "steps": 5})
-        assert result.content[0].text == "Task 'test' completed"
+        result = await session.call_tool(name="logging_tool", arguments={})
+        assert result.content[0].text == "Logging tool completed"
     finally:
         await client.close_all_sessions()

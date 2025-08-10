@@ -35,6 +35,7 @@ def summarize_text(text: str) -> str:
     return f"Please summarize the following text: {text}"
 
 
+# Tool with all kinds of notifications
 @mcp.tool()
 async def long_running_task(task_name: str, ctx: Context, steps: int = 5) -> str:
     """Execute a task with progress updates."""
@@ -42,6 +43,10 @@ async def long_running_task(task_name: str, ctx: Context, steps: int = 5) -> str
 
     for i in range(steps):
         progress = (i + 1) / steps
+        await ctx.send_prompt_list_changed()
+        await ctx.send_resource_list_changed()
+        await ctx.send_tool_list_changed()
+        await ctx.send_tool_list_changed()
         await ctx.report_progress(
             progress=progress,
             total=1.0,
@@ -50,6 +55,17 @@ async def long_running_task(task_name: str, ctx: Context, steps: int = 5) -> str
         await ctx.debug(f"Completed step {i + 1}")
 
     return f"Task '{task_name}' completed"
+
+
+# Tool with no notifications, but logging
+@mcp.tool()
+async def logging_tool(ctx: Context) -> str:
+    """Log a message to the client."""
+    await ctx.debug("This is a debug message")
+    await ctx.info("This is an info message")
+    await ctx.warning("This is a warning message")
+    await ctx.error("This is an error message")
+    return "Logging tool completed"
 
 
 @mcp.tool
