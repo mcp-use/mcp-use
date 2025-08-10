@@ -46,7 +46,6 @@ async def long_running_task(task_name: str, ctx: Context, steps: int = 5) -> str
         await ctx.send_prompt_list_changed()
         await ctx.send_resource_list_changed()
         await ctx.send_tool_list_changed()
-        await ctx.send_tool_list_changed()
         await ctx.report_progress(
             progress=progress,
             total=1.0,
