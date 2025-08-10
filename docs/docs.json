@@ -74,7 +74,9 @@
                 "icon": "sparkle",
                 "pages": [
                   "client/sampling",
-                  "client/elicitation"
+                  "client/elicitation",
+                  "client/notifications",
+                  "client/logging"
                 ]
               }
             ]
