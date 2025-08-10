@@ -67,6 +67,27 @@ async def logging_tool(ctx: Context) -> str:
     return "Logging tool completed"
 
 
+@mcp.tool()
+async def change_tools(ctx: Context) -> str:
+    """Disable the logging_tool."""
+    await logging_tool.disable()
+    return "Tools disabled"
+
+
+@mcp.tool()
+async def change_resources(ctx: Context) -> str:
+    """Disable the get_config resource."""
+    await get_config.disable()
+    return "Resources disabled"
+
+
+@mcp.tool()
+async def change_prompts(ctx: Context) -> str:
+    """Disable the summarize_text prompt."""
+    await summarize_text.disable()
+    return "Prompts disabled"
+
+
 @mcp.tool
 async def analyze_sentiment(text: str, ctx: Context) -> str:
     """Analyze the sentiment of text using the client's LLM."""
