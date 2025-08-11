@@ -563,6 +563,12 @@ class MCPAgent:
                     for agent_step in next_step_output:
                         yield agent_step
                         action, observation = agent_step
+                        reasoning = getattr(action, "log", "")
+                        if reasoning:
+                            reasoning_str = reasoning.replace("\n", " ")
+                            if len(reasoning_str) > 300:
+                                reasoning_str = reasoning_str[:297] + "..."
+                            logger.info(f"💭 Reasoning: {reasoning_str}")
                         tool_name = action.tool
                         self.tools_used_names.append(tool_name)
                         tool_input_str = str(action.tool_input)
