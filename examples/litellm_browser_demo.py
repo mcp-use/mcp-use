@@ -73,7 +73,7 @@ class LitellmAdapter(BaseAdapter):
     
     def _convert_prompt(self, mcp_prompt: dict[str, Any], connector: BaseConnector) -> dict[str, Any]:
         pass
-
+    
 class LitellmMCPAgent():
     """
     This class is used to run the agent.
@@ -162,3 +162,23 @@ class LitellmMCPAgent():
             return f"Error: Tool {tool_name} not found"
         except Exception as e:
             return f"Error: {str(e)}"
+        
+async def main():
+    load_dotenv()
+
+    config = {
+        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
+    }
+    # Create MCPClient from config file
+    client = MCPClient(config=config)
+
+    agent = LitellmMCPAgent(model="claude-3-5-sonnet-20240620", client=client)
+    await agent.initialize()
+
+    response = await agent.run("Please go to 'https://github.com/renvins/serverpulse' and summarize the project.")
+    print(response)
+
+    await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(main())
