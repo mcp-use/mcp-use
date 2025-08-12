@@ -73,3 +73,92 @@ class LitellmAdapter(BaseAdapter):
     
     def _convert_prompt(self, mcp_prompt: dict[str, Any], connector: BaseConnector) -> dict[str, Any]:
         pass
+
+class LitellmMCPAgent():
+    """
+    This class is used to run the agent.
+    """
+
+    def __init__(self, model: str, client: MCPClient, disallowed_tools: List[str] | None = None, system_prompt: str | None = None):
+
+        if model is None:
+            raise ValueError("LLM is required for execution.")
+        if not client:
+            raise ValueError("MCP client is required for execution.")
+
+        self.model = model
+        self.client = client
+        self.adapter = LitellmAdapter(disallowed_tools=disallowed_tools)
+        self.system_prompt = system_prompt
+        self._tools = List[dict[str, Any]]
+    
+    async def initialize(self):
+        """
+        Initialize the agent, create tools and sessions.
+        """
+        # It follows a bit the MCPAgent pattern, but it's not exactly the same.
+        self._sessions = self.client.get_all_active_sessions()
+        print(f"Found {len(self._sessions)} existing sessions")
+
+        if not self._sessions:
+            print("No existing sessions found, creating new session")
+            self._sessions = await self.client.create_all_sessions()
+            self._connectors = [session.connector for session in self._sessions.values()]
+            print(f"Created {len(self._sessions)} new sessions")
+        
+        self._tools = await self.adapter.create_tools(self.client)
+        print(f"Created {len(self._tools)} tools")
+
+    async def run(self, query: str):
+        """
+        Run the agent with the given query.
+        """
+        messages = [
+            {"role": "system", "content": self.system_prompt or "You are a helpful assistant that can use tools to answer questions."},
+            {"role": "user", "content": query}
+        ]
+
+        response = await acompletion(model=self.model, messages=messages, tools=self._tools, tool_choice="auto")
+        if response.choices[0].message.tool_calls:
+            print(f"Length of tool calls: {len(response.choices[0].message.tool_calls)}")
+            print(f"Decided to call with reason: {response.choices[0].message.content}")
+
+            messages.append(response.choices[0].message) # Add assistant response to messages
+            for tool_call in response.choices[0].message.tool_calls:
+                tool_name = tool_call.function.name
+                tool_args = tool_call.function.arguments
+                tool_id = tool_call.id
+
+                tool_result = await self._execute_tool(tool_name, tool_args)
+                # Add context of tool call to messages
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_id,
+                    "name": tool_name,
+                    "content": tool_result
+                })
+            # Call the model again with the updated messages
+            final_response = await acompletion(model=self.model, messages=messages, tools=self._tools, tool_choice="auto")
+            return final_response.choices[0].message.content
+        else:
+            return response.choices[0].message.content # If no tool calls, return directly the final response
+    
+    async def _execute_tool(self, tool_name: str, tool_args: dict[str, Any]):
+        """
+        Execute the tool with the given name and arguments.
+        """
+        import json
+
+        try:
+            args = json.loads(tool_args)
+            for session in self._sessions.values(): # That's a bit inefficient, we're going to engineer a better solution
+                try:
+                    result = await session.call_tool(tool_name, args)
+                    if result.content and len(result.content) > 0:
+                        return result.content[0].text
+                    return str(result)
+                except:
+                    continue
+            return f"Error: Tool {tool_name} not found"
+        except Exception as e:
+            return f"Error: {str(e)}"
