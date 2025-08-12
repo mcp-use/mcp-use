@@ -131,7 +131,7 @@ class Logger:
 
 
 # Check environment variable for debug flag
-debug_env = os.environ.get("DEBUG", "").lower()
+debug_env = os.environ.get("MCP_USE_DEBUG", "").lower() or os.environ.get("DEBUG", "").lower()
 if debug_env == "2":
     MCP_USE_DEBUG = 2
 elif debug_env == "1":
