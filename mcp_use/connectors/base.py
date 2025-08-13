@@ -122,9 +122,7 @@ class BaseConnector(ABC):
                 logger.warning(error_msg)
                 errors.append(error_msg)
             finally:
-                # The manager closes the ClientSession in its own task; clear it
                 self._connection_manager = None
-                self.client_session = None
 
         # Ensure the client_session reference is cleared (it should already be
         # closed by the connection manager). Only attempt a direct __aexit__ if
