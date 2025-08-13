@@ -218,7 +218,9 @@ class MCPAgent:
         # Note: The system message should not be included in the conversation history,
         # as it will be automatically added using the create_tool_calling_agent function with the prompt parameter
         if self.memory_enabled:
-            self._conversation_history = [msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)]
+            self._conversation_history = [
+                msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)
+            ]
 
     def _create_agent(self) -> AgentExecutor:
         """Create the LangChain agent with the configured system message.
@@ -880,10 +882,10 @@ class MCPAgent:
                         if not isinstance(message, ToolAgentAction):
                             self.add_to_history(message)
             yield event
-            
+
         if self.memory_enabled:
             self.add_to_history(HumanMessage(content=query))
-            
+
         # 5. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
         #  when the agent was initialized in this generator and is not client-managed
