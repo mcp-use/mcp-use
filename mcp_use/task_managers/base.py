@@ -22,13 +22,14 @@ class ConnectionManager(Generic[T], ABC):
     used with MCP connectors.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize a new connection manager."""
         self._ready_event = asyncio.Event()
         self._done_event = asyncio.Event()
+        self._stop_event = asyncio.Event()
         self._exception: Exception | None = None
         self._connection: T | None = None
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Task[None] | None = None
 
     @abstractmethod
     async def _establish_connection(self) -> T:
@@ -86,20 +87,15 @@ class ConnectionManager(Generic[T], ABC):
 
     async def stop(self) -> None:
         """Stop the connection manager and close the connection."""
+        # Signal stop to the connection task instead of cancelling it, avoids
+        # propagating CancelledError to unrelated tasks.
         if self._task and not self._task.done():
-            # Cancel the task
-            logger.debug(f"Cancelling {self.__class__.__name__} task")
-            self._task.cancel()
+            logger.debug(f"Signaling stop to {self.__class__.__name__} task")
+            self._stop_event.set()
+            # Wait for it to finish gracefully
+            await self._task
 
-            # Wait for it to complete
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                logger.debug(f"{self.__class__.__name__} task cancelled successfully")
-            except Exception as e:
-                logger.warning(f"Error stopping {self.__class__.__name__} task: {e}")
-
-        # Wait for the connection to be done
+        # Ensure cleanup completed
         await self._done_event.wait()
         logger.debug(f"{self.__class__.__name__} task completed")
 
@@ -125,14 +121,8 @@ class ConnectionManager(Generic[T], ABC):
             # Signal that the connection is ready
             self._ready_event.set()
 
-            # Wait indefinitely until cancelled
-            try:
-                # This keeps the connection open until cancelled
-                await asyncio.Event().wait()
-            except asyncio.CancelledError:
-                # Expected when stopping
-                logger.debug(f"{self.__class__.__name__} task received cancellation")
-                pass
+            # Wait until stop is requested
+            await self._stop_event.wait()
 
         except Exception as e:
             # Store the exception
