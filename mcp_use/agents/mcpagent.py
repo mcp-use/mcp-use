@@ -880,9 +880,6 @@ class MCPAgent:
         effective_max_steps = max_steps or self.max_steps
         self._agent_executor.max_iterations = effective_max_steps
 
-        if self.memory_enabled:
-            self.add_to_history(HumanMessage(content=query))
-
         history_to_use = external_history if external_history is not None else self._conversation_history
         inputs = {"input": query, "chat_history": history_to_use}
 
@@ -895,6 +892,10 @@ class MCPAgent:
                         if not isinstance(message, ToolAgentAction):
                             self.add_to_history(message)
             yield event
+            
+        if self.memory_enabled:
+            self.add_to_history(HumanMessage(content=query))
+            
         # 5. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
         #  when the agent was initialized in this generator and is not client-managed
