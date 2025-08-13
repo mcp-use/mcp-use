@@ -149,10 +149,6 @@ class HttpConnector(BaseConnector):
                     pass
                 raise init_error
 
-        except McpError:
-            # Re-raise McpError without attempting fallback
-            raise
-
         except Exception as streamable_error:
             logger.debug(f"Streamable HTTP failed: {streamable_error}")
 
