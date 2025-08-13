@@ -2,6 +2,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel
 
+from mcp_use.errors.error_formatting import format_error
 from mcp_use.logging import logger
 
 from .base_tool import MCPServerTool
@@ -36,7 +37,7 @@ class DisconnectServerTool(MCPServerTool):
             return f"Successfully disconnected from MCP server '{server_name}'."
         except Exception as e:
             logger.error(f"Error disconnecting from server '{server_name}': {e}")
-            return f"Failed to disconnect from server '{server_name}': {str(e)}"
+            return format_error(e, server_name=server_name)
 
     async def _arun(self, **kwargs) -> str:
         """Async implementation of _run."""

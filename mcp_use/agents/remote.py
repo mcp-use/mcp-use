@@ -14,6 +14,11 @@ from ..logging import logger
 
 T = TypeVar("T", bound=BaseModel)
 
+# API endpoint constants
+API_CHATS_ENDPOINT = "/api/v1/chats"
+API_CHAT_EXECUTE_ENDPOINT = "/api/v1/chats/{chat_id}/execute"
+API_CHAT_DELETE_ENDPOINT = "/api/v1/chats/{chat_id}"
+
 
 class RemoteAgent:
     """Agent that executes remotely via API."""
@@ -28,6 +33,7 @@ class RemoteAgent:
         """
         self.agent_id = agent_id
         self.base_url = base_url
+        self._chat_id = None  # Persistent chat session
 
         # Handle API key validation
         if api_key is None:
@@ -103,6 +109,49 @@ class RemoteAgent:
                 return output_schema.model_validate({"content": str(result_data)})
             raise
 
+    async def _create_chat_session(self, query: str) -> str:
+        """Create a persistent chat session for the agent.
+        Args:
+            query: The initial query (not used in title anymore)
+        Returns:
+            The chat ID of the created session
+        Raises:
+            RuntimeError: If chat creation fails
+        """
+        chat_payload = {
+            "title": f"Remote Agent Session - {self.agent_id}",
+            "agent_id": self.agent_id,
+            "type": "agent_execution",
+        }
+
+        headers = {"Content-Type": "application/json", "x-api-key": self.api_key}
+        chat_url = f"{self.base_url}{API_CHATS_ENDPOINT}"
+
+        logger.info(f"📝 Creating chat session for agent {self.agent_id}")
+
+        try:
+            chat_response = await self._client.post(chat_url, json=chat_payload, headers=headers)
+            chat_response.raise_for_status()
+
+            chat_data = chat_response.json()
+            chat_id = chat_data["id"]
+            logger.info(f"✅ Chat session created: {chat_id}")
+            return chat_id
+
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            response_text = e.response.text
+
+            if status_code == 404:
+                raise RuntimeError(
+                    f"Agent not found: Agent '{self.agent_id}' does not exist or you don't have access to it. "
+                    "Please verify the agent ID and ensure it exists in your account."
+                ) from e
+            else:
+                raise RuntimeError(f"Failed to create chat session: {status_code} - {response_text}") from e
+        except Exception as e:
+            raise RuntimeError(f"Failed to create chat session: {str(e)}") from e
+
     async def run(
         self,
         query: str,
@@ -126,20 +175,28 @@ class RemoteAgent:
         if external_history is not None:
             logger.warning("External history is not yet supported for remote execution")
 
-        payload = {"query": query, "max_steps": max_steps or 10}
-
-        # Add structured output schema if provided
-        if output_schema is not None:
-            payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
-            logger.info(f"🔧 Using structured output with schema: {output_schema.__name__}")
-
-        headers = {"Content-Type": "application/json", "x-api-key": self.api_key}
-
-        url = f"{self.base_url}/api/v1/agents/{self.agent_id}/run"
-
         try:
             logger.info(f"🌐 Executing query on remote agent {self.agent_id}")
-            response = await self._client.post(url, json=payload, headers=headers)
+
+            # Step 1: Create a chat session for this agent (only if we don't have one)
+            if self._chat_id is None:
+                self._chat_id = await self._create_chat_session(query)
+
+            chat_id = self._chat_id
+
+            # Step 2: Execute the agent within the chat context
+            execution_payload = {"query": query, "max_steps": max_steps or 10}
+
+            # Add structured output schema if provided
+            if output_schema is not None:
+                execution_payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
+                logger.info(f"🔧 Using structured output with schema: {output_schema.__name__}")
+
+            headers = {"Content-Type": "application/json", "x-api-key": self.api_key}
+            execution_url = f"{self.base_url}{API_CHAT_EXECUTE_ENDPOINT.format(chat_id=chat_id)}"
+            logger.info(f"🚀 Executing agent in chat {chat_id}")
+
+            response = await self._client.post(execution_url, json=execution_payload, headers=headers)
             response.raise_for_status()
 
             result = response.json()

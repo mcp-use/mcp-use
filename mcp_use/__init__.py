@@ -25,7 +25,6 @@ __all__ = [
     "StdioConnector",
     "WebSocketConnector",
     "HttpConnector",
-    "create_session_from_config",
     "load_config_file",
     "logger",
     "MCP_USE_DEBUG",

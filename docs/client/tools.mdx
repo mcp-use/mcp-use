@@ -1,0 +1,160 @@
+---
+title: "Tools"
+description: "How to use tools from the client"
+icon: "hammer"
+---
+
+# Tools
+
+Tools in MCP are server-implemented functions that enable AI models to perform specific actions. They represent capabilities that a server exposes to clients, allowing AI applications to interact with external systems, execute commands, or manipulate data.
+
+## What are Tools?
+
+Tools are well-defined functions with:
+- **JSON Schema definitions** that specify their inputs and outputs
+- **Single, focused operations** that perform one specific task
+- **User approval requirement** before execution for security
+
+Common examples include:
+- File operations (read, write, delete)
+- Web browsing and data fetching
+- Database queries
+- API calls to external services
+- System commands
+
+## Listing Available Tools
+
+To see what tools are available from a connected MCP server:
+
+```python
+import asyncio
+from mcp_use import MCPClient
+
+async def list_tools():
+    # Initialize client with server configuration
+    config = {
+        "mcpServers": {
+            # Your server definitions here
+        }
+    }
+    client = MCPClient(config)
+
+    # Connect to servers
+    await client.create_all_sessions()
+
+    # Get a session for a specific server
+    session = client.get_session("my_server")
+
+    # List all available tools - always returns fresh data
+    tools = await session.list_tools()
+
+    for tool in tools:
+        print(f"Tool: {tool.name}")
+        print(f"Description: {tool.description}")
+        print(f"Schema: {tool.inputSchema}")
+        print("---")
+
+# Run the example
+asyncio.run(list_tools())
+```
+
+### Automatic Tool List Update
+
+When servers send `ToolListChangedNotification`, it signals that the tool list has changed. The `list_tools()` method always fetches fresh data from the server, ensuring you get up-to-date information.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Note over Server: Server Changes State
+    Server->>Server: disable(tool)
+    Server->>Client: ToolListChangedNotification
+    Client->>Client: Log notification
+
+    Note over Client: User Calls list_tools()
+    Client->>Server: list_tools()
+    Server-->>Client: [updated tools]
+    Client->>Client: Return fresh data
+```
+
+**Important:** Always use `await session.list_tools()` instead of the deprecated `session.tools` property to ensure you get fresh data:
+
+```python
+# ✅ Recommended - always returns fresh data
+tools = await session.list_tools()
+
+# ⚠️ Deprecated - may return stale data
+# tools = session.tools
+```
+
+## Calling Tools
+
+Tools are executed using the `call_tool` method:
+
+```python
+import asyncio
+from mcp_use import MCPClient
+
+async def call_tool_example():
+    config = {
+        "mcpServers": {
+            # Your server definitions here
+        }
+    }
+    client = MCPClient(config)
+    await client.create_all_sessions()
+
+    session = client.get_session("filesystem_server")
+
+    # Call a tool with arguments
+    result = await session.call_tool(
+        name="read_file",
+        arguments={
+            "path": "/path/to/file.txt",
+            "encoding": "utf-8"
+        }
+    )
+
+    # Handle the result
+    if result.isError:
+        print(f"Error: {result.content}")
+    else:
+        print(f"File content: {result.content}")
+
+asyncio.run(call_tool_example())
+```
+
+## Tool Results
+
+Tool calls return a `CallToolResult` object with:
+- `content`: The result data or error message
+- `isError`: Boolean indicating success or failure
+- Additional metadata about the execution
+
+```python
+# Example of handling tool results
+result = await session.call_tool("search_web", {"query": "MCP protocol"})
+
+if result.isError:
+    print(f"Tool execution failed: {result.content}")
+else:
+    # Process successful result
+    for item in result.content:
+        print(f"Found: {item}")
+```
+
+## Error Handling
+
+Always handle potential errors when calling tools:
+
+```python
+try:
+    result = await session.call_tool("risky_operation", {"param": "value"})
+    if result.isError:
+        print(f"Tool reported error: {result.content}")
+    else:
+        print(f"Success: {result.content}")
+except Exception as e:
+    print(f"Connection or protocol error: {e}")
+```

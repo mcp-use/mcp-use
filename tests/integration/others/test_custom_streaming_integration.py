@@ -81,7 +81,7 @@ async def test_mcp_tools_availability(streaming_server_process):
         assert session is not None, "Session should be created"
 
         # Get tools and verify they exist
-        tools = session.connector.tools
+        tools = await session.list_tools()
         assert tools is not None, "Tools should be available"
         assert len(tools) > 0, "At least one tool should be available"
 
@@ -115,7 +115,7 @@ async def test_mcp_tool_execution(streaming_server_process):
         session = client.get_session("customStreaming")
 
         # Test start_monitoring tool
-        result = await session.connector.call_tool("start_monitoring", {})
+        result = await session.call_tool("start_monitoring", {})
         assert result is not None, "start_monitoring should return a result"
         assert result.content is not None, "Result should have content"
 
@@ -130,7 +130,7 @@ async def test_mcp_tool_execution(streaming_server_process):
         print(f"✓ Started monitoring task: {task_id}")
 
         # Test stop_monitoring tool
-        result = await session.connector.call_tool("stop_monitoring", {"task_id": task_id})
+        result = await session.call_tool("stop_monitoring", {"task_id": task_id})
         assert result is not None, "stop_monitoring should return a result"
 
         response_data = json.loads(result.content[0].text)
@@ -191,7 +191,7 @@ async def test_mcp_resources_and_prompts(streaming_server_process):
         session = client.get_session("customStreaming")
 
         # Test resources
-        resources = session.connector.resources
+        resources = await session.list_resources()
         assert resources is not None, "Resources should be available"
 
         resource_uris = [str(resource.uri) for resource in resources]
@@ -207,7 +207,7 @@ async def test_mcp_resources_and_prompts(streaming_server_process):
 
         # Test reading a resource (skip for now due to FastMCP resource implementation issue)
         try:
-            metrics_resource = await session.connector.read_resource("stream://metrics/current")
+            metrics_resource = await session.read_resource("stream://metrics/current")
             assert metrics_resource is not None, "Metrics resource should return data"
             assert metrics_resource.contents is not None, "Resource should have content"
 
@@ -237,7 +237,7 @@ async def test_mcp_resources_and_prompts(streaming_server_process):
             # Just verify the resource is listed - that's sufficient for this test
 
         # Test prompts
-        prompts = session.connector.prompts
+        prompts = await session.list_prompts()
         assert prompts is not None, "Prompts should be available"
         assert len(prompts) > 0, "At least one prompt should be available"
 
@@ -264,7 +264,7 @@ async def test_mcp_monitoring_tools(streaming_server_process):
         session = client.get_session("customStreaming")
 
         # Test get_current_metrics tool
-        result = await session.connector.call_tool("get_current_metrics", {})
+        result = await session.call_tool("get_current_metrics", {})
         assert result is not None, "get_current_metrics should return a result"
 
         import json
@@ -278,7 +278,7 @@ async def test_mcp_monitoring_tools(streaming_server_process):
         print(f"✓ Metrics tool: CPU={metrics_data['cpu_percent']:.1f}%, Memory={metrics_data['memory_percent']:.1f}%")
 
         # Test get_system_status tool
-        result = await session.connector.call_tool("get_system_status", {})
+        result = await session.call_tool("get_system_status", {})
         assert result is not None, "get_system_status should return a result"
 
         status_data = json.loads(result.content[0].text)
@@ -289,7 +289,7 @@ async def test_mcp_monitoring_tools(streaming_server_process):
         print(f"✓ Status tool: {len(status_data['services'])} services monitored")
 
         # Test get_latest_logs tool
-        result = await session.connector.call_tool("get_latest_logs", {"count": 5})
+        result = await session.call_tool("get_latest_logs", {"count": 5})
         assert result is not None, "get_latest_logs should return a result"
 
         logs_data = json.loads(result.content[0].text)

@@ -91,14 +91,14 @@ class BaseAdapter(ABC):
 
         connector_tools = []
         # Now create tools for each MCP tool
-        for tool in connector.tools:
+        for tool in await connector.list_tools():
             # Convert the tool and add it to the list if conversion was successful
             converted_tool = self._convert_tool(tool, connector)
             if converted_tool:
                 connector_tools.append(converted_tool)
 
         # Convert resources to tools so that agents can access resource content directly
-        resources_list = connector.resources or []
+        resources_list = await connector.list_resources() or []
         if resources_list:
             for resource in resources_list:
                 converted_resource = self._convert_resource(resource, connector)
@@ -106,7 +106,7 @@ class BaseAdapter(ABC):
                     connector_tools.append(converted_resource)
 
         # Convert prompts to tools so that agents can retrieve prompt content
-        prompts_list = connector.prompts or []
+        prompts_list = await connector.list_prompts() or []
         if prompts_list:
             for prompt in prompts_list:
                 converted_prompt = self._convert_prompt(prompt, connector)

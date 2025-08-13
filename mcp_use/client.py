@@ -9,7 +9,7 @@ import json
 import warnings
 from typing import Any
 
-from mcp.client.session import ElicitationFnT, LoggingFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
 from mcp_use.types.sandbox import SandboxOptions
 
@@ -33,6 +33,7 @@ class MCPClient:
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
     ) -> None:
         """Initialize a new MCP client.
@@ -52,6 +53,7 @@ class MCPClient:
         self.active_sessions: list[str] = []
         self.sampling_callback = sampling_callback
         self.elicitation_callback = elicitation_callback
+        self.message_handler = message_handler
         self.logging_callback = logging_callback
         # Load configuration if provided
         if config is not None:
@@ -68,6 +70,7 @@ class MCPClient:
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
@@ -85,6 +88,7 @@ class MCPClient:
             sandbox_options=sandbox_options,
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
             logging_callback=logging_callback,
         )
 
@@ -96,6 +100,8 @@ class MCPClient:
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
@@ -112,6 +118,8 @@ class MCPClient:
             sandbox_options=sandbox_options,
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
+            logging_callback=logging_callback,
         )
 
     def add_server(
@@ -191,6 +199,7 @@ class MCPClient:
             sandbox_options=self.sandbox_options,
             sampling_callback=self.sampling_callback,
             elicitation_callback=self.elicitation_callback,
+            message_handler=self.message_handler,
             logging_callback=self.logging_callback,
         )
 

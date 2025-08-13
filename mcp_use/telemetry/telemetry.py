@@ -11,10 +11,7 @@ from posthog import Posthog
 from scarf import ScarfEventLogger
 
 from mcp_use.logging import MCP_USE_DEBUG
-from mcp_use.telemetry.events import (
-    BaseTelemetryEvent,
-    MCPAgentExecutionEvent,
-)
+from mcp_use.telemetry.events import BaseTelemetryEvent, MCPAgentExecutionEvent
 from mcp_use.telemetry.utils import get_package_version
 from mcp_use.utils import singleton
 
