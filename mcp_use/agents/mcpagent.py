@@ -66,7 +66,7 @@ class MCPAgent:
         agent_id: str | None = None,
         api_key: str | None = None,
         base_url: str = "https://cloud.mcp-use.com",
-        retry_on_validation_error: bool = True,
+        retry_on_error: bool = True,
         max_retries_per_step: int = 2,
     ):
         """Initialize a new MCPAgent instance.
@@ -86,7 +86,7 @@ class MCPAgent:
             agent_id: Remote agent ID for remote execution. If provided, creates a remote agent.
             api_key: API key for remote execution. If None, checks MCP_USE_API_KEY env var.
             base_url: Base URL for remote API calls.
-            retry_on_validation_error: Whether to retry tool calls that fail due to validation errors.
+            retry_on_error: Whether to retry tool calls that fail due to validation errors.
             max_retries_per_step: Maximum number of retries for validation errors per step.
         """
         # Handle remote execution
@@ -114,7 +114,7 @@ class MCPAgent:
         self.tools_used_names = tools_used_names or []
         self.use_server_manager = use_server_manager
         self.verbose = verbose
-        self.retry_on_validation_error = retry_on_validation_error
+        self.retry_on_error = retry_on_error
         self.max_retries_per_step = max_retries_per_step
         # System prompt configuration
         self.system_prompt = system_prompt  # User-provided full prompt override
@@ -523,7 +523,7 @@ class MCPAgent:
                             break
 
                         except Exception as e:
-                            if not self.retry_on_validation_error or retry_count >= self.max_retries_per_step:
+                            if not self.retry_on_error or retry_count >= self.max_retries_per_step:
                                 logger.error(f"❌ Validation error during step {step_num + 1}: {e}")
                                 result = f"Agent stopped due to a validation error: {str(e)}"
                                 success = False
