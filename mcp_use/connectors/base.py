@@ -111,19 +111,8 @@ class BaseConnector(ABC):
         """Clean up all resources associated with this connector."""
         errors = []
 
-        # First close the client session
-        if self.client_session:
-            try:
-                logger.debug("Closing client session")
-                await self.client_session.__aexit__(None, None, None)
-            except Exception as e:
-                error_msg = f"Error closing client session: {e}"
-                logger.warning(error_msg)
-                errors.append(error_msg)
-            finally:
-                self.client_session = None
-
-        # Then stop the connection manager
+        # First stop the connection manager, this closes the ClientSession inside
+        # the same task where it was opened, avoiding cancel-scope mismatches.
         if self._connection_manager:
             try:
                 logger.debug("Stopping connection manager")
@@ -134,6 +123,22 @@ class BaseConnector(ABC):
                 errors.append(error_msg)
             finally:
                 self._connection_manager = None
+
+        # Ensure the client_session reference is cleared (it should already be
+        # closed by the connection manager). Only attempt a direct __aexit__ if
+        # the connection manager did *not* exist, this covers edge-cases like
+        # failed connections where no manager was started.
+        if self.client_session:
+            try:
+                if not self._connection_manager:
+                    logger.debug("Closing client session (no connection manager)")
+                    await self.client_session.__aexit__(None, None, None)
+            except Exception as e:
+                error_msg = f"Error closing client session: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+            finally:
+                self.client_session = None
 
         # Reset tools
         self._tools = None
