@@ -66,6 +66,8 @@ class MCPAgent:
         agent_id: str | None = None,
         api_key: str | None = None,
         base_url: str = "https://cloud.mcp-use.com",
+        retry_on_validation_error: bool = True,
+        max_retries_per_step: int = 2,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -84,6 +86,8 @@ class MCPAgent:
             agent_id: Remote agent ID for remote execution. If provided, creates a remote agent.
             api_key: API key for remote execution. If None, checks MCP_USE_API_KEY env var.
             base_url: Base URL for remote API calls.
+            retry_on_validation_error: Whether to retry tool calls that fail due to validation errors.
+            max_retries_per_step: Maximum number of retries for validation errors per step.
         """
         # Handle remote execution
         if agent_id is not None:
@@ -110,6 +114,8 @@ class MCPAgent:
         self.tools_used_names = tools_used_names or []
         self.use_server_manager = use_server_manager
         self.verbose = verbose
+        self.retry_on_validation_error = retry_on_validation_error
+        self.max_retries_per_step = max_retries_per_step
         # System prompt configuration
         self.system_prompt = system_prompt  # User-provided full prompt override
         # User can provide a template override, otherwise use the imported default
@@ -498,15 +504,43 @@ class MCPAgent:
 
                 # --- Plan and execute the next step ---
                 try:
-                    # Use the internal _atake_next_step which handles planning and execution
-                    # This requires providing the necessary context like maps and intermediate steps
-                    next_step_output = await self._agent_executor._atake_next_step(
-                        name_to_tool_map=name_to_tool_map,
-                        color_mapping=color_mapping,
-                        inputs=inputs,
-                        intermediate_steps=intermediate_steps,
-                        run_manager=None,
-                    )
+                    retry_count = 0
+                    next_step_output = None
+
+                    while retry_count <= self.max_retries_per_step:
+                        try:
+                            # Use the internal _atake_next_step which handles planning and execution
+                            # This requires providing the necessary context like maps and intermediate steps
+                            next_step_output = await self._agent_executor._atake_next_step(
+                                name_to_tool_map=name_to_tool_map,
+                                color_mapping=color_mapping,
+                                inputs=inputs,
+                                intermediate_steps=intermediate_steps,
+                                run_manager=None,
+                            )
+
+                            # If we get here, the step succeeded, break out of retry loop
+                            break
+
+                        except Exception as e:
+                            if not self.retry_on_validation_error or retry_count >= self.max_retries_per_step:
+                                logger.error(f"❌ Validation error during step {step_num + 1}: {e}")
+                                result = f"Agent stopped due to a validation error: {str(e)}"
+                                success = False
+                                yield result
+                                return
+
+                            retry_count += 1
+                            logger.warning(
+                                f"⚠️ Validation error, retrying ({retry_count}/{self.max_retries_per_step}): {e}"
+                            )
+
+                            # Create concise feedback for the LLM about the validation error
+                            error_message = f"Error: {str(e)}"
+                            inputs["input"] = error_message
+
+                            # Continue to next iteration of retry loop
+                            continue
 
                     # Process the output
                     if isinstance(next_step_output, AgentFinish):
