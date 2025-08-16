@@ -1,0 +1,176 @@
+---
+title: "Interactive Chat Patterns"
+description: "Create interactive chat interfaces with persistent conversation memory"
+icon: "message-circle"
+---
+
+## Building a chat loop
+
+With mcp-use you can build interactive interface where users can have conversations with
+your `MCPAgent`, maintaining context and memory across multiple queries.
+
+## Basic chat loop
+Here's a basic chat-loop with conversation memory enabled:
+```python chat_loop.py
+import asyncio
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def basic_chat_loop():
+    """Simple console chat loop with MCPAgent"""
+    # Load environment variables
+    load_dotenv()
+
+    # MCP server configuration
+    config = {
+        "mcpServers": {
+            "playwright": {
+                "command": "npx",
+                "args": ["@playwright/mcp@latest"],
+                "env": {"DISPLAY": ":1"}
+            },
+            "filesystem": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+            }
+        }
+    }
+
+    # Create client and agent
+    client = MCPClient.from_dict(config)
+    llm = ChatOpenAI(model="gpt-4o")
+
+    agent = MCPAgent(llm=llm,
+        client=client,
+        memory_enabled=True, # Enable memory to track conversation history
+        max_steps=20)
+
+    # Some initial messages
+    print("🤖 MCP Agent Chat")
+    print("Type 'quit/exit' to exit the chat.")
+    print("Type 'clear' to clear conversation history")
+
+    try:
+        while True:
+            user_input = input("\nYou: ")
+
+            if user_input.lower() in ['quit', 'exit']:
+                print("👋 Goodbye!")
+                break
+            
+            if user_input.lower() == 'clear':
+                agent.clear_conversation_history()
+                print("🧹 Conversation history cleared.")
+                continue
+
+            # Skip empty messages
+            if not user_input:
+                continue
+            
+            try:
+                print("\n🤖 Assistant: ", end="", flush=True)
+                response = await agent.run(user_input)
+                print(response)
+            except KeyboardInterrupt: # Handle keyboard interrupt
+                print("\n\n⏸️ Interrupted by user")
+                break
+            except Exception as e:
+                print(f"\n❌ Error: {e}")
+                print("Please try again or type 'exit' to quit.")
+        finally:
+            await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(basic_chat_loop())
+```
+
+## Streaming Chat Loop
+
+Here's a chat loop with streaming responses enabled:
+
+```python chat_loop_streaming.py
+import asyncio
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def streaming_chat_loop():
+    """Chat loop with streaming responses with MCPAgent"""
+    # Load environment variables
+    load_dotenv()
+
+    # MCP server configuration
+    config = {
+        "mcpServers": {
+            "playwright": {
+                "command": "npx",
+                "args": ["@playwright/mcp@latest"],
+                "env": {"DISPLAY": ":1"}
+            }
+        }
+    }
+
+    # Create client and agent
+    client = MCPClient.from_dict(config)
+    llm = ChatOpenAI(model="gpt-4o")
+
+    agent = MCPAgent(llm=llm,
+        client=client,
+        memory_enabled=True, # Enable memory to track conversation history
+        max_steps=20)
+    
+    # Some initial messages
+    print("🤖 MCP Agent Chat (Streaming)")
+    print("Type 'quit/exit' to exit the chat.")
+    print("Type 'clear' to clear conversation history")
+
+    try:
+        while True:
+            user_input = input("\nYou: ")
+
+            if user_input.lower() in ['quit', 'exit']:
+                print("👋 Goodbye!")
+                break
+            
+            if user_input.lower() == 'clear':
+                agent.clear_conversation_history()
+                print("🧹 Conversation history cleared.")
+                continue
+
+            if not user_input: # Skip empty messages
+                continue
+            
+            try:
+                print("\n🤖 Assistant: ", end="", flush=True)
+
+                # Stream the response
+                async for chunk in agent.astream(user_input):
+                    print(chunk, end="", flush=True)
+                print()
+            except KeyboardInterrupt: # Handle keyboard interrupt
+                print("\n\n⏸️ Interrupted by user")
+                break
+            except Exception as e:
+                print(f"\n❌ Error: {e}")
+                print("Please try again or type 'exit' to quit.")
+        finally:
+            await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(streaming_chat_loop())
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Agent Configuration" icon="cloud" href="/agent/agent-configuration">
+    Learn more about configuring agents for optimal streaming performance
+  </Card>
+  <Card title="Multi-Server Setup" icon="server" href="/advanced/multi-server-setup">
+    Stream output from agents using multiple MCP servers
+  </Card>
+  <Card title="Security Best Practices" icon="shield" href="/advanced/security">
+    Learn how to secure your MCP deployments
+  </Card>
+</CardGroup>
