@@ -89,7 +89,8 @@
               "agent/llm-integration",
               "agent/server-manager",
               "agent/streaming",
-              "agent/structured-output"
+              "agent/structured-output",
+              "agent/interactive-chat-patterns"
             ]
           },
           {
