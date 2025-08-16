@@ -12,6 +12,8 @@ from .agents.mcpagent import MCPAgent
 from .client import MCPClient
 from .config import load_config_file
 from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
+
+# Import logging first to ensure it's configured before other modules
 from .logging import MCP_USE_DEBUG, Logger, logger
 from .session import MCPSession
 
