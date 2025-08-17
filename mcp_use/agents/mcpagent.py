@@ -484,6 +484,22 @@ class MCPAgent:
 
             logger.info(f"🏁 Starting agent execution with max_steps={steps}")
 
+            # Create a run manager with our callbacks if we have any - ONCE for the entire execution
+            run_manager = None
+            if self.callbacks:
+                # Create an async callback manager with our callbacks
+                from langchain_core.callbacks.manager import AsyncCallbackManager
+
+                callback_manager = AsyncCallbackManager.configure(
+                    inheritable_callbacks=self.callbacks,
+                    local_callbacks=self.callbacks,
+                )
+                # Create a run manager for this chain execution
+                run_manager = await callback_manager.on_chain_start(
+                    {"name": "MCPAgent (mcp-use)"},
+                    inputs,
+                )
+
             for step_num in range(steps):
                 steps_taken = step_num + 1
                 # --- Check for tool updates if using server manager ---
@@ -513,22 +529,6 @@ class MCPAgent:
 
                 # --- Plan and execute the next step ---
                 try:
-                    # Create a run manager with our callbacks if we have any
-                    run_manager = None
-                    if self.callbacks:
-                        # Create an async callback manager with our callbacks
-                        from langchain_core.callbacks.manager import AsyncCallbackManager
-
-                        callback_manager = AsyncCallbackManager.configure(
-                            inheritable_callbacks=self.callbacks,
-                            local_callbacks=self.callbacks,
-                        )
-                        # Create a run manager for this chain execution
-                        run_manager = await callback_manager.on_chain_start(
-                            {"name": "MCPAgent (mcp-use)"},
-                            inputs,
-                        )
-
                     # Use the internal _atake_next_step which handles planning and execution
                     # This requires providing the necessary context like maps and intermediate steps
                     next_step_output = await self._agent_executor._atake_next_step(
@@ -623,6 +623,8 @@ class MCPAgent:
                 except OutputParserException as e:
                     logger.error(f"❌ Output parsing error during step {step_num + 1}: {e}")
                     result = f"Agent stopped due to a parsing error: {str(e)}"
+                    if run_manager:
+                        await run_manager.on_chain_error(e)
                     break
                 except Exception as e:
                     logger.error(f"❌ Error during agent execution step {step_num + 1}: {e}")
@@ -630,7 +632,7 @@ class MCPAgent:
 
                     traceback.print_exc()
                     # End the chain with error if we have a run manager
-                    if "run_manager" in locals() and run_manager:
+                    if run_manager:
                         await run_manager.on_chain_error(e)
                     result = f"Agent stopped due to an error: {str(e)}"
                     break
@@ -639,6 +641,8 @@ class MCPAgent:
             if not result:
                 logger.warning(f"⚠️ Agent stopped after reaching max iterations ({steps})")
                 result = f"Agent stopped after reaching the maximum number of steps ({steps})."
+                if run_manager:
+                    await run_manager.on_chain_end({"output": result})
 
             # If structured output was requested but not achieved, attempt one final time
             if output_schema and structured_llm and not success:
