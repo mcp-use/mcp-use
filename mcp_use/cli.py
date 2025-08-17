@@ -63,7 +63,7 @@ def print_header():
 def get_project_name() -> str:
     """Get project name from user."""
     while True:
-        name = input("📝 Project name: ").strip()
+        name = input("📝 Project name: ").strip().replace("-", "_")
         if not name:
             print("   ⚠️  Project name cannot be empty")
             continue
