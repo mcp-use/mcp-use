@@ -47,17 +47,12 @@ class ObservabilityManager:
             logger.debug("ObservabilityManager: Langfuse module not available")
 
         try:
-            from .laminar import laminar_handler, laminar_initialized
+            from .laminar import laminar_initialized
 
-            if laminar_handler is not None:
-                # We have a custom callback handler for Laminar
-                self._available_handlers.append(laminar_handler)
-                self._handler_names.append("Laminar")
-                logger.debug("ObservabilityManager: Laminar callback handler available")
-            elif laminar_initialized:
-                # Laminar is initialized but using only automatic instrumentation
+            if laminar_initialized:
+                # Laminar is initialized with automatic instrumentation only
                 self._handler_names.append("Laminar (auto-instrumentation)")
-                logger.debug("ObservabilityManager: Laminar auto-instrumentation active (no callback handler)")
+                logger.debug("ObservabilityManager: Laminar auto-instrumentation active")
         except ImportError:
             logger.debug("ObservabilityManager: Laminar module not available")
 
