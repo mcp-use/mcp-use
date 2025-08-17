@@ -31,6 +31,9 @@ from mcp_use.telemetry.utils import extract_model_info
 from ..adapters.langchain_adapter import LangChainAdapter
 from ..logging import logger
 from ..managers.server_manager import ServerManager
+
+# Import observability manager
+from ..observability import ObservabilityManager
 from .prompts.system_prompt_builder import create_system_message
 from .prompts.templates import DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE
 from .remote import RemoteAgent
@@ -66,6 +69,7 @@ class MCPAgent:
         agent_id: str | None = None,
         api_key: str | None = None,
         base_url: str = "https://cloud.mcp-use.com",
+        callbacks: list | None = None,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -84,6 +88,7 @@ class MCPAgent:
             agent_id: Remote agent ID for remote execution. If provided, creates a remote agent.
             api_key: API key for remote execution. If None, checks MCP_USE_API_KEY env var.
             base_url: Base URL for remote API calls.
+            callbacks: List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler.
         """
         # Handle remote execution
         if agent_id is not None:
@@ -115,6 +120,10 @@ class MCPAgent:
         # User can provide a template override, otherwise use the imported default
         self.system_prompt_template_override = system_prompt_template
         self.additional_instructions = additional_instructions
+
+        # Set up observability callbacks using the ObservabilityManager
+        self.observability_manager = ObservabilityManager(custom_callbacks=callbacks)
+        self.callbacks = self.observability_manager.get_callbacks()
 
         # Either client or connector must be provided
         if not client and len(self.connectors) == 0:
@@ -246,9 +255,15 @@ class MCPAgent:
         # Use the standard create_tool_calling_agent
         agent = create_tool_calling_agent(llm=self.llm, tools=self._tools, prompt=prompt)
 
-        # Use the standard AgentExecutor
-        executor = AgentExecutor(agent=agent, tools=self._tools, max_iterations=self.max_steps, verbose=self.verbose)
-        logger.debug(f"Created agent executor with max_iterations={self.max_steps}")
+        # Use the standard AgentExecutor with callbacks
+        executor = AgentExecutor(
+            agent=agent,
+            tools=self._tools,
+            max_iterations=self.max_steps,
+            verbose=self.verbose,
+            callbacks=self.callbacks,
+        )
+        logger.debug(f"Created agent executor with max_iterations={self.max_steps} and {len(self.callbacks)} callbacks")
         return executor
 
     def get_conversation_history(self) -> list[BaseMessage]:
@@ -498,6 +513,22 @@ class MCPAgent:
 
                 # --- Plan and execute the next step ---
                 try:
+                    # Create a run manager with our callbacks if we have any
+                    run_manager = None
+                    if self.callbacks:
+                        # Create an async callback manager with our callbacks
+                        from langchain_core.callbacks.manager import AsyncCallbackManager
+
+                        callback_manager = AsyncCallbackManager.configure(
+                            inheritable_callbacks=self.callbacks,
+                            local_callbacks=self.callbacks,
+                        )
+                        # Create a run manager for this chain execution
+                        run_manager = await callback_manager.on_chain_start(
+                            {"name": "MCPAgent (mcp-use)"},
+                            inputs,
+                        )
+
                     # Use the internal _atake_next_step which handles planning and execution
                     # This requires providing the necessary context like maps and intermediate steps
                     next_step_output = await self._agent_executor._atake_next_step(
@@ -505,13 +536,16 @@ class MCPAgent:
                         color_mapping=color_mapping,
                         inputs=inputs,
                         intermediate_steps=intermediate_steps,
-                        run_manager=None,
+                        run_manager=run_manager,
                     )
 
                     # Process the output
                     if isinstance(next_step_output, AgentFinish):
                         logger.info(f"✅ Agent finished at step {step_num + 1}")
                         result = next_step_output.return_values.get("output", "No output generated")
+                        # End the chain if we have a run manager
+                        if run_manager:
+                            await run_manager.on_chain_end({"output": result})
 
                         # If structured output is requested, attempt to create it
                         if output_schema and structured_llm:
@@ -595,6 +629,9 @@ class MCPAgent:
                     import traceback
 
                     traceback.print_exc()
+                    # End the chain with error if we have a run manager
+                    if "run_manager" in locals() and run_manager:
+                        await run_manager.on_chain_error(e)
                     result = f"Agent stopped due to an error: {str(e)}"
                     break
 

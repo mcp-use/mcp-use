@@ -4,5 +4,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from . import laminar, langfuse  # noqa
+from .callbacks_manager import ObservabilityManager, get_default_manager, create_manager  # noqa
 
-__all__ = ["laminar", "langfuse"]
+__all__ = ["laminar", "langfuse", "ObservabilityManager", "get_default_manager", "create_manager"]
