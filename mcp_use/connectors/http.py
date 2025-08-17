@@ -14,6 +14,7 @@ from mcp.client.session import ElicitationFnT, SamplingFnT
 from ..auth import BearerAuth, OAuth
 from ..logging import logger
 from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
+from ..exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from .base import BaseConnector
 
 
@@ -102,17 +103,26 @@ class HttpConnector(BaseConnector):
 
         # Handle OAuth if needed
         if self._oauth:
-            # Create a temporary client for OAuth metadata discovery
-            async with httpx.AsyncClient() as client:
-                bearer_auth = await self._oauth.initialize(client)
-                if not bearer_auth:
-                    # Need to perform OAuth flow
-                    logger.info("OAuth authentication required")
-                    bearer_auth = await self._oauth.authenticate()
+            try:
+                # Create a temporary client for OAuth metadata discovery
+                async with httpx.AsyncClient() as client:
+                    bearer_auth = await self._oauth.initialize(client)
+                    if not bearer_auth:
+                        # Need to perform OAuth flow
+                        logger.info("OAuth authentication required")
+                        bearer_auth = await self._oauth.authenticate()
 
-                # Update auth and headers
-                self._auth = bearer_auth
-                self.headers["Authorization"] = f"Bearer {bearer_auth.token.get_secret_value()}"
+                    # Update auth and headers
+                    self._auth = bearer_auth
+                    self.headers["Authorization"] = f"Bearer {bearer_auth.token.get_secret_value()}"
+            except OAuthDiscoveryError:
+                # OAuth discovery failed - it means server doesn't support OAuth default urls
+                logger.debug("OAuth discovery failed, continuing without initialization.")
+                self._oauth = None
+                self._auth = None
+            except OAuthAuthenticationError as e:
+                logger.error(f"OAuth initialization failed: {e}")
+                raise 
 
         # Try streamable HTTP first (new transport), fall back to SSE (old transport)
         # This implements backwards compatibility per MCP specification
@@ -173,13 +183,22 @@ class HttpConnector(BaseConnector):
                 else:
                     self._prompts = []
 
-            except Exception as init_error:
+            except Exception as exception:
                 # Clean up the test client
                 try:
                     await test_client.__aexit__(None, None, None)
                 except Exception:
                     pass
-                raise init_error
+
+                if (isinstance(exception, httpx.HTTPStatusError)):
+                    if exception.response.status_code in [401, 403, 407]: # Authentication error using status
+                        # Server requires authentication but OAuth discovery failed
+                        raise OAuthAuthenticationError(
+                            f"Server requires authentication (HTTP {exception.response.status_code}) "
+                            "but OAuth discovery failed. Please provide OAuth configuration manually."
+                        ) from exception
+                else:
+                    raise exception
 
         except Exception as streamable_error:
             logger.debug(f"Streamable HTTP failed: {streamable_error}")
@@ -225,10 +244,17 @@ class HttpConnector(BaseConnector):
                     self.transport_type = "SSE"
 
                 except Exception as sse_error:
-                    logger.error(
-                        f"Both transport methods failed. Streamable HTTP: {streamable_error}, SSE: {sse_error}"
-                    )
-                    raise sse_error
+                    if isinstance(sse_error, httpx.HTTPStatusError) and sse_error.response.status_code in [401, 403, 407]:
+                        raise OAuthAuthenticationError(
+                            f"Server requires authentication (HTTP {sse_error.response.status_code}) "
+                            "but OAuth discovery failed. Please provide OAuth configuration manually."
+                        ) from sse_error
+                    else:
+
+                        logger.error(
+                            f"Both transport methods failed. Streamable HTTP: {streamable_error}, SSE: {sse_error}"
+                        )
+                        raise sse_error
             else:
                 raise streamable_error
 

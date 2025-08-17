@@ -17,9 +17,9 @@ from ..logging import logger
 class CallbackResponse:
     """Response data from OAuth callback."""
 
-    code: str | None = None
-    state: str | None = None
-    error: str | None = None
+    code: str | None = None # Authorization code (success)
+    state: str | None = None # CSRF protection token
+    error: str | None = None # Errors code (if failed)
     error_description: str | None = None
     error_uri: str | None = None
 
@@ -35,7 +35,7 @@ class OAuthCallbackServer:
         """
         self.port = port or 0
         self.redirect_uri: str | None = None
-        self.response_queue: asyncio.Queue[CallbackResponse] = asyncio.Queue(maxsize=1)
+        self.response_queue: asyncio.Queue[CallbackResponse] = asyncio.Queue(maxsize=1) # Thread safe way to pass callback data to the main OAuth flow
         self.server: uvicorn.Server | None = None
         self._shutdown_event = anyio.Event()
 
@@ -58,7 +58,7 @@ class OAuthCallbackServer:
 
             sock = socket.socket()
             sock.bind(("127.0.0.1", 0))
-            self.port = sock.getsockname()[1]
+            self.port = sock.getsockname()[1] # Get the assigned port
             sock.close()
             config.port = self.port
 

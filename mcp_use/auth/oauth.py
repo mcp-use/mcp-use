@@ -13,27 +13,33 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 from authlib.oauth2 import OAuth2Error
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
 
-from ..exceptions import AuthenticationError
+from ..exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from ..logging import logger
 from .bearer import BearerAuth
 from .oauth_callback import OAuthCallbackServer
 
 
 class ServerOAuthMetadata(BaseModel):
-    """OAuth metadata from MCP server with flexible field support."""
+    """OAuth metadata from MCP server with flexible field support.
+    It is essentially a configuration that tells MCP client:
+    
+    - Where to send users for authorization
+    - Where to exchange the codes for tokens
+    - Which OAuth features are supported
+    - Where to register new users with DCR"""
 
-    issuer: HttpUrl
-    authorization_endpoint: HttpUrl
-    token_endpoint: HttpUrl
+    issuer: HttpUrl # The OAuth server's identity
+    authorization_endpoint: HttpUrl # URL with endpoint for client auth
+    token_endpoint: HttpUrl # URL with endpoint for tokens' exchange
     userinfo_endpoint: HttpUrl | None = None
     revocation_endpoint: HttpUrl | None = None
     introspection_endpoint: HttpUrl | None = None
-    registration_endpoint: HttpUrl | None = None  # For Dynamic Client Registration
+    registration_endpoint: HttpUrl | None = None  # Endpoint for DCR
     jwks_uri: HttpUrl | None = None
     response_types_supported: list[str] = Field(default_factory=lambda: ["code"])
     subject_types_supported: list[str] = Field(default_factory=lambda: ["public"])
     id_token_signing_alg_values_supported: list[str] = Field(default_factory=lambda: ["RS256"])
-    scopes_supported: list[str] | None = None
+    scopes_supported: list[str] | None = None # Which permissions are supported
     token_endpoint_auth_methods_supported: list[str] = Field(default_factory=lambda: ["client_secret_basic"])
     claims_supported: list[str] | None = None
     code_challenge_methods_supported: list[str] | None = None
@@ -43,11 +49,16 @@ class ServerOAuthMetadata(BaseModel):
 
 
 class OAuthClientProvider(BaseModel):
-    """OAuth client provider with metadata discovery."""
+    """OAuth client provider with metadata discovery.
+    It's used to avoid metadata discovery and
+    registration.
+    
+    Ideally we would have a config with client and server
+    metadata information."""
 
-    id: str
+    id: str # Unique identifier
     display_name: str
-    client_id: str
+    client_id: str # OAuth client id
     metadata: ServerOAuthMetadata | dict[str, Any]
 
     @property
@@ -59,9 +70,12 @@ class OAuthClientProvider(BaseModel):
 
 
 class TokenData(BaseModel):
-    """OAuth token data."""
+    """OAuth token data.
 
-    access_token: str
+    These are the information received after
+    successfull authentication"""
+ 
+    access_token: str # Actual credential used for requests
     token_type: str = "Bearer"
     expires_at: float | None = None
     refresh_token: str | None = None
@@ -69,14 +83,17 @@ class TokenData(BaseModel):
 
 
 class ClientRegistrationResponse(BaseModel):
-    """Dynamic Client Registration response."""
+    """Dynamic Client Registration response.
+    
+    It represents the response from an OAuth server
+    when you dinamically register a new OAuth client."""
 
     client_id: str
     client_secret: str | None = None
     client_id_issued_at: int | None = None
     client_secret_expires_at: int | None = None
-    redirect_uris: list[str] | None = None
-    grant_types: list[str] | None = None
+    redirect_uris: list[str] | None = None # Where auth server should redirect after auth
+    grant_types: list[str] | None = None # Which oauth flows it uses
     response_types: list[str] | None = None
     client_name: str | None = None
     token_endpoint_auth_method: str | None = None
@@ -86,7 +103,14 @@ class ClientRegistrationResponse(BaseModel):
 
 
 class FileTokenStorage:
-    """File-based token storage."""
+    """File-based token storage.
+    
+    It's responsible for:
+
+    - Saving OAuth tokens to disk after auth
+    - Loading saved tokens when the app restarts
+    - Deleting tokens when they're revoked
+    - Organizing tokens by server URL"""
 
     def __init__(self, base_dir: Path | None = None):
         """Initialize token storage.
@@ -144,7 +168,14 @@ class FileTokenStorage:
 
 
 class OAuth:
-    """OAuth authentication handler for MCP clients."""
+    """OAuth authentication handler for MCP clients.
+    
+    This is the main class that handles all the authentication
+    It has several features:
+    
+    - Discovers OAuth server capabilities automatically
+    - Registers client dynamically when possible
+    - Manages token storage and refresh automaticlly"""
 
     def __init__(
         self,
@@ -204,7 +235,7 @@ class OAuth:
         logger.debug("OAuth.authenticate called")
         if not self._metadata:
             logger.error("OAuth.authenticate called before metadata was discovered.")
-            raise AuthenticationError("OAuth metadata not discovered")
+            raise OAuthAuthenticationError("OAuth metadata not discovered")
 
         # Try to get client_id - either from config or dynamic registration
         client_id = self.client_id
@@ -231,7 +262,7 @@ class OAuth:
                     await self._store_client_registration(registration)
                 else:
                     logger.error("Dynamic client registration failed or not supported")
-                    raise AuthenticationError(
+                    raise OAuthAuthenticationError(
                         "OAuth requires a client_id. Server does not support dynamic registration. "
                         "Please provide one in the auth configuration. "
                         "Example: {'auth': {'client_id': 'your-registered-client-id'}}"
@@ -305,7 +336,7 @@ class OAuth:
             logger.debug("Received response from callback server")
         except TimeoutError as e:
             logger.error(f"OAuth callback timed out: {e}")
-            raise AuthenticationError(f"OAuth timeout: {e}") from e
+            raise OAuthAuthenticationError(f"OAuth timeout: {e}") from e
 
         if response.error:
             logger.error("OAuth authorization failed:")
@@ -315,11 +346,11 @@ class OAuth:
             logger.error(f"    1. The client_id '{client_id}' is not registered with the OAuth server")
             logger.error("    2. The redirect_uri doesn't match the registered one")
             logger.error("    3. The requested scopes are invalid")
-            raise AuthenticationError(f"{response.error}: {response.error_description}")
+            raise OAuthAuthenticationError(f"{response.error}: {response.error_description}")
 
         if not response.code:
             logger.error("Callback response did not contain an authorization code")
-            raise AuthenticationError("No authorization code received")
+            raise OAuthAuthenticationError("No authorization code received")
 
         logger.debug(f"Received authorization code: {response.code[:10]}...")
 
@@ -327,7 +358,7 @@ class OAuth:
         logger.debug(f"Verifying state. Expected: {state}, Got: {response.state}")
         if response.state != state:
             logger.error("State mismatch in OAuth callback. Possible CSRF attack.")
-            raise AuthenticationError("Invalid state parameter - possible CSRF attack")
+            raise OAuthAuthenticationError("Invalid state parameter - possible CSRF attack")
         logger.debug("State verified successfully")
 
         # Exchange code for tokens
@@ -341,7 +372,7 @@ class OAuth:
             logger.debug("Successfully fetched tokens")
         except OAuth2Error as e:
             logger.error(f"Token exchange failed: {e}")
-            raise AuthenticationError(f"Token exchange failed: {e}") from e
+            raise OAuthAuthenticationError(f"Token exchange failed: {e}") from e
 
         # Save tokens
         logger.debug("Saving fetched tokens")
@@ -392,7 +423,7 @@ class OAuth:
 
         # If discovery fails, we'll need the metadata from somewhere else
         logger.error(f"Failed to discover OAuth/OIDC metadata for {self.server_url}")
-        raise AuthenticationError(
+        raise OAuthDiscoveryError(
             f"Failed to discover OAuth metadata for {self.server_url}. "
             "Server must support OAuth metadata discovery at "
             "/.well-known/oauth-authorization-server or /.well-known/openid-configuration"

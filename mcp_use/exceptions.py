@@ -7,8 +7,13 @@ class MCPError(Exception):
     pass
 
 
-class AuthenticationError(MCPError):
-    """Authentication-related errors."""
+class OAuthDiscoveryError(MCPError):
+    """OAuth discovery auth metadata error"""
+
+    pass
+
+class OAuthAuthenticationError(MCPError):
+    """OAuth authentication-related errors"""
 
     pass
 
