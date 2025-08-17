@@ -66,6 +66,7 @@ class MCPAgent:
         agent_id: str | None = None,
         api_key: str | None = None,
         base_url: str = "https://cloud.mcp-use.com",
+        chat_id: str | None = None,
         retry_on_error: bool = True,
         max_retries_per_step: int = 2,
     ):
@@ -91,7 +92,7 @@ class MCPAgent:
         """
         # Handle remote execution
         if agent_id is not None:
-            self._remote_agent = RemoteAgent(agent_id=agent_id, api_key=api_key, base_url=base_url)
+            self._remote_agent = RemoteAgent(agent_id=agent_id, api_key=api_key, base_url=base_url, chat_id=chat_id)
             self._is_remote = True
             return
 
@@ -772,7 +773,8 @@ class MCPAgent:
         """
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
-            return await self._remote_agent.run(query, max_steps, manage_connector, external_history, output_schema)
+            result = await self._remote_agent.run(query, max_steps, external_history, output_schema)
+            return result
 
         success = True
         start_time = time.time()
