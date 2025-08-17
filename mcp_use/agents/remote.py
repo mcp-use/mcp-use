@@ -138,7 +138,11 @@ class RemoteAgent:
             raise
 
     async def _upsert_chat_session(self) -> str:
-        """Create or resume a persistent chat session for the agent via upsert."""
+        """Create or resume a persistent chat session for the agent via upsert.
+
+        Returns:
+            The chat session ID
+        """
         chat_payload = {
             "id": self.chat_id,  # Include chat_id for resuming or None for creating
             "title": f"Remote Agent Session - {self.agent_id}",
@@ -190,14 +194,11 @@ class RemoteAgent:
         Args:
             query: The query to execute
             max_steps: Maximum number of steps (default: 10)
-            manage_connector: Ignored for remote execution
-        external_history: Ignored for remote execution (not supported yet)
+            external_history: External history (not supported yet for remote execution)
             output_schema: Optional Pydantic model for structured output
 
         Returns:
-            A tuple containing:
-                - The result from the remote agent execution (string or structured output)
-                - The chat ID of the execution
+            The result from the remote agent execution (string or structured output)
         """
         if external_history is not None:
             logger.warning("External history is not yet supported for remote execution")
