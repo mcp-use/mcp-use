@@ -110,7 +110,7 @@ pip install mcp-use
 Or install from source:
 
 ```bash
-git clone https://github.com/pietrozullo/mcp-use.git
+git clone https://github.com/mcp-use/mcp-use.git
 cd mcp-use
 pip install -e .
 ```
