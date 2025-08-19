@@ -30,21 +30,16 @@ async def run_airbnb_example():
     # llm = ChatOpenAI(model="gpt-4o")
 
     # Create agent with the client
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30, use_server_manager=True)
 
-    try:
-        # Run a query to search for accommodations
-        result = await agent.run(
-            "Find me a nice place to stay in Barcelona for 2 adults "
-            "for a week in August. I prefer places with a pool and "
-            "good reviews. Show me the top 3 options.",
-            max_steps=30,
-        )
-        print(f"\nResult: {result}")
-    finally:
-        # Ensure we clean up resources properly
-        if client.sessions:
-            await client.close_all_sessions()
+    # Run a query to search for accommodations
+    result = await agent.run(
+        "Find me a nice place to stay in Barcelona for 2 adults "
+        "for a week in August. I prefer places with a pool and "
+        "good reviews. Show me the top 3 options.",
+        max_steps=30,
+    )
+    print(f"\nResult: {result}")
 
 
 if __name__ == "__main__":

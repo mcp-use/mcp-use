@@ -1,25 +1,31 @@
 <div align="center">
 <div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="static/logo_white.svg">
-    <source media="(prefers-color-scheme: light)" srcset="static/logo_black.svg">
-    <img alt="mcp use logo" src="./static/logo-white.svg" width="80%" style="margin: 20px auto;">
+    <source media="(prefers-color-scheme: dark)" srcset="static/logo-gh.jpg">
+    <source media="(prefers-color-scheme: light)" srcset="static/logo-gh.jpg">
+    <img alt="mcp use logo" src="./static/logo-gh.jpg" width="80%" style="margin: 20px auto;">
   </picture>
 </div>
 
-<br>
+<div align="center">
+  <h2>🎉 <strong>We're LIVE on Product Hunt!</strong> 🎉</h2>
+  <p><strong>Support us today and help us reach #1!</strong></p>
+  <a href="https://www.producthunt.com/products/mcp-use?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-mcp&#0045;use" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1002629&theme=neutral&t=1754609432704" alt="mcp&#0045;use - Open&#0032;source&#0032;SDK&#0032;and&#0032;infra&#0032;for&#0032;MCP&#0032;servers&#0032;&#0038;&#0032;agents | Product Hunt" style="width: 220px; height: 54px;" width="250" height="54" /></a>
+  <p>👆 <em>Click to upvote and leave a comment!</em></p>
+</div>
 
-# Connect any LLM to any MCP server
-
+<h1 align="center">🚀 Create MCP Clients and Agents</h1>
 <p align="center">
     <a href="https://github.com/pietrozullo/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/pietrozullo/mcp-use?style=social" /></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
-        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
-    <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
         <img src="https://static.pepy.tech/badge/mcp-use" /></a>
+    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
+        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
+    <a href="https://github.com/mcp-use/mcp-use-ts" alt="TypeScript">
+      <img src="https://img.shields.io/badge/TypeScript-mcp--use-3178C6?logo=typescript&logoColor=white" /></a>
+    <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
+        <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
     <a href="https://docs.mcp-use.com" alt="Documentation">
         <img src="https://img.shields.io/badge/docs-mcp--use.com-blue" /></a>
     <a href="https://mcp-use.com" alt="Website">
@@ -39,15 +45,14 @@
 
 💡 Let developers easily connect any LLM to tools like web browsing, file operations, and more.
 
-- Visit the [mcp-use.com website](https://mcp-use.com/) to know how to build and deploy MCP agents.
+- If you want to get started quickly check out [mcp-use.com website](https://mcp-use.com/) to build and deploy agents with your favorite MCP servers.
 - Visit the [mcp-use docs](https://docs.mcp-use.com/) to get started with mcp-use library
+- For the TypeScript version, visit [mcp-use-ts](https://github.com/mcp-use/mcp-use-ts)
 
-💬 Get started quickly - chat with your servers on our <b>hosted version</b>! [Try mcp-use chat (beta)](https://chat.mcp-use.com).
-
-| Supports  | |
-| :--- | :--- |
+| Supports       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| :------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Primitives** | [![Tools](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-tools&label=Tools&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Resources](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-resources&label=Resources&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Prompts](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-prompts&label=Prompts&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Sampling](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-sampling&label=Sampling&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Elicitation](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=primitive-elicitation&label=Elicitation&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) |
-| **Transports** | [![Stdio](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-stdio&label=Stdio&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![SSE](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-sse&label=SSE&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Streamable HTTP](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-streamableHttp&label=Streamable%20HTTP&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) |
+| **Transports** | [![Stdio](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-stdio&label=Stdio&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![SSE](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-sse&label=SSE&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml) [![Streamable HTTP](https://img.shields.io/github/actions/workflow/status/pietrozullo/mcp-use/tests.yml?job=transport-streamableHttp&label=Streamable%20HTTP&style=flat)](https://github.com/pietrozullo/mcp-use/actions/workflows/tests.yml)                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ## Features
 
@@ -105,7 +110,7 @@ pip install mcp-use
 Or install from source:
 
 ```bash
-git clone https://github.com/pietrozullo/mcp-use.git
+git clone https://github.com/mcp-use/mcp-use.git
 cd mcp-use
 pip install -e .
 ```
@@ -373,29 +378,7 @@ if __name__ == "__main__":
     asyncio.run(run_blender_example())
 ```
 
-# Configuration File Support
-
-MCP-Use supports initialization from configuration files, making it easy to manage and switch between different MCP server setups:
-
-```python
-import asyncio
-from mcp_use import create_session_from_config
-
-async def main():
-    # Create an MCP session from a config file
-    session = create_session_from_config("mcp-config.json")
-
-    # Initialize the session
-    await session.initialize()
-
-    # Use the session...
-
-    # Disconnect when done
-    await session.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+# Configuration Support
 
 ## HTTP Connection Example
 
@@ -651,6 +634,47 @@ The `SandboxOptions` type provides configuration for the sandbox environment:
 - **Consistent environment**: Ensure consistent behavior across different systems
 - **Resource efficiency**: Offload resource-intensive tasks to cloud infrastructure
 
+# Direct Tool Calls (Without LLM)
+
+You can call MCP server tools directly without an LLM when you need programmatic control:
+
+```python
+import asyncio
+from mcp_use import MCPClient
+
+async def call_tool_example():
+    config = {
+        "mcpServers": {
+            "everything": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-everything"],
+            }
+        }
+    }
+
+    client = MCPClient.from_dict(config)
+
+    try:
+        await client.create_all_sessions()
+        session = client.get_session("everything")
+
+        # Call tool directly
+        result = await session.call_tool(
+            name="add",
+            arguments={"a": 1, "b": 2}
+        )
+
+        print(f"Result: {result.content[0].text}")  # Output: 3
+
+    finally:
+        await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(call_tool_example())
+```
+
+See the complete example: [examples/direct_tool_call.py](examples/direct_tool_call.py)
+
 # Build a Custom Agent:
 
 You can also build your own custom agent using the LangChain adapter:
@@ -768,16 +792,28 @@ Thanks to all our amazing contributors!
     <th>Stars</th>
   </tr>
   <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/170207473?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/tavily-ai/meeting-prep-agent"><strong>tavily-ai/meeting-prep-agent</strong></a></td>
-    <td>⭐ 127</td>
+    <td><img src="https://avatars.githubusercontent.com/u/38653995?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/patchy631/ai-engineering-hub"><strong>patchy631/ai-engineering-hub</strong></a></td>
+    <td>⭐ 17384</td>
   </tr>
   <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/205593730?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/Qingyon-AI/Revornix"><strong>Qingyon-AI/Revornix</strong></a></td>
-    <td>⭐ 108</td>
+    <td><img src="https://avatars.githubusercontent.com/u/170207473?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/tavily-ai/meeting-prep-agent"><strong>tavily-ai/meeting-prep-agent</strong></a></td>
+    <td>⭐ 131</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/164294848?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/buildfastwithai/gen-ai-experiments"><strong>buildfastwithai/gen-ai-experiments</strong></a></td>
+    <td>⭐ 100</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/187057607?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/hud-evals/hud-python"><strong>hud-evals/hud-python</strong></a></td>
+    <td>⭐ 78</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/20041231?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/krishnaik06/MCP-CRASH-Course"><strong>krishnaik06/MCP-CRASH-Course</strong></a></td>
-    <td>⭐ 57</td>
+    <td>⭐ 64</td>
+  </tr>
+  <tr>
+    <td><img src="https://avatars.githubusercontent.com/u/54944174?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/larksuite/lark-samples"><strong>larksuite/lark-samples</strong></a></td>
+    <td>⭐ 35</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/892404?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/truemagic-coder/solana-agent-app"><strong>truemagic-coder/solana-agent-app</strong></a></td>
@@ -785,27 +821,15 @@ Thanks to all our amazing contributors!
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/8344498?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/schogini/techietalksai"><strong>schogini/techietalksai</strong></a></td>
-    <td>⭐ 23</td>
+    <td>⭐ 24</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/201161342?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/autometa-dev/whatsapp-mcp-voice-agent"><strong>autometa-dev/whatsapp-mcp-voice-agent</strong></a></td>
-    <td>⭐ 22</td>
+    <td>⭐ 23</td>
   </tr>
   <tr>
     <td><img src="https://avatars.githubusercontent.com/u/100749943?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/Deniscartin/mcp-cli"><strong>Deniscartin/mcp-cli</strong></a></td>
-    <td>⭐ 18</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/6688805?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/innovaccer/Healthcare-MCP"><strong>innovaccer/Healthcare-MCP</strong></a></td>
-    <td>⭐ 12</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/6764390?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/elastic/genai-workshops"><strong>elastic/genai-workshops</strong></a></td>
-    <td>⭐ 10</td>
-  </tr>
-  <tr>
-    <td><img src="https://avatars.githubusercontent.com/u/68845761?s=40&v=4" width="20" height="20" style="vertical-align: middle; margin-right: 8px;"> <a href="https://github.com/entbappy/MCP-Tutorials"><strong>entbappy/MCP-Tutorials</strong></a></td>
-    <td>⭐ 6</td>
+    <td>⭐ 19</td>
   </tr>
 </table>
 

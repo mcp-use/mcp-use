@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 from mcp import ClientSession
-from mcp.client.session import ElicitationFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
 from mcp_use.auth.oauth import OAuthClientProvider
 
@@ -36,6 +36,8 @@ class HttpConnector(BaseConnector):
         auth: str | dict[str, Any] | httpx.Auth | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
     ):
         """Initialize a new HTTP connector.
 
@@ -51,7 +53,12 @@ class HttpConnector(BaseConnector):
             sampling_callback: Optional sampling callback.
             elicitation_callback: Optional elicitation callback.
         """
-        super().__init__(sampling_callback=sampling_callback, elicitation_callback=elicitation_callback)
+        super().__init__(
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
+            logging_callback=logging_callback,
+        )
         self.base_url = base_url.rstrip("/")
         self.headers = headers or {}
         self.timeout = timeout
@@ -154,6 +161,8 @@ class HttpConnector(BaseConnector):
                 write_stream,
                 sampling_callback=self.sampling_callback,
                 elicitation_callback=self.elicitation_callback,
+                message_handler=self._internal_message_handler,
+                logging_callback=self.logging_callback,
                 client_info=self.client_info,
             )
             await test_client.__aenter__()
@@ -247,6 +256,8 @@ class HttpConnector(BaseConnector):
                         write_stream,
                         sampling_callback=self.sampling_callback,
                         elicitation_callback=self.elicitation_callback,
+                        message_handler=self._internal_message_handler,
+                        logging_callback=self.logging_callback,
                         client_info=self.client_info,
                     )
                     await self.client_session.__aenter__()

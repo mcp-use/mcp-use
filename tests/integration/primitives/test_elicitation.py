@@ -20,7 +20,7 @@ async def test_elicitation(primitive_server):
     try:
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")
-        result = await session.connector.call_tool(name="purchase_item", arguments={})
+        result = await session.call_tool(name="purchase_item", arguments={})
         assert result.content[0].text == "You are buying 1 kg of the item"
     finally:
         await client.close_all_sessions()

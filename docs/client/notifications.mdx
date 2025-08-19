@@ -1,0 +1,111 @@
+---
+title: "Notifications"
+description: "MCP servers can send various notifications to the client to signal events or provide updates on long-running tasks. This is distinct from logging, which is handled separately."
+icon: "bell-ring"
+---
+import { Callout } from "nextra/components";
+
+
+`mcp-use` allows you to handle these notifications by providing a `message_handler` to the `MCPClient`.
+
+## Server-Side: Sending Notifications
+
+On the server (using `fastmcp`), you can send notifications from within a tool's context (`ctx`). Here's an example of a tool that sends multiple types of notifications, including progress updates.
+
+```python filename="server.py"
+from fastmcp import Context, FastMCP
+
+mcp = FastMCP(name="PrimitiveServer")
+
+@mcp.tool()
+async def long_running_task(task_name: str, ctx: Context, steps: int = 5) -> str:
+    """Execute a task with progress updates."""
+    # This is a log message, not a notification
+    await ctx.info(f"Starting: {task_name}")
+
+    for i in range(steps):
+        progress = (i + 1) / steps
+        # These are notifications
+        await ctx.send_prompt_list_changed()
+        await ctx.send_resource_list_changed()
+        await ctx.send_tool_list_changed()
+        await ctx.report_progress(
+            progress=progress,
+            total=1.0,
+            message=f"Step {i + 1}/{steps}",
+        )
+        # This is another log message
+        await ctx.debug(f"Completed step {i + 1}")
+
+    return f"Task '{task_name}' completed"
+```
+
+## Available Notification Types
+
+The `fastmcp` server context provides several methods for sending specific notifications. Here are the ones you can use and the corresponding type to check for in your client's `message_handler`:
+
+-   `ctx.report_progress(...)` sends a `types.ProgressNotification`. This is used to report the progress of a long-running operation.
+-   `ctx.send_tool_list_changed()` sends a `types.ToolListChangedNotification`. This signals that the tool list has changed (see [Tools documentation](/client/tools)).
+-   `ctx.send_resource_list_changed()` sends a `types.ResourceListChangedNotification`. This signals that the resource list has changed (see [Resources documentation](/client/resources)).
+-   `ctx.send_prompt_list_changed()` sends a `types.PromptListChangedNotification`. This signals that the prompt list has changed (see [Prompts documentation](/client/prompts)).
+
+## Client-Side: Handling Notifications
+
+On the client, you create a `message_handler` function and pass it to the `MCPClient`. This function will receive all messages from the server, including notifications.
+
+Since the `message_handler` receives all message types (requests, notifications, exceptions), you need to check the type of the incoming message to handle it correctly. Notifications are of type `mcp.types.ServerNotification`, and their specific type is stored in the `.root` attribute.
+
+```python filename="client.py"
+import asyncio
+import mcp.types as types
+from mcp_use import MCPClient
+
+# The message handler receives all server-sent messages
+async def handle_messages(message):
+    # Check if the message is a server notification
+    if isinstance(message, types.ServerNotification):
+        notification = message.root
+        # Check the specific type of notification
+        if isinstance(notification, types.ProgressNotification):
+            params = notification.params
+            print(
+                f"Progress: {params.progress:.0%}"
+                f" ({params.message})"
+            )
+        elif isinstance(notification, types.PromptListChangedNotification):
+            print("Server prompts have changed")
+        elif isinstance(notification, types.ResourceListChangedNotification):
+            print("Server resources have changed")
+        elif isinstance(notification, types.ToolListChangedNotification):
+            print("Server tools have changed")
+        # Logging notifications are also sent here, but can be handled
+        # by a dedicated logging_callback.
+        elif isinstance(notification, types.LoggingMessageNotification):
+            pass
+        else:
+            print(f"Received unhandled notification: {notification}")
+    else:
+        # Handle other message types like requests or exceptions
+        print(f"Received other message type: {type(message)}")
+
+async def test_notifications(primitive_server):
+    """Tests receiving notifications from the primitive server."""
+    config = {"mcpServers": {"PrimitiveServer": {"url": f"{primitive_server}/mcp"}}}
+    client = MCPClient(config, message_handler=handle_messages)
+    try:
+        await client.create_all_sessions()
+        session = client.get_session("PrimitiveServer")
+
+        # This will trigger the notifications in the handler
+        result = await session.call_tool(
+            name="long_running_task",
+            arguments={"task_name": "test", "steps": 5}
+        )
+        assert result.content[0].text == "Task 'test' completed"
+    finally:
+        await client.close_all_sessions()
+```
+
+<Callout>
+  The `message_handler` is a powerful catch-all for any message from the server. By inspecting the message type, you can build rich, responsive applications that react to server-side events in real time.
+</Callout>

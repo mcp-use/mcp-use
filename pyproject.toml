@@ -1,6 +1,6 @@
 [project]
 name = "mcp-use"
-version = "1.3.7"
+version = "1.3.10"
 description = "MCP Library for LLMs"
 authors = [
     {name = "Pietro Zullo", email = "pietro.zullo@gmail.com"}
@@ -54,6 +54,9 @@ search = [
 e2b = [
     "e2b-code-interpreter>=1.5.0",
 ]
+
+[project.scripts]
+mcp-use = "mcp_use.cli:main"
 
 [build-system]
 requires = ["hatchling"]

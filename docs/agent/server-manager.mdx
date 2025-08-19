@@ -71,6 +71,7 @@ agent = MCPAgent(
 )
 ```
 
+
 ## 🔍 Tool Discovery Flow
 
 
@@ -213,3 +214,54 @@ if __name__ == "__main__":
 ```
 
 The Server Manager transforms your MCP agent from a static tool user into an intelligent, adaptive assistant that can dynamically discover and utilize the perfect tools for any task! 🚀
+
+
+
+## Bring Your Own Server Manager
+
+For ultimate control, you can create your own server manager. By implementing the `BaseServerManager` abstract class, you can define custom logic for tool discovery, dynamic tool creation, or integration with other systems. The server manager's primary role is to provide tools **to the agent**. These can be management tools for connecting to external MCP servers, or, as shown below, custom tools that operate entirely within the agent's environment without needing an external server.
+
+Here’s a minimal example of a custom server manager that provides a single, hard-coded tool directly to the agent.
+
+```python
+import asyncio
+from mcp_use.agents import MCPAgent
+from mcp_use.managers.base import BaseServerManager
+from langchain_core.tools import BaseTool
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel
+
+# 1. Define a custom tool
+class HelloWorldTool(BaseTool):
+    """A simple tool that returns a greeting."""
+    name: str = "hello_world"
+    description: str = "Returns 'Hello, World!'"
+    args_schema: type[BaseModel] | None = None
+    def _run(self) -> str: return "Hello, World!"
+    async def _arun(self) -> str: return "Hello, World!"
+
+# 2. Implement the BaseServerManager interface
+class SimpleServerManager(BaseServerManager):
+    """A minimal server manager with one tool."""
+    def __init__(self):
+        self._tools = [HelloWorldTool()]
+    async def initialize(self) -> None: pass
+    @property
+    def tools(self) -> list[BaseTool]: return self._tools
+    def has_tool_changes(self, current_tool_names: set[str]) -> bool:
+        return {tool.name for tool in self.tools} != current_tool_names
+
+# 3. Pass your custom manager to the agent
+async def useCustomManager():
+    agent = MCPAgent(
+        llm=ChatOpenAI(model="gpt-4o"),
+        use_server_manager=True,
+        server_manager=SimpleServerManager(),
+    )
+    # The agent now has access to your custom tool
+    result = await agent.run("Use the hello_world tool")
+    print(result) #> "Hello, World!"
+    await agent.close()
+
+asyncio.run(useCustomManager())
+```

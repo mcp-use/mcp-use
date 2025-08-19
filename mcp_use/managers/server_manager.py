@@ -4,16 +4,11 @@ from mcp_use.client import MCPClient
 from mcp_use.logging import logger
 
 from ..adapters.base import BaseAdapter
-from .tools import (
-    ConnectServerTool,
-    DisconnectServerTool,
-    GetActiveServerTool,
-    ListServersTool,
-    SearchToolsTool,
-)
+from .base import BaseServerManager
+from .tools import ConnectServerTool, DisconnectServerTool, GetActiveServerTool, ListServersTool, SearchToolsTool
 
 
-class ServerManager:
+class ServerManager(BaseServerManager):
     """Manages MCP servers and provides tools for server selection and management.
 
     This class allows an agent to discover and select which MCP server to use,

@@ -1,0 +1,61 @@
+---
+title: "Logging"
+description: "MCP provides a dedicated channel for servers to send log messages to the client, which is separate from the standard notification system. This allows for structured and level-specific logging without cluttering the main message stream."
+icon: "logs"
+---
+
+`mcp-use` supports this feature through a `logging_callback` function that can be passed to the `MCPClient`.
+
+## Server-Side: Sending Logs
+
+On the server (using `fastmcp`), you can send log messages with different severity levels from within a tool's context (`ctx`).
+
+```python filename="server.py"
+from fastmcp import Context, FastMCP
+
+mcp = FastMCP(name="PrimitiveServer")
+
+@mcp.tool()
+async def logging_tool(ctx: Context) -> str:
+    """Log a message to the client."""
+    await ctx.debug("This is a debug message")
+    await ctx.info("This is an info message")
+    await ctx.warning("This is a warning message")
+    await ctx.error("This is an error message")
+    return "Logging tool completed"
+```
+
+These log messages are sent as `logging/message` notifications to the client.
+
+## Client-Side: Handling Logs
+
+While you can catch `LoggingMessageNotification` events within the general `message_handler`, the recommended approach is to use the dedicated `logging_callback`. This keeps your code clean by separating logging concerns from other notification handling.
+
+The `logging_callback` receives the parameters of the log notification directly, which include the `level` and `message`.
+
+```python filename="client.py"
+import asyncio
+import mcp.types as types
+from mcp_use import MCPClient
+
+# A dedicated handler for log messages
+async def handle_logs(log_params: types.LoggingMessageNotificationParams):
+    print(f"LOG [{log_params.level.upper()}]: {log_params.message}")
+
+async def test_logging(primitive_server):
+    """Tests receiving logs from the primitive server."""
+    config = {"mcpServers": {"PrimitiveServer": {"url": f"{primitive_server}/mcp"}}}
+    # Pass the callback to the client
+    client = MCPClient(config, logging_callback=handle_logs)
+    try:
+        await client.create_all_sessions()
+        session = client.get_session("PrimitiveServer")
+
+        # This tool will trigger the logging_callback
+        result = await session.call_tool(name="logging_tool", arguments={})
+        assert result.content[0].text == "Logging tool completed"
+    finally:
+        await client.close_all_sessions()
+```
+
+By using the `logging_callback`, you can easily route server-side logs to your client's logging system, display them in a debug console, or handle them in any other way that suits your application's needs.

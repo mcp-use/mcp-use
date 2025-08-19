@@ -48,7 +48,8 @@ async def run(
     max_steps: int | None = None,
     manage_connector: bool = True,
     external_history: list[BaseMessage] | None = None,
-) -> str:
+    output_schema: type[T] | None = None,
+) -> str | T:
 ```
 
 Run agent execution and return the final result. Uses the streaming implementation internally.
@@ -58,15 +59,32 @@ Run agent execution and return the final result. Uses the streaming implementati
 - `max_steps` (int, optional): Maximum number of steps to take
 - `manage_connector` (bool): Whether to handle connector lifecycle
 - `external_history` (list[BaseMessage], optional): External conversation history
+- `output_schema` (type[T], optional): Pydantic model for structured output. If provided, the agent will return an instance of this model.
 
 **Returns:**
-- `str`: The final result
+- `str` | `T`: The final result as a string, or a Pydantic model instance if `output_schema` is provided.
 
-**Example:**
+**Examples:**
 
+**Basic Usage**
 ```python
 result = await agent.run("What's the weather like?")
 print(result)
+```
+
+**Structured Output**
+```python
+from pydantic import BaseModel, Field
+
+class WeatherInfo(BaseModel):
+    temperature: float = Field(description="Temperature in Celsius")
+    condition: str = Field(description="Weather condition")
+
+weather: WeatherInfo = await agent.run(
+    "What's the weather like in London?",
+    output_schema=WeatherInfo
+)
+print(f"Temperature: {weather.temperature}°C, Condition: {weather.condition}")
 ```
 
 ## astream
@@ -106,7 +124,9 @@ async for chunk in agent.astream("hello"):
 | `run()` | Simple execution | Final result only | Complete |
 | `astream()` | Real-time chat interfaces | Streaming chunks | Token-level |
 
-## Configuration Methods
+## Conversation Memory
+
+Methods for managing the agent's conversation history.
 
 ### get_conversation_history
 
@@ -114,7 +134,10 @@ async for chunk in agent.astream("hello"):
 def get_conversation_history() -> list[BaseMessage]:
 ```
 
-Get the current conversation history.
+Retrieves the current conversation history, which is a list of LangChain `BaseMessage` objects. This is useful for inspecting the agent's memory or for passing it to another agent.
+
+**Returns:**
+- `list[BaseMessage]`: The list of messages in the conversation history.
 
 ### clear_conversation_history
 
@@ -122,7 +145,24 @@ Get the current conversation history.
 def clear_conversation_history() -> None:
 ```
 
-Clear the conversation history.
+Clears the agent's conversation history. This is useful for starting a new conversation without creating a new agent instance. The system message is preserved.
+
+**Example:**
+```python
+# Run a query, which populates the history
+await agent.run("What is the capital of France?")
+
+# Clear the history
+agent.clear_conversation_history()
+
+# The next query will not have the context of the first one
+await agent.run("What was the last question I asked?")
+# Assistant: I'm sorry, I don't have access to our previous conversation.
+```
+
+## Agent Management
+
+Methods for managing the agent's lifecycle and configuration.
 
 ### set_system_message
 

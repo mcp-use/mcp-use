@@ -200,6 +200,8 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
             "write_stream",
             sampling_callback=None,
             elicitation_callback=None,
+            message_handler=ANY,
+            logging_callback=None,
             client_info=ANY,
         )
         mock_client_session_instance.__aenter__.assert_called_once()

@@ -57,7 +57,7 @@ async def test_streamable_http_connection(server_process):
         assert session is not None, "Session should be created"
 
         # Get tools and verify they exist
-        tools = session.connector.tools
+        tools = await session.list_tools()
         assert tools is not None, "Tools should be available"
         assert len(tools) > 0, "At least one tool should be available"
 
@@ -66,7 +66,7 @@ async def test_streamable_http_connection(server_process):
         assert "add" in tool_names, "The 'add' tool should be available"
 
         # Test calling the add tool
-        result = await session.connector.call_tool("add", {"a": 5, "b": 3})
+        result = await session.call_tool("add", {"a": 5, "b": 3})
         assert result is not None, "Tool call should return a result"
         assert result.content is not None, "Result should have content"
         assert result.content[0].text == "8", "Result should be 8"

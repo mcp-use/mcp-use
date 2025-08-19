@@ -13,7 +13,7 @@ async def test_static_resource(primitive_server):
     try:
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")
-        result = await session.connector.read_resource(uri="data://config")
+        result = await session.read_resource(uri="data://config")
         resource = result.contents[0].text
         resource_dict = json.loads(resource)
         assert resource_dict == {"version": "1.0", "status": "ok"}
@@ -29,12 +29,12 @@ async def test_templated_resource(primitive_server):
     try:
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")
-        result = await session.connector.read_resource(uri="users://123/profile")
+        result = await session.read_resource(uri="users://123/profile")
         resource = result.contents[0].text
         resource_dict = json.loads(resource)
         assert resource_dict == {"id": 123, "name": "User 123"}
 
-        result = await session.connector.read_resource(uri="users://456/profile")
+        result = await session.read_resource(uri="users://456/profile")
         resource = result.contents[0].text
         resource_dict = json.loads(resource)
         assert resource_dict == {"id": 456, "name": "User 456"}

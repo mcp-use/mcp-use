@@ -21,6 +21,7 @@ from mcp.types import (
 from pydantic import BaseModel, Field, create_model
 
 from ..connectors.base import BaseConnector
+from ..errors.error_formatting import format_error
 from ..logging import logger
 from .base import BaseAdapter
 
@@ -159,11 +160,11 @@ class LangChainAdapter(BaseAdapter):
                     except Exception as e:
                         # Log the exception for debugging
                         logger.error(f"Error parsing tool result: {e}")
-                        return f"Error parsing result: {e!s}; Raw content: {tool_result.content!r}"
+                        return format_error(e, tool=self.name, tool_content=tool_result.content)
 
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error executing MCP tool: {str(e)}"
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return McpToLangChainAdapter()
@@ -204,7 +205,7 @@ class LangChainAdapter(BaseAdapter):
                     return content_decoded
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error reading resource: {str(e)}"
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return ResourceTool()
@@ -261,7 +262,7 @@ class LangChainAdapter(BaseAdapter):
                     return result.messages
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error fetching prompt: {str(e)}"
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return PromptTool()
