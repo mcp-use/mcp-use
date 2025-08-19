@@ -5,7 +5,6 @@ This module provides functionality to load MCP configuration from JSON files.
 """
 
 import json
-from pydoc import cli
 from typing import Any
 
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT

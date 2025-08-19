@@ -14,9 +14,9 @@ from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, Sa
 from mcp_use.auth.oauth import OAuthClientProvider
 
 from ..auth import BearerAuth, OAuth
+from ..exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from ..logging import logger
 from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
-from ..exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from .base import BaseConnector
 
 
@@ -95,7 +95,7 @@ class HttpConnector(BaseConnector):
                     client_id=auth.get("client_id"),
                     client_secret=auth.get("client_secret"),
                     scope=auth.get("scope"),
-                    oauth_provider=oauth_provider
+                    oauth_provider=oauth_provider,
                 )
                 self._oauth_config = auth
             else:
@@ -138,7 +138,7 @@ class HttpConnector(BaseConnector):
                 self._auth = None
             except OAuthAuthenticationError as e:
                 logger.error(f"OAuth initialization failed: {e}")
-                raise 
+                raise
 
         # Try streamable HTTP first (new transport), fall back to SSE (old transport)
         # This implements backwards compatibility per MCP specification
@@ -208,8 +208,8 @@ class HttpConnector(BaseConnector):
                 except Exception:
                     pass
 
-                if (isinstance(exception, httpx.HTTPStatusError)):
-                    if exception.response.status_code in [401, 403, 407]: # Authentication error using status
+                if isinstance(exception, httpx.HTTPStatusError):
+                    if exception.response.status_code in [401, 403, 407]:  # Authentication error using status
                         # Server requires authentication but OAuth discovery failed
                         raise OAuthAuthenticationError(
                             f"Server requires authentication (HTTP {exception.response.status_code}) "
@@ -264,13 +264,13 @@ class HttpConnector(BaseConnector):
                     self.transport_type = "SSE"
 
                 except Exception as sse_error:
-                    if isinstance(sse_error, httpx.HTTPStatusError) and sse_error.response.status_code in [401, 403, 407]:
-                        raise OAuthAuthenticationError(
-                            f"Server requires authentication (HTTP {sse_error.response.status_code}) "
-                            "but OAuth discovery failed. Please provide OAuth configuration manually."
-                        ) from sse_error
+                    if isinstance(sse_error, httpx.HTTPStatusError):
+                        if sse_error.response.status_code in [401, 403, 407]:
+                            raise OAuthAuthenticationError(
+                                f"Server requires authentication (HTTP {sse_error.response.status_code}) "
+                                "but OAuth discovery failed. Please provide OAuth configuration manually."
+                            ) from sse_error
                     else:
-
                         logger.error(
                             f"Both transport methods failed. Streamable HTTP: {streamable_error}, SSE: {sse_error}"
                         )

@@ -22,15 +22,15 @@ from .oauth_callback import OAuthCallbackServer
 class ServerOAuthMetadata(BaseModel):
     """OAuth metadata from MCP server with flexible field support.
     It is essentially a configuration that tells MCP client:
-    
+
     - Where to send users for authorization
     - Where to exchange the codes for tokens
     - Which OAuth features are supported
     - Where to register new users with DCR"""
 
-    issuer: HttpUrl # The OAuth server's identity
-    authorization_endpoint: HttpUrl # URL with endpoint for client auth
-    token_endpoint: HttpUrl # URL with endpoint for tokens' exchange
+    issuer: HttpUrl  # The OAuth server's identity
+    authorization_endpoint: HttpUrl  # URL with endpoint for client auth
+    token_endpoint: HttpUrl  # URL with endpoint for tokens' exchange
     userinfo_endpoint: HttpUrl | None = None
     revocation_endpoint: HttpUrl | None = None
     introspection_endpoint: HttpUrl | None = None
@@ -39,7 +39,7 @@ class ServerOAuthMetadata(BaseModel):
     response_types_supported: list[str] = Field(default_factory=lambda: ["code"])
     subject_types_supported: list[str] = Field(default_factory=lambda: ["public"])
     id_token_signing_alg_values_supported: list[str] = Field(default_factory=lambda: ["RS256"])
-    scopes_supported: list[str] | None = None # Which permissions are supported
+    scopes_supported: list[str] | None = None  # Which permissions are supported
     token_endpoint_auth_methods_supported: list[str] = Field(default_factory=lambda: ["client_secret_basic"])
     claims_supported: list[str] | None = None
     code_challenge_methods_supported: list[str] | None = None
@@ -50,11 +50,11 @@ class ServerOAuthMetadata(BaseModel):
 
 class OAuthClientProvider(BaseModel):
     """OAuth client provider configuration for a specific server.
-    
+
     This contains all the information needed to authenticate with an OAuth server
     without needing to discover metadata or register clients dynamically."""
 
-    id: str # Unique identifier
+    id: str  # Unique identifier
     display_name: str
     metadata: ServerOAuthMetadata | dict[str, Any]
 
@@ -71,8 +71,8 @@ class TokenData(BaseModel):
 
     These are the information received after
     successfull authentication"""
- 
-    access_token: str # Actual credential used for requests
+
+    access_token: str  # Actual credential used for requests
     token_type: str = "Bearer"
     expires_at: float | None = None
     refresh_token: str | None = None
@@ -81,7 +81,7 @@ class TokenData(BaseModel):
 
 class ClientRegistrationResponse(BaseModel):
     """Dynamic Client Registration response.
-    
+
     It represents the response from an OAuth server
     when you dinamically register a new OAuth client."""
 
@@ -89,8 +89,8 @@ class ClientRegistrationResponse(BaseModel):
     client_secret: str | None = None
     client_id_issued_at: int | None = None
     client_secret_expires_at: int | None = None
-    redirect_uris: list[str] | None = None # Where auth server should redirect after auth
-    grant_types: list[str] | None = None # Which oauth flows it uses
+    redirect_uris: list[str] | None = None  # Where auth server should redirect after auth
+    grant_types: list[str] | None = None  # Which oauth flows it uses
     response_types: list[str] | None = None
     client_name: str | None = None
     token_endpoint_auth_method: str | None = None
@@ -101,7 +101,7 @@ class ClientRegistrationResponse(BaseModel):
 
 class FileTokenStorage:
     """File-based token storage.
-    
+
     It's responsible for:
 
     - Saving OAuth tokens to disk after auth
@@ -166,10 +166,10 @@ class FileTokenStorage:
 
 class OAuth:
     """OAuth authentication handler for MCP clients.
-    
+
     This is the main class that handles all the authentication
     It has several features:
-    
+
     - Discovers OAuth server capabilities automatically
     - Registers client dynamically when possible
     - Manages token storage and refresh automaticlly"""
@@ -181,7 +181,7 @@ class OAuth:
         scope: str | None = None,
         client_id: str | None = None,
         client_secret: str | None = None,
-        oauth_provider: OAuthClientProvider | None = None
+        oauth_provider: OAuthClientProvider | None = None,
     ):
         """Initialize OAuth handler.
 

@@ -9,7 +9,6 @@ import json
 import warnings
 from typing import Any
 
-import httpx
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
 from mcp_use.types.sandbox import SandboxOptions

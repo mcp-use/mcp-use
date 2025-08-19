@@ -12,6 +12,7 @@ class OAuthDiscoveryError(MCPError):
 
     pass
 
+
 class OAuthAuthenticationError(MCPError):
     """OAuth authentication-related errors"""
 
