@@ -11,6 +11,8 @@ import httpx
 from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, SamplingFnT
 
+from mcp_use.auth.oauth import OAuthClientProvider
+
 from ..auth import BearerAuth, OAuth
 from ..logging import logger
 from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
@@ -72,24 +74,31 @@ class HttpConnector(BaseConnector):
         """
         self._oauth_config = {}
         if isinstance(auth, str):
-            if auth.lower() == "oauth":
-                raise ValueError(
-                    "OAuth requires a client_id. Please provide OAuth configuration as a dict: "
-                    "{'client_id': 'your-registered-client-id', 'client_secret': '...', 'scope': '...'}"
-                )
-            else:
-                # Treat as bearer token
-                self._auth = BearerAuth(token=auth)
-                self.headers["Authorization"] = f"Bearer {auth}"
+            # Treat as bearer token
+            self._auth = BearerAuth(token=auth)
+            self.headers["Authorization"] = f"Bearer {auth}"
         elif isinstance(auth, dict):
-            # OAuth configuration provided
-            self._oauth = OAuth(
-                self.base_url,
-                client_id=auth.get("client_id"),
-                client_secret=auth.get("client_secret"),
-                scope=auth.get("scope"),
-            )
-            self._oauth_config = auth
+            # Check if this is an OAuth provider configuration
+            if "oauth_provider" in auth:
+                oauth_provider = auth["oauth_provider"]
+                if isinstance(oauth_provider, dict):
+                    oauth_provider = OAuthClientProvider(**oauth_provider)
+                self._oauth = OAuth(
+                    self.base_url,
+                    client_id=auth.get("client_id"),
+                    client_secret=auth.get("client_secret"),
+                    scope=auth.get("scope"),
+                    oauth_provider=oauth_provider
+                )
+                self._oauth_config = auth
+            else:
+                self._oauth = OAuth(
+                    self.base_url,
+                    client_id=auth.get("client_id"),
+                    client_secret=auth.get("client_secret"),
+                    scope=auth.get("scope"),
+                )
+                self._oauth_config = auth
         elif isinstance(auth, httpx.Auth):
             self._auth = auth
         else:

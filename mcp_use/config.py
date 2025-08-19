@@ -5,6 +5,7 @@ This module provides functionality to load MCP configuration from JSON files.
 """
 
 import json
+from pydoc import cli
 from typing import Any
 
 from mcp.client.session import ElicitationFnT, SamplingFnT
@@ -38,7 +39,6 @@ def create_connector_from_config(
     server_config: dict[str, Any],
     sandbox: bool = False,
     sandbox_options: SandboxOptions | None = None,
-    client_auth: Any = None,
     sampling_callback: SamplingFnT | None = None,
     elicitation_callback: ElicitationFnT | None = None,
 ) -> BaseConnector:
@@ -49,11 +49,6 @@ def create_connector_from_config(
         server_config: The server configuration section
         sandbox: Whether to use sandboxed execution mode for running MCP servers.
         sandbox_options: Optional sandbox configuration options.
-        client_auth: Default authentication from the client level - can be:
-            - A string token: Use Bearer token authentication
-            - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
-            - An httpx.Auth object: Use custom authentication
-
         sampling_callback: Optional sampling callback function.
     Returns:
         A configured connector instance
@@ -85,7 +80,7 @@ def create_connector_from_config(
         return HttpConnector(
             base_url=server_config["url"],
             headers=server_config.get("headers", None),
-            auth=client_auth,
+            auth=server_config.get("auth", {}),
             timeout=server_config.get("timeout", 5),
             sse_read_timeout=server_config.get("sse_read_timeout", 60 * 5),
             sampling_callback=sampling_callback,
@@ -97,7 +92,7 @@ def create_connector_from_config(
         return WebSocketConnector(
             url=server_config["ws_url"],
             headers=server_config.get("headers", None),
-            auth=client_auth,
+            auth=server_config.get("auth", {}),
         )
 
     raise ValueError("Cannot determine connector type from config")

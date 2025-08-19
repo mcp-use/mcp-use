@@ -6,134 +6,51 @@ icon: "key"
 
 # Authentication
 
-mcp-use supports OAuth 2.0 authentication for MCP servers that require it. This includes automatic Dynamic Client Registration (DCR) for servers that support it.
+mcp-use supports multiple authentication methods for MCP servers, including OAuth 2.0 with automatic Dynamic Client Registration (DCR), bearer tokens, and custom authentication providers.
 
 ## Overview
 
-When connecting to an MCP server that requires authentication, mcp-use will:
-1. Attempt to use existing access tokens if available
-2. Try Dynamic Client Registration if no client_id is provided
-3. Guide you through the OAuth flow to obtain new tokens
-4. Store tokens securely for future use
+mcp-use provides a flexible authentication system with three configuration layers:
 
-## Basic OAuth Configuration
+1. **Server-Level Configuration** - Each server explicitly defines its authentication method
+2. **OAuth Discovery** - Automatic metadata discovery for OAuth servers
+3. **No Authentication** - Servers that don't require authentication
 
-### With Pre-registered Client
+## Authentication Methods
 
-If you've already registered an OAuth application with the server:
+### 1. OAuth Provider Configuration
 
-```python
-from mcp_use import MCPClient
-
-config = {
-    "mcpServers": {
-        "myserver": {
-            "url": "https://mcp.example.com/sse",
-            "auth": {
-                "client_id": "your-registered-client-id",
-                "client_secret": "your-client-secret",  # Optional, for confidential clients
-                "scope": "read write"  # Optional, specify required scopes
-            }
-        }
-    }
-}
-
-client = MCPClient(config=config)
-```
-
-### With Dynamic Client Registration
-
-For servers that support Dynamic Client Registration (RFC 7591), you can omit the client_id:
-
-```python
-config = {
-    "mcpServers": {
-        "myserver": {
-            "url": "https://mcp.example.com/sse",
-            "auth": {
-                # No client_id needed - will use Dynamic Client Registration
-                "scope": "read write"  # Optional
-            }
-        }
-    }
-}
-```
-
-On first run, mcp-use will:
-1. Automatically register a new OAuth client with the server
-2. Store the registration for future use
-3. Proceed with the OAuth flow
-
-## OAuth Flow
-
-When authentication is needed:
-
-1. **Browser Opens**: Your default browser will open to the authorization page
-2. **Grant Access**: Review and approve the requested permissions
-3. **Automatic Redirect**: You'll be redirected to a local callback URL
-4. **Token Storage**: Access tokens are stored securely in `~/.mcp_use/tokens/`
-
-## Token Storage
-
-Tokens and client registrations are stored in:
-- **Access Tokens**: `~/.mcp_use/tokens/{server_domain}.json`
-- **Client Registrations**: `~/.mcp_use/tokens/registrations/{server_domain}_registration.json`
-
-## Redirect URIs
-
-### For Dynamic Client Registration
-
-mcp-use registers multiple redirect URIs to ensure compatibility:
-- `http://127.0.0.1:8080/callback`
-- `http://127.0.0.1:8081/callback`
-- `http://127.0.0.1:8082/callback`
-- `http://127.0.0.1:8083/callback`
-- `http://127.0.0.1:8084/callback`
-
-The client will try to use one of these registered ports during the OAuth flow.
-
-### For Manual Registration
-
-When manually registering your OAuth application, you can use:
-- **Dynamic Port**: `http://127.0.0.1:{port}/callback` (any port)
-- **Fixed Port**: One of the ports listed above
-- **Wildcard**: Some providers support `http://127.0.0.1:*/callback`
-
-## Examples
-
-### Linear MCP Server
+For servers with known OAuth endpoints, you can provide metadata upfront to avoid discovery:
 
 ```python
 from mcp_use import MCPClient
 
-# Uses Dynamic Client Registration
 config = {
     "mcpServers": {
         "linear": {
             "url": "https://mcp.linear.app/sse",
-            "auth": {}  # Empty auth config triggers DCR
+            "auth": {
+                "oauth_provider": {
+                    "id": "linear",
+                    "display_name": "Linear",
+                    "metadata": {
+                        "issuer": "https://linear.app",
+                        "authorization_endpoint": "https://linear.app/oauth/authorize",
+                        "token_endpoint": "https://linear.app/oauth/token",
+                        "registration_endpoint": "https://linear.app/oauth/register"
+                    }
+                }
+            }
         }
     }
 }
 
 client = MCPClient(config=config)
-sessions = await client.create_all_sessions()
 ```
 
-### Asana MCP Server
+### 2. Standard OAuth Configuration
 
-```python
-config = {
-    "mcpServers": {
-        "asana": {
-            "url": "https://mcp.asana.com/sse",
-            "auth": {}  # Uses DCR
-        }
-    }
-}
-```
-
-### With Pre-registered Client
+For servers with pre-registered OAuth applications:
 
 ```python
 config = {
@@ -141,8 +58,8 @@ config = {
         "github": {
             "url": "https://mcp.github.com/sse",
             "auth": {
-                "client_id": "Iv1.8a61f9b3a7aba766",
-                "client_secret": "1234567890abcdef",
+                "client_id": "your-registered-client-id",
+                "client_secret": "your-client-secret",  # Optional
                 "scope": "repo read:user"
             }
         }
@@ -150,42 +67,170 @@ config = {
 }
 ```
 
+### 3. Dynamic Client Registration
+
+For servers that support DCR, omit the client_id:
+
+```python
+config = {
+    "mcpServers": {
+        "linear": {
+            "url": "https://mcp.linear.app/sse",
+            "auth": {
+                "scope": "read write"  # Optional
+            }
+        }
+    }
+}
+```
+
+### 4. Bearer Token Authentication
+
+For servers requiring simple bearer tokens:
+
+```python
+config = {
+    "mcpServers": {
+        "api": {
+            "url": "https://api.example.com/mcp/sse",
+            "auth": "sk-your-api-key-here"
+        }
+    }
+}
+```
+
+### 5. Custom Authentication
+
+For servers requiring custom authentication methods:
+
+```python
+from httpx import BasicAuth, DigestAuth
+
+config = {
+    "mcpServers": {
+        "secure": {
+            "url": "https://secure.example.com/mcp/sse",
+            "auth": BasicAuth("username", "password")
+        },
+        "digest": {
+            "url": "https://digest.example.com/mcp/sse",
+            "auth": DigestAuth("username", "password")
+        }
+    }
+}
+```
+
+### 6. Discovery Mode
+
+For servers without explicit auth configuration, mcp-use will attempt OAuth discovery:
+
+```python
+config = {
+    "mcpServers": {
+        "unknown": {
+            "url": "https://mcp.unknown.com/sse"
+            # No auth config - will attempt discovery
+        }
+    }
+}
+```
+
+## Mixed Configuration Example
+
+You can mix different authentication methods across servers:
+
+```python
+from httpx import BasicAuth
+
+config = {
+    "mcpServers": {
+        "linear": {
+            "url": "https://mcp.linear.app/sse",
+            "auth": {
+                "oauth_provider": {
+                    "id": "linear",
+                    "display_name": "Linear",
+                    "metadata": {
+                        "issuer": "https://linear.app",
+                        "authorization_endpoint": "https://linear.app/oauth/authorize",
+                        "token_endpoint": "https://linear.app/oauth/token"
+                    }
+                }
+            }
+        },
+        "api": {
+            "url": "https://api.example.com/mcp/sse",
+            "auth": "sk-api-key"
+        },
+        "secure": {
+            "url": "https://secure.example.com/mcp/sse",
+            "auth": BasicAuth("username", "password")
+        },
+        "public": {
+            "url": "https://public.example.com/mcp/sse"
+            # No auth - will attempt discovery or continue without auth
+        }
+    }
+}
+
+client = MCPClient(config=config)
+```
+
+## OAuth Flow
+
+When OAuth authentication is required:
+
+1. **Browser Opens**: Your default browser opens to the authorization page
+2. **Grant Access**: Review and approve the requested permissions
+3. **Automatic Redirect**: You're redirected to a local callback URL
+4. **Token Storage**: Access tokens are stored securely in `~/.mcp_use/tokens/`
+
+## Token Storage
+
+Authentication data is stored securely:
+- **Access Tokens**: `~/.mcp_use/tokens/{server_domain}.json`
+- **Client Registrations**: `~/.mcp_use/tokens/registrations/{server_domain}_registration.json`
+
+## Benefits of Server-Level Configuration
+
+- **Explicit Control**: Each server defines its own authentication method
+- **No Ambiguity**: Clear mapping between servers and their auth requirements
+- **Performance**: OAuth providers skip discovery overhead
+- **Flexibility**: Support for all authentication types per server
+- **Self-Documenting**: Configuration shows exactly what auth each server uses
+
 ## Troubleshooting
+
+### OAuth Discovery Fails
+
+If a server doesn't support OAuth discovery:
+- Provide an `oauth_provider` with metadata
+- Use a pre-registered client_id
+- Check if the server requires different authentication
 
 ### "Invalid redirect URI" Error
 
-This occurs when the callback URL doesn't match registered redirect URIs. Solutions:
-- Let mcp-use use Dynamic Client Registration (remove client_id)
-- Register your app with one of the supported redirect URIs
-- Check if your OAuth provider supports wildcard redirect URIs
-
-### Token Expiration
-
-mcp-use automatically:
-- Checks token validity before use
-- Refreshes tokens when possible (if refresh_token is available)
-- Prompts for re-authentication when tokens expire
+Solutions:
+- Use Dynamic Client Registration (omit client_id)
+- Register your app with supported redirect URIs
+- Check if your provider supports wildcard redirect URIs
 
 ### Debugging
 
-Enable debug logging to see OAuth flow details:
+Enable debug logging:
 
 ```python
-import os
-os.environ['DEBUG'] = '2'
-
-# Or
 from mcp_use import set_debug
 set_debug(2)
 ```
 
 ## Security Notes
 
-- Tokens are stored in your home directory with restricted permissions
-- Never commit token files to version control
-- Client secrets are only needed for confidential clients
-- The OAuth flow uses CSRF protection via state parameter
+- Tokens are stored with restricted permissions
+- Never commit authentication files to version control
+- OAuth flow uses CSRF protection via state parameter
 - All callbacks use localhost (127.0.0.1) for security
+- Each server's authentication is isolated
 
 ## Server Support
 
@@ -194,4 +239,4 @@ Servers known to support OAuth with DCR:
 - Asana (`https://mcp.asana.com/sse`)
 - Atlassian (`https://mcp.atlassian.com/v1/sse`)
 
-Check your server's documentation for specific OAuth requirements.
+Check your server's documentation for specific authentication requirements.

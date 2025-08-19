@@ -49,16 +49,13 @@ class ServerOAuthMetadata(BaseModel):
 
 
 class OAuthClientProvider(BaseModel):
-    """OAuth client provider with metadata discovery.
-    It's used to avoid metadata discovery and
-    registration.
+    """OAuth client provider configuration for a specific server.
     
-    Ideally we would have a config with client and server
-    metadata information."""
+    This contains all the information needed to authenticate with an OAuth server
+    without needing to discover metadata or register clients dynamically."""
 
     id: str # Unique identifier
     display_name: str
-    client_id: str # OAuth client id
     metadata: ServerOAuthMetadata | dict[str, Any]
 
     @property
@@ -184,6 +181,7 @@ class OAuth:
         scope: str | None = None,
         client_id: str | None = None,
         client_secret: str | None = None,
+        oauth_provider: OAuthClientProvider | None = None
     ):
         """Initialize OAuth handler.
 
@@ -193,17 +191,25 @@ class OAuth:
             scope: OAuth scopes to request
             client_id: OAuth client ID. If not provided, will attempt dynamic registration
             client_secret: OAuth client secret (for confidential clients)
+            oauth_provider: OAuth client provider to prevent metadata discovery
         """
         logger.debug(f"Initializing OAuth for server: {server_url}")
         self.server_url = server_url
         self.token_storage = token_storage or FileTokenStorage()
-        self.scope = scope
+        self._oauth_provider = oauth_provider
+        self._metadata: ServerOAuthMetadata | None = None
+
+        if self._oauth_provider:
+            self._metadata = self._oauth_provider.oauth_metadata
+            logger.debug(f"Using OAuth provider {self._oauth_provider.id} with metadata")
+
         self.client_id = client_id
         self.client_secret = client_secret
+        self.scope = scope
+
         self._client: AsyncOAuth2Client | None = None
         self._bearer_auth: BearerAuth | None = None
-        self._metadata: ServerOAuthMetadata | None = None
-        logger.debug(f"OAuth initialized with scope='{scope}', client_id='{client_id}'")
+        logger.debug(f"OAuth initialized with scope='{self.scope}', client_id='{self.client_id}'")
 
     async def initialize(self, client: httpx.AsyncClient) -> BearerAuth | None:
         """Initialize OAuth and return bearer auth if tokens exist."""
@@ -224,8 +230,11 @@ class OAuth:
             logger.debug("No existing tokens found")
 
         # Discover OAuth metadata
-        logger.debug("No valid token, proceeding to discover OAuth metadata")
-        await self._discover_metadata(client)
+        if not self._metadata:
+            logger.debug("No valid token, proceeding to discover OAuth metadata")
+            await self._discover_metadata(client)
+        else:
+            logger.debug("Using provided OAuth metadata, skipping discovery")
 
         logger.debug("OAuth.initialize finished, no valid token available yet")
         return None

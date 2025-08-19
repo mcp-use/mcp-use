@@ -31,7 +31,6 @@ class MCPClient:
         config: str | dict[str, Any] | None = None,
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
-        auth: str | dict[str, Any] | httpx.Auth = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
     ) -> None:
@@ -42,17 +41,11 @@ class MCPClient:
                    If None, an empty configuration is used.
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
-            auth: Default authentication method for all servers - can be:
-                - A string token: Use Bearer token authentication
-                - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
-                - An httpx.Auth object: Use custom authentication
-                This auth will be used for all servers unless overridden at the server level.
             sampling_callback: Optional sampling callback function.
         """
         self.config: dict[str, Any] = {}
         self.sandbox = sandbox
         self.sandbox_options = sandbox_options
-        self.auth = auth if auth is not None else {}
         self.sessions: dict[str, MCPSession] = {}
         self.active_sessions: list[str] = []
         self.sampling_callback = sampling_callback
@@ -70,7 +63,6 @@ class MCPClient:
         config: dict[str, Any],
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
-        auth: str | dict[str, Any] | httpx.Auth | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
     ) -> "MCPClient":
@@ -80,7 +72,6 @@ class MCPClient:
             config: The configuration dictionary.
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
-            auth: Default authentication method for all servers.
             sampling_callback: Optional sampling callback function.
             elicitation_callback: Optional elicitation callback function.
         """
@@ -88,7 +79,6 @@ class MCPClient:
             config=config,
             sandbox=sandbox,
             sandbox_options=sandbox_options,
-            auth=auth,
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
         )
@@ -99,7 +89,6 @@ class MCPClient:
         filepath: str,
         sandbox: bool = False,
         sandbox_options: SandboxOptions | None = None,
-        auth: str | dict[str, Any] | httpx.Auth | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
     ) -> "MCPClient":
@@ -109,7 +98,6 @@ class MCPClient:
             filepath: The path to the configuration file.
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
-            auth: Default authentication method for all servers.
             sampling_callback: Optional sampling callback function.
             elicitation_callback: Optional elicitation callback function.
         """
@@ -117,7 +105,6 @@ class MCPClient:
             config=load_config_file(filepath),
             sandbox=sandbox,
             sandbox_options=sandbox_options,
-            auth=auth,
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
         )
@@ -197,7 +184,6 @@ class MCPClient:
             server_config,
             sandbox=self.sandbox,
             sandbox_options=self.sandbox_options,
-            client_auth=self.auth,
             sampling_callback=self.sampling_callback,
             elicitation_callback=self.elicitation_callback,
         )
