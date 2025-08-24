@@ -46,6 +46,7 @@ class WebSocketConnector(BaseConnector):
         self.headers = headers or {}
 
         # Handle authentication - WebSocket only supports bearer tokens
+        # An auth field it's not needed
         if auth is not None:
             if isinstance(auth, str):
                 self.headers["Authorization"] = f"Bearer {auth}"
