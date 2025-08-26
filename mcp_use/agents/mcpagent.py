@@ -134,6 +134,7 @@ class MCPAgent:
         # Set up observability callbacks using the ObservabilityManager
         self.observability_manager = ObservabilityManager(custom_callbacks=callbacks)
         self.callbacks = self.observability_manager.get_callbacks()
+        self.chat_id = chat_id if chat_id else None
 
         # Either client or connector must be provided
         if not client and len(self.connectors) == 0:
@@ -469,7 +470,7 @@ class MCPAgent:
 
             # Add the user query to conversation history if memory is enabled
             if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
+                self.add_to_history(HumanMessage(content=query,id = self.chat_id))
 
             # Use the provided history or the internal history
             history_to_use = external_history if external_history is not None else self._conversation_history
@@ -593,7 +594,7 @@ class MCPAgent:
 
                                 # Add the final response to conversation history if memory is enabled
                                 if self.memory_enabled:
-                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}",id = self.chat_id))
 
                                 logger.info("✅ Structured output successful")
                                 success = True
@@ -696,7 +697,7 @@ class MCPAgent:
 
                     # Add the final response to conversation history if memory is enabled
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}",id = self.chat_id))
 
                     logger.info("✅ Final structured output successful")
                     success = True
@@ -708,7 +709,7 @@ class MCPAgent:
                     raise RuntimeError(f"Failed to generate structured output after {steps} steps: {str(e)}") from e
 
             if self.memory_enabled and not output_schema:
-                self.add_to_history(AIMessage(content=result))
+                self.add_to_history(AIMessage(content=result,id = self.chat_id))
 
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
             if not success:
@@ -965,7 +966,7 @@ class MCPAgent:
         self._agent_executor.max_iterations = effective_max_steps
 
         if self.memory_enabled:
-            self.add_to_history(HumanMessage(content=query))
+            self.add_to_history(HumanMessage(content=query,id = self.chat_id))
 
         history_to_use = external_history if external_history is not None else self._conversation_history
         inputs = {"input": query, "chat_history": history_to_use}
