@@ -470,7 +470,7 @@ class MCPAgent:
 
             # Add the user query to conversation history if memory is enabled
             if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query,id = self.chat_id))
+                self.add_to_history(HumanMessage(content=query, id=self.chat_id))
 
             # Use the provided history or the internal history
             history_to_use = external_history if external_history is not None else self._conversation_history
@@ -594,7 +594,7 @@ class MCPAgent:
 
                                 # Add the final response to conversation history if memory is enabled
                                 if self.memory_enabled:
-                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}",id = self.chat_id))
+                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}", id=self.chat_id))
 
                                 logger.info("✅ Structured output successful")
                                 success = True
@@ -619,7 +619,7 @@ class MCPAgent:
                                 # Add this as feedback and continue the loop
                                 inputs["input"] = missing_info_prompt
                                 if self.memory_enabled:
-                                    self.add_to_history(HumanMessage(content=missing_info_prompt))
+                                    self.add_to_history(HumanMessage(content=missing_info_prompt, id=self.chat_id))
 
                                 logger.info("🔄 Continuing execution to gather missing information...")
                                 continue
@@ -697,7 +697,7 @@ class MCPAgent:
 
                     # Add the final response to conversation history if memory is enabled
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}",id = self.chat_id))
+                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}", id=self.chat_id))
 
                     logger.info("✅ Final structured output successful")
                     success = True
@@ -709,7 +709,7 @@ class MCPAgent:
                     raise RuntimeError(f"Failed to generate structured output after {steps} steps: {str(e)}") from e
 
             if self.memory_enabled and not output_schema:
-                self.add_to_history(AIMessage(content=result,id = self.chat_id))
+                self.add_to_history(AIMessage(content=result, id=self.chat_id))
 
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
             if not success:
@@ -966,7 +966,7 @@ class MCPAgent:
         self._agent_executor.max_iterations = effective_max_steps
 
         if self.memory_enabled:
-            self.add_to_history(HumanMessage(content=query,id = self.chat_id))
+            self.add_to_history(HumanMessage(content=query, id=self.chat_id))
 
         history_to_use = external_history if external_history is not None else self._conversation_history
         inputs = {"input": query, "chat_history": history_to_use}
@@ -978,6 +978,8 @@ class MCPAgent:
                 if isinstance(output, list):
                     for message in output:
                         if not isinstance(message, ToolAgentAction):
+                            if self.chat_id:
+                                message["id"] = self.chat_id
                             self.add_to_history(message)
             yield event
         # 5. House-keeping -------------------------------------------------------
