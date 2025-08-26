@@ -594,7 +594,9 @@ class MCPAgent:
 
                                 # Add the final response to conversation history if memory is enabled
                                 if self.memory_enabled:
-                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}", id=self.chat_id))
+                                    self.add_to_history(
+                                        AIMessage(content=f"Structured result: {structured_result}", id=self.chat_id)
+                                    )
 
                                 logger.info("✅ Structured output successful")
                                 success = True
@@ -697,7 +699,9 @@ class MCPAgent:
 
                     # Add the final response to conversation history if memory is enabled
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}", id=self.chat_id))
+                        self.add_to_history(
+                            AIMessage(content=f"Structured result: {structured_result}", id=self.chat_id)
+                        )
 
                     logger.info("✅ Final structured output successful")
                     success = True
