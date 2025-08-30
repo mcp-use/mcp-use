@@ -1,51 +1,57 @@
 {
-  "description": "The `mcp-use` project serves as an AI agent framework, designed to orchestrate complex interactions with Large Language Models (LLMs) and external tools. Its core functionality revolves around an `Agent Core` that manages conversational flow and tool utilization. This core integrates with an `LLM Integration & Prompting` component for dynamic prompt generation and LLM communication. Communication with backend services and external tools is facilitated by the `MCP Client & Session Management` layer, which leverages a `Protocol Connector Layer` for various communication protocols. `Server & Tool Management` handles the discovery and organization of available tools, while a `Tool Adaptation Layer` ensures compatibility between generic MCP tool definitions and specific AI frameworks. Finally, `Configuration Management` provides essential system-wide settings, ensuring the framework operates with correct parameters.",
+  "description": "The `mcp-use` project implements an intelligent agent architecture designed for interacting with Multi-Cloud Platform (MCP) environments. At its core, the `Agent Orchestration Core` drives the decision-making process, leveraging an `LLM Integration Layer` built on LangChain for prompt execution and response generation. This core agent dynamically discovers and utilizes tools managed by the `Tool & Server Manager`, which in turn retrieves raw tool data from `MCP Connectors`. `Tool Adapters` play a crucial role in standardizing these raw tool definitions into a format consumable by the agent. All interactions with MCP environments, including tool execution and session management, are mediated by the `MCP Client & Session Manager`, which relies on `MCP Connectors` for low-level communication and receives its operational parameters from the `Configuration Manager`. This modular design ensures robust, scalable, and maintainable interactions with diverse MCP services.",
   "components": [
     {
-      "name": "Agent Core",
-      "description": "The central intelligence unit orchestrating AI agent behavior, conversation flow, and tool coordination.",
+      "name": "Agent Orchestration Core",
+      "description": "The central intelligence, embodied by the MCP Agent (`mcpagent.py`), orchestrating LLM reasoning, conversation flow, tool selection, and response generation. It leverages the LLM Integration Layer for agent execution.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.agents",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents",
+          "qualified_name": "mcp_use/agents/mcpagent.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py",
           "reference_start_line": 1,
           "reference_end_line": 1
-        }
-      ],
-      "can_expand": true
-    },
-    {
-      "name": "LLM Integration & Prompting",
-      "description": "Manages interactions with Large Language Models, including dynamic prompt construction and response handling.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.agents.prompts",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        }
-      ],
-      "can_expand": true
-    },
-    {
-      "name": "MCP Client & Session Management",
-      "description": "Handles the establishment, maintenance, and termination of connections and sessions with MCP backend servers, including low-level I/O.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.client",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py",
-          "reference_start_line": 28,
-          "reference_end_line": 59
         },
         {
-          "qualified_name": "mcp_use.session",
+          "qualified_name": "mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "MCP Client & Session Manager",
+      "description": "Manages the lifecycle of connections and communication sessions with various MCP environments, acting as an intermediary for tool execution requests.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use/session.py",
           "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py",
-          "reference_start_line": 20,
-          "reference_end_line": 33
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "MCP Connectors",
+      "description": "Provides concrete implementations for various communication protocols (e.g., WebSocket, Sandbox) to interact with MCP, handling the low-level communication.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use/connectors/base.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
         },
         {
-          "qualified_name": "mcp_use.task_managers",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers",
+          "qualified_name": "mcp_use/connectors/websocket.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        },
+        {
+          "qualified_name": "mcp_use/connectors/sandbox.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py",
           "reference_start_line": 1,
           "reference_end_line": 1
         }
@@ -53,31 +59,18 @@
       "can_expand": true
     },
     {
-      "name": "Protocol Connector Layer",
-      "description": "Provides a standardized abstraction for various communication protocols (e.g., HTTP, WebSocket, Stdio, Sandbox).",
+      "name": "Tool & Server Manager",
+      "description": "Manages the discovery, registration, and search of available tools across connected MCP servers.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.connectors",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors",
-          "reference_start_line": 1,
-          "reference_end_line": 1
-        }
-      ],
-      "can_expand": true
-    },
-    {
-      "name": "Server & Tool Management",
-      "description": "Responsible for discovering, organizing, and providing access to tools exposed by connected servers.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.managers.server_manager",
+          "qualified_name": "mcp_use/managers/server_manager.py",
           "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py",
-          "reference_start_line": 17,
-          "reference_end_line": 28
+          "reference_start_line": 1,
+          "reference_end_line": 1
         },
         {
-          "qualified_name": "mcp_use.managers.tools",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools",
+          "qualified_name": "mcp_use/managers/tools/search_tools.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py",
           "reference_start_line": 1,
           "reference_end_line": 1
         }
@@ -85,12 +78,12 @@
       "can_expand": true
     },
     {
-      "name": "Tool Adaptation Layer",
-      "description": "Acts as a bridge, converting generic MCP tool definitions into formats consumable by specific AI frameworks.",
+      "name": "Tool Adapters",
+      "description": "Receives raw tool definitions (e.g., from `Tool & Server Manager`) and standardizes them into a format consumable by the `Agent Orchestration Core` and `LLM Integration Layer`.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.adapters",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters",
+          "qualified_name": "mcp_use/adapters/langchain_adapter.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py",
           "reference_start_line": 1,
           "reference_end_line": 1
         }
@@ -98,12 +91,25 @@
       "can_expand": true
     },
     {
-      "name": "Configuration Management",
-      "description": "Handles the loading, parsing, and validation of configuration files for system-wide parameters.",
+      "name": "LLM Integration Layer",
+      "description": "Encapsulates the underlying LangChain components, providing the framework and execution capabilities for the `Agent Orchestration Core` to build and run the LLM agent.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.config",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/config/__init__.py",
+          "qualified_name": "mcp_use/agents/mcpagent.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Configuration Manager",
+      "description": "Handles loading, parsing, and interpreting project-specific configurations, providing them to other components.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use/config.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/config.py",
           "reference_start_line": 1,
           "reference_end_line": 1
         }
@@ -113,64 +119,74 @@
   ],
   "components_relations": [
     {
-      "relation": "utilizes",
-      "src_name": "Agent Core",
-      "dst_name": "LLM Integration & Prompting"
+      "relation": "requests_session_info",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "MCP Client & Session Manager"
     },
     {
-      "relation": "leverages",
-      "src_name": "Agent Core",
-      "dst_name": "Server & Tool Management"
+      "relation": "queries_available_tools",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "Tool & Server Manager"
     },
     {
-      "relation": "communicates through",
-      "src_name": "Agent Core",
-      "dst_name": "MCP Client & Session Management"
+      "relation": "receives_adapted_tools",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "Tool Adapters"
     },
     {
-      "relation": "supports",
-      "src_name": "LLM Integration & Prompting",
-      "dst_name": "Agent Core"
+      "relation": "sends_prompts_for_execution",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "LLM Integration Layer"
     },
     {
-      "relation": "employs",
-      "src_name": "MCP Client & Session Management",
-      "dst_name": "Protocol Connector Layer"
+      "relation": "receives_execution_results",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "LLM Integration Layer"
     },
     {
-      "relation": "provides protocol implementations for",
-      "src_name": "Protocol Connector Layer",
-      "dst_name": "MCP Client & Session Management"
+      "relation": "establishes_connections",
+      "src_name": "MCP Client & Session Manager",
+      "dst_name": "MCP Connectors"
     },
     {
-      "relation": "queries",
-      "src_name": "Server & Tool Management",
-      "dst_name": "MCP Client & Session Management"
+      "relation": "executes_tool_calls",
+      "src_name": "MCP Client & Session Manager",
+      "dst_name": "MCP Connectors"
     },
     {
-      "relation": "uses",
-      "src_name": "Server & Tool Management",
-      "dst_name": "Tool Adaptation Layer"
+      "relation": "receives_connection_configs",
+      "src_name": "MCP Client & Session Manager",
+      "dst_name": "Configuration Manager"
     },
     {
-      "relation": "serves",
-      "src_name": "Tool Adaptation Layer",
-      "dst_name": "Agent Core"
+      "relation": "provides_raw_tool_data",
+      "src_name": "MCP Connectors",
+      "dst_name": "Tool & Server Manager"
     },
     {
-      "relation": "serves",
-      "src_name": "Tool Adaptation Layer",
-      "dst_name": "Server & Tool Management"
+      "relation": "requests_tool_definitions",
+      "src_name": "Tool & Server Manager",
+      "dst_name": "MCP Connectors"
     },
     {
-      "relation": "provides settings for",
-      "src_name": "Configuration Management",
-      "dst_name": "MCP Client & Session Management"
+      "relation": "provides_raw_tool_definitions",
+      "src_name": "Tool & Server Manager",
+      "dst_name": "Tool Adapters"
     },
     {
-      "relation": "provides settings for",
-      "src_name": "Configuration Management",
-      "dst_name": "Agent Core"
+      "relation": "supplies_executable_tools",
+      "src_name": "Tool Adapters",
+      "dst_name": "LLM Integration Layer"
+    },
+    {
+      "relation": "invokes_adapted_tools",
+      "src_name": "LLM Integration Layer",
+      "dst_name": "Tool Adapters"
+    },
+    {
+      "relation": "requests_tool_execution",
+      "src_name": "LLM Integration Layer",
+      "dst_name": "MCP Client & Session Manager"
     }
   ]
 }
