@@ -5,6 +5,9 @@ from starlette.responses import JSONResponse, RedirectResponse
 
 mcp = FastMCP(name="AuthServer")
 
+# We set all the fields to ensure that models
+# correctly bind data
+
 # OAuth metadata configuration
 OAUTH_METADATA_RESPONSE = {
     "issuer": "http://127.0.0.1:8081",
@@ -102,12 +105,6 @@ async def protected_tool(ctx: Context) -> str:
     verify_auth(ctx)
     return "Authenticated access granted!"
 
-# Public tool (no auth required)
-@mcp.tool()
-def public_tool() -> str:
-    """A public tool that doesn't require auth."""
-    return "Public access granted!"
-
 # Simple math tool for testing
 @mcp.tool()
 def add(a: int, b: int) -> int:
@@ -119,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--transport",
         type=str,
-        choices=["streamable-http"],
+        choices=["streamable-http", "sse"],
         default="streamable-http",
         help="MCP transport type to use (default: streamable-http)",
     )
@@ -129,3 +126,5 @@ if __name__ == "__main__":
 
     if args.transport == "streamable-http":
         mcp.run(transport="streamable-http", host="127.0.0.1", port=8081)
+    elif args.transport == "sse":
+        mcp.run(transport="sse", host="127.0.0.1", port=8081)
