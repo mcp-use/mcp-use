@@ -1,12 +1,13 @@
 import argparse
+
 from fastmcp import Context, FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse
 
 mcp = FastMCP(name="AuthServer")
 
-# We set all the fields to ensure that models
-# correctly bind data
+# We set all the fields to ensure that models
+# correctly bind data
 
 # OAuth metadata configuration
 OAUTH_METADATA_RESPONSE = {
@@ -24,7 +25,7 @@ OAUTH_METADATA_RESPONSE = {
     "scopes_supported": ["openid", "profile", "email"],
     "token_endpoint_auth_methods_supported": ["client_secret_basic", "none"],
     "claims_supported": ["bla", "blabla"],
-    "code_challenge_methods_supported": ["S256", "plain"]
+    "code_challenge_methods_supported": ["S256", "plain"],
 }
 
 DCR_RESPONSE = {
@@ -36,7 +37,7 @@ DCR_RESPONSE = {
     "grant_types": ["what a grant"],
     "response_types": ["good_response"],
     "client_name": "renvins_better",
-    "token_endpoint_auth_method": "code"
+    "token_endpoint_auth_method": "code",
 }
 
 AUTH_CODE_RESPONSE = {
@@ -47,10 +48,11 @@ TOKEN_RESPONSE = {
     "access_token": "valid_token",
     "token_type": "Bearer",
     "expires_in": 3600,
-    "scope": "openid profile email"
+    "scope": "openid profile email",
 }
 
 SAMPLE_VALID_TOKEN = "valid_token"
+
 
 def verify_auth(ctx: Context) -> str:
     """Verify auth token from context."""
@@ -59,27 +61,31 @@ def verify_auth(ctx: Context) -> str:
 
     if not auth_header or not auth_header.startswith("Bearer "):
         raise Exception("Missing or invalid Authorization header")
-    
+
     token = auth_header.split(" ")[1]
     if token != SAMPLE_VALID_TOKEN:
         raise Exception("Invalid token")
-    
+
     return token
+
 
 @mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
 async def oauth_metadata(request: Request) -> JSONResponse:
     """Serve OAuth 2.0 Authorization Server Metadata."""
     return JSONResponse(OAUTH_METADATA_RESPONSE)
 
+
 @mcp.custom_route("/.well-known/openid-configuration", methods=["GET"])
 async def oidc_metadata(request: Request) -> JSONResponse:
     """Serve OpenID Connect Discovery metadata."""
     return JSONResponse(OAUTH_METADATA_RESPONSE)
 
+
 @mcp.custom_route("/oauth/register", methods=["POST"])
 async def dynamic_regisration(request: Request) -> JSONResponse:
     """Serve client DCR data"""
     return JSONResponse(DCR_RESPONSE)
+
 
 @mcp.custom_route("/oauth/authorize", methods=["GET"])
 async def oauth_authorize(request: Request) -> RedirectResponse:
@@ -88,15 +94,17 @@ async def oauth_authorize(request: Request) -> RedirectResponse:
     params = dict(request.query_params)
     redirect_uri = params.get("redirect_uri", "http://127.0.0.1:8080/callback")
     state = params.get("state")
-    
+
     # Redirect with pre-created authorization code
     redirect_url = f"{redirect_uri}?code={AUTH_CODE_RESPONSE['code']}&state={state}"
     return RedirectResponse(url=redirect_url, status_code=302)
+
 
 @mcp.custom_route("/oauth/token", methods=["POST"])
 async def oauth_token(request: Request) -> JSONResponse:
     """OAuth token endpoint - returns pre-created token"""
     return JSONResponse(TOKEN_RESPONSE)
+
 
 # Protected tool that requires auth
 @mcp.tool()
@@ -105,11 +113,13 @@ async def protected_tool(ctx: Context) -> str:
     verify_auth(ctx)
     return "Authenticated access granted!"
 
+
 # Simple math tool for testing
 @mcp.tool()
 def add(a: int, b: int) -> int:
     """Add two numbers."""
     return a + b
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run MCP auth test server.")

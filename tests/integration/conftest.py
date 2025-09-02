@@ -37,6 +37,7 @@ async def primitive_server():
             process.wait()
     logger.info("Primitive server cleanup complete.")
 
+
 @pytest.fixture(scope="session")
 async def auth_server():
     """Starts the auth_server.py as a subprocess for integration tests."""
