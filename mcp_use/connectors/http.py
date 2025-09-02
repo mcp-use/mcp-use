@@ -80,7 +80,6 @@ class HttpConnector(BaseConnector):
                 - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
                 - An httpx.Auth object: Use custom authentication
         """
-        self._oauth_config = {}
         if isinstance(auth, str):
             # Treat as bearer token
             self._auth = BearerAuth(token=auth)
