@@ -493,6 +493,10 @@ class MCPAgent:
 
             logger.info(f"🏁 Starting agent execution with max_steps={steps}")
 
+            # Track whether agent finished successfully vs reached max iterations
+            agent_finished_successfully = False
+            result = None
+
             # Create a run manager with our callbacks if we have any - ONCE for the entire execution
             run_manager = None
             if self.callbacks:
@@ -579,6 +583,7 @@ class MCPAgent:
                     # Process the output
                     if isinstance(next_step_output, AgentFinish):
                         logger.info(f"✅ Agent finished at step {step_num + 1}")
+                        agent_finished_successfully = True
                         result = next_step_output.return_values.get("output", "No output generated")
                         # End the chain if we have a run manager
                         if run_manager:
@@ -662,6 +667,7 @@ class MCPAgent:
                         tool_return = self._agent_executor._get_tool_return(last_step)
                         if tool_return is not None:
                             logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
+                            agent_finished_successfully = True
                             result = tool_return.return_values.get("output", "No output generated")
                             break
 
@@ -684,10 +690,16 @@ class MCPAgent:
 
             # --- Loop finished ---
             if not result:
-                logger.warning(f"⚠️ Agent stopped after reaching max iterations ({steps})")
-                result = f"Agent stopped after reaching the maximum number of steps ({steps})."
-                if run_manager:
-                    await run_manager.on_chain_end({"output": result})
+                if agent_finished_successfully:
+                    # Agent finished successfully but returned empty output
+                    result = "Agent completed the task successfully."
+                    logger.info("✅ Agent finished successfully with empty output")
+                else:
+                    # Agent actually reached max iterations
+                    logger.warning(f"⚠️ Agent stopped after reaching max iterations ({steps})")
+                    result = f"Agent stopped after reaching the maximum number of steps ({steps})."
+                    if run_manager:
+                        await run_manager.on_chain_end({"output": result})
 
             # If structured output was requested but not achieved, attempt one final time
             if output_schema and structured_llm and not success:
