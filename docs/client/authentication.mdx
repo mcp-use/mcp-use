@@ -34,10 +34,10 @@ config = {
                     "id": "linear",
                     "display_name": "Linear",
                     "metadata": {
-                        "issuer": "https://linear.app",
-                        "authorization_endpoint": "https://linear.app/oauth/authorize",
-                        "token_endpoint": "https://linear.app/oauth/token",
-                        "registration_endpoint": "https://linear.app/oauth/register"
+                        "issuer": "https://mcp.linear.app",
+                        "authorization_endpoint": "https://mcp.linear.app/authorize",
+                        "token_endpoint": "https://mcp.linear.app/token",
+                        "registration_endpoint": "https://mcp.linear.app/register"
                     }
                 }
             }
@@ -55,12 +55,11 @@ For servers with pre-registered OAuth applications:
 ```python
 config = {
     "mcpServers": {
-        "github": {
-            "url": "https://mcp.github.com/sse",
+        "linear": {
+            "url": "https://mcp.supported.clientid/",
             "auth": {
                 "client_id": "your-registered-client-id",
                 "client_secret": "your-client-secret",  # Optional
-                "scope": "repo read:user"
             }
         }
     }
@@ -151,9 +150,10 @@ config = {
                     "id": "linear",
                     "display_name": "Linear",
                     "metadata": {
-                        "issuer": "https://linear.app",
-                        "authorization_endpoint": "https://linear.app/oauth/authorize",
-                        "token_endpoint": "https://linear.app/oauth/token"
+                        "issuer": "https://mcp.linear.app",
+                        "authorization_endpoint": "https://mcp.linear.app/authorize",
+                        "token_endpoint": "https://mcp.linear.app/token",
+                        "registration_endpoint": "https://mcp.linear.app/register"
                     }
                 }
             }
