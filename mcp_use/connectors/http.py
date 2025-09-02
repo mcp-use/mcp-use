@@ -8,8 +8,9 @@ through HTTP APIs with SSE or Streamable HTTP for transport.
 from typing import Any
 
 import httpx
-from mcp import ClientSession
+from mcp import ClientSession, McpError
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.shared.exceptions import McpError
 
 from mcp_use.auth.oauth import OAuthClientProvider
 
@@ -201,22 +202,37 @@ class HttpConnector(BaseConnector):
                 else:
                     self._prompts = []
 
-            except Exception as exception:
+            except McpError as mcp_error:
+                # This is a protocol error, not a transport error
+                # The server is reachable and speaking MCP, but rejecting our request
+                logger.error("MCP protocol error during initialization: %s", mcp_error)
+
                 # Clean up the test client
                 try:
                     await test_client.__aexit__(None, None, None)
                 except Exception:
                     pass
 
-                if isinstance(exception, httpx.HTTPStatusError):
-                    if exception.response.status_code in [401, 403, 407]:  # Authentication error using status
+                # Don't try SSE fallback for protocol errors - the server is working,
+                # it just doesn't like our request
+                raise mcp_error
+
+            except Exception as init_error:
+                # Clean up the test client
+                try:
+                    await test_client.__aexit__(None, None, None)
+                except Exception:
+                    pass
+
+                if isinstance(init_error, httpx.HTTPStatusError):
+                    if init_error.response.status_code in [401, 403, 407]:  # Authentication error using status
                         # Server requires authentication but OAuth discovery failed
                         raise OAuthAuthenticationError(
-                            f"Server requires authentication (HTTP {exception.response.status_code}) "
+                            f"Server requires authentication (HTTP {init_error.response.status_code}) "
                             "but OAuth discovery failed. Please provide OAuth configuration manually."
-                        ) from exception
+                        ) from init_error
                 else:
-                    raise exception
+                    raise init_error
 
         except Exception as streamable_error:
             logger.debug(f"Streamable HTTP failed: {streamable_error}")
