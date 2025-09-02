@@ -8,7 +8,7 @@ through HTTP APIs with SSE or Streamable HTTP for transport.
 from typing import Any
 
 import httpx
-from mcp import ClientSession, McpError
+from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
 
