@@ -69,7 +69,7 @@ class OAuthClientProvider(BaseModel):
 class TokenData(BaseModel):
     """OAuth token data.
 
-    These are the information received after
+    This is the information received after
     successfull authentication"""
 
     access_token: str  # Actual credential used for requests
