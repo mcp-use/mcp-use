@@ -36,3 +36,32 @@ async def primitive_server():
             process.kill()
             process.wait()
     logger.info("Primitive server cleanup complete.")
+
+@pytest.fixture(scope="session")
+async def auth_server():
+    """Starts the auth_server.py as a subprocess for integration tests."""
+    server_path = Path(__file__).parent / "servers_for_testing" / "auth_server.py"
+    logger.info(f"Starting auth server: python {server_path}")
+
+    process = subprocess.Popen(
+        ["python", str(server_path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    # Allow server to initialize
+    await asyncio.sleep(2)
+
+    yield "http://127.0.0.1:8081"
+
+    logger.info("Cleaning up auth server process")
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logger.warning("Server process did not terminate gracefully, killing.")
+            process.kill()
+            process.wait()
+    logger.info("Auth server cleanup complete.")
