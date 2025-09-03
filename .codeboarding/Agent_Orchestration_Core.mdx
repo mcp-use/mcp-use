@@ -1,0 +1,29 @@
+# Agent Orchestration Core
+```mermaid
+graph LR
+    MCPAgent["MCPAgent"]
+    SystemPromptConstructor["SystemPromptConstructor"]
+    MCPAgent -- "calls" --> SystemPromptConstructor
+    MCPAgent -- "configures with" --> SystemPromptConstructor
+```
+
+### Details
+
+The MCPAgent serves as the central control unit for the LLM agent, managing its lifecycle and interactions. A key aspect of its operation involves dynamically configuring the LLM's context through a system prompt. This is achieved by calling the `create_system_message` function, which acts as the `SystemPromptConstructor`. This function gathers tool descriptions, templates, and other contextual information to build a tailored system prompt. The `MCPAgent` then utilizes this constructed system prompt to initialize and guide its internal `AgentExecutor`, which is responsible for executing the LLM's reasoning and tool interactions. This clear separation of concerns ensures that prompt generation is modular and the `MCPAgent` remains focused on orchestration.
+
+### MCPAgent
+The MCPAgent is the core orchestrator of the LLM agent's lifecycle and execution. It manages the entire interaction flow, from processing user queries and maintaining conversation history to orchestrating LLM reasoning, selecting appropriate tools, and generating responses. It acts as the central decision-making unit, leveraging the `create_system_message` function to configure its LLM context and interacting with external layers for LLM execution and tool management.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L48-L1095" target="_blank" rel="noopener noreferrer">QName:`MCPAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py`, Lines:(48:1095)</a>
+
+
+### SystemPromptConstructor
+The SystemPromptConstructor is a crucial utility function responsible for dynamically constructing the comprehensive system prompt that guides the `MCPAgent`'s behavior. This involves gathering and formatting tool descriptions, and integrating other contextual information to create an effective and well-structured prompt for the underlying LLM, ensuring the agent has the necessary context to perform its tasks.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py#L59-L103" target="_blank" rel="noopener noreferrer">QName:`create_system_message` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`, Lines:(59:103)</a>

@@ -106,6 +106,7 @@
             "group": "Development",
             "pages": [
               "development",
+              "development/architecture",
               "development/telemetry",
               "development/observability"
             ]

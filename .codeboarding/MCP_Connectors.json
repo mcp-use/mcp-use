@@ -1,0 +1,117 @@
+{
+  "description": "The MCP Connectors subsystem provides foundational interfaces and concrete implementations for various communication protocols used to interact with the Multi-Agent Communication Protocol (MCP).",
+  "components": [
+    {
+      "name": "BaseConnector",
+      "description": "An abstract base class that establishes the contract for all MCP communication. It defines a consistent interface for core operations such as connecting, disconnecting, initializing, calling tools, listing resources, and making general requests to the MCP. This component is crucial for enforcing a standardized interaction model across different communication protocols.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "BaseConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 37,
+          "reference_end_line": 453
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "WebSocketConnector",
+      "description": "A concrete implementation of `BaseConnector` specifically designed for WebSocket-based communication with the MCP. It handles the low-level details of establishing and managing connections over the WebSocket protocol, translating abstract MCP operations into WebSocket messages.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "WebSocketConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 21,
+          "reference_end_line": 248
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "SandboxConnector",
+      "description": "A concrete implementation of `BaseConnector` tailored for interacting with the MCP within a sandboxed environment. This connector abstracts the complexities of a sandboxed execution context, allowing agents to safely perform operations without direct system access.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "SandboxConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py",
+          "reference_start_line": 35,
+          "reference_end_line": 302
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Configuration Manager",
+      "description": "Responsible for dynamically instantiating the appropriate concrete `BaseConnector` implementation (e.g., `WebSocketConnector`, `SandboxConnector`) based on the application's configuration. It acts as a factory for connectors, decoupling their creation from their usage.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "create_connector_from_config",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/config.py",
+          "reference_start_line": 31,
+          "reference_end_line": 99
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "External Modules",
+      "description": "Represents any module or component within the broader LLM Agent Framework that needs to interact with the MCP. These modules utilize the `BaseConnector` interface to perform operations like calling tools, listing resources, or sending requests, without needing to know the underlying communication protocol.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use/adapters/base.py",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/base.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": true
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "Implemented by",
+      "src_name": "BaseConnector",
+      "dst_name": "WebSocketConnector"
+    },
+    {
+      "relation": "Implemented by",
+      "src_name": "BaseConnector",
+      "dst_name": "SandboxConnector"
+    },
+    {
+      "relation": "Implements",
+      "src_name": "WebSocketConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "Instantiated by",
+      "src_name": "WebSocketConnector",
+      "dst_name": "Configuration Manager"
+    },
+    {
+      "relation": "Implements",
+      "src_name": "SandboxConnector",
+      "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "Instantiated by",
+      "src_name": "SandboxConnector",
+      "dst_name": "Configuration Manager"
+    },
+    {
+      "relation": "Instantiates",
+      "src_name": "Configuration Manager",
+      "dst_name": "WebSocketConnector"
+    },
+    {
+      "relation": "Instantiates",
+      "src_name": "Configuration Manager",
+      "dst_name": "SandboxConnector"
+    },
+    {
+      "relation": "Interacts with",
+      "src_name": "External Modules",
+      "dst_name": "BaseConnector"
+    }
+  ]
+}

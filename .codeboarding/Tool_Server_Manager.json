@@ -1,0 +1,166 @@
+{
+  "description": "The Server Management subsystem is orchestrated by the ServerManager, which serves as the central component for handling MCP server connections and dynamically providing a suite of tools. The ServerManager directly instantiates and offers essential Management Tools such as ListServersTool, ConnectServerTool, GetActiveServerTool, DisconnectServerTool, and SearchToolsTool. These tools enable agents to interact with and manage server states. For dynamic tool discovery, the ToolSearchEngine provides core indexing and semantic search capabilities, which are exposed through the SearchTools adapter. The SearchToolsTool, provided by the ServerManager, allows agents to leverage this search functionality. This architecture emphasizes a clear separation of concerns, with the ServerManager acting as a unified interface for server operations and tool provisioning, while the ToolSearchEngine handles the complexities of tool discovery.",
+  "components": [
+    {
+      "name": "ServerManager",
+      "description": "The central orchestrator for MCP server connections and dynamic tool provision. It manages server sessions, pre-fetches server-specific tools, and directly instantiates core server management tools. This component is crucial for the \"Client-Server Architecture\" and \"Orchestration\" patterns, managing the lifecycle and availability of server-centric functionalities.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": 11,
+          "reference_end_line": 124
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "ToolSearchEngine",
+      "description": "Provides the core functionality for indexing and semantically searching tools, including embedding model loading and cosine similarity calculations. It is central to the \"Tool-use/Function Calling\" pattern, enabling dynamic tool discovery.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.ToolSearchEngine",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 58,
+          "reference_end_line": 328
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "SearchTools",
+      "description": "A callable tool that acts as an adapter for the `ToolSearchEngine`, making tool discovery accessible within the agent framework. This component embodies the \"Adapter Pattern\".",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.SearchTools",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 23,
+          "reference_end_line": 55
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "ListServersTool",
+      "description": "A concrete management tool provided by `ServerManager` to list all currently connected MCP servers. It encapsulates the logic for interacting with the server registry to retrieve server information.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.list_servers_tool.ListServersTool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/list_servers_tool.py",
+          "reference_start_line": 17,
+          "reference_end_line": 54
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "ConnectServerTool",
+      "description": "A concrete management tool provided by `ServerManager` to initiate a connection to a specified MCP server. This tool provides the functionality to manage server connections directly.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.connect_server_tool.ConnectServerTool",
+          "reference_file": null,
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "GetActiveServerTool",
+      "description": "A concrete management tool provided by `ServerManager` for identifying and returning information about the currently active MCP server. This tool provides a focused capability for querying the active server's status.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.get_active_server.GetActiveServerTool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/get_active_server.py",
+          "reference_start_line": 14,
+          "reference_end_line": 29
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "DisconnectServerTool",
+      "description": "A concrete management tool provided by `ServerManager` for initiating a disconnection from a specified MCP server. This tool provides the functionality to manage server connections directly.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.disconnect_server.DisconnectServerTool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/disconnect_server.py",
+          "reference_start_line": 17,
+          "reference_end_line": 44
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "SearchToolsTool",
+      "description": "A concrete management tool provided by `ServerManager` that exposes the `SearchTools` functionality, allowing agents to dynamically search for available tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools_tool.SearchToolsTool",
+          "reference_file": null,
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "provides",
+      "src_name": "ServerManager",
+      "dst_name": "ListServersTool"
+    },
+    {
+      "relation": "provides",
+      "src_name": "ServerManager",
+      "dst_name": "ConnectServerTool"
+    },
+    {
+      "relation": "provides",
+      "src_name": "ServerManager",
+      "dst_name": "GetActiveServerTool"
+    },
+    {
+      "relation": "provides",
+      "src_name": "ServerManager",
+      "dst_name": "DisconnectServerTool"
+    },
+    {
+      "relation": "provides",
+      "src_name": "ServerManager",
+      "dst_name": "SearchToolsTool"
+    },
+    {
+      "relation": "delegates to",
+      "src_name": "SearchTools",
+      "dst_name": "ToolSearchEngine"
+    },
+    {
+      "relation": "invokes",
+      "src_name": "SearchToolsTool",
+      "dst_name": "SearchTools"
+    },
+    {
+      "relation": "queries",
+      "src_name": "ListServersTool",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "requests",
+      "src_name": "ConnectServerTool",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "queries",
+      "src_name": "GetActiveServerTool",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "requests",
+      "src_name": "DisconnectServerTool",
+      "dst_name": "ServerManager"
+    }
+  ]
+}
