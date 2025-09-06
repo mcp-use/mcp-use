@@ -1,0 +1,118 @@
+{
+  "description": "The `mcp-use` agent subsystem is orchestrated by the `McPAgent`, which acts as the core intelligence, managing interactions with an \"Underlying LLM Agent\" for reasoning and response generation. The `McPAgent` dynamically constructs system prompts using the `SystemPromptBuilder`, which in turn leverages `Prompt Templates` for modular and reusable prompt content. All agents within the system adhere to the `BaseAgent` interface, ensuring a consistent contract for agent behavior. The \"Underlying LLM Agent\" represents the actual LLM integration, either directly through a LangChain `BaseLanguageModel` or via a `RemoteAgent` for remote execution, abstracting the specifics of the LLM provider. This architecture promotes modularity, prompt engineering best practices, and flexible LLM integration.",
+  "components": [
+    {
+      "name": "McPAgent",
+      "description": "The central orchestrator of the agent's lifecycle, responsible for LLM interaction, reasoning, dynamic prompt construction, and coordinating external tool utilization. It embodies the \"Agent Core\" pattern.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.McPAgent",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_start_line": 48,
+          "reference_end_line": 1107
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "SystemPromptBuilder",
+      "description": "Manages the dynamic construction of the comprehensive system prompt for the LLM, aligning with \"Prompt Engineering\" principles.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.SystemPromptBuilder",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "Prompt Templates",
+      "description": "Provides reusable, predefined structures and content for various parts of the system prompt, supporting \"Prompt Engineering\" and \"Modular Design.\"",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.prompts.templates",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/templates.py",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "BaseAgent",
+      "description": "Defines the foundational contract and common interface that all agents must adhere to, promoting \"Modular Design\" and the \"Adapter Pattern.\"",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.base.BaseAgent",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/base.py",
+          "reference_start_line": 13,
+          "reference_end_line": 61
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Underlying LLM Agent",
+      "description": "Represents the \"LLM Integration Layer,\" abstracting the specifics of the LLM provider and focusing on core function calling and response generation. This is a conceptual component that `McPAgent` interacts with, either directly via a LangChain `BaseLanguageModel` instance or through a `RemoteAgent` for remote execution.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "langchain_core.language_models.BaseLanguageModel",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/",
+          "reference_start_line": 0,
+          "reference_end_line": 0
+        },
+        {
+          "qualified_name": "mcp_use.agents.remote.RemoteAgent",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/remote.py",
+          "reference_start_line": 34,
+          "reference_end_line": 327
+        }
+      ],
+      "can_expand": true
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "requests system prompt construction from",
+      "src_name": "McPAgent",
+      "dst_name": "SystemPromptBuilder"
+    },
+    {
+      "relation": "initializes and configures",
+      "src_name": "McPAgent",
+      "dst_name": "Underlying LLM Agent"
+    },
+    {
+      "relation": "implements the interface defined by",
+      "src_name": "McPAgent",
+      "dst_name": "BaseAgent"
+    },
+    {
+      "relation": "directs to execute LLM operations",
+      "src_name": "McPAgent",
+      "dst_name": "Underlying LLM Agent"
+    },
+    {
+      "relation": "provides structured system messages to",
+      "src_name": "SystemPromptBuilder",
+      "dst_name": "McPAgent"
+    },
+    {
+      "relation": "utilizes for constructing prompt content",
+      "src_name": "SystemPromptBuilder",
+      "dst_name": "Prompt Templates"
+    },
+    {
+      "relation": "supplies predefined prompt structures and content to",
+      "src_name": "Prompt Templates",
+      "dst_name": "SystemPromptBuilder"
+    },
+    {
+      "relation": "defines the contract for",
+      "src_name": "BaseAgent",
+      "dst_name": "McPAgent"
+    }
+  ]
+}

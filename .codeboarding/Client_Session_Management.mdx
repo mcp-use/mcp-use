@@ -1,0 +1,36 @@
+# Client Session Management
+```mermaid
+graph LR
+    Client_Session_Orchestrator["Client Session Orchestrator"]
+    Single_Client_Session_Handler["Single Client Session Handler"]
+    Client_Session_Orchestrator -- "orchestrates" --> Single_Client_Session_Handler
+```
+
+### Details
+
+The Client & Session Management subsystem, primarily defined by the `mcp_use.client` and `mcp_use.session` modules, encapsulates the logic for establishing, maintaining, and terminating connections to MCP servers. It manages the overall user session lifecycle within the `mcp-use` framework, providing the capability to manage multiple, potentially concurrent, connections to various MCP servers, which is essential for agents interacting with diverse services or other agents.
+
+### Client Session Orchestrator
+This component is responsible for the high-level orchestration and aggregation of multiple client sessions. It manages the creation, lifecycle, and termination of individual sessions, acting as a central point for managing the overall client-side connectivity to MCP servers. This aligns with the "Orchestration" pattern, enabling the framework to manage multiple concurrent agent interactions. Its role is crucial for scaling and managing complex multi-agent scenarios.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L218-L244" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.create_all_sessions` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(218:244)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L304-L326" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.close_all_sessions` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(304:326)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L171-L216" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.create_session` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(171:216)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L272-L302" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.close_session` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(272:302)</a>
+
+
+### Single Client Session Handler
+This component manages the complete lifecycle of a single, independent client connection to an MCP server. It handles the establishment, maintenance, and graceful termination of a connection, often leveraging asynchronous context management for reliable resource handling. This component embodies the "Client" aspect of a client-server architecture, providing the fundamental connection capabilities for an individual agent or service. It ensures robust and isolated session management.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L39-L46" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.__aenter__` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(39:46)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L48-L56" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.__aexit__` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(48:56)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L66-L79" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.initialize` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(66:79)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L58-L60" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.connect` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(58:60)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L62-L64" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.disconnect` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(62:64)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L81-L88" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.is_connected` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(81:88)</a>

@@ -1,0 +1,97 @@
+{
+  "description": "The MCP (Multi-Component Platform) system is designed around a flexible tool management and adaptation architecture. At its core, the `BaseTool` defines a universal interface for all tools, ensuring consistency and interoperability. The `ServerManager` acts as a central registry, managing the lifecycle and accessibility of server-hosted tools, making them available to various agents within the system. For dynamic discovery, the `ToolSearchEngine` indexes and facilitates searching for these tools based on their capabilities. To enable integration with external frameworks, the `BaseAdapter` provides an abstract mechanism for transforming MCP entities. A concrete implementation, the `LangChainAdapter`, specifically adapts MCP tools for seamless consumption by the LangChain framework, highlighting the system's extensibility and focus on external framework compatibility. This architecture promotes modularity, discoverability, and adaptability, crucial for a robust multi-component platform.",
+  "components": [
+    {
+      "name": "BaseTool",
+      "description": "Defines the abstract interface and foundational structure for all tools within the MCP ecosystem. It establishes a consistent contract for tool execution, input/output, and metadata, ensuring interoperability across different tool implementations.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "BaseTool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": 1,
+          "reference_end_line": 1
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "ServerManager",
+      "description": "Manages the discovery, registration, and provision of server-managed tools. It acts as a central registry for tools hosted or controlled by an MCP server, making them accessible to agents.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "ServerManager",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/simple_server_manager_use.py",
+          "reference_start_line": 53,
+          "reference_end_line": 74
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "ToolSearchEngine",
+      "description": "Indexes available tools and facilitates their dynamic discovery through search queries. It enables agents to find relevant tools based on their capabilities or descriptions, supporting the \"search-enabled\" aspect of tool access.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "ToolSearchEngine",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 58,
+          "reference_end_line": 328
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "BaseAdapter",
+      "description": "Provides a generic, abstract framework for adapting MCP-defined entities (including tools) into formats compatible with external systems or frameworks. It defines the common interface for conversion logic, promoting extensibility.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "BaseAdapter",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/base.py",
+          "reference_start_line": 20,
+          "reference_end_line": 190
+        }
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "LangChainAdapter",
+      "description": "Specializes the BaseAdapter to specifically translate MCP-defined tools into a format consumable by the LangChain framework. This is crucial for integrating MCP tools with LangChain-based LLM agents, directly addressing the adaptation to \"external frameworks like LangChain.\"",
+      "referenced_source_code": [
+        {
+          "qualified_name": "LangChainAdapter",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 29,
+          "reference_end_line": 268
+        }
+      ],
+      "can_expand": true
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "manages and provides access to",
+      "src_name": "ServerManager",
+      "dst_name": "BaseTool"
+    },
+    {
+      "relation": "indexes and searches for",
+      "src_name": "ToolSearchEngine",
+      "dst_name": "BaseTool"
+    },
+    {
+      "relation": "provides a framework for adapting",
+      "src_name": "BaseAdapter",
+      "dst_name": "BaseTool"
+    },
+    {
+      "relation": "extends",
+      "src_name": "LangChainAdapter",
+      "dst_name": "BaseAdapter"
+    },
+    {
+      "relation": "consumes and transforms",
+      "src_name": "LangChainAdapter",
+      "dst_name": "BaseTool"
+    }
+  ]
+}
