@@ -9,6 +9,7 @@ the from_provider method.
 from typing import Any
 
 import instructor
+from instructor.core.client import AsyncInstructor, Instructor
 
 from ..logging import logger
 
@@ -38,9 +39,9 @@ class LLMClient:
         self.kwargs = kwargs
 
         # Initialize the instructor client using from_provider
-        self.client = self._create_instructor_client()
+        self.client: Instructor | AsyncInstructor = self._create_instructor_client()
 
-    def _create_instructor_client(self) -> Any:
+    def _create_instructor_client(self) -> Instructor | AsyncInstructor:
         """
         Create an instructor-wrapped LLM client using from_provider.
 
@@ -78,9 +79,9 @@ class LLMClient:
         logger.debug(f"Creating instructor client for provider: {provider_string}")
 
         try:
-            client = instructor.from_provider(provider_string, **provider_kwargs)
+            self.client = instructor.from_provider(provider_string, **provider_kwargs)
             logger.debug(f"Successfully created instructor client for {provider_string}")
-            return client
+            return self.client
         except Exception as e:
             logger.error(f"Failed to create instructor client for {provider_string}: {e}")
             raise
