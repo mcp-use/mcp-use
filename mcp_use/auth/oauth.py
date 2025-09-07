@@ -402,6 +402,18 @@ class OAuth:
         logger.debug(f"Discovering OAuth metadata for {self.server_url}")
         # Try well-known endpoint first
         parsed = urlparse(self.server_url)
+
+        # Edge case for GH that doesn't have metadata discovery
+        if parsed.netloc == "api.githubcopilot.com":
+            logger.debug("Detected GitHub MCP server, using its metadata")
+            issuer = "https://github.com/login/oauth"
+            authorization_endpoint = "https://github.com/login/oauth/authorize"
+            token_endpoint = "https://github.com/login/oauth/access_token"
+            self._metadata = ServerOAuthMetadata(
+                issuer=issuer, authorization_endpoint=authorization_endpoint, token_endpoint=token_endpoint
+            )
+            return
+
         base_url = f"{parsed.scheme}://{parsed.netloc}"
         well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
 
