@@ -92,18 +92,20 @@ class HttpConnector(BaseConnector):
                     oauth_provider = OAuthClientProvider(**oauth_provider)
                 self._oauth = OAuth(
                     self.base_url,
+                    scope=auth.get("scope"),
                     client_id=auth.get("client_id"),
                     client_secret=auth.get("client_secret"),
-                    scope=auth.get("scope"),
+                    callback_port=auth.get("callback_port"),
                     oauth_provider=oauth_provider,
                 )
                 self._oauth_config = auth
             else:
                 self._oauth = OAuth(
                     self.base_url,
+                    scope=auth.get("scope"),
                     client_id=auth.get("client_id"),
                     client_secret=auth.get("client_secret"),
-                    scope=auth.get("scope"),
+                    callback_port=auth.get("callback_port"),
                 )
                 self._oauth_config = auth
         elif isinstance(auth, httpx.Auth):

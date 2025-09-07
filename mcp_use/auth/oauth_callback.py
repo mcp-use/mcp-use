@@ -27,13 +27,13 @@ class CallbackResponse:
 class OAuthCallbackServer:
     """Local server to handle OAuth callback."""
 
-    def __init__(self, port: int | None = None):
+    def __init__(self, port: int):
         """Initialize the callback server.
 
         Args:
-            port: Port to listen on. If None, will find an available port.
+            port: Port to listen on.
         """
-        self.port = port or 0
+        self.port = port
         self.redirect_uri: str | None = None
         # Thread safe way to pass callback data to the main OAuth flow
         self.response_queue: asyncio.Queue[CallbackResponse] = asyncio.Queue(maxsize=1)
@@ -53,23 +53,13 @@ class OAuthCallbackServer:
         )
         self.server = uvicorn.Server(config)
 
-        # Find available port if needed
-        if self.port == 0:
-            import socket
-
-            sock = socket.socket()
-            sock.bind(("127.0.0.1", 0))
-            self.port = sock.getsockname()[1]  # Get the assigned port
-            sock.close()
-            config.port = self.port
-
         # Start server in background
         self._server_task = asyncio.create_task(self.server.serve())
 
         # Wait a moment for server to start
         await asyncio.sleep(0.1)
 
-        self.redirect_uri = f"http://127.0.0.1:{self.port}/callback"
+        self.redirect_uri = f"http://localhost:{self.port}/callback"
         return self.redirect_uri
 
     async def wait_for_code(self, timeout: float = 300) -> CallbackResponse:

@@ -181,6 +181,7 @@ class OAuth:
         scope: str | None = None,
         client_id: str | None = None,
         client_secret: str | None = None,
+        callback_port: int | None = None,
         oauth_provider: OAuthClientProvider | None = None,
     ):
         """Initialize OAuth handler.
@@ -191,21 +192,31 @@ class OAuth:
             scope: OAuth scopes to request
             client_id: OAuth client ID. If not provided, will attempt dynamic registration
             client_secret: OAuth client secret (for confidential clients)
+            callback_port: Port for local callback server, if empty, 8080 is used
             oauth_provider: OAuth client provider to prevent metadata discovery
         """
         logger.debug(f"Initializing OAuth for server: {server_url}")
         self.server_url = server_url
         self.token_storage = token_storage or FileTokenStorage()
+        self.scope = scope
+        self.client_id = client_id
+        self.client_secret = client_secret
+
+        if callback_port:
+            self.callback_port = callback_port
+            logger.info(f"Using custom callback port {self.callback_port} provided in config")
+        else:
+            self.callback_port = 8080
+            logger.info(f"Using default callback port {self.callback_port}")
+
+        # Set the default redirect uri
+        self.redirect_uri = f"http://localhost:{self.callback_port}/callback"
         self._oauth_provider = oauth_provider
         self._metadata: ServerOAuthMetadata | None = None
 
         if self._oauth_provider:
             self._metadata = self._oauth_provider.oauth_metadata
             logger.debug(f"Using OAuth provider {self._oauth_provider.id} with metadata")
-
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.scope = scope
 
         self._client: AsyncOAuth2Client | None = None
         self._bearer_auth: BearerAuth | None = None
@@ -246,6 +257,21 @@ class OAuth:
             logger.error("OAuth.authenticate called before metadata was discovered.")
             raise OAuthAuthenticationError("OAuth metadata not discovered")
 
+        # The port check should be done now. OAuth servers
+        # register client_id with also redirect_uri, so we
+        # have to ensure port is available before DCR
+        try:
+            import socket
+
+            sock = socket.socket()
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(("127.0.0.1", self.callback_port))
+            sock.close()
+            logger.debug(f"Using registered port {self.callback_port} for callback")
+        except (ValueError, OSError) as exception:
+            logger.error(f"The port {self.callback_port} is not available! Try using a different port!")
+            raise exception
+
         # Try to get client_id - either from config or dynamic registration
         client_id = self.client_id
         client_secret = self.client_secret
@@ -284,35 +310,14 @@ class OAuth:
         self._client = AsyncOAuth2Client(
             client_id=client_id,
             client_secret=client_secret,
-            redirect_uri="http://127.0.0.1:0/callback",  # Will be updated with actual port
+            redirect_uri=self.redirect_uri,
             scope=self.scope,
         )
 
         # Start callback server
         logger.debug("Starting OAuth callback server")
 
-        # If we used DCR, try to use one of the registered ports
-        callback_port = None
-        if registration:
-            # Try ports in order until we find an available one
-            for uri in registration.redirect_uris:
-                if uri.startswith("http://127.0.0.1:") and "/callback" in uri:
-                    try:
-                        port = int(uri.split(":")[2].split("/")[0])
-                        # Quick check if port is available
-                        import socket
-
-                        sock = socket.socket()
-                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                        sock.bind(("127.0.0.1", port))
-                        sock.close()
-                        callback_port = port
-                        logger.debug(f"Using registered port {port} for callback")
-                        break
-                    except (ValueError, OSError):
-                        continue
-
-        callback_server = OAuthCallbackServer(port=callback_port)
+        callback_server = OAuthCallbackServer(port=self.callback_port)
         redirect_uri = await callback_server.start()
         self._client.redirect_uri = redirect_uri
         logger.debug(f"Callback server started, redirect_uri: {redirect_uri}")
@@ -461,21 +466,9 @@ class OAuth:
         logger.info("Attempting Dynamic Client Registration")
         logger.debug(f"DCR endpoint: {self._metadata.registration_endpoint}")
 
-        # Prepare registration request
-        # Register multiple redirect URIs to support dynamic port allocation
-        # Most OAuth servers will accept at least one of these ports
-        redirect_uris = [
-            "http://127.0.0.1:8080/callback",
-            "http://127.0.0.1:8081/callback",
-            "http://127.0.0.1:8082/callback",
-            "http://127.0.0.1:8083/callback",
-            "http://127.0.0.1:8084/callback",
-            "http://localhost/callback",  # Some servers support this as a wildcard
-        ]
-
         registration_data = {
             "client_name": "mcp-use",
-            "redirect_uris": redirect_uris,
+            "redirect_uris": [self.redirect_uri],
             "grant_types": ["authorization_code"],
             "response_types": ["code"],
             "token_endpoint_auth_method": "none",  # Public client
