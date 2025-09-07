@@ -539,15 +539,15 @@ class MCPReActAgent:
         )
 
         # Memory management
-        self.memory = ConversationMemory() if memory_enabled else None
+        self.memory = ConversationMemory(max_turns=max_steps) if memory_enabled else None
 
         # System prompt
         self.system_prompt = system_prompt or self._get_default_system_prompt()
 
         # Telemetry
         self.telemetry = Telemetry()
-        self._model_provider = self.llm_client.model_provider
-        self._model_name = self.model_name
+        self._model_provider = self.llm_client.model_name.split("/")[0] or "unknown"
+        self._model_name = self.llm_client.model_name.split("/")[1] or "unknown"
 
     def _get_default_system_prompt(self) -> str:
         """Get the default ReAct system prompt."""
@@ -670,8 +670,8 @@ Remember:
                 success=success,
                 model_provider=self._model_provider,
                 model_name=self._model_name,
-                server_count=len(self.connectors),
-                server_identifiers=[],
+                server_count=len(self.client.get_all_active_sessions()) if self.client else len(self.connectors),
+                server_identifiers=[connector.public_identifier for connector in self.connectors],
                 total_tools_available=len(self.tool_adapter.tools),
                 tools_available_names=list(self.tool_adapter.tools.keys()),
                 max_steps_configured=self.max_steps,
