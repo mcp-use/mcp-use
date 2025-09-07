@@ -13,6 +13,8 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field, field_validator
 
+from mcp_use.adapters.react_adapter import ReactAdapter
+from mcp_use.agents.prompts.templates import DEFAULT_REACT_SYSTEM_PROMPT_TEMPLATE
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
 from mcp_use.llm import LLMClient
@@ -134,69 +136,31 @@ class ConversationMemory:
         return "\n".join(formatted)
 
 
-class MCPToolAdapter:
-    """Adapts MCP tools for use in the ReAct agent."""
+class ReActExecutor:
+    """Core execution engine for the ReAct loop."""
 
-    def __init__(self, client: MCPClient | None = None, connectors: list[BaseConnector] | None = None):
-        """Initialize the MCP tool adapter.
+    def __init__(
+        self,
+        llm_client: Any,
+        tools: dict[str, dict[str, Any]],
+        max_steps: int = 5,
+        verbose: bool = False,
+    ):
+        """Initialize the ReAct executor.
 
         Args:
-            client: Optional MCPClient instance.
-            connectors: Optional list of MCP connectors.
+            llm_client: Instructor-wrapped LLM client.
+            tools: Dictionary of available tools.
+            max_steps: Maximum number of reasoning steps.
+            verbose: Whether to print detailed logs.
         """
-        self.client = client
-        self.connectors = connectors or []
-        self.tools: dict[str, Any] = {}
-        self._initialized = False
+        self.llm_client = llm_client
+        self.tools = tools
+        self.max_steps = max_steps
+        self.verbose = verbose
+        self.steps: list[ReActStep] = []
 
-    async def initialize(self) -> None:
-        """Initialize and discover available tools."""
-        if self._initialized:
-            return
-
-        logger.info("Discovering MCP tools...")
-
-        if self.client:
-            # Get tools from client
-            sessions = self.client.get_all_active_sessions()
-            if not sessions:
-                sessions = await self.client.create_all_sessions()
-
-            for _session_id, session in sessions.items():
-                tools = await session.list_tools()
-                for tool in tools:
-                    tool_name = tool.name
-                    self.tools[tool_name] = {
-                        "session": session,
-                        "schema": tool.inputSchema if hasattr(tool, "inputSchema") else {},
-                        "description": tool.description if hasattr(tool, "description") else "",
-                    }
-                    logger.debug(f"Discovered tool: {tool_name}")
-
-        elif self.connectors:
-            # Get tools from direct connectors
-            for connector in self.connectors:
-                if not hasattr(connector, "client_session") or connector.client_session is None:
-                    await connector.connect()
-
-                # Initialize the session
-                session = connector.client_session
-                await session.initialize()
-
-                tools = await session.list_tools()
-                for tool in tools:
-                    tool_name = tool.name
-                    self.tools[tool_name] = {
-                        "session": session,
-                        "schema": tool.inputSchema if hasattr(tool, "inputSchema") else {},
-                        "description": tool.description if hasattr(tool, "description") else "",
-                    }
-                    logger.debug(f"Discovered tool: {tool_name}")
-
-        self._initialized = True
-        logger.info(f"Discovered {len(self.tools)} tools")
-
-    async def execute_tool(self, name: str, params: dict | None = None) -> str:
+    async def _execute_tool(self, name: str, params: dict | None = None) -> str:
         """Execute a tool and return the result.
 
         Args:
@@ -211,79 +175,53 @@ class MCPToolAdapter:
 
         try:
             tool_info = self.tools[name]
+            tool_type = tool_info.get("type", "tool")
             session = tool_info["session"]
 
-            # Execute the tool
-            result = await session.call_tool(name, arguments=params or {})
-
-            # Format the result
-            if hasattr(result, "content"):
-                # Handle different content types
-                content = result.content
-                if isinstance(content, list):
-                    # Join multiple content items
-                    formatted_parts = []
-                    for item in content:
-                        if hasattr(item, "text"):
-                            formatted_parts.append(item.text)
-                        elif hasattr(item, "type") and item.type == "text":
-                            formatted_parts.append(item.text)
-                        else:
-                            formatted_parts.append(str(item))
-                    return "\n".join(formatted_parts)
-                elif hasattr(content, "text"):
-                    return content.text
-                else:
-                    return str(content)
+            if tool_type == "resource":
+                # Handle resource tools
+                resource_uri = tool_info["resource_uri"]
+                result = await session.read_resource(resource_uri)
+                # Format resource content
+                content_parts = []
+                for content in result.contents:
+                    if isinstance(content, bytes):
+                        content_parts.append(content.decode())
+                    else:
+                        content_parts.append(str(content))
+                return "\n".join(content_parts)
+            elif tool_type == "prompt":
+                # Handle prompt tools
+                prompt_name = tool_info["prompt_name"]
+                result = await session.get_prompt(prompt_name, params or {})
+                # Format prompt messages
+                return str(result.messages)
             else:
-                return str(result)
+                # Handle regular tools
+                result = await session.call_tool(name, arguments=params or {})
+                # Format the result
+                if hasattr(result, "content"):
+                    content = result.content
+                    if isinstance(content, list):
+                        formatted_parts = []
+                        for item in content:
+                            if hasattr(item, "text"):
+                                formatted_parts.append(item.text)
+                            elif hasattr(item, "type") and item.type == "text":
+                                formatted_parts.append(item.text)
+                            else:
+                                formatted_parts.append(str(item))
+                        return "\n".join(formatted_parts)
+                    elif hasattr(content, "text"):
+                        return content.text
+                    else:
+                        return str(content)
+                else:
+                    return str(result)
 
         except Exception as e:
             logger.error(f"Error executing tool {name}: {e}")
             return f"Error executing tool '{name}': {str(e)}"
-
-    def get_tool_descriptions(self) -> str:
-        """Get formatted descriptions of all available tools."""
-        if not self.tools:
-            return "No tools available."
-
-        descriptions = []
-        for name, info in self.tools.items():
-            desc = f"- {name}: {info['description']}"
-            if info.get("schema"):
-                desc += f"\n  Parameters: {json.dumps(info['schema'], indent=2)}"
-            descriptions.append(desc)
-
-        return "\n".join(descriptions)
-
-    def get_tool_names(self) -> list[str]:
-        """Get list of available tool names."""
-        return list(self.tools.keys())
-
-
-class ReActExecutor:
-    """Core execution engine for the ReAct loop."""
-
-    def __init__(
-        self,
-        llm_client: Any,
-        tool_adapter: MCPToolAdapter,
-        max_steps: int = 5,
-        verbose: bool = False,
-    ):
-        """Initialize the ReAct executor.
-
-        Args:
-            llm_client: Instructor-wrapped LLM client.
-            tool_adapter: MCP tool adapter.
-            max_steps: Maximum number of reasoning steps.
-            verbose: Whether to print detailed logs.
-        """
-        self.llm_client = llm_client
-        self.tool_adapter = tool_adapter
-        self.max_steps = max_steps
-        self.verbose = verbose
-        self.steps: list[ReActStep] = []
 
     def _build_prompt(self, query: str, steps: list[ReActStep]) -> str:
         """Build the prompt for the next reasoning step.
@@ -383,7 +321,7 @@ class ReActExecutor:
                         logger.info(f"Action Input: {response.action_input}")
 
                     # Execute the tool
-                    observation = await self.tool_adapter.execute_tool(response.action, response.action_input)
+                    observation = await self._execute_tool(response.action, response.action_input)
                     step.observation = observation
 
                     if self.verbose:
@@ -459,7 +397,7 @@ class ReActExecutor:
                     yield (StepType.ACTION, f"{response.action} with {json.dumps(response.action_input)}")
 
                     # Execute the tool
-                    observation = await self.tool_adapter.execute_tool(response.action, response.action_input)
+                    observation = await self._execute_tool(response.action, response.action_input)
                     yield (StepType.OBSERVATION, observation)
 
                     # Create step for history
@@ -498,6 +436,9 @@ class MCPReActAgent:
         memory_enabled: bool = True,
         system_prompt: str | None = None,
         verbose: bool = False,
+        disallowed_tools: list[str] | None = None,
+        include_resources: bool = True,
+        include_prompts: bool = True,
     ):
         """Initialize the ReAct agent.
 
@@ -512,6 +453,9 @@ class MCPReActAgent:
             memory_enabled: Whether to maintain conversation history.
             system_prompt: Optional custom system prompt.
             verbose: Whether to print detailed logs.
+            disallowed_tools: List of tool names that should not be available.
+            include_resources: Whether to include resources as tools.
+            include_prompts: Whether to include prompts as tools.
         """
         self.client = client
         self.connectors = connectors or []
@@ -529,11 +473,20 @@ class MCPReActAgent:
         )
         self.model_name = model_name
 
-        # Initialize components
-        self.tool_adapter = MCPToolAdapter(client=client, connectors=connectors)
+        # Initialize adapter
+        self.adapter = ReactAdapter(
+            disallowed_tools=disallowed_tools,
+            include_resources=include_resources,
+            include_prompts=include_prompts,
+        )
+
+        # Tools dictionary will be populated during initialization
+        self.tools: dict[str, dict[str, Any]] = {}
+
+        # Initialize executor with empty tools (will be updated during initialization)
         self.executor = ReActExecutor(
             llm_client=self.llm_client,
-            tool_adapter=self.tool_adapter,
+            tools=self.tools,
             max_steps=max_steps,
             verbose=verbose,
         )
@@ -542,26 +495,12 @@ class MCPReActAgent:
         self.memory = ConversationMemory(max_turns=max_steps) if memory_enabled else None
 
         # System prompt
-        self.system_prompt = system_prompt or self._get_default_system_prompt()
+        self.system_prompt = system_prompt or DEFAULT_REACT_SYSTEM_PROMPT_TEMPLATE
 
         # Telemetry
         self.telemetry = Telemetry()
-        self._model_provider = self.llm_client.model_name.split("/")[0] or "unknown"
-        self._model_name = self.llm_client.model_name.split("/")[1] or "unknown"
-
-    def _get_default_system_prompt(self) -> str:
-        """Get the default ReAct system prompt."""
-        return """You are a helpful assistant that uses the ReAct (Reasoning and Acting) framework to solve problems.
-
-Follow this approach:
-1. Thought: Reason about what you need to do
-2. Action: Choose an action to take from available tools
-3. Observation: Observe the result
-4. Repeat until you have enough information
-5. Provide a final answer
-
-Always start with a thought about the problem. Be systematic and thorough in your reasoning.
-When you have sufficient information, provide a clear and complete final answer."""
+        self._model_provider = self.llm_client.provider.name
+        self._model_name = self.llm_client.model_name or "unknown"
 
     async def initialize(self) -> None:
         """Initialize the agent and discover tools."""
@@ -570,12 +509,23 @@ When you have sufficient information, provide a clear and complete final answer.
 
         logger.info("Initializing ReAct agent...")
 
-        # Initialize tool adapter
-        await self.tool_adapter.initialize()
+        # Use adapter to create tools
+        if self.client:
+            # Create tools from client
+            tool_list = await self.adapter.create_tools(self.client)
+        else:
+            # Create tools from connectors
+            tool_list = await self.adapter._create_tools_from_connectors(self.connectors)
+
+        # Convert list of tool dicts to dictionary keyed by name
+        self.tools = {tool["name"]: tool for tool in tool_list}
+
+        # Update executor with the tools
+        self.executor.tools = self.tools
 
         # Build system prompt with tool descriptions
-        tool_descriptions = self.tool_adapter.get_tool_descriptions()
-        tool_names = self.tool_adapter.get_tool_names()
+        tool_descriptions = self._get_tool_descriptions()
+        tool_names = list(self.tools.keys())
 
         full_system_prompt = f"""{self.system_prompt}
 
@@ -595,7 +545,21 @@ Remember:
             self.memory.add_message("system", full_system_prompt)
 
         self._initialized = True
-        logger.info(f"ReAct agent initialized with {len(self.tool_adapter.tools)} tools")
+        logger.info(f"ReAct agent initialized with {len(self.tools)} tools")
+
+    def _get_tool_descriptions(self) -> str:
+        """Get formatted descriptions of all available tools."""
+        if not self.tools:
+            return "No tools available."
+
+        descriptions = []
+        for name, info in self.tools.items():
+            desc = f"- {name}: {info['description']}"
+            if info.get("schema"):
+                desc += f"\n  Parameters: {json.dumps(info['schema'], indent=2)}"
+            descriptions.append(desc)
+
+        return "\n".join(descriptions)
 
     async def run(
         self,
@@ -672,8 +636,8 @@ Remember:
                 model_name=self._model_name,
                 server_count=len(self.client.get_all_active_sessions()) if self.client else len(self.connectors),
                 server_identifiers=[connector.public_identifier for connector in self.connectors],
-                total_tools_available=len(self.tool_adapter.tools),
-                tools_available_names=list(self.tool_adapter.tools.keys()),
+                total_tools_available=len(self.tools),
+                tools_available_names=list(self.tools.keys()),
                 max_steps_configured=self.max_steps,
                 memory_enabled=self.memory_enabled,
                 use_server_manager=False,
@@ -740,6 +704,13 @@ Remember:
         elif self.connectors:
             for connector in self.connectors:
                 await connector.disconnect()
+
+        # Clear tools
+        self.tools.clear()
+
+        # Clear adapter cache
+        if hasattr(self.adapter, "_connector_tool_map"):
+            self.adapter._connector_tool_map.clear()
 
         # Clear memory
         if self.memory:
