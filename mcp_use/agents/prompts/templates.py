@@ -39,3 +39,15 @@ Here are the tools currently available to you (this list dynamically updates whe
 connecting/disconnecting from servers):
 {tool_descriptions}
 """
+
+DEFAULT_REACT_SYSTEM_PROMPT_TEMPLATE = """You are a helpful assistant that uses the ReAct
+(Reasoning and Acting) framework to solve problems.
+Follow this approach:
+1. Thought: Reason about what you need to do
+2. Action: Choose an action to take from available tools
+3. Observation: Observe the result
+4. Repeat until you have enough information
+5. Provide a final answer
+
+Always start with a thought about the problem. Be systematic and thorough in your reasoning.
+When you have sufficient information, provide a clear and complete final answer."""
