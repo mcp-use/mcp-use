@@ -172,9 +172,9 @@ class HttpConnector(BaseConnector):
             try:
                 # Try to initialize - this is where streamable HTTP vs SSE difference should show up
                 result = await test_client.initialize()
+                logger.debug(f"Streamable HTTP initialization result: {result}")
 
                 # If we get here, streamable HTTP works
-
                 self.client_session = test_client
                 self.transport_type = "streamable HTTP"
                 self._initialized = True  # Mark as initialized since we just called initialize()
@@ -204,18 +204,12 @@ class HttpConnector(BaseConnector):
                     self._prompts = []
 
             except McpError as mcp_error:
-                # This is a protocol error, not a transport error
-                # The server is reachable and speaking MCP, but rejecting our request
-                logger.error("MCP protocol error during initialization: %s", mcp_error)
-
+                logger.error("MCP protocol error during initialization: %s", mcp_error.error)
                 # Clean up the test client
                 try:
                     await test_client.__aexit__(None, None, None)
                 except Exception:
                     pass
-
-                # Don't try SSE fallback for protocol errors - the server is working,
-                # it just doesn't like our request
                 raise mcp_error
 
             except Exception as init_error:
@@ -246,15 +240,16 @@ class HttpConnector(BaseConnector):
                     pass
 
             # Check if this is a 4xx error that indicates we should try SSE fallback
+            # HACK: Still sometimes StreamableHTTP will return other errors, so we still try to fallback to SSE
             should_fallback = False
             if isinstance(streamable_error, httpx.HTTPStatusError):
                 if streamable_error.response.status_code in [404, 405]:
                     should_fallback = True
+                    logger.debug("Streamable HTTP failed: 404/ 405 Not Found/ Method Not Allowed")
             elif "405 Method Not Allowed" in str(streamable_error) or "404 Not Found" in str(streamable_error):
                 should_fallback = True
             else:
-                # For other errors, still try fallback but they might indicate
-                # real connectivity issues
+                logger.debug("Streamable HTTP failed, falling back to SSE")
                 should_fallback = True
 
             if should_fallback:
