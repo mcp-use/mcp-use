@@ -2,7 +2,7 @@
 React adapter for MCP tools.
 
 This module provides utilities to convert MCP tools to a format suitable for the ReAct agent.
-Unlike the LangChain adapter, this returns dictionaries that can be used directly by the ReAct agent.
+Unlike the LangChain adapter, this returns ReactTool instances with callable execute functions.
 """
 
 from typing import Any
@@ -12,6 +12,7 @@ from mcp.types import Prompt, Resource, Tool
 from ..connectors.base import BaseConnector
 from ..logging import logger
 from .base import BaseAdapter
+from .types.react_adapter_types import ReactTool, ToolType
 
 
 class ReactAdapter(BaseAdapter):
@@ -33,9 +34,9 @@ class ReactAdapter(BaseAdapter):
         super().__init__(disallowed_tools)
         self.include_resources = include_resources
         self.include_prompts = include_prompts
-        self._connector_tool_map: dict[BaseConnector, list[dict[str, Any]]] = {}
+        self._connector_tool_map: dict[BaseConnector, list[ReactTool]] = {}
 
-    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> dict[str, Any]:
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> ReactTool | None:
         """Convert an MCP tool to ReAct agent's tool format.
 
         Args:
@@ -43,21 +44,49 @@ class ReactAdapter(BaseAdapter):
             connector: The connector that provides this tool.
 
         Returns:
-            A dictionary containing tool information for the ReAct agent.
+            A ReactTool instance for the ReAct agent.
         """
         # Skip disallowed tools
         if mcp_tool.name in self.disallowed_tools:
             return None
 
-        return {
-            "name": mcp_tool.name,
-            "session": connector.client_session,
-            "schema": mcp_tool.inputSchema if hasattr(mcp_tool, "inputSchema") else {},
-            "description": mcp_tool.description if hasattr(mcp_tool, "description") else "",
-            "type": "tool",
-        }
+        # Create the execute function that calls the tool
+        async def execute(params: dict[str, Any] | None = None) -> str:
+            """Execute the tool and return the result as a string."""
+            try:
+                result = await connector.client_session.call_tool(mcp_tool.name, arguments=params or {})
+                # Format the result
+                if hasattr(result, "content"):
+                    content = result.content
+                    if isinstance(content, list):
+                        formatted_parts = []
+                        for item in content:
+                            if hasattr(item, "text"):
+                                formatted_parts.append(item.text)
+                            elif hasattr(item, "type") and item.type == "text":
+                                formatted_parts.append(item.text)
+                            else:
+                                formatted_parts.append(str(item))
+                        return "\n".join(formatted_parts)
+                    elif hasattr(content, "text"):
+                        return content.text
+                    else:
+                        return str(content)
+                else:
+                    return str(result)
+            except Exception as e:
+                logger.error(f"Error executing tool {mcp_tool.name}: {e}")
+                return f"Error executing tool '{mcp_tool.name}': {str(e)}"
 
-    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> dict[str, Any]:
+        return ReactTool(
+            name=mcp_tool.name,
+            execute=execute,
+            schema=mcp_tool.inputSchema if hasattr(mcp_tool, "inputSchema") else {},
+            description=mcp_tool.description if hasattr(mcp_tool, "description") else "",
+            type=ToolType.TOOL,
+        )
+
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> ReactTool | None:
         """Convert an MCP resource to ReAct agent's tool format.
 
         Each resource becomes a tool-like interface that returns its content when called.
@@ -67,7 +96,7 @@ class ReactAdapter(BaseAdapter):
             connector: The connector that provides this resource.
 
         Returns:
-            A dictionary containing resource information wrapped as a tool.
+            A ReactTool instance for reading the resource.
         """
         if not self.include_resources:
             return None
@@ -75,16 +104,33 @@ class ReactAdapter(BaseAdapter):
         # Create a tool name from the resource
         tool_name = f"read_resource_{mcp_resource.name or mcp_resource.uri}".replace("/", "_").replace(":", "_")
 
-        return {
-            "name": tool_name,
-            "session": connector.client_session,
-            "schema": {},  # Resources don't take parameters
-            "description": mcp_resource.description or f"Read the content of resource: {mcp_resource.uri}",
-            "type": "resource",
-            "resource_uri": mcp_resource.uri,
-        }
+        # Create the execute function that reads the resource
+        async def execute(params: dict[str, Any] | None = None) -> str:
+            """Read the resource and return its content as a string."""
+            try:
+                result = await connector.client_session.read_resource(mcp_resource.uri)
+                # Format resource content
+                content_parts = []
+                for content in result.contents:
+                    if isinstance(content, bytes):
+                        content_parts.append(content.decode())
+                    else:
+                        content_parts.append(str(content))
+                return "\n".join(content_parts)
+            except Exception as e:
+                logger.error(f"Error reading resource {mcp_resource.uri}: {e}")
+                return f"Error reading resource '{mcp_resource.uri}': {str(e)}"
 
-    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> dict[str, Any]:
+        return ReactTool(
+            name=tool_name,
+            execute=execute,
+            schema={},  # Resources don't take parameters
+            description=mcp_resource.description or f"Read the content of resource: {mcp_resource.uri}",
+            type=ToolType.RESOURCE,
+            resource_uri=mcp_resource.uri,
+        )
+
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> ReactTool | None:
         """Convert an MCP prompt to ReAct agent's tool format.
 
         The resulting tool executes `get_prompt` on the connector with the prompt's name and
@@ -95,7 +141,7 @@ class ReactAdapter(BaseAdapter):
             connector: The connector that provides this prompt.
 
         Returns:
-            A dictionary containing prompt information wrapped as a tool.
+            A ReactTool instance for getting the prompt.
         """
         if not self.include_prompts:
             return None
@@ -116,25 +162,36 @@ class ReactAdapter(BaseAdapter):
                 if arg.required:
                     schema["required"].append(arg.name)
 
-        return {
-            "name": f"get_prompt_{mcp_prompt.name}",
-            "session": connector.client_session,
-            "schema": schema,
-            "description": mcp_prompt.description or f"Get the prompt: {mcp_prompt.name}",
-            "type": "prompt",
-            "prompt_name": mcp_prompt.name,
-        }
+        # Create the execute function that gets the prompt
+        async def execute(params: dict[str, Any] | None = None) -> str:
+            """Get the prompt and return its messages as a string."""
+            try:
+                result = await connector.client_session.get_prompt(mcp_prompt.name, params or {})
+                # Format prompt messages
+                return str(result.messages)
+            except Exception as e:
+                logger.error(f"Error getting prompt {mcp_prompt.name}: {e}")
+                return f"Error getting prompt '{mcp_prompt.name}': {str(e)}"
 
-    async def load_tools_for_connector(self, connector: BaseConnector) -> list[dict[str, Any]]:
+        return ReactTool(
+            name=f"get_prompt_{mcp_prompt.name}",
+            execute=execute,
+            schema=schema,
+            description=mcp_prompt.description or f"Get the prompt: {mcp_prompt.name}",
+            type=ToolType.PROMPT,
+            prompt_name=mcp_prompt.name,
+        )
+
+    async def load_tools_for_connector(self, connector: BaseConnector) -> list[ReactTool]:
         """Dynamically load tools for a specific connector.
 
-        Overrides the base method to return dictionaries instead of tool objects.
+        Overrides the base method to return ReactTool instances with callable execute functions.
 
         Args:
             connector: The connector to load tools for.
 
         Returns:
-            The list of tools as dictionaries.
+            The list of ReactTool instances.
         """
         # Check if we already have tools for this connector
         if connector in self._connector_tool_map:

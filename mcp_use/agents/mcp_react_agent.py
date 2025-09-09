@@ -8,9 +8,9 @@ library for structured LLM outputs and Pydantic for data models.
 import json
 import time
 from collections.abc import AsyncGenerator
-from typing import Any
 
 from mcp_use.adapters.react_adapter import ReactAdapter
+from mcp_use.adapters.types.react_adapter_types import ReactTool
 from mcp_use.agents.prompts.templates import DEFAULT_REACT_SYSTEM_PROMPT_TEMPLATE
 from mcp_use.agents.types.react_agent_types import ConversationMemory, Message, ReActResponse, ReActStep, StepType, T
 from mcp_use.client import MCPClient
@@ -26,7 +26,7 @@ class ReActExecutor:
     def __init__(
         self,
         llm_client: LLMClient,
-        tools: dict[str, dict[str, Any]],
+        tools: dict[str, ReactTool],
         max_steps: int = 5,
         verbose: bool = False,
     ):
@@ -34,7 +34,7 @@ class ReActExecutor:
 
         Args:
             llm_client: Instructor-wrapped LLM client.
-            tools: Dictionary of available tools.
+            tools: Dictionary of available ReactTools.
             max_steps: Maximum number of reasoning steps.
             verbose: Whether to print detailed logs.
         """
@@ -54,54 +54,16 @@ class ReActExecutor:
         Returns:
             Tool execution result as a string.
         """
-        if name not in self.tools:
+        logger.info(f"🛠️ Selected tool name: {name}")
+        logger.info(f"🛠️ Selected tool: {self.tools.get(name)}")
+        if not self.tools.get(name):
             return f"Error: Tool '{name}' not found. Available tools: {', '.join(self.tools.keys())}"
 
         try:
-            tool_info = self.tools[name]
-            tool_type = tool_info.get("type", "tool")
-            session = tool_info["session"]
-
-            if tool_type == "resource":
-                # Handle resource tools
-                resource_uri = tool_info["resource_uri"]
-                result = await session.read_resource(resource_uri)
-                # Format resource content
-                content_parts = []
-                for content in result.contents:
-                    if isinstance(content, bytes):
-                        content_parts.append(content.decode())
-                    else:
-                        content_parts.append(str(content))
-                return "\n".join(content_parts)
-            elif tool_type == "prompt":
-                # Handle prompt tools
-                prompt_name = tool_info["prompt_name"]
-                result = await session.get_prompt(prompt_name, params or {})
-                # Format prompt messages
-                return str(result.messages)
-            else:
-                # Handle regular tools
-                result = await session.call_tool(name, arguments=params or {})
-                # Format the result
-                if hasattr(result, "content"):
-                    content = result.content
-                    if isinstance(content, list):
-                        formatted_parts = []
-                        for item in content:
-                            if hasattr(item, "text"):
-                                formatted_parts.append(item.text)
-                            elif hasattr(item, "type") and item.type == "text":
-                                formatted_parts.append(item.text)
-                            else:
-                                formatted_parts.append(str(item))
-                        return "\n".join(formatted_parts)
-                    elif hasattr(content, "text"):
-                        return content.text
-                    else:
-                        return str(content)
-                else:
-                    return str(result)
+            tool = self.tools.get(name)
+            logger.info(f"🛠️ Tool: {tool}")
+            logger.info(f"🛠️ Tool execute: {tool.get('execute')}")
+            return await tool["execute"](params)
 
         except Exception as e:
             logger.error(f"Error executing tool {name}: {e}")
@@ -177,6 +139,8 @@ class ReActExecutor:
                     messages=messages,
                 )
 
+                logger.info(f"🛠️ Response: {response}")
+
                 # Create a step from the response
                 step = ReActStep(
                     step_type=StepType.THOUGHT,
@@ -209,8 +173,8 @@ class ReActExecutor:
                     step.observation = observation
 
                     if self.verbose:
-                        if len(observation) > 200:
-                            logger.info(f"Observation: {observation[:200]}...")
+                        if len(observation) > 1000:
+                            logger.info(f"Observation: {observation[:1000]}...")
                         else:
                             logger.info(f"Observation: {observation}")
 
@@ -365,7 +329,7 @@ class MCPReActAgent:
         )
 
         # Tools dictionary will be populated during initialization
-        self.tools: dict[str, dict[str, Any]] = {}
+        self.tools: dict[str, ReactTool] = {}
 
         self._agent_executor: ReActExecutor | None = None
 
@@ -408,10 +372,10 @@ class MCPReActAgent:
             return "No tools available."
 
         descriptions = []
-        for name, info in self.tools.items():
-            desc = f"- {name}: {info['description']}"
-            if info.get("schema"):
-                desc += f"\n  Parameters: {json.dumps(info['schema'], indent=2)}"
+        for name, tool in self.tools.items():
+            desc = f"- {name}: {tool['description']}"
+            if tool["schema"]:
+                desc += f"\n  Parameters: {json.dumps(tool['schema'], indent=2)}"
             descriptions.append(desc)
 
         return "\n".join(descriptions)
@@ -423,7 +387,7 @@ class MCPReActAgent:
             An initialized ReAct executor.
         """
 
-        tool_names = [tool.get("name") for tool in self.tools.values() if tool.get("name")]
+        tool_names = [tool["name"] for tool in self.tools.values()]
         logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
 
         # Build system prompt with tool descriptions
