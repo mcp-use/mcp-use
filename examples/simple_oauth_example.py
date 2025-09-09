@@ -9,7 +9,6 @@ from mcp_use import MCPAgent, MCPClient
 # Clean MCP configuration - no auth details in the server config
 linear_config = {"mcpServers": {"linear": {"url": "https://mcp.linear.app/sse"}}}
 
-
 async def main():
     # Create client with OAuth-enabled configuration at the client level
     # Option 1: Dynamic Client Registration (empty dict)
@@ -25,11 +24,9 @@ async def main():
     # )
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-
     agent = MCPAgent(llm=llm, client=client)
 
     response = await agent.run(query="What are my latest linear tickets")
-
     print(response)
 
 
