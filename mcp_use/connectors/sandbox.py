@@ -15,6 +15,7 @@ from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
 from ..logging import logger
+from ..middleware import CallbackClientSession, MiddlewareCallbackT
 from ..task_managers import SseConnectionManager
 
 # Import E2B SDK components (optional dependency)
@@ -52,6 +53,7 @@ class SandboxConnector(BaseConnector):
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        middleware: list[MiddlewareCallbackT] | None = None,
     ):
         """Initialize a new sandbox connector.
 
@@ -71,6 +73,7 @@ class SandboxConnector(BaseConnector):
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            middleware=middleware,
         )
         if Sandbox is None:
             raise ImportError(
@@ -226,7 +229,7 @@ class SandboxConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client_session = ClientSession(
+            raw_client_session = ClientSession(
                 read_stream,
                 write_stream,
                 sampling_callback=self.sampling_callback,
@@ -235,7 +238,12 @@ class SandboxConnector(BaseConnector):
                 logging_callback=self.logging_callback,
                 client_info=self.client_info,
             )
-            await self.client_session.__aenter__()
+            await raw_client_session.__aenter__()
+
+            # Wrap with middleware
+            self.client_session = CallbackClientSession(
+                raw_client_session, self.public_identifier, self.middleware_manager
+            )
 
             # Mark as connected
             self._connected = True
@@ -299,4 +307,5 @@ class SandboxConnector(BaseConnector):
     @property
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
-        return {"type": "sandbox", "command": self.user_command, "args": self.user_args}
+        args_str = " ".join(self.user_args) if self.user_args else ""
+        return f"sandbox:{self.user_command} {args_str}".strip()

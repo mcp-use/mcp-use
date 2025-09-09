@@ -17,6 +17,19 @@ from .agents.mcpagent import MCPAgent
 from .client import MCPClient
 from .config import load_config_file
 from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
+from .middleware import (
+    CallbackClientSession,
+    CombinedAnalyticsMiddleware,
+    ErrorTrackingMiddleware,
+    MCPRequestContext,
+    MCPResponseContext,
+    MetricsMiddleware,
+    MiddlewareCallbackT,
+    MiddlewareManager,
+    NextFunctionT,
+    PerformanceMetricsMiddleware,
+    default_logging_middleware,
+)
 from .session import MCPSession
 
 __version__ = version("mcp-use")
@@ -35,6 +48,22 @@ __all__ = [
     "Logger",
     "set_debug",
     "observability",
+    # Middleware
+    "MCPRequestContext",
+    "MCPResponseContext",
+    "MiddlewareCallbackT",
+    "MiddlewareManager",
+    "CallbackClientSession",
+    "NextFunctionT",
+    # Default middleware
+    "default_logging_middleware",
+    # Middleware classes
+    "MetricsMiddleware",
+    "PerformanceMetricsMiddleware",
+    "ErrorTrackingMiddleware",
+    "CombinedAnalyticsMiddleware",
+    # Backwards compatibility
+    "create_metrics_middleware",
 ]
 
 

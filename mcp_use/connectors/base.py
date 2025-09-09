@@ -31,6 +31,7 @@ from pydantic import AnyUrl
 import mcp_use
 
 from ..logging import logger
+from ..middleware import MiddlewareCallbackT, MiddlewareManager
 from ..task_managers import ConnectionManager
 
 
@@ -46,6 +47,7 @@ class BaseConnector(ABC):
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        middleware: list[MiddlewareCallbackT] | None = None,
     ):
         """Initialize base connector with common attributes."""
         self.client_session: ClientSession | None = None
@@ -61,6 +63,12 @@ class BaseConnector(ABC):
         self.message_handler = message_handler
         self.logging_callback = logging_callback
         self.capabilities: ServerCapabilities | None = None
+
+        # Set up middleware manager
+        self.middleware_manager = MiddlewareManager()
+        if middleware:
+            for mw in middleware:
+                self.middleware_manager.add_middleware(mw)
 
     @property
     def client_info(self) -> Implementation:

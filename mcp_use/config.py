@@ -13,6 +13,7 @@ from mcp_use.types.sandbox import SandboxOptions
 
 from .connectors import BaseConnector, HttpConnector, SandboxConnector, StdioConnector, WebSocketConnector
 from .connectors.utils import is_stdio_server
+from .middleware import MiddlewareCallbackT
 
 
 def load_config_file(filepath: str) -> dict[str, Any]:
@@ -36,6 +37,7 @@ def create_connector_from_config(
     elicitation_callback: ElicitationFnT | None = None,
     message_handler: MessageHandlerFnT | None = None,
     logging_callback: LoggingFnT | None = None,
+    middleware: list[MiddlewareCallbackT] | None = None,
 ) -> BaseConnector:
     """Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
@@ -59,6 +61,7 @@ def create_connector_from_config(
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            middleware=middleware,
         )
 
     # Sandboxed connector
@@ -72,6 +75,7 @@ def create_connector_from_config(
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            middleware=middleware,
         )
 
     # HTTP connector
@@ -86,6 +90,7 @@ def create_connector_from_config(
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            middleware=middleware,
         )
 
     # WebSocket connector
@@ -94,6 +99,7 @@ def create_connector_from_config(
             url=server_config["ws_url"],
             headers=server_config.get("headers", None),
             auth_token=server_config.get("auth_token", None),
+            middleware=middleware,
         )
 
     raise ValueError("Cannot determine connector type from config")
