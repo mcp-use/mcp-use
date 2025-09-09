@@ -9,6 +9,7 @@ from mcp_use import MCPAgent, MCPClient
 # Clean MCP configuration - no auth details in the server config
 linear_config = {"mcpServers": {"linear": {"url": "https://mcp.linear.app/sse"}}}
 
+
 async def main():
     # Create client with OAuth-enabled configuration at the client level
     # Option 1: Dynamic Client Registration (empty dict)
