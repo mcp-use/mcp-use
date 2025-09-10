@@ -159,17 +159,6 @@ class BaseAdapter(ABC):
         logger.debug(f"Available tools: {len(tools)}")
         return tools
 
-    def _check_connector_initialized(self, connector: BaseConnector) -> bool:
-        """Check if a connector is initialized and has tools.
-
-        Args:
-            connector: The connector to check.
-
-        Returns:
-            True if the connector is initialized and has tools, False otherwise.
-        """
-        return hasattr(connector, "tools") and connector.tools
-
     async def _ensure_connector_initialized(self, connector: BaseConnector) -> bool:
         """Ensure a connector is initialized.
 
@@ -179,7 +168,7 @@ class BaseAdapter(ABC):
         Returns:
             True if initialization succeeded, False otherwise.
         """
-        if not self._check_connector_initialized(connector):
+        if not connector._initialized:
             logger.debug("Connector doesn't have tools, initializing it")
             try:
                 await connector.initialize()

@@ -11,6 +11,7 @@ from typing import Any
 
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
+from mcp_use.types.mcp import ServerCapability
 from mcp_use.types.sandbox import SandboxOptions
 
 from .config import create_connector_from_config, load_config_file
@@ -324,3 +325,50 @@ class MCPClient:
             logger.error(f"Encountered {len(errors)} errors while closing sessions")
         else:
             logger.debug("All sessions closed successfully")
+
+    async def get_all_capabilities(self) -> dict[str, ServerCapability]:
+        """Get all capabilities (tools, resources, prompts) from all active sessions.
+
+        Returns:
+            Dictionary mapping server names to their ServerCapability objects.
+            Each ServerCapability contains:
+            - 'tools': List of Tool objects
+            - 'resources': List of Resource objects
+            - 'prompts': List of Prompt objects
+
+        Raises:
+            ValueError: If no sessions are active.
+        """
+        if not self.sessions:
+            raise ValueError(
+                "No sessions available. Create sessions first using create_session() or create_all_sessions()"
+            )
+
+        capabilities: dict[str, ServerCapability] = {}
+        errors = []
+
+        for server_name, session in self.sessions.items():
+            try:
+                # Get all capabilities for this session
+                tools = await session.list_tools()
+                resources = await session.list_resources()
+                prompts = await session.list_prompts()
+
+                capabilities[server_name] = {"tools": tools, "resources": resources, "prompts": prompts}
+
+                logger.debug(
+                    f"Retrieved capabilities for server '{server_name}': "
+                    f"{len(tools)} tools, {len(resources)} resources, {len(prompts)} prompts"
+                )
+
+            except Exception as e:
+                error_msg = f"Failed to get capabilities for server '{server_name}': {e}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+                # Skip servers that fail - don't include them in results
+
+        # If all servers failed, raise an exception
+        if errors and not capabilities:
+            raise RuntimeError(f"Failed to get capabilities from any server. Errors: {'; '.join(errors)}")
+
+        return capabilities
