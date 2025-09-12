@@ -192,7 +192,7 @@ class MCPClient:
 
         server_config = servers[server_name]
 
-        # Create connector with options
+        # Create connector with options and client-level auth
         connector = create_connector_from_config(
             server_config,
             sandbox=self.sandbox,
