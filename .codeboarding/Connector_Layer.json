@@ -1,90 +1,106 @@
 {
-  "description": "The `Connector Layer` subsystem is crucial for abstracting how the system communicates with various MCP server implementations. It adheres to the Adapter Pattern, providing a unified interface for diverse communication protocols.",
+  "description": "The Connector Layer subsystem provides a robust and standardized mechanism for the MCPClient to interact with various external MCP servers and tools. It acts as a crucial abstraction layer, enabling protocol-agnostic communication. At its core, the BaseConnector defines a common interface for all communication protocols, ensuring consistency and extensibility. Concrete implementations, such as WebSocketConnector and HTTPConnector, extend this base to handle specific protocol intricacies, facilitating real-time and traditional request-response interactions for the MCPClient.",
   "components": [
     {
-      "name": "BaseConnector",
-      "description": "Defines the abstract interface and contract for all MCP server interactions. It provides a unified set of methods (`connect()`, `disconnect()`, `is_connected()`, `call_tool()`, `list_tools()`, `request()`, etc.) that concrete connectors must implement. This component embodies the Adapter Pattern, abstracting the underlying communication protocol from the agent core.",
+      "name": "Connector Layer",
+      "description": "The overarching subsystem providing a standardized, protocol-agnostic mechanism for the `MCPClient` to communicate with diverse external `MCP servers` and tools. It acts as the entry point for establishing and managing connections.",
       "referenced_source_code": [
         {
-          "qualified_name": "BaseConnector",
+          "qualified_name": "mcp_use.connectors.base.BaseConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 37,
+          "reference_end_line": 453
+        },
+        {
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 22,
+          "reference_end_line": 257
+        },
+        {
+          "qualified_name": "mcp_use.connectors.http.HTTPConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 24,
+          "reference_end_line": 301
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/utils.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "BaseConnector",
+      "description": "Defines the abstract interface and common contract for all concrete connectors. It establishes fundamental operations for connecting, sending requests, and receiving responses, ensuring a consistent API across different communication protocols. This component is crucial for extensibility and adherence to the Adapter Pattern.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector",
           "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
           "reference_start_line": 37,
           "reference_end_line": 453
         }
       ],
-      "can_expand": true
-    },
-    {
-      "name": "SandboxConnector",
-      "description": "Implements the `BaseConnector` interface specifically for interacting with MCP servers running in a sandboxed environment. It manages the lifecycle of the sandbox process, redirects standard I/O, and handles communication specific to the sandbox's execution context.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "SandboxConnector",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py",
-          "reference_start_line": 35,
-          "reference_end_line": 302
-        }
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py"
       ],
       "can_expand": true
     },
     {
       "name": "WebSocketConnector",
-      "description": "Implements the `BaseConnector` interface for real-time, event-driven communication with MCP servers over WebSockets. It manages WebSocket connection establishment, message sending, and asynchronous message reception.",
+      "description": "Implements the `BaseConnector` interface specifically for WebSocket-based communication. It handles the intricacies of WebSocket connections, including establishing, maintaining, closing, and managing asynchronous message exchange, vital for real-time agent interactions.",
       "referenced_source_code": [
         {
-          "qualified_name": "WebSocketConnector",
+          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector",
           "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
-          "reference_start_line": 21,
-          "reference_end_line": 248
+          "reference_start_line": 22,
+          "reference_end_line": 257
         }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py"
       ],
       "can_expand": true
     },
     {
-      "name": "HttpConnector",
-      "description": "Implements the `BaseConnector` interface for standard HTTP-based communication with MCP servers. It handles HTTP request/response cycles, making it suitable for RESTful or RPC-style interactions.",
+      "name": "HTTPConnector",
+      "description": "Implements the `BaseConnector` interface for HTTP-based communication. It manages the sending of HTTP requests and processing of HTTP responses, handling various HTTP methods and status codes, suitable for traditional request-response interactions with `MCP Servers`.",
       "referenced_source_code": [
         {
-          "qualified_name": "HttpConnector",
+          "qualified_name": "mcp_use.connectors.http.HTTPConnector",
           "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py",
-          "reference_start_line": 18,
-          "reference_end_line": 213
+          "reference_start_line": 24,
+          "reference_end_line": 301
         }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py"
       ],
       "can_expand": true
     },
     {
-      "name": "StdioConnector",
-      "description": "Implements the `BaseConnector` interface for communication via standard input/output (stdio) streams. This is typically used for interacting with local processes or command-line tools that communicate over stdin/stdout.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "StdioConnector",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/stdio.py",
-          "reference_start_line": 18,
-          "reference_end_line": 101
-        }
-      ],
-      "can_expand": false
-    },
-    {
-      "name": "create_connector_from_config",
-      "description": "Acts as a Simple Factory responsible for dynamically creating and returning the appropriate concrete `BaseConnector` instance based on the provided configuration. This decouples the client code from the specific connector implementation, promoting flexibility and extensibility.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "create_connector_from_config",
-          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/config.py",
-          "reference_start_line": 31,
-          "reference_end_line": 99
-        }
-      ],
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [],
       "can_expand": false
     }
   ],
   "components_relations": [
     {
-      "relation": "inherits from",
-      "src_name": "SandboxConnector",
+      "relation": "encompasses",
+      "src_name": "Connector Layer",
       "dst_name": "BaseConnector"
+    },
+    {
+      "relation": "encompasses",
+      "src_name": "Connector Layer",
+      "dst_name": "WebSocketConnector"
+    },
+    {
+      "relation": "encompasses",
+      "src_name": "Connector Layer",
+      "dst_name": "HTTPConnector"
     },
     {
       "relation": "inherits from",
@@ -93,37 +109,7 @@
     },
     {
       "relation": "inherits from",
-      "src_name": "HttpConnector",
-      "dst_name": "BaseConnector"
-    },
-    {
-      "relation": "inherits from",
-      "src_name": "StdioConnector",
-      "dst_name": "BaseConnector"
-    },
-    {
-      "relation": "instantiates",
-      "src_name": "create_connector_from_config",
-      "dst_name": "SandboxConnector"
-    },
-    {
-      "relation": "instantiates",
-      "src_name": "create_connector_from_config",
-      "dst_name": "WebSocketConnector"
-    },
-    {
-      "relation": "instantiates",
-      "src_name": "create_connector_from_config",
-      "dst_name": "HttpConnector"
-    },
-    {
-      "relation": "instantiates",
-      "src_name": "create_connector_from_config",
-      "dst_name": "StdioConnector"
-    },
-    {
-      "relation": "returns",
-      "src_name": "create_connector_from_config",
+      "src_name": "HTTPConnector",
       "dst_name": "BaseConnector"
     }
   ]

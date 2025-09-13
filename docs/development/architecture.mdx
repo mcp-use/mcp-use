@@ -1,204 +1,95 @@
 
 
-# Agent Core Orchestration
+# Authentication Authorization
 ```mermaid
 graph LR
-    McPAgent["McPAgent"]
-    SystemPromptBuilder["SystemPromptBuilder"]
-    Prompt_Templates["Prompt Templates"]
-    BaseAgent["BaseAgent"]
-    Underlying_LLM_Agent["Underlying LLM Agent"]
-    McPAgent -- "requests system prompt construction from" --> SystemPromptBuilder
-    McPAgent -- "initializes and configures" --> Underlying_LLM_Agent
-    McPAgent -- "implements the interface defined by" --> BaseAgent
-    McPAgent -- "directs to execute LLM operations" --> Underlying_LLM_Agent
-    SystemPromptBuilder -- "provides structured system messages to" --> McPAgent
-    SystemPromptBuilder -- "utilizes for constructing prompt content" --> Prompt_Templates
-    Prompt_Templates -- "supplies predefined prompt structures and content to" --> SystemPromptBuilder
-    BaseAgent -- "defines the contract for" --> McPAgent
-```
-
-### Details
-
-The `mcp-use` agent subsystem is orchestrated by the `McPAgent`, which acts as the core intelligence, managing interactions with an "Underlying LLM Agent" for reasoning and response generation. The `McPAgent` dynamically constructs system prompts using the `SystemPromptBuilder`, which in turn leverages `Prompt Templates` for modular and reusable prompt content. All agents within the system adhere to the `BaseAgent` interface, ensuring a consistent contract for agent behavior. The "Underlying LLM Agent" represents the actual LLM integration, either directly through a LangChain `BaseLanguageModel` or via a `RemoteAgent` for remote execution, abstracting the specifics of the LLM provider. This architecture promotes modularity, prompt engineering best practices, and flexible LLM integration.
-
-### McPAgent
-The central orchestrator of the agent's lifecycle, responsible for LLM interaction, reasoning, dynamic prompt construction, and coordinating external tool utilization. It embodies the "Agent Core" pattern.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L48-L1107" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.mcpagent.McPAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py`, Lines:(48:1107)</a>
-
-
-### SystemPromptBuilder
-Manages the dynamic construction of the comprehensive system prompt for the LLM, aligning with "Prompt Engineering" principles.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.system_prompt_builder.SystemPromptBuilder` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`</a>
-
-
-### Prompt Templates
-Provides reusable, predefined structures and content for various parts of the system prompt, supporting "Prompt Engineering" and "Modular Design."
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/templates.py" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.templates` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/templates.py`</a>
-
-
-### BaseAgent
-Defines the foundational contract and common interface that all agents must adhere to, promoting "Modular Design" and the "Adapter Pattern."
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py#L13-L61" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.base.BaseAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/base.py`, Lines:(13:61)</a>
-
-
-### Underlying LLM Agent
-Represents the "LLM Integration Layer," abstracting the specifics of the LLM provider and focusing on core function calling and response generation. This is a conceptual component that `McPAgent` interacts with, either directly via a LangChain `BaseLanguageModel` instance or through a `RemoteAgent` for remote execution.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/" target="_blank" rel="noopener noreferrer">QName:`langchain_core.language_models.BaseLanguageModel` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py#L34-L327" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.remote.RemoteAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/remote.py`, Lines:(34:327)</a>
-
-
-# Asynchronous Task Management
-```mermaid
-graph LR
-    BaseTaskManager["BaseTaskManager"]
-    StdioTaskManager["StdioTaskManager"]
-    WebSocketTaskManager["WebSocketTaskManager"]
-    SseTaskManager["SseTaskManager"]
-    StreamableHttpTaskManager["StreamableHttpTaskManager"]
-    BaseTaskManager -- "defines contract for" --> StdioTaskManager
-    BaseTaskManager -- "defines contract for" --> WebSocketTaskManager
-    BaseTaskManager -- "defines contract for" --> SseTaskManager
-    BaseTaskManager -- "defines contract for" --> StreamableHttpTaskManager
-    StdioTaskManager -- "inherits from" --> BaseTaskManager
-    WebSocketTaskManager -- "inherits from" --> BaseTaskManager
-    SseTaskManager -- "inherits from" --> BaseTaskManager
-    StreamableHttpTaskManager -- "inherits from" --> BaseTaskManager
-```
-
-### Details
-
-The `Asynchronous Task Management` subsystem is critical for the `mcp-use` project, an LLM Agent Framework/Library, as it provides the foundational mechanisms for agents to interact with various communication channels asynchronously. This aligns with the project's architectural bias towards extensibility and modularity, allowing different transport layers to be plugged in seamlessly.
-
-### BaseTaskManager
-Defines the abstract interface and core lifecycle management for asynchronous connections and background tasks. It provides a common structure for establishing, maintaining, and closing connections, acting as the blueprint for all specific task managers.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/base.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.base.BaseTaskManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/base.py`</a>
-
-
-### StdioTaskManager
-Manages asynchronous tasks specifically for standard input/output (stdio) streams, enabling console-based communication for agents. This is crucial for local development, debugging, and simple interactive agent sessions.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/stdio.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.stdio.StdioTaskManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/stdio.py`</a>
-
-
-### WebSocketTaskManager
-Manages asynchronous tasks for WebSocket connections, facilitating persistent, full-duplex communication channels for agents. This is vital for real-time, interactive agent-to-agent or agent-to-client communication.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/websocket.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.websocket.WebSocketTaskManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/websocket.py`</a>
-
-
-### SseTaskManager
-Manages asynchronous tasks for Server-Sent Events (SSE), enabling agents to receive continuous event streams from a server. This is useful for one-way, server-initiated updates or notifications to agents.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/sse.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.sse.SseTaskManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/sse.py`</a>
-
-
-### StreamableHttpTaskManager
-Manages asynchronous tasks for streamable HTTP connections, allowing for long-lived HTTP requests that continuously stream data, potentially for agent communication or data ingestion. This supports scenarios requiring continuous data flow over HTTP without full-duplex WebSockets.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/streamable_http.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.streamable_http.StreamableHttpTaskManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/streamable_http.py`</a>
-
-
-# Client Session Management
-```mermaid
-graph LR
-    Client_Session_Orchestrator["Client Session Orchestrator"]
-    Single_Client_Session_Handler["Single Client Session Handler"]
-    Client_Session_Orchestrator -- "orchestrates" --> Single_Client_Session_Handler
-```
-
-### Details
-
-The Client & Session Management subsystem, primarily defined by the `mcp_use.client` and `mcp_use.session` modules, encapsulates the logic for establishing, maintaining, and terminating connections to MCP servers. It manages the overall user session lifecycle within the `mcp-use` framework, providing the capability to manage multiple, potentially concurrent, connections to various MCP servers, which is essential for agents interacting with diverse services or other agents.
-
-### Client Session Orchestrator
-This component is responsible for the high-level orchestration and aggregation of multiple client sessions. It manages the creation, lifecycle, and termination of individual sessions, acting as a central point for managing the overall client-side connectivity to MCP servers. This aligns with the "Orchestration" pattern, enabling the framework to manage multiple concurrent agent interactions. Its role is crucial for scaling and managing complex multi-agent scenarios.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L218-L244" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.create_all_sessions` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(218:244)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L304-L326" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.close_all_sessions` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(304:326)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L171-L216" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.create_session` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(171:216)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L272-L302" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.close_session` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(272:302)</a>
-
-
-### Single Client Session Handler
-This component manages the complete lifecycle of a single, independent client connection to an MCP server. It handles the establishment, maintenance, and graceful termination of a connection, often leveraging asynchronous context management for reliable resource handling. This component embodies the "Client" aspect of a client-server architecture, providing the fundamental connection capabilities for an individual agent or service. It ensures robust and isolated session management.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L39-L46" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.__aenter__` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(39:46)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L48-L56" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.__aexit__` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(48:56)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L66-L79" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.initialize` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(66:79)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L58-L60" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.connect` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(58:60)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L62-L64" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.disconnect` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(62:64)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L81-L88" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.is_connected` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`, Lines:(81:88)</a>
-
-
-# Connector Layer
-```mermaid
-graph LR
+    OAuth["OAuth"]
+    FileTokenStorage["FileTokenStorage"]
+    ServerOAuthMetadata["ServerOAuthMetadata"]
+    OAuthClientProvider["OAuthClientProvider"]
+    TokenData["TokenData"]
+    ClientRegistrationResponse["ClientRegistrationResponse"]
+    BearerAuth["BearerAuth"]
     BaseConnector["BaseConnector"]
-    SandboxConnector["SandboxConnector"]
-    WebSocketConnector["WebSocketConnector"]
-    HttpConnector["HttpConnector"]
-    StdioConnector["StdioConnector"]
-    create_connector_from_config["create_connector_from_config"]
-    SandboxConnector -- "inherits from" --> BaseConnector
-    WebSocketConnector -- "inherits from" --> BaseConnector
-    HttpConnector -- "inherits from" --> BaseConnector
-    StdioConnector -- "inherits from" --> BaseConnector
-    create_connector_from_config -- "instantiates" --> SandboxConnector
-    create_connector_from_config -- "instantiates" --> WebSocketConnector
-    create_connector_from_config -- "instantiates" --> HttpConnector
-    create_connector_from_config -- "instantiates" --> StdioConnector
-    create_connector_from_config -- "returns" --> BaseConnector
+    Unclassified["Unclassified"]
+    OAuth -- "relies on" --> FileTokenStorage
+    OAuth -- "utilizes" --> ServerOAuthMetadata
+    OAuth -- "utilizes" --> OAuthClientProvider
+    OAuth -- "manages" --> TokenData
+    OAuth -- "processes" --> ClientRegistrationResponse
+    OAuth -- "provides" --> BearerAuth
+    BaseConnector -- "consumes" --> BearerAuth
 ```
 
 ### Details
 
-The `Connector Layer` subsystem is crucial for abstracting how the system communicates with various MCP server implementations. It adheres to the Adapter Pattern, providing a unified interface for diverse communication protocols.
+The `Authentication & Authorization` subsystem in `mcp-use` is designed to manage secure access to MCP servers using OAuth 2.0. The central `OAuth` component orchestrates the entire authentication flow, from server metadata discovery and dynamic client registration to the lifecycle management of access tokens. It relies on `FileTokenStorage` for persistent token storage and utilizes `ServerOAuthMetadata` and `OAuthClientProvider` for configuration and server capabilities. The subsystem produces `BearerAuth` tokens, which are then consumed by `BaseConnector` instances to make authenticated requests to MCP servers. This design ensures a clear separation of concerns, with dedicated components handling different aspects of the OAuth process and providing a robust mechanism for secure communication.
+
+### OAuth
+The central orchestrator for the entire OAuth authentication flow. It manages server metadata discovery, dynamic client registration, token lifecycle (loading, saving, refreshing, deleting), and facilitates authenticated requests to secure MCP servers. It acts as the primary interface for clients requiring OAuth-based authentication.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py#L68-L68" target="_blank" rel="noopener noreferrer">QName:`OAuth` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py`</a>
+
+
+### FileTokenStorage
+Provides a concrete mechanism for securely persisting and retrieving OAuth tokens on the local file system. This ensures token durability across application restarts and manages tokens based on the server URL.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py#L102-L164" target="_blank" rel="noopener noreferrer">QName:`FileTokenStorage` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py`, Lines:(102:164)</a>
+
+
+### ServerOAuthMetadata
+A data model that encapsulates the OAuth server's capabilities, endpoints, and other essential metadata required for initiating and managing the OAuth flow.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py#L22-L48" target="_blank" rel="noopener noreferrer">QName:`ServerOAuthMetadata` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py`, Lines:(22:48)</a>
+
+
+### OAuthClientProvider
+Responsible for providing the necessary OAuth client configuration and capabilities, including client ID and secrets, which are crucial for dynamic client registration and token requests.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py#L51-L66" target="_blank" rel="noopener noreferrer">QName:`OAuthClientProvider` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py`, Lines:(51:66)</a>
+
+
+### TokenData
+A data model representing the structure and content of an OAuth token, including access tokens, refresh tokens, expiration times, and scopes.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py#L69-L79" target="_blank" rel="noopener noreferrer">QName:`TokenData` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py`, Lines:(69:79)</a>
+
+
+### ClientRegistrationResponse
+A data model that captures the response received from an OAuth server during the dynamic client registration process, containing details like the registered client ID and client secret.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py#L82-L99" target="_blank" rel="noopener noreferrer">QName:`ClientRegistrationResponse` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py`, Lines:(82:99)</a>
+
+
+### BearerAuth
+An authentication object that provides the Bearer token, ready to be included in HTTP request headers for authenticating requests to secure MCP servers. It is the direct output of a successful authentication process.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/bearer.py#L9-L17" target="_blank" rel="noopener noreferrer">QName:`BearerAuth` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/bearer.py`, Lines:(9:17)</a>
+
 
 ### BaseConnector
-Defines the abstract interface and contract for all MCP server interactions. It provides a unified set of methods (`connect()`, `disconnect()`, `is_connected()`, `call_tool()`, `list_tools()`, `request()`, etc.) that concrete connectors must implement. This component embodies the Adapter Pattern, abstracting the underlying communication protocol from the agent core.
+A base class for connectors that interact with secure MCP servers. It defines the interface for consuming authentication credentials (like `BearerAuth`) to make authenticated requests. This component represents the external consumer of the `Authentication & Authorization` subsystem's output.
 
 
 **Related Classes/Methods**:
@@ -206,217 +97,99 @@ Defines the abstract interface and contract for all MCP server interactions. It 
 - <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L37-L453" target="_blank" rel="noopener noreferrer">QName:`BaseConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py`, Lines:(37:453)</a>
 
 
-### SandboxConnector
-Implements the `BaseConnector` interface specifically for interacting with MCP servers running in a sandboxed environment. It manages the lifecycle of the sandbox process, redirects standard I/O, and handles communication specific to the sandbox's execution context.
+### Unclassified
+Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)
+
+
+**Related Classes/Methods**: _None_
+
+
+# Connector Layer
+```mermaid
+graph LR
+    Connector_Layer["Connector Layer"]
+    BaseConnector["BaseConnector"]
+    WebSocketConnector["WebSocketConnector"]
+    HTTPConnector["HTTPConnector"]
+    Unclassified["Unclassified"]
+    Connector_Layer -- "encompasses" --> BaseConnector
+    Connector_Layer -- "encompasses" --> WebSocketConnector
+    Connector_Layer -- "encompasses" --> HTTPConnector
+    WebSocketConnector -- "inherits from" --> BaseConnector
+    HTTPConnector -- "inherits from" --> BaseConnector
+    click Connector_Layer href "/codeboarding/Connector_Layer.md" "Details"
+```
+
+### Details
+
+The Connector Layer subsystem provides a robust and standardized mechanism for the MCPClient to interact with various external MCP servers and tools. It acts as a crucial abstraction layer, enabling protocol-agnostic communication. At its core, the BaseConnector defines a common interface for all communication protocols, ensuring consistency and extensibility. Concrete implementations, such as WebSocketConnector and HTTPConnector, extend this base to handle specific protocol intricacies, facilitating real-time and traditional request-response interactions for the MCPClient.
+
+### Connector Layer
+The overarching subsystem providing a standardized, protocol-agnostic mechanism for the `MCPClient` to communicate with diverse external `MCP servers` and tools. It acts as the entry point for establishing and managing connections.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py#L35-L302" target="_blank" rel="noopener noreferrer">QName:`SandboxConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py`, Lines:(35:302)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L37-L453" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.base.BaseConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py`, Lines:(37:453)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py#L22-L257" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.websocket.WebSocketConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py`, Lines:(22:257)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py#L24-L301" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.http.HTTPConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py`, Lines:(24:301)</a>
+
+
+### BaseConnector
+Defines the abstract interface and common contract for all concrete connectors. It establishes fundamental operations for connecting, sending requests, and receiving responses, ensuring a consistent API across different communication protocols. This component is crucial for extensibility and adherence to the Adapter Pattern.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L37-L453" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.base.BaseConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py`, Lines:(37:453)</a>
 
 
 ### WebSocketConnector
-Implements the `BaseConnector` interface for real-time, event-driven communication with MCP servers over WebSockets. It manages WebSocket connection establishment, message sending, and asynchronous message reception.
+Implements the `BaseConnector` interface specifically for WebSocket-based communication. It handles the intricacies of WebSocket connections, including establishing, maintaining, closing, and managing asynchronous message exchange, vital for real-time agent interactions.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py#L21-L248" target="_blank" rel="noopener noreferrer">QName:`WebSocketConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py`, Lines:(21:248)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py#L22-L257" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.websocket.WebSocketConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py`, Lines:(22:257)</a>
 
 
-### HttpConnector
-Implements the `BaseConnector` interface for standard HTTP-based communication with MCP servers. It handles HTTP request/response cycles, making it suitable for RESTful or RPC-style interactions.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py#L18-L213" target="_blank" rel="noopener noreferrer">QName:`HttpConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py`, Lines:(18:213)</a>
-
-
-### StdioConnector
-Implements the `BaseConnector` interface for communication via standard input/output (stdio) streams. This is typically used for interacting with local processes or command-line tools that communicate over stdin/stdout.
+### HTTPConnector
+Implements the `BaseConnector` interface for HTTP-based communication. It manages the sending of HTTP requests and processing of HTTP responses, handling various HTTP methods and status codes, suitable for traditional request-response interactions with `MCP Servers`.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/stdio.py#L18-L101" target="_blank" rel="noopener noreferrer">QName:`StdioConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/stdio.py`, Lines:(18:101)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py#L24-L301" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.http.HTTPConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py`, Lines:(24:301)</a>
 
 
-### create_connector_from_config
-Acts as a Simple Factory responsible for dynamically creating and returning the appropriate concrete `BaseConnector` instance based on the provided configuration. This decouples the client code from the specific connector implementation, promoting flexibility and extensibility.
+### Unclassified
+Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)
 
 
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/config.py#L31-L99" target="_blank" rel="noopener noreferrer">QName:`create_connector_from_config` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/config.py`, Lines:(31:99)</a>
+**Related Classes/Methods**: _None_
 
 
-# Observability Telemetry
+# LLM Integration Adapters
 ```mermaid
 graph LR
-    Telemetry_Tracker["Telemetry Tracker"]
-    Telemetry_Events["Telemetry Events"]
-    Telemetry_Utilities["Telemetry Utilities"]
-    Observability_Manager["Observability Manager"]
-    Laminar_Observability_Backend["Laminar Observability Backend"]
-    Langfuse_Observability_Backend["Langfuse Observability Backend"]
-    Telemetry_Tracker -- "relies on" --> Telemetry_Utilities
-    Telemetry_Tracker -- "consumes from" --> Telemetry_Events
-    Observability_Manager -- "manages" --> Laminar_Observability_Backend
-    Observability_Manager -- "manages" --> Langfuse_Observability_Backend
-    Observability_Manager -- "utilizes" --> Laminar_Observability_Backend
-    Observability_Manager -- "utilizes" --> Langfuse_Observability_Backend
-```
-
-### Details
-
-The Observability & Telemetry subsystem, comprising `mcp_use.telemetry` and `mcp_use.observability` packages, is responsible for monitoring agent execution, collecting performance metrics, and managing callbacks for external integrations and debugging within the `mcp-use` project. Its main flow involves tracking operational events and providing a flexible mechanism for integrating with various observability backends.
-
-### Telemetry Tracker
-This component serves as the primary interface for recording various operational events within the LLM agent framework. It focuses on monitoring agent execution, identifying users, and tracking package usage, providing critical insights into the agent's runtime behavior.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/telemetry.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.telemetry.telemetry` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/telemetry/telemetry.py`</a>
-
-
-### Telemetry Events
-Defines the standardized schema and types for all telemetry events that can be captured by the `Telemetry Tracker`. This ensures consistency, clarity, and ease of analysis for the collected data, which is crucial for reliable monitoring.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/events.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.telemetry.events` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/telemetry/events.py`</a>
-
-
-### Telemetry Utilities
-Provides helper functions and utilities specifically designed to assist the `Telemetry Tracker` in extracting and formatting relevant information for tracking, such as details about the LLM model (provider, name).
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/utils.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.telemetry.utils` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/telemetry/utils.py`</a>
-
-
-### Observability Manager
-Acts as a central registry and factory for managing and providing access to various observability callback handlers. This component is critical for enabling flexible integration with different external observability backends, a common requirement in LLM development for tracing and debugging.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/callbacks_manager.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.observability.callbacks_manager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/observability/callbacks_manager.py`</a>
-
-
-### Laminar Observability Backend
-A concrete implementation of an observability backend that integrates with the Laminar platform. It encapsulates the specific logic for sending traces, logs, and other observability data to Laminar.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/laminar.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.observability.laminar` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/observability/laminar.py`</a>
-
-
-### Langfuse Observability Backend
-A concrete implementation of an observability backend that integrates with the Langfuse platform. It handles the specific logic for sending traces, logs, and other observability data to Langfuse, a popular tool for LLM application monitoring.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/langfuse.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.observability.langfuse` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/observability/langfuse.py`</a>
-
-
-# Project Initialization Configuration
-```mermaid
-graph LR
-    CLI_Project_Management["CLI Project Management"]
-    Configuration_Connector_Factory["Configuration & Connector Factory"]
-    CLI_Project_Management -- "prepares configuration for" --> Configuration_Connector_Factory
-```
-
-### Details
-
-This graph describes the Project Initialization & Configuration subsystem of `mcp-use`. The main flow involves the `CLI Project Management` component handling command-line interactions, project scaffolding, and the creation of initial project structures, including configuration files. Subsequently, the `Configuration & Connector Factory` component loads and interprets these configurations to dynamically instantiate external connectors like LLMs and sandboxes, enabling flexible integration with various external services. The purpose of this subsystem is to provide a robust and extensible mechanism for setting up and configuring new `mcp-use` applications.
-
-### CLI Project Management
-This component serves as the primary command-line interface for `mcp-use`, orchestrating the entire project lifecycle from initial command parsing to interactive project creation and the generation of foundational project structures. It provides the user-facing mechanism for setting up new `mcp-use` applications.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py#L542-L577" target="_blank" rel="noopener noreferrer">QName:`mcp_use.cli.main` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/cli.py`, Lines:(542:577)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py#L481-L511" target="_blank" rel="noopener noreferrer">QName:`mcp_use.cli.handle_create` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/cli.py`, Lines:(481:511)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py#L399-L446" target="_blank" rel="noopener noreferrer">QName:`mcp_use.cli.create_project` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/cli.py`, Lines:(399:446)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py#L405-L405" target="_blank" rel="noopener noreferrer">QName:`mcp_use.cli.Spinner` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/cli.py`</a>
-
-
-### Configuration & Connector Factory
-Responsible for loading and interpreting project-specific configuration data, and dynamically instantiating various external connector objects (e.g., LLMs, sandboxes) based on these configurations. This component is vital for enabling flexible and extensible integration with diverse external services, aligning with the framework's modular design.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/config.py#L31-L99" target="_blank" rel="noopener noreferrer">QName:`mcp_use.config.create_connector_from_config` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/config.py`, Lines:(31:99)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py#L35-L302" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.sandbox.SandboxConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py`, Lines:(35:302)</a>
-
-
-# Tool Management Adaptation
-```mermaid
-graph LR
-    BaseTool["BaseTool"]
-    ServerManager["ServerManager"]
-    ToolSearchEngine["ToolSearchEngine"]
-    BaseAdapter["BaseAdapter"]
     LangChainAdapter["LangChainAdapter"]
-    ServerManager -- "manages and provides access to" --> BaseTool
-    ToolSearchEngine -- "indexes and searches for" --> BaseTool
-    BaseAdapter -- "provides a framework for adapting" --> BaseTool
-    LangChainAdapter -- "extends" --> BaseAdapter
-    LangChainAdapter -- "consumes and transforms" --> BaseTool
+    BaseConnector["BaseConnector"]
+    MCPAgent["MCPAgent"]
+    BaseAdapter["BaseAdapter"]
+    Unclassified["Unclassified"]
+    LangChainAdapter -- "adapts/translates for" --> MCPAgent
+    LangChainAdapter -- "utilizes" --> BaseConnector
+    BaseConnector -- "provides MCP operations to" --> LangChainAdapter
+    MCPAgent -- "uses/depends on" --> LangChainAdapter
+    LangChainAdapter -- "inherits from" --> BaseAdapter
 ```
 
 ### Details
 
-The MCP (Multi-Component Platform) system is designed around a flexible tool management and adaptation architecture. At its core, the `BaseTool` defines a universal interface for all tools, ensuring consistency and interoperability. The `ServerManager` acts as a central registry, managing the lifecycle and accessibility of server-hosted tools, making them available to various agents within the system. For dynamic discovery, the `ToolSearchEngine` indexes and facilitates searching for these tools based on their capabilities. To enable integration with external frameworks, the `BaseAdapter` provides an abstract mechanism for transforming MCP entities. A concrete implementation, the `LangChainAdapter`, specifically adapts MCP tools for seamless consumption by the LangChain framework, highlighting the system's extensibility and focus on external framework compatibility. This architecture promotes modularity, discoverability, and adaptability, crucial for a robust multi-component platform.
-
-### BaseTool
-Defines the abstract interface and foundational structure for all tools within the MCP ecosystem. It establishes a consistent contract for tool execution, input/output, and metadata, ensuring interoperability across different tool implementations.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/base_tool.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`BaseTool` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py`</a>
-
-
-### ServerManager
-Manages the discovery, registration, and provision of server-managed tools. It acts as a central registry for tools hosted or controlled by an MCP server, making them accessible to agents.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/examples/simple_server_manager_use.py#L53-L74" target="_blank" rel="noopener noreferrer">QName:`ServerManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/examples/simple_server_manager_use.py`, Lines:(53:74)</a>
-
-
-### ToolSearchEngine
-Indexes available tools and facilitates their dynamic discovery through search queries. It enables agents to find relevant tools based on their capabilities or descriptions, supporting the "search-enabled" aspect of tool access.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/search_tools.py#L58-L328" target="_blank" rel="noopener noreferrer">QName:`ToolSearchEngine` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py`, Lines:(58:328)</a>
-
-
-### BaseAdapter
-Provides a generic, abstract framework for adapting MCP-defined entities (including tools) into formats compatible with external systems or frameworks. It defines the common interface for conversion logic, promoting extensibility.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py#L20-L190" target="_blank" rel="noopener noreferrer">QName:`BaseAdapter` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/base.py`, Lines:(20:190)</a>
-
+This subsystem is dedicated to enabling seamless communication and data translation between MCP's internal agent representations and external Large Language Model (LLM) frameworks, primarily LangChain. Its core responsibility is to adapt MCP's tools, resources, and prompts into a format consumable by LLMs, manage the execution of MCP operations within an LLM context, and ensure proper error handling and schema compatibility. It acts as the crucial bridge for MCP agents to leverage the capabilities of various LLM providers.
 
 ### LangChainAdapter
-Specializes the BaseAdapter to specifically translate MCP-defined tools into a format consumable by the LangChain framework. This is crucial for integrating MCP tools with LangChain-based LLM agents, directly addressing the adaptation to "external frameworks like LangChain."
+This is the central component of the subsystem. It acts as a translator and orchestrator, adapting MCP's internal tools, resources, and prompts into a LangChain-compatible format. It handles schema translation, manages asynchronous execution of MCP operations (via `BaseConnector`), and formats errors for effective LLM consumption. This component is crucial for enabling MCP agents to interact with LLMs through LangChain.
 
 
 **Related Classes/Methods**:
@@ -424,117 +197,408 @@ Specializes the BaseAdapter to specifically translate MCP-defined tools into a f
 - <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py#L29-L268" target="_blank" rel="noopener noreferrer">QName:`LangChainAdapter` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py`, Lines:(29:268)</a>
 
 
-# overview
+### BaseConnector
+An abstract base class defining the interface for connecting to MCP servers. It provides methods for executing MCP tool calls, reading resources, and retrieving prompts. `LangChainAdapter` relies on concrete implementations of `BaseConnector` to perform actual MCP operations, abstracting the specifics of MCP server communication.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L37-L453" target="_blank" rel="noopener noreferrer">QName:`BaseConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py`, Lines:(37:453)</a>
+
+
+### MCPAgent
+Represents the core agent component that integrates MCP functionalities into its workflow. It utilizes the `LangChainAdapter` to interact with external LLM frameworks, allowing it to leverage LLMs for decision-making and task execution based on MCP's tools and resources. It is the primary consumer of the `LLM Integration & Adapters` subsystem.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L48-L1107" target="_blank" rel="noopener noreferrer">QName:`MCPAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py`, Lines:(48:1107)</a>
+
+
+### BaseAdapter
+An abstract base class that defines a common interface and contract for all adapter implementations within the project. `LangChainAdapter` inherits from this class, ensuring a consistent structure and adherence to the Adapter Pattern for different integration points.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py#L20-L190" target="_blank" rel="noopener noreferrer">QName:`BaseAdapter` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/base.py`, Lines:(20:190)</a>
+
+
+### Unclassified
+Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)
+
+
+**Related Classes/Methods**: _None_
+
+
+# MCPAgent Core
 ```mermaid
 graph LR
-    Project_Initialization_Configuration["Project Initialization & Configuration"]
-    Client_Session_Management["Client & Session Management"]
-    Connector_Layer["Connector Layer"]
-    Agent_Core_Orchestration["Agent Core & Orchestration"]
-    Tool_Management_Adaptation["Tool Management & Adaptation"]
-    Asynchronous_Task_Management["Asynchronous Task Management"]
-    Observability_Telemetry["Observability & Telemetry"]
-    Project_Initialization_Configuration -- "Configures Client" --> Client_Session_Management
-    Client_Session_Management -- "Initiates and Manages Connections" --> Connector_Layer
-    Connector_Layer -- "Provides Connection Streams" --> Asynchronous_Task_Management
-    Asynchronous_Task_Management -- "Manages Connection Lifecycle" --> Connector_Layer
-    Agent_Core_Orchestration -- "Requests Tools" --> Tool_Management_Adaptation
-    Tool_Management_Adaptation -- "Provides Adapted Tools" --> Agent_Core_Orchestration
-    Tool_Management_Adaptation -- "Retrieves Tool Definitions" --> Connector_Layer
-    Agent_Core_Orchestration -- "Sends Execution Data" --> Observability_Telemetry
-    Observability_Telemetry -- "Provides Callbacks/Metrics" --> Agent_Core_Orchestration
-    click Project_Initialization_Configuration href "/codeboarding/Project_Initialization_Configuration.md" "Details"
-    click Client_Session_Management href "/codeboarding/Client_Session_Management.md" "Details"
-    click Connector_Layer href "/codeboarding/Connector_Layer.md" "Details"
-    click Agent_Core_Orchestration href "/codeboarding/Agent_Core_Orchestration.md" "Details"
-    click Tool_Management_Adaptation href "/codeboarding/Tool_Management_Adaptation.md" "Details"
-    click Asynchronous_Task_Management href "/codeboarding/Asynchronous_Task_Management.md" "Details"
-    click Observability_Telemetry href "/codeboarding/Observability_Telemetry.md" "Details"
+    MCPAgent["MCPAgent"]
+    LLM_Integration_Layer["LLM Integration Layer"]
+    MCPClient["MCPClient"]
+    Connectors["Connectors"]
+    LangChainAdapter["LangChainAdapter"]
+    ServerManager["ServerManager"]
+    Conversation_Memory["Conversation Memory"]
+    System_Prompt_Builder["System Prompt Builder"]
+    Unclassified["Unclassified"]
+    MCPAgent -- "uses" --> LLM_Integration_Layer
+    MCPAgent -- "configures" --> MCPClient
+    MCPAgent -- "provides to" --> ServerManager
+    MCPAgent -- "calls" --> System_Prompt_Builder
+    MCPAgent -- "manages" --> Conversation_Memory
+    MCPClient -- "uses" --> Connectors
+    LangChainAdapter -- "provides tools to" --> MCPAgent
+    ServerManager -- "provides tools to" --> MCPAgent
 ```
 
 ### Details
 
-The `mcp-use` project is architected as a modular agent-based system for interacting with MCP servers. It begins with `Project Initialization & Configuration`, which sets up the environment and configures the `Client & Session Management` component. This client then establishes and manages connections through a flexible `Connector Layer`, which abstracts various MCP server implementations. Asynchronous operations, such as processing event streams and managing connection lifecycles, are handled by `Asynchronous Task Management`. The core intelligence resides in `Agent Core & Orchestration`, responsible for LLM interactions and coordinating external tools. `Tool Management & Adaptation` discovers, adapts, and provides these tools to the agent, often retrieving definitions via the `Connector Layer`. Throughout the system's operation, `Observability & Telemetry` monitors execution, collects metrics, and provides feedback, ensuring a robust and traceable agent experience.
+The mcp-use project's core subsystem is centered around the MCPAgent, an intelligent orchestrator that leverages Large Language Models (LLMs) to interact with various MCP (Multi-Cloud Platform) services. The MCPAgent utilizes an LLM Integration Layer for its reasoning and decision-making, enabling it to interpret user requests and execute actions. It connects to MCP services through the MCPClient, which in turn manages Connectors for specific communication protocols. To ensure compatibility with the LLM framework, the LangChainAdapter translates MCP-specific tools into a standardized format. An optional ServerManager can dynamically discover and provision tools, enhancing the agent's capabilities. The MCPAgent maintains conversational context through its Conversation Memory and dynamically constructs its operational guidelines using the System Prompt Builder. This architecture allows the MCPAgent to provide a flexible and powerful interface for interacting with diverse MCP tools and services.
 
-### Project Initialization & Configuration
-Manages the project lifecycle, including command-line interactions, project setup, and loading environmental and connector configurations.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.cli` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/cli.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/config.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.config` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/config.py`</a>
-
-
-### Client & Session Management
-Oversees the establishment, maintenance, and termination of client connections to MCP servers, managing the overall user session.
+### MCPAgent
+The central orchestrator, responsible for interpreting user requests, planning actions, interacting with tools, managing conversation flow, and formulating responses. It leverages LLMs for reasoning and integrates various components to achieve its goals.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L48-L1107" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.mcpagent.MCPAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py`, Lines:(48:1107)</a>
+
+
+### LLM Integration Layer
+This component encapsulates the interaction with Large Language Models. It includes the BaseLanguageModel (e.g., OpenAI, Anthropic, Groq) used by MCPAgent and the LangChain AgentExecutor and create_tool_calling_agent which facilitate the LLM's reasoning and tool-calling capabilities.
+
+
+**Related Classes/Methods**:
+
+- QName:`langchain_core.language_models.base.BaseLanguageModel` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/`
+- QName:`langchain.agents.agent_executor.AgentExecutor` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/`
+- QName:`langchain.agents.tool_calling_agent.create_tool_calling_agent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/`
+
+
+### MCPClient
+Manages the creation, retrieval, and closure of multiple sessions with various MCP servers/connectors. It provides a high-level interface for connection management and tool aggregation from these sessions.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L21-L326" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.MCPClient` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(21:326)</a>
+
+
+### Connectors
+Implement the concrete communication protocols (e.g., HTTP, WebSocket, Sandbox) for interacting with individual MCP servers. They handle low-level request/response mechanisms and resource management for specific server types.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L37-L453" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.base.BaseConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py`, Lines:(37:453)</a>
+
+
+### LangChainAdapter
+Translates between the MCP's internal tool and resource formats and the LangChain framework's BaseTool format, ensuring compatibility and a unified interface for the MCPAgent to interact with diverse MCP tools.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py#L29-L268" target="_blank" rel="noopener noreferrer">QName:`mcp_use.adapters.langchain_adapter.LangChainAdapter` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py`, Lines:(29:268)</a>
+- QName:`langchain_core.tools.base.BaseTool` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/`
+
+
+### ServerManager
+When enabled, dynamically discovers and provisions available MCP servers and their associated tools, including management tools like ListServersTool. It provides a layer of abstraction for tool discovery.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/server_manager.py#L11-L124" target="_blank" rel="noopener noreferrer">QName:`mcp_use.managers.server_manager.ServerManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py`, Lines:(11:124)</a>
+
+
+### Conversation Memory
+Managed internally by MCPAgent through _conversation_history (a list of BaseMessage objects). It stores the ongoing dialogue, including system messages, human queries, and AI responses, to provide context for subsequent interactions.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.agents.mcpagent.MCPAgent._conversation_history` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py`
+- QName:`langchain_core.messages.base.BaseMessage` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/`
+
+
+### System Prompt Builder
+An external utility (create_system_message function) used by MCPAgent to dynamically construct the agent's system prompt based on available tools, user-provided instructions, and server manager mode.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py#L59-L103" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.system_prompt_builder.create_system_message` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`, Lines:(59:103)</a>
+
+
+### Unclassified
+Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)
+
+
+**Related Classes/Methods**: _None_
+
+
+# MCP Client Session Management
+```mermaid
+graph LR
+    MCPClient["MCPClient"]
+    Session["Session"]
+    BaseConnector["BaseConnector"]
+    Unclassified["Unclassified"]
+    MCPClient -- "composes" --> Session
+    Session -- "composes" --> BaseConnector
+```
+
+### Details
+
+The `mcp-use` project facilitates agent interaction with external services through a well-defined client-connector architecture. The `MCPClient` acts as the central orchestrator, managing multiple `Session` instances. Each `Session` represents a single, isolated connection to an MCP server, handling its lifecycle from establishment to termination. The `Session` relies on `BaseConnector` implementations to abstract the underlying communication protocols, allowing for flexible integration with various MCP server types. This design promotes modularity and extensibility, enabling the agent framework to adapt to diverse communication requirements without significant changes to its core logic.
+
+### MCPClient
+The high-level manager for all MCP server connections. It orchestrates the creation, management, and closing of multiple Session instances, providing a unified interface for the MCPAgent to interact with external services. This component is crucial for an agent framework as it centralizes the management of diverse external tool connections.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.client.MCPClient` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`
+
+
+### Session
+Manages the lifecycle of a single, individual connection to an MCP server. This includes establishing the connection, ensuring its proper termination, and providing an asynchronous context for interaction. It encapsulates the state and operations related to a specific connection, which is fundamental for robust and isolated communication within an agent system.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.session.Session` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`
+
+
+### BaseConnector
+An abstract base class that defines the interface for concrete communication mechanisms. Its implementations (e.g., WebSocketConnector, SandboxConnector) provide the actual underlying protocol for a Session to connect and exchange messages with an MCP server. This component embodies the Adapter Pattern, allowing the agent framework to support various communication protocols without altering the core Session logic.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L37-L453" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.base.BaseConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py`, Lines:(37:453)</a>
+
+
+### Unclassified
+Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)
+
+
+**Related Classes/Methods**: _None_
+
+
+# Prompt Engineering System Message Builder
+```mermaid
+graph LR
+    System_Message_Orchestrator["System Message Orchestrator"]
+    Tool_Description_Formatter["Tool Description Formatter"]
+    Prompt_Content_Builder["Prompt Content Builder"]
+    Unclassified["Unclassified"]
+    System_Message_Orchestrator -- "Orchestration, Data Request" --> Tool_Description_Formatter
+    System_Message_Orchestrator -- "Orchestration, Data Request" --> Prompt_Content_Builder
+    Tool_Description_Formatter -- "Data Flow, Input Provision" --> Prompt_Content_Builder
+    Prompt_Content_Builder -- "Data Flow, Result Return" --> System_Message_Orchestrator
+```
+
+### Details
+
+This subsystem is responsible for the dynamic construction of `SystemMessage` objects and prompts specifically tailored for the `MCPAgent`. Its scope includes gathering contextual information, formatting tool descriptions, and assembling these elements into a coherent and effective prompt for interaction with Large Language Models (LLMs). The core functionality is encapsulated within the `mcp_use/agents/prompts/system_prompt_builder.py` module, primarily centered around the `SystemPromptBuilder` concept.
+
+### System Message Orchestrator
+This component acts as the primary entry point and orchestrator for the entire system message construction process. It coordinates the generation of tool descriptions and the final assembly of the system prompt content, ensuring all necessary elements are integrated into the `SystemMessage` for the `MCPAgent`.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py#L59-L103" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.system_prompt_builder.create_system_message` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`, Lines:(59:103)</a>
+
+
+### Tool Description Formatter
+Responsible for transforming raw `BaseTool` objects into a structured, human-readable format suitable for inclusion in the system prompt. It also handles the logic for filtering out any tools that are explicitly disallowed, ensuring only relevant and permitted tools are described to the LLM.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py#L5-L25" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.system_prompt_builder.generate_tool_descriptions` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`, Lines:(5:25)</a>
+
+
+### Prompt Content Builder
+This component focuses on the templating and assembly of the actual system prompt content. It takes a base prompt template, injects the formatted tool descriptions provided by the `Tool Description Formatter`, and appends any additional instructions or contextual information, ensuring the final prompt adheres to a predefined structure and effectively guides the LLM.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py#L28-L56" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.system_prompt_builder.build_system_prompt_content` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`, Lines:(28:56)</a>
+
+
+### Unclassified
+Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)
+
+
+**Related Classes/Methods**: _None_
+
+
+# Tool Management Discovery
+```mermaid
+graph LR
+    ServerManager["ServerManager"]
+    Tool_Search_Engine["Tool Search Engine"]
+    Tool_Base_Class_["Tool (Base Class)"]
+    Unclassified["Unclassified"]
+    ServerManager -- "informs" --> Tool_Search_Engine
+    Tool_Search_Engine -- "depends on" --> ServerManager
+    Tool_Search_Engine -- "works with" --> Tool_Base_Class_
+    Tool_Base_Class_ -- "is discovered and managed by" --> Tool_Search_Engine
+```
+
+### Details
+
+This subsystem, 'Tool Management & Discovery', is responsible for connecting to external MCP servers, discovering and indexing the tools they offer, and providing a standardized interface for these tools to be utilized by the `MCPAgent`. Its main purpose is to act as the bridge between the agent's need for functionality and the available external services, ensuring dynamic and reliable access to tools.
+
+### ServerManager
+Manages the lifecycle and state of connections to various MCP servers. It acts as the central registry for available servers, handling connection establishment, disconnection, and potentially monitoring server health. This component is crucial for maintaining a dynamic and reliable connection landscape for the agent.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.managers.server_manager.ServerManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py`
+
+
+### Tool Search Engine
+Provides the capability to dynamically discover, index, and search for tools available across connected MCP servers. This component enables the `MCPAgent` to find and utilize tools based on specific criteria without prior explicit configuration, embodying the dynamic nature of agentic systems.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.managers.tools.search_tools:search_tools` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py`
+
+
+### Tool (Base Class)
+Defines the abstract interface and common properties for all tools within the MCP ecosystem. This standardization is crucial for the `MCPAgent` to interact uniformly with diverse tools, regardless of their underlying implementation. It encapsulates attributes like name, description, and input/output schemas, ensuring interoperability.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.managers.tools.base_tool.Tool` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py`
+
+
+### Unclassified
+Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)
+
+
+**Related Classes/Methods**: _None_
+
+
+# overview
+```mermaid
+graph LR
+    MCPAgent_Core["MCPAgent Core"]
+    MCP_Client_Session_Management["MCP Client & Session Management"]
+    Tool_Management_Discovery["Tool Management & Discovery"]
+    LLM_Integration_Adapters["LLM Integration & Adapters"]
+    Connector_Layer["Connector Layer"]
+    Authentication_Authorization["Authentication & Authorization"]
+    Prompt_Engineering_System_Message_Builder["Prompt Engineering & System Message Builder"]
+    Unclassified["Unclassified"]
+    MCPAgent_Core -- "requests system prompts from" --> Prompt_Engineering_System_Message_Builder
+    Prompt_Engineering_System_Message_Builder -- "provides prompts to" --> MCPAgent_Core
+    MCPAgent_Core -- "sends LLM requests to" --> LLM_Integration_Adapters
+    LLM_Integration_Adapters -- "forwards LLM responses to" --> MCPAgent_Core
+    MCPAgent_Core -- "queries for tools from" --> Tool_Management_Discovery
+    Tool_Management_Discovery -- "provides tool info to" --> MCPAgent_Core
+    MCPAgent_Core -- "sends tool invocation requests to" --> MCP_Client_Session_Management
+    MCP_Client_Session_Management -- "returns tool execution results to" --> MCPAgent_Core
+    MCP_Client_Session_Management -- "utilizes for communication" --> Connector_Layer
+    Connector_Layer -- "handles communication for" --> MCP_Client_Session_Management
+    Connector_Layer -- "requests authentication from" --> Authentication_Authorization
+    Authentication_Authorization -- "provides credentials to" --> Connector_Layer
+    Tool_Management_Discovery -- "retrieves tool metadata via" --> MCP_Client_Session_Management
+    click MCPAgent_Core href "/codeboarding/MCPAgent_Core.md" "Details"
+    click MCP_Client_Session_Management href "/codeboarding/MCP_Client_Session_Management.md" "Details"
+    click Tool_Management_Discovery href "/codeboarding/Tool_Management_Discovery.md" "Details"
+    click LLM_Integration_Adapters href "/codeboarding/LLM_Integration_Adapters.md" "Details"
+    click Connector_Layer href "/codeboarding/Connector_Layer.md" "Details"
+    click Authentication_Authorization href "/codeboarding/Authentication_Authorization.md" "Details"
+    click Prompt_Engineering_System_Message_Builder href "/codeboarding/Prompt_Engineering_System_Message_Builder.md" "Details"
+```
+
+### Details
+
+The MCP system is designed around a central `MCPAgent Core` that orchestrates interactions with external MCP servers and tools. It leverages `LLM Integration & Adapters` for reasoning and `Prompt Engineering & System Message Builder` for dynamic prompt generation. The `MCP Client & Session Management` component handles connections to MCP servers, relying on the `Connector Layer` for various communication protocols and `Authentication & Authorization` for secure access. `Tool Management & Discovery` provides the MCPAgent with access to available tools, which are then invoked through the `MCP Client & Session Management`. This modular design ensures clear separation of concerns, facilitating maintainability and scalability, and is optimized for clear data flow visualization in diagrams.
+
+### MCPAgent Core
+The central intelligence and orchestration unit. It interprets user requests, plans actions, interacts with tools, and formulates responses, leveraging LLMs for reasoning.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L48-L1107" target="_blank" rel="noopener noreferrer">QName:`MCPAgent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py`, Lines:(48:1107)</a>
+
+
+### MCP Client & Session Management
+Manages the lifecycle of connections (sessions) to various MCP servers, acting as the primary interface for the MCPAgent to external services.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L21-L326" target="_blank" rel="noopener noreferrer">QName:`MCPClient` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py`, Lines:(21:326)</a>
+- QName:`Session` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py`
+
+
+### Tool Management & Discovery
+Responsible for identifying, indexing, and providing access to tools available across connected MCP servers, enabling dynamic utilization by the MCPAgent.
+
+
+**Related Classes/Methods**:
+
+- QName:`ServerManager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py`
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/search_tools.py#L229-L286" target="_blank" rel="noopener noreferrer">QName:`search_tools` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py`, Lines:(229:286)</a>
+- QName:`Tool` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py`
+
+
+### LLM Integration & Adapters
+Facilitates seamless integration of MCP's internal representations with external LLM frameworks (e.g., LangChain), ensuring compatibility and schema translation.
+
+
+**Related Classes/Methods**:
+
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py#L29-L268" target="_blank" rel="noopener noreferrer">QName:`LangChainAdapter` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py`, Lines:(29:268)</a>
 
 
 ### Connector Layer
-An abstract and concrete layer defining how the system interacts with different MCP server implementations (e.g., Sandbox, WebSocket, HTTP, Stdio).
+Provides a standardized, protocol-agnostic mechanism for the MCP Client to communicate with diverse external MCP servers and tools.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.base` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.sandbox` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.websocket` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.http` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/stdio.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.stdio` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/stdio.py`</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L37-L453" target="_blank" rel="noopener noreferrer">QName:`BaseConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py`, Lines:(37:453)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py#L22-L257" target="_blank" rel="noopener noreferrer">QName:`WebSocketConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py`, Lines:(22:257)</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py#L24-L301" target="_blank" rel="noopener noreferrer">QName:`HTTPConnector` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py`, Lines:(24:301)</a>
 
 
-### Agent Core & Orchestration
-The central component responsible for LLM interaction, reasoning, dynamic prompt construction, and coordinating the utilization of external tools.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.base` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/base.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.mcpagent` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.system_prompt_builder` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/templates.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.templates` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/templates.py`</a>
-
-
-### Tool Management & Adaptation
-Discovers, indexes, and provides access to various tools (server-managed, search-enabled) and translates MCP-defined tools into formats compatible with external frameworks like LangChain.
+### Authentication & Authorization
+Manages secure access to MCP servers and resources through OAuth, handling token management and client registration.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/server_manager.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.managers.server_manager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/base_tool.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.managers.tools.base_tool` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.adapters.base` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/base.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.adapters.langchain_adapter` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py`</a>
+- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py#L51-L66" target="_blank" rel="noopener noreferrer">QName:`OAuthClient` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py`, Lines:(51:66)</a>
 
 
-### Asynchronous Task Management
-Manages background tasks, particularly those related to maintaining persistent connections, processing event streams from connectors, and handling asynchronous operations.
+### Prompt Engineering & System Message Builder
+Dynamically constructs system messages and prompts for the MCPAgent, incorporating tool descriptions and contextual information for effective LLM interaction.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/base.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.base` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/base.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/stdio.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.stdio` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/stdio.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/websocket.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.websocket` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/websocket.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/sse.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.sse` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/sse.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/streamable_http.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.task_managers.streamable_http` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/task_managers/streamable_http.py`</a>
+- QName:`SystemPromptBuilder` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py`
 
 
-### Observability & Telemetry
-Provides mechanisms for monitoring agent execution, collecting performance metrics, and managing callbacks for external integrations and debugging.
+### Unclassified
+Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)
 
 
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/telemetry.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.telemetry.telemetry` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/telemetry/telemetry.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/events.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.telemetry.events` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/telemetry/events.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/callbacks_manager.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.observability.callbacks_manager` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/observability/callbacks_manager.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/laminar.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.observability.laminar` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/observability/laminar.py`</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/langfuse.py#L1-L1" target="_blank" rel="noopener noreferrer">QName:`mcp_use.observability.langfuse` FileRef: `/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/observability/langfuse.py`</a>
+**Related Classes/Methods**: _None_
 
