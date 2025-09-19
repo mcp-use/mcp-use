@@ -78,7 +78,8 @@
                   "client/sampling",
                   "client/elicitation",
                   "client/notifications",
-                  "client/logging"
+                  "client/logging",
+                  "client/authentication"
                 ]
               }
             ]

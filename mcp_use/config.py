@@ -83,7 +83,7 @@ def create_connector_from_config(
         return HttpConnector(
             base_url=server_config["url"],
             headers=server_config.get("headers", None),
-            auth_token=server_config.get("auth_token", None),
+            auth=server_config.get("auth", {}),
             timeout=server_config.get("timeout", 5),
             sse_read_timeout=server_config.get("sse_read_timeout", 60 * 5),
             sampling_callback=sampling_callback,
@@ -98,8 +98,8 @@ def create_connector_from_config(
         return WebSocketConnector(
             url=server_config["ws_url"],
             headers=server_config.get("headers", None),
-            auth_token=server_config.get("auth_token", None),
             middleware=middleware,
+            auth=server_config.get("auth", {}),
         )
 
     raise ValueError("Cannot determine connector type from config")
