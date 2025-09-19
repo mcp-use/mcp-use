@@ -1,45 +1,55 @@
 """
-Core middleware system implementation for MCP requests.
+Core middleware system for MCP requests.
 
-This module provides the fundamental middleware architecture including:
-- Protocol definitions for type-safe middleware callbacks
-- Request and response context classes
-- Middleware manager for processing middleware chains
-- Client session wrapper for intercepting MCP calls
+This module provides a robust and extensible middleware architecture:
+- A typed MiddlewareContext to carry request data.
+- A Middleware base class with a dispatcher that routes to strongly-typed hooks.
+- A MiddlewareManager to build and execute the processing chain.
+- A CallbackClientSession that acts as an adapter, creating the initial context
+  without requiring changes to upstream callers like HttpConnector.
 """
 
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any, Protocol
+from dataclasses import dataclass, field
+from functools import partial
+from typing import Any, Generic, Protocol, TypeVar
 
 from mcp import ClientSession
-from mcp.types import JSONRPCRequest, JSONRPCResponse
+from mcp.types import (
+    CallToolRequestParams,
+    CallToolResult,
+    GetPromptRequestParams,
+    GetPromptResult,
+    InitializeRequestParams,
+    InitializeResult,
+    JSONRPCResponse,
+    ListPromptsRequest,
+    ListPromptsResult,
+    ListResourcesRequest,
+    ListResourcesResult,
+    ListToolsRequest,
+    ListToolsResult,
+    ReadResourceRequestParams,
+    ReadResourceResult,
+)
+
+# Generig TypeVars for context and results
+T = TypeVar("T")
+R = TypeVar("R", covariant=True)
 
 
 @dataclass
-class MCPRequestContext:
-    """Extended context for MCP requests with middleware metadata."""
+class MiddlewareContext(Generic[T]):
+    """Unified, typed context for all middleware operations."""
 
     id: str
-    method: str
-    params: dict[str, Any]
-    connector_id: str
+    method: str  # The JSON-RPC method name, e.g., "tools/call"
+    params: T  # The typed parameters for the method
+    connection_id: str
     timestamp: float
-    metadata: dict[str, Any]
-    jsonrpc_request: JSONRPCRequest | None = None
-
-    @classmethod
-    def create(cls, method: str, params: dict[str, Any], connector_id: str) -> "MCPRequestContext":
-        return cls(
-            id=str(uuid.uuid4()),
-            method=method,
-            params=params,
-            connector_id=connector_id,
-            timestamp=time.time(),
-            metadata={},
-        )
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -58,70 +68,128 @@ class MCPResponseContext:
         return cls(request_id=request_id, result=result, error=error, duration=0.0, metadata={})
 
 
-# Protocol definitions for middleware
+# Protocol definition for middleware
+class NextFunctionT(Protocol[T, R]):
+    """Protocol for the `call_next` function passed to middleware."""
+
+    async def __call__(self, context: MiddlewareContext[T]) -> R: ...
 
 
-class NextFunctionT(Protocol):
-    """Protocol for the next() function passed to middleware."""
+class Middleware:
+    """Base class for middlewares with hooks."""
 
-    async def __call__(self) -> Any: ...
+    async def __call__(self, context: MiddlewareContext[T], call_next: NextFunctionT[T, Any]) -> Any:
+        """Main entry point that orchestrates the chain"""
+        handler_chain = await self._dispatch_handler(context, call_next)
+        return await handler_chain(context)
 
+    async def _dispatch_handler(
+        self, context: MiddlewareContext[Any], call_next: NextFunctionT[Any, Any]
+    ) -> NextFunctionT[Any, Any]:
+        """Build a chain of handlers"""
+        handler = call_next
 
-class MiddlewareCallbackT(Protocol):
-    """Protocol for middleware callbacks.
+        method_map = {
+            "initialize": self.on_initialize,
+            "tools/call": self.on_call_tool,
+            "tools/list": self.on_list_tools,
+            "resources/list": self.on_list_resources,
+            "resources/read": self.on_read_resource,
+            "prompts/list": self.on_list_prompts,
+            "prompts/get": self.on_get_prompt,
+        }
 
-    Args:
-        request: The MCP request context with metadata
-        call_next: Function to call the next middleware or original handler
+        if hook := method_map.get(context.method):
+            handler = partial(hook, call_next=handler)
 
-    Returns:
-        The result from the middleware chain
-    """
+        # We can assume that all intercepted calls are requests
+        handler = partial(self.on_request, call_next=handler)
 
-    async def __call__(self, request: MCPRequestContext, call_next: NextFunctionT) -> Any: ...
+        return handler
+
+    # Default implementations for all hooks
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT[Any, Any]) -> Any:
+        return await call_next(context)
+
+    async def on_initialize(
+        self, context: MiddlewareContext[InitializeRequestParams], call_next: NextFunctionT
+    ) -> InitializeResult:
+        return await call_next(context)
+
+    async def on_call_tool(
+        self, context: MiddlewareContext[CallToolRequestParams], call_next: NextFunctionT
+    ) -> CallToolResult:
+        return await call_next(context)
+
+    async def on_read_resource(
+        self, context: MiddlewareContext[ReadResourceRequestParams], call_next: NextFunctionT
+    ) -> ReadResourceResult:
+        return await call_next(context)
+
+    async def on_get_prompt(
+        self, context: MiddlewareContext[GetPromptRequestParams], call_next: NextFunctionT
+    ) -> GetPromptResult:
+        return await call_next(context)
+
+    async def on_list_tools(
+        self, context: MiddlewareContext[ListToolsRequest], call_next: NextFunctionT
+    ) -> ListToolsResult:
+        return await call_next(context)
+
+    async def on_list_resources(
+        self, context: MiddlewareContext[ListResourcesRequest], call_next: NextFunctionT
+    ) -> ListResourcesResult:
+        return await call_next(context)
+
+    async def on_list_prompts(
+        self, context: MiddlewareContext[ListPromptsRequest], call_next: NextFunctionT
+    ) -> ListPromptsResult:
+        return await call_next(context)
 
 
 class MiddlewareManager:
     """Manages middleware callbacks for MCP requests."""
 
     def __init__(self):
-        self.middleware_callbacks: list[MiddlewareCallbackT] = []
+        self.middlewares: list[Middleware] = []
 
-    def add_middleware(self, callback: MiddlewareCallbackT) -> None:
+    def add_middleware(self, callback: Middleware) -> None:
         """Add a middleware callback."""
-        self.middleware_callbacks.append(callback)
+        self.middlewares.append(callback)
 
-    async def process_request(self, request: MCPRequestContext, original_call: Callable) -> MCPResponseContext:
-        """Process a request through all middleware."""
+    async def process_request(self, context: MiddlewareContext, original_call: Callable) -> MCPResponseContext:
+        """
+        Runs the full middleware chain, captures timing and errors,
+        and returns a structured MCPResponseContext.
+        """
 
         try:
             # Chain middleware callbacks
-            async def execute_call():
+            async def execute_call(_: MiddlewareContext) -> Any:
                 return await original_call()
 
             call_chain = execute_call
-            for middleware in reversed(self.middleware_callbacks):
-                current_call = call_chain
-
-                async def wrapped_call(middleware=middleware, current_call=current_call):
-                    return await middleware(request, current_call)
-
-                call_chain = wrapped_call
+            for middleware in reversed(self.middlewares):
+                call_chain = partial(middleware, call_next=call_chain)
 
             # Execute the chain
             start_time = time.time()
-            result = await call_chain()
+
+            # The result of the chain is the reaw result (e.g., CallToolResult)
+            raw_result = await call_chain(context)
+
+            # Success, now wrap the result in response context
             duration = time.time() - start_time
 
-            response = MCPResponseContext.create(request.id, result=result)
+            response = MCPResponseContext.create(request_id=context.id, result=raw_result)
             response.duration = duration
             return response
 
         except Exception as error:
-            duration = time.time() - request.timestamp
-            response = MCPResponseContext.create(request.id, error=error)
+            duration = time.time() - context.timestamp
+            response = MCPResponseContext.create(request_id=context.id, error=error)
             response.duration = duration
-            raise error
+            return response
 
 
 class CallbackClientSession:
@@ -132,37 +200,62 @@ class CallbackClientSession:
         self.connector_id = connector_id
         self.middleware_manager = middleware_manager
 
-    async def _intercept_call(self, method_name: str, original_method: Callable, *args, **kwargs) -> Any:
-        """Intercept method calls through middleware."""
-        request = MCPRequestContext.create(method_name, {"args": args, "kwargs": kwargs}, self.connector_id)
+    async def _intercept_call(self, method_name: str, params: Any, original_call: Callable) -> Any:
+        """
+        Creates the context, runs it through the manager, and unwraps the final response.
+        """
+        context = MiddlewareContext(
+            id=str(uuid.uuid4()),
+            method=method_name,
+            params=params,
+            connection_id=self.connector_id,
+            timestamp=time.time(),
+        )
 
-        async def original_call():
-            return await original_method(*args, **kwargs)
+        # This now returns a rich MCPResponseContext
+        response_context = await self.middleware_manager.process_request(context, original_call)
 
-        response = await self.middleware_manager.process_request(request, original_call)
-        return response.result
+        # If there is an error, return it
+        if response_context.error:
+            raise response_context.error
 
-    # Wrap all MCP methods
-    async def initialize(self, *args, **kwargs):
-        return await self._intercept_call("initialize", self._client_session.initialize, *args, **kwargs)
+        return response_context.result
 
-    async def list_tools(self, *args, **kwargs):
-        return await self._intercept_call("tools/list", self._client_session.list_tools, *args, **kwargs)
+    # Wrap all MCP methods with specific params
+    async def initialize(self, *args, **kwargs) -> InitializeResult:
+        return await self._intercept_call("initialize", None, lambda: self._client_session.initialize(*args, **kwargs))
 
-    async def call_tool(self, *args, **kwargs):
-        return await self._intercept_call("tools/call", self._client_session.call_tool, *args, **kwargs)
+    # List requests usually don't have parameters
+    async def list_tools(self, *args, **kwargs) -> ListToolsResult:
+        return await self._intercept_call("tools/list", None, lambda: self._client_session.list_tools(*args, **kwargs))
 
-    async def list_resources(self, *args, **kwargs):
-        return await self._intercept_call("resources/list", self._client_session.list_resources, *args, **kwargs)
+    async def call_tool(self, name: str, arguments: dict[str, Any], *args, **kwargs) -> CallToolResult:
+        params = CallToolRequestParams(name=name, arguments=arguments)
+        return await self._intercept_call(
+            "tools/call", params, lambda: self._client_session.call_tool(name, arguments, *args, **kwargs)
+        )
 
-    async def read_resource(self, *args, **kwargs):
-        return await self._intercept_call("resources/read", self._client_session.read_resource, *args, **kwargs)
+    async def list_resources(self, *args, **kwargs) -> ListResourcesResult:
+        return await self._intercept_call(
+            "resources/list", None, lambda: self._client_session.list_resources(*args, **kwargs)
+        )
 
-    async def list_prompts(self, *args, **kwargs):
-        return await self._intercept_call("prompts/list", self._client_session.list_prompts, *args, **kwargs)
+    async def read_resource(self, uri: str, *args, **kwargs) -> ReadResourceResult:
+        params = ReadResourceRequestParams(uri=uri)
+        return await self._intercept_call(
+            "resources/read", params, lambda: self._client_session.read_resource(uri, *args, **kwargs)
+        )
 
-    async def get_prompt(self, *args, **kwargs):
-        return await self._intercept_call("prompts/get", self._client_session.get_prompt, *args, **kwargs)
+    async def list_prompts(self, *args, **kwargs) -> ListPromptsResult:
+        return await self._intercept_call(
+            "prompts/list", None, lambda: self._client_session.list_prompts(*args, **kwargs)
+        )
+
+    async def get_prompt(self, name: str, *args, **kwargs) -> GetPromptResult:
+        params = GetPromptRequestParams(name=name, **kwargs)
+        return await self._intercept_call(
+            "prompts/get", params, lambda: self._client_session.get_prompt(name, *args, **kwargs)
+        )
 
     def __getattr__(self, name: str) -> Any:
         """Delegate other attributes to the wrapped session."""

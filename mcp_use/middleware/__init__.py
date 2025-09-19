@@ -24,21 +24,21 @@ from .metrics import (
 # Protocol types for type-safe middleware
 from .middleware import (
     CallbackClientSession,
-    MCPRequestContext,
     MCPResponseContext,
-    MiddlewareCallbackT,
+    Middleware,
+    MiddlewareContext,
     MiddlewareManager,
     NextFunctionT,
 )
 
 __all__ = [
     # Core types and classes
-    "MCPRequestContext",
+    "MiddlewareContext",
     "MCPResponseContext",
+    "Middleware",
     "MiddlewareManager",
     "CallbackClientSession",
     # Protocol types
-    "MiddlewareCallbackT",
     "NextFunctionT",
     # Default logging middleware
     "default_logging_middleware",

@@ -11,7 +11,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
 from ..logging import logger
-from ..middleware import CallbackClientSession, MiddlewareCallbackT
+from ..middleware import CallbackClientSession, Middleware
 from ..task_managers import StdioConnectionManager
 from .base import BaseConnector
 
@@ -34,7 +34,7 @@ class StdioConnector(BaseConnector):
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
-        middleware: list[MiddlewareCallbackT] | None = None,
+        middleware: list[Middleware] | None = None,
     ):
         """Initialize a new stdio connector.
 

@@ -15,7 +15,7 @@ from mcp_use.types.sandbox import SandboxOptions
 
 from .config import create_connector_from_config, load_config_file
 from .logging import logger
-from .middleware import MiddlewareCallbackT, default_logging_middleware
+from .middleware import Middleware, default_logging_middleware
 from .session import MCPSession
 
 
@@ -36,7 +36,7 @@ class MCPClient:
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
-        middleware: list[MiddlewareCallbackT] | None = None,
+        middleware: list[Middleware] | None = None,
     ) -> None:
         """Initialize a new MCP client.
 
