@@ -13,9 +13,11 @@ import asyncio
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from mcp.types import CallToolRequestParams, CallToolResult
 
 from mcp_use import MCPAgent, MCPClient
-from mcp_use.middleware import MCPRequestContext, NextFunctionT
+from mcp_use.middleware import MiddlewareContext, NextFunctionT
+from mcp_use.middleware.middleware import Middleware
 
 
 async def main():
@@ -23,18 +25,11 @@ async def main():
     # Load environment variables
     load_dotenv()
 
-    # Optional: Add custom middleware if needed
-    async def custom_browser_middleware(request: MCPRequestContext, call_next: NextFunctionT):
-        """Custom middleware for browser automation."""
-        if "browser" in request.method:
-            print(f"🌐 Browser action: {request.method}")
-
-        result = await call_next()
-
-        if "browser" in request.method:
-            print(f"✅ Browser action completed: {request.method}")
-
-        return result
+    # Create custom middleware
+    class CustomMiddleware(Middleware):
+        async def on_call_tool(self, context: MiddlewareContext[CallToolRequestParams], call_next: NextFunctionT) -> CallToolResult:
+            print(f"Calling tool {context.params.name}")
+            return await call_next(context)
 
     config = {
         "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
@@ -42,7 +37,7 @@ async def main():
 
     # MCPClient includes default logging middleware automatically
     # Add custom middleware only if needed
-    client = MCPClient(config=config, middleware=[custom_browser_middleware])
+    client = MCPClient(config=config, middleware=[CustomMiddleware()])
 
     # Create LLM
     llm = ChatOpenAI(model="gpt-4o")
@@ -53,7 +48,7 @@ async def main():
     # Run the query
     result = await agent.run(
         """
-        Navigate to https://github.com/mcp-use/mcp-use, give a star to the project and write
+        Navigate to https://github.com/mcp-use/mcp-use and write
         a summary of the project.
         """,
         max_steps=30,

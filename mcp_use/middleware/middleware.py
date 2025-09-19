@@ -108,7 +108,7 @@ class Middleware:
         return handler
 
     # Default implementations for all hooks
-    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT[Any, Any]) -> Any:
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
         return await call_next(context)
 
     async def on_initialize(

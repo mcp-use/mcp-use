@@ -1,7 +1,7 @@
 """
-Metrics middleware for MCP requests.
+Metrics middleware for MCP contexts.
 
-Classes for collecting comprehensive metrics about MCP request patterns,
+Classes for collecting comprehensive metrics about MCP context patterns,
 performance, and errors with simple instantiation.
 """
 
@@ -10,47 +10,47 @@ import time
 from collections import Counter, defaultdict
 from typing import Any
 
-from .middleware import MCPRequestContext, NextFunctionT
+from .middleware import Middleware, MiddlewareContext, NextFunctionT
 
 
-class MetricsMiddleware:
-    """Collects basic metrics about MCP requests including counts, durations, and errors."""
+class MetricsMiddleware(Middleware):
+    """Collects basic metrics about MCP contexts including counts, durations, and errors."""
 
     def __init__(self):
         self.metrics = {
-            "total_requests": 0,
+            "total_contexts": 0,
             "total_errors": 0,
             "method_counts": {},
             "method_durations": {},
-            "active_requests": 0,
+            "active_contexts": 0,
             "start_time": time.time(),
         }
         self.lock = asyncio.Lock()
 
-    async def __call__(self, request: MCPRequestContext, call_next: NextFunctionT) -> Any:
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
         async with self.lock:
-            self.metrics["total_requests"] += 1
-            self.metrics["active_requests"] += 1
-            self.metrics["method_counts"][request.method] = self.metrics["method_counts"].get(request.method, 0) + 1
+            self.metrics["total_contexts"] += 1
+            self.metrics["active_contexts"] += 1
+            self.metrics["method_counts"][context.method] = self.metrics["method_counts"].get(context.method, 0) + 1
 
         try:
-            result = await call_next()
-            duration = time.time() - request.timestamp
+            result = await call_next(context)
+            duration = time.time() - context.timestamp
 
             async with self.lock:
-                self.metrics["active_requests"] -= 1
-                if request.method not in self.metrics["method_durations"]:
-                    self.metrics["method_durations"][request.method] = []
-                self.metrics["method_durations"][request.method].append(duration)
+                self.metrics["active_contexts"] -= 1
+                if context.method not in self.metrics["method_durations"]:
+                    self.metrics["method_durations"][context.method] = []
+                self.metrics["method_durations"][context.method].append(duration)
 
             return result
         except Exception:
             async with self.lock:
                 self.metrics["total_errors"] += 1
-                self.metrics["active_requests"] -= 1
-                if request.method not in self.metrics["method_durations"]:
-                    self.metrics["method_durations"][request.method] = []
-                self.metrics["method_durations"][request.method].append(time.time() - request.timestamp)
+                self.metrics["active_contexts"] -= 1
+                if context.method not in self.metrics["method_durations"]:
+                    self.metrics["method_durations"][context.method] = []
+                self.metrics["method_durations"][context.method].append(time.time() - context.timestamp)
             raise
 
     def get_metrics(self) -> dict[str, Any]:
@@ -60,9 +60,9 @@ class MetricsMiddleware:
         return {
             **self.metrics,
             "uptime_seconds": uptime,
-            "requests_per_second": self.metrics["total_requests"] / uptime if uptime > 0 else 0,
-            "error_rate": self.metrics["total_errors"] / self.metrics["total_requests"]
-            if self.metrics["total_requests"] > 0
+            "contexts_per_second": self.metrics["total_contexts"] / uptime if uptime > 0 else 0,
+            "error_rate": self.metrics["total_errors"] / self.metrics["total_contexts"]
+            if self.metrics["total_contexts"] > 0
             else 0,
             "method_avg_duration": {
                 method: sum(durations) / len(durations) if durations else 0
@@ -79,72 +79,72 @@ class MetricsMiddleware:
         }
 
 
-class PerformanceMetricsMiddleware:
+class PerformanceMetricsMiddleware(Middleware):
     """Advanced performance metrics including percentiles, throughput, and performance trends."""
 
     def __init__(self):
         self.performance_data = {
-            "request_times": defaultdict(list),
+            "context_times": defaultdict(list),
             "hourly_counts": defaultdict(int),
             "connector_performance": defaultdict(list),
-            "slow_requests": [],  # Requests over threshold
-            "fast_requests": [],  # Fastest requests
+            "slow_contexts": [],  # contexts over threshold
+            "fast_contexts": [],  # Fastest contexts
             "slow_threshold_ms": 1000,  # 1 second
             "fast_threshold_ms": 50,  # 50ms
         }
         self.lock = asyncio.Lock()
 
-    async def __call__(self, request: MCPRequestContext, call_next: NextFunctionT) -> Any:
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
         start_time = time.time()
 
         try:
-            result = await call_next()
+            result = await call_next(context)
             duration_ms = (time.time() - start_time) * 1000
 
             async with self.lock:
                 # Track performance by method and connector
-                self.performance_data["request_times"][request.method].append(duration_ms)
-                self.performance_data["connector_performance"][request.connector_id].append(duration_ms)
+                self.performance_data["context_times"][context.method].append(duration_ms)
+                self.performance_data["connector_performance"][context.connector_id].append(duration_ms)
 
                 # Track hourly patterns
                 hour = int(time.time() // 3600)
                 self.performance_data["hourly_counts"][hour] += 1
 
-                # Identify slow/fast requests
+                # Identify slow/fast contexts
                 if duration_ms > self.performance_data["slow_threshold_ms"]:
-                    self.performance_data["slow_requests"].append(
+                    self.performance_data["slow_contexts"].append(
                         {
-                            "method": request.method,
-                            "connector": request.connector_id,
+                            "method": context.method,
+                            "connector": context.connector_id,
                             "duration_ms": duration_ms,
-                            "timestamp": request.timestamp,
+                            "timestamp": context.timestamp,
                         }
                     )
-                    # Keep only last 100 slow requests
-                    if len(self.performance_data["slow_requests"]) > 100:
-                        self.performance_data["slow_requests"] = self.performance_data["slow_requests"][-100:]
+                    # Keep only last 100 slow contexts
+                    if len(self.performance_data["slow_contexts"]) > 100:
+                        self.performance_data["slow_contexts"] = self.performance_data["slow_contexts"][-100:]
 
                 if duration_ms < self.performance_data["fast_threshold_ms"]:
-                    self.performance_data["fast_requests"].append(
+                    self.performance_data["fast_contexts"].append(
                         {
-                            "method": request.method,
-                            "connector": request.connector_id,
+                            "method": context.method,
+                            "connector": context.connector_id,
                             "duration_ms": duration_ms,
-                            "timestamp": request.timestamp,
+                            "timestamp": context.timestamp,
                         }
                     )
-                    # Keep only last 100 fast requests
-                    if len(self.performance_data["fast_requests"]) > 100:
-                        self.performance_data["fast_requests"] = self.performance_data["fast_requests"][-100:]
+                    # Keep only last 100 fast contexts
+                    if len(self.performance_data["fast_contexts"]) > 100:
+                        self.performance_data["fast_contexts"] = self.performance_data["fast_contexts"][-100:]
 
             return result
 
         except Exception:
-            # Still track duration even for failed requests
+            # Still track duration even for failed contexts
             duration_ms = (time.time() - start_time) * 1000
             async with self.lock:
-                self.performance_data["request_times"][request.method].append(duration_ms)
-                self.performance_data["connector_performance"][request.connector_id].append(duration_ms)
+                self.performance_data["context_times"][context.method].append(duration_ms)
+                self.performance_data["connector_performance"][context.connector_id].append(duration_ms)
             raise
 
     def get_performance_metrics(self) -> dict[str, Any]:
@@ -163,7 +163,7 @@ class PerformanceMetricsMiddleware:
             }
 
         method_stats = {}
-        for method, times in self.performance_data["request_times"].items():
+        for method, times in self.performance_data["context_times"].items():
             if times:
                 method_stats[method] = {
                     "count": len(times),
@@ -187,8 +187,8 @@ class PerformanceMetricsMiddleware:
         return {
             "method_performance": method_stats,
             "connector_performance": connector_stats,
-            "slow_requests": self.performance_data["slow_requests"][-10:],  # Last 10 slow requests
-            "fast_requests": self.performance_data["fast_requests"][-10:],  # Last 10 fast requests
+            "slow_contexts": self.performance_data["slow_contexts"][-10:],  # Last 10 slow contexts
+            "fast_contexts": self.performance_data["fast_contexts"][-10:],  # Last 10 fast contexts
             "hourly_distribution": dict(self.performance_data["hourly_counts"]),
             "thresholds": {
                 "slow_ms": self.performance_data["slow_threshold_ms"],
@@ -197,7 +197,7 @@ class PerformanceMetricsMiddleware:
         }
 
 
-class ErrorTrackingMiddleware:
+class ErrorTrackingMiddleware(Middleware):
     """Error tracking and analysis middleware for detailed error analytics."""
 
     def __init__(self):
@@ -210,9 +210,9 @@ class ErrorTrackingMiddleware:
         }
         self.lock = asyncio.Lock()
 
-    async def __call__(self, request: MCPRequestContext, call_next: NextFunctionT) -> Any:
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
         try:
-            return await call_next()
+            return await call_next(context)
 
         except Exception as e:
             async with self.lock:
@@ -221,18 +221,18 @@ class ErrorTrackingMiddleware:
 
                 # Track error patterns
                 self.error_data["error_counts"][error_type] += 1
-                self.error_data["error_by_method"][request.method][error_type] += 1
-                self.error_data["error_by_connector"][request.connector_id][error_type] += 1
+                self.error_data["error_by_method"][context.method][error_type] += 1
+                self.error_data["error_by_connector"][context.connector_id][error_type] += 1
                 self.error_data["error_timestamps"].append(time.time())
 
                 # Keep recent errors for analysis
                 error_info = {
-                    "timestamp": request.timestamp,
-                    "method": request.method,
-                    "connector": request.connector_id,
+                    "timestamp": context.timestamp,
+                    "method": context.method,
+                    "connector": context.connector_id,
                     "error_type": error_type,
                     "error_message": error_msg,
-                    "request_id": request.id,
+                    "context_id": context.id,
                 }
                 self.error_data["recent_errors"].append(error_info)
 
@@ -268,7 +268,7 @@ class ErrorTrackingMiddleware:
         }
 
 
-class CombinedAnalyticsMiddleware:
+class CombinedAnalyticsMiddleware(Middleware):
     """Comprehensive middleware combining metrics, performance, and error tracking."""
 
     def __init__(self):
@@ -276,13 +276,17 @@ class CombinedAnalyticsMiddleware:
         self.perf_mw = PerformanceMetricsMiddleware()
         self.error_mw = ErrorTrackingMiddleware()
 
-    async def __call__(self, request: MCPRequestContext, call_next: NextFunctionT) -> Any:
-        # Chain all middleware together
-        async def perf_and_error_chain():
-            return await self.error_mw(request, lambda: self.perf_mw(request, call_next))
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
+        # Chain the middleware in the desired order: Metrics -> Errors -> Performance
+        async def chain(ctx):
+            # The final call in the chain is the original `call_next`
+            return await self.perf_mw.on_request(ctx, call_next)
 
-        return await self.metrics_mw(request, perf_and_error_chain)
+        async def error_chain(ctx):
+            return await self.error_mw.on_request(ctx, chain)
 
+        return await self.metrics_mw.on_request(context, error_chain)
+        
     def get_combined_analytics(self) -> dict[str, Any]:
         """Get all analytics data in one comprehensive report."""
         return {
