@@ -98,7 +98,6 @@ def create_connector_from_config(
         return WebSocketConnector(
             url=server_config["ws_url"],
             headers=server_config.get("headers", None),
-            middleware=middleware,
             auth=server_config.get("auth", {}),
         )
 
