@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from mcp_use.client import MCPClient
+from mcp_use.client.client import MCPClient
 
 
 @pytest.mark.asyncio

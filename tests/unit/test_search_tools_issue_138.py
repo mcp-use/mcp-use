@@ -13,7 +13,7 @@ import pytest
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
 
-from mcp_use.managers.tools.search_tools import SearchToolsTool, ToolSearchEngine, ToolSearchInput
+from mcp_use.agent.managers.tools.search_tools import SearchToolsTool, ToolSearchEngine, ToolSearchInput
 
 
 class MockTool(BaseTool):

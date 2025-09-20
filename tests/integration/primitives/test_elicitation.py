@@ -2,7 +2,7 @@ import pytest
 from mcp.client.session import RequestContext
 from mcp.types import ElicitRequestParams, ElicitResult
 
-from mcp_use.client import MCPClient
+from mcp_use.client.client import MCPClient
 
 
 async def elicitation_callback(ctx: RequestContext, params: ElicitRequestParams) -> ElicitResult:

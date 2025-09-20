@@ -2,7 +2,7 @@ import pytest
 from mcp.client.session import ClientSession
 from mcp.types import CreateMessageRequestParams, CreateMessageResult, ErrorData, TextContent
 
-from mcp_use.client import MCPClient
+from mcp_use.client.client import MCPClient
 
 
 @pytest.mark.asyncio

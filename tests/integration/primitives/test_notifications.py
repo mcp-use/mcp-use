@@ -1,6 +1,6 @@
 import pytest
 
-from mcp_use.client import MCPClient
+from mcp_use.client.client import MCPClient
 
 
 async def handle_messages(message):

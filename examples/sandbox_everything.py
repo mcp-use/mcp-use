@@ -11,7 +11,7 @@ from langchain_openai import ChatOpenAI
 
 import mcp_use
 from mcp_use import MCPAgent, MCPClient
-from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.client.types.sandbox import SandboxOptions
 
 mcp_use.set_debug(debug=1)
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from mcp_use import MCPClient
+from mcp_use.client.client import MCPClient
 
 
 @pytest.fixture

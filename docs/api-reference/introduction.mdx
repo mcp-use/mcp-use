@@ -56,7 +56,7 @@ Both `from_config_file` and `from_dict` methods support the `options` parameter 
 
 ```python
 from mcp_use import MCPClient
-from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.client.types.sandbox import SandboxOptions
 
 # Define sandbox options
 sandbox_options: SandboxOptions = {
@@ -506,7 +506,7 @@ Configure and use multiple sandboxed MCP servers:
 import os
 from dotenv import load_dotenv
 from mcp_use import MCPClient, MCPAgent
-from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.client.types.sandbox import SandboxOptions
 from langchain_anthropic import ChatAnthropic
 
 # Load environment variables

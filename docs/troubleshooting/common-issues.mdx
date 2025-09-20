@@ -216,7 +216,7 @@ pip install langchain-groq  # for Groq
 
 2. Test tools individually:
    ```python
-   from mcp_use.adapters import LangChainAdapter
+   from mcp_use.agent.adapters import LangChainAdapter
 
    adapter = LangChainAdapter()
    tools = await adapter.create_tools(client)

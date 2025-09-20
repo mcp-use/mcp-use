@@ -157,7 +157,7 @@ async def main():
     }
 
     # Create MCPClient from configuration dictionary
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config=config)
 
     # Create LLM
     llm = ChatOpenAI(model="gpt-4o")
@@ -566,7 +566,7 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
-from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.client.types.sandbox import SandboxOptions
 
 async def main():
     # Load environment variables (needs E2B_API_KEY)
@@ -676,8 +676,8 @@ You can also build your own custom agent using the LangChain adapter:
 ```python
 import asyncio
 from langchain_openai import ChatOpenAI
-from mcp_use.client import MCPClient
-from mcp_use.adapters.langchain_adapter import LangChainAdapter
+from mcp_use import MCPClient
+from mcp_use.agent.adapters.langchain_adapter import LangChainAdapter
 from dotenv import load_dotenv
 
 load_dotenv()

@@ -46,8 +46,8 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from mcp_use.client import MCPClient
-from mcp_use.adapters import LangChainAdapter
+from mcp_use import MCPClient
+from mcp_use.agent.adapters import LangChainAdapter
 
 async def main():
     # Initialize the MCP client
@@ -127,7 +127,7 @@ Here's a simple template for creating a new adapter:
 ```python
 from typing import Any
 
-from mcp_use.adapters.base import BaseAdapter
+from mcp_use.agent.adapters.base import BaseAdapter
 from mcp_use.connectors.base import BaseConnector
 from your_framework import YourFrameworkTool  # Import your framework's tool class
 
@@ -165,7 +165,7 @@ Once you've implemented your adapter, you can use it with the simplified API:
 
 ```python
 from your_module import YourFrameworkAdapter
-from mcp_use.client import MCPClient
+from mcp_use import MCPClient
 
 # Initialize the client
 client = MCPClient.from_config_file("config.json")

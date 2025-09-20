@@ -43,7 +43,7 @@ Creates tools compatible with LangChain agents and runnables.
 **Example:**
 ```python
 from mcp_use import MCPClient
-from mcp_use.adapters import LangChainAdapter
+from mcp_use.agent.adapters import LangChainAdapter
 
 client = MCPClient.from_config_file("config.json")
 adapter = LangChainAdapter()
@@ -196,7 +196,7 @@ Create custom adapters for other frameworks:
 ### CrewAI Adapter Example
 
 ```python
-from mcp_use.adapters import BaseAdapter
+from mcp_use.agent.adapters import BaseAdapter
 
 class CrewAIAdapter(BaseAdapter):
     def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector):

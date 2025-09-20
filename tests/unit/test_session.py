@@ -6,7 +6,7 @@ import unittest
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
-from mcp_use.session import MCPSession
+from mcp_use.client.session import MCPSession
 
 
 class TestMCPSessionInitialization(unittest.TestCase):

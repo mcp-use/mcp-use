@@ -10,9 +10,9 @@ import pytest
 
 # Use MagicMock instead of importing from mcp.types
 # from mcp.types import CallToolResult, Tool
-from mcp_use.connectors.sandbox import SandboxConnector
-from mcp_use.task_managers import SseConnectionManager
-from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.client.connectors.sandbox import SandboxConnector
+from mcp_use.client.task_managers import SseConnectionManager
+from mcp_use.client.types.sandbox import SandboxOptions
 
 
 # Mock the sandbox module for tests

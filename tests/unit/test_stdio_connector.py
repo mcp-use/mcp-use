@@ -9,8 +9,8 @@ import pytest
 from mcp.types import CallToolResult, Tool
 from pydantic import AnyUrl
 
-from mcp_use.connectors.stdio import StdioConnector
-from mcp_use.task_managers.stdio import StdioConnectionManager
+from mcp_use.client.connectors.stdio import StdioConnector
+from mcp_use.client.task_managers.stdio import StdioConnectionManager
 
 
 @pytest.fixture(autouse=True)

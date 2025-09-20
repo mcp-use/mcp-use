@@ -225,8 +225,8 @@ Here’s a minimal example of a custom server manager that provides a single, ha
 
 ```python
 import asyncio
-from mcp_use.agents import MCPAgent
-from mcp_use.managers.base import BaseServerManager
+from mcp_use.agent import MCPAgent
+from mcp_use.agent.managers.base import BaseServerManager
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel

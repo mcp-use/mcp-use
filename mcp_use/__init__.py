@@ -12,12 +12,13 @@ from importlib.metadata import version
 from .logging import MCP_USE_DEBUG, Logger, logger  # isort: skip
 
 # Now import other modules - observability must come after logging
-from . import observability  # noqa: E402
-from .agents.mcpagent import MCPAgent
-from .client import MCPClient
-from .config import load_config_file
-from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
-from .session import MCPSession
+from .agent import managers, observability  # noqa: E402
+from .agent.mcpagent import MCPAgent
+from .client import connectors
+from .client.client import MCPClient
+from .client.config import load_config_file
+from .client.connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
+from .client.session import MCPSession
 
 __version__ = version("mcp-use")
 
@@ -29,6 +30,8 @@ __all__ = [
     "StdioConnector",
     "WebSocketConnector",
     "HttpConnector",
+    "connectors",
+    "managers",
     "load_config_file",
     "logger",
     "MCP_USE_DEBUG",

@@ -10,9 +10,9 @@ import aiohttp
 from mcp import McpError
 from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
 
-from mcp_use.auth.bearer import BearerAuth
-from mcp_use.connectors.http import HttpConnector
-from mcp_use.task_managers import SseConnectionManager
+from mcp_use.client.auth.bearer import BearerAuth
+from mcp_use.client.connectors.http import HttpConnector
+from mcp_use.client.task_managers import SseConnectionManager
 
 
 @patch("mcp_use.connectors.base.logger")

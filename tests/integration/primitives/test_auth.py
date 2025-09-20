@@ -1,12 +1,11 @@
-import token
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from httpx import Auth, Request
 
-from mcp_use import MCPClient, set_debug
-from mcp_use.auth.bearer import BearerAuth
+from mcp_use import set_debug
+from mcp_use.client.auth.bearer import BearerAuth
+from mcp_use.client.client import MCPClient
 
 set_debug(2)
 

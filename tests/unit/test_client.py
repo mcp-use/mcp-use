@@ -9,8 +9,8 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
-from mcp_use.client import MCPClient
-from mcp_use.session import MCPSession
+from mcp_use.client.client import MCPClient
+from mcp_use.client.session import MCPSession
 
 
 class TestMCPClientInitialization:
@@ -199,8 +199,8 @@ class TestMCPClientSessionManagement:
     """Tests for MCPClient session management methods."""
 
     @pytest.mark.asyncio
-    @patch("mcp_use.client.create_connector_from_config")
-    @patch("mcp_use.client.MCPSession")
+    @patch("mcp_use.client.client.create_connector_from_config")
+    @patch("mcp_use.client.client.MCPSession")
     async def test_create_session(self, mock_session_class, mock_create_connector):
         """Test creating a session."""
         config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
@@ -258,8 +258,8 @@ class TestMCPClientSessionManagement:
         assert "Server 'server2' not found in config" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    @patch("mcp_use.client.create_connector_from_config")
-    @patch("mcp_use.client.MCPSession")
+    @patch("mcp_use.client.client.create_connector_from_config")
+    @patch("mcp_use.client.client.MCPSession")
     async def test_create_session_no_auto_initialize(self, mock_session_class, mock_create_connector):
         """Test creating a session without auto-initialization."""
         config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
@@ -437,8 +437,8 @@ class TestMCPClientSessionManagement:
         assert len(client.active_sessions) == 0
 
     @pytest.mark.asyncio
-    @patch("mcp_use.client.create_connector_from_config")
-    @patch("mcp_use.client.MCPSession")
+    @patch("mcp_use.client.client.create_connector_from_config")
+    @patch("mcp_use.client.client.MCPSession")
     async def test_create_all_sessions(self, mock_session_class, mock_create_connector):
         """Test creating all sessions."""
         config = {
@@ -502,8 +502,8 @@ class TestMCPClientSessionManagement:
         assert sessions == client.sessions
 
     @pytest.mark.asyncio
-    @patch("mcp_use.client.create_connector_from_config")
-    @patch("mcp_use.client.MCPSession")
+    @patch("mcp_use.client.client.create_connector_from_config")
+    @patch("mcp_use.client.client.MCPSession")
     async def test_create_allowed_sessions(self, mock_session_class, mock_create_connector):
         """Test creating only allowed sessions."""
         config = {
