@@ -159,6 +159,19 @@ class MCPClient:
             if name in self.active_sessions:
                 self.active_sessions.remove(name)
 
+    def add_middleware(self, middleware: Middleware) -> None:
+        """Add a middleware.
+
+        Args:
+            middleware: The middleware to add
+        """
+        if len(self.sessions) == 0:
+            self.middleware.append(middleware)
+            return
+
+        for session in self.sessions.values():
+            session.connector.middleware_manager.add_middleware(middleware)
+
     def get_server_names(self) -> list[str]:
         """Get the list of configured server names.
 

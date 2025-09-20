@@ -1,409 +1,295 @@
 ---
 title: "Middleware System"
-description: "Flexible middleware system for intercepting and processing MCP requests and responses"
+description: "Flexible middleware system for intercepting and processing MCP requests and responses with typed hooks"
 icon: "layers"
 ---
 
-The mcp-use middleware system provides a powerful, flexible way to intercept and process all MCP (Model Context Protocol) requests and responses. Using an Express.js-style callback pattern, middleware functions can perform logging, metrics collection, caching, rate limiting, and custom processing.
+The mcp-use middleware system provides a powerful, flexible way to intercept and process all MCP (Model Context Protocol) requests and responses. It uses a class-based hook pattern (with an Express-like `next` flow) so you can log, collect metrics, filter/transform requests, cache, rate limit, and more.
+
+## Middleware Process
+
+mcp-use runs middleware in a chain. When a request like `initialize`, `tools/call`, `resources/read`, etc. is made, it flows through your middlewares (in order). In each middleware you can:
+
+1. Analyze the incoming request through the context
+2. Modify the request (and its metadata) before execution
+3. Execute the next handler via `await call_next(context)`
+4. Inspect/transform the result or handle errors
+
+Transport support:
+- Fully supported: `stdio`, `http` (streamable HTTP and SSE), `sandbox`
+- Not yet supported: `websocket`
 
 ## Overview
 
-Middleware in mcp-use follows a simple, familiar pattern where each middleware function receives:
-- `request: MCPRequestContext` - The MCP request with metadata
-- `call_next: NextFunctionT` - Function to call the next middleware or actual MCP handler
+You implement middleware by subclassing `Middleware` and overriding one or more hooks. Each hook receives:
+- `context: MiddlewareContext[T]` - typed request context
+- `call_next: NextFunctionT[T, R]` - call to the next middleware or the actual MCP handler
 
-Each middleware function can process both incoming requests (before `call_next()`) and outgoing responses (after `call_next()`), making it naturally bidirectional.
+Hooks are typed to the specific MCP method so you get strong IDE assistance when overriding specific operations like `on_call_tool`.
 
 ## Quick Start
 
 ```python
+from mcp.types import CallToolRequestParams, CallToolResult
 from mcp_use import MCPClient
-from mcp_use.middleware.logging import create_logging_middleware
-from mcp_use.middleware.metrics import create_metrics_middleware
+from mcp_use.middleware import Middleware, MiddlewareContext, NextFunctionT
 
-# Create middleware
-logging_middleware = create_logging_middleware(detailed=True)
-metrics_middleware, get_metrics = create_metrics_middleware()
+class CustomMiddleware(Middleware):
+    async def on_call_tool(
+        self, context: MiddlewareContext[CallToolRequestParams], call_next: NextFunctionT
+    ) -> CallToolResult:
+        print(f"Calling tool {context.params.name}")
+        return await call_next(context)
 
-# Custom middleware
-async def custom_middleware(request, call_next):
-    print(f"🚀 Starting {request.method}")
-    result = await call_next()
-    print(f"✅ Completed {request.method}")
-    return result
+config = {
+    "mcpServers": {
+        "playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}
+    }
+}
 
-# Use with MCPClient
-client = MCPClient(
-    config=config,
-    middleware=[logging_middleware, metrics_middleware, custom_middleware]
-)
+# MCPClient automatically prepends a default logging middleware.
+# You can add your own middlewares after it.
+client = MCPClient(config=config, middleware=[CustomMiddleware()])
 ```
 
 ## Core Types
 
-### MiddlewareCallbackT Protocol
+### `MiddlewareContext[T]`
 
-The main middleware function signature:
+```python
+from dataclasses import dataclass, field
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+@dataclass
+class MiddlewareContext(Generic[T]):
+    id: str                 # Unique request ID
+    method: str             # JSON-RPC method name (e.g., "tools/call")
+    params: T               # Typed parameters for the method (may be None for list APIs)
+    connection_id: str      # Connector identifier (e.g., "stdio:...", "http:...")
+    timestamp: float        # Request start time
+    metadata: dict[str, Any] = field(default_factory=dict)
+```
+
+### `NextFunctionT[T, R]`
 
 ```python
 from typing import Protocol
-from mcp_use import MCPRequestContext, NextFunctionT
 
-class MiddlewareCallbackT(Protocol):
-    """Protocol for Express.js-style middleware callbacks."""
-
-    async def __call__(self, request: MCPRequestContext, call_next: NextFunctionT) -> Any:
-        ...
+class NextFunctionT(Protocol[T, R]):
+    async def __call__(self, context: MiddlewareContext[T]) -> R: ...
 ```
 
-### MCPRequestContext
+### `Middleware` base class
 
-Contains all request information and metadata:
+You override hooks on the base class. If you only need a single entry point for all requests, override `on_request`.
 
 ```python
-@dataclass
-class MCPRequestContext:
-    id: str                              # Unique request ID
-    method: str                          # MCP method (e.g., "tools/call")
-    params: dict[str, Any]               # Request parameters
-    connector_id: str                    # Connector identifier
-    timestamp: float                     # Request start time
-    metadata: dict[str, Any]             # Custom metadata
-    jsonrpc_request: JSONRPCRequest | None = None  # Raw MCP request
+from typing import Any
+from mcp_use.middleware import Middleware, MiddlewareContext, NextFunctionT
+
+class MyMiddleware(Middleware):
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
+        # before
+        result = await call_next(context)
+        # after
+        return result
 ```
 
-### NextFunctionT Protocol
+## Hook Reference
 
-The function to call the next middleware:
+Available hooks (override any subset). Types below come from `mcp.types`.
 
 ```python
-class NextFunctionT(Protocol):
-    """Protocol for the next() function passed to middleware."""
+from typing import Any
+from mcp.types import (
+    InitializeRequestParams, InitializeResult,
+    CallToolRequestParams, CallToolResult,
+    ListToolsRequest, ListToolsResult,
+    ListResourcesRequest, ListResourcesResult,
+    ReadResourceRequestParams, ReadResourceResult,
+    ListPromptsRequest, ListPromptsResult,
+    GetPromptRequestParams, GetPromptResult,
+)
+from mcp_use.middleware import Middleware, MiddlewareContext, NextFunctionT
 
-    async def __call__(self) -> Any:
-        ...
+class Middleware:
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any: ...
+
+    async def on_initialize(
+        self, context: MiddlewareContext[InitializeRequestParams], call_next: NextFunctionT
+    ) -> InitializeResult: ...
+
+    async def on_call_tool(
+        self, context: MiddlewareContext[CallToolRequestParams], call_next: NextFunctionT
+    ) -> CallToolResult: ...
+
+    async def on_list_tools(
+        self, context: MiddlewareContext[ListToolsRequest], call_next: NextFunctionT
+    ) -> ListToolsResult: ...
+
+    async def on_list_resources(
+        self, context: MiddlewareContext[ListResourcesRequest], call_next: NextFunctionT
+    ) -> ListResourcesResult: ...
+
+    async def on_read_resource(
+        self, context: MiddlewareContext[ReadResourceRequestParams], call_next: NextFunctionT
+    ) -> ReadResourceResult: ...
+
+    async def on_list_prompts(
+        self, context: MiddlewareContext[ListPromptsRequest], call_next: NextFunctionT
+    ) -> ListPromptsResult: ...
+
+    async def on_get_prompt(
+        self, context: MiddlewareContext[GetPromptRequestParams], call_next: NextFunctionT
+    ) -> GetPromptResult: ...
 ```
 
 ## Writing Middleware
 
-### Basic Pattern
-
-```python
-from mcp_use.middleware import MCPRequestContext, NextFunctionT, MiddlewareCallbackT
-
-async def my_middleware(request: MCPRequestContext, call_next: NextFunctionT) -> Any:
-    # BEFORE: Process incoming request
-    print(f"📥 Incoming: {request.method}")
-
-    try:
-        # Execute next middleware or actual MCP call
-        result = await call_next()
-
-        # AFTER: Process outgoing response
-        print(f"📤 Outgoing: {request.method} -> {type(result)}")
-        return result
-
-    except Exception as e:
-        # ERROR: Handle errors
-        print(f"❌ Error in {request.method}: {e}")
-        raise  # Re-raise to maintain error handling
-```
-
-### Advanced Middleware Examples
-
-#### Request Timing Middleware
+### Timing Example
 
 ```python
 import time
+from typing import Any
+from mcp_use.middleware import Middleware, MiddlewareContext, NextFunctionT
 
-async def timing_middleware(request: MCPRequestContext, call_next: NextFunctionT) -> Any:
-    start_time = time.time()
-
-    result = await call_next()
-
-    duration = time.time() - start_time
-    print(f"⏱️ {request.method} took {duration:.3f}s")
-
-    return result
-```
-
-#### Request Filtering Middleware
-
-```python
-async def filter_middleware(request: MCPRequestContext, call_next: NextFunctionT) -> Any:
-    # Block certain methods
-    if request.method in ["dangerous/operation"]:
-        raise ValueError(f"Method {request.method} is not allowed")
-
-    # Modify request parameters
-    if request.method == "tools/call":
-        request.metadata["filtered"] = True
-
-    return await call_next()
-```
-
-#### Response Caching Middleware
-
-```python
-from functools import lru_cache
-import json
-
-# Simple in-memory cache
-_cache = {}
-
-async def caching_middleware(request: MCPRequestContext, call_next: NextFunctionT) -> Any:
-    # Create cache key from method and params
-    cache_key = f"{request.method}:{json.dumps(request.params, sort_keys=True)}"
-
-    # Check cache
-    if cache_key in _cache:
-        print(f"🎯 Cache hit for {request.method}")
-        return _cache[cache_key]
-
-    # Execute request
-    result = await call_next()
-
-    # Cache result (for read-only operations)
-    if request.method.startswith(("list_", "get_", "read_")):
-        _cache[cache_key] = result
-        print(f"💾 Cached result for {request.method}")
-
-    return result
+class TimingMiddleware(Middleware):
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
+        start = time.time()
+        try:
+            result = await call_next(context)
+            return result
+        finally:
+            duration = time.time() - start
+            print(f"{context.method} took {duration:.3f}s")
 ```
 
 ## Built-in Middleware
 
-### Logging Middleware
+### Default logging
 
-<CodeGroup>
+- A default logging middleware is automatically prepended by `MCPClient`.
+- It logs each request/response at debug level with timing.
+- You don’t need to add it manually; just pass your custom middlewares.
 
-```python Basic Logging
-from mcp_use.middleware.logging import create_logging_middleware
+```python
+from mcp_use import MCPClient
+from mcp_use.middleware import Middleware
 
-# Basic logging
-logging_middleware = create_logging_middleware()
-
-# Detailed logging with request/response data
-detailed_logging = create_logging_middleware(detailed=True)
+client = MCPClient(config=config, middleware=[MyCustomMiddleware()])
+# Order = [default_logging_middleware, MyCustomMiddleware()]
 ```
 
-```python Structured Logging
-from mcp_use.middleware.logging import create_structured_logging_middleware
+### Metrics
 
-# Structured JSON logging
-structured_middleware = create_structured_logging_middleware(
-    log_level="INFO",
-    include_params=True,
-    include_result=False,
-    max_result_length=200
-)
+Instantiate and pass to the client. Each middleware exposes a getter on the instance.
+
+```python
+from mcp_use.middleware import MetricsMiddleware, PerformanceMetricsMiddleware, CombinedAnalyticsMiddleware
+
+metrics_mw = MetricsMiddleware()
+perf_mw = PerformanceMetricsMiddleware()
+analytics_mw = CombinedAnalyticsMiddleware()
+
+client = MCPClient(config=config, middleware=[metrics_mw, perf_mw, analytics_mw])
+
+# Later, retrieve data
+print(metrics_mw.get_metrics())
+print(perf_mw.get_performance_metrics())
+print(analytics_mw.get_combined_analytics())
 ```
-
-```python Conditional Logging
-from mcp_use.middleware.logging import (
-    create_tool_logging_middleware,
-    create_conditional_logging_middleware
-)
-
-# Only log tool calls
-tool_logger = create_tool_logging_middleware(detailed=True)
-
-# Custom condition
-custom_logger = create_conditional_logging_middleware(
-    lambda req: "important" in req.method,
-    detailed=True
-)
-```
-
-</CodeGroup>
-
-### Metrics Middleware
-
-<CodeGroup>
-
-```python Basic Metrics
-from mcp_use.middleware.metrics import create_metrics_middleware
-
-# Create metrics middleware and getter
-metrics_middleware, get_metrics = create_metrics_middleware()
-
-# Use with client
-client = MCPClient(config=config, middleware=[metrics_middleware])
-
-# Get metrics after requests
-metrics = get_metrics()
-print(f"Total requests: {metrics['total_requests']}")
-print(f"Method counts: {metrics['method_counts']}")
-print(f"Average durations: {metrics['method_avg_duration']}")
-```
-
-```python Performance Metrics
-from mcp_use.middleware.metrics import create_performance_metrics_middleware
-
-# Advanced performance tracking
-perf_middleware, get_perf = create_performance_metrics_middleware()
-
-# Get detailed performance stats
-perf_stats = get_perf()
-print(f"P95 latency: {perf_stats['method_performance']['tools/call']['p95']}ms")
-print(f"Slow requests: {len(perf_stats['slow_requests'])}")
-```
-
-```python Combined Analytics
-from mcp_use.middleware.metrics import create_combined_analytics_middleware
-
-# All-in-one analytics
-analytics_mw, get_analytics = create_combined_analytics_middleware()
-
-# Get comprehensive report
-report = get_analytics()
-print(f"Metrics: {report['metrics']}")
-print(f"Performance: {report['performance']}")
-print(f"Errors: {report['errors']}")
-```
-
-</CodeGroup>
 
 ## Middleware Chain Execution
 
-Middleware is executed in the order provided:
+Middleware executes in the order provided (outermost first):
 
 ```python
 middleware = [
-    middleware_1,  # Executes first (outermost)
-    middleware_2,  # Executes second
-    middleware_3,  # Executes third (innermost)
+    mw1,  # Executes first (outermost)
+    mw2,  # Executes second
+    mw3,  # Executes third (innermost)
 ]
 ```
 
-Execution flow:
-1. `middleware_1` starts → calls `call_next()`
-2. `middleware_2` starts → calls `call_next()`
-3. `middleware_3` starts → calls `call_next()`
-4. **Actual MCP call executes**
-5. `middleware_3` finishes ← receives result
-6. `middleware_2` finishes ← receives result
-7. `middleware_1` finishes ← receives result
+Flow:
+1. `mw1` starts → calls `await call_next(context)`
+2. `mw2` starts → calls `await call_next(context)`
+3. `mw3` starts → calls `await call_next(context)`
+4. Actual MCP call executes
+5. `mw3` resumes with result
+6. `mw2` resumes with result
+7. `mw1` resumes with result
 
 ## Error Handling
 
-Middleware can handle and transform errors:
+Always re-raise unless you’re intentionally transforming errors.
 
 ```python
-async def error_handling_middleware(request: MCPRequestContext, call_next: NextFunctionT) -> Any:
-    try:
-        return await call_next()
-    except ConnectionError as e:
-        # Log error and retry logic
-        print(f"🔄 Connection error for {request.method}, retrying...")
-        # Implement retry logic here
-        raise
-    except Exception as e:
-        # Log all errors with context
-        print(f"❌ Error in {request.method}: {e}")
-        # Add error to metadata
-        request.metadata["error"] = str(e)
-        raise
+from typing import Any
+from mcp_use.middleware import Middleware, MiddlewareContext, NextFunctionT
+
+class ErrorAware(Middleware):
+    async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
+        try:
+            return await call_next(context)
+        except Exception as e:
+            context.metadata["error"] = str(e)
+            raise
 ```
 
 ## Best Practices
 
-### 1. Always Re-raise Exceptions
-Unless you're intentionally handling/transforming errors, always re-raise:
+1. Re-raise exceptions unless you have a clear alternative behavior.
+2. Use type hints on hooks for better IDE support.
+3. Keep each middleware focused on a single concern.
+4. Use `context.metadata` for cross-middleware communication.
 
 ```python
-async def middleware(request, call_next):
-    try:
-        return await call_next()
-    except Exception as e:
-        # Log or process the error
-        logger.error(f"Error: {e}")
-        raise  # Important: re-raise to maintain error flow
-```
+class Auth(Middleware):
+    async def on_request(self, context, call_next):
+        context.metadata["user"] = "alice"
+        return await call_next(context)
 
-### 2. Use Type Hints
-Leverage the Protocol types for better IDE support:
-
-```python
-async def typed_middleware(
-    request: MCPRequestContext,
-    call_next: NextFunctionT
-) -> Any:
-    # IDE provides full autocomplete and type checking
-    print(f"Method: {request.method}")
-    return await call_next()
-```
-
-### 3. Keep Middleware Focused
-Each middleware should have a single responsibility:
-
-```python
-# Good: Single purpose
-async def timing_middleware(request, call_next): ...
-async def logging_middleware(request, call_next): ...
-
-# Avoid: Multiple responsibilities in one middleware
-async def kitchen_sink_middleware(request, call_next): ...
-```
-
-### 4. Use Metadata for Communication
-Pass data between middleware using `request.metadata`:
-
-```python
-async def auth_middleware(request, call_next):
-    request.metadata["user"] = get_current_user()
-    return await call_next()
-
-async def audit_middleware(request, call_next):
-    user = request.metadata.get("user", "unknown")
-    log_audit(user, request.method)
-    return await call_next()
+class Audit(Middleware):
+    async def on_request(self, context, call_next):
+        user = context.metadata.get("user", "unknown")
+        print(f"{user} -> {context.method}")
+        return await call_next(context)
 ```
 
 ## Integration with MCP Clients
 
-### MCPClient Integration
+### MCPClient
 
 ```python
 from mcp_use import MCPClient
+from mcp_use.middleware import MetricsMiddleware
+
+metrics_mw = MetricsMiddleware()
 
 client = MCPClient(
     config={
         "mcpServers": {
-            "my_server": {
-                "command": "my-mcp-server",
-                "args": ["--port", "8080"]
-            }
+            "my_server": {"command": "my-mcp-server", "args": ["--port", "8080"]}
         }
     },
-    middleware=[
-        logging_middleware,
-        metrics_middleware,
-        custom_middleware
-    ]
+    middleware=[metrics_mw],  # default logging is automatically prepended
 )
+
+# You can also add middleware during execution with:
+client.add_middleware(CustomMiddleware())
 ```
 
-### Per-Session vs Global Middleware
-
-Middleware is configured per-client, allowing different middleware stacks for different use cases:
+### Per-session stacks
 
 ```python
-# Production client with full monitoring
-prod_client = MCPClient(
-    config=prod_config,
-    middleware=[security_middleware, logging_middleware, metrics_middleware]
-)
-
-# Development client with just logging
-dev_client = MCPClient(
-    config=dev_config,
-    middleware=[logging_middleware]
-)
+prod_client = MCPClient(config=prod_config, middleware=[SecurityMw(), MetricsMiddleware()])
+dev_client  = MCPClient(config=dev_config)  # default logging only
 ```
 
 <Note>
-See the [examples directory](../../examples/) for complete working examples:
-- [`browser_use.py`](../../examples/browser_use.py) - Browser automation with middleware
-- [`example_middleware_logging.py`](../../example_middleware_logging.py) - Comprehensive logging examples
+See the examples directory for a complete working example:
+- [`examples/example_middleware.py`](../../examples/example_middleware.py)
 </Note>
