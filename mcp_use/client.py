@@ -15,6 +15,7 @@ from mcp_use.types.sandbox import SandboxOptions
 
 from .config import create_connector_from_config, load_config_file
 from .logging import logger
+from .middleware import Middleware, default_logging_middleware
 from .session import MCPSession
 
 
@@ -35,6 +36,7 @@ class MCPClient:
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        middleware: list[Middleware] | None = None,
     ) -> None:
         """Initialize a new MCP client.
 
@@ -55,6 +57,12 @@ class MCPClient:
         self.elicitation_callback = elicitation_callback
         self.message_handler = message_handler
         self.logging_callback = logging_callback
+        # Add default logging middleware if no middleware provided, or prepend it to existing middleware
+        default_middleware = [default_logging_middleware]
+        if middleware:
+            self.middleware = default_middleware + middleware
+        else:
+            self.middleware = default_middleware
         # Load configuration if provided
         if config is not None:
             if isinstance(config, str):
@@ -151,6 +159,21 @@ class MCPClient:
             if name in self.active_sessions:
                 self.active_sessions.remove(name)
 
+    def add_middleware(self, middleware: Middleware) -> None:
+        """Add a middleware.
+
+        Args:
+            middleware: The middleware to add
+        """
+        if len(self.sessions) == 0 and middleware not in self.middleware:
+            self.middleware.append(middleware)
+            return
+
+        if middleware not in self.middleware:
+            self.middleware.append(middleware)
+            for session in self.sessions.values():
+                session.connector.middleware_manager.add_middleware(middleware)
+
     def get_server_names(self) -> list[str]:
         """Get the list of configured server names.
 
@@ -201,6 +224,7 @@ class MCPClient:
             elicitation_callback=self.elicitation_callback,
             message_handler=self.message_handler,
             logging_callback=self.logging_callback,
+            middleware=self.middleware,
         )
 
         # Create the session

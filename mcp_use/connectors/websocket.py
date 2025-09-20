@@ -254,4 +254,4 @@ class WebSocketConnector(BaseConnector):
     @property
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
-        return {"type": "websocket", "url": self.url}
+        return f"websocket:{self.url}"
