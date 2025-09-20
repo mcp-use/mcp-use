@@ -27,7 +27,9 @@ async def main():
 
     # Create custom middleware
     class CustomMiddleware(Middleware):
-        async def on_call_tool(self, context: MiddlewareContext[CallToolRequestParams], call_next: NextFunctionT) -> CallToolResult:
+        async def on_call_tool(
+            self, context: MiddlewareContext[CallToolRequestParams], call_next: NextFunctionT
+        ) -> CallToolResult:
             print(f"Calling tool {context.params.name}")
             return await call_next(context)
 

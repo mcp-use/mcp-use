@@ -286,7 +286,7 @@ class CombinedAnalyticsMiddleware(Middleware):
             return await self.error_mw.on_request(ctx, chain)
 
         return await self.metrics_mw.on_request(context, error_chain)
-        
+
     def get_combined_analytics(self) -> dict[str, Any]:
         """Get all analytics data in one comprehensive report."""
         return {
