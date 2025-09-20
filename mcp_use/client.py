@@ -168,7 +168,7 @@ class MCPClient:
         if len(self.sessions) == 0 and middleware not in self.middleware:
             self.middleware.append(middleware)
             return
-        
+
         if middleware not in self.middleware:
             self.middleware.append(middleware)
             for session in self.sessions.values():
