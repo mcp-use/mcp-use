@@ -104,7 +104,7 @@ class PerformanceMetricsMiddleware(Middleware):
             async with self.lock:
                 # Track performance by method and connector
                 self.performance_data["context_times"][context.method].append(duration_ms)
-                self.performance_data["connector_performance"][context.connector_id].append(duration_ms)
+                self.performance_data["connector_performance"][context.connection_id].append(duration_ms)
 
                 # Track hourly patterns
                 hour = int(time.time() // 3600)
@@ -115,7 +115,7 @@ class PerformanceMetricsMiddleware(Middleware):
                     self.performance_data["slow_contexts"].append(
                         {
                             "method": context.method,
-                            "connector": context.connector_id,
+                            "connector": context.connection_id,
                             "duration_ms": duration_ms,
                             "timestamp": context.timestamp,
                         }
@@ -128,7 +128,7 @@ class PerformanceMetricsMiddleware(Middleware):
                     self.performance_data["fast_contexts"].append(
                         {
                             "method": context.method,
-                            "connector": context.connector_id,
+                            "connector": context.connection_id,
                             "duration_ms": duration_ms,
                             "timestamp": context.timestamp,
                         }
@@ -144,7 +144,7 @@ class PerformanceMetricsMiddleware(Middleware):
             duration_ms = (time.time() - start_time) * 1000
             async with self.lock:
                 self.performance_data["context_times"][context.method].append(duration_ms)
-                self.performance_data["connector_performance"][context.connector_id].append(duration_ms)
+                self.performance_data["connector_performance"][context.connection_id].append(duration_ms)
             raise
 
     def get_performance_metrics(self) -> dict[str, Any]:
@@ -222,14 +222,14 @@ class ErrorTrackingMiddleware(Middleware):
                 # Track error patterns
                 self.error_data["error_counts"][error_type] += 1
                 self.error_data["error_by_method"][context.method][error_type] += 1
-                self.error_data["error_by_connector"][context.connector_id][error_type] += 1
+                self.error_data["error_by_connector"][context.connection_id][error_type] += 1
                 self.error_data["error_timestamps"].append(time.time())
 
                 # Keep recent errors for analysis
                 error_info = {
                     "timestamp": context.timestamp,
                     "method": context.method,
-                    "connector": context.connector_id,
+                    "connector": context.connection_id,
                     "error_type": error_type,
                     "error_message": error_msg,
                     "context_id": context.id,
