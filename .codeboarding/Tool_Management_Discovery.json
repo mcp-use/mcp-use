@@ -1,0 +1,90 @@
+{
+  "description": "This subsystem, 'Tool Management & Discovery', is responsible for connecting to external MCP servers, discovering and indexing the tools they offer, and providing a standardized interface for these tools to be utilized by the `MCPAgent`. Its main purpose is to act as the bridge between the agent's need for functionality and the available external services, ensuring dynamic and reliable access to tools.",
+  "components": [
+    {
+      "name": "ServerManager",
+      "description": "Manages the lifecycle and state of connections to various MCP servers. It acts as the central registry for available servers, handling connection establishment, disconnection, and potentially monitoring server health. This component is crucial for maintaining a dynamic and reliable connection landscape for the agent.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Tool Search Engine",
+      "description": "Provides the capability to dynamically discover, index, and search for tools available across connected MCP servers. This component enables the `MCPAgent` to find and utilize tools based on specific criteria without prior explicit configuration, embodying the dynamic nature of agentic systems.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools:search_tools",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Tool (Base Class)",
+      "description": "Defines the abstract interface and common properties for all tools within the MCP ecosystem. This standardization is crucial for the `MCPAgent` to interact uniformly with diverse tools, regardless of their underlying implementation. It encapsulates attributes like name, description, and input/output schemas, ensuring interoperability.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.base_tool.Tool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/list_servers_tool.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/get_active_server.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/connect_server.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/disconnect_server.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/base.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/__init__.py"
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "informs",
+      "src_name": "ServerManager",
+      "dst_name": "Tool Search Engine"
+    },
+    {
+      "relation": "depends on",
+      "src_name": "Tool Search Engine",
+      "dst_name": "ServerManager"
+    },
+    {
+      "relation": "works with",
+      "src_name": "Tool Search Engine",
+      "dst_name": "Tool (Base Class)"
+    },
+    {
+      "relation": "is discovered and managed by",
+      "src_name": "Tool (Base Class)",
+      "dst_name": "Tool Search Engine"
+    }
+  ]
+}

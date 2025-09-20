@@ -1,0 +1,270 @@
+{
+  "description": "The MCP system is designed around a central `MCPAgent Core` that orchestrates interactions with external MCP servers and tools. It leverages `LLM Integration & Adapters` for reasoning and `Prompt Engineering & System Message Builder` for dynamic prompt generation. The `MCP Client & Session Management` component handles connections to MCP servers, relying on the `Connector Layer` for various communication protocols and `Authentication & Authorization` for secure access. `Tool Management & Discovery` provides the MCPAgent with access to available tools, which are then invoked through the `MCP Client & Session Management`. This modular design ensures clear separation of concerns, facilitating maintainability and scalability, and is optimized for clear data flow visualization in diagrams.",
+  "components": [
+    {
+      "name": "MCPAgent Core",
+      "description": "The central intelligence and orchestration unit. It interprets user requests, plans actions, interacts with tools, and formulates responses, leveraging LLMs for reasoning.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "MCPAgent",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py",
+          "reference_start_line": 48,
+          "reference_end_line": 1107
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/base.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/mcpagent.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/remote.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "MCP Client & Session Management",
+      "description": "Manages the lifecycle of connections (sessions) to various MCP servers, acting as the primary interface for the MCPAgent to external services.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "MCPClient",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py",
+          "reference_start_line": 21,
+          "reference_end_line": 326
+        },
+        {
+          "qualified_name": "Session",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/session.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/client.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Tool Management & Discovery",
+      "description": "Responsible for identifying, indexing, and providing access to tools available across connected MCP servers, enabling dynamic utilization by the MCPAgent.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "ServerManager",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "search_tools",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 229,
+          "reference_end_line": 286
+        },
+        {
+          "qualified_name": "Tool",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/base.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/server_manager.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/base_tool.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/list_servers_tool.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/get_active_server.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/search_tools.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/connect_server.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/managers/tools/disconnect_server.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "LLM Integration & Adapters",
+      "description": "Facilitates seamless integration of MCP's internal representations with external LLM frameworks (e.g., LangChain), ensuring compatibility and schema translation.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "LangChainAdapter",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 29,
+          "reference_end_line": 268
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/base.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/adapters/langchain_adapter.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Connector Layer",
+      "description": "Provides a standardized, protocol-agnostic mechanism for the MCP Client to communicate with diverse external MCP servers and tools.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "BaseConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 37,
+          "reference_end_line": 453
+        },
+        {
+          "qualified_name": "WebSocketConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+          "reference_start_line": 22,
+          "reference_end_line": 257
+        },
+        {
+          "qualified_name": "HTTPConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 24,
+          "reference_end_line": 301
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/sandbox.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/stdio.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/websocket.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/utils.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/types/sandbox.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Authentication & Authorization",
+      "description": "Manages secure access to MCP servers and resources through OAuth, handling token management and client registration.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "OAuthClient",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py",
+          "reference_start_line": 51,
+          "reference_end_line": 66
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/bearer.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth_callback.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Prompt Engineering & System Message Builder",
+      "description": "Dynamically constructs system messages and prompts for the MCPAgent, incorporating tool descriptions and contextual information for effective LLM interaction.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "SystemPromptBuilder",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/templates.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/http_example.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/airbnb_use.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/direct_tool_call.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/multi_server_example.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/filesystem_use.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/sandbox_everything.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/stream_example.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/mcp_everything.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/blender_use.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/structured_output.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/chat_example.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/simple_oauth_example.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/browser_use.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/examples/simple_server_manager_use.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/cli.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/utils.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/logging.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/exceptions.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/config.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/errors/__init__.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/errors/error_formatting.py"
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "requests system prompts from",
+      "src_name": "MCPAgent Core",
+      "dst_name": "Prompt Engineering & System Message Builder"
+    },
+    {
+      "relation": "provides prompts to",
+      "src_name": "Prompt Engineering & System Message Builder",
+      "dst_name": "MCPAgent Core"
+    },
+    {
+      "relation": "sends LLM requests to",
+      "src_name": "MCPAgent Core",
+      "dst_name": "LLM Integration & Adapters"
+    },
+    {
+      "relation": "forwards LLM responses to",
+      "src_name": "LLM Integration & Adapters",
+      "dst_name": "MCPAgent Core"
+    },
+    {
+      "relation": "queries for tools from",
+      "src_name": "MCPAgent Core",
+      "dst_name": "Tool Management & Discovery"
+    },
+    {
+      "relation": "provides tool info to",
+      "src_name": "Tool Management & Discovery",
+      "dst_name": "MCPAgent Core"
+    },
+    {
+      "relation": "sends tool invocation requests to",
+      "src_name": "MCPAgent Core",
+      "dst_name": "MCP Client & Session Management"
+    },
+    {
+      "relation": "returns tool execution results to",
+      "src_name": "MCP Client & Session Management",
+      "dst_name": "MCPAgent Core"
+    },
+    {
+      "relation": "utilizes for communication",
+      "src_name": "MCP Client & Session Management",
+      "dst_name": "Connector Layer"
+    },
+    {
+      "relation": "handles communication for",
+      "src_name": "Connector Layer",
+      "dst_name": "MCP Client & Session Management"
+    },
+    {
+      "relation": "requests authentication from",
+      "src_name": "Connector Layer",
+      "dst_name": "Authentication & Authorization"
+    },
+    {
+      "relation": "provides credentials to",
+      "src_name": "Authentication & Authorization",
+      "dst_name": "Connector Layer"
+    },
+    {
+      "relation": "retrieves tool metadata via",
+      "src_name": "Tool Management & Discovery",
+      "dst_name": "MCP Client & Session Management"
+    }
+  ]
+}

@@ -1,0 +1,168 @@
+{
+  "description": "The `Authentication & Authorization` subsystem in `mcp-use` is designed to manage secure access to MCP servers using OAuth 2.0. The central `OAuth` component orchestrates the entire authentication flow, from server metadata discovery and dynamic client registration to the lifecycle management of access tokens. It relies on `FileTokenStorage` for persistent token storage and utilizes `ServerOAuthMetadata` and `OAuthClientProvider` for configuration and server capabilities. The subsystem produces `BearerAuth` tokens, which are then consumed by `BaseConnector` instances to make authenticated requests to MCP servers. This design ensures a clear separation of concerns, with dedicated components handling different aspects of the OAuth process and providing a robust mechanism for secure communication.",
+  "components": [
+    {
+      "name": "OAuth",
+      "description": "The central orchestrator for the entire OAuth authentication flow. It manages server metadata discovery, dynamic client registration, token lifecycle (loading, saving, refreshing, deleting), and facilitates authenticated requests to secure MCP servers. It acts as the primary interface for clients requiring OAuth-based authentication.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "OAuth",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/http.py",
+          "reference_start_line": 68,
+          "reference_end_line": 68
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py",
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth_callback.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "FileTokenStorage",
+      "description": "Provides a concrete mechanism for securely persisting and retrieving OAuth tokens on the local file system. This ensures token durability across application restarts and manages tokens based on the server URL.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "FileTokenStorage",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py",
+          "reference_start_line": 102,
+          "reference_end_line": 164
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "ServerOAuthMetadata",
+      "description": "A data model that encapsulates the OAuth server's capabilities, endpoints, and other essential metadata required for initiating and managing the OAuth flow.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "ServerOAuthMetadata",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py",
+          "reference_start_line": 22,
+          "reference_end_line": 48
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "OAuthClientProvider",
+      "description": "Responsible for providing the necessary OAuth client configuration and capabilities, including client ID and secrets, which are crucial for dynamic client registration and token requests.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "OAuthClientProvider",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py",
+          "reference_start_line": 51,
+          "reference_end_line": 66
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "TokenData",
+      "description": "A data model representing the structure and content of an OAuth token, including access tokens, refresh tokens, expiration times, and scopes.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "TokenData",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py",
+          "reference_start_line": 69,
+          "reference_end_line": 79
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "ClientRegistrationResponse",
+      "description": "A data model that captures the response received from an OAuth server during the dynamic client registration process, containing details like the registered client ID and client secret.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "ClientRegistrationResponse",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/oauth.py",
+          "reference_start_line": 82,
+          "reference_end_line": 99
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "BearerAuth",
+      "description": "An authentication object that provides the Bearer token, ready to be included in HTTP request headers for authenticating requests to secure MCP servers. It is the direct output of a successful authentication process.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "BearerAuth",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/bearer.py",
+          "reference_start_line": 9,
+          "reference_end_line": 17
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/bearer.py"
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "BaseConnector",
+      "description": "A base class for connectors that interact with secure MCP servers. It defines the interface for consuming authentication credentials (like `BearerAuth`) to make authenticated requests. This component represents the external consumer of the `Authentication & Authorization` subsystem's output.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "BaseConnector",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/connectors/base.py",
+          "reference_start_line": 37,
+          "reference_end_line": 453
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/auth/__init__.py"
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "relies on",
+      "src_name": "OAuth",
+      "dst_name": "FileTokenStorage"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "OAuth",
+      "dst_name": "ServerOAuthMetadata"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "OAuth",
+      "dst_name": "OAuthClientProvider"
+    },
+    {
+      "relation": "manages",
+      "src_name": "OAuth",
+      "dst_name": "TokenData"
+    },
+    {
+      "relation": "processes",
+      "src_name": "OAuth",
+      "dst_name": "ClientRegistrationResponse"
+    },
+    {
+      "relation": "provides",
+      "src_name": "OAuth",
+      "dst_name": "BearerAuth"
+    },
+    {
+      "relation": "consumes",
+      "src_name": "BaseConnector",
+      "dst_name": "BearerAuth"
+    }
+  ]
+}

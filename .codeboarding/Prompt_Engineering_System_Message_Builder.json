@@ -1,0 +1,80 @@
+{
+  "description": "This subsystem is responsible for the dynamic construction of `SystemMessage` objects and prompts specifically tailored for the `MCPAgent`. Its scope includes gathering contextual information, formatting tool descriptions, and assembling these elements into a coherent and effective prompt for interaction with Large Language Models (LLMs). The core functionality is encapsulated within the `mcp_use/agents/prompts/system_prompt_builder.py` module, primarily centered around the `SystemPromptBuilder` concept.",
+  "components": [
+    {
+      "name": "System Message Orchestrator",
+      "description": "This component acts as the primary entry point and orchestrator for the entire system message construction process. It coordinates the generation of tool descriptions and the final assembly of the system prompt content, ensuring all necessary elements are integrated into the `SystemMessage` for the `MCPAgent`.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.create_system_message",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": 59,
+          "reference_end_line": 103
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Tool Description Formatter",
+      "description": "Responsible for transforming raw `BaseTool` objects into a structured, human-readable format suitable for inclusion in the system prompt. It also handles the logic for filtering out any tools that are explicitly disallowed, ensuring only relevant and permitted tools are described to the LLM.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.generate_tool_descriptions",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": 5,
+          "reference_end_line": 25
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "Prompt Content Builder",
+      "description": "This component focuses on the templating and assembly of the actual system prompt content. It takes a base prompt template, injects the formatted tool descriptions provided by the `Tool Description Formatter`, and appends any additional instructions or contextual information, ensuring the final prompt adheres to a predefined structure and effectively guides the LLM.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.build_system_prompt_content",
+          "reference_file": "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": 28,
+          "reference_end_line": 56
+        }
+      ],
+      "assigned_files": [
+        "/home/ubuntu/CodeBoarding/repo/mcp-use/mcp_use/agents/prompts/templates.py"
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "Orchestration, Data Request",
+      "src_name": "System Message Orchestrator",
+      "dst_name": "Tool Description Formatter"
+    },
+    {
+      "relation": "Orchestration, Data Request",
+      "src_name": "System Message Orchestrator",
+      "dst_name": "Prompt Content Builder"
+    },
+    {
+      "relation": "Data Flow, Input Provision",
+      "src_name": "Tool Description Formatter",
+      "dst_name": "Prompt Content Builder"
+    },
+    {
+      "relation": "Data Flow, Result Return",
+      "src_name": "Prompt Content Builder",
+      "dst_name": "System Message Orchestrator"
+    }
+  ]
+}
