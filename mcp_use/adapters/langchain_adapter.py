@@ -76,11 +76,8 @@ class LangChainAdapter(BaseAdapter):
         if tool_result.isError:
             raise ToolException(f"Tool execution failed: {tool_result.content}")
 
-        if not tool_result.content:
-            raise ToolException("Tool execution returned no content")
-
         decoded_result = ""
-        for item in tool_result.content:
+        for item in tool_result.content or []:
             match item.type:
                 case "text":
                     item: TextContent
