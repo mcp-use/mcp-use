@@ -22,14 +22,7 @@ class TestEnumHandling(unittest.TestCase):
     def test_fix_schema_with_enum(self):
         """Test that fix_schema properly handles enum fields."""
         # Schema with enum but no explicit type
-        schema_with_enum = {
-            "type": "object",
-            "properties": {
-                "code_type": {
-                    "enum": ["x", "y", "z"]
-                }
-            }
-        }
+        schema_with_enum = {"type": "object", "properties": {"code_type": {"enum": ["x", "y", "z"]}}}
 
         fixed_schema = self.adapter.fix_schema(schema_with_enum)
 
@@ -43,12 +36,7 @@ class TestEnumHandling(unittest.TestCase):
         # Schema with enum and explicit type
         schema_with_enum_and_type = {
             "type": "object",
-            "properties": {
-                "code_type": {
-                    "type": "string",
-                    "enum": ["x", "y", "z"]
-                }
-            }
+            "properties": {"code_type": {"type": "string", "enum": ["x", "y", "z"]}},
         }
 
         fixed_schema = self.adapter.fix_schema(schema_with_enum_and_type)
@@ -62,15 +50,8 @@ class TestEnumHandling(unittest.TestCase):
         # Create a schema that would cause the original issue
         problematic_schema = {
             "type": "object",
-            "properties": {
-                "age": {
-                    "type": "integer"
-                },
-                "code_type": {
-                    "enum": ["x", "y", "z"]
-                }
-            },
-            "required": ["age", "code_type"]
+            "properties": {"age": {"type": "integer"}, "code_type": {"enum": ["x", "y", "z"]}},
+            "required": ["age", "code_type"],
         }
 
         # Apply the fix
@@ -80,10 +61,7 @@ class TestEnumHandling(unittest.TestCase):
         DynamicModel = jsonschema_to_pydantic(fixed_schema)
 
         # Test with valid data
-        test_data = {
-            "age": 25,
-            "code_type": "x"
-        }
+        test_data = {"age": 25, "code_type": "x"}
 
         # This should work without validation errors
         instance = DynamicModel(**test_data)
@@ -95,13 +73,8 @@ class TestEnumHandling(unittest.TestCase):
         # Create a schema with enum
         schema_with_enum = {
             "type": "object",
-            "properties": {
-                "code_type": {
-                    "type": "string",
-                    "enum": ["x", "y", "z"]
-                }
-            },
-            "required": ["code_type"]
+            "properties": {"code_type": {"type": "string", "enum": ["x", "y", "z"]}},
+            "required": ["code_type"],
         }
 
         # Apply the fix
@@ -111,9 +84,7 @@ class TestEnumHandling(unittest.TestCase):
         DynamicModel = jsonschema_to_pydantic(fixed_schema)
 
         # Test with invalid data
-        test_data = {
-            "code_type": "invalid_value"
-        }
+        test_data = {"code_type": "invalid_value"}
 
         # This should raise a validation error
         with self.assertRaises(ValidationError):
@@ -123,16 +94,7 @@ class TestEnumHandling(unittest.TestCase):
         """Test that schema fixing works recursively."""
         nested_schema = {
             "type": "object",
-            "properties": {
-                "nested": {
-                    "type": "object",
-                    "properties": {
-                        "code_type": {
-                            "enum": ["a", "b", "c"]
-                        }
-                    }
-                }
-            }
+            "properties": {"nested": {"type": "object", "properties": {"code_type": {"enum": ["a", "b", "c"]}}}},
         }
 
         fixed_schema = self.adapter.fix_schema(nested_schema)
