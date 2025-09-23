@@ -3,10 +3,11 @@ Unit tests for enum handling in LangChain adapter.
 """
 
 import unittest
-from unittest.mock import Mock
 from enum import Enum
-from pydantic import BaseModel, ValidationError
+from unittest.mock import Mock
+
 from jsonschema_pydantic import jsonschema_to_pydantic
+from pydantic import BaseModel, ValidationError
 
 from mcp_use.adapters.langchain_adapter import LangChainAdapter
 
@@ -29,9 +30,9 @@ class TestEnumHandling(unittest.TestCase):
                 }
             }
         }
-        
+
         fixed_schema = self.adapter.fix_schema(schema_with_enum)
-        
+
         # Check that enum field now has type: "string"
         self.assertIn("type", fixed_schema["properties"]["code_type"])
         self.assertEqual(fixed_schema["properties"]["code_type"]["type"], "string")
@@ -49,9 +50,9 @@ class TestEnumHandling(unittest.TestCase):
                 }
             }
         }
-        
+
         fixed_schema = self.adapter.fix_schema(schema_with_enum_and_type)
-        
+
         # Check that existing type is preserved
         self.assertEqual(fixed_schema["properties"]["code_type"]["type"], "string")
         self.assertIn("enum", fixed_schema["properties"]["code_type"])
@@ -71,19 +72,19 @@ class TestEnumHandling(unittest.TestCase):
             },
             "required": ["age", "code_type"]
         }
-        
+
         # Apply the fix
         fixed_schema = self.adapter.fix_schema(problematic_schema)
-        
+
         # Convert to Pydantic model
         DynamicModel = jsonschema_to_pydantic(fixed_schema)
-        
+
         # Test with valid data
         test_data = {
             "age": 25,
             "code_type": "x"
         }
-        
+
         # This should work without validation errors
         instance = DynamicModel(**test_data)
         self.assertEqual(instance.age, 25)
@@ -102,18 +103,18 @@ class TestEnumHandling(unittest.TestCase):
             },
             "required": ["code_type"]
         }
-        
+
         # Apply the fix
         fixed_schema = self.adapter.fix_schema(schema_with_enum)
-        
+
         # Convert to Pydantic model
         DynamicModel = jsonschema_to_pydantic(fixed_schema)
-        
+
         # Test with invalid data
         test_data = {
             "code_type": "invalid_value"
         }
-        
+
         # This should raise a validation error
         with self.assertRaises(ValidationError):
             DynamicModel(**test_data)
@@ -133,9 +134,9 @@ class TestEnumHandling(unittest.TestCase):
                 }
             }
         }
-        
+
         fixed_schema = self.adapter.fix_schema(nested_schema)
-        
+
         # Check that nested enum field is fixed
         nested_props = fixed_schema["properties"]["nested"]["properties"]
         self.assertIn("type", nested_props["code_type"])

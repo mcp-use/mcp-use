@@ -51,11 +51,11 @@ class LangChainAdapter(BaseAdapter):
             if "type" in schema and isinstance(schema["type"], list):
                 schema["anyOf"] = [{"type": t} for t in schema["type"]]
                 del schema["type"]  # Remove 'type' and standardize to 'anyOf'
-            
+
             # Fix enum handling - ensure enum fields are properly typed as strings
             if "enum" in schema and "type" not in schema:
                 schema["type"] = "string"
-            
+
             for key, value in schema.items():
                 schema[key] = self.fix_schema(value)  # Apply recursively
         return schema
