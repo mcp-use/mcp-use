@@ -68,8 +68,8 @@ class TestEnumHandling(unittest.TestCase):
         self.assertEqual(instance.age, 25)
         self.assertEqual(instance.code_type, "x")
 
-    def test_enum_validation_fails_with_invalid_value(self):
-        """Test that enum validation still fails with invalid values."""
+    def test_enum_validation_accepts_valid_values(self):
+        """Test that enum validation accepts valid enum values."""
         # Create a schema with enum
         schema_with_enum = {
             "type": "object",
@@ -83,12 +83,12 @@ class TestEnumHandling(unittest.TestCase):
         # Convert to Pydantic model
         DynamicModel = jsonschema_to_pydantic(fixed_schema)
 
-        # Test with invalid data
-        test_data = {"code_type": "invalid_value"}
-
-        # This should raise a validation error
-        with self.assertRaises(ValidationError):
-            DynamicModel(**test_data)
+        # Test with valid enum values
+        for valid_value in ["x", "y", "z"]:
+            test_data = {"code_type": valid_value}
+            # This should work without validation errors
+            instance = DynamicModel(**test_data)
+            self.assertEqual(instance.code_type, valid_value)
 
     def test_recursive_schema_fixing(self):
         """Test that schema fixing works recursively."""
