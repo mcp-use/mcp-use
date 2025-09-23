@@ -16,6 +16,6 @@ async def echo(message: str) -> str:
     return f"You said: {message} Lupo"
 
 
-# 3. Run the mcp-use Server
+# 3. Run the server
 if __name__ == "__main__":
-    server.run(reload=True)
+    server.run(reload=False)
