@@ -39,7 +39,7 @@ class LangChainAdapter(BaseAdapter):
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
 
     def fix_schema(self, schema: dict) -> dict:
-        """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format.
+        """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
 
         Args:
             schema: The JSON schema to fix.
@@ -51,6 +51,11 @@ class LangChainAdapter(BaseAdapter):
             if "type" in schema and isinstance(schema["type"], list):
                 schema["anyOf"] = [{"type": t} for t in schema["type"]]
                 del schema["type"]  # Remove 'type' and standardize to 'anyOf'
+
+            # Fix enum handling - ensure enum fields are properly typed as strings
+            if "enum" in schema and "type" not in schema:
+                schema["type"] = "string"
+
             for key, value in schema.items():
                 schema[key] = self.fix_schema(value)  # Apply recursively
         return schema
@@ -71,11 +76,8 @@ class LangChainAdapter(BaseAdapter):
         if tool_result.isError:
             raise ToolException(f"Tool execution failed: {tool_result.content}")
 
-        if not tool_result.content:
-            raise ToolException("Tool execution returned no content")
-
         decoded_result = ""
-        for item in tool_result.content:
+        for item in tool_result.content or []:
             match item.type:
                 case "text":
                     item: TextContent
