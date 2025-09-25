@@ -456,6 +456,25 @@ class MCPAgent:
                 await self.initialize()
                 initialized_here = True
 
+            # Check connection health and reinitialize if needed
+            if self._initialized and self.client:
+                # Check if any sessions have become disconnected
+                sessions_need_reinit = False
+                for session_name, session in self.client.sessions.items():
+                    if not session.is_connected:
+                        logger.warning(
+                            f"Session '{session_name}' is disconnected, will reinitialize"
+                        )
+                        sessions_need_reinit = True
+                        break
+
+                if sessions_need_reinit:
+                    logger.info(
+                        "🔄 Reinitializing agent due to disconnected sessions"
+                    )
+                    await self.initialize()
+                    initialized_here = True
+
             # Check if initialization succeeded
             if not self._agent_executor:
                 raise RuntimeError("MCP agent failed to initialize")
@@ -779,9 +798,17 @@ class MCPAgent:
                 )
 
             # Clean up if necessary (e.g., if not using client-managed sessions)
+            # Only close if we initialized here AND we're not using a client
+            # (which manages its own sessions)
             if manage_connector and not self.client and initialized_here:
                 logger.info("🧹 Closing agent after stream completion")
                 await self.close()
+            elif manage_connector and self.client and initialized_here:
+                # For client-managed sessions, we don't close the agent but we
+                # ensure sessions stay alive
+                logger.debug(
+                    "🔄 Agent using client-managed sessions, keeping connections alive"
+                )
 
     async def run(
         self,
@@ -965,12 +992,35 @@ class MCPAgent:
 
         # 1. Initialise on-demand ------------------------------------------------
         initialised_here = False
-        if (manage_connector and not self._initialized) or (not self._initialized and self.auto_initialize):
+        if (manage_connector and not self._initialized) or (
+            not self._initialized and self.auto_initialize
+        ):
             await self.initialize()
             initialised_here = True
 
+        # Check connection health and reinitialize if needed
+        if self._initialized and self.client:
+            # Check if any sessions have become disconnected
+            sessions_need_reinit = False
+            for session_name, session in self.client.sessions.items():
+                if not session.is_connected:
+                    logger.warning(
+                        f"Session '{session_name}' is disconnected, will reinitialize"
+                    )
+                    sessions_need_reinit = True
+                    break
+
+            if sessions_need_reinit:
+                logger.info(
+                    "🔄 Reinitializing agent due to disconnected sessions"
+                )
+                await self.initialize()
+                initialised_here = True
+
         if not self._agent_executor:
-            raise RuntimeError("MCP agent failed to initialise – call initialise() first?")
+            raise RuntimeError(
+                "MCP agent failed to initialise – call initialise() first?"
+            )
 
         # 2. Build inputs --------------------------------------------------------
         effective_max_steps = max_steps or self.max_steps
