@@ -203,6 +203,8 @@ class HttpConnector(BaseConnector):
                 else:
                     self._prompts = []
 
+            # Only McpError is raised from client's initialization because
+            # exceptions are handled internally.
             except McpError as mcp_error:
                 logger.error("MCP protocol error during initialization: %s", mcp_error.error)
                 # Clean up the test client
@@ -213,22 +215,16 @@ class HttpConnector(BaseConnector):
                 raise mcp_error
 
             except Exception as init_error:
-                # Clean up the test client
+                # This catches non-McpError exceptions, like a direct httpx timeout
+                # but in the most cases this won't happen. It's for safety.
                 try:
                     await test_client.__aexit__(None, None, None)
                 except Exception:
                     pass
+                raise init_error
 
-                if isinstance(init_error, httpx.HTTPStatusError):
-                    if init_error.response.status_code in [401, 403, 407]:  # Authentication error using status
-                        # Server requires authentication but OAuth discovery failed
-                        raise OAuthAuthenticationError(
-                            f"Server requires authentication (HTTP {init_error.response.status_code}) "
-                            "but OAuth discovery failed. Please provide OAuth configuration manually."
-                        ) from init_error
-                else:
-                    raise init_error
-
+        # Exception from the inner try is propagated here and in
+        # the most cases is an McpError, so checking instances is useless
         except Exception as streamable_error:
             logger.debug(f"Streamable HTTP failed: {streamable_error}")
 
@@ -239,18 +235,10 @@ class HttpConnector(BaseConnector):
                 except Exception:
                     pass
 
-            # Check if this is a 4xx error that indicates we should try SSE fallback
-            # HACK: Still sometimes StreamableHTTP will return other errors, so we still try to fallback to SSE
-            should_fallback = False
-            if isinstance(streamable_error, httpx.HTTPStatusError):
-                if streamable_error.response.status_code in [404, 405]:
-                    should_fallback = True
-                    logger.debug("Streamable HTTP failed: 404/ 405 Not Found/ Method Not Allowed")
-            elif "405 Method Not Allowed" in str(streamable_error) or "404 Not Found" in str(streamable_error):
-                should_fallback = True
-            else:
-                logger.debug("Streamable HTTP failed, falling back to SSE")
-                should_fallback = True
+            # It doesn't make sense to check error types. Because client
+            # always return a McpError, if he can't reach the server
+            # because it's offline, or if it has an auth problem.
+            should_fallback = True
 
             if should_fallback:
                 try:
@@ -275,18 +263,22 @@ class HttpConnector(BaseConnector):
                     await self.client_session.__aenter__()
                     self.transport_type = "SSE"
 
-                except Exception as sse_error:
-                    if isinstance(sse_error, httpx.HTTPStatusError):
-                        if sse_error.response.status_code in [401, 403, 407]:
-                            raise OAuthAuthenticationError(
-                                f"Server requires authentication (HTTP {sse_error.response.status_code}) "
-                                "but OAuth discovery failed. Please provide OAuth configuration manually."
-                            ) from sse_error
-                    else:
-                        logger.error(
-                            f"Both transport methods failed. Streamable HTTP: {streamable_error}, SSE: {sse_error}"
-                        )
-                        raise sse_error
+                except* Exception as sse_error:
+                    # Get the exception from the ExceptionGroup, and here we will get the correct type.
+                    sse_error = sse_error.exceptions[0]
+                    if isinstance(sse_error, httpx.HTTPStatusError) and sse_error.response.status_code in [
+                        401,
+                        403,
+                        407,
+                    ]:
+                        raise OAuthAuthenticationError(
+                            f"Server requires authentication (HTTP {sse_error.response.status_code}) "
+                            "but auth failed. Please provide auth configuration manually."
+                        ) from sse_error
+                    logger.error(
+                        f"Both transport methods failed. Streamable HTTP: {streamable_error}, SSE: {sse_error}"
+                    )
+                    raise sse_error
             else:
                 raise streamable_error
 
