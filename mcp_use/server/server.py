@@ -1,8 +1,11 @@
+import inspect
 import logging
 import os
+from typing import Any, get_type_hints, overload
 
 import click
 from mcp.server.fastmcp import FastMCP
+from mcp.types import AnyFunction, ToolAnnotations
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
@@ -10,6 +13,37 @@ from starlette.responses import HTMLResponse
 from mcp_use.server.logging import MCP_LOGGING_CONFIG, MCPEnhancerMiddleware
 from mcp_use.server.openmcp import get_openmcp_json
 from mcp_use.server.utils import estimate_tokens
+
+
+def get_return_type(func_or_callable) -> type:
+    """Get the return type annotation from a function or callable class."""
+    if inspect.isclass(func_or_callable):
+        # It's a class, get return type from __call__ method
+        if callable(func_or_callable):
+            call_method = func_or_callable.__call__
+            return get_return_type(call_method)
+        return Any
+    elif (
+        callable(func_or_callable)
+        and not inspect.isfunction(func_or_callable)
+        and not inspect.ismethod(func_or_callable)
+        and not inspect.isbuiltin(func_or_callable)
+    ):
+        # It's a callable class instance, get return type from __call__ method
+        return get_return_type(func_or_callable.__call__)
+    else:
+        # It's a regular function
+        try:
+            # Try get_type_hints first (handles forward references)
+            hints = get_type_hints(func_or_callable)
+            return hints.get("return", Any)
+        except (NameError, AttributeError):
+            # Fallback to inspect.signature
+            try:
+                sig = inspect.signature(func_or_callable)
+                return sig.return_annotation if sig.return_annotation != inspect.Signature.empty else Any
+            except (ValueError, TypeError):
+                return Any
 
 
 async def display_startup_info(server: "MCPServer", host: str, port: int) -> None:
@@ -55,6 +89,125 @@ class MCPServer(FastMCP):
         self.app = self.streamable_http_app()
 
         logging.getLogger("mcp.server.lowlevel.server").setLevel(logging.WARNING)
+
+    @overload
+    def add_tool(
+        self,
+        fn: AnyFunction,
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: ToolAnnotations | None = None,
+        structured_output: bool | None = None,
+    ) -> None:
+        """Add a function as a tool to the server.
+
+        Args:
+            fn: The function to register as a tool
+            name: Optional name for the tool (defaults to function name)
+            title: Optional human-readable title for the tool
+            description: Optional description of what the tool does
+            annotations: Optional ToolAnnotations providing additional tool information
+            structured_output: Controls whether the tool's output is structured or unstructured
+        """
+        ...
+
+    @overload
+    def add_tool(
+        self,
+        fn: type,  # Class with __call__ method
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: ToolAnnotations | None = None,
+        structured_output: bool | None = None,
+        auto_instantiate: bool = True,
+    ) -> None:
+        """Add a callable class as a tool to the server.
+
+        Args:
+            fn: The callable class to register as a tool
+            name: Optional name for the tool (defaults to class name)
+            title: Optional human-readable title for the tool
+            description: Optional description of what the tool does
+            annotations: Optional ToolAnnotations providing additional tool information
+            structured_output: Controls whether the tool's output is structured or unstructured
+            auto_instantiate: Whether to auto-instantiate the class (default: True)
+        """
+        ...
+
+    @overload
+    def add_tool(
+        self,
+        fn: object,  # Callable class instance
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: ToolAnnotations | None = None,
+        structured_output: bool | None = None,
+    ) -> None:
+        """Add a callable class instance as a tool to the server.
+
+        Args:
+            fn: The callable class instance to register as a tool
+            name: Optional name for the tool (defaults to class name)
+            title: Optional human-readable title for the tool
+            description: Optional description of what the tool does
+            annotations: Optional ToolAnnotations providing additional tool information
+            structured_output: Controls whether the tool's output is structured or unstructured
+        """
+        ...
+
+    def add_tool(
+        self,
+        fn: AnyFunction | object,
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: ToolAnnotations | None = None,
+        structured_output: bool | None = None,
+    ) -> None:
+        """Add a tool to the server.
+
+        Supports both regular functions and callable classes (objects with __call__ method).
+
+        Args:
+            fn: The function or callable class to register as a tool
+            name: Optional name for the tool (defaults to function name or class name)
+            title: Optional human-readable title for the tool
+            description: Optional description of what the tool does
+            annotations: Optional ToolAnnotations providing additional tool information
+            structured_output: Controls whether the tool's output is structured or unstructured
+        """
+        # Handle callable classes by using their __call__ method
+        match fn:
+            case fn if inspect.isclass(fn):
+                # It's a class, use its __call__ method or instantiate
+                instance = fn()
+                actual_fn = instance.__call__
+                name = name or fn.__name__
+                title = title or fn.__name__
+                description = description or fn.__doc__
+            case fn if (
+                callable(fn) and not inspect.isfunction(fn) and not inspect.ismethod(fn) and not inspect.isbuiltin(fn)
+            ):
+                # It's a callable class instance
+                actual_fn = fn.__call__
+                name = name or fn.__class__.__name__
+                title = title or fn.__class__.__name__
+                description = description or fn.__class__.__doc__ or fn.__call__.__doc__
+            case _:
+                # Regular function or method
+                actual_fn = fn
+
+        super().add_tool(
+            actual_fn,
+            name=name,
+            title=title,
+            description=description,
+            annotations=annotations,
+            structured_output=structured_output,
+        )
 
     def _add_dev_routes(self):
         self.custom_route("/openmcp.json", methods=["GET"])(self._openmcp_json)
