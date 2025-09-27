@@ -7,7 +7,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse
 
 from mcp_use.server.logging import MCP_LOGGING_CONFIG, MCPEnhancerMiddleware
-from mcp_use.server.openMCP import get_openmcp_json
+from mcp_use.server.openmcp import get_openmcp_json
 
 
 class MCPServer(FastMCP):
