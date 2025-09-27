@@ -7,6 +7,16 @@ from starlette.requests import Request
 from starlette.responses import Response
 from uvicorn.logging import AccessFormatter
 
+# Configuration for which library logs to suppress
+SUPPRESSED_LOGGERS = {
+    "uvicorn": "CRITICAL",
+    "uvicorn.error": "CRITICAL",
+    "mcp.server.lowlevel.server": "CRITICAL",
+    "mcp.server.streamable_http_manager": "CRITICAL",
+    "mcp.server.fastmcp": "CRITICAL",
+    "mcp": "CRITICAL",
+}
+
 # Thread-safe storage for MCP method info
 _mcp_methods: dict[str, str] = {}
 _mcp_methods_lock = threading.Lock()
@@ -109,6 +119,9 @@ MCP_LOGGING_CONFIG = {
             "()": "mcp_use.server.logging.MCPAccessFormatter",
             "fmt": '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
         },
+        "minimal": {
+            "format": "%(message)s",
+        },
     },
     "handlers": {
         "access": {
@@ -116,8 +129,17 @@ MCP_LOGGING_CONFIG = {
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
         },
+        "null": {
+            "class": "logging.NullHandler",
+        },
     },
     "loggers": {
+        # Keep our custom access logs
         "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+        # Silence unwanted startup logs
+        **{
+            logger_name: {"handlers": ["null"], "level": level, "propagate": False}
+            for logger_name, level in SUPPRESSED_LOGGERS.items()
+        },
     },
 }

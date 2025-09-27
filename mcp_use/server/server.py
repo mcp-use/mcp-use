@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+import time
 from typing import overload
 
 import click
@@ -15,8 +16,11 @@ from mcp_use.server.openmcp import get_openmcp_json
 from mcp_use.server.utils import estimate_tokens, get_local_network_ip
 
 
-async def display_startup_info(server: "MCPServer", host: str, port: int) -> None:
-    """Display comprehensive startup information for the MCP server."""
+async def display_startup_info(server: "MCPServer", host: str, port: int, start_time: float) -> None:
+    """Display Next.js-style startup information for the MCP server."""
+    # Calculate startup time
+    startup_time = time.time() - start_time
+
     # Gather server information
     tools = await server.list_tools()
     resources = await server.list_resources()
@@ -28,34 +32,34 @@ async def display_startup_info(server: "MCPServer", host: str, port: int) -> Non
     prompts_tokens = sum(estimate_tokens(prompt.model_dump_json()) for prompt in prompts)
     total_tokens = tools_tokens + resources_tokens + prompts_tokens
 
-    # Display startup information
-    click.echo(click.style(f"MCP Server: {server.name}", fg="cyan", bold=True))
-    click.echo(
-        f"Protocol: {click.style('2025-06-18', fg='green')} | Tools: {click.style(str(len(tools)), fg='yellow')} |"
-        f" Resources: {click.style(str(len(resources)), fg='yellow')} |"
-        f" Prompts: {click.style(str(len(prompts)), fg='yellow')} |"
-        f" Tokens: {click.style(str(total_tokens), fg='magenta')}"
-    )
-    # Get network IP for additional URL display
+    # Get network IP
     network_ip = get_local_network_ip()
 
-    if server.dev_mode:
-        click.echo(f"Docs:    {click.style(f'http://{host}:{port}/docs', fg='cyan')}")
-        if network_ip and network_ip != host:
-            click.echo(f"         {click.style(f'http://{network_ip}:{port}/docs', fg='cyan')}")
-        click.echo(f"OpenMCP: {click.style(f'http://{host}:{port}/openmcp.json', fg='cyan')}")
-        if network_ip and network_ip != host:
-            click.echo(f"         {click.style(f'http://{network_ip}:{port}/openmcp.json', fg='cyan')}")
-
-    click.echo(f"Server:  {click.style(f'http://{host}:{port}/mcp', fg='cyan')}")
+    # Next.js-style startup display
+    click.echo("mcp-use Version: 1.3.10")
+    click.echo(f"{server.name}")
+    click.echo(f"{server.instructions}")
+    click.echo()
+    click.echo(f"Tools: {len(tools)} | Resources: {len(resources)} | Prompts: {len(prompts)} | Tokens: {total_tokens}")
+    click.echo()
+    click.echo(f"- Local:        http://{host}:{port}")
     if network_ip and network_ip != host:
-        network_url = f"http://{network_ip}:{port}/mcp"
-        click.echo(f"         {click.style(network_url, fg='cyan')} {click.style('(network)', fg='bright_black')}")
+        click.echo(f"- Network:      http://{network_ip}:{port}")
+
+    # Show additional endpoints if in dev mode
+    if server.dev_mode:
+        click.echo(f"- Docs:         http://{host}:{port}/docs")
+        click.echo(f"- OpenMCP:      http://{host}:{port}/openmcp.json")
+
+    click.echo()
+    click.echo(f"{click.style('✓', fg='green')} Starting...")
+    click.echo(f"{click.style('✓', fg='green')} Ready in {startup_time:.1f}s")
     click.echo()
 
 
 class MCPServer(FastMCP):
     def __init__(self, name: str, version: str | None = None, instructions: str | None = None, dev_mode: bool = False):
+        self._start_time = time.time()  # Track startup time
         super().__init__(name=name, instructions=instructions)
         if version:
             self._mcp_server.version = version
@@ -242,7 +246,7 @@ class MCPServer(FastMCP):
         starlette_app = self.streamable_http_app()
 
         # Display startup information (show localhost for primary URL)
-        await display_startup_info(self, "localhost", self.settings.port)
+        await display_startup_info(self, "localhost", self.settings.port, self._start_time)
 
         config = uvicorn.Config(
             starlette_app,
