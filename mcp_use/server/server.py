@@ -1,6 +1,7 @@
 import logging
 import os
 
+import click
 from mcp.server.fastmcp import FastMCP
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -8,6 +9,35 @@ from starlette.responses import HTMLResponse
 
 from mcp_use.server.logging import MCP_LOGGING_CONFIG, MCPEnhancerMiddleware
 from mcp_use.server.openmcp import get_openmcp_json
+from mcp_use.server.utils import estimate_tokens
+
+
+async def display_startup_info(server: "MCPServer", host: str, port: int) -> None:
+    """Display comprehensive startup information for the MCP server."""
+    # Gather server information
+    tools = await server.list_tools()
+    resources = await server.list_resources()
+    prompts = await server.list_prompts()
+
+    # Calculate token estimates
+    tools_tokens = sum(estimate_tokens(tool.model_dump_json()) for tool in tools)
+    resources_tokens = sum(estimate_tokens(resource.model_dump_json()) for resource in resources)
+    prompts_tokens = sum(estimate_tokens(prompt.model_dump_json()) for prompt in prompts)
+    total_tokens = tools_tokens + resources_tokens + prompts_tokens
+
+    # Display startup information
+    click.echo(click.style(f"MCP Server: {server.name}", fg="cyan", bold=True))
+    click.echo(
+        f"Protocol: {click.style('2025-06-18', fg='green')} | Tools: {click.style(str(len(tools)), fg='yellow')} |"
+        f" Resources: {click.style(str(len(resources)), fg='yellow')} |"
+        f" Prompts: {click.style(str(len(prompts)), fg='yellow')} |"
+        f" Tokens: {click.style(str(total_tokens), fg='magenta')}"
+    )
+    if server.dev_mode:
+        click.echo(f"Docs:    {click.style(f'http://{host}:{port}/docs', fg='cyan')}")
+        click.echo(f"OpenMCP: {click.style(f'http://{host}:{port}/openmcp.json', fg='cyan')}")
+    click.echo(f"Server:  {click.style(f'http://{host}:{port}/mcp', fg='cyan')}")
+    click.echo()
 
 
 class MCPServer(FastMCP):
@@ -78,7 +108,8 @@ class MCPServer(FastMCP):
 
         starlette_app = self.streamable_http_app()
 
-        # Use the logging config from the logging module
+        # Display startup information
+        await display_startup_info(self, self.settings.host, self.settings.port)
 
         config = uvicorn.Config(
             starlette_app,

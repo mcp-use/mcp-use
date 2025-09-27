@@ -1,9 +1,10 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mcp.server.lowlevel.server import NotificationOptions
 from starlette.responses import JSONResponse
 
-from mcp_use.server.server import MCPServer
+if TYPE_CHECKING:
+    from mcp_use.server.server import MCPServer
 
 
 class OpenMCPInfo:
@@ -49,7 +50,7 @@ class OpenMCPResponse:
         }
 
 
-async def get_openmcp_json(server: MCPServer) -> JSONResponse:
+async def get_openmcp_json(server: "MCPServer") -> JSONResponse:
     """
     Generate OpenMCP JSON response for a FastMCP server.
 
