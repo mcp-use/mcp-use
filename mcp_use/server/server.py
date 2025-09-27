@@ -1,7 +1,7 @@
 import inspect
 import logging
 import os
-from typing import Any, get_type_hints, overload
+from typing import overload
 
 import click
 from mcp.server.fastmcp import FastMCP
@@ -12,38 +12,7 @@ from starlette.responses import HTMLResponse
 
 from mcp_use.server.logging import MCP_LOGGING_CONFIG, MCPEnhancerMiddleware
 from mcp_use.server.openmcp import get_openmcp_json
-from mcp_use.server.utils import estimate_tokens
-
-
-def get_return_type(func_or_callable) -> type:
-    """Get the return type annotation from a function or callable class."""
-    if inspect.isclass(func_or_callable):
-        # It's a class, get return type from __call__ method
-        if callable(func_or_callable):
-            call_method = func_or_callable.__call__
-            return get_return_type(call_method)
-        return Any
-    elif (
-        callable(func_or_callable)
-        and not inspect.isfunction(func_or_callable)
-        and not inspect.ismethod(func_or_callable)
-        and not inspect.isbuiltin(func_or_callable)
-    ):
-        # It's a callable class instance, get return type from __call__ method
-        return get_return_type(func_or_callable.__call__)
-    else:
-        # It's a regular function
-        try:
-            # Try get_type_hints first (handles forward references)
-            hints = get_type_hints(func_or_callable)
-            return hints.get("return", Any)
-        except (NameError, AttributeError):
-            # Fallback to inspect.signature
-            try:
-                sig = inspect.signature(func_or_callable)
-                return sig.return_annotation if sig.return_annotation != inspect.Signature.empty else Any
-            except (ValueError, TypeError):
-                return Any
+from mcp_use.server.utils import estimate_tokens, get_local_network_ip
 
 
 async def display_startup_info(server: "MCPServer", host: str, port: int) -> None:
@@ -67,10 +36,21 @@ async def display_startup_info(server: "MCPServer", host: str, port: int) -> Non
         f" Prompts: {click.style(str(len(prompts)), fg='yellow')} |"
         f" Tokens: {click.style(str(total_tokens), fg='magenta')}"
     )
+    # Get network IP for additional URL display
+    network_ip = get_local_network_ip()
+
     if server.dev_mode:
         click.echo(f"Docs:    {click.style(f'http://{host}:{port}/docs', fg='cyan')}")
+        if network_ip and network_ip != host:
+            click.echo(f"         {click.style(f'http://{network_ip}:{port}/docs', fg='cyan')}")
         click.echo(f"OpenMCP: {click.style(f'http://{host}:{port}/openmcp.json', fg='cyan')}")
+        if network_ip and network_ip != host:
+            click.echo(f"         {click.style(f'http://{network_ip}:{port}/openmcp.json', fg='cyan')}")
+
     click.echo(f"Server:  {click.style(f'http://{host}:{port}/mcp', fg='cyan')}")
+    if network_ip and network_ip != host:
+        network_url = f"http://{network_ip}:{port}/mcp"
+        click.echo(f"         {click.style(network_url, fg='cyan')} {click.style('(network)', fg='bright_black')}")
     click.echo()
 
 
@@ -247,7 +227,7 @@ class MCPServer(FastMCP):
 
         config = uvicorn.Config(
             starlette_app,
-            host=self.settings.host,
+            host="0.0.0.0",  # Bind to all interfaces for network access
             port=self.settings.port,
             log_level=self.settings.log_level.lower(),
             reload=reload,
@@ -261,12 +241,12 @@ class MCPServer(FastMCP):
 
         starlette_app = self.streamable_http_app()
 
-        # Display startup information
-        await display_startup_info(self, self.settings.host, self.settings.port)
+        # Display startup information (show localhost for primary URL)
+        await display_startup_info(self, "localhost", self.settings.port)
 
         config = uvicorn.Config(
             starlette_app,
-            host=self.settings.host,
+            host="0.0.0.0",  # Bind to all interfaces for network access
             port=self.settings.port,
             log_level=self.settings.log_level.lower(),
             reload=reload,
