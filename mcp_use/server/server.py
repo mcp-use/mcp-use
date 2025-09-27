@@ -1,19 +1,22 @@
+import logging
 import os
 
-import click
-import uvicorn
 from mcp.server.fastmcp import FastMCP
-from mcp.server.lowlevel.server import NotificationOptions
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse
+
+from mcp_use.server.logging import MCP_LOGGING_CONFIG, MCPEnhancerMiddleware
+from mcp_use.server.openMCP import get_openmcp_json
 
 
-class Server(FastMCP):
+class MCPServer(FastMCP):
     def __init__(self, name: str, version: str | None = None, instructions: str | None = None, dev_mode: bool = False):
         super().__init__(name=name, instructions=instructions)
         if version:
             self._mcp_server.version = version
+
+        # Logging is now handled entirely through Uvicorn's logging system
 
         self.dev_mode = dev_mode
         if self.dev_mode:
@@ -21,13 +24,7 @@ class Server(FastMCP):
 
         self.app = self.streamable_http_app()
 
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+        logging.getLogger("mcp.server.lowlevel.server").setLevel(logging.WARNING)
 
     def _add_dev_routes(self):
         self.custom_route("/openmcp.json", methods=["GET"])(self._openmcp_json)
@@ -39,35 +36,57 @@ class Server(FastMCP):
             return HTMLResponse(f.read())
 
     async def _openmcp_json(self, request: Request):
-        tools = await self.list_tools()
-        resources = await self.list_resources()
-        capabilities = self._mcp_server.get_capabilities(NotificationOptions(), experimental_capabilities={})
-        prompts = await self.list_prompts()
+        return await get_openmcp_json(self)
 
-        server_description = {
-            "openmcp": "1.0",
-            "info": {
-                "title": self.name,
-                "version": self._mcp_server.version,
-                "description": self.instructions,
-            },
-            "capabilities": capabilities.model_dump(),
-            "tools": [tool.model_dump() for tool in tools],
-            "resources": [resource.model_dump() for resource in resources],
-            "prompts": [prompt.model_dump() for prompt in prompts],
-        }
-        return JSONResponse(server_description)
+    def streamable_http_app(self):
+        """Override to add our custom middleware."""
+        app = super().streamable_http_app()
 
-    def run(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
-        # This is a simplified run method for direct execution.
-        # For reload, the CLI is now the recommended approach.
+        # Add CORS middleware
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
-        click.echo("🚀 Starting mcp-use server...")
-        click.echo("│")
-        if self.dev_mode:
-            click.echo(f"├─ � Docs: {click.style(f'http://{host}:{port}/docs', fg='cyan')}")
-            click.echo(f"├─ 📖 openmcp.json: {click.style(f'http://{host}:{port}/openmcp.json', fg='cyan')}")
-        click.echo(f"└─ 🔌 Server URL: {click.style(f'http://{host}:{port}/mcp', fg='cyan')}")
-        click.echo()
+        # Add middleware to extract MCP method info
+        app.add_middleware(MCPEnhancerMiddleware)
 
-        uvicorn.run(self.app, host=host, port=port, reload=reload)
+        return app
+
+    async def run_sse_async(self, mount_path: str | None = None, reload: bool = False) -> None:
+        """Run the server using SSE transport."""
+        import uvicorn
+
+        starlette_app = self.sse_app(mount_path)
+
+        config = uvicorn.Config(
+            starlette_app,
+            host=self.settings.host,
+            port=self.settings.port,
+            log_level=self.settings.log_level.lower(),
+            reload=reload,
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
+
+    async def run_streamable_http_async(self, reload: bool = False) -> None:
+        """Run the server using StreamableHTTP transport."""
+        import uvicorn
+
+        starlette_app = self.streamable_http_app()
+
+        # Use the logging config from the logging module
+
+        config = uvicorn.Config(
+            starlette_app,
+            host=self.settings.host,
+            port=self.settings.port,
+            log_level=self.settings.log_level.lower(),
+            reload=reload,
+            log_config=MCP_LOGGING_CONFIG,
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
