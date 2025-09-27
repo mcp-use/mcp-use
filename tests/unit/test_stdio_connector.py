@@ -10,6 +10,7 @@ from mcp.types import CallToolResult, Tool
 from pydantic import AnyUrl
 
 from mcp_use.connectors.stdio import StdioConnector
+from mcp_use.middleware.middleware import CallbackClientSession
 from mcp_use.task_managers.stdio import StdioConnectionManager
 
 
@@ -95,7 +96,7 @@ class TestStdioConnectorConnection:
 
         # Verify state
         assert connector._connected is True
-        assert connector.client_session == mock_client_instance
+        assert isinstance(connector.client_session, CallbackClientSession)
         assert connector._connection_manager == mock_manager_instance
 
     @pytest.mark.asyncio

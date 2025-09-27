@@ -17,6 +17,7 @@ from mcp_use.auth.oauth import OAuthClientProvider
 from ..auth import BearerAuth, OAuth
 from ..exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from ..logging import logger
+from ..middleware import CallbackClientSession, Middleware
 from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
 from .base import BaseConnector
 
@@ -39,6 +40,7 @@ class HttpConnector(BaseConnector):
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        middleware: list[Middleware] | None = None,
     ):
         """Initialize a new HTTP connector.
 
@@ -59,6 +61,7 @@ class HttpConnector(BaseConnector):
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            middleware=middleware,
         )
         self.base_url = base_url.rstrip("/")
         self.headers = headers or {}
@@ -158,7 +161,7 @@ class HttpConnector(BaseConnector):
             read_stream, write_stream = await connection_manager.start()
 
             # Test if this actually works by trying to create a client session and initialize it
-            test_client = ClientSession(
+            raw_test_client = ClientSession(
                 read_stream,
                 write_stream,
                 sampling_callback=self.sampling_callback,
@@ -167,7 +170,10 @@ class HttpConnector(BaseConnector):
                 logging_callback=self.logging_callback,
                 client_info=self.client_info,
             )
-            await test_client.__aenter__()
+            await raw_test_client.__aenter__()
+
+            # Wrap test client with middleware temporarily for testing
+            test_client = CallbackClientSession(raw_test_client, self.public_identifier, self.middleware_manager)
 
             try:
                 # Try to initialize - this is where streamable HTTP vs SSE difference should show up
@@ -209,7 +215,7 @@ class HttpConnector(BaseConnector):
                 logger.error("MCP protocol error during initialization: %s", mcp_error.error)
                 # Clean up the test client
                 try:
-                    await test_client.__aexit__(None, None, None)
+                    await raw_test_client.__aexit__(None, None, None)
                 except Exception:
                     pass
                 raise mcp_error
@@ -218,7 +224,7 @@ class HttpConnector(BaseConnector):
                 # This catches non-McpError exceptions, like a direct httpx timeout
                 # but in the most cases this won't happen. It's for safety.
                 try:
-                    await test_client.__aexit__(None, None, None)
+                    await raw_test_client.__aexit__(None, None, None)
                 except Exception:
                     pass
                 raise init_error
@@ -251,7 +257,7 @@ class HttpConnector(BaseConnector):
                     read_stream, write_stream = await connection_manager.start()
 
                     # Create the client session for SSE
-                    self.client_session = ClientSession(
+                    raw_client_session = ClientSession(
                         read_stream,
                         write_stream,
                         sampling_callback=self.sampling_callback,
@@ -260,7 +266,12 @@ class HttpConnector(BaseConnector):
                         logging_callback=self.logging_callback,
                         client_info=self.client_info,
                     )
-                    await self.client_session.__aenter__()
+                    await raw_client_session.__aenter__()
+
+                    # Wrap with middleware
+                    self.client_session = CallbackClientSession(
+                        raw_client_session, self.public_identifier, self.middleware_manager
+                    )
                     self.transport_type = "SSE"
 
                 except* Exception as sse_error:
@@ -290,4 +301,5 @@ class HttpConnector(BaseConnector):
     @property
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
-        return {"type": self.transport_type, "base_url": self.base_url}
+        transport_type = getattr(self, "transport_type", "http")
+        return f"{transport_type}:{self.base_url}"
