@@ -62,7 +62,7 @@ class MCPEnhancerMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Only process MCP POST requests
-        if request.url.path.startswith("/mcp") and request.method == "POST":
+        if request.method == "POST":
             body_bytes = await request.body()
 
             async def receive():

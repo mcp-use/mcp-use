@@ -19,6 +19,7 @@ from .client.client import MCPClient
 from .client.config import load_config_file
 from .client.connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
 from .client.session import MCPSession
+from .server import MCPServer
 
 __version__ = version("mcp-use")
 
@@ -38,6 +39,7 @@ __all__ = [
     "Logger",
     "set_debug",
     "observability",
+    "MCPServer",
 ]
 
 

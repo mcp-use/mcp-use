@@ -464,14 +464,21 @@ Available Commands:
   create     🚀 Create a new MCP project (server, agent, or both)
              Interactive wizard to scaffold your MCP project
 
+  run        🏃 Run an MCP server from a Python file
+             Start your MCP server with various transport options
+
   deploy     ☁️  Deploy your MCP project to the cloud
              (Coming soon - Cloud deployment from CLI)
 
 Examples:
-  uvx mcp-use create           # Start interactive project creation
-  uvx mcp-use deploy           # Deploy to cloud (coming soon)
-  uvx mcp-use --help           # Show this help message
-  uvx mcp-use --version        # Show version information
+  uvx mcp-use create                    # Start interactive project creation
+  uvx mcp-use run server.py             # Run server with default settings
+  uvx mcp-use run @server.py            # Run server (@ syntax supported)
+  uvx mcp-use run server.py --reload    # Run with auto-reload
+  uvx mcp-use run server.py --transport sse --port 3000
+  uvx mcp-use deploy                    # Deploy to cloud (coming soon)
+  uvx mcp-use --help                    # Show this help message
+  uvx mcp-use --version                 # Show version information
 
 For more information, visit: https://mcp-use.com
     """
@@ -508,6 +515,19 @@ def handle_create():
 
         print()
     else:
+        sys.exit(1)
+
+
+def handle_run(args):
+    """Handle the run command to start an MCP server."""
+    from mcp_use.server.cli import handle_server_run
+
+    try:
+        handle_server_run(
+            server_file=args.server, transport=args.transport, host=args.host, port=args.port, reload=args.reload
+        )
+    except Exception as e:
+        print(f"❌ Error running server: {str(e)}")
         sys.exit(1)
 
 
@@ -555,8 +575,27 @@ def main(args=None):
     # Add help argument
     parser.add_argument("--help", "-h", action="store_true", help="Show help message")
 
-    # Add subcommand as positional argument
-    parser.add_argument("command", nargs="?", choices=["create", "deploy"], help="Command to execute")
+    # Add subcommands
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Create command
+    subparsers.add_parser("create", help="Create a new MCP project")
+
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Run an MCP server")
+    run_parser.add_argument("server", help="Path to the server Python file")
+    run_parser.add_argument("--reload", action="store_true", help="Enable auto-reload on file changes")
+    run_parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse", "streamable-http"],
+        default="streamable-http",
+        help="Transport type (default: streamable-http)",
+    )
+    run_parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    run_parser.add_argument("--port", type=int, default=8000, help="Port to bind to (default: 8000)")
+
+    # Deploy command
+    subparsers.add_parser("deploy", help="Deploy MCP project to cloud")
 
     # Parse arguments
     parsed_args = parser.parse_args(args)
@@ -569,6 +608,8 @@ def main(args=None):
     # Handle commands
     if parsed_args.command == "create":
         handle_create()
+    elif parsed_args.command == "run":
+        handle_run(parsed_args)
     elif parsed_args.command == "deploy":
         handle_deploy()
     else:
