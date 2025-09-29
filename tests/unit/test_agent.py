@@ -5,12 +5,12 @@ Unit tests for the MCPAgent class.
 from unittest.mock import MagicMock, patch
 
 import pytest
+from langchain.schema import HumanMessage
+from langchain_core.agents import AgentFinish
 
 from mcp_use.agents.mcpagent import MCPAgent
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
-from langchain.schema import HumanMessage
-from langchain_core.agents import AgentFinish
 
 
 class TestMCPAgentInitialization:
@@ -93,8 +93,10 @@ class TestMCPAgentRun:
         with patch("mcp_use.agents.mcpagent.RemoteAgent") as MockRemote:
             remote_instance = MockRemote.return_value
             remote_instance.run = MagicMock()
+
             async def _arun(*args, **kwargs):
                 return "remote-result"
+
             remote_instance.run.side_effect = _arun
 
             agent = MCPAgent(agent_id="abc123", api_key="k", base_url="https://x")
@@ -116,10 +118,14 @@ class TestMCPAgentRun:
             if False:
                 yield None
 
-        with patch.object(MCPAgent, "stream", return_value=dummy_gen()) as mock_stream, \
-             patch.object(MCPAgent, "_consume_and_return") as mock_consume:
+        with (
+            patch.object(MCPAgent, "stream", return_value=dummy_gen()) as mock_stream,
+            patch.object(MCPAgent, "_consume_and_return") as mock_consume,
+        ):
+
             async def _aconsume(gen):
                 return ("ok", 1)
+
             mock_consume.side_effect = _aconsume
 
             result = await agent.run("query", max_steps=2, manage_connector=True, external_history=None)
@@ -127,6 +133,7 @@ class TestMCPAgentRun:
             mock_stream.assert_called_once()
             mock_consume.assert_called_once()
             assert result == "ok"
+
 
 class TestMCPAgentStream:
     """Tests for MCPAgent.stream"""
@@ -141,6 +148,7 @@ class TestMCPAgentStream:
     @pytest.mark.asyncio
     async def test_stream_remote_delegates(self):
         """In remote mode, stream delegates to RemoteAgent.stream and yields its items."""
+
         async def _astream(*args, **kwargs):
             yield "remote-yield-1"
             yield "remote-yield-2"
@@ -175,8 +183,10 @@ class TestMCPAgentStream:
             agent._initialized = True
 
         with patch.object(MCPAgent, "initialize", side_effect=_init_side_effect) as mock_init:
+
             async def _atake_next_step(**kwargs):
                 return AgentFinish(return_values={"output": "done"}, log="")
+
             executor._atake_next_step = MagicMock(side_effect=_atake_next_step)
 
             outputs = []
@@ -197,7 +207,7 @@ class TestMCPAgentStream:
         agent.callbacks = []
         agent.telemetry = MagicMock()
 
-        external_history = [HumanMessage(content="past")] 
+        external_history = [HumanMessage(content="past")]
 
         executor = MagicMock()
         executor.max_iterations = None
@@ -207,7 +217,10 @@ class TestMCPAgentStream:
             agent._initialized = True
 
         with patch.object(MCPAgent, "initialize", side_effect=_init_side_effect):
-            async def _asserting_step(name_to_tool_map=None, color_mapping=None, inputs=None, intermediate_steps=None, run_manager=None):
+
+            async def _asserting_step(
+                name_to_tool_map=None, color_mapping=None, inputs=None, intermediate_steps=None, run_manager=None
+            ):
                 assert inputs["chat_history"] == [msg for msg in external_history]
                 return AgentFinish(return_values={"output": "ok"}, log="")
 
@@ -219,4 +232,3 @@ class TestMCPAgentStream:
 
             assert executor.max_iterations == 4
             assert outputs[-1] == "ok"
-
