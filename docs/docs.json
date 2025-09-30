@@ -84,6 +84,10 @@
             ]
           },
           {
+            "group": "Integrations",
+            "pages": ["integration/openai"]
+          },
+          {
             "group": "Agent Configuration",
             "pages": [
               "agent/agent-configuration",

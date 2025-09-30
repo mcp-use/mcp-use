@@ -8,15 +8,12 @@ import re
 from typing import Any, NoReturn
 
 from jsonschema_pydantic import jsonschema_to_pydantic
-from langchain_core.tools import BaseTool, ToolException
+from langchain_core.tools import BaseTool
 from mcp.types import (
     CallToolResult,
-    EmbeddedResource,
-    ImageContent,
     Prompt,
     ReadResourceRequestParams,
     Resource,
-    TextContent,
 )
 from pydantic import BaseModel, Field, create_model
 
@@ -37,69 +34,6 @@ class LangChainAdapter(BaseAdapter):
         """
         super().__init__(disallowed_tools)
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
-
-    def fix_schema(self, schema: dict) -> dict:
-        """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
-
-        Args:
-            schema: The JSON schema to fix.
-
-        Returns:
-            The fixed JSON schema.
-        """
-        if isinstance(schema, dict):
-            if "type" in schema and isinstance(schema["type"], list):
-                schema["anyOf"] = [{"type": t} for t in schema["type"]]
-                del schema["type"]  # Remove 'type' and standardize to 'anyOf'
-
-            # Fix enum handling - ensure enum fields are properly typed as strings
-            if "enum" in schema and "type" not in schema:
-                schema["type"] = "string"
-
-            for key, value in schema.items():
-                schema[key] = self.fix_schema(value)  # Apply recursively
-        return schema
-
-    def _parse_mcp_tool_result(self, tool_result: CallToolResult) -> str:
-        """Parse the content of a CallToolResult into a string.
-
-        Args:
-            tool_result: The result object from calling an MCP tool.
-
-        Returns:
-            A string representation of the tool result content.
-
-        Raises:
-            ToolException: If the tool execution failed, returned no content,
-                        or contained unexpected content types.
-        """
-        if tool_result.isError:
-            raise ToolException(f"Tool execution failed: {tool_result.content}")
-
-        decoded_result = ""
-        for item in tool_result.content or []:
-            match item.type:
-                case "text":
-                    item: TextContent
-                    decoded_result += item.text
-                case "image":
-                    item: ImageContent
-                    decoded_result += item.data  # Assuming data is string-like or base64
-                case "resource":
-                    resource: EmbeddedResource = item.resource
-                    if hasattr(resource, "text"):
-                        decoded_result += resource.text
-                    elif hasattr(resource, "blob"):
-                        # Assuming blob needs decoding or specific handling; adjust as needed
-                        decoded_result += (
-                            resource.blob.decode() if isinstance(resource.blob, bytes) else str(resource.blob)
-                        )
-                    else:
-                        raise ToolException(f"Unexpected resource type: {resource.type}")
-                case _:
-                    raise ToolException(f"Unexpected content type: {item.type}")
-
-        return decoded_result
 
     def _convert_tool(self, mcp_tool: dict[str, Any], connector: BaseConnector) -> BaseTool:
         """Convert an MCP tool to LangChain's tool format.

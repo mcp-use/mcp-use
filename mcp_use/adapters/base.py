@@ -7,7 +7,15 @@ This module provides the abstract base class that all MCP tool adapters should i
 from abc import ABC, abstractmethod
 from typing import TypeVar
 
-from mcp.types import Prompt, Resource, Tool
+from mcp.types import (
+    CallToolResult,
+    EmbeddedResource,
+    ImageContent,
+    Prompt,
+    Resource,
+    TextContent,
+    Tool,
+)
 
 from ..client import MCPClient
 from ..connectors.base import BaseConnector
@@ -32,6 +40,69 @@ class BaseAdapter(ABC):
         """
         self.disallowed_tools = disallowed_tools or []
         self._connector_tool_map: dict[BaseConnector, list[T]] = {}
+
+    def fix_schema(self, schema: dict) -> dict:
+        """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
+
+        Args:
+            schema: The JSON schema to fix.
+
+        Returns:
+            The fixed JSON schema.
+        """
+        if isinstance(schema, dict):
+            if "type" in schema and isinstance(schema["type"], list):
+                schema["anyOf"] = [{"type": t} for t in schema["type"]]
+                del schema["type"]  # Remove 'type' and standardize to 'anyOf'
+
+            # Fix enum handling - ensure enum fields are properly typed as strings
+            if "enum" in schema and "type" not in schema:
+                schema["type"] = "string"
+
+            for key, value in schema.items():
+                schema[key] = self.fix_schema(value)  # Apply recursively
+        return schema
+
+    def _parse_mcp_tool_result(self, tool_result: CallToolResult) -> str:
+        """Parse the content of a CallToolResult into a string.
+
+        Args:
+            tool_result: The result object from calling an MCP tool.
+
+        Returns:
+            A string representation of the tool result content.
+
+        Raises:
+            RuntimeError: If the tool execution failed, returned no content,
+                        or contained unexpected content types.
+        """
+        if tool_result.isError:
+            raise Exception(f"Tool execution failed: {tool_result.content}")
+
+        decoded_result = ""
+        for item in tool_result.content or []:
+            match item.type:
+                case "text":
+                    item: TextContent
+                    decoded_result += item.text
+                case "image":
+                    item: ImageContent
+                    decoded_result += item.data  # Assuming data is string-like or base64
+                case "resource":
+                    resource: EmbeddedResource = item.resource
+                    if hasattr(resource, "text"):
+                        decoded_result += resource.text
+                    elif hasattr(resource, "blob"):
+                        # Assuming blob needs decoding or specific handling; adjust as needed
+                        decoded_result += (
+                            resource.blob.decode() if isinstance(resource.blob, bytes) else str(resource.blob)
+                        )
+                    else:
+                        raise RuntimeError(f"Unexpected resource type: {resource.type}")
+                case _:
+                    raise RuntimeError(f"Unexpected content type: {item.type}")
+
+        return decoded_result
 
     async def create_tools(self, client: "MCPClient") -> list[T]:
         """Create tools from an MCPClient instance.
