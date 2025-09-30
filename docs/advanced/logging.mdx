@@ -57,7 +57,8 @@ There are two primary ways to enable debug mode:
 Programmatic control is useful for debugging specific parts of your application or conditionally enabling debug mode based on your application state.
 </Note>
 
-```python
+<CodeGroup>
+```python Python
 import mcp_use
 
 # Different debug levels
@@ -66,16 +67,36 @@ mcp_use.set_debug(2)  # DEBUG level (full verbose output)
 mcp_use.set_debug(0)  # Turn off debug (WARNING level)
 ```
 
+```typescript TypeScript
+import { logger } from 'mcp-use'
+
+// Set the logger level
+logger.level = 'info'   // INFO level
+logger.level = 'debug'  // DEBUG level (full verbose output)
+logger.level = 'warn'   // Turn off debug (WARNING level)
+```
+</CodeGroup>
+
 <Tip>
 You can conditionally enable debugging based on environment or configuration:
 
-```python
+<CodeGroup>
+```python Python
 import os
 import mcp_use
 
 if os.getenv("ENVIRONMENT") == "development":
     mcp_use.set_debug(2)
 ```
+
+```typescript TypeScript
+import { logger } from 'mcp-use'
+
+if (process.env.ENVIRONMENT === 'development') {
+    logger.level = 'debug'
+}
+```
+</CodeGroup>
 </Tip>
 
 ## Debug Levels
@@ -110,7 +131,8 @@ if os.getenv("ENVIRONMENT") == "development":
 
 If you only want to increase verbosity for the agent component without enabling full debug mode for the entire package, you can use the `verbose` parameter when creating an MCPAgent:
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPAgent
 
 # Create agent with increased verbosity
@@ -120,6 +142,18 @@ agent = MCPAgent(
     verbose=True  # Only shows debug messages from the agent
 )
 ```
+
+```typescript TypeScript
+import { MCPAgent } from 'mcp-use'
+
+// Create agent with increased verbosity
+const agent = new MCPAgent({
+    llm: yourLlm,
+    client: yourClient,
+    verbose: true  // Only shows debug messages from the agent
+})
+```
+</CodeGroup>
 
 This option is useful when you want to see the agent's steps and decision-making process without all the low-level debug information from other components.
 

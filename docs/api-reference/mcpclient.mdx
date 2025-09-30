@@ -72,7 +72,7 @@ config = {
     }
 }
 
-client = MCPClient.from_dict(config)
+client = MCPClient(config)
 ```
 
 ## Instance Methods
@@ -454,7 +454,7 @@ config = {
 }
 
 async def multi_server_example():
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
 
     # Create sessions with multiple servers
     await client.create_all_sessions()

@@ -40,7 +40,8 @@ The `LangChainAdapter` is a powerful component that converts MCP tools to LangCh
 
 Here's a simple example of creating a custom agent using the LangChain adapter:
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
@@ -84,13 +85,65 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
+import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
+import { MCPClient, LangChainAdapter, loadConfigFile } from 'mcp-use'
+
+async function main() {
+    // Initialize the MCP client
+    const config = await loadConfigFile('path/to/config.json')
+    const client = new MCPClient(config)
+
+    // Create adapter instance
+    const adapter = new LangChainAdapter()
+
+    // Get LangChain tools directly from the client with a single line
+    const tools = await adapter.createTools(client)
+
+    // Initialize your language model
+    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+
+    // Create a prompt template
+    const prompt = ChatPromptTemplate.fromMessages([
+        ['system', 'You are a helpful assistant with access to powerful tools.'],
+        new MessagesPlaceholder('chat_history'),
+        ['human', '{input}'],
+        new MessagesPlaceholder('agent_scratchpad'),
+    ])
+
+    // Create the agent
+    const agent = createToolCallingAgent({ llm, tools, prompt })
+
+    // Create the agent executor
+    const agentExecutor = new AgentExecutor({ agent, tools, verbose: true })
+
+    // Run the agent
+    const result = await agentExecutor.invoke({ input: 'What can you do?' })
+    console.log(result.output)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+</CodeGroup>
+
 <Tip>
 **One-Line Tool Creation**: The API simplifies tool creation - all you need is to create an adapter instance and call its `create_tools` method:
 
-```python
+<CodeGroup>
+```python Python
 adapter = LangChainAdapter()
 tools = await adapter.create_tools(client)
 ```
+
+```typescript TypeScript
+const adapter = new LangChainAdapter()
+const tools = await adapter.createTools(client)
+```
+</CodeGroup>
 
 You don't need to worry about sessions, connectors, or initialization. The adapter handles everything for you.
 </Tip>
@@ -163,7 +216,8 @@ class YourFrameworkAdapter(BaseAdapter):
 
 Once you've implemented your adapter, you can use it with the simplified API:
 
-```python
+<CodeGroup>
+```python Python
 from your_module import YourFrameworkAdapter
 from mcp_use.client import MCPClient
 
@@ -179,6 +233,25 @@ tools = await adapter.create_tools(client)
 # Use the tools with your framework
 agent = your_framework.create_agent(tools=tools)
 ```
+
+```typescript TypeScript
+import { YourFrameworkAdapter } from './your-module'
+import { MCPClient, loadConfigFile } from 'mcp-use'
+
+// Initialize the client
+const config = await loadConfigFile('config.json')
+const client = new MCPClient(config)
+
+// Create an adapter instance
+const adapter = new YourFrameworkAdapter()
+
+// Get tools with a single line
+const tools = await adapter.createTools(client)
+
+// Use the tools with your framework
+const agent = yourFramework.createAgent({ tools })
+```
+</CodeGroup>
 
 ### Tips for Implementing an Adapter
 

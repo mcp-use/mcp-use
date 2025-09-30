@@ -14,7 +14,8 @@ Sampling allows MCP tools to request LLM completions during their execution.
 
 To enable sampling, provide a `sampling_callback` function when initializing the MCPClient:
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use.client import MCPClient
 from mcp.client.session import ClientSession
 from mcp.types import (
@@ -48,6 +49,34 @@ client = MCPClient(
 )
 ```
 
+```typescript TypeScript
+// ⚠️ Sampling callbacks are not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient } from 'mcp-use'
+
+async function samplingCallback(context, params) {
+    // Integrate with your LLM of choice
+    const response = await yourLlm.complete(params.messages.at(-1).content.text)
+
+    return {
+        content: { text: response, type: 'text' },
+        model: 'your-model-name',
+        role: 'assistant'
+    }
+}
+
+const client = new MCPClient(
+    config,
+    { samplingCallback }
+)
+*/
+```
+</CodeGroup>
+
 
 ## Creating Sampling-Enabled Tools
 
@@ -76,7 +105,8 @@ async def analyze_sentiment(text: str, ctx: Context) -> str:
 
 If no sampling callback is provided but a tool requests sampling:
 
-```python
+<CodeGroup>
+```python Python
 # Without sampling callback
 client = MCPClient(config="config.json")  # No sampling_callback
 
@@ -84,3 +114,9 @@ client = MCPClient(config="config.json")  # No sampling_callback
 result = await session.call_tool("analyze_sentiment", {"text": "Hello"})
 # result.isError will be True
 ```
+
+```typescript TypeScript
+// ⚠️ Not yet supported - see above for details
+// When supported, similar error handling will apply
+```
+</CodeGroup>
