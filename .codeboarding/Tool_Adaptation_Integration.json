@@ -1,0 +1,187 @@
+{
+  "description": "The system operates as an intelligent agent framework, with the Agent Orchestrator at its core, managing the overall execution flow. User queries are initially handled by the Query Processor, which prepares them for the orchestrator. The Agent Orchestrator then interacts with the LLM Interface for reasoning and decision-making, leveraging Tool Adaptation & Integration to discover and adapt available tools. Once a tool is selected, the Tool Executor is responsible for its invocation, potentially communicating with external MCP services via the MCP Client. Throughout this process, the Configuration Manager provides essential settings. Finally, the Response Formatter prepares the consolidated output for the user.",
+  "components": [
+    {
+      "name": "Agent Orchestrator",
+      "description": "The central intelligence of the framework, responsible for managing the overall flow of execution. It receives processed queries, interacts with the LLM for reasoning and tool selection, orchestrates tool execution, and prepares the final response.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "reference_file": "mcp_use/agents/mcpagent.py",
+          "reference_start_line": 48,
+          "reference_end_line": 1107
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "LLM Interface",
+      "description": "Provides an abstraction layer for communicating with various Large Language Models. It handles sending prompts, managing API calls, and receiving raw LLM outputs.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "langchain_core.language_models.base.BaseLanguageModel",
+          "reference_file": "langchain_core/language_models/base.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Tool Adaptation & Integration",
+      "description": "Adapts MCP-defined tools, resources, and prompts into a format compatible with external LLM frameworks (e.g., LangChain). This component is crucial for seamlessly integrating MCP tools into the agent's reasoning and execution pipeline, including functionalities for server management and tool discovery.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.base.BaseAdapter",
+          "reference_file": "mcp_use/adapters/base.py",
+          "reference_start_line": 20,
+          "reference_end_line": 190
+        },
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
+          "reference_file": "mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": 29,
+          "reference_end_line": 268
+        },
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "mcp_use/managers/server_manager.py",
+          "reference_start_line": 11,
+          "reference_end_line": 124
+        },
+        {
+          "qualified_name": "mcp_use.managers.tools.search_tools.SearchTools",
+          "reference_file": "mcp_use/managers/tools/search_tools.py",
+          "reference_start_line": 23,
+          "reference_end_line": 55
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/managers/base.py",
+        "mcp_use/managers/server_manager.py",
+        "mcp_use/managers/tools/base_tool.py",
+        "mcp_use/managers/tools/list_servers_tool.py",
+        "mcp_use/managers/tools/get_active_server.py",
+        "mcp_use/managers/tools/search_tools.py",
+        "mcp_use/managers/tools/connect_server.py",
+        "mcp_use/managers/tools/disconnect_server.py",
+        "mcp_use/adapters/base.py",
+        "mcp_use/adapters/langchain_adapter.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Tool Executor",
+      "description": "Executes the adapted external tools or APIs as directed by the Agent Orchestrator, handling the actual invocation and result retrieval. This component leverages LangChain's AgentExecutor for tool management and execution.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.managers.tools.base_tool.ExternalTool",
+          "reference_file": "mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": 6,
+          "reference_end_line": 19
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "MCP Client",
+      "description": "Manages the client-side communication with MCP servers, sending requests for tool execution and receiving raw responses from the servers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.client.MCPClient",
+          "reference_file": "mcp_use/client.py",
+          "reference_start_line": 21,
+          "reference_end_line": 326
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Configuration Manager",
+      "description": "Centralizes the management of application settings, environment variables, API keys, and other configurable parameters, providing them to various components as needed.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.config.Config",
+          "reference_file": "mcp_use/config.py",
+          "reference_start_line": 10,
+          "reference_end_line": 100
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "interacts with for decision-making",
+      "src_name": "Agent Orchestrator",
+      "dst_name": "LLM Interface"
+    },
+    {
+      "relation": "provides decision-making output to",
+      "src_name": "LLM Interface",
+      "dst_name": "Agent Orchestrator"
+    },
+    {
+      "relation": "consults for tool specifications",
+      "src_name": "Agent Orchestrator",
+      "dst_name": "Tool Adaptation & Integration"
+    },
+    {
+      "relation": "provides adapted tools to",
+      "src_name": "Tool Adaptation & Integration",
+      "dst_name": "Agent Orchestrator"
+    },
+    {
+      "relation": "directs to execute tool",
+      "src_name": "Agent Orchestrator",
+      "dst_name": "Tool Executor"
+    },
+    {
+      "relation": "uses for MCP tool invocations",
+      "src_name": "Tool Executor",
+      "dst_name": "MCP Client"
+    },
+    {
+      "relation": "feeds back execution results to",
+      "src_name": "Tool Executor",
+      "dst_name": "Agent Orchestrator"
+    },
+    {
+      "relation": "provides core settings to",
+      "src_name": "Configuration Manager",
+      "dst_name": "Agent Orchestrator"
+    },
+    {
+      "relation": "provides API credentials/settings to",
+      "src_name": "Configuration Manager",
+      "dst_name": "LLM Interface"
+    },
+    {
+      "relation": "provides server details/tool config to",
+      "src_name": "Configuration Manager",
+      "dst_name": "Tool Adaptation & Integration"
+    },
+    {
+      "relation": "provides connection parameters to",
+      "src_name": "Configuration Manager",
+      "dst_name": "MCP Client"
+    },
+    {
+      "relation": "returns raw results to",
+      "src_name": "MCP Client",
+      "dst_name": "Tool Executor"
+    }
+  ]
+}
