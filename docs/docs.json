@@ -85,7 +85,10 @@
           },
           {
             "group": "Integrations",
-            "pages": ["integration/openai"]
+            "pages": [
+              "integration/openai",
+              "integration/anthropic"
+            ]
           },
           {
             "group": "Agent Configuration",
