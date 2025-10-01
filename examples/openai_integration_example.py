@@ -16,7 +16,7 @@ load_dotenv()
 async def main():
     config = {
         "mcpServers": {
-            "airbnb": {"command": "npx", "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]}
+            "airbnb": {"command": "npx", "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]},
         }
     }
 
@@ -31,7 +31,9 @@ async def main():
 
         # Use tools with OpenAI's SDK (not agent in this case)
         openai = OpenAI()
-        input_list = [{"role": "user", "content": "Search on Airbnb the cheapest hotel in Trapani for two nights."}]
+        input_list = [
+            {"role": "user", "content": "Please execute the `assistant_prompt` tool and tell me what it returns."}
+        ]
         response = openai.chat.completions.create(model="gpt-4o", messages=input_list, tools=openai_tools)
 
         response_message = response.choices[0].message
@@ -41,26 +43,44 @@ async def main():
             print(response_message.content)
             return
 
+        # Handle the tool calls (Tools, Resources, Prompts...)
         for tool_call in response_message.tool_calls:
             import json
 
             function_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments)
 
-            # Use the adapter's map to get the correct connector
-            connector = adapter.tool_to_connector_map[function_name]
+            # Use the adapter's map to get the correct executor
+            executor = adapter.tool_executors[function_name]
 
-            print(f"Executing tool: {function_name}({arguments})")
-            tool_result = await connector.call_tool(name=function_name, arguments=arguments)
+            if not executor:
+                print(f"Error: Unknown tool '{function_name}' requested by model.")
+                content = f"Error: Tool '{function_name}' not found."
+            else:
+                try:
+                    # Execute the tool using the retrieved function
+                    print(f"Executing tool: {function_name}({arguments})")
+                    tool_result = await executor(**arguments)
 
-        # Handle and print the result
-        if getattr(tool_result, "isError", False):
-            print(f"Error: {tool_result.content}")
-            return
+                    # Parse the result from any tool type
+                    if getattr(tool_result, "isError", False):
+                        print(f"Error from tool execution: {tool_result.content}")
+                        content = f"Error: {tool_result.content}"
+                    elif hasattr(tool_result, "contents"):  # For Resources
+                        content = "\n".join(
+                            c.decode() if isinstance(c, bytes) else str(c) for c in tool_result.contents
+                        )
+                    elif hasattr(tool_result, "messages"):  # For Prompts
+                        content = "\n".join(str(s) for s in tool_result.messages)
+                    else:  # For Tools and other types with a .content attribute
+                        content = str(tool_result.content)
 
-        input_list.append(
-            {"tool_call_id": tool_call.id, "role": "tool", "name": function_name, "content": tool_result.content}
-        )
+                except Exception as e:
+                    print(f"An unexpected error occurred while executing tool {function_name}: {e}")
+                    content = f"Error executing tool: {e}"
+
+            # 4. Append the result for this specific tool call
+            input_list.append({"tool_call_id": tool_call.id, "role": "tool", "name": function_name, "content": content})
 
         # Send the tool result back to the model
         second_response = openai.chat.completions.create(model="gpt-4o", messages=input_list, tools=openai_tools)
