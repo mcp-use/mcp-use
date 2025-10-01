@@ -60,24 +60,13 @@ async def main():
                     print(f"Executing tool: {function_name}({arguments})")
                     tool_result = await executor(**arguments)
 
-                    # Parse the result from any tool type
-                    if getattr(tool_result, "isError", False):
-                        print(f"Error from tool execution: {tool_result.content}")
-                        content = f"Error: {tool_result.content}"
-                    elif hasattr(tool_result, "contents"):  # For Resources
-                        content = "\n".join(
-                            c.decode() if isinstance(c, bytes) else str(c) for c in tool_result.contents
-                        )
-                    elif hasattr(tool_result, "messages"):  # For Prompts
-                        content = "\n".join(str(s) for s in tool_result.messages)
-                    else:  # For Tools and other types with a .content attribute
-                        content = str(tool_result.content)
-
+                    # Use the adapter's universal parser
+                    content = adapter.parse_result(tool_result)
                 except Exception as e:
                     print(f"An unexpected error occurred while executing tool {function_name}: {e}")
                     content = f"Error executing tool: {e}"
 
-            # 4. Append the result for this specific tool call
+            # Append the result for this specific tool call
             messages.append({"tool_call_id": tool_call.id, "role": "tool", "name": function_name, "content": content})
 
         # Send the tool result back to the model
