@@ -55,9 +55,7 @@ class BaseAdapter(ABC):
             error_content = tool_result.content or "Unknown error"
             return f"Error: {error_content}"
         elif hasattr(tool_result, "contents"):  # For Resources (ReadResourceResult)
-            return "\n".join(
-                c.decode() if isinstance(c, bytes) else str(c) for c in tool_result.contents
-            )
+            return "\n".join(c.decode() if isinstance(c, bytes) else str(c) for c in tool_result.contents)
         elif hasattr(tool_result, "messages"):  # For Prompts (GetPromptResult)
             return "\n".join(str(s) for s in tool_result.messages)
         elif hasattr(tool_result, "content"):  # For Tools (CallToolResult)
