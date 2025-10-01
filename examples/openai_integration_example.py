@@ -31,9 +31,7 @@ async def main():
 
         # Use tools with OpenAI's SDK (not agent in this case)
         openai = OpenAI()
-        messages = [
-            {"role": "user", "content": "Please tell me the cheapest hotel for two people in Trapani."}
-        ]
+        messages = [{"role": "user", "content": "Please tell me the cheapest hotel for two people in Trapani."}]
         response = openai.chat.completions.create(model="gpt-4o", messages=messages, tools=openai_tools)
 
         response_message = response.choices[0].message
