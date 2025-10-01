@@ -31,13 +31,13 @@ async def main():
 
         # Use tools with OpenAI's SDK (not agent in this case)
         openai = OpenAI()
-        input_list = [
-            {"role": "user", "content": "Please execute the `assistant_prompt` tool and tell me what it returns."}
+        messages = [
+            {"role": "user", "content": "Please tell me the cheapest hotel for two people in Trapani."}
         ]
-        response = openai.chat.completions.create(model="gpt-4o", messages=input_list, tools=openai_tools)
+        response = openai.chat.completions.create(model="gpt-4o", messages=messages, tools=openai_tools)
 
         response_message = response.choices[0].message
-        input_list.append(response_message)
+        messages.append(response_message)
         if not response_message.tool_calls:
             print("No tool call requested by the model")
             print(response_message.content)
@@ -80,10 +80,10 @@ async def main():
                     content = f"Error executing tool: {e}"
 
             # 4. Append the result for this specific tool call
-            input_list.append({"tool_call_id": tool_call.id, "role": "tool", "name": function_name, "content": content})
+            messages.append({"tool_call_id": tool_call.id, "role": "tool", "name": function_name, "content": content})
 
         # Send the tool result back to the model
-        second_response = openai.chat.completions.create(model="gpt-4o", messages=input_list, tools=openai_tools)
+        second_response = openai.chat.completions.create(model="gpt-4o", messages=messages, tools=openai_tools)
         final_message = second_response.choices[0].message
         print("\n--- Final response from the model ---")
         print(final_message.content)
