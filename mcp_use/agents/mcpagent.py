@@ -102,6 +102,13 @@ class MCPAgent:
             output_config: Configuration for output formatting. Uses defaults if None.
             auto_format_output: Whether to automatically format output with pretty printing.
         """
+        self.output_config = output_config or OutputConfig()
+        self.auto_format_output = auto_format_output
+        
+        # Suppress logging when auto formatting is enabled
+        if self.auto_format_output:
+            logging.getLogger("mcp_use").setLevel(logging.ERROR)
+        
         # Handle remote execution
         if agent_id is not None:
             self._remote_agent = RemoteAgent(agent_id=agent_id, api_key=api_key, base_url=base_url, chat_id=chat_id)
@@ -130,14 +137,6 @@ class MCPAgent:
         self.verbose = verbose
         self.retry_on_error = retry_on_error
         self.max_retries_per_step = max_retries_per_step
-
-        # Output formatting configuration
-        self.output_config = output_config or OutputConfig()
-        self.auto_format_output = auto_format_output
-
-        # Suppress logging when auto formatting is enabled
-        if self.auto_format_output:
-            logging.getLogger("mcp_use").setLevel(logging.ERROR)
 
         # System prompt configuration
         self.system_prompt = system_prompt  # User-provided full prompt override
@@ -943,7 +942,6 @@ class MCPAgent:
         except Exception as e:
             success = False
             error = str(e)
-            logger.error(f"❌ Error during agent execution: {e}")
 
             if self.auto_format_output:
                 format_error(

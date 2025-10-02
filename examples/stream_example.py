@@ -1,51 +1,54 @@
 """
 Basic usage example for streaming with mcp_use.
 
-This example demonstrates how to use the mcp_use library with MCPClient
-to connect any LLM to MCP tools through a unified interface.
-
-Special thanks to https://github.com/microsoft/playwright-mcp for the server.
+This example demonstrates how to use the MCPAgent to navigate to a news site,
+extract the main headlines, and summarize them.
 """
 
 import asyncio
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-
+from langchain_anthropic import ChatAnthropic
 from mcp_use import MCPAgent, MCPClient
 
 
 async def main():
-    """Run the example using a configuration file."""
+    """Run the example using Playwright MCP server."""
     # Load environment variables
     load_dotenv()
 
+    # Configure MCP to use Playwright
     config = {
-        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
+        "mcpServers": {
+            "playwright": {
+                "command": "npx",
+                "args": ["@playwright/mcp@latest"],
+                "env": {"DISPLAY": ":1"},
+            }
+        }
     }
-    # Create MCPClient from config file
+
+    # Create MCPClient
     client = MCPClient(config=config)
+
     # Create LLM
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+
     # Create agent with the client
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
-    # Run the query
+    agent = MCPAgent(llm=llm, client=client, max_steps=25)
+
+    # Example task: scrape headlines
     async for step in agent.stream(
         """
-        Navigate to https://github.com/mcp-use/mcp-use, give a star to the project and write
-        a summary of the project.
+        Navigate to https://www.bbc.com/news,
+        extract the top 5 headlines shown on the homepage,
+        and provide a short 1-sentence summary of each.
         """,
-        max_steps=30,
+        max_steps=25,
     ):
-        if isinstance(step, str):
-            print("Result:", step)
-        else:
-            action, observation = step
-            print("Observation:", observation[:20])
-            print("Calling:", action.tool)
-            print("Input:", action.tool_input)
+        pass
 
 
 if __name__ == "__main__":
-    # Run the appropriate example
     asyncio.run(main())
+    
