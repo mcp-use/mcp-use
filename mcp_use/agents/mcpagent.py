@@ -227,6 +227,42 @@ class MCPAgent:
         self._initialized = True
         logger.info("✨ Agent initialization complete")
 
+    def _normalize_output(self, value: object) -> str:
+        """Normalize model outputs into a plain text string."""
+        try:
+            if isinstance(value, str):
+                return value
+
+            # LangChain messages may have .content which is str or list-like
+            content = getattr(value, "content", None)
+            if content is not None:
+                return self._normalize_output(content)
+
+            if isinstance(value, list):
+                parts: list[str] = []
+                for item in value:
+                    if isinstance(item, dict):
+                        if "text" in item and isinstance(item["text"], str):
+                            parts.append(item["text"])
+                        elif "content" in item:
+                            parts.append(self._normalize_output(item["content"]))
+                        else:
+                            # Fallback to str for unknown shapes
+                            parts.append(str(item))
+                    else:
+                        # recurse on .content or str
+                        part_content = getattr(item, "text", None)
+                        if isinstance(part_content, str):
+                            parts.append(part_content)
+                        else:
+                            parts.append(self._normalize_output(getattr(item, "content", item)))
+                return "".join(parts)
+
+            return str(value)
+
+        except Exception:
+            return str(value)
+
     async def _create_system_message_from_tools(self, tools: list[BaseTool]) -> None:
         """Create the system message based on provided tools using the builder."""
         # Use the override if provided, otherwise use the imported default
@@ -627,7 +663,8 @@ class MCPAgent:
                     if isinstance(next_step_output, AgentFinish):
                         logger.info(f"✅ Agent finished at step {step_num + 1}")
                         agent_finished_successfully = True
-                        result = next_step_output.return_values.get("output", "No output generated")
+                        output_value = next_step_output.return_values.get("output", "No output generated")
+                        result = self._normalize_output(output_value)
                         # End the chain if we have a run manager
                         if run_manager:
                             await run_manager.on_chain_end({"output": result})
@@ -710,6 +747,7 @@ class MCPAgent:
                             logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
                             agent_finished_successfully = True
                             result = tool_return.return_values.get("output", "No output generated")
+                            result = self._normalize_output(result)
                             break
 
                 except OutputParserException as e:
@@ -764,7 +802,7 @@ class MCPAgent:
                     raise RuntimeError(f"Failed to generate structured output after {steps} steps: {str(e)}") from e
 
             if self.memory_enabled and not output_schema:
-                self.add_to_history(AIMessage(content=result))
+                self.add_to_history(AIMessage(content=self._normalize_output(result)))
 
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
             if not success:
@@ -937,7 +975,7 @@ class MCPAgent:
                 steps_taken=steps_taken,
                 tools_used_count=len(self.tools_used_names),
                 tools_used_names=self.tools_used_names,
-                response=str(result),
+                response=str(self._normalize_output(result)),
                 execution_time_ms=execution_time_ms,
                 error_type=error,
                 conversation_history_length=len(self._conversation_history),
