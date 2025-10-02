@@ -4,10 +4,11 @@ Output types for MCP agent responses.
 This module defines the data structures for agent outputs and events.
 """
 
-from dataclasses import dataclass, field
+import json
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from time import time
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -30,32 +31,87 @@ class AgentOutputEvent:
 
     event_type: EventType
     timestamp: int = field(default_factory=lambda: int(time()))
-    content: Optional[Any] = None
-    metadata: Optional[dict[str, Any]] = None
+    content: Any | None = None
+    metadata: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert event to dictionary."""
-        pass
+        """Convert event to dictionary.
+
+        Returns:
+            Dictionary representation of event.
+        """
+        result = {
+            "event_type": self.event_type.value if isinstance(self.event_type, EventType) else self.event_type,
+            "timestamp": self.timestamp,
+        }
+
+        if self.content is not None:
+            if isinstance(self.content, BaseModel):
+                result["content"] = self.content.model_dump(exclude_none=True)
+            else:
+                result["content"] = self.content
+
+        if self.metadata is not None:
+            result["metadata"] = self.metadata
+
+        return result
 
 
 @dataclass
 class AgentOutput:
     """Represents the final output from an agent execution."""
 
-    content: Optional[Any] = None
+    content: Any | None = None
     content_type: str = "str"
-    metadata: Optional[dict[str, Any]] = None
-    events: Optional[list[AgentOutputEvent]] = None
-    execution_time_ms: Optional[int] = None
-    steps_taken: Optional[int] = None
-    tools_used: Optional[list[str]] = None
+    metadata: dict[str, Any] | None = None
+    events: list[AgentOutputEvent] | None = None
+    execution_time_ms: int | None = None
+    steps_taken: int | None = None
+    tools_used: list[str] | None = None
     success: bool = True
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert output to dictionary."""
-        pass
+        """Convert output to dictionary.
+
+        Returns:
+            Dictionary representation of output.
+        """
+        result = asdict(self)
+
+        # Handle Pydantic models in content
+        if self.content is not None and isinstance(self.content, BaseModel):
+            result["content"] = self.content.model_dump(exclude_none=True)
+
+        # Handle events list
+        if self.events is not None:
+            result["events"] = [event.to_dict() for event in self.events]
+
+        # Remove None values for cleaner output
+        return {k: v for k, v in result.items() if v is not None}
 
     def get_content_as_string(self, **kwargs) -> str:
-        """Get content as formatted string."""
-        pass
+        """Get content as formatted string.
+
+        Args:
+            **kwargs: Additional formatting options (e.g., indent for JSON).
+
+        Returns:
+            String representation of content.
+        """
+        if self.content is None:
+            return ""
+
+        if isinstance(self.content, str):
+            return self.content
+
+        if isinstance(self.content, BaseModel):
+            return self.content.model_dump_json(exclude_none=True, **kwargs)
+
+        # For other types, use JSON serialization
+        try:
+            indent = kwargs.get("indent", 2)
+            return json.dumps(self.content, indent=indent)
+        except (TypeError, ValueError):
+            # Fallback to string representation
+            return str(self.content)

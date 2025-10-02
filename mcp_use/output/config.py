@@ -4,8 +4,8 @@ Configuration for output formatting.
 This module provides configuration options for output formatting.
 """
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import asdict, dataclass
+from typing import Any
 
 
 @dataclass
@@ -13,32 +13,59 @@ class OutputConfig:
     """Configuration for output formatting."""
 
     # Display options
-    markdown: bool = False
-    show_timing: bool = False
-    show_metadata: bool = False
-    show_steps: bool = True
+    show_message: bool = True  # Always show query/message panel
+    show_timing: bool = True  # Show timing in response title
+    show_steps: bool = False  # Optional: show intermediate reasoning steps
+    markdown: bool = False  # Render content as markdown
 
-    # Formatting options
-    max_tool_input_length: int = 100
-    max_tool_result_length: int = 200
-    max_thinking_length: int = 300
+    # Truncation
+    max_stream_preview_length: int = 500  # Brief preview during streaming
+    max_step_display_length: int = 200  # Brief step summaries
+    max_final_output_length: int | None = None  # No limit for final output
 
-    # Color scheme
-    tool_call_color: str = "cyan"
-    tool_result_color: str = "green"
-    thinking_color: str = "yellow"
-    error_color: str = "red"
-    success_color: str = "green"
+    # Panel styling
+    message_border_style: str = "cyan"  # Cyan for user message
+    response_border_style: str = "blue"  # Blue for agent response
+    step_border_style: str = "green"  # Green for reasoning steps
+    error_border_style: str = "red"  # Red for errors
 
-    # Table styling
-    table_box_style: str = "ROUNDED"
-    table_border_color: str = "blue"
+    # Box styles
+    message_box_style: str = "HEAVY"  # Heavy/double for message
+    response_box_style: str = "ROUNDED"  # Rounded for response
+    step_box_style: str = "ROUNDED"  # Rounded for steps
 
     @classmethod
-    def from_dict(cls, config: dict) -> "OutputConfig":
-        """Create config from dictionary."""
-        pass
+    def from_dict(cls, config: dict[str, Any]) -> "OutputConfig":
+        """Create config from dictionary.
 
-    def to_dict(self) -> dict:
-        """Convert config to dictionary."""
-        pass
+        Args:
+            config: Dictionary with configuration values.
+
+        Returns:
+            OutputConfig instance.
+        """
+        # Filter to only valid fields
+        valid_fields = {k: v for k, v in config.items() if k in cls.__dataclass_fields__}
+        return cls(**valid_fields)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert config to dictionary.
+
+        Returns:
+            Dictionary representation of config.
+        """
+        return asdict(self)
+
+    @classmethod
+    def disabled(cls) -> "OutputConfig":
+        """Create a config with all formatting disabled.
+
+        Returns:
+            OutputConfig with minimal formatting.
+        """
+        return cls(
+            show_message=False,
+            show_timing=False,
+            show_steps=False,
+            markdown=False,
+        )

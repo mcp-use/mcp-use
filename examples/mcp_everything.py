@@ -22,7 +22,7 @@ async def main():
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
 
-    result = await agent.run(
+    await agent.run(
         """
         Hello, you are a tester can you please answer the following questions:
         - Which resources do you have access to?
@@ -31,7 +31,6 @@ async def main():
         """,
         max_steps=30,
     )
-    print(f"\nResult: {result}")
 
 
 if __name__ == "__main__":

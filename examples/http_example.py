@@ -41,11 +41,10 @@ async def main():
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
 
     # Run the query
-    result = await agent.run(
+    await agent.run(
         "Find the best restaurant in San Francisco USING GOOGLE SEARCH",
         max_steps=30,
     )
-    print(f"\nResult: {result}")
 
 
 if __name__ == "__main__":

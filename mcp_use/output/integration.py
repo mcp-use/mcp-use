@@ -6,121 +6,126 @@ integrate pretty printing into agent run() and stream() methods.
 """
 
 from collections.abc import AsyncGenerator
-from typing import Any, Callable, Optional, TypeVar, Union
-
-from langchain_core.agents import AgentAction
+from typing import Any
 
 from .config import OutputConfig
-from .types import AgentOutput, AgentOutputEvent, EventType
-
-T = TypeVar("T")
-
-
-def create_output_from_result(
-    result: Union[str, Any],
-    execution_time_ms: Optional[int] = None,
-    steps_taken: Optional[int] = None,
-    tools_used: Optional[list[str]] = None,
-    metadata: Optional[dict[str, Any]] = None,
-) -> AgentOutput:
-    """
-    Create an AgentOutput from a result.
-
-    Args:
-        result: The result from agent execution
-        execution_time_ms: Execution time in milliseconds
-        steps_taken: Number of steps taken
-        tools_used: List of tool names used
-        metadata: Additional metadata
-
-    Returns:
-        AgentOutput instance
-    """
-    pass
-
-
-def create_event_from_step(
-    step: tuple[AgentAction, str],
-    event_type: EventType = EventType.TOOL_CALL_COMPLETED,
-) -> AgentOutputEvent:
-    """
-    Create an AgentOutputEvent from an agent step.
-
-    Args:
-        step: Tuple of (AgentAction, observation)
-        event_type: Type of event
-
-    Returns:
-        AgentOutputEvent instance
-    """
-    pass
-
-
-async def wrap_stream_with_formatting(
-    stream: AsyncGenerator[tuple[AgentAction, str] | str | T, None],
-    config: Optional[OutputConfig] = None,
-    auto_print: bool = True,
-) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
-    """
-    Wrap a stream to add automatic formatting.
-
-    This generator wraps the agent's stream and optionally prints
-    formatted output while still yielding the original items.
-
-    Args:
-        stream: The original stream from agent
-        config: Output configuration
-        auto_print: Whether to automatically print formatted output
-
-    Yields:
-        Original stream items
-    """
-    pass
+from .printer import PanelPrinter, StreamPrinter
 
 
 def format_and_print_result(
-    result: Union[str, Any],
-    config: Optional[OutputConfig] = None,
+    query: str,
+    result: Any,
+    execution_time_ms: int | None = None,
+    steps: list[dict[str, Any]] | None = None,
+    config: OutputConfig | None = None,
 ) -> None:
     """
-    Format and print a single result.
+    Format and print query and result in clean panels (for run()).
 
     Args:
-        result: The result to format and print
+        query: User's query/message
+        result: Agent's result
+        execution_time_ms: Execution time in milliseconds
+        steps: Optional reasoning steps
         config: Output configuration
     """
-    pass
+    config = config or OutputConfig()
+    printer = PanelPrinter(config)
+
+    # Convert execution time to seconds
+    execution_time_s = None
+    if execution_time_ms is not None:
+        execution_time_s = execution_time_ms / 1000.0
+
+    printer.print_message_and_response(
+        query=query,
+        response=result,
+        execution_time_s=execution_time_s,
+        steps=steps if config.show_steps else None,
+    )
+
+
+def format_error(
+    query: str,
+    error: str,
+    config: OutputConfig | None = None,
+) -> None:
+    """
+    Format and print error in a panel.
+
+    Args:
+        query: User's query that caused the error
+        error: Error message
+        config: Output configuration
+    """
+    config = config or OutputConfig()
+    printer = PanelPrinter(config)
+    printer.print_error(error=error, query=query)
+
+
+async def format_stream_with_panels(
+    query: str,
+    stream: AsyncGenerator,
+    config: OutputConfig | None = None,
+    stream_intermediate_steps: bool = False,
+) -> AsyncGenerator:
+    """
+    Format agent stream with live panel updates (for stream()).
+
+    Args:
+        query: User's query/message
+        stream: Agent's stream generator
+        config: Output configuration
+        stream_intermediate_steps: Whether to show steps during streaming
+
+    Yields:
+        Original stream items (passthrough for backward compatibility)
+    """
+    config = config or OutputConfig()
+    printer = StreamPrinter(config)
+
+    # Display panels in real-time while consuming the stream
+    final_result = await printer.run_with_panels(
+        query=query,
+        agent_stream=stream,
+        stream_intermediate_steps=stream_intermediate_steps,
+    )
+
+    # Yield the final result for backward compatibility
+    if final_result is not None:
+        yield final_result
 
 
 class OutputCapture:
     """
-    Context manager for capturing and formatting agent output.
+    Context manager for capturing agent execution metadata.
 
-    This can be used to wrap agent execution and automatically
-    format the output.
+    This can be used to track execution time and collect steps.
     """
 
-    def __init__(self, config: Optional[OutputConfig] = None):
-        """
-        Initialize output capture.
-
-        Args:
-            config: Output configuration
-        """
-        pass
+    def __init__(self):
+        """Initialize output capture."""
+        self.start_time: float | None = None
+        self.end_time: float | None = None
+        self.execution_time_ms: int | None = None
+        self.steps: list[dict[str, Any]] = []
 
     async def __aenter__(self) -> "OutputCapture":
         """Enter async context."""
-        pass
+        from time import time
+
+        self.start_time = time()
+        return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit async context."""
-        pass
+        from time import time
 
-    def capture_event(self, event: AgentOutputEvent) -> None:
-        """Capture an event."""
-        pass
+        self.end_time = time()
+        if self.start_time:
+            self.execution_time_ms = int((self.end_time - self.start_time) * 1000)
 
-    def get_output(self) -> AgentOutput:
-        """Get the captured output."""
-        pass
+    def add_step(self, step_type: str, **kwargs) -> None:
+        """Add a step to the capture."""
+        step = {"type": step_type, **kwargs}
+        self.steps.append(step)
