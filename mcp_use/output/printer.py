@@ -345,7 +345,7 @@ class StreamPrinter:
         """Create a response panel for agent output."""
         response_str = str(response)
 
-        error_keywords = ['error', 'error code', 'failed', 'exception']
+        error_keywords = ["error", "error code", "failed", "exception"]
         is_error = any(keyword in response_str.lower() for keyword in error_keywords)
 
         if is_error:
