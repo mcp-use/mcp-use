@@ -104,11 +104,11 @@ class MCPAgent:
         """
         self.output_config = output_config or OutputConfig()
         self.auto_format_output = auto_format_output
-        
+
         # Suppress logging when auto formatting is enabled
         if self.auto_format_output:
             logging.getLogger("mcp_use").setLevel(logging.ERROR)
-        
+
         # Handle remote execution
         if agent_id is not None:
             self._remote_agent = RemoteAgent(agent_id=agent_id, api_key=api_key, base_url=base_url, chat_id=chat_id)

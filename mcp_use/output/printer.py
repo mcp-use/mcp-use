@@ -344,10 +344,10 @@ class StreamPrinter:
     ) -> Panel:
         """Create a response panel for agent output."""
         response_str = str(response)
-        
+
         error_keywords = ['error', 'error code', 'failed', 'exception']
         is_error = any(keyword in response_str.lower() for keyword in error_keywords)
-        
+
         if is_error:
             return Panel(
                 Text(response_str, style="white"),
@@ -358,7 +358,7 @@ class StreamPrinter:
                 expand=True,
                 padding=(1, 1),
             )
-        
+
         # Normal response panel
         if isinstance(response, str):
             escaped_content = escape_markdown_tags(response, {"think", "thinking"})

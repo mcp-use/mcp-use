@@ -9,6 +9,7 @@ import asyncio
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
+
 from mcp_use import MCPAgent, MCPClient
 
 
@@ -38,7 +39,7 @@ async def main():
     agent = MCPAgent(llm=llm, client=client, max_steps=25)
 
     # Example task: scrape headlines
-    async for step in agent.stream(
+    async for _step in agent.stream(
         """
         Navigate to https://www.bbc.com/news,
         extract the top 5 headlines shown on the homepage,
@@ -51,4 +52,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
