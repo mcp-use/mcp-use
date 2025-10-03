@@ -10,6 +10,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 
 from mcp_use.client import MCPClient
+from mcp_use.middleware.logging import default_logging_middleware
 from mcp_use.session import MCPSession
 
 
@@ -226,6 +227,7 @@ class TestMCPClientSessionManagement:
             elicitation_callback=None,
             message_handler=None,
             logging_callback=None,
+            middleware=[default_logging_middleware],
         )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_called_once()
@@ -284,6 +286,7 @@ class TestMCPClientSessionManagement:
             elicitation_callback=None,
             message_handler=None,
             logging_callback=None,
+            middleware=[default_logging_middleware],
         )
         mock_session_class.assert_called_once_with(mock_connector)
         mock_session.initialize.assert_not_called()
@@ -473,6 +476,7 @@ class TestMCPClientSessionManagement:
             elicitation_callback=None,
             message_handler=None,
             logging_callback=None,
+            middleware=[default_logging_middleware],
         )
         mock_create_connector.assert_any_call(
             {"url": "http://server2.com"},
@@ -482,6 +486,7 @@ class TestMCPClientSessionManagement:
             elicitation_callback=None,
             message_handler=None,
             logging_callback=None,
+            middleware=[default_logging_middleware],
         )
 
         assert mock_session_class.call_count == 2
@@ -538,6 +543,7 @@ class TestMCPClientSessionManagement:
             elicitation_callback=None,
             message_handler=None,
             logging_callback=None,
+            middleware=[default_logging_middleware],
         )
 
         assert mock_session_class.call_count == 1

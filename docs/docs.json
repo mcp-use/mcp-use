@@ -74,6 +74,7 @@
                 "group": "Advanced Features",
                 "icon": "sparkle",
                 "pages": [
+                  "client/middleware",
                   "client/sampling",
                   "client/elicitation",
                   "client/notifications",
