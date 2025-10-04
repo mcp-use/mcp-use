@@ -17,7 +17,7 @@ from mcp_use.server.openmcp import get_openmcp_json
 class MCPServer(FastMCP):
     def __init__(self, name: str, version: str | None = None, instructions: str | None = None, debug: bool = False):
         self._start_time = time.time()  # Track startup time
-        super().__init__(name=name, instructions=instructions)
+        super().__init__(name=name or "mcp-use server", instructions=instructions)
         if version:
             self._mcp_server.version = version
 
