@@ -9,7 +9,6 @@ from uvicorn.logging import AccessFormatter
 
 # Configuration for which library logs to suppress
 SUPPRESSED_LOGGERS = {
-    "uvicorn": "CRITICAL",
     "uvicorn.error": "CRITICAL",
     "mcp.server.lowlevel.server": "CRITICAL",
     "mcp.server.streamable_http_manager": "CRITICAL",

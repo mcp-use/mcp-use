@@ -15,7 +15,7 @@ from mcp_use.server.openmcp import get_openmcp_json
 
 
 class MCPServer(FastMCP):
-    def __init__(self, name: str, version: str | None = None, instructions: str | None = None, dev_mode: bool = False):
+    def __init__(self, name: str, version: str | None = None, instructions: str | None = None, debug: bool = False):
         self._start_time = time.time()  # Track startup time
         super().__init__(name=name, instructions=instructions)
         if version:
@@ -23,8 +23,8 @@ class MCPServer(FastMCP):
 
         # Logging is now handled entirely through Uvicorn's logging system
 
-        self.dev_mode = dev_mode
-        if self.dev_mode:
+        self.debug = debug
+        if self.debug:
             self._add_dev_routes()
 
         self.app = self.streamable_http_app()
@@ -85,6 +85,7 @@ class MCPServer(FastMCP):
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
+        debug: bool = False,
     ) -> None:
         """Run the FastMCP server. Note this is a synchronous function.
 
@@ -103,4 +104,6 @@ class MCPServer(FastMCP):
             case "stdio":
                 anyio.run(self.run_stdio_async)
             case "streamable-http":
+                if debug:
+                    self._add_dev_routes()
                 anyio.run(partial(self.run_streamable_http_async, host=host, port=port, reload=reload))
