@@ -3,6 +3,7 @@ MCP: Main integration module with customizable system prompt.
 
 This module provides the main MCPAgent class that integrates all components
 to provide a simple interface for using MCP tools with different LLMs.
+
 """
 
 import logging
@@ -174,6 +175,7 @@ class MCPAgent:
         else:
             # Standard initialization - if using client, get or create sessions
             if self.client:
+                # SESSION STATE MONITORING: Check existing sessions and their connection status
                 # First try to get existing sessions
                 self._sessions = self.client.get_all_active_sessions()
                 logger.info(f"🔌 Found {len(self._sessions)} existing sessions")
@@ -491,6 +493,22 @@ class MCPAgent:
             elif not self._initialized and self.auto_initialize:
                 await self.initialize()
                 initialized_here = True
+
+            # CONNECTION HEALTH CHECK: Verify all sessions are still connected
+            # This implements automatic reinitialization when disconnected sessions are detected
+            if self._initialized and self.client:
+                # Check if any sessions have become disconnected
+                sessions_need_reinit = False
+                for session_name, session in self.client.sessions.items():
+                    if not session.is_connected:
+                        logger.warning(f"Session '{session_name}' is disconnected, will reinitialize")
+                        sessions_need_reinit = True
+                        break
+
+                if sessions_need_reinit:
+                    logger.info("🔄 Reinitializing agent due to disconnected sessions")
+                    await self.initialize()
+                    initialized_here = True
 
             # Check if initialization succeeded
             if not self._agent_executor:
@@ -817,9 +835,15 @@ class MCPAgent:
                 )
 
             # Clean up if necessary (e.g., if not using client-managed sessions)
+            # Only close if we initialized here AND we're not using a client
+            # (which manages its own sessions)
             if manage_connector and not self.client and initialized_here:
                 logger.info("🧹 Closing agent after stream completion")
                 await self.close()
+            elif manage_connector and self.client and initialized_here:
+                # For client-managed sessions, we don't close the agent but we
+                # ensure sessions stay alive
+                logger.debug("🔄 Agent using client-managed sessions, keeping connections alive")
 
     async def run(
         self,
@@ -1006,6 +1030,22 @@ class MCPAgent:
         if (manage_connector and not self._initialized) or (not self._initialized and self.auto_initialize):
             await self.initialize()
             initialised_here = True
+
+        # CONNECTION HEALTH CHECK: Verify all sessions are still connected
+        # This implements automatic reinitialization when disconnected sessions are detected
+        if self._initialized and self.client:
+            # Check if any sessions have become disconnected
+            sessions_need_reinit = False
+            for session_name, session in self.client.sessions.items():
+                if not session.is_connected:
+                    logger.warning(f"Session '{session_name}' is disconnected, will reinitialize")
+                    sessions_need_reinit = True
+                    break
+
+            if sessions_need_reinit:
+                logger.info("🔄 Reinitializing agent due to disconnected sessions")
+                await self.initialize()
+                initialised_here = True
 
         if not self._agent_executor:
             raise RuntimeError("MCP agent failed to initialise – call initialise() first?")
