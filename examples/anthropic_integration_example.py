@@ -23,11 +23,19 @@ async def main():
     try:
         client = MCPClient(config=config)
 
-        # Creates the adapter for OpenAI's format
+        # Creates the adapter for Anthropic's format
         adapter = AnthropicMCPAdapter()
 
-        # Convert tools from active connectors to the OpenAI's format
-        anthropic_tools = await adapter.create_tools(client)
+        # Convert tools from active connectors to the Anthropic's format
+        await adapter.create_all(client)
+
+        # List concatenation (if you loaded all tools)
+        anthropic_tools = adapter.tools + adapter.resources + adapter.prompts
+
+        # If you don't want to create all tools, you can call single functions
+        # await adapter.create_tools(client)
+        # await adapter.create_resources(client)
+        # await adapter.create_prompts(client)
 
         # Use tools with Anthropic's SDK (not agent in this case)
         anthropic = Anthropic()
@@ -99,6 +107,7 @@ async def main():
 
     except Exception as e:
         print(f"Error: {e}")
+        raise e
 
 
 if __name__ == "__main__":

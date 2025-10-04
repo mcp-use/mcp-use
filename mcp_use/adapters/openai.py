@@ -81,19 +81,12 @@ class OpenAIMCPAdapter(BaseAdapter):
         # Preparing JSON schema for prompt arguments
         properties = {}
         required_args = []
-        python_to_json_schema_type = {
-            str: "string",
-            int: "integer",
-            float: "number",
-            bool: "boolean",
-            list: "array",
-            dict: "object",
-        }
         if mcp_prompt.arguments:
             for arg in mcp_prompt.arguments:
-                param_type = getattr(arg, "type", str)
-                json_type = python_to_json_schema_type.get(param_type, "string")
-                properties[arg.name] = {"type": json_type, "description": arg.description}
+                prop = {"type": "string"}
+                if arg.description:
+                    prop["description"] = arg.description
+                properties[arg.name] = prop
                 if arg.required:
                     required_args.append(arg.name)
 

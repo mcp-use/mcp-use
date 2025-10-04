@@ -25,6 +25,14 @@ class AnthropicMCPAdapter(BaseAdapter):
         # This map stores the actual async function to call for each tool.
         self.tool_executors: dict[str, Callable[..., Coroutine[Any, Any, Any]]] = {}
 
+        self._connector_tool_map: dict[BaseConnector, list[dict[str, Any]]] = {}
+        self._connector_resource_map: dict[BaseConnector, list[dict[str, Any]]] = {}
+        self._connector_prompt_map: dict[BaseConnector, list[dict[str, Any]]] = {}
+
+        self.tools: list[dict[str, Any]] = []
+        self.resources: list[dict[str, Any]] = []
+        self.prompts: list[dict[str, Any]] = []
+
     def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> dict[str, Any]:
         """Convert an MCP tool to the Anthropic tool format."""
         if mcp_tool.name in self.disallowed_tools:
@@ -36,9 +44,43 @@ class AnthropicMCPAdapter(BaseAdapter):
         return {"name": mcp_tool.name, "description": mcp_tool.description, "input_schema": fixed_schema}
 
     def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> dict[str, Any]:
-        """Convert an MCP resource to a readable tool in OpenAI format."""
-        pass
+        """Convert an MCP resource to a readable tool in Anthropic format."""
+        tool_name = _sanitize_for_tool_name(f"resource_{mcp_resource.name}")
+
+        if tool_name in self.disallowed_tools:
+            return None
+
+        self.tool_executors[tool_name] = lambda **kwargs: connector.read_resource(mcp_resource.uri)
+
+        return {
+            "name": tool_name,
+            "description": mcp_resource.description,
+            "input_schema": {"type": "object", "properties": {}},
+        }
 
     def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> dict[str, Any]:
-        """Convert an MCP prompt to a usable tool in OpenAI format."""
-        pass
+        """Convert an MCP prompt to a usable tool in Anthropic format."""
+        if mcp_prompt.name in self.disallowed_tools:
+            return None
+
+        self.tool_executors[mcp_prompt.name] = lambda **kwargs: connector.get_prompt(mcp_prompt.name, kwargs)
+
+        properties = {}
+        required_args = []
+        if mcp_prompt.arguments:
+            for arg in mcp_prompt.arguments:
+                prop = {"type": "string"}
+                if arg.description:
+                    prop["description"] = arg.description
+                properties[arg.name] = prop
+                if arg.required:
+                    required_args.append(arg.name)
+        parameters_schema = {"type": "object", "properties": properties}
+        if required_args:
+            parameters_schema["required"] = required_args
+
+        return {
+            "name": mcp_prompt.name,
+            "description": mcp_prompt.description,
+            "input_schema": parameters_schema,
+        }
