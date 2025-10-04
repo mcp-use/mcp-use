@@ -1,178 +1,121 @@
 {
-  "description": "The MCP Agent system is designed around a central `MCPAgent Core` that orchestrates interactions between users, Large Language Models (LLMs), and various external tools. The `CLI Interface` serves as the primary entry point for users, initiating agent runs and managing sessions. The `MCPAgent Core` leverages `LLM Interaction & Prompting` to formulate effective prompts and interpret LLM responses, driving the agent's decision-making. For tool execution, the `MCPAgent Core` interacts with `Tool Adaptation & Integration`, which is responsible for converting MCP-defined tools into a format usable by the LLM framework and managing tool discovery. `Tool Adaptation & Integration` then communicates with `MCP Client & Session Management` to handle active connections to MCP servers. The `MCP Client & Session Management` relies on the `MCP Connector Framework` to establish and manage diverse communication protocols (e.g., HTTP, WebSocket) with external services. Finally, `Remote Execution & Task Management` handles the execution of agent logic in remote environments and manages streaming outputs, ensuring the agent can operate across distributed systems. This modular design ensures clear separation of concerns, facilitating maintainability and extensibility.",
+  "description": "The `mcp-use` project is structured around a core `Agent Orchestration Core` that leverages external tools and services to interact with the Model Context Protocol (MCP). The `Command Line Interface (CLI)` serves as the primary entry point, allowing users to initiate and manage MCP projects. It interacts with the `MCP Communication & Management` component to establish and maintain connections with MCP servers, which in turn relies on the `Authentication Service` for secure access.\n\nThe `Agent Orchestration Core` is responsible for the intelligent orchestration of tasks, utilizing `Tool & Adapter Framework` to convert MCP-specific tools and resources into a format consumable by the agent (e.g., LangChain). This framework acts as an abstraction layer, ensuring interoperability. During its operation, the `Agent Orchestration Core` reports execution events and metrics to the `Observability & Telemetry` component, which provides insights into agent performance and behavior. Conversely, `Observability & Telemetry` also provides callback handlers to the `Agent Orchestration Core` for real-time event observation. The `MCP Communication & Management` component not only handles session management but also provides the raw tool, resource, and prompt definitions that the `Tool & Adapter Framework` then adapts for the agent's use. This architecture ensures a clear separation of concerns, enabling modular development and maintainability, while facilitating a robust and observable agent-server interaction.",
   "components": [
     {
-      "name": "CLI Interface",
-      "description": "Provides the command-line interface for users to interact with the MCP Agent, initiating agent runs and managing sessions.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.cli.main",
-          "reference_file": "mcp_use/cli.py",
-          "reference_start_line": 542,
-          "reference_end_line": 577
-        }
-      ],
-      "assigned_files": [
-        "mcp_use/cli.py"
-      ],
-      "can_expand": true
-    },
-    {
-      "name": "MCPAgent Core",
-      "description": "The central intelligent agent orchestrating the entire workflow. It processes user queries, manages chat history, interacts with LLMs for reasoning, and delegates tool execution. This component embodies the agent's decision-making and control flow.",
+      "name": "Agent Orchestration Core",
+      "description": "The central intelligence unit, orchestrating LLM interactions, managing conversational state, and executing tools. It also handles dynamic prompt construction and remote execution.",
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
           "reference_file": "mcp_use/agents/mcpagent.py",
-          "reference_start_line": 48,
-          "reference_end_line": 1107
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.agents.base.BaseAgent",
+          "reference_file": "mcp_use/agents/base.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.create_system_message",
+          "reference_file": "mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.agents.remote.RemoteAgent",
+          "reference_file": "mcp_use/agents/remote.py",
+          "reference_start_line": null,
+          "reference_end_line": null
         }
       ],
       "assigned_files": [
         "mcp_use/agents/base.py",
-        "mcp_use/agents/mcpagent.py"
-      ],
-      "can_expand": true
-    },
-    {
-      "name": "LLM Interaction & Prompting",
-      "description": "Responsible for constructing and formatting system messages and tool descriptions for the LLM. It ensures the agent provides the necessary context to the LLM for effective reasoning and tool selection.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.create_system_message",
-          "reference_file": "mcp_use/agents/prompts/system_prompt_builder.py",
-          "reference_start_line": 59,
-          "reference_end_line": 103
-        },
-        {
-          "qualified_name": "mcp_use.agents.prompts.templates.DEFAULT_SYSTEM_PROMPT_TEMPLATE",
-          "reference_file": "mcp_use/agents/prompts/templates.py",
-          "reference_start_line": 3,
-          "reference_end_line": 3
-        }
-      ],
-      "assigned_files": [
+        "mcp_use/agents/mcpagent.py",
+        "mcp_use/agents/remote.py",
         "mcp_use/agents/prompts/templates.py",
         "mcp_use/agents/prompts/system_prompt_builder.py"
       ],
       "can_expand": true
     },
     {
-      "name": "MCP Client & Session Management",
-      "description": "Manages the lifecycle of connections (sessions) to various MCP servers. It handles the creation, maintenance, and closing of these sessions, enabling the agent to interact with multiple external tool providers.",
+      "name": "MCP Communication & Management",
+      "description": "Manages the establishment, maintenance, and termination of client sessions and connections to various MCP servers. It provides abstract and concrete implementations for different server types and handles server/tool discovery and management.",
       "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.session.MCPSession",
+          "reference_file": "mcp_use/session.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
         {
           "qualified_name": "mcp_use.client.MCPClient",
           "reference_file": "mcp_use/client.py",
-          "reference_start_line": 21,
-          "reference_end_line": 326
+          "reference_start_line": null,
+          "reference_end_line": null
         },
         {
-          "qualified_name": "mcp_use.session.Session",
-          "reference_file": "mcp_use/session.py",
-          "reference_start_line": 36,
-          "reference_end_line": 36
+          "qualified_name": "mcp_use.connectors.base.BaseConnector",
+          "reference_file": "mcp_use/connectors/base.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "mcp_use/managers/server_manager.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.base.BaseTaskManager",
+          "reference_file": "mcp_use/task_managers/base.py",
+          "reference_start_line": null,
+          "reference_end_line": null
         }
       ],
       "assigned_files": [
         "mcp_use/session.py",
-        "mcp_use/client.py"
-      ],
-      "can_expand": true
-    },
-    {
-      "name": "MCP Connector Framework",
-      "description": "Provides a standardized, pluggable interface for the agent to communicate with different types of MCP servers (e.g., sandbox, HTTP, WebSocket). It abstracts away the underlying communication protocols and handles authentication, allowing for flexible integration of various tool environments.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "mcp_use.connectors.base.BaseConnector",
-          "reference_file": "mcp_use/connectors/base.py",
-          "reference_start_line": 37,
-          "reference_end_line": 453
-        },
-        {
-          "qualified_name": "mcp_use.connectors.sandbox.SandboxConnector",
-          "reference_file": "mcp_use/connectors/sandbox.py",
-          "reference_start_line": 35,
-          "reference_end_line": 302
-        },
-        {
-          "qualified_name": "mcp_use.connectors.http.HTTPConnector",
-          "reference_file": "mcp_use/connectors/http.py",
-          "reference_start_line": 24,
-          "reference_end_line": 301
-        },
-        {
-          "qualified_name": "mcp_use.connectors.websocket.WebSocketConnector",
-          "reference_file": "mcp_use/connectors/websocket.py",
-          "reference_start_line": 22,
-          "reference_end_line": 257
-        },
-        {
-          "qualified_name": "mcp_use.connectors.stdio.StdioConnector",
-          "reference_file": "mcp_use/connectors/stdio.py",
-          "reference_start_line": 18,
-          "reference_end_line": 101
-        },
-        {
-          "qualified_name": "mcp_use.auth.oauth.OAuthAuthenticator",
-          "reference_file": "mcp_use/auth/oauth.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "mcp_use.auth.bearer.BearerAuthenticator",
-          "reference_file": "mcp_use/auth/bearer.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        }
-      ],
-      "assigned_files": [
+        "mcp_use/client.py",
         "mcp_use/connectors/sandbox.py",
         "mcp_use/connectors/base.py",
         "mcp_use/connectors/stdio.py",
         "mcp_use/connectors/http.py",
         "mcp_use/connectors/websocket.py",
         "mcp_use/connectors/utils.py",
-        "mcp_use/auth/oauth.py",
-        "mcp_use/auth/bearer.py",
-        "mcp_use/auth/oauth_callback.py",
-        "mcp_use/types/sandbox.py"
+        "mcp_use/managers/server_manager.py",
+        "mcp_use/task_managers/base.py",
+        "mcp_use/task_managers/stdio.py",
+        "mcp_use/task_managers/sse.py",
+        "mcp_use/task_managers/streamable_http.py",
+        "mcp_use/task_managers/websocket.py"
       ],
       "can_expand": true
     },
     {
-      "name": "Tool Adaptation & Integration",
-      "description": "Adapts MCP-defined tools, resources, and prompts into a format compatible with external LLM frameworks (e.g., LangChain). This component is crucial for seamlessly integrating MCP tools into the agent's reasoning and execution pipeline, including functionalities for server management and tool discovery.",
+      "name": "Tool & Adapter Framework",
+      "description": "Provides an abstraction layer for adapting MCP-specific tools, resources, and prompts into a format usable by external frameworks (e.g., LangChain), ensuring interoperability.",
       "referenced_source_code": [
         {
           "qualified_name": "mcp_use.adapters.base.BaseAdapter",
           "reference_file": "mcp_use/adapters/base.py",
-          "reference_start_line": 20,
-          "reference_end_line": 190
+          "reference_start_line": null,
+          "reference_end_line": null
         },
         {
           "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
           "reference_file": "mcp_use/adapters/langchain_adapter.py",
-          "reference_start_line": 29,
-          "reference_end_line": 268
+          "reference_start_line": null,
+          "reference_end_line": null
         },
         {
-          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
-          "reference_file": "mcp_use/managers/server_manager.py",
-          "reference_start_line": 11,
-          "reference_end_line": 124
-        },
-        {
-          "qualified_name": "mcp_use.managers.tools.search_tools.SearchTools",
-          "reference_file": "mcp_use/managers/tools/search_tools.py",
-          "reference_start_line": 23,
-          "reference_end_line": 55
+          "qualified_name": "mcp_use.managers.tools.base_tool.BaseTool",
+          "reference_file": "mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": null,
+          "reference_end_line": null
         }
       ],
       "assigned_files": [
-        "mcp_use/managers/base.py",
-        "mcp_use/managers/server_manager.py",
         "mcp_use/managers/tools/base_tool.py",
         "mcp_use/managers/tools/list_servers_tool.py",
         "mcp_use/managers/tools/get_active_server.py",
@@ -185,53 +128,69 @@
       "can_expand": true
     },
     {
-      "name": "Remote Execution & Task Management",
-      "description": "Facilitates the execution of agent logic in remote environments and manages asynchronous task streams (e.g., SSE, WebSocket). It handles serialization/deserialization of data for remote calls and manages the lifecycle of streaming outputs.",
+      "name": "Authentication Service",
+      "description": "Handles user authentication and authorization, primarily using OAuth, and manages bearer tokens for secure communication with MCP servers.",
       "referenced_source_code": [
         {
-          "qualified_name": "mcp_use.agents.remote.RemoteAgent",
-          "reference_file": "mcp_use/agents/remote.py",
-          "reference_start_line": 34,
-          "reference_end_line": 327
-        },
-        {
-          "qualified_name": "mcp_use.task_managers.base.BaseTaskManager",
-          "reference_file": "mcp_use/task_managers/base.py",
+          "qualified_name": "mcp_use.auth.oauth.OAuth",
+          "reference_file": "mcp_use/auth/oauth.py",
           "reference_start_line": null,
           "reference_end_line": null
         },
         {
-          "qualified_name": "mcp_use.task_managers.sse.SseTaskManager",
-          "reference_file": "mcp_use/task_managers/sse.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "mcp_use.task_managers.stdio.StdioTaskManager",
-          "reference_file": "mcp_use/task_managers/stdio.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "mcp_use.task_managers.streamable_http.StreamableHttpTaskManager",
-          "reference_file": "mcp_use/task_managers/streamable_http.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "mcp_use.task_managers.websocket.WebSocketTaskManager",
-          "reference_file": "mcp_use/task_managers/websocket.py",
+          "qualified_name": "mcp_use.auth.bearer.BearerAuth",
+          "reference_file": "mcp_use/auth/bearer.py",
           "reference_start_line": null,
           "reference_end_line": null
         }
       ],
       "assigned_files": [
-        "mcp_use/agents/remote.py",
-        "mcp_use/task_managers/base.py",
-        "mcp_use/task_managers/stdio.py",
-        "mcp_use/task_managers/sse.py",
-        "mcp_use/task_managers/streamable_http.py",
-        "mcp_use/task_managers/websocket.py"
+        "mcp_use/auth/oauth.py",
+        "mcp_use/auth/bearer.py",
+        "mcp_use/auth/oauth_callback.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Command Line Interface (CLI)",
+      "description": "Manages command-line interface operations for project setup, server configuration, and general utility commands, serving as the primary entry point for user interaction.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.cli",
+          "reference_file": "mcp_use/cli.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/cli.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Observability & Telemetry",
+      "description": "Provides mechanisms for collecting telemetry data, managing callbacks for observing agent events, and integrating with observability platforms.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.telemetry.telemetry.Telemetry",
+          "reference_file": "mcp_use/telemetry/telemetry.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.observability.callbacks_manager.ObservabilityManager",
+          "reference_file": "mcp_use/observability/callbacks_manager.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/telemetry/events.py",
+        "mcp_use/telemetry/utils.py",
+        "mcp_use/telemetry/telemetry.py",
+        "mcp_use/observability/laminar.py",
+        "mcp_use/observability/langfuse.py",
+        "mcp_use/observability/callbacks_manager.py"
       ],
       "can_expand": true
     },
@@ -262,94 +221,65 @@
         "mcp_use/connectors/__init__.py",
         "mcp_use/agents/__init__.py",
         "mcp_use/managers/__init__.py",
+        "mcp_use/managers/base.py",
         "mcp_use/managers/tools/__init__.py",
         "mcp_use/auth/__init__.py",
         "mcp_use/telemetry/__init__.py",
-        "mcp_use/telemetry/events.py",
-        "mcp_use/telemetry/utils.py",
-        "mcp_use/telemetry/telemetry.py",
         "mcp_use/task_managers/__init__.py",
         "mcp_use/adapters/__init__.py",
         "mcp_use/observability/__init__.py",
-        "mcp_use/observability/laminar.py",
-        "mcp_use/observability/langfuse.py",
-        "mcp_use/observability/callbacks_manager.py",
         "mcp_use/errors/__init__.py",
-        "mcp_use/errors/error_formatting.py"
+        "mcp_use/errors/error_formatting.py",
+        "mcp_use/types/sandbox.py"
       ],
       "can_expand": false
     }
   ],
   "components_relations": [
     {
-      "relation": "Initiates Agent Run",
-      "src_name": "CLI Interface",
-      "dst_name": "MCPAgent Core"
+      "relation": "initiates server connections and project-specific sessions via",
+      "src_name": "Command Line Interface (CLI)",
+      "dst_name": "MCP Communication & Management"
     },
     {
-      "relation": "Initiates Sessions",
-      "src_name": "CLI Interface",
-      "dst_name": "MCP Client & Session Management"
+      "relation": "interacts with",
+      "src_name": "Command Line Interface (CLI)",
+      "dst_name": "Authentication Service"
     },
     {
-      "relation": "Sends User Query & Context",
-      "src_name": "MCPAgent Core",
-      "dst_name": "LLM Interaction & Prompting"
+      "relation": "dispatches actions and requests to",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "MCP Communication & Management"
     },
     {
-      "relation": "Receives LLM Response & Tool Suggestions",
-      "src_name": "LLM Interaction & Prompting",
-      "dst_name": "MCPAgent Core"
+      "relation": "consumes adapted tools and prompts provided by",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "Tool & Adapter Framework"
     },
     {
-      "relation": "Requests Available Tools",
-      "src_name": "MCPAgent Core",
-      "dst_name": "Tool Adaptation & Integration"
+      "relation": "reports agent execution events and metrics to",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "Observability & Telemetry"
     },
     {
-      "relation": "Executes Adapted Tool",
-      "src_name": "MCPAgent Core",
-      "dst_name": "Tool Adaptation & Integration"
+      "relation": "utilizes",
+      "src_name": "MCP Communication & Management",
+      "dst_name": "Authentication Service"
     },
     {
-      "relation": "Requests Active Sessions",
-      "src_name": "Tool Adaptation & Integration",
-      "dst_name": "MCP Client & Session Management"
+      "relation": "provides raw tool, resource, and prompt definitions for adaptation to",
+      "src_name": "MCP Communication & Management",
+      "dst_name": "Tool & Adapter Framework"
     },
     {
-      "relation": "Provides Active Sessions",
-      "src_name": "MCP Client & Session Management",
-      "dst_name": "Tool Adaptation & Integration"
+      "relation": "supplies adapted tools and structured prompts to",
+      "src_name": "Tool & Adapter Framework",
+      "dst_name": "Agent Orchestration Core"
     },
     {
-      "relation": "Establishes/Closes Connections",
-      "src_name": "MCP Client & Session Management",
-      "dst_name": "MCP Connector Framework"
-    },
-    {
-      "relation": "Manages Connector Instances",
-      "src_name": "MCP Client & Session Management",
-      "dst_name": "MCP Connector Framework"
-    },
-    {
-      "relation": "Sends Tool Call Requests",
-      "src_name": "Tool Adaptation & Integration",
-      "dst_name": "MCP Connector Framework"
-    },
-    {
-      "relation": "Executes Tool Calls",
-      "src_name": "MCP Connector Framework",
-      "dst_name": "Tool Adaptation & Integration"
-    },
-    {
-      "relation": "Delegates Remote Agent Logic",
-      "src_name": "MCPAgent Core",
-      "dst_name": "Remote Execution & Task Management"
-    },
-    {
-      "relation": "Receives Streaming Outputs",
-      "src_name": "Remote Execution & Task Management",
-      "dst_name": "MCPAgent Core"
+      "relation": "provides callback handlers to",
+      "src_name": "Observability & Telemetry",
+      "dst_name": "Agent Orchestration Core"
     }
   ]
 }

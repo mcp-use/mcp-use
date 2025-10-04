@@ -1,0 +1,102 @@
+{
+  "description": "The `mcp-use` subsystem is orchestrated by the Command Line Interface (CLI), which serves as the primary user interaction point. The CLI is responsible for initiating various operations, including project setup and managing agent workflows. It interacts with the Configuration Manager to load and persist application and project-specific settings, ensuring consistent behavior across sessions. For interacting with external MCP servers, the CLI leverages the MCP Client, which handles communication, server command execution, and status reporting. The core intelligence of the system resides within the MCP Agent, which executes agentic workflows and integrates LLMs and tools. The CLI manages the execution of the MCP Agent and receives feedback on its operations. This architecture ensures a clear separation of concerns, with the CLI handling user input and orchestration, the Configuration Manager providing persistent settings, the MCP Client managing external server interactions, and the MCP Agent performing the core intelligent tasks.",
+  "components": [
+    {
+      "name": "Command Line Interface (CLI)",
+      "description": "The primary user interface for `mcp-use`, responsible for parsing command-line arguments, validating inputs, and dispatching commands to initiate project setup, manage server configurations, or execute agent workflows. It serves as the initial entry point for user interaction.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.cli",
+          "reference_file": "mcp_use/cli.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/cli.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Configuration Manager",
+      "description": "Manages the loading, saving, and access of all application and project-specific settings, including server endpoints, agent parameters, and tool configurations. It ensures persistent and consistent configuration across sessions. This component is crucial for any framework requiring customizable behavior.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.config",
+          "reference_file": "mcp_use/config.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "MCP Client",
+      "description": "Facilitates communication with external MCP (Multi-Agent Communication Protocol) servers. It handles connection establishment, sending requests (e.g., start server, get status), and processing responses, acting as the network interface for server interactions. This is essential for a framework that interacts with external services or agents.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.client.MCPClient",
+          "reference_file": "mcp_use/client.py",
+          "reference_start_line": 21,
+          "reference_end_line": 326
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "MCP Agent",
+      "description": "The core intelligent component responsible for executing agentic workflows, leveraging LLMs, and integrating various tools. The CLI can initiate, monitor, or configure aspects of its operation. This is the central \"brain\" of an LLM Agent Framework.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "reference_file": "mcp_use/agents/mcpagent.py",
+          "reference_start_line": 48,
+          "reference_end_line": 1145
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "Loads Settings From",
+      "src_name": "Command Line Interface (CLI)",
+      "dst_name": "Configuration Manager"
+    },
+    {
+      "relation": "Provides Settings To",
+      "src_name": "Configuration Manager",
+      "dst_name": "Command Line Interface (CLI)"
+    },
+    {
+      "relation": "Initiates Server Operations",
+      "src_name": "Command Line Interface (CLI)",
+      "dst_name": "MCP Client"
+    },
+    {
+      "relation": "Reports Status To",
+      "src_name": "MCP Client",
+      "dst_name": "Command Line Interface (CLI)"
+    },
+    {
+      "relation": "Manages Execution Of",
+      "src_name": "Command Line Interface (CLI)",
+      "dst_name": "MCP Agent"
+    },
+    {
+      "relation": "Provides Feedback To",
+      "src_name": "MCP Agent",
+      "dst_name": "Command Line Interface (CLI)"
+    }
+  ]
+}

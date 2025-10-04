@@ -1,112 +1,99 @@
 # overview
 ```mermaid
 graph LR
-    CLI_Interface["CLI Interface"]
-    MCPAgent_Core["MCPAgent Core"]
-    LLM_Interaction_Prompting["LLM Interaction & Prompting"]
-    MCP_Client_Session_Management["MCP Client & Session Management"]
-    MCP_Connector_Framework["MCP Connector Framework"]
-    Tool_Adaptation_Integration["Tool Adaptation & Integration"]
-    Remote_Execution_Task_Management["Remote Execution & Task Management"]
+    Agent_Orchestration_Core["Agent Orchestration Core"]
+    MCP_Communication_Management["MCP Communication & Management"]
+    Tool_Adapter_Framework["Tool & Adapter Framework"]
+    Authentication_Service["Authentication Service"]
+    Command_Line_Interface_CLI_["Command Line Interface (CLI)"]
+    Observability_Telemetry["Observability & Telemetry"]
     Unclassified["Unclassified"]
-    CLI_Interface -- "Initiates Agent Run" --> MCPAgent_Core
-    CLI_Interface -- "Initiates Sessions" --> MCP_Client_Session_Management
-    MCPAgent_Core -- "Sends User Query & Context" --> LLM_Interaction_Prompting
-    LLM_Interaction_Prompting -- "Receives LLM Response & Tool Suggestions" --> MCPAgent_Core
-    MCPAgent_Core -- "Requests Available Tools" --> Tool_Adaptation_Integration
-    MCPAgent_Core -- "Executes Adapted Tool" --> Tool_Adaptation_Integration
-    Tool_Adaptation_Integration -- "Requests Active Sessions" --> MCP_Client_Session_Management
-    MCP_Client_Session_Management -- "Provides Active Sessions" --> Tool_Adaptation_Integration
-    MCP_Client_Session_Management -- "Establishes/Closes Connections" --> MCP_Connector_Framework
-    MCP_Client_Session_Management -- "Manages Connector Instances" --> MCP_Connector_Framework
-    Tool_Adaptation_Integration -- "Sends Tool Call Requests" --> MCP_Connector_Framework
-    MCP_Connector_Framework -- "Executes Tool Calls" --> Tool_Adaptation_Integration
-    MCPAgent_Core -- "Delegates Remote Agent Logic" --> Remote_Execution_Task_Management
-    Remote_Execution_Task_Management -- "Receives Streaming Outputs" --> MCPAgent_Core
-    click Tool_Adaptation_Integration href "/codeboarding/Tool_Adaptation_Integration.md" "Details"
+    Command_Line_Interface_CLI_ -- "initiates server connections and project-specific sessions via" --> MCP_Communication_Management
+    Command_Line_Interface_CLI_ -- "interacts with" --> Authentication_Service
+    Agent_Orchestration_Core -- "dispatches actions and requests to" --> MCP_Communication_Management
+    Agent_Orchestration_Core -- "consumes adapted tools and prompts provided by" --> Tool_Adapter_Framework
+    Agent_Orchestration_Core -- "reports agent execution events and metrics to" --> Observability_Telemetry
+    MCP_Communication_Management -- "utilizes" --> Authentication_Service
+    MCP_Communication_Management -- "provides raw tool, resource, and prompt definitions for adaptation to" --> Tool_Adapter_Framework
+    Tool_Adapter_Framework -- "supplies adapted tools and structured prompts to" --> Agent_Orchestration_Core
+    Observability_Telemetry -- "provides callback handlers to" --> Agent_Orchestration_Core
+    click Agent_Orchestration_Core href "/codeboarding/Agent_Orchestration_Core.md" "Details"
+    click MCP_Communication_Management href "/codeboarding/MCP_Communication_Management.md" "Details"
+    click Tool_Adapter_Framework href "/codeboarding/Tool_Adapter_Framework.md" "Details"
+    click Authentication_Service href "/codeboarding/Authentication_Service.md" "Details"
+    click Command_Line_Interface_CLI_ href "/codeboarding/Command_Line_Interface_CLI_.md" "Details"
+    click Observability_Telemetry href "/codeboarding/Observability_Telemetry.md" "Details"
 ```
 
 ### Details
 
-The MCP Agent system is designed around a central `MCPAgent Core` that orchestrates interactions between users, Large Language Models (LLMs), and various external tools. The `CLI Interface` serves as the primary entry point for users, initiating agent runs and managing sessions. The `MCPAgent Core` leverages `LLM Interaction & Prompting` to formulate effective prompts and interpret LLM responses, driving the agent's decision-making. For tool execution, the `MCPAgent Core` interacts with `Tool Adaptation & Integration`, which is responsible for converting MCP-defined tools into a format usable by the LLM framework and managing tool discovery. `Tool Adaptation & Integration` then communicates with `MCP Client & Session Management` to handle active connections to MCP servers. The `MCP Client & Session Management` relies on the `MCP Connector Framework` to establish and manage diverse communication protocols (e.g., HTTP, WebSocket) with external services. Finally, `Remote Execution & Task Management` handles the execution of agent logic in remote environments and manages streaming outputs, ensuring the agent can operate across distributed systems. This modular design ensures clear separation of concerns, facilitating maintainability and extensibility.
+The `mcp-use` project is structured around a core `Agent Orchestration Core` that leverages external tools and services to interact with the Model Context Protocol (MCP). The `Command Line Interface (CLI)` serves as the primary entry point, allowing users to initiate and manage MCP projects. It interacts with the `MCP Communication & Management` component to establish and maintain connections with MCP servers, which in turn relies on the `Authentication Service` for secure access.
 
-### CLI Interface
-Provides the command-line interface for users to interact with the MCP Agent, initiating agent runs and managing sessions.
+The `Agent Orchestration Core` is responsible for the intelligent orchestration of tasks, utilizing `Tool & Adapter Framework` to convert MCP-specific tools and resources into a format consumable by the agent (e.g., LangChain). This framework acts as an abstraction layer, ensuring interoperability. During its operation, the `Agent Orchestration Core` reports execution events and metrics to the `Observability & Telemetry` component, which provides insights into agent performance and behavior. Conversely, `Observability & Telemetry` also provides callback handlers to the `Agent Orchestration Core` for real-time event observation. The `MCP Communication & Management` component not only handles session management but also provides the raw tool, resource, and prompt definitions that the `Tool & Adapter Framework` then adapts for the agent's use. This architecture ensures a clear separation of concerns, enabling modular development and maintainability, while facilitating a robust and observable agent-server interaction.
 
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py#L542-L577" target="_blank" rel="noopener noreferrer">QName:`mcp_use.cli.main` FileRef: `mcp_use/cli.py`, Lines:(542:577)</a>
-
-
-### MCPAgent Core
-The central intelligent agent orchestrating the entire workflow. It processes user queries, manages chat history, interacts with LLMs for reasoning, and delegates tool execution. This component embodies the agent's decision-making and control flow.
+### Agent Orchestration Core
+The central intelligence unit, orchestrating LLM interactions, managing conversational state, and executing tools. It also handles dynamic prompt construction and remote execution.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py#L48-L1107" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.mcpagent.MCPAgent` FileRef: `mcp_use/agents/mcpagent.py`, Lines:(48:1107)</a>
+- QName:`mcp_use.agents.mcpagent.MCPAgent` FileRef: `mcp_use/agents/mcpagent.py`
+- QName:`mcp_use.agents.base.BaseAgent` FileRef: `mcp_use/agents/base.py`
+- QName:`mcp_use.agents.prompts.system_prompt_builder.create_system_message` FileRef: `mcp_use/agents/prompts/system_prompt_builder.py`
+- QName:`mcp_use.agents.remote.RemoteAgent` FileRef: `mcp_use/agents/remote.py`
 
 
-### LLM Interaction & Prompting
-Responsible for constructing and formatting system messages and tool descriptions for the LLM. It ensures the agent provides the necessary context to the LLM for effective reasoning and tool selection.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py#L59-L103" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.system_prompt_builder.create_system_message` FileRef: `mcp_use/agents/prompts/system_prompt_builder.py`, Lines:(59:103)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/templates.py#L3-L3" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.prompts.templates.DEFAULT_SYSTEM_PROMPT_TEMPLATE` FileRef: `mcp_use/agents/prompts/templates.py`</a>
-
-
-### MCP Client & Session Management
-Manages the lifecycle of connections (sessions) to various MCP servers. It handles the creation, maintenance, and closing of these sessions, enabling the agent to interact with multiple external tool providers.
+### MCP Communication & Management
+Manages the establishment, maintenance, and termination of client sessions and connections to various MCP servers. It provides abstract and concrete implementations for different server types and handles server/tool discovery and management.
 
 
 **Related Classes/Methods**:
 
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py#L21-L326" target="_blank" rel="noopener noreferrer">QName:`mcp_use.client.MCPClient` FileRef: `mcp_use/client.py`, Lines:(21:326)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py#L36-L36" target="_blank" rel="noopener noreferrer">QName:`mcp_use.session.Session` FileRef: `mcp_use/session.py`</a>
-
-
-### MCP Connector Framework
-Provides a standardized, pluggable interface for the agent to communicate with different types of MCP servers (e.g., sandbox, HTTP, WebSocket). It abstracts away the underlying communication protocols and handles authentication, allowing for flexible integration of various tool environments.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/base.py#L37-L453" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.base.BaseConnector` FileRef: `mcp_use/connectors/base.py`, Lines:(37:453)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py#L35-L302" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.sandbox.SandboxConnector` FileRef: `mcp_use/connectors/sandbox.py`, Lines:(35:302)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py#L24-L301" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.http.HTTPConnector` FileRef: `mcp_use/connectors/http.py`, Lines:(24:301)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py#L22-L257" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.websocket.WebSocketConnector` FileRef: `mcp_use/connectors/websocket.py`, Lines:(22:257)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/stdio.py#L18-L101" target="_blank" rel="noopener noreferrer">QName:`mcp_use.connectors.stdio.StdioConnector` FileRef: `mcp_use/connectors/stdio.py`, Lines:(18:101)</a>
-- QName:`mcp_use.auth.oauth.OAuthAuthenticator` FileRef: `mcp_use/auth/oauth.py`
-- QName:`mcp_use.auth.bearer.BearerAuthenticator` FileRef: `mcp_use/auth/bearer.py`
-
-
-### Tool Adaptation & Integration
-Adapts MCP-defined tools, resources, and prompts into a format compatible with external LLM frameworks (e.g., LangChain). This component is crucial for seamlessly integrating MCP tools into the agent's reasoning and execution pipeline, including functionalities for server management and tool discovery.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py#L20-L190" target="_blank" rel="noopener noreferrer">QName:`mcp_use.adapters.base.BaseAdapter` FileRef: `mcp_use/adapters/base.py`, Lines:(20:190)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/langchain_adapter.py#L29-L268" target="_blank" rel="noopener noreferrer">QName:`mcp_use.adapters.langchain_adapter.LangChainAdapter` FileRef: `mcp_use/adapters/langchain_adapter.py`, Lines:(29:268)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/server_manager.py#L11-L124" target="_blank" rel="noopener noreferrer">QName:`mcp_use.managers.server_manager.ServerManager` FileRef: `mcp_use/managers/server_manager.py`, Lines:(11:124)</a>
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/search_tools.py#L23-L55" target="_blank" rel="noopener noreferrer">QName:`mcp_use.managers.tools.search_tools.SearchTools` FileRef: `mcp_use/managers/tools/search_tools.py`, Lines:(23:55)</a>
-
-
-### Remote Execution & Task Management
-Facilitates the execution of agent logic in remote environments and manages asynchronous task streams (e.g., SSE, WebSocket). It handles serialization/deserialization of data for remote calls and manages the lifecycle of streaming outputs.
-
-
-**Related Classes/Methods**:
-
-- <a href="https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py#L34-L327" target="_blank" rel="noopener noreferrer">QName:`mcp_use.agents.remote.RemoteAgent` FileRef: `mcp_use/agents/remote.py`, Lines:(34:327)</a>
+- QName:`mcp_use.session.MCPSession` FileRef: `mcp_use/session.py`
+- QName:`mcp_use.client.MCPClient` FileRef: `mcp_use/client.py`
+- QName:`mcp_use.connectors.base.BaseConnector` FileRef: `mcp_use/connectors/base.py`
+- QName:`mcp_use.managers.server_manager.ServerManager` FileRef: `mcp_use/managers/server_manager.py`
 - QName:`mcp_use.task_managers.base.BaseTaskManager` FileRef: `mcp_use/task_managers/base.py`
-- QName:`mcp_use.task_managers.sse.SseTaskManager` FileRef: `mcp_use/task_managers/sse.py`
-- QName:`mcp_use.task_managers.stdio.StdioTaskManager` FileRef: `mcp_use/task_managers/stdio.py`
-- QName:`mcp_use.task_managers.streamable_http.StreamableHttpTaskManager` FileRef: `mcp_use/task_managers/streamable_http.py`
-- QName:`mcp_use.task_managers.websocket.WebSocketTaskManager` FileRef: `mcp_use/task_managers/websocket.py`
+
+
+### Tool & Adapter Framework
+Provides an abstraction layer for adapting MCP-specific tools, resources, and prompts into a format usable by external frameworks (e.g., LangChain), ensuring interoperability.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.adapters.base.BaseAdapter` FileRef: `mcp_use/adapters/base.py`
+- QName:`mcp_use.adapters.langchain_adapter.LangChainAdapter` FileRef: `mcp_use/adapters/langchain_adapter.py`
+- QName:`mcp_use.managers.tools.base_tool.BaseTool` FileRef: `mcp_use/managers/tools/base_tool.py`
+
+
+### Authentication Service
+Handles user authentication and authorization, primarily using OAuth, and manages bearer tokens for secure communication with MCP servers.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.auth.oauth.OAuth` FileRef: `mcp_use/auth/oauth.py`
+- QName:`mcp_use.auth.bearer.BearerAuth` FileRef: `mcp_use/auth/bearer.py`
+
+
+### Command Line Interface (CLI)
+Manages command-line interface operations for project setup, server configuration, and general utility commands, serving as the primary entry point for user interaction.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.cli` FileRef: `mcp_use/cli.py`
+
+
+### Observability & Telemetry
+Provides mechanisms for collecting telemetry data, managing callbacks for observing agent events, and integrating with observability platforms.
+
+
+**Related Classes/Methods**:
+
+- QName:`mcp_use.telemetry.telemetry.Telemetry` FileRef: `mcp_use/telemetry/telemetry.py`
+- QName:`mcp_use.observability.callbacks_manager.ObservabilityManager` FileRef: `mcp_use/observability/callbacks_manager.py`
 
 
 ### Unclassified

@@ -1,0 +1,71 @@
+{
+  "description": "The authentication subsystem in `mcp_use.auth` is designed to handle OAuth 2.0 authentication flows and apply bearer tokens to outgoing HTTP requests. The `OAuth Handler` component, implemented by the `mcp_use.auth.oauth.OAuth` class, is responsible for orchestrating the OAuth process, including discovering server capabilities, dynamic client registration, and managing token storage. Once access tokens are acquired, the `Bearer Token Manager` component, implemented by `mcp_use.auth.bearer.BearerAuth`, takes these tokens and applies them as `Authorization: Bearer` headers to `External HTTP Requests`. This ensures secure communication with external services, such as MCP servers. The `OAuth Handler` provides the necessary access tokens to the `Bearer Token Manager`, which then uses them to authenticate `External HTTP Requests`.",
+  "components": [
+    {
+      "name": "OAuth Handler",
+      "description": "Manages the entire OAuth 2.0 protocol flow. This includes initiating authentication requests with external OAuth providers, handling redirects, and securely obtaining and storing access tokens. It acts as the primary interface for acquiring the necessary authentication credentials.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.auth.oauth.OAuth",
+          "reference_file": "mcp_use/auth/oauth.py",
+          "reference_start_line": 167,
+          "reference_end_line": 625
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/auth/oauth.py",
+        "mcp_use/auth/oauth_callback.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Bearer Token Manager",
+      "description": "Responsible for taking an acquired access token (typically from the OAuth Handler) and correctly formatting it as a bearer token. It then integrates this token into the Authorization header of outgoing HTTP requests, ensuring secure and authenticated communication with MCP servers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.auth.bearer.BearerAuth",
+          "reference_file": "mcp_use/auth/bearer.py",
+          "reference_start_line": 9,
+          "reference_end_line": 17
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/auth/bearer.py"
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "External HTTP Requests",
+      "description": "Represents any HTTP requests made to external services or APIs, typically to MCP servers, that require authentication.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "requests.request",
+          "reference_file": "",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "provides access tokens to",
+      "src_name": "OAuth Handler",
+      "dst_name": "Bearer Token Manager"
+    },
+    {
+      "relation": "applies tokens to",
+      "src_name": "Bearer Token Manager",
+      "dst_name": "External HTTP Requests"
+    }
+  ]
+}
