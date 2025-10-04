@@ -46,11 +46,10 @@ async def main():
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
 
     # Run the query
-    result = await agent.run(
+    await agent.run(
         "Hello can you give me a list of files and directories in the current directory",
         max_steps=30,
     )
-    print(f"\nResult: {result}")
 
 
 if __name__ == "__main__":

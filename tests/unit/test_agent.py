@@ -157,7 +157,7 @@ class TestMCPAgentStream:
             remote_instance = MockRemote.return_value
             remote_instance.stream = MagicMock(side_effect=_astream)
 
-            agent = MCPAgent(agent_id="abc123", api_key="k", base_url="https://x")
+            agent = MCPAgent(agent_id="abc123", api_key="k", base_url="https://x", auto_format_output=False)
 
             outputs = []
             async for item in agent.stream("hello", max_steps=2):

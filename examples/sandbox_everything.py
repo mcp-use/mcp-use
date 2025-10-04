@@ -50,13 +50,12 @@ async def main():
 
     try:
         # Run the same test query
-        result = await agent.run(
+        await agent.run(
             """
             Run echo "test" and then echo "second test" again and then add 1 + 1
             """,
             max_steps=30,
         )
-        print(f"\nResult: {result}")
     finally:
         # Ensure we clean up resources properly
         await client.close_all_sessions()
