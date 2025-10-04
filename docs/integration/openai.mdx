@@ -54,14 +54,30 @@ You can pass a `disallowed_tools` list to the adapter's constructor to prevent s
 
 ### Step 3: Generate OpenAI-Compatible Tools
 
-Use the `create_tools` method on the adapter to inspect all connected MCP servers and generate a list of tools in the OpenAI function-calling format.
+Use the `create_all` method on the adapter to inspect all connected MCP servers and generate a list of tools, resources and prompts in the OpenAI function-calling format.
 
 ```python
 # Convert tools from active connectors to the OpenAI's format
-openai_tools = await adapter.create_tools(client)
+# this will populates the list of tools, resources and prompts
+await adapter.create_all(client)
+
+# If you decided to create all tools (list concatenation)
+openai_tools = adapter.tools + adapter.resources + adapter.prompts
 ```
 
 This list will include functions generated from your MCP tools, resources, and prompts.
+
+<Tip>
+If you don't want to create all tools, you can call single functions. For example, if you only want to use tools and resources, you can do the following:
+
+```python
+await adapter.create_tools(client)
+await adapter.create_resources(client)
+
+# Then, you can decide which ones to use:
+openai_tools = adapter.tools + adapter.resources
+```
+</Tip>
 
 ### Step 4: Make the Initial API Call
 
@@ -177,7 +193,16 @@ async def main():
         adapter = OpenAIMCPAdapter()
 
         # Convert tools from active connectors to the OpenAI's format
-        openai_tools = await adapter.create_tools(client)
+        # this will populates the list of tools, resources and prompts
+        await adapter.create_all(client)
+
+        # If you don't want to create all tools, you can call single functions
+        # await adapter.create_tools(client)
+        # await adapter.create_resources(client)
+        # await adapter.create_prompts(client)
+
+        # If you decided to create all tools (list concatenation)
+        openai_tools = adapter.tools + adapter.resources + adapter.prompts
 
         # Use tools with OpenAI's SDK (not agent in this case)
         openai = OpenAI()

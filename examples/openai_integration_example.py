@@ -27,7 +27,16 @@ async def main():
         adapter = OpenAIMCPAdapter()
 
         # Convert tools from active connectors to the OpenAI's format
-        openai_tools = await adapter.create_tools(client)
+        # this will populates the list of tools, resources and prompts
+        await adapter.create_all(client)
+
+        # If you don't want to create all tools, you can call single functions
+        # await adapter.create_tools(client)
+        # await adapter.create_resources(client)
+        # await adapter.create_prompts(client)
+
+        # If you decided to create all tools (list concatenation)
+        openai_tools = adapter.tools + adapter.resources + adapter.prompts
 
         # Use tools with OpenAI's SDK (not agent in this case)
         openai = OpenAI()

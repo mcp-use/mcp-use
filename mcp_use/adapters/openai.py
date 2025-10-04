@@ -25,6 +25,14 @@ class OpenAIMCPAdapter(BaseAdapter):
         # This map stores the actual async function to call for each tool.
         self.tool_executors: dict[str, Callable[..., Coroutine[Any, Any, Any]]] = {}
 
+        self._connector_tool_map: dict[BaseConnector, list[dict[str, Any]]] = {}
+        self._connector_resource_map: dict[BaseConnector, list[dict[str, Any]]] = {}
+        self._connector_prompt_map: dict[BaseConnector, list[dict[str, Any]]] = {}
+
+        self.tools: list[dict[str, Any]] = []
+        self.resources: list[dict[str, Any]] = []
+        self.prompts: list[dict[str, Any]] = []
+
     def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> dict[str, Any]:
         """Convert an MCP tool to the OpenAI tool format."""
         if mcp_tool.name in self.disallowed_tools:

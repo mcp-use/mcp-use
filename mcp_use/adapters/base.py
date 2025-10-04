@@ -139,7 +139,7 @@ class BaseAdapter(ABC):
         """Get all connectors from the client, creating sessions if needed."""
         if not client.active_sessions:
             logger.info("No active sessions found, creating new ones...")
-            await self.client.create_all_sessions()
+            await client.create_all_sessions()
 
         sessions = client.get_all_active_sessions()
         return [session.connector for session in sessions.values()]
