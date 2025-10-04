@@ -34,6 +34,8 @@ class LangChainAdapter(BaseAdapter):
         """
         super().__init__(disallowed_tools)
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
+        self._connector_resource_map: dict[BaseConnector, list[BaseTool]] = {}
+        self._connector_prompt_map: dict[BaseConnector, list[BaseTool]] = {}
 
     def _convert_tool(self, mcp_tool: dict[str, Any], connector: BaseConnector) -> BaseTool:
         """Convert an MCP tool to LangChain's tool format.

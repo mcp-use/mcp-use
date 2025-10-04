@@ -39,7 +39,15 @@ class BaseAdapter(ABC):
             disallowed_tools: list of tool names that should not be available.
         """
         self.disallowed_tools = disallowed_tools or []
+
+        # Three maps to optimize and cache only what is needed
         self._connector_tool_map: dict[BaseConnector, list[T]] = {}
+        self._connector_resource_map: dict[BaseConnector, list[T]] = {}
+        self._connector_prompt_map: dict[BaseConnector, list[T]] = {}
+
+        self.tools: list[T] = []
+        self.resources: list[T] = []
+        self.prompts: list[T] = []
 
     def parse_result(self, tool_result: Any) -> str:
         """Parse the result from any MCP operation (tool, resource, or prompt) into a string.
@@ -127,40 +135,62 @@ class BaseAdapter(ABC):
 
         return decoded_result
 
-    async def create_tools(self, client: "MCPClient") -> list[T]:
-        """Create tools from an MCPClient instance.
+    async def _get_connectors(self, client: MCPClient) -> list[BaseConnector]:
+        """Get all connectors from the client, creating sessions if needed."""
+        if not client.active_sessions:
+            logger.info("No active sessions found, creating new ones...")
+            await self.client.create_all_sessions()
 
-        This is the recommended way to create tools from an MCPClient, as it handles
-        session creation and connector extraction automatically.
+        sessions = client.get_all_active_sessions()
+        return [session.connector for session in sessions.values()]
 
-        Args:
-            client: The MCPClient to extract tools from.
+    async def create_all(self, client: MCPClient) -> None:
+        """Create tools, resources, and prompts from an MCPClient instance."""
+        await self.create_tools(client)
+        await self.create_resources(client)
+        await self.create_prompts(client)
+
+    async def create_tools(self, client: MCPClient) -> list[T]:
+        """Create tools from the MCPClient instance.
+
+        This handles session creation and connector extraction automatically.
+        The created tools are stored in `self.tools`.
 
         Returns:
             A list of tools in the target framework's format.
-
-        Example:
-            ```python
-            from mcp_use.client import MCPClient
-            from mcp_use.adapters import YourAdapter
-
-            client = MCPClient.from_config_file("config.json")
-            tools = await YourAdapter.create_tools(client)
-            ```
         """
-        # Ensure we have active sessions
-        if not client.active_sessions:
-            logger.info("No active sessions found, creating new ones...")
-            await client.create_all_sessions()
+        connectors = await self._get_connectors(client)
+        self.tools = await self._create_tools_from_connectors(connectors)
 
-        # Get all active sessions
-        sessions = client.get_all_active_sessions()
+        return self.tools
 
-        # Extract connectors from sessions
-        connectors = [session.connector for session in sessions.values()]
+    async def create_resources(self, client: MCPClient) -> list[T]:
+        """Create resources from the MCPClient instance.
 
-        # Create tools from connectors
-        return await self._create_tools_from_connectors(connectors)
+        This handles session creation and connector extraction automatically.
+        The created resources are stored in `self.resources`.
+
+        Returns:
+            A list of resources in the target framework's format.
+        """
+        connectors = await self._get_connectors(client)
+        self.resources = await self._create_resources_from_connectors(connectors)
+
+        return self.resources
+
+    async def create_prompts(self, client: MCPClient) -> list[T]:
+        """Create prompts from the MCPClient instance.
+
+        This handles session creation and connector extraction automatically.
+        The created prompts are stored in `self.prompts`.
+
+        Returns:
+            A list of prompts in the target framework's format.
+        """
+        connectors = await self._get_connectors(client)
+        self.prompts = await self._create_prompts_from_connectors(connectors)
+
+        return self.prompts
 
     async def load_tools_for_connector(self, connector: BaseConnector) -> list[T]:
         """Dynamically load tools for a specific connector.
@@ -176,37 +206,14 @@ class BaseAdapter(ABC):
             logger.debug(f"Returning {len(self._connector_tool_map[connector])} existing tools for connector")
             return self._connector_tool_map[connector]
 
-        # Create tools for this connector
-
-        # Make sure the connector is initialized and has tools
-        success = await self._ensure_connector_initialized(connector)
-        if not success:
+        if not await self._ensure_connector_initialized(connector):
             return []
 
         connector_tools = []
-        # Now create tools for each MCP tool
         for tool in await connector.list_tools():
-            # Convert the tool and add it to the list if conversion was successful
             converted_tool = self._convert_tool(tool, connector)
             if converted_tool:
                 connector_tools.append(converted_tool)
-
-        # Convert resources to tools so that agents can access resource content directly
-        resources_list = await connector.list_resources() or []
-        if resources_list:
-            for resource in resources_list:
-                converted_resource = self._convert_resource(resource, connector)
-                if converted_resource:
-                    connector_tools.append(converted_resource)
-
-        # Convert prompts to tools so that agents can retrieve prompt content
-        prompts_list = await connector.list_prompts() or []
-        if prompts_list:
-            for prompt in prompts_list:
-                converted_prompt = self._convert_prompt(prompt, connector)
-                if converted_prompt:
-                    connector_tools.append(converted_prompt)
-        # ------------------------------
 
         # Store the tools for this connector
         self._connector_tool_map[connector] = connector_tools
@@ -218,6 +225,64 @@ class BaseAdapter(ABC):
         )
 
         return connector_tools
+
+    async def load_resources_for_connector(self, connector: BaseConnector):
+        """Dynamically load resources for a specific connector.
+
+        Args:
+            connector: The connector to load resources for.
+
+        Returns:
+            The list of resources that were loaded in the target framework's format.
+        """
+        if connector in self._connector_resource_map:
+            logger.debug(f"Returning {len(self._connector_resource_map[connector])} existing resources for connector")
+            return self._connector_resource_map[connector]
+
+        if not await self._ensure_connector_initialized(connector):
+            return []
+
+        connector_resources = []
+        for resource in await connector.list_resources() or []:
+            converted_resource = self._convert_resource(resource, connector)
+            if converted_resource:
+                connector_resources.append(converted_resource)
+
+        self._connector_resource_map[connector] = connector_resources
+        logger.debug(
+            f"Loaded {len(connector_resources)} new resources for connector: "
+            f"{[getattr(r, 'name', str(r)) for r in connector_resources]}"
+        )
+        return connector_resources
+
+    async def load_prompts_for_connector(self, connector: BaseConnector) -> list[T]:
+        """Dynamically load prompts for a specific connector.
+
+        Args:
+            connector: The connector to load prompts for.
+
+        Returns:
+            The list of prompts that were loaded in the target framework's format.
+        """
+        if connector in self._connector_prompt_map:
+            logger.debug(f"Returning {len(self._connector_prompt_map[connector])} existing prompts for connector")
+            return self._connector_prompt_map[connector]
+
+        if not await self._ensure_connector_initialized(connector):
+            return []
+
+        connector_prompts = []
+        for prompt in await connector.list_prompts() or []:
+            converted_prompt = self._convert_prompt(prompt, connector)
+            if converted_prompt:
+                connector_prompts.append(converted_prompt)
+
+        self._connector_prompt_map[connector] = connector_prompts
+        logger.debug(
+            f"Loaded {len(connector_prompts)} new prompts for connector: "
+            f"{[getattr(p, 'name', str(p)) for p in connector_prompts]}"
+        )
+        return connector_prompts
 
     @abstractmethod
     def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> T:
@@ -252,6 +317,36 @@ class BaseAdapter(ABC):
         # Log available tools for debugging
         logger.debug(f"Available tools: {len(tools)}")
         return tools
+
+    async def _create_tools_from_connectors(self, connectors: list[BaseConnector]) -> list[T]:
+        """Create tools from MCP tools in all provided connectors."""
+        tools = []
+        for connector in connectors:
+            connector_tools = await self.load_tools_for_connector(connector)
+            tools.extend(connector_tools)
+
+        logger.debug(f"Available tools: {len(tools)}")
+        return tools
+
+    async def _create_resources_from_connectors(self, connectors: list[BaseConnector]) -> list[T]:
+        """Create resources from MCP resources in all provided connectors."""
+        resources = []
+        for connector in connectors:
+            connector_resources = await self.load_resources_for_connector(connector)
+            resources.extend(connector_resources)
+
+        logger.debug(f"Available resources: {len(resources)}")
+        return resources
+
+    async def _create_prompts_from_connectors(self, connectors: list[BaseConnector]) -> list[T]:
+        """Create prompts from MCP prompts in all provided connectors."""
+        prompts = []
+        for connector in connectors:
+            connector_prompts = await self.load_prompts_for_connector(connector)
+            prompts.extend(connector_prompts)
+
+        logger.debug(f"Available prompts: {len(prompts)}")
+        return prompts
 
     def _check_connector_initialized(self, connector: BaseConnector) -> bool:
         """Check if a connector is initialized and has tools.
