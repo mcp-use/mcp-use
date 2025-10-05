@@ -503,10 +503,6 @@ class MCPAgent:
             display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
             logger.info(f"💬 Received query: '{display_query}'")
 
-            # Add the user query to conversation history if memory is enabled
-            if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
-
             # Use the provided history or the internal history
             history_to_use = external_history if external_history is not None else self._conversation_history
 
