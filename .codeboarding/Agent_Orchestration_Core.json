@@ -1,0 +1,163 @@
+{
+  "description": "The `mcp-use` agent subsystem is designed around a central `Agent Core` that orchestrates interactions with various components to achieve its goals. It leverages a `Prompt Construction` module to dynamically generate context-rich prompts for the `LLM Interface`, which abstracts communication with large language models. For executing specific tasks, the `Agent Core` delegates to a `Tool Executor`, which manages the invocation of external capabilities. The `Conversational State Manager`, an intrinsic part of the `Agent Core`, maintains the dialogue history and context, ensuring coherent interactions. Additionally, a `Remote Execution Handler` allows the agent to offload tasks to remote MCP servers, extending its operational reach. This architecture emphasizes modularity, allowing for flexible integration of different LLMs and tools while maintaining a clear separation of concerns.",
+  "components": [
+    {
+      "name": "Agent Core",
+      "description": "The primary orchestrator and decision-making unit of the agent. It manages the overall flow, interprets LLM outputs, and decides on subsequent actions, including tool usage or further LLM interactions. It also encapsulates the conversational state management.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "reference_file": "mcp_use/agents/mcpagent.py",
+          "reference_start_line": 48,
+          "reference_end_line": 1145
+        },
+        {
+          "qualified_name": "mcp_use.agents.base.BaseAgent",
+          "reference_file": "mcp_use/agents/base.py",
+          "reference_start_line": 13,
+          "reference_end_line": 61
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/agents/base.py",
+        "mcp_use/agents/mcpagent.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Prompt Construction",
+      "description": "Responsible for dynamically generating and formatting prompts for the LLM, incorporating conversational context, available tools, and specific instructions to guide the LLM's behavior.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.create_system_message",
+          "reference_file": "mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": 59,
+          "reference_end_line": 103
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/agents/prompts/system_prompt_builder.py"
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "Remote Execution Handler",
+      "description": "Manages the delegation and execution of tasks or tool calls on remote MCP (Multi-Component Platform) servers, handling the communication protocol and result retrieval.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.remote.RemoteAgent",
+          "reference_file": "mcp_use/agents/remote.py",
+          "reference_start_line": 34,
+          "reference_end_line": 327
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/agents/remote.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "LLM Interface",
+      "description": "Provides a standardized abstraction layer for interacting with various Large Language Models, handling request formatting, sending prompts, and parsing responses.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "langchain_core.language_models.BaseLanguageModel",
+          "reference_file": "full/path/to/file.txt",
+          "reference_start_line": 10,
+          "reference_end_line": 25
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Tool Executor",
+      "description": "Manages the invocation and execution of external tools or internal functions that the agent decides to use to achieve its goals. It handles tool input, execution, and output processing.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "langchain.agents.AgentExecutor",
+          "reference_file": "",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "Conversational State Manager",
+      "description": "Responsible for maintaining and updating the ongoing conversational context, including message history, user inputs, and agent thoughts, ensuring coherent and context-aware interactions. This functionality is integrated within the `Agent Core`.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "reference_file": "mcp_use/agents/mcpagent.py",
+          "reference_start_line": 48,
+          "reference_end_line": 1145
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [
+        "mcp_use/agents/prompts/templates.py"
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "Uses",
+      "src_name": "Agent Core",
+      "dst_name": "Prompt Construction"
+    },
+    {
+      "relation": "Provides prompts to",
+      "src_name": "Prompt Construction",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "Communicates with",
+      "src_name": "Agent Core",
+      "dst_name": "LLM Interface"
+    },
+    {
+      "relation": "Sends responses to",
+      "src_name": "LLM Interface",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "Delegates to",
+      "src_name": "Agent Core",
+      "dst_name": "Tool Executor"
+    },
+    {
+      "relation": "Returns execution results to",
+      "src_name": "Tool Executor",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "Manages",
+      "src_name": "Agent Core",
+      "dst_name": "Conversational State Manager"
+    },
+    {
+      "relation": "Provides and updates state for",
+      "src_name": "Conversational State Manager",
+      "dst_name": "Agent Core"
+    },
+    {
+      "relation": "Initiates tasks via",
+      "src_name": "Agent Core",
+      "dst_name": "Remote Execution Handler"
+    },
+    {
+      "relation": "Returns results to",
+      "src_name": "Remote Execution Handler",
+      "dst_name": "Agent Core"
+    }
+  ]
+}

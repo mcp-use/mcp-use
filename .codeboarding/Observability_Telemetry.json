@@ -1,0 +1,55 @@
+{
+  "description": "The mcp_use project employs a modular architecture for observability and telemetry. The ObservabilityManager serves as a central point for handling various observability callbacks, facilitating flexible integration with platforms like Langfuse and Laminar, and enabling other components to register for event notifications. Concurrently, the Telemetry component is responsible for collecting and transmitting anonymized usage data, including agent execution details and package download information, to external services such as PostHog and Scarf. The ObservabilityManager generates events that the Telemetry component can consume, allowing for the capture of detailed operational metrics and insights, thereby ensuring robust, extensible, and maintainable observability and telemetry functionalities through a clear separation of concerns.",
+  "components": [
+    {
+      "name": "Telemetry",
+      "description": "This component is responsible for the collection, formatting, and potential transmission of various telemetry data types, including metrics, traces, and logs. It captures data pertaining to agent execution, tool utilization, and interactions with LLMs, providing insights into the system's operational health and performance.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.telemetry.telemetry.Telemetry",
+          "reference_file": "mcp_use/telemetry/telemetry.py",
+          "reference_start_line": 52,
+          "reference_end_line": 303
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/telemetry/events.py",
+        "mcp_use/telemetry/utils.py",
+        "mcp_use/telemetry/telemetry.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "ObservabilityManager",
+      "description": "This component acts as a central hub for managing callbacks and event listeners. It allows other components within the agent framework, or external systems, to subscribe to and react to specific events that occur throughout the agent's lifecycle and execution flow. It effectively decouples event producers from event consumers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.observability.callbacks_manager.ObservabilityManager",
+          "reference_file": "mcp_use/observability/callbacks_manager.py",
+          "reference_start_line": 13,
+          "reference_end_line": 132
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/observability/laminar.py",
+        "mcp_use/observability/langfuse.py",
+        "mcp_use/observability/callbacks_manager.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "triggers events for",
+      "src_name": "ObservabilityManager",
+      "dst_name": "Telemetry"
+    }
+  ]
+}

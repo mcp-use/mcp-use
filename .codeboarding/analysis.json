@@ -1,0 +1,285 @@
+{
+  "description": "The `mcp-use` project is structured around a core `Agent Orchestration Core` that leverages external tools and services to interact with the Model Context Protocol (MCP). The `Command Line Interface (CLI)` serves as the primary entry point, allowing users to initiate and manage MCP projects. It interacts with the `MCP Communication & Management` component to establish and maintain connections with MCP servers, which in turn relies on the `Authentication Service` for secure access.\n\nThe `Agent Orchestration Core` is responsible for the intelligent orchestration of tasks, utilizing `Tool & Adapter Framework` to convert MCP-specific tools and resources into a format consumable by the agent (e.g., LangChain). This framework acts as an abstraction layer, ensuring interoperability. During its operation, the `Agent Orchestration Core` reports execution events and metrics to the `Observability & Telemetry` component, which provides insights into agent performance and behavior. Conversely, `Observability & Telemetry` also provides callback handlers to the `Agent Orchestration Core` for real-time event observation. The `MCP Communication & Management` component not only handles session management but also provides the raw tool, resource, and prompt definitions that the `Tool & Adapter Framework` then adapts for the agent's use. This architecture ensures a clear separation of concerns, enabling modular development and maintainability, while facilitating a robust and observable agent-server interaction.",
+  "components": [
+    {
+      "name": "Agent Orchestration Core",
+      "description": "The central intelligence unit, orchestrating LLM interactions, managing conversational state, and executing tools. It also handles dynamic prompt construction and remote execution.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.agents.mcpagent.MCPAgent",
+          "reference_file": "mcp_use/agents/mcpagent.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.agents.base.BaseAgent",
+          "reference_file": "mcp_use/agents/base.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.agents.prompts.system_prompt_builder.create_system_message",
+          "reference_file": "mcp_use/agents/prompts/system_prompt_builder.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.agents.remote.RemoteAgent",
+          "reference_file": "mcp_use/agents/remote.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/agents/base.py",
+        "mcp_use/agents/mcpagent.py",
+        "mcp_use/agents/remote.py",
+        "mcp_use/agents/prompts/templates.py",
+        "mcp_use/agents/prompts/system_prompt_builder.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "MCP Communication & Management",
+      "description": "Manages the establishment, maintenance, and termination of client sessions and connections to various MCP servers. It provides abstract and concrete implementations for different server types and handles server/tool discovery and management.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.session.MCPSession",
+          "reference_file": "mcp_use/session.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.client.MCPClient",
+          "reference_file": "mcp_use/client.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.connectors.base.BaseConnector",
+          "reference_file": "mcp_use/connectors/base.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.managers.server_manager.ServerManager",
+          "reference_file": "mcp_use/managers/server_manager.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.task_managers.base.BaseTaskManager",
+          "reference_file": "mcp_use/task_managers/base.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/session.py",
+        "mcp_use/client.py",
+        "mcp_use/connectors/sandbox.py",
+        "mcp_use/connectors/base.py",
+        "mcp_use/connectors/stdio.py",
+        "mcp_use/connectors/http.py",
+        "mcp_use/connectors/websocket.py",
+        "mcp_use/connectors/utils.py",
+        "mcp_use/managers/server_manager.py",
+        "mcp_use/task_managers/base.py",
+        "mcp_use/task_managers/stdio.py",
+        "mcp_use/task_managers/sse.py",
+        "mcp_use/task_managers/streamable_http.py",
+        "mcp_use/task_managers/websocket.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Tool & Adapter Framework",
+      "description": "Provides an abstraction layer for adapting MCP-specific tools, resources, and prompts into a format usable by external frameworks (e.g., LangChain), ensuring interoperability.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.adapters.base.BaseAdapter",
+          "reference_file": "mcp_use/adapters/base.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.adapters.langchain_adapter.LangChainAdapter",
+          "reference_file": "mcp_use/adapters/langchain_adapter.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.managers.tools.base_tool.BaseTool",
+          "reference_file": "mcp_use/managers/tools/base_tool.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/managers/tools/base_tool.py",
+        "mcp_use/managers/tools/list_servers_tool.py",
+        "mcp_use/managers/tools/get_active_server.py",
+        "mcp_use/managers/tools/search_tools.py",
+        "mcp_use/managers/tools/connect_server.py",
+        "mcp_use/managers/tools/disconnect_server.py",
+        "mcp_use/adapters/base.py",
+        "mcp_use/adapters/langchain_adapter.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Authentication Service",
+      "description": "Handles user authentication and authorization, primarily using OAuth, and manages bearer tokens for secure communication with MCP servers.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.auth.oauth.OAuth",
+          "reference_file": "mcp_use/auth/oauth.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.auth.bearer.BearerAuth",
+          "reference_file": "mcp_use/auth/bearer.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/auth/oauth.py",
+        "mcp_use/auth/bearer.py",
+        "mcp_use/auth/oauth_callback.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Command Line Interface (CLI)",
+      "description": "Manages command-line interface operations for project setup, server configuration, and general utility commands, serving as the primary entry point for user interaction.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.cli",
+          "reference_file": "mcp_use/cli.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/cli.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Observability & Telemetry",
+      "description": "Provides mechanisms for collecting telemetry data, managing callbacks for observing agent events, and integrating with observability platforms.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "mcp_use.telemetry.telemetry.Telemetry",
+          "reference_file": "mcp_use/telemetry/telemetry.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        },
+        {
+          "qualified_name": "mcp_use.observability.callbacks_manager.ObservabilityManager",
+          "reference_file": "mcp_use/observability/callbacks_manager.py",
+          "reference_start_line": null,
+          "reference_end_line": null
+        }
+      ],
+      "assigned_files": [
+        "mcp_use/telemetry/events.py",
+        "mcp_use/telemetry/utils.py",
+        "mcp_use/telemetry/telemetry.py",
+        "mcp_use/observability/laminar.py",
+        "mcp_use/observability/langfuse.py",
+        "mcp_use/observability/callbacks_manager.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [
+        "examples/http_example.py",
+        "examples/airbnb_use.py",
+        "examples/direct_tool_call.py",
+        "examples/multi_server_example.py",
+        "examples/filesystem_use.py",
+        "examples/sandbox_everything.py",
+        "examples/stream_example.py",
+        "examples/mcp_everything.py",
+        "examples/blender_use.py",
+        "examples/structured_output.py",
+        "examples/chat_example.py",
+        "examples/simple_oauth_example.py",
+        "examples/browser_use.py",
+        "examples/simple_server_manager_use.py",
+        "mcp_use/__init__.py",
+        "mcp_use/utils.py",
+        "mcp_use/logging.py",
+        "mcp_use/exceptions.py",
+        "mcp_use/config.py",
+        "mcp_use/connectors/__init__.py",
+        "mcp_use/agents/__init__.py",
+        "mcp_use/managers/__init__.py",
+        "mcp_use/managers/base.py",
+        "mcp_use/managers/tools/__init__.py",
+        "mcp_use/auth/__init__.py",
+        "mcp_use/telemetry/__init__.py",
+        "mcp_use/task_managers/__init__.py",
+        "mcp_use/adapters/__init__.py",
+        "mcp_use/observability/__init__.py",
+        "mcp_use/errors/__init__.py",
+        "mcp_use/errors/error_formatting.py",
+        "mcp_use/types/sandbox.py"
+      ],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "initiates server connections and project-specific sessions via",
+      "src_name": "Command Line Interface (CLI)",
+      "dst_name": "MCP Communication & Management"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "Command Line Interface (CLI)",
+      "dst_name": "Authentication Service"
+    },
+    {
+      "relation": "dispatches actions and requests to",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "MCP Communication & Management"
+    },
+    {
+      "relation": "consumes adapted tools and prompts provided by",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "Tool & Adapter Framework"
+    },
+    {
+      "relation": "reports agent execution events and metrics to",
+      "src_name": "Agent Orchestration Core",
+      "dst_name": "Observability & Telemetry"
+    },
+    {
+      "relation": "utilizes",
+      "src_name": "MCP Communication & Management",
+      "dst_name": "Authentication Service"
+    },
+    {
+      "relation": "provides raw tool, resource, and prompt definitions for adaptation to",
+      "src_name": "MCP Communication & Management",
+      "dst_name": "Tool & Adapter Framework"
+    },
+    {
+      "relation": "supplies adapted tools and structured prompts to",
+      "src_name": "Tool & Adapter Framework",
+      "dst_name": "Agent Orchestration Core"
+    },
+    {
+      "relation": "provides callback handlers to",
+      "src_name": "Observability & Telemetry",
+      "dst_name": "Agent Orchestration Core"
+    }
+  ]
+}
