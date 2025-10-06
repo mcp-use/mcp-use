@@ -1,0 +1,187 @@
+---
+title: "Introduction"
+description: "The open source MCP client library. Connect any LLM to any MCP server without vendor lock-in."
+icon: "book-open"
+mode: "custom"
+---
+
+
+
+<div className="absolute inset-0 z-[-10]">
+  <img
+    src="/images/02.png"
+    className="block dark:hidden pointer-events-none w-full h-full object-cover"
+  />
+  <img
+    src="/images/02.png"
+    className="hidden dark:block pointer-events-none w-full h-full object-cover opacity-40"
+  />
+</div>
+
+<div className="px-4 py-8 mt-24 lg:pb-24 max-w-3xl mx-auto">
+<div className="text-center">
+<img
+  src="/logo/light.svg"
+  className="block dark:hidden mx-auto h-16 w-auto"
+  alt="mcp_use"
+/>
+<img
+  src="/logo/dark.svg"
+  className="hidden dark:block mx-auto h-16 w-auto"
+  alt="mcp_use"
+/>
+</div>
+
+<p className="max-w-xl mx-auto px-4 mt-4 text-lg text-center text-gray-500 dark:text-zinc-500">
+The open source MCP client library. Connect any LLM to any MCP server.
+
+</p>
+
+<div className="px-6 lg:px-0 mt-12 lg:mt-24 grid sm:grid-cols-2 gap-x-6 gap-y-4">
+<a className="group cursor-pointer pb-8" href="/getting-started/quickstart">
+  <img src="/images/quickstart-light.png" className="block dark:hidden pointer-events-none group-hover:scale-105 transition-all duration-100" />
+  <img src="/images/quickstart-dark.png" className="pointer-events-none group-hover:scale-105 transition-all duration-100 hidden dark:block" />
+  <h3 className="mt-5 text-gray-900 dark:text-zinc-50 font-medium">Quick Start</h3>
+  <span className="mt-1.5">
+    Get up and running in minutes with our step-by-step guide
+  </span>
+</a>
+
+<a className="group cursor-pointer pb-8" href="/getting-started/installation">
+  <img src="/images/installation-light.png" className="block dark:hidden pointer-events-none group-hover:scale-105 transition-all duration-100" />
+  <img src="/images/installation-dark.png" className="pointer-events-none group-hover:scale-105 transition-all duration-100 hidden dark:block" />
+  <h3 className="mt-5 text-gray-900 dark:text-zinc-50 font-medium">Installation</h3>
+  <span className="mt-1.5">
+    Install mcp_use and set up your development environment
+  </span>
+</a>
+
+<a className="group cursor-pointer pb-8" href="/getting-started/configuration">
+  <img src="/images/configuration-light.png" className="block dark:hidden pointer-events-none group-hover:scale-105 transition-all duration-100" />
+  <img src="/images/configuration-dark.png" className="pointer-events-none group-hover:scale-105 transition-all duration-100 hidden dark:block" />
+  <h3 className="mt-5 text-gray-900 dark:text-zinc-50 font-medium">Configuration</h3>
+  <span className="mt-1.5">
+    Learn how to configure MCP servers and LLM providers
+  </span>
+</a>
+
+<a className="group cursor-pointer pb-8" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
+  <img src="/images/examples-light.png" className="block dark:hidden pointer-events-none group-hover:scale-105 transition-all duration-100" />
+  <img src="/images/examples-dark.png" className="pointer-events-none group-hover:scale-105 transition-all duration-100 hidden dark:block" />
+  <h3 className="mt-5 text-gray-900 dark:text-zinc-50 font-medium">Examples</h3>
+  <span className="mt-1.5">
+    Explore real-world examples and advanced use cases
+  </span>
+</a>
+
+</div>
+
+</div>
+
+<div className="max-w-5xl mx-auto px-6 py-16">
+
+
+# What is mcp_use?
+
+mcp_use is an **open source library** that enables developers to connect any Language Learning Model (LLM) to any MCP server, allowing the creation of custom agents with tool access without relying on closed-source or application-specific clients.
+
+<Note>
+**Freedom & Flexibility**: Break free from vendor lock-in and build agents that work with any LLM provider and any MCP server combination.
+</Note>
+
+# Key Features
+
+<CardGroup cols={2}>
+  <Card title="Open Source" icon="code" href="/development">
+    Connect any LLM to any MCP server without vendor lock-in
+  </Card>
+  <Card title="Flexible Configuration" icon="server" href="/getting-started/configuration">
+    Support for any MCP server through a simple configuration system
+  </Card>
+  <Card title="Easy Setup" icon="grid-2x2-check" href="getting-started/installation">
+    Simple JSON-based configuration for MCP server integration
+  </Card>
+  <Card title="Universal LLM Support" icon="globe" href="/agent/llm-integration">
+    Compatible with any LangChain-supported LLM provider
+  </Card>
+  <Card title="Multi-Server Support" icon="network" href="/advanced/multi-server-setup">
+    Connect to multiple MCP servers simultaneously for complex workflows
+  </Card>
+  <Card title="Dynamic Server Selection" icon="shuffle" href="/agent/server-manager">
+    Agents can dynamically choose the most appropriate MCP server for each task
+  </Card>
+</CardGroup>
+
+# Popular Use Cases
+
+<CardGroup cols={3}>
+  <Card title="Web Scraping & Research" icon="globe" href="/getting-started/quickstart">
+    Combine Playwright with filesystem servers for automated research workflows
+  </Card>
+  <Card title="Data Analysis" icon="chart-bar" href="/advanced/multi-server-setup">
+    Connect database servers with Python execution for data processing pipelines
+  </Card>
+  <Card title="Development Automation" icon="git-pull-request" href="/agent/streaming">
+    Integrate Git, filesystem, and code execution servers for automated development tasks
+  </Card>
+  <Card title="Content Generation" icon="file-text" href="/advanced/building-custom-agents">
+    Build content pipelines with research, writing, and publishing capabilities
+  </Card>
+  <Card title="API Integration" icon="plug" href="/client/connection-types">
+    Connect to external APIs and services through custom MCP servers
+  </Card>
+  <Card title="Security & Compliance" icon="shield" href="/advanced/security">
+    Implement secure, auditable agent workflows with proper access controls
+  </Card>
+</CardGroup>
+
+# Supported MCP Servers
+
+<Info>
+mcp_use supports **any MCP server**, allowing you to connect to a wide range of server implementations for different use cases.
+</Info>
+
+<CardGroup cols={2}>
+  <Card title="Playwright" icon="globe" href="https://github.com/microsoft/playwright-python">
+    Web scraping and browser automation capabilities
+  </Card>
+  <Card title="Filesystem" icon="folder" href="https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem">
+    Safe file system operations and management
+  </Card>
+  <Card title="SQLite" icon="database" href="https://github.com/modelcontextprotocol/servers/tree/main/src/sqlite">
+    Database querying and management tools
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/modelcontextprotocol/servers/tree/main/src/github">
+    Repository management and GitHub API access
+  </Card>
+</CardGroup>
+
+<Card title="Awesome MCP Servers" icon="star" href="https://github.com/punkpeye/awesome-mcp-servers" horizontal>
+  Explore a comprehensive list of available MCP servers from the community - find servers for APIs, databases, cloud services, and more.
+</Card>
+
+# Why Choose mcp_use?
+
+<AccordionGroup>
+  <Accordion title="True Multi-Provider Freedom">
+    Unlike proprietary solutions that lock you into specific LLM providers or platforms, mcp_use works with any LangChain-supported model and any MCP server, giving you complete freedom to choose the best tools for your needs.
+  </Accordion>
+
+  <Accordion title="Production-Ready Security">
+    Built with security best practices in mind, featuring comprehensive input validation, access controls, audit logging, and secure configuration management for enterprise deployments.
+  </Accordion>
+
+  <Accordion title="Scalable Architecture">
+    The server manager enables efficient resource utilization by connecting to servers only when needed, supporting complex multi-server workflows without unnecessary overhead.
+  </Accordion>
+
+  <Accordion title="Developer Experience">
+    Simple configuration, comprehensive documentation, real-time streaming support, and extensive examples make it easy to get started and scale your implementations.
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+**New to MCP?** The Model Context Protocol (MCP) is an open standard that enables secure connections between LLM applications and external data sources and tools. Learn more at [modelcontextprotocol.io](https://modelcontextprotocol.io/).
+</Tip>
+
+</div>

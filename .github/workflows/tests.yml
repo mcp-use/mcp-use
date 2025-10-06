@@ -53,7 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        transport: [stdio, sse, streamableHttp]
+        transport: [stdio, sse, streamable_http]
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python 3.11
@@ -68,7 +68,7 @@ jobs:
           uv pip install --system .[dev,anthropic,openai,search,e2b]
       - name: Run integration tests for ${{ matrix.transport }} transport
         run: |
-          pytest tests/integration/transports/${{ matrix.transport }}
+          pytest tests/integration/transports/test_${{ matrix.transport }}.py
 
   primitive-tests:
     needs: lint
@@ -77,7 +77,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        primitive: [sampling, tools, resources, prompts, elicitation]
+        primitive: [sampling, tools, resources, prompts, elicitation, notifications, auth]
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python 3.11
@@ -93,3 +93,23 @@ jobs:
       - name: Run integration tests for ${{ matrix.primitive }} primitive
         run: |
           pytest tests/integration/primitives/test_${{ matrix.primitive }}.py
+
+  integration-tests:
+    needs: lint
+    name: "Integration"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: |
+          pip install uv
+      - name: Install dependencies
+        run: |
+          uv pip install --system .[dev,anthropic,openai,search,e2b]
+      - name: Run other integration tests
+        run: |
+          pytest tests/integration/others/

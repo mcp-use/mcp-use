@@ -1,0 +1,71 @@
+---
+title: "Library Updates"
+description: "New updates and improvements"
+icon:  "history"
+---
+
+<Update label="v1.3.11 - 2025‑09‑29">
+  ## Auth Revolution
+  - **New**: Complete OAuth2 and Bearer token authentication framework ([#149](https://github.com/pietrozullo/mcp-use/pull/149))
+  - Fix: HTTP connector error handling with better diagnostics ([#279](https://github.com/pietrozullo/mcp-use/pull/279))
+  - Fix: Accept empty tool results without validation errors ([#273](https://github.com/pietrozullo/mcp-use/pull/273))
+  - Fix: JSON schema enum validation in jsonschema_to_pydantic conversion ([#270](https://github.com/pietrozullo/mcp-use/pull/270))
+  - Fix: Documentation typo (astream → stream) ([#266](https://github.com/pietrozullo/mcp-use/pull/266))
+  - Enhancement: MCPAgent execution tracking with success status ([#254](https://github.com/pietrozullo/mcp-use/pull/254))
+  - Fix: Subprocess cleanup for multiple MCP clients to prevent memory leaks ([#231](https://github.com/pietrozullo/mcp-use/pull/231))
+</Update>
+
+<Update label="v1.3.3 - 2025‑06‑19">
+  ## Stability Boost
+  - Set default logging level to info
+  - Fix: prevent double async cleanup and event loop errors in astream
+  - Fix: Raise import error for fastembed, server manager does not silently fail
+  - Fix: search tools tuple unpacking error
+</Update>
+
+<Update label="v1.3.1 - 2025‑06‑10">
+  ## Stream Power
+  - Remove client options for easier usage
+  - Add streamable HTTP support
+  - Fix websocket error positional arguments (headers were missing)
+  - Fix connection state tracking after SSE disconnection
+  - Add CLAUDE.md for development guidance
+</Update>
+
+<Update label="v1.3.0 - 2025‑05‑27">
+  ## Sandbox Magic
+  - Added optional E2B sandbox execution so MCP servers can run in secure cloud sandboxes.
+  - `MCPAgent.astream()` now lets you stream results **and** automatically log full conversation history.
+</Update>
+
+
+<Update label="v1.2.13 - 2025‑05‑19">
+  ## Resource Discovery
+  - Alpha support for **Resources** & **Prompts** exposed by remote servers.
+  - Routine version bump and stability tweaks across task / connection managers.
+</Update>
+
+<Update label="v1.2.10 - 2025‑05‑11">
+  ## Emergency Patch
+  - Hot‑fix: patched **FastEmbed** import failure that could break vector search.
+</Update>
+
+<Update label="v1.1.5 - 2025‑04‑11">
+  ## Polish Pass
+  - Maintenance release – internal refactors, doc clean‑ups, and incremental API polish.
+</Update>
+
+<Update label="v1.0.1 - 2025‑04‑07">
+  ## Transport Layer
+  - Introduced HTTP transport layer and dynamic multi‑server selection.
+</Update>
+
+<Update label="v1.0.0 - 2025‑04‑03">
+  ## Stable Launch
+  - First stable release of the unified Python client after the 0.0.x preview series.
+</Update>
+
+<Update label="v0.0.6 - 2025‑04‑02">
+  ## Public Preview
+  - Initial public preview published to PyPI; automated publish workflow enabled.
+</Update>

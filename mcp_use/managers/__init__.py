@@ -6,16 +6,14 @@ from .tools import (
     ListServersTool,
     MCPServerTool,
     SearchToolsTool,
-    UseToolFromServerTool,
 )
 
 __all__ = [
     "ServerManager",
-    "ListServersTool",
-    "ConnectServerTool",
-    "GetActiveServerTool",
-    "DisconnectServerTool",
-    "SearchToolsTool",
     "MCPServerTool",
-    "UseToolFromServerTool",
+    "ConnectServerTool",
+    "DisconnectServerTool",
+    "GetActiveServerTool",
+    "ListServersTool",
+    "SearchToolsTool",
 ]

@@ -8,6 +8,7 @@ to provide a simple interface for using MCP tools with different LLMs.
 import logging
 import time
 from collections.abc import AsyncGenerator, AsyncIterator
+from typing import TypeVar
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
@@ -20,6 +21,7 @@ from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
 from langchain_core.utils.input import get_color_mapping
+from pydantic import BaseModel
 
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
@@ -28,11 +30,19 @@ from mcp_use.telemetry.utils import extract_model_info
 
 from ..adapters.langchain_adapter import LangChainAdapter
 from ..logging import logger
+from ..managers.base import BaseServerManager
 from ..managers.server_manager import ServerManager
+
+# Import observability manager
+from ..observability import ObservabilityManager
 from .prompts.system_prompt_builder import create_system_message
 from .prompts.templates import DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE
+from .remote import RemoteAgent
 
 set_debug(logger.level == logging.DEBUG)
+
+# Type variable for structured output
+T = TypeVar("T", bound=BaseModel)
 
 
 class MCPAgent:
@@ -44,7 +54,7 @@ class MCPAgent:
 
     def __init__(
         self,
-        llm: BaseLanguageModel,
+        llm: BaseLanguageModel | None = None,
         client: MCPClient | None = None,
         connectors: list[BaseConnector] | None = None,
         max_steps: int = 5,
@@ -54,13 +64,22 @@ class MCPAgent:
         system_prompt_template: str | None = None,  # User can still override the template
         additional_instructions: str | None = None,
         disallowed_tools: list[str] | None = None,
+        tools_used_names: list[str] | None = None,
         use_server_manager: bool = False,
+        server_manager: BaseServerManager | None = None,
         verbose: bool = False,
+        agent_id: str | None = None,
+        api_key: str | None = None,
+        base_url: str = "https://cloud.mcp-use.com",
+        callbacks: list | None = None,
+        chat_id: str | None = None,
+        retry_on_error: bool = True,
+        max_retries_per_step: int = 2,
     ):
         """Initialize a new MCPAgent instance.
 
         Args:
-            llm: The LangChain LLM to use.
+            llm: The LangChain LLM to use. Not required if agent_id is provided for remote execution.
             client: The MCPClient to use. If provided, connector is ignored.
             connectors: A list of MCP connectors to use if client is not provided.
             max_steps: The maximum number of steps to take.
@@ -71,7 +90,26 @@ class MCPAgent:
             additional_instructions: Extra instructions to append to the system prompt.
             disallowed_tools: List of tool names that should not be available to the agent.
             use_server_manager: Whether to use server manager mode instead of exposing all tools.
+            agent_id: Remote agent ID for remote execution. If provided, creates a remote agent.
+            api_key: API key for remote execution. If None, checks MCP_USE_API_KEY env var.
+            base_url: Base URL for remote API calls.
+            callbacks: List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler.
+            retry_on_error: Whether to retry tool calls that fail due to validation errors.
+            max_retries_per_step: Maximum number of retries for validation errors per step.
         """
+        # Handle remote execution
+        if agent_id is not None:
+            self._remote_agent = RemoteAgent(agent_id=agent_id, api_key=api_key, base_url=base_url, chat_id=chat_id)
+            self._is_remote = True
+            return
+
+        self._is_remote = False
+        self._remote_agent = None
+
+        # Validate requirements for local execution
+        if llm is None:
+            raise ValueError("llm is required for local execution. For remote execution, provide agent_id instead.")
+
         self.llm = llm
         self.client = client
         self.connectors = connectors or []
@@ -81,13 +119,21 @@ class MCPAgent:
         self._initialized = False
         self._conversation_history: list[BaseMessage] = []
         self.disallowed_tools = disallowed_tools or []
+        self.tools_used_names = tools_used_names or []
         self.use_server_manager = use_server_manager
+        self.server_manager = server_manager
         self.verbose = verbose
+        self.retry_on_error = retry_on_error
+        self.max_retries_per_step = max_retries_per_step
         # System prompt configuration
         self.system_prompt = system_prompt  # User-provided full prompt override
         # User can provide a template override, otherwise use the imported default
         self.system_prompt_template_override = system_prompt_template
         self.additional_instructions = additional_instructions
+
+        # Set up observability callbacks using the ObservabilityManager
+        self.observability_manager = ObservabilityManager(custom_callbacks=callbacks)
+        self.callbacks = self.observability_manager.get_callbacks()
 
         # Either client or connector must be provided
         if not client and len(self.connectors) == 0:
@@ -99,9 +145,7 @@ class MCPAgent:
         # Initialize telemetry
         self.telemetry = Telemetry()
 
-        # Initialize server manager if requested
-        self.server_manager = None
-        if self.use_server_manager:
+        if self.use_server_manager and self.server_manager is None:
             if not self.client:
                 raise ValueError("Client must be provided when using server manager")
             self.server_manager = ServerManager(self.client, self.adapter)
@@ -169,6 +213,42 @@ class MCPAgent:
         self._initialized = True
         logger.info("✨ Agent initialization complete")
 
+    def _normalize_output(self, value: object) -> str:
+        """Normalize model outputs into a plain text string."""
+        try:
+            if isinstance(value, str):
+                return value
+
+            # LangChain messages may have .content which is str or list-like
+            content = getattr(value, "content", None)
+            if content is not None:
+                return self._normalize_output(content)
+
+            if isinstance(value, list):
+                parts: list[str] = []
+                for item in value:
+                    if isinstance(item, dict):
+                        if "text" in item and isinstance(item["text"], str):
+                            parts.append(item["text"])
+                        elif "content" in item:
+                            parts.append(self._normalize_output(item["content"]))
+                        else:
+                            # Fallback to str for unknown shapes
+                            parts.append(str(item))
+                    else:
+                        # recurse on .content or str
+                        part_content = getattr(item, "text", None)
+                        if isinstance(part_content, str):
+                            parts.append(part_content)
+                        else:
+                            parts.append(self._normalize_output(getattr(item, "content", item)))
+                return "".join(parts)
+
+            return str(value)
+
+        except Exception:
+            return str(value)
+
     async def _create_system_message_from_tools(self, tools: list[BaseTool]) -> None:
         """Create the system message based on provided tools using the builder."""
         # Use the override if provided, otherwise use the imported default
@@ -188,9 +268,12 @@ class MCPAgent:
         )
 
         # Update conversation history if memory is enabled
+        # Note: The system message should not be included in the conversation history,
+        # as it will be automatically added using the create_tool_calling_agent function with the prompt parameter
         if self.memory_enabled:
-            history_without_system = [msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)]
-            self._conversation_history = [self._system_message] + history_without_system
+            self._conversation_history = [
+                msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)
+            ]
 
     def _create_agent(self) -> AgentExecutor:
         """Create the LangChain agent with the configured system message.
@@ -210,6 +293,7 @@ class MCPAgent:
                 [
                     ("system", system_content),
                     MessagesPlaceholder(variable_name="chat_history"),
+                    ("human", "{input}"),
                     MessagesPlaceholder(variable_name="agent_scratchpad"),
                 ]
             )
@@ -229,9 +313,15 @@ class MCPAgent:
         # Use the standard create_tool_calling_agent
         agent = create_tool_calling_agent(llm=self.llm, tools=self._tools, prompt=prompt)
 
-        # Use the standard AgentExecutor
-        executor = AgentExecutor(agent=agent, tools=self._tools, max_iterations=self.max_steps, verbose=self.verbose)
-        logger.debug(f"Created agent executor with max_iterations={self.max_steps}")
+        # Use the standard AgentExecutor with callbacks
+        executor = AgentExecutor(
+            agent=agent,
+            tools=self._tools,
+            max_iterations=self.max_steps,
+            verbose=self.verbose,
+            callbacks=self.callbacks,
+        )
+        logger.debug(f"Created agent executor with max_iterations={self.max_steps} and {len(self.callbacks)} callbacks")
         return executor
 
     def get_conversation_history(self) -> list[BaseMessage]:
@@ -245,10 +335,6 @@ class MCPAgent:
     def clear_conversation_history(self) -> None:
         """Clear the conversation history."""
         self._conversation_history = []
-
-        # Re-add the system message if it exists
-        if self._system_message and self.memory_enabled:
-            self._conversation_history = [self._system_message]
 
     def add_to_history(self, message: BaseMessage) -> None:
         """Add a message to the conversation history.
@@ -274,15 +360,6 @@ class MCPAgent:
             message: The new system message content.
         """
         self._system_message = SystemMessage(content=message)
-
-        # Update conversation history if memory is enabled
-        if self.memory_enabled:
-            # Remove old system message if it exists
-            history_without_system = [msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)]
-            self._conversation_history = history_without_system
-
-            # Add new system message
-            self._conversation_history.insert(0, self._system_message)
 
         # Recreate the agent with the new system message if initialized
         if self._initialized and self._tools:
@@ -317,8 +394,8 @@ class MCPAgent:
 
     async def _consume_and_return(
         self,
-        generator: AsyncGenerator[tuple[AgentAction, str], str],
-    ) -> str:
+        generator: AsyncGenerator[tuple[AgentAction, str] | str | T, None],
+    ) -> tuple[str | T, int]:
         """Consume the generator and return the final result.
 
         This method manually iterates through the generator to consume the steps.
@@ -329,20 +406,24 @@ class MCPAgent:
             generator: The async generator that yields steps and a final result.
 
         Returns:
-            The final result from the generator.
+            A tuple of (final_result, steps_taken). final_result can be a string
+            for regular output or a Pydantic model instance for structured output.
         """
         final_result = ""
         steps_taken = 0
-        tools_used_names = []
         async for item in generator:
-            # If it's a string, it's the final result
+            # If it's a string, it's the final result (regular output)
             if isinstance(item, str):
                 final_result = item
                 break
+            # If it's not a tuple, it might be structured output (Pydantic model)
+            elif not isinstance(item, tuple):
+                final_result = item
+                break
             # Otherwise it's a step tuple, just consume it
-            steps_taken += 1
-            tools_used_names.append(item[0].tool)
-        return final_result, steps_taken, tools_used_names
+            else:
+                steps_taken += 1
+        return final_result, steps_taken
 
     async def stream(
         self,
@@ -351,7 +432,8 @@ class MCPAgent:
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
         track_execution: bool = True,
-    ) -> AsyncGenerator[tuple[AgentAction, str] | str, None]:
+        output_schema: type[T] | None = None,
+    ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
         """Run the agent and yield intermediate steps as an async generator.
 
         Args:
@@ -360,16 +442,47 @@ class MCPAgent:
             manage_connector: Whether to handle the connector lifecycle internally.
             external_history: Optional external history to use instead of the
                 internal conversation history.
+            track_execution: Whether to track execution for telemetry.
+            output_schema: Optional Pydantic BaseModel class for structured output.
+                If provided, the agent will attempt structured output at finish points
+                and continue execution if required information is missing.
 
         Yields:
-            Intermediate steps as (AgentAction, str) tuples, followed by the final result as a string.
+            Intermediate steps as (AgentAction, str) tuples, followed by the final result.
+            If output_schema is provided, yields structured output as instance of the schema.
         """
+        # Delegate to remote agent if in remote mode
+        if self._is_remote and self._remote_agent:
+            async for item in self._remote_agent.stream(
+                query, max_steps, manage_connector, external_history, track_execution, output_schema
+            ):
+                yield item
+            return
+
         result = ""
         initialized_here = False
         start_time = time.time()
-        tools_used_names = []
         steps_taken = 0
         success = False
+
+        # Schema-aware setup for structured output
+        structured_llm = None
+        schema_description = ""
+        if output_schema:
+            query = self._enhance_query_with_schema(query, output_schema)
+            structured_llm = self.llm.with_structured_output(output_schema)
+            # Get schema description for feedback
+            schema_fields = []
+            try:
+                for field_name, field_info in output_schema.model_fields.items():
+                    description = getattr(field_info, "description", "") or field_name
+                    required = not hasattr(field_info, "default") or field_info.default is None
+                    schema_fields.append(f"- {field_name}: {description} {'(required)' if required else '(optional)'}")
+
+                schema_description = "\n".join(schema_fields)
+            except Exception as e:
+                logger.warning(f"Could not extract schema details: {e}")
+                schema_description = f"Schema: {output_schema.__name__}"
 
         try:
             # Initialize if needed
@@ -391,10 +504,6 @@ class MCPAgent:
             display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
             logger.info(f"💬 Received query: '{display_query}'")
 
-            # Add the user query to conversation history if memory is enabled
-            if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
-
             # Use the provided history or the internal history
             history_to_use = external_history if external_history is not None else self._conversation_history
 
@@ -415,6 +524,26 @@ class MCPAgent:
             color_mapping = get_color_mapping([tool.name for tool in self._tools], excluded_colors=["green", "red"])
 
             logger.info(f"🏁 Starting agent execution with max_steps={steps}")
+
+            # Track whether agent finished successfully vs reached max iterations
+            agent_finished_successfully = False
+            result = None
+
+            # Create a run manager with our callbacks if we have any - ONCE for the entire execution
+            run_manager = None
+            if self.callbacks:
+                # Create an async callback manager with our callbacks
+                from langchain_core.callbacks.manager import AsyncCallbackManager
+
+                callback_manager = AsyncCallbackManager.configure(
+                    inheritable_callbacks=self.callbacks,
+                    local_callbacks=self.callbacks,
+                )
+                # Create a run manager for this chain execution
+                run_manager = await callback_manager.on_chain_start(
+                    {"name": "MCPAgent (mcp-use)"},
+                    inputs,
+                )
 
             for step_num in range(steps):
                 steps_taken = step_num + 1
@@ -445,21 +574,96 @@ class MCPAgent:
 
                 # --- Plan and execute the next step ---
                 try:
-                    # Use the internal _atake_next_step which handles planning and execution
-                    # This requires providing the necessary context like maps and intermediate steps
-                    next_step_output = await self._agent_executor._atake_next_step(
-                        name_to_tool_map=name_to_tool_map,
-                        color_mapping=color_mapping,
-                        inputs=inputs,
-                        intermediate_steps=intermediate_steps,
-                        run_manager=None,
-                    )
+                    retry_count = 0
+                    next_step_output = None
+
+                    while retry_count <= self.max_retries_per_step:
+                        try:
+                            # Use the internal _atake_next_step which handles planning and execution
+                            # This requires providing the necessary context like maps and intermediate steps
+                            next_step_output = await self._agent_executor._atake_next_step(
+                                name_to_tool_map=name_to_tool_map,
+                                color_mapping=color_mapping,
+                                inputs=inputs,
+                                intermediate_steps=intermediate_steps,
+                                run_manager=run_manager,
+                            )
+
+                            # If we get here, the step succeeded, break out of retry loop
+                            break
+
+                        except Exception as e:
+                            if not self.retry_on_error or retry_count >= self.max_retries_per_step:
+                                logger.error(f"❌ Validation error during step {step_num + 1}: {e}")
+                                result = f"Agent stopped due to a validation error: {str(e)}"
+                                success = False
+                                yield result
+                                return
+
+                            retry_count += 1
+                            logger.warning(
+                                f"⚠️ Validation error, retrying ({retry_count}/{self.max_retries_per_step}): {e}"
+                            )
+
+                            # Create concise feedback for the LLM about the validation error
+                            error_message = f"Error: {str(e)}"
+                            inputs["input"] = error_message
+
+                            # Continue to next iteration of retry loop
+                            continue
 
                     # Process the output
                     if isinstance(next_step_output, AgentFinish):
                         logger.info(f"✅ Agent finished at step {step_num + 1}")
-                        result = next_step_output.return_values.get("output", "No output generated")
-                        break
+                        agent_finished_successfully = True
+                        output_value = next_step_output.return_values.get("output", "No output generated")
+                        result = self._normalize_output(output_value)
+                        # End the chain if we have a run manager
+                        if run_manager:
+                            await run_manager.on_chain_end({"output": result})
+
+                        # If structured output is requested, attempt to create it
+                        if output_schema and structured_llm:
+                            try:
+                                logger.info("🔧 Attempting structured output...")
+                                structured_result = await self._attempt_structured_output(
+                                    result, structured_llm, output_schema, schema_description
+                                )
+
+                                # Add the final response to conversation history if memory is enabled
+                                if self.memory_enabled:
+                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+
+                                logger.info("✅ Structured output successful")
+                                success = True
+                                yield structured_result
+                                return
+
+                            except Exception as e:
+                                logger.warning(f"⚠️ Structured output failed: {e}")
+                                # Continue execution to gather missing information
+                                missing_info_prompt = f"""
+                                The current result cannot be formatted into the required structure.
+                                Error: {str(e)}
+
+                                Current information: {result}
+
+                                Please continue working to gather the missing information needed for:
+                                {schema_description}
+
+                                Focus on finding the specific missing details.
+                                """
+
+                                # Add this as feedback and continue the loop
+                                inputs["input"] = missing_info_prompt
+                                if self.memory_enabled:
+                                    self.add_to_history(HumanMessage(content=missing_info_prompt))
+
+                                logger.info("🔄 Continuing execution to gather missing information...")
+                                continue
+                        else:
+                            # Regular execution without structured output
+                            break
 
                     # If it's actions/steps, add to intermediate steps and yield them
                     intermediate_steps.extend(next_step_output)
@@ -468,8 +672,14 @@ class MCPAgent:
                     for agent_step in next_step_output:
                         yield agent_step
                         action, observation = agent_step
+                        reasoning = getattr(action, "log", "")
+                        if reasoning:
+                            reasoning_str = reasoning.replace("\n", " ")
+                            if len(reasoning_str) > 300:
+                                reasoning_str = reasoning_str[:297] + "..."
+                            logger.info(f"💭 Reasoning: {reasoning_str}")
                         tool_name = action.tool
-                        tools_used_names.append(tool_name)
+                        self.tools_used_names.append(tool_name)
                         tool_input_str = str(action.tool_input)
                         # Truncate long inputs for readability
                         if len(tool_input_str) > 100:
@@ -488,35 +698,75 @@ class MCPAgent:
                         tool_return = self._agent_executor._get_tool_return(last_step)
                         if tool_return is not None:
                             logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
+                            agent_finished_successfully = True
                             result = tool_return.return_values.get("output", "No output generated")
+                            result = self._normalize_output(result)
                             break
 
                 except OutputParserException as e:
                     logger.error(f"❌ Output parsing error during step {step_num + 1}: {e}")
                     result = f"Agent stopped due to a parsing error: {str(e)}"
+                    if run_manager:
+                        await run_manager.on_chain_error(e)
                     break
                 except Exception as e:
                     logger.error(f"❌ Error during agent execution step {step_num + 1}: {e}")
                     import traceback
 
                     traceback.print_exc()
+                    # End the chain with error if we have a run manager
+                    if run_manager:
+                        await run_manager.on_chain_error(e)
                     result = f"Agent stopped due to an error: {str(e)}"
                     break
 
             # --- Loop finished ---
             if not result:
-                logger.warning(f"⚠️ Agent stopped after reaching max iterations ({steps})")
-                result = f"Agent stopped after reaching the maximum number of steps ({steps})."
+                if agent_finished_successfully:
+                    # Agent finished successfully but returned empty output
+                    result = "Agent completed the task successfully."
+                    logger.info("✅ Agent finished successfully with empty output")
+                else:
+                    # Agent actually reached max iterations
+                    logger.warning(f"⚠️ Agent stopped after reaching max iterations ({steps})")
+                    result = f"Agent stopped after reaching the maximum number of steps ({steps})."
+                    if run_manager:
+                        await run_manager.on_chain_end({"output": result})
 
-            # Add the final response to conversation history if memory is enabled
+            # If structured output was requested but not achieved, attempt one final time
+            if output_schema and structured_llm and not success:
+                try:
+                    logger.info("🔧 Final attempt at structured output...")
+                    structured_result = await self._attempt_structured_output(
+                        result, structured_llm, output_schema, schema_description
+                    )
+
+                    # Add the final response to conversation history if memory is enabled
+                    if self.memory_enabled:
+                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+
+                    logger.info("✅ Final structured output successful")
+                    success = True
+                    yield structured_result
+                    return
+
+                except Exception as e:
+                    logger.error(f"❌ Final structured output attempt failed: {e}")
+                    raise RuntimeError(f"Failed to generate structured output after {steps} steps: {str(e)}") from e
+
             if self.memory_enabled:
-                self.add_to_history(AIMessage(content=result))
+                self.add_to_history(HumanMessage(content=query))
+
+            if self.memory_enabled and not output_schema:
+                self.add_to_history(AIMessage(content=self._normalize_output(result)))
 
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
-            success = True
+            if not success:
+                success = True
 
-            # Yield the final result as a string
-            yield result
+            # Yield the final result (only for non-structured output)
+            if not output_schema:
+                yield result
 
         except Exception as e:
             logger.error(f"❌ Error running query: {e}")
@@ -558,8 +808,8 @@ class MCPAgent:
                     manage_connector=manage_connector,
                     external_history_used=external_history is not None,
                     steps_taken=steps_taken,
-                    tools_used_count=len(tools_used_names),
-                    tools_used_names=tools_used_names,
+                    tools_used_count=len(self.tools_used_names),
+                    tools_used_names=self.tools_used_names,
                     response=result,
                     execution_time_ms=execution_time_ms,
                     error_type=None if success else "execution_error",
@@ -577,11 +827,13 @@ class MCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
-    ) -> str:
+        output_schema: type[T] | None = None,
+    ) -> str | T:
         """Run a query using the MCP tools and return the final result.
 
         This method uses the streaming implementation internally and returns
-        the final result after consuming all intermediate steps.
+        the final result after consuming all intermediate steps. If output_schema
+        is provided, the agent will be schema-aware and return structured output.
 
         Args:
             query: The query to run.
@@ -592,19 +844,48 @@ class MCPAgent:
                 for managing the connector lifecycle.
             external_history: Optional external history to use instead of the
                 internal conversation history.
+            output_schema: Optional Pydantic BaseModel class for structured output.
+                If provided, the agent will attempt to return an instance of this model.
 
         Returns:
-            The result of running the query.
+            The result of running the query as a string, or if output_schema is provided,
+            an instance of the specified Pydantic model.
+
+        Example:
+            ```python
+            # Regular usage
+            result = await agent.run("What's the weather like?")
+
+            # Structured output usage
+            from pydantic import BaseModel, Field
+
+            class WeatherInfo(BaseModel):
+                temperature: float = Field(description="Temperature in Celsius")
+                condition: str = Field(description="Weather condition")
+
+            weather: WeatherInfo = await agent.run(
+                "What's the weather like?",
+                output_schema=WeatherInfo
+            )
+            ```
         """
+        # Delegate to remote agent if in remote mode
+        if self._is_remote and self._remote_agent:
+            result = await self._remote_agent.run(query, max_steps, external_history, output_schema)
+            return result
+
         success = True
         start_time = time.time()
-        generator = self.stream(query, max_steps, manage_connector, external_history, track_execution=False)
+
+        generator = self.stream(
+            query, max_steps, manage_connector, external_history, track_execution=False, output_schema=output_schema
+        )
         error = None
         steps_taken = 0
-        tools_used_names = []
         result = None
         try:
-            result, steps_taken, tools_used_names = await self._consume_and_return(generator)
+            result, steps_taken = await self._consume_and_return(generator)
+
         except Exception as e:
             success = False
             error = str(e)
@@ -628,14 +909,78 @@ class MCPAgent:
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
                 steps_taken=steps_taken,
-                tools_used_count=len(tools_used_names),
-                tools_used_names=tools_used_names,
-                response=result,
+                tools_used_count=len(self.tools_used_names),
+                tools_used_names=self.tools_used_names,
+                response=str(self._normalize_output(result)),
                 execution_time_ms=int((time.time() - start_time) * 1000),
                 error_type=error,
                 conversation_history_length=len(self._conversation_history),
             )
         return result
+
+    async def _attempt_structured_output(
+        self, raw_result: str, structured_llm, output_schema: type[T], schema_description: str
+    ) -> T:
+        """Attempt to create structured output from raw result with validation."""
+        format_prompt = f"""
+        Please format the following information according to the specified schema.
+        Extract and structure the relevant information from the content below.
+
+        Required schema fields:
+        {schema_description}
+
+        Content to format:
+        {raw_result}
+
+        Please provide the information in the requested structured format.
+        If any required information is missing, you must indicate this clearly.
+        """
+
+        structured_result = await structured_llm.ainvoke(format_prompt)
+
+        try:
+            for field_name, field_info in output_schema.model_fields.items():
+                required = not hasattr(field_info, "default") or field_info.default is None
+                if required:
+                    value = getattr(structured_result, field_name, None)
+                    if value is None or (isinstance(value, str) and not value.strip()):
+                        raise ValueError(f"Required field '{field_name}' is missing or empty")
+                    if isinstance(value, list) and len(value) == 0:
+                        raise ValueError(f"Required field '{field_name}' is an empty list")
+        except Exception as e:
+            logger.debug(f"Validation details: {e}")
+            raise  # Re-raise to trigger retry logic
+
+        return structured_result
+
+    def _enhance_query_with_schema(self, query: str, output_schema: type[T]) -> str:
+        """Enhance the query with schema information to make the agent aware of required fields."""
+        schema_fields = []
+
+        try:
+            for field_name, field_info in output_schema.model_fields.items():
+                description = getattr(field_info, "description", "") or field_name
+                required = not hasattr(field_info, "default") or field_info.default is None
+                schema_fields.append(f"- {field_name}: {description} {'(required)' if required else '(optional)'}")
+
+            schema_description = "\n".join(schema_fields)
+        except Exception as e:
+            logger.warning(f"Could not extract schema details: {e}")
+            schema_description = f"Schema: {output_schema.__name__}"
+
+        # Enhance the query with schema awareness
+        enhanced_query = f"""
+        {query}
+
+        IMPORTANT: Your response must include sufficient information to populate the following structured output:
+
+        {schema_description}
+
+        Make sure you gather ALL the required information during your task execution.
+        If any required information is missing, continue working to find it.
+        """
+
+        return enhanced_query
 
     async def _generate_response_chunks_async(
         self,
@@ -669,9 +1014,6 @@ class MCPAgent:
         effective_max_steps = max_steps or self.max_steps
         self._agent_executor.max_iterations = effective_max_steps
 
-        if self.memory_enabled:
-            self.add_to_history(HumanMessage(content=query))
-
         history_to_use = external_history if external_history is not None else self._conversation_history
         inputs = {"input": query, "chat_history": history_to_use}
 
@@ -684,6 +1026,10 @@ class MCPAgent:
                         if not isinstance(message, ToolAgentAction):
                             self.add_to_history(message)
             yield event
+
+        if self.memory_enabled:
+            self.add_to_history(HumanMessage(content=query))
+
         # 5. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
         #  when the agent was initialized in this generator and is not client-managed
@@ -759,6 +1105,11 @@ class MCPAgent:
 
     async def close(self) -> None:
         """Close the MCP connection with improved error handling."""
+        # Delegate to remote agent if in remote mode
+        if self._is_remote and self._remote_agent:
+            await self._remote_agent.close()
+            return
+
         logger.info("🔌 Closing agent and cleaning up resources...")
         try:
             # Clean up the agent first

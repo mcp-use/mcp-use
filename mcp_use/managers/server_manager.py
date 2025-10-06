@@ -4,17 +4,11 @@ from mcp_use.client import MCPClient
 from mcp_use.logging import logger
 
 from ..adapters.base import BaseAdapter
-from .tools import (
-    ConnectServerTool,
-    DisconnectServerTool,
-    GetActiveServerTool,
-    ListServersTool,
-    SearchToolsTool,
-    UseToolFromServerTool,
-)
+from .base import BaseServerManager
+from .tools import ConnectServerTool, DisconnectServerTool, GetActiveServerTool, ListServersTool, SearchToolsTool
 
 
-class ServerManager:
+class ServerManager(BaseServerManager):
     """Manages MCP servers and provides tools for server selection and management.
 
     This class allows an agent to discover and select which MCP server to use,
@@ -73,12 +67,21 @@ class ServerManager:
             except Exception as e:
                 logger.error(f"Error prefetching tools for server '{server_name}': {e}")
 
-    @property
-    def tools(self) -> list[BaseTool]:
-        """Get all server management tools.
+    def get_active_server_tools(self) -> list[BaseTool]:
+        """Get tools from the currently active server.
 
         Returns:
-            list of LangChain tools for server management
+            List of tools from the active server, or empty list if no server is active
+        """
+        if self.active_server and self.active_server in self._server_tools:
+            return self._server_tools[self.active_server]
+        return []
+
+    def get_management_tools(self) -> list[BaseTool]:
+        """Get the server management tools.
+
+        Returns:
+            List of server management tools
         """
         return [
             ListServersTool(self),
@@ -86,5 +89,36 @@ class ServerManager:
             GetActiveServerTool(self),
             DisconnectServerTool(self),
             SearchToolsTool(self),
-            UseToolFromServerTool(self),
         ]
+
+    def has_tool_changes(self, current_tool_names: set[str]) -> bool:
+        """Check if the available tools have changed.
+
+        Args:
+            current_tool_names: Set of currently known tool names
+
+        Returns:
+            True if tools have changed, False otherwise
+        """
+        new_tool_names = {tool.name for tool in self.tools}
+        return new_tool_names != current_tool_names
+
+    @property
+    def tools(self) -> list[BaseTool]:
+        """Get all server management tools and tools from the active server.
+
+        Returns:
+            list of LangChain tools for server management plus tools from active server
+        """
+        management_tools = self.get_management_tools()
+
+        # Add tools from the active server if available
+        if self.active_server and self.active_server in self._server_tools:
+            server_tools = self._server_tools[self.active_server]
+            logger.debug(f"Including {len(server_tools)} tools from active server '{self.active_server}'")
+            logger.debug(f"Server tools: {[tool.name for tool in server_tools]}")
+            return management_tools + server_tools
+        else:
+            logger.debug("No active server - returning only management tools")
+
+        return management_tools

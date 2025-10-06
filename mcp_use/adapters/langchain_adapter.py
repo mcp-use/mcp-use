@@ -21,6 +21,7 @@ from mcp.types import (
 from pydantic import BaseModel, Field, create_model
 
 from ..connectors.base import BaseConnector
+from ..errors.error_formatting import format_error
 from ..logging import logger
 from .base import BaseAdapter
 
@@ -38,7 +39,7 @@ class LangChainAdapter(BaseAdapter):
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
 
     def fix_schema(self, schema: dict) -> dict:
-        """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format.
+        """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
 
         Args:
             schema: The JSON schema to fix.
@@ -50,6 +51,11 @@ class LangChainAdapter(BaseAdapter):
             if "type" in schema and isinstance(schema["type"], list):
                 schema["anyOf"] = [{"type": t} for t in schema["type"]]
                 del schema["type"]  # Remove 'type' and standardize to 'anyOf'
+
+            # Fix enum handling - ensure enum fields are properly typed as strings
+            if "enum" in schema and "type" not in schema:
+                schema["type"] = "string"
+
             for key, value in schema.items():
                 schema[key] = self.fix_schema(value)  # Apply recursively
         return schema
@@ -70,11 +76,8 @@ class LangChainAdapter(BaseAdapter):
         if tool_result.isError:
             raise ToolException(f"Tool execution failed: {tool_result.content}")
 
-        if not tool_result.content:
-            raise ToolException("Tool execution returned no content")
-
         decoded_result = ""
-        for item in tool_result.content:
+        for item in tool_result.content or []:
             match item.type:
                 case "text":
                     item: TextContent
@@ -159,11 +162,11 @@ class LangChainAdapter(BaseAdapter):
                     except Exception as e:
                         # Log the exception for debugging
                         logger.error(f"Error parsing tool result: {e}")
-                        return f"Error parsing result: {e!s}; Raw content: {tool_result.content!r}"
+                        return format_error(e, tool=self.name, tool_content=tool_result.content)
 
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error executing MCP tool: {str(e)}"
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return McpToLangChainAdapter()
@@ -204,7 +207,7 @@ class LangChainAdapter(BaseAdapter):
                     return content_decoded
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error reading resource: {str(e)}"
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return ResourceTool()
@@ -261,7 +264,7 @@ class LangChainAdapter(BaseAdapter):
                     return result.messages
                 except Exception as e:
                     if self.handle_tool_error:
-                        return f"Error fetching prompt: {str(e)}"
+                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
                     raise
 
         return PromptTool()

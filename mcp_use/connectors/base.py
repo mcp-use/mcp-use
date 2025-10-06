@@ -5,14 +5,27 @@ This module provides the base connector interface that all MCP connectors
 must implement.
 """
 
+import warnings
 from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import Any
 
 from mcp import ClientSession, Implementation
-from mcp.client.session import ElicitationFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
-from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
+from mcp.types import (
+    CallToolResult,
+    GetPromptResult,
+    Prompt,
+    PromptListChangedNotification,
+    ReadResourceResult,
+    Resource,
+    ResourceListChangedNotification,
+    ServerCapabilities,
+    ServerNotification,
+    Tool,
+    ToolListChangedNotification,
+)
 from pydantic import AnyUrl
 
 import mcp_use
@@ -31,6 +44,8 @@ class BaseConnector(ABC):
         self,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
     ):
         """Initialize base connector with common attributes."""
         self.client_session: ClientSession | None = None
@@ -43,6 +58,9 @@ class BaseConnector(ABC):
         self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now)
         self.sampling_callback = sampling_callback
         self.elicitation_callback = elicitation_callback
+        self.message_handler = message_handler
+        self.logging_callback = logging_callback
+        self.capabilities: ServerCapabilities | None = None
 
     @property
     def client_info(self) -> Implementation:
@@ -52,6 +70,20 @@ class BaseConnector(ABC):
             version=mcp_use.__version__,
             url="https://github.com/mcp-use/mcp-use",
         )
+
+    async def _internal_message_handler(self, message: Any) -> None:
+        """Wrap the user-provided message handler."""
+        if isinstance(message, ServerNotification):
+            if isinstance(message.root, ToolListChangedNotification):
+                logger.debug("Received tool list changed notification")
+            elif isinstance(message.root, ResourceListChangedNotification):
+                logger.debug("Received resource list changed notification")
+            elif isinstance(message.root, PromptListChangedNotification):
+                logger.debug("Received prompt list changed notification")
+
+        # Call the user's handler
+        if self.message_handler:
+            await self.message_handler(message)
 
     @abstractmethod
     async def connect(self) -> None:
@@ -79,19 +111,8 @@ class BaseConnector(ABC):
         """Clean up all resources associated with this connector."""
         errors = []
 
-        # First close the client session
-        if self.client_session:
-            try:
-                logger.debug("Closing client session")
-                await self.client_session.__aexit__(None, None, None)
-            except Exception as e:
-                error_msg = f"Error closing client session: {e}"
-                logger.warning(error_msg)
-                errors.append(error_msg)
-            finally:
-                self.client_session = None
-
-        # Then stop the connection manager
+        # First stop the connection manager, this closes the ClientSession inside
+        # the same task where it was opened, avoiding cancel-scope mismatches.
         if self._connection_manager:
             try:
                 logger.debug("Stopping connection manager")
@@ -102,6 +123,22 @@ class BaseConnector(ABC):
                 errors.append(error_msg)
             finally:
                 self._connection_manager = None
+
+        # Ensure the client_session reference is cleared (it should already be
+        # closed by the connection manager). Only attempt a direct __aexit__ if
+        # the connection manager did *not* exist, this covers edge-cases like
+        # failed connections where no manager was started.
+        if self.client_session:
+            try:
+                if not self._connection_manager:
+                    logger.debug("Closing client session (no connection manager)")
+                    await self.client_session.__aexit__(None, None, None)
+            except Exception as e:
+                error_msg = f"Error closing client session: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+            finally:
+                self.client_session = None
 
         # Reset tools
         self._tools = None
@@ -125,37 +162,37 @@ class BaseConnector(ABC):
         result = await self.client_session.initialize()
         self._initialized = True  # Mark as initialized
 
-        server_capabilities = result.capabilities
+        self.capabilities = result.capabilities
 
-        if server_capabilities.tools:
+        if self.capabilities.tools:
             # Get available tools directly from client session
             try:
                 tools_result = await self.client_session.list_tools()
                 self._tools = tools_result.tools if tools_result else []
             except Exception as e:
-                logger.error(f"Error listing tools: {e}")
+                logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
                 self._tools = []
         else:
             self._tools = []
 
-        if server_capabilities.resources:
+        if self.capabilities.resources:
             # Get available resources directly from client session
             try:
                 resources_result = await self.client_session.list_resources()
                 self._resources = resources_result.resources if resources_result else []
             except Exception as e:
-                logger.error(f"Error listing resources: {e}")
+                logger.error(f"Error listing resources for connector {self.public_identifier}: {e}")
                 self._resources = []
         else:
             self._resources = []
 
-        if server_capabilities.prompts:
+        if self.capabilities.prompts:
             # Get available prompts directly from client session
             try:
                 prompts_result = await self.client_session.list_prompts()
                 self._prompts = prompts_result.prompts if prompts_result else []
             except Exception as e:
-                logger.error(f"Error listing prompts: {e}")
+                logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
                 self._prompts = []
         else:
             self._prompts = []
@@ -170,21 +207,57 @@ class BaseConnector(ABC):
 
     @property
     def tools(self) -> list[Tool]:
-        """Get the list of available tools."""
+        """Get the list of available tools.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_tools()` instead to ensure
+            you always get the latest data.
+        """
+        warnings.warn(
+            "The 'tools' property is deprecated and may return stale data. "
+            "Use 'await list_tools()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self._tools is None:
             raise RuntimeError("MCP client is not initialized")
         return self._tools
 
     @property
     def resources(self) -> list[Resource]:
-        """Get the list of available resources."""
+        """Get the list of available resources.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_resources()` instead to ensure
+            you always get the latest data.
+        """
+        warnings.warn(
+            "The 'resources' property is deprecated and may return stale data. "
+            "Use 'await list_resources()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self._resources is None:
             raise RuntimeError("MCP client is not initialized")
         return self._resources
 
     @property
     def prompts(self) -> list[Prompt]:
-        """Get the list of available prompts."""
+        """Get the list of available prompts.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_prompts()' instead to ensure
+            you always get the latest data.
+        """
+        warnings.warn(
+            "The 'prompts' property is deprecated and may return stale data. "
+            "Use 'await list_prompts()' instead to ensure fresh data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self._prompts is None:
             raise RuntimeError("MCP client is not initialized")
         return self._prompts
@@ -303,28 +376,39 @@ class BaseConnector(ABC):
     async def list_tools(self) -> list[Tool]:
         """List all available tools from the MCP implementation."""
 
+        if self.capabilities and not self.capabilities.tools:
+            logger.debug(f"Server {self.public_identifier} does not support tools")
+            return []
+
         # Ensure we're connected
         await self._ensure_connected()
 
         logger.debug("Listing tools")
         try:
             result = await self.client_session.list_tools()
+            self._tools = result.tools
             return result.tools
         except McpError as e:
-            logger.error(f"Error listing tools: {e}")
+            logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
             return []
 
     async def list_resources(self) -> list[Resource]:
         """List all available resources from the MCP implementation."""
+
+        if self.capabilities and not self.capabilities.resources:
+            logger.debug(f"Server {self.public_identifier} does not support resources")
+            return []
+
         # Ensure we're connected
         await self._ensure_connected()
 
         logger.debug("Listing resources")
         try:
             result = await self.client_session.list_resources()
+            self._resources = result.resources
             return result.resources
         except McpError as e:
-            logger.error(f"Error listing resources: {e}")
+            logger.warning(f"Error listing resources for connector {self.public_identifier}: {e}")
             return []
 
     async def read_resource(self, uri: AnyUrl) -> ReadResourceResult:
@@ -337,14 +421,20 @@ class BaseConnector(ABC):
 
     async def list_prompts(self) -> list[Prompt]:
         """List all available prompts from the MCP implementation."""
+
+        if self.capabilities and not self.capabilities.prompts:
+            logger.debug(f"Server {self.public_identifier} does not support prompts")
+            return []
+
         await self._ensure_connected()
 
         logger.debug("Listing prompts")
         try:
             result = await self.client_session.list_prompts()
+            self._prompts = result.prompts
             return result.prompts
         except McpError as e:
-            logger.error(f"Error listing prompts: {e}")
+            logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
             return []
 
     async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> GetPromptResult:

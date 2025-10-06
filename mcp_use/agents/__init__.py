@@ -5,10 +5,10 @@ This module provides ready-to-use agent implementations
 that are pre-configured for using MCP tools.
 """
 
-from .base import BaseAgent
 from .mcpagent import MCPAgent
+from .remote import RemoteAgent
 
 __all__ = [
-    "BaseAgent",
     "MCPAgent",
+    "RemoteAgent",
 ]

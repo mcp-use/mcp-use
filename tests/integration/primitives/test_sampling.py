@@ -25,7 +25,7 @@ async def test_sampling(primitive_server):
     try:
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")
-        result = await session.connector.call_tool(name="analyze_sentiment", arguments={"text": "Hello, world!"})
+        result = await session.call_tool(name="analyze_sentiment", arguments={"text": "Hello, world!"})
         content = result.content[0]
         logger.info(f"Result: {content}")
         assert content.text == "Hello, world!"
@@ -40,7 +40,7 @@ async def test_sampling_with_no_callback(primitive_server):
         client = MCPClient(config)
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")
-        result = await session.connector.call_tool(name="analyze_sentiment", arguments={"text": "Hello, world!"})
+        result = await session.call_tool(name="analyze_sentiment", arguments={"text": "Hello, world!"})
         logger.info(f"Result: {result}")
         print(f"Result: {result}")
         assert result.isError

@@ -2,6 +2,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
+from mcp_use.errors.error_formatting import format_error
 from mcp_use.logging import logger
 
 from .base_tool import MCPServerTool
@@ -62,7 +63,7 @@ class ConnectServerTool(MCPServerTool):
 
         except Exception as e:
             logger.error(f"Error connecting to server '{server_name}': {e}")
-            return f"Failed to connect to server '{server_name}': {str(e)}"
+            return format_error(e, server_name=server_name)
 
     def _run(self, server_name: str) -> str:
         """Synchronous version that raises a NotImplementedError - use _arun instead."""
