@@ -1,0 +1,253 @@
+---
+title: "Server Overview"
+description: "How to create MCP servers and use them with mcp-use"
+icon: "server"
+---
+
+At mcp-use we provide some utilities and dev tools for server creation that we found very handy while building servers.
+This include several improvement to the original FastMCP implementation in the `python-sdk` and to `FastMCP2.0`, two other popular frameworks to
+create MCP servers.
+
+We tried to keep our modifications as lightweight as possible in order for you to be able to use our development tools also
+with the other frameworks, this means that you will still be able to get a lot of value from using mcp-use even if you use them.
+
+
+To install:
+```bash
+uv pip install mcp-use[server]
+```
+
+# Quick Started
+
+## Create a server
+
+You can create a server the same way you create it in the other frameworks
+
+```python
+from mcp_use import MCPServer
+
+server = MCPServer(
+    name="My MCP Server",
+)
+```
+
+## Add tools
+
+```python
+from mcp_use import MCPServer
+
+server = MCPServer(
+    name="My MCP Server",
+)
+
+@server.tool()
+def get_cat(name: str) -> str:
+    return f"{name} cat"
+```
+
+## Run the server
+
+```python
+mcp = MCPServer("My MCP Server")
+
+@mcp.tool
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+you will be greated with these terminal output when you run this file:
+
+```bash
+mcp-use Version: 1.3.10
+
+Example Server
+This is an example server with a simple echo tool.
+Tools: 4 | Resources: 0 | Prompts: 0 | Tokens: 307
+
+- Local:        http://localhost:8000
+- Network:      http://192.168.1.241:8000
+- Docs:         http://localhost:8000/docs
+- Inspector:    http://localhost:8000/inspector
+- OpenMCP:      http://localhost:8000/openmcp.json
+
+✓ Starting...
+✓ Ready in 0.0s
+```
+
+You can see how this will return some interesting informations, lets break them down in the next section.
+
+## Server Informations
+
+```bash
+mcp-use Version: 1.3.10
+
+Example Server
+This is an example server with a simple echo tool.
+Tools: 4 | Resources: 0 | Prompts: 0 | Tokens: 307
+```
+
+This section contains:
+* the version of `mcp-use` you are using to run the server.
+* the name of the server
+* the `description/instructions` of the server
+* information about the available capabilities of the server along with an estimate of the tokens it will occupy.
+
+## Server Endpoints
+
+```bash
+- Local:        http://localhost:8000
+- Network:      http://192.168.1.241:8000
+- Docs:         http://localhost:8000/docs
+- Inspector:    http://localhost:8000/inspector
+- OpenMCP:      http://localhost:8000/openmcp.json
+```
+
+When your server starts, it automatically exposes several endpoints for different use cases:
+
+### **Primary MCP Endpoint**
+
+#### `/mcp` - MCP Protocol Endpoint
+The main endpoint where MCP clients connect to interact with your server.
+
+**Usage:**
+- **Local**: `http://localhost:8000/mcp`
+- **Network**: `http://192.168.1.241:8000/mcp`
+
+This endpoint handles all MCP protocol communication including:
+- Server initialization and capability negotiation
+- Tool discovery and execution
+- Resource listing and retrieval
+- Prompt management
+- Real-time streaming and notifications
+
+**Transport Types:**
+- **HTTP Streaming**: Default transport for web-based clients
+- **Server-Sent Events (SSE)**: For real-time updates
+- **STDIO**: For local transport.
+
+### **Development Endpoints**
+
+<Tip>
+Development endpoints are only available when `dev_mode=True` is set in your server configuration.
+</Tip>
+
+#### `/docs` - Interactive API Documentation
+A comprehensive, interactive documentation interface powered by mcp-use's automatic OpenMCP generation.
+
+**Features:**
+- **Tool Testing**: Test your MCP tools directly in the browser with a user-friendly interface
+- **Schema Exploration**: View detailed JSON schemas for all tools, resources, and prompts
+- **Request/Response Examples**: See example payloads and responses
+- **Authentication Testing**: Test different authentication methods if configured
+
+**Use Cases:**
+- Rapid prototyping and testing during development
+- Debugging tool parameters and return values
+- Sharing API documentation with team members
+- Client integration testing
+
+#### `/inspector` - MCP Protocol Inspector
+A real-time debugging interface that visualizes MCP protocol messages as they flow between clients and your server.
+
+**Features:**
+- **Live Message Monitoring**: See all incoming and outgoing MCP messages in real-time
+- **Message Filtering**: Filter by message type (initialize, tools/list, tools/call, etc.)
+- **Payload Inspection**: Detailed view of JSON-RPC message structure
+- **Performance Metrics**: Response times and message frequency
+- **Error Tracking**: Highlight failed requests and error responses
+
+**Use Cases:**
+- Debugging client-server communication issues
+- Understanding MCP protocol flow
+- Performance optimization
+- Integration testing with different MCP clients
+
+#### `/openmcp.json` - Server Metadata
+A JSON endpoint that provides comprehensive metadata about your server in the OpenMCP format.
+
+**Response Structure:**
+```json
+{
+  "openmcp": "1.0",
+  "info": {
+    "title": "Example Server",
+    "version": "0.1.0",
+    "description": "This is an example server with a simple echo tool."
+  },
+  "capabilities": {
+    "tools": { "listChanged": false },
+    "resources": { "subscribe": false, "listChanged": false },
+    "prompts": { "listChanged": false }
+  },
+  "tools": [...],
+  "resources": [...],
+  "prompts": [...]
+}
+```
+
+**Use Cases:**
+- **Client Discovery**: Allow MCP clients to discover your server capabilities
+- **Schema Validation**: Validate your server's tool and resource schemas
+- **Integration Testing**: Programmatically inspect server metadata
+- **Documentation Generation**: Generate client-side documentation from server metadata
+
+### **Network Access**
+
+#### Local vs Network URLs
+- **Local (`localhost:8000`)**:
+  - Accessible only from your development machine
+  - Faster connection with lower latency
+  - Ideal for development and testing
+
+- **Network (`192.168.1.241:8000`)**:
+  - Accessible from any device on your local network
+  - Perfect for testing on mobile devices, tablets, or other computers
+  - Enables collaborative development and demo scenarios
+  - IP address automatically detected from your network interface
+
+<Warning>
+Network endpoints expose your server to your local network. Ensure you trust all devices on your network when using network access.
+</Warning>
+
+### **Endpoint Configuration**
+
+You can customize endpoint behavior through server settings:
+
+```python
+server = MCPServer(
+    name="My Server",
+    dev_mode=True,  # Enable development endpoints
+    settings=ServerSettings(
+        host="0.0.0.0",  # Bind to all interfaces for network access
+        port=8000,       # Custom port
+    )
+)
+```
+
+**Available Settings:**
+- `host`: Network interface to bind to (`"127.0.0.1"` for local only, `"0.0.0.0"` for all interfaces)
+- `port`: Port number (default: 8000)
+- `dev_mode`: Enable/disable development endpoints (default: False)
+
+## Development Features
+
+### **Auto-Reload**
+Use the `mcp-use run` command to automatically restart your server when files change:
+
+```bash
+mcp-use run server.py --reload
+```
+
+When you save changes to your server file, you'll see:
+```bash
+🔄 Server reloaded due to file changes
+
+mcp-use Version: 1.3.10
+Example Server
+This is an example server with a simple echo tool.
+...
+✓ Ready in 0.3s
+```

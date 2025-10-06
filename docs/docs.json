@@ -49,6 +49,12 @@
             ]
           },
           {
+            "group": "Server",
+            "pages": [
+              "server/overview"
+            ]
+          },
+          {
             "group": "Client Configuration",
             "pages": [
               {
