@@ -349,7 +349,7 @@ class MCPAgent:
 
     def _generate_tool_call_id(self) -> str:
         """Generate unique tool call ID.
-        
+
         Returns:
             A unique tool call ID string.
         """
@@ -357,11 +357,11 @@ class MCPAgent:
 
     def _create_tool_message(self, tool_call_id: str, content: str) -> ToolMessage:
         """Create ToolMessage with proper tool_call_id.
-        
+
         Args:
             tool_call_id: The unique ID for this tool call.
             content: The content/result of the tool call.
-            
+
         Returns:
             A ToolMessage object with the specified tool_call_id.
         """

@@ -258,21 +258,21 @@ class TestMCPAgentToolCallIDManagement:
         """Test that tool call ID generation creates unique IDs with correct format."""
         llm = self._mock_llm()
         client = self._mock_client()
-        
+
         agent = MCPAgent(llm=llm, client=client)
-        
+
         # Generate multiple IDs and verify they are unique
         id1 = agent._generate_tool_call_id()
         id2 = agent._generate_tool_call_id()
         id3 = agent._generate_tool_call_id()
-        
+
         # Check format
         assert id1.startswith("call_")
         assert len(id1) == 13  # "call_" + 8 chars
-        
+
         # Check uniqueness
         assert id1 != id2 != id3
-        
+
         # Check UUID format (last 8 chars should be hex)
         uuid_part = id1[5:]  # Remove "call_" prefix
         assert len(uuid_part) == 8
@@ -282,14 +282,14 @@ class TestMCPAgentToolCallIDManagement:
         """Test ToolMessage creation with proper tool_call_id."""
         llm = self._mock_llm()
         client = self._mock_client()
-        
+
         agent = MCPAgent(llm=llm, client=client)
-        
+
         tool_call_id = "call_abc12345"
         content = "Tool execution result"
-        
+
         tool_message = agent._create_tool_message(tool_call_id, content)
-        
+
         assert isinstance(tool_message, ToolMessage)
         assert tool_message.tool_call_id == tool_call_id
         assert tool_message.content == content
@@ -298,18 +298,18 @@ class TestMCPAgentToolCallIDManagement:
         """Test that ToolMessage objects are properly stored in conversation history."""
         llm = self._mock_llm()
         client = self._mock_client()
-        
+
         agent = MCPAgent(llm=llm, client=client, memory_enabled=True)
-        
+
         # Add different message types
         human_msg = HumanMessage(content="User query")
         ai_msg = AIMessage(content="AI response")
         tool_msg = ToolMessage(content="Tool result", tool_call_id="call_123")
-        
+
         agent.add_to_history(human_msg)
         agent.add_to_history(ai_msg)
         agent.add_to_history(tool_msg)
-        
+
         # Check all messages are in history
         history = agent.get_conversation_history()
         assert len(history) == 3

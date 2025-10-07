@@ -37,42 +37,37 @@ class TestLangChainAdapterToolCallIDManagement:
         connector = self._mock_connector()
         agent = self._mock_agent()
         adapter = LangChainAdapter(agent=agent)
-        
+
         # Mock tool result
         mock_result = MagicMock()
         mock_result.isError = False
         mock_result.content = [{"type": "text", "text": "Tool execution result"}]
-        
+
         connector.call_tool = AsyncMock(return_value=mock_result)
-        
+
         # Create a tool
         mcp_tool = MagicMock()
         mcp_tool.name = "test_tool"
         mcp_tool.description = "A test tool"
-        mcp_tool.inputSchema = {
-            "type": "object",
-            "properties": {
-                "arg1": {"type": "string"}
-            }
-        }
-        
+        mcp_tool.inputSchema = {"type": "object", "properties": {"arg1": {"type": "string"}}}
+
         tool = adapter._convert_tool(mcp_tool, connector)
-        
+
         # Mock the _parse_mcp_tool_result method
-        with patch.object(adapter, '_parse_mcp_tool_result', return_value="Parsed result"):
+        with patch.object(adapter, "_parse_mcp_tool_result", return_value="Parsed result"):
             # Execute the tool
             result = await tool._arun(arg1="test_value")
-            
+
             # Verify core functionality:
             # 1. Tool call ID was generated
             agent._generate_tool_call_id.assert_called_once()
-            
+
             # 2. ToolMessage was created with the ID
             agent._create_tool_message.assert_called_once_with("call_abc12345", "Parsed result")
-            
+
             # 3. ToolMessage was added to conversation history
             agent.add_to_history.assert_called_once()
-            
+
             # 4. Tool execution returned correct result
             assert result == "Parsed result"
 
@@ -82,29 +77,29 @@ class TestLangChainAdapterToolCallIDManagement:
         connector = self._mock_connector()
         agent = self._mock_agent()
         adapter = LangChainAdapter(agent=agent)
-        
+
         # Mock tool error
         connector.call_tool = AsyncMock(side_effect=Exception("Tool execution failed"))
-        
+
         # Create a tool
         mcp_tool = MagicMock()
         mcp_tool.name = "test_tool"
         mcp_tool.description = "A test tool"
         mcp_tool.inputSchema = {"type": "object"}
-        
+
         tool = adapter._convert_tool(mcp_tool, connector)
-        
+
         # Execute the tool
         result = await tool._arun()
-        
+
         # Verify error handling:
         # 1. Tool call ID was still generated
         agent._generate_tool_call_id.assert_called_once()
-        
+
         # 2. ToolMessage was created with error content
         agent._create_tool_message.assert_called_once()
         agent.add_to_history.assert_called_once()
-        
+
         # 3. Error was handled gracefully
         assert isinstance(result, dict)
         assert result.get("details") == "Tool execution failed"
@@ -113,22 +108,22 @@ class TestLangChainAdapterToolCallIDManagement:
         """Test that adapter works normally when no agent reference is provided."""
         connector = self._mock_connector()
         adapter = LangChainAdapter()
-        
+
         # Mock tool result
         mock_result = MagicMock()
         mock_result.isError = False
         mock_result.content = [{"type": "text", "text": "Tool execution result"}]
-        
+
         connector.call_tool = AsyncMock(return_value=mock_result)
-        
+
         # Create a tool
         mcp_tool = MagicMock()
         mcp_tool.name = "test_tool"
         mcp_tool.description = "A test tool"
         mcp_tool.inputSchema = {"type": "object"}
-        
+
         tool = adapter._convert_tool(mcp_tool, connector)
-        
+
         # Verify tool was created normally
         assert tool is not None
         assert tool.name == "test_tool"
