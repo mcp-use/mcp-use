@@ -160,6 +160,18 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "Blog",
+        "icon": "book",
+        "groups": [
+          {
+            "group": "Blog",
+            "pages": [
+              "blog/middleware"
+            ]
+          }
+        ]
       }
     ]
   },
