@@ -1,27 +1,25 @@
 import asyncio
 import os
-from dotenv import load_dotenv
 
-from mcp_use import MCPClient, MCPAgent
+from dotenv import load_dotenv
 
 # Choose any tool-using LLM you already support in your local setup.
 # Example here uses langchain_anthropic (Claude), but you can swap this to your preferred tool-calling LLM.
 from langchain_anthropic import ChatAnthropic
 
+from mcp_use import MCPAgent, MCPClient
+
 
 async def main():
     load_dotenv()  # Optional: loads from .env file. Otherwise export MORPH_API_KEY in your shell.
-    
+
     # Build config with actual env var values (JSON doesn't expand ${VAR} syntax)
     config = {
         "mcpServers": {
             "filesystem-with-morph": {
                 "command": "npx",
                 "args": ["@morph-llm/morph-fast-apply"],
-                "env": {
-                    "MORPH_API_KEY": os.getenv("MORPH_API_KEY", ""),
-                    "ALL_TOOLS": "false"
-                }
+                "env": {"MORPH_API_KEY": os.getenv("MORPH_API_KEY", ""), "ALL_TOOLS": "false"},
             }
         }
     }
@@ -38,6 +36,7 @@ async def main():
         "Open README.md and append a new line saying: 'Integrated with Morph via MCP.' Use the edit tool."
     )
     print(result)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

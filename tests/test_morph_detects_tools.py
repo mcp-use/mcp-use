@@ -1,6 +1,7 @@
-import os
-import pytest
 import asyncio
+import os
+
+import pytest
 
 from mcp_use import MCPClient
 
