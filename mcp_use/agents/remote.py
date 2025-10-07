@@ -17,7 +17,7 @@ T = TypeVar("T", bound=BaseModel)
 
 # API endpoint constants
 API_CHATS_ENDPOINT = "/api/v1/chats/get-or-create"
-API_CHAT_EXECUTE_ENDPOINT = "/api/v1/chats/{chat_id}/execute"
+API_CHAT_STREAM_ENDPOINT = "/api/v1/chats/{chat_id}/stream"
 API_CHAT_DELETE_ENDPOINT = "/api/v1/chats/{chat_id}"
 
 UUID_ERROR_MESSAGE = """A UUID is a 36 character string of the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \n
@@ -94,6 +94,58 @@ class RemoteAgent:
             JSON schema representation of the model
         """
         return model_class.model_json_schema()
+
+    def _parse_sse_line(self, line: str) -> tuple[str, Any] | None:
+        """Parse a single SSE line into event type and data.
+
+        Args:
+            line: A line from the SSE stream
+
+        Returns:
+            Tuple of (event_type, data) or None if not parseable
+        """
+        # Skip empty lines and comments
+        if not line.strip() or line.startswith(":"):
+            return None
+
+        # SSE format: "data: {json}"
+        if line.startswith("data: "):
+            line = line[6:].strip()
+
+        # Try parsing as JSON first (worker format: data: {"type":"text","text":"..."})
+        try:
+            parsed = json.loads(line)
+            if isinstance(parsed, dict) and "type" in parsed:
+                # Worker format: {"type": "text", "text": "...", ...}
+                return (parsed["type"], parsed)
+        except json.JSONDecodeError:
+            pass
+
+        # Parse AI SDK protocol format (e.g., "0:{json}", "d:{json}")
+        if len(line) > 2 and line[1] == ":":
+            protocol_code = line[0]
+            data_str = line[2:]
+
+            # Map protocol codes to event types
+            protocol_map = {
+                "0": "text",  # Text chunk
+                "3": "error",  # Error
+                "9": "tool_call",  # Tool call
+                "a": "tool_result",  # Tool result
+                "d": "done",  # Finish
+                "e": "message_finish",  # Message finish
+            }
+
+            event_type = protocol_map.get(protocol_code, "unknown")
+
+            try:
+                data = json.loads(data_str)
+                return (event_type, data)
+            except json.JSONDecodeError:
+                # If it's not JSON, treat it as plain text
+                return (event_type, data_str)
+
+        return None
 
     def _parse_structured_response(self, response_data: Any, output_schema: type[T]) -> T:
         """Parse the API response into the structured output format.
@@ -189,11 +241,11 @@ class RemoteAgent:
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
     ) -> str | T:
-        """Run a query on the remote agent.
+        """Run a query on the remote agent using streaming.
 
         Args:
             query: The query to execute
-            max_steps: Maximum number of steps (default: 10)
+            max_steps: Maximum number of steps (ignored for streaming, kept for compatibility)
             external_history: External history (not supported yet for remote execution)
             output_schema: Optional Pydantic model for structured output
 
@@ -215,57 +267,92 @@ class RemoteAgent:
 
             chat_id = self.chat_id
 
-            # Step 2: Execute the agent within the chat context
-            execution_payload = {"query": query, "max_steps": max_steps or 10}
+            # Step 2: Stream the agent execution
+            # Format request for streaming endpoint (expects messages array)
+            stream_payload = {
+                "messages": [{"role": "user", "content": query}],
+            }
 
             # Add structured output schema if provided
             if output_schema is not None:
-                execution_payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
+                stream_payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
                 logger.info(f"🔧 Using structured output with schema: {output_schema.__name__}")
 
             headers = {"Content-Type": "application/json", "x-api-key": self.api_key}
-            execution_url = f"{self.base_url}{API_CHAT_EXECUTE_ENDPOINT.format(chat_id=chat_id)}"
-            logger.info(f"🚀 Executing agent in chat {chat_id}")
+            stream_url = f"{self.base_url}{API_CHAT_STREAM_ENDPOINT.format(chat_id=chat_id)}"
+            logger.info(f"🚀 Streaming agent execution in chat {chat_id}")
+            logger.debug(f"Stream URL: {stream_url}")
+            logger.debug(f"Payload: {stream_payload}")
 
-            response = await self._client.post(execution_url, json=execution_payload, headers=headers)
-            response.raise_for_status()
+            # Stream the response
+            accumulated_text = []
+            error_message = None
+            received_any_data = False
 
-            result = response.json()
-            logger.info(f"🔧 Response: {result}")
-            logger.info("✅ Remote execution completed successfully")
+            try:
+                async with self._client.stream("POST", stream_url, json=stream_payload, headers=headers) as response:
+                    response.raise_for_status()
 
-            # Check for error responses (even with 200 status)
-            if isinstance(result, dict):
-                # Check for actual error conditions (not just presence of error field)
-                if result.get("status") == "error" or (result.get("error") is not None):
-                    error_msg = result.get("error", str(result))
-                    logger.error(f"❌ Remote agent execution failed: {error_msg}")
-                    raise RuntimeError(f"Remote agent execution failed: {error_msg}")
+                    # Process SSE stream
+                    async for line in response.aiter_lines():
+                        received_any_data = True
+                        event_data = self._parse_sse_line(line)
+                        if not event_data:
+                            continue
 
-                # Check if the response indicates agent initialization failure
-                if "failed to initialize" in str(result):
-                    logger.error(f"❌ Agent initialization failed: {result}")
-                    raise RuntimeError(
-                        f"Agent initialization failed on remote server. "
-                        f"This usually indicates:\n"
-                        f"• Invalid agent configuration (LLM model, system prompt)\n"
-                        f"• Missing or invalid MCP server configurations\n"
-                        f"• Network connectivity issues with MCP servers\n"
-                        f"• Missing environment variables or credentials\n"
-                        f"Raw error: {result}"
-                    )
+                        event_type, data = event_data
+
+                        if event_type == "text":
+                            # Accumulate text chunks
+                            if isinstance(data, str):
+                                # AI SDK protocol format: data is the text directly
+                                accumulated_text.append(data)
+                            elif isinstance(data, dict):
+                                # Worker format: {"type": "text", "text": "content"}
+                                # or other formats with "text" or "content" fields
+                                text_content = data.get("text") or data.get("content") or ""
+                                if text_content:
+                                    accumulated_text.append(str(text_content))
+                        elif event_type == "error":
+                            # Handle error events
+                            if isinstance(data, str):
+                                error_message = data
+                            elif isinstance(data, dict):
+                                # Worker format: {"type": "error", "error": "message"}
+                                # or API format with error details
+                                error_message = data.get("error") or data.get("message") or str(data)
+                            else:
+                                error_message = str(data)
+                            logger.error(f"❌ Stream error: {error_message}")
+                        elif event_type == "done":
+                            # Stream completed successfully
+                            logger.info("✅ Remote execution completed successfully")
+                            break
+            except httpx.RemoteProtocolError as e:
+                if not received_any_data:
+                    logger.error(f"❌ Server disconnected without sending any data: {e}")
+                    error_message = "Server disconnected without sending a response. This may indicate: worker initialization timeout, network issues, or worker crash."
+                else:
+                    logger.error(f"❌ Connection lost mid-stream: {e}")
+                    error_message = f"Connection lost during streaming: {e}"
+
+            # Check for errors
+            if error_message:
+                raise RuntimeError(f"Remote agent execution failed: {error_message}")
+
+            # Combine accumulated text
+            final_text = "".join(accumulated_text)
+
+            if not final_text:
+                raise RuntimeError("No output received from remote agent")
 
             # Handle structured output
             if output_schema is not None:
-                return self._parse_structured_response(result, output_schema)
+                # Parse the accumulated text as structured output
+                return self._parse_structured_response(final_text, output_schema)
 
             # Regular string output
-            if isinstance(result, dict) and "result" in result:
-                return result["result"]
-            elif isinstance(result, str):
-                return result
-            else:
-                return str(result)
+            return final_text
 
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
