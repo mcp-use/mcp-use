@@ -937,8 +937,13 @@ class MCPAgent:
         start_time = time.time()
 
         generator = self.stream(
-            query, max_steps, manage_connector, external_history, track_execution=False, 
-            output_schema=output_schema, pretty_print=pretty_print
+            query,
+            max_steps,
+            manage_connector,
+            external_history,
+            track_execution=False,
+            output_schema=output_schema,
+            pretty_print=pretty_print,
         )
         error = None
         steps_taken = 0
