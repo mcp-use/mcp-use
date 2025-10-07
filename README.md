@@ -241,13 +241,71 @@ This streaming interface is ideal for applications that require real-time update
 
 # Example Use Cases
 
-## Supported MCP Servers
+## Morph (Fast Apply)
 
-- **Morph (Fast Apply)** — preset + examples for a fast edit-focused MCP server.
-  - Config: `examples/configs/morph_fast_apply.json`
-  - Agent example: `examples/morph_fast_apply.py`
-  - Raw tools example: `examples/morph_tools_langchain.py`
-  - Docs: `docs/servers/morph.mdx`
+MCP-Use supports integration with various MCP servers. Below are detailed examples for each supported server.
+
+[Morph](https://morph.so) provides AI-powered code editing capabilities through MCP. The Fast Apply feature enables efficient code modifications with minimal context.
+
+```python
+import asyncio
+import os
+from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
+from mcp_use import MCPAgent, MCPClient
+
+async def run_morph_example():
+    # Load environment variables
+    load_dotenv()
+
+    # Create MCPClient with Morph configuration
+    client = MCPClient.from_config_file(
+        os.path.join(os.path.dirname(__file__), "examples/configs/morph_fast_apply.json")
+    )
+
+    # Create LLM
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+
+    # Create agent with the client
+    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+
+    try:
+        # Run a code editing query
+        result = await agent.run(
+            "Refactor the main function to improve readability",
+            max_steps=30,
+        )
+        print(f"\nResult: {result}")
+    finally:
+        # Ensure we clean up resources properly
+        if client.sessions:
+            await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(run_morph_example())
+```
+
+Example configuration file (`examples/configs/morph_fast_apply.json`):
+
+```json
+{
+  "mcpServers": {
+    "morph": {
+      "command": "npx",
+      "args": ["-y", "@morph-labs/mcp-morph"],
+      "env": {
+        "MORPH_API_KEY": "your-api-key-here",
+        "ALL_TOOLS": "false"
+      }
+    }
+  }
+}
+```
+
+For more examples:
+- Agent example: `examples/morph_fast_apply.py`
+- Raw tools example: `examples/morph_tools_langchain.py`
+- Documentation: `docs/servers/morph.mdx`
 
 ## Web Browsing with Playwright
 
