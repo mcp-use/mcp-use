@@ -52,7 +52,7 @@ class TestLangChainAdapterToolCallIDManagement:
         mcp_tool.inputSchema = {"type": "object", "properties": {"arg1": {"type": "string"}}}
 
         tool = adapter._convert_tool(mcp_tool, connector)
-        
+
         result = await tool._arun(arg1="test_value")
 
         # Verify core functionality:
@@ -60,11 +60,13 @@ class TestLangChainAdapterToolCallIDManagement:
         agent._generate_tool_call_id.assert_called_once()
 
         # 2. ToolMessage was created with the ID
-        agent._create_tool_message.assert_called_once_with("call_abc12345", "[{'type': 'text', 'text': 'Tool execution result'}]")
-        
+        agent._create_tool_message.assert_called_once_with(
+            "call_abc12345", "[{'type': 'text', 'text': 'Tool execution result'}]"
+        )
+
         # 3. ToolMessage was added to conversation history
         agent.add_to_history.assert_called_once()
-        
+
         # 4. Tool execution returned correct result
         assert result == "[{'type': 'text', 'text': 'Tool execution result'}]"
 
