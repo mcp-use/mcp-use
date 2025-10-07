@@ -29,14 +29,16 @@ from .base import BaseAdapter
 class LangChainAdapter(BaseAdapter):
     """Adapter for converting MCP tools to LangChain tools."""
 
-    def __init__(self, disallowed_tools: list[str] | None = None) -> None:
+    def __init__(self, disallowed_tools: list[str] | None = None, agent: Any = None) -> None:
         """Initialize a new LangChain adapter.
 
         Args:
             disallowed_tools: list of tool names that should not be available.
+            agent: Optional MCPAgent instance for tool call ID management.
         """
         super().__init__(disallowed_tools)
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
+        self.agent = agent
 
     def fix_schema(self, schema: dict) -> dict:
         """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
@@ -154,19 +156,40 @@ class LangChainAdapter(BaseAdapter):
                 """
                 logger.debug(f'MCP tool: "{self.name}" received input: {kwargs}')
 
+                tool_call_id = None
+                if adapter_self.agent:
+                    tool_call_id = adapter_self.agent._generate_tool_call_id()
+
                 try:
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     try:
                         # Use the helper function to parse the result
-                        return adapter_self._parse_mcp_tool_result(tool_result)
+                        result_content = adapter_self._parse_mcp_tool_result(tool_result)
+                        
+                        if adapter_self.agent and tool_call_id:
+                            tool_message = adapter_self.agent._create_tool_message(tool_call_id, result_content)
+                            adapter_self.agent.add_to_history(tool_message)
+                        
+                        return result_content
                     except Exception as e:
-                        # Log the exception for debugging
                         logger.error(f"Error parsing tool result: {e}")
-                        return format_error(e, tool=self.name, tool_content=tool_result.content)
+                        error_content = format_error(e, tool=self.name, tool_content=tool_result.content)
+                        
+                        if adapter_self.agent and tool_call_id:
+                            tool_message = adapter_self.agent._create_tool_message(tool_call_id, error_content)
+                            adapter_self.agent.add_to_history(tool_message)
+                        
+                        return error_content
 
                 except Exception as e:
+                    error_content = format_error(e, tool=self.name) if self.handle_tool_error else str(e)
+                    
+                    if adapter_self.agent and tool_call_id:
+                        tool_message = adapter_self.agent._create_tool_message(tool_call_id, error_content)
+                        adapter_self.agent.add_to_history(tool_message)
+                    
                     if self.handle_tool_error:
-                        return format_error(e, tool=self.name)  # Format the error to make LLM understand it
+                        return error_content
                     raise
 
         return McpToLangChainAdapter()

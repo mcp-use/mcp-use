@@ -7,6 +7,7 @@ to provide a simple interface for using MCP tools with different LLMs.
 
 import logging
 import time
+import uuid
 from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TypeVar
 
@@ -15,6 +16,7 @@ from langchain.agents.output_parsers.tools import ToolAgentAction
 from langchain.globals import set_debug
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages.tool import ToolMessage
 from langchain.schema.language_model import BaseLanguageModel
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.exceptions import OutputParserException
@@ -140,7 +142,7 @@ class MCPAgent:
             raise ValueError("Either client or connector must be provided")
 
         # Create the adapter for tool conversion
-        self.adapter = LangChainAdapter(disallowed_tools=self.disallowed_tools)
+        self.adapter = LangChainAdapter(disallowed_tools=self.disallowed_tools, agent=self)
 
         # Initialize telemetry
         self.telemetry = Telemetry()
@@ -344,6 +346,26 @@ class MCPAgent:
         """
         if self.memory_enabled:
             self._conversation_history.append(message)
+
+    def _generate_tool_call_id(self) -> str:
+        """Generate unique tool call ID.
+        
+        Returns:
+            A unique tool call ID string.
+        """
+        return f"call_{uuid.uuid4().hex[:8]}"
+
+    def _create_tool_message(self, tool_call_id: str, content: str) -> ToolMessage:
+        """Create ToolMessage with proper tool_call_id.
+        
+        Args:
+            tool_call_id: The unique ID for this tool call.
+            content: The content/result of the tool call.
+            
+        Returns:
+            A ToolMessage object with the specified tool_call_id.
+        """
+        return ToolMessage(content=content, tool_call_id=tool_call_id)
 
     def get_system_message(self) -> SystemMessage | None:
         """Get the current system message.
