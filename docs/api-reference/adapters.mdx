@@ -473,6 +473,53 @@ agent = await create_langchain_agent()
 result = await agent.ainvoke({"input": "Read the contents of README.md"})
 ```
 
+### Morph Fast Apply Integration
+
+Using Morph MCP for safe file editing with environment variable configuration:
+
+```python
+import os
+from mcp_use import MCPClient
+from mcp_use.adapters import LangChainAdapter
+from dotenv import load_dotenv
+
+async def setup_morph_integration():
+    load_dotenv()  # Optional: loads from .env file
+    
+    # Configure Morph MCP server with actual env var values
+    # (JSON configs don't expand ${VAR} syntax automatically)
+    config = {
+        "mcpServers": {
+            "filesystem-with-morph": {
+                "command": "npx",
+                "args": ["@morph-llm/morph-fast-apply"],
+                "env": {
+                    "MORPH_API_KEY": os.getenv("MORPH_API_KEY", ""),
+                    "ALL_TOOLS": "false"  # Set to "true" to expose all filesystem tools
+                }
+            }
+        }
+    }
+    client = MCPClient.from_dict(config)
+    
+    # Get all tools discovered from Morph
+    adapter = LangChainAdapter()
+    tools = await adapter.create_tools(client)
+    
+    # With ALL_TOOLS="false", Morph only exposes edit_file (safe mode)
+    # With ALL_TOOLS="true", Morph exposes additional filesystem tools
+    print(f"Discovered {len(tools)} tool(s) from Morph MCP:")
+    for tool in tools:
+        print(f"  • {tool.name}")
+    
+    return client, tools
+
+# Usage
+client, tools = await setup_morph_integration()
+```
+
+This pattern demonstrates how to properly pass environment variables to MCP servers. For production environments, keep `ALL_TOOLS="false"` to limit capabilities to only the safe edit tool. See [Morph documentation](../servers/morph.mdx) for more details.
+
 ### Custom Framework Integration
 
 ```python

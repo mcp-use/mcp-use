@@ -241,6 +241,14 @@ This streaming interface is ideal for applications that require real-time update
 
 # Example Use Cases
 
+## Supported MCP Servers
+
+- **Morph (Fast Apply)** — preset + examples for a fast edit-focused MCP server.
+  - Config: `examples/configs/morph_fast_apply.json`
+  - Agent example: `examples/morph_fast_apply.py`
+  - Raw tools example: `examples/morph_tools_langchain.py`
+  - Docs: `docs/servers/morph.mdx`
+
 ## Web Browsing with Playwright
 
 ```python
@@ -854,3 +862,5 @@ If you use MCP-Use in your research or project, please cite:
 ```
 
 <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=732589b6-6850-4b8c-aa25-906c0979e426&page=README.md" />
+
+Integrated with Morph via MCP.
