@@ -10,14 +10,14 @@ Special thanks to https://github.com/microsoft/playwright-mcp for the server.
 """
 
 import asyncio
+import time
+from typing import Any
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from mcp.types import CallToolRequestParams, CallToolResult
 
 from mcp_use import MCPAgent, MCPClient
-from mcp_use.middleware import MiddlewareContext, NextFunctionT
-from mcp_use.middleware.middleware import Middleware
+from mcp_use.middleware import Middleware, MiddlewareContext, NextFunctionT
 
 
 async def main():
@@ -26,12 +26,22 @@ async def main():
     load_dotenv()
 
     # Create custom middleware
-    class CustomMiddleware(Middleware):
-        async def on_call_tool(
-            self, context: MiddlewareContext[CallToolRequestParams], call_next: NextFunctionT
-        ) -> CallToolResult:
-            print(f"Calling tool {context.params.name}")
-            return await call_next(context)
+    class TimingMiddleware(Middleware):
+        async def on_request(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> Any:
+            start = time.time()
+            try:
+                print("--------------------------------")
+                print(f"{context.method} started")
+                print("--------------------------------")
+                print(f"{context.params}, {context.metadata}, {context.timestamp}, {context.connection_id}")
+                print("--------------------------------")
+                result = await call_next(context)
+                return result
+            finally:
+                duration = time.time() - start
+                print("--------------------------------")
+                print(f"{context.method} took {int(1000 * duration)}ms")
+                print("--------------------------------")
 
     config = {
         "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
@@ -39,7 +49,7 @@ async def main():
 
     # MCPClient includes default logging middleware automatically
     # Add custom middleware only if needed
-    client = MCPClient(config=config, middleware=[CustomMiddleware()])
+    client = MCPClient(config=config, middleware=[TimingMiddleware()])
 
     # Create LLM
     llm = ChatOpenAI(model="gpt-4o")
