@@ -245,7 +245,7 @@ This streaming interface is ideal for applications that require real-time update
 
 MCP-Use supports integration with various MCP servers. Below are detailed examples for each supported server.
 
-[Morph](https://morph.so) provides AI-powered code editing capabilities through MCP. The Fast Apply feature enables efficient code modifications with minimal context.
+[Morph](https://morphllm.com) provides AI-powered code editing capabilities through MCP. The Fast Apply feature enables efficient code modifications with minimal context.
 
 ```python
 import asyncio
@@ -292,7 +292,7 @@ Example configuration file (`examples/configs/morph_fast_apply.json`):
   "mcpServers": {
     "morph": {
       "command": "npx",
-      "args": ["-y", "@morph-labs/mcp-morph"],
+      "args": ["-y", "@morph-llm/morph-fast-apply"],
       "env": {
         "MORPH_API_KEY": "your-api-key-here",
         "ALL_TOOLS": "false"
