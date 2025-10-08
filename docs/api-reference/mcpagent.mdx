@@ -87,10 +87,10 @@ weather: WeatherInfo = await agent.run(
 print(f"Temperature: {weather.temperature}°C, Condition: {weather.condition}")
 ```
 
-## astream
+## stream_events
 
 ```python
-async def astream(
+async def stream_events(
     query: str,
     max_steps: int | None = None,
     manage_connector: bool = True,
@@ -112,7 +112,7 @@ Asynchronous streaming interface for low-level agent events. Yields incremental 
 **Example:**
 
 ```python
-async for chunk in agent.astream("hello"):
+async for chunk in agent.stream_events("hello"):
     print(chunk, end="", flush=True)
 ```
 
@@ -122,7 +122,7 @@ async for chunk in agent.astream("hello"):
 |--------|----------|-------------|-------------|
 | `stream()` | Step-by-step workflow tracking | Steps + final result | Tool-level |
 | `run()` | Simple execution | Final result only | Complete |
-| `astream()` | Real-time chat interfaces | Streaming chunks | Token-level |
+| `stream_events()` | Real-time chat interfaces | Streaming chunks | Token-level |
 
 ## Conversation Memory
 
@@ -172,6 +172,28 @@ def set_system_message(message: str) -> None:
 
 Set a new system message for the agent.
 
+### get_system_message
+
+```python
+def get_system_message() -> SystemMessage | None:
+```
+
+Get the current system message.
+
+**Returns:**
+- `SystemMessage | None`: The current system message, or None if not set.
+
+### add_to_history
+
+```python
+def add_to_history(message: BaseMessage) -> None:
+```
+
+Add a message to the conversation history.
+
+**Parameters:**
+- `message` (BaseMessage): The message to add to the history.
+
 ### close
 
 ```python
@@ -179,3 +201,74 @@ async def close() -> None:
 ```
 
 Close the MCP connection and clean up resources.
+
+## Remote Agent Support
+
+The MCPAgent supports remote execution through the cloud service. When using remote execution, provide an `agent_id` instead of an `llm`:
+
+```python
+agent = MCPAgent(
+    agent_id="your_agent_id",
+    api_key="your_api_key",  # Optional, can use MCP_USE_API_KEY env var
+    base_url="https://cloud.mcp-use.com",  # Optional, defaults to cloud service
+    chat_id="optional_chat_id"  # Optional, for conversation continuity
+)
+
+# Use the same interface
+result = await agent.run("What's the weather like?")
+```
+
+**Remote Agent Parameters:**
+- `agent_id` (str): Remote agent ID for cloud execution
+- `api_key` (str, optional): API key for authentication. If None, checks MCP_USE_API_KEY environment variable
+- `base_url` (str, optional): Base URL for remote API calls. Defaults to "https://cloud.mcp-use.com"
+- `chat_id` (str, optional): Chat ID for conversation continuity across sessions
+
+## Advanced Configuration
+
+### Error Handling and Retry Logic
+
+```python
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    retry_on_error=True,  # Enable retry on validation errors
+    max_retries_per_step=2  # Maximum retries per step
+)
+```
+
+**Parameters:**
+- `retry_on_error` (bool): Whether to retry tool calls that fail due to validation errors
+- `max_retries_per_step` (int): Maximum number of retries for validation errors per step
+
+### Verbose Logging
+
+```python
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    verbose=True  # Enable verbose logging during execution
+)
+```
+
+**Parameters:**
+- `verbose` (bool): Enable verbose logging for agent execution steps
+
+### Custom Callbacks
+
+```python
+from langchain.callbacks import BaseCallbackHandler
+
+class CustomCallback(BaseCallbackHandler):
+    def on_tool_start(self, serialized, input_str, **kwargs):
+        print(f"Tool started: {serialized['name']}")
+
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    callbacks=[CustomCallback()]  # Custom callback handlers
+)
+```
+
+**Parameters:**
+- `callbacks` (list): List of LangChain callback handlers for monitoring agent execution

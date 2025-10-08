@@ -10,13 +10,20 @@ The `MCPClient` class is the core component for managing connections to MCP serv
 
 ## Constructor
 
-### MCPClient(config_dict, debug=False)
+### MCPClient(config=None, allowed_servers=None, sandbox=False, sandbox_options=None, sampling_callback=None, elicitation_callback=None, message_handler=None, logging_callback=None, middleware=None)
 
-Creates a new MCPClient instance from a configuration dictionary.
+Creates a new MCPClient instance from a configuration dictionary or file path.
 
 **Parameters:**
-- `config_dict` (dict): Configuration dictionary containing server definitions
-- `debug` (bool, optional): Enable debug logging. Defaults to False.
+- `config` (str | dict, optional): Either a dict containing configuration or a path to a JSON config file. If None, an empty configuration is used.
+- `allowed_servers` (list[str], optional): List of server names that are allowed to be used. If None, all configured servers are allowed.
+- `sandbox` (bool, optional): Whether to use sandboxed execution mode for running MCP servers. Defaults to False.
+- `sandbox_options` (SandboxOptions, optional): Configuration options for sandbox execution.
+- `sampling_callback` (SamplingFnT, optional): Optional sampling callback function.
+- `elicitation_callback` (ElicitationFnT, optional): Optional elicitation callback function.
+- `message_handler` (MessageHandlerFnT, optional): Optional message handler function.
+- `logging_callback` (LoggingFnT, optional): Optional logging callback function.
+- `middleware` (list[Middleware], optional): List of middleware to use.
 
 **Example:**
 ```python
@@ -29,34 +36,53 @@ config = {
     }
 }
 
-client = MCPClient(config, debug=True)
+client = MCPClient(
+    config=config,
+    sandbox=True,
+    sandbox_options={"api_key": "your_e2b_key"},
+    allowed_servers=["filesystem"]
+)
 ```
 
 ## Class Methods
 
-### from_config_file(config_file_path, debug=False)
+### from_config_file(filepath, sandbox=False, sandbox_options=None, sampling_callback=None, elicitation_callback=None, message_handler=None, logging_callback=None)
 
 Creates an MCPClient instance from a JSON configuration file.
 
 **Parameters:**
-- `config_file_path` (str): Path to the JSON configuration file
-- `debug` (bool, optional): Enable debug logging. Defaults to False.
+- `filepath` (str): Path to the JSON configuration file
+- `sandbox` (bool, optional): Whether to use sandboxed execution mode. Defaults to False.
+- `sandbox_options` (SandboxOptions, optional): Configuration options for sandbox execution.
+- `sampling_callback` (SamplingFnT, optional): Optional sampling callback function.
+- `elicitation_callback` (ElicitationFnT, optional): Optional elicitation callback function.
+- `message_handler` (MessageHandlerFnT, optional): Optional message handler function.
+- `logging_callback` (LoggingFnT, optional): Optional logging callback function.
 
 **Returns:**
 - `MCPClient`: Configured client instance
 
 **Example:**
 ```python
-client = MCPClient.from_config_file("mcp_config.json")
+client = MCPClient.from_config_file(
+    "mcp_config.json",
+    sandbox=True,
+    sandbox_options={"api_key": "your_e2b_key"}
+)
 ```
 
-### from_dict(config_dict, debug=False)
+### from_dict(config, sandbox=False, sandbox_options=None, sampling_callback=None, elicitation_callback=None, message_handler=None, logging_callback=None)
 
 Creates an MCPClient instance from a configuration dictionary.
 
 **Parameters:**
-- `config_dict` (dict): Configuration dictionary
-- `debug` (bool, optional): Enable debug logging. Defaults to False.
+- `config` (dict): Configuration dictionary
+- `sandbox` (bool, optional): Whether to use sandboxed execution mode. Defaults to False.
+- `sandbox_options` (SandboxOptions, optional): Configuration options for sandbox execution.
+- `sampling_callback` (SamplingFnT, optional): Optional sampling callback function.
+- `elicitation_callback` (ElicitationFnT, optional): Optional elicitation callback function.
+- `message_handler` (MessageHandlerFnT, optional): Optional message handler function.
+- `logging_callback` (LoggingFnT, optional): Optional logging callback function.
 
 **Returns:**
 - `MCPClient`: Configured client instance
@@ -72,7 +98,11 @@ config = {
     }
 }
 
-client = MCPClient(config)
+client = MCPClient.from_dict(
+    config,
+    sandbox=True,
+    sampling_callback=my_sampling_callback
+)
 ```
 
 ## Instance Methods
@@ -109,6 +139,28 @@ Removes a server configuration from the client.
 **Example:**
 ```python
 client.remove_server("filesystem")
+```
+
+### add_middleware(middleware)
+
+Adds a middleware to the client. Middleware is applied to all sessions created by this client.
+
+**Parameters:**
+- `middleware` (Middleware): The middleware to add
+
+**Returns:**
+- `None`
+
+**Example:**
+```python
+from mcp_use.middleware import Middleware
+
+class CustomMiddleware(Middleware):
+    async def process_request(self, request):
+        # Custom request processing
+        return request
+
+client.add_middleware(CustomMiddleware())
 ```
 
 ### get_server_names()

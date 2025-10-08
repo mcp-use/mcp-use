@@ -19,12 +19,18 @@ The `MCPClient` is the core class for interacting with MCP servers. It handles c
 ```python
 from mcp_use import MCPClient
 
-client = MCPClient.from_config_file(config_path="config.json")
+client = MCPClient.from_config_file(
+    filepath="config.json",
+    sandbox=False,
+    sandbox_options=None
+)
 ```
 
-| Parameter     | Type | Required | Description                         |
-| ------------- | ---- | -------- | ----------------------------------- |
-| `config_path` | str  | Yes      | Path to the JSON configuration file |
+| Parameter       | Type | Required | Description                         |
+| --------------- | ---- | -------- | ----------------------------------- |
+| `filepath`      | str  | Yes      | Path to the JSON configuration file |
+| `sandbox`       | bool | No       | Whether to use sandboxed execution  |
+| `sandbox_options` | SandboxOptions | No | Configuration options for sandbox |
 
 #### From Dictionary
 
@@ -43,16 +49,22 @@ config = {
   }
 }
 
-client = MCPClient.from_dict(config=config)
+client = MCPClient.from_dict(
+    config=config,
+    sandbox=False,
+    sandbox_options=None
+)
 ```
 
-| Parameter | Type | Required | Description                                    |
-| --------- | ---- | -------- | ---------------------------------------------- |
-| `config`  | dict | Yes      | Dictionary containing MCP server configuration |
+| Parameter       | Type | Required | Description                                    |
+| --------------- | ---- | -------- | ---------------------------------------------- |
+| `config`        | dict | Yes      | Dictionary containing MCP server configuration |
+| `sandbox`       | bool | No       | Whether to use sandboxed execution             |
+| `sandbox_options` | SandboxOptions | No | Configuration options for sandbox           |
 
 #### Sandboxed Execution
 
-Both `from_config_file` and `from_dict` methods support the `options` parameter for configuring client features, including sandboxed execution:
+Both `from_config_file` and `from_dict` methods support sandboxed execution for running MCP servers in isolated environments:
 
 ```python
 from mcp_use import MCPClient
@@ -66,7 +78,7 @@ sandbox_options: SandboxOptions = {
 
 # Create client with sandboxed mode enabled
 client = MCPClient.from_config_file(
-    config_path="config.json",
+    filepath="config.json",
     sandbox=True,
     sandbox_options=sandbox_options
 )
@@ -97,16 +109,14 @@ Creates a new session with an MCP server.
 session = await client.create_session(server_name="my_server")
 ```
 
-| Parameter     | Type  | Required | Default | Description                             |
-| ------------- | ----- | -------- | ------- | --------------------------------------- |
-| `server_name` | str   | Yes      | -       | Name of the server as defined in config |
-| `timeout`     | float | No       | 30.0    | Connection timeout in seconds           |
-| `retry_count` | int   | No       | 3       | Number of connection retry attempts     |
+| Parameter         | Type  | Required | Default | Description                             |
+| ----------------- | ----- | -------- | ------- | --------------------------------------- |
+| `server_name`     | str   | Yes      | -       | Name of the server as defined in config |
+| `auto_initialize` | bool  | No       | True    | Whether to automatically initialize the session |
 
 **When to use**:
 
-- Use a longer `timeout` for servers that take more time to initialize
-- Increase `retry_count` in unstable network environments
+- Set `auto_initialize=False` if you want to manually initialize the session later
 - Use specific `server_name` when working with multiple servers in the same config
 
 #### close_session
@@ -160,33 +170,49 @@ agent = MCPAgent(
     llm=ChatOpenAI(model="gpt-4o", temperature=0.7),
     client=MCPClient.from_config_file("config.json"),
     max_steps=30,
-    session_options={"timeout": 60.0},
     auto_initialize=True,
     memory_enabled=True,
     system_prompt=None,
     system_prompt_template=None,
     additional_instructions=None,
     disallowed_tools=None,
-    use_server_manager=False
+    tools_used_names=None,
+    use_server_manager=False,
+    server_manager=None,
+    verbose=False,
+    agent_id=None,
+    api_key=None,
+    base_url="https://cloud.mcp-use.com",
+    callbacks=None,
+    chat_id=None,
+    retry_on_error=True,
+    max_retries_per_step=2
 )
 ```
 
 | Parameter                 | Type                | Required | Default | Description                                                                                                                                     |
 | ------------------------- | ------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `llm`                     | BaseLanguageModel   | Yes      | -       | Any LangChain-compatible language model                                                                                                         |
+| `llm`                     | BaseLanguageModel   | No       | None    | Any LangChain-compatible language model. Not required if agent_id is provided for remote execution.                                            |
 | `client`                  | MCPClient           | No       | None    | The MCPClient instance                                                                                                                          |
 | `connectors`              | list[BaseConnector] | No       | None    | List of connectors if not using client                                                                                                          |
-| `server_name`             | str                 | No       | None    | Name of the server to use                                                                                                                       |
 | `max_steps`               | int                 | No       | 5       | Maximum number of steps the agent can take                                                                                                      |
 | `auto_initialize`         | bool                | No       | False   | Whether to initialize automatically                                                                                                             |
 | `memory_enabled`          | bool                | No       | True    | Whether to enable memory                                                                                                                        |
 | `system_prompt`           | str                 | No       | None    | Custom system prompt                                                                                                                            |
 | `system_prompt_template`  | str                 | No       | None    | Custom system prompt template                                                                                                                   |
 | `additional_instructions` | str                 | No       | None    | Additional instructions for the agent                                                                                                           |
-| `session_options`         | dict                | No       | {}      | Additional options for session creation                                                                                                         |
-| `output_parser`           | OutputParser        | No       | None    | Custom output parser for LLM responses                                                                                                          |
-| `use_server_manager`      | bool                | No       | False   | If `True`, enables automatic selection of the appropriate server based on the chosen tool when multiple servers are configured via `MCPClient`. |
 | `disallowed_tools`        | list[str]           | No       | None    | List of tool names that should not be available to the agent                                                                                    |
+| `tools_used_names`        | list[str]           | No       | None    | List of tool names that have been used by the agent                                                                                             |
+| `use_server_manager`      | bool                | No       | False   | If `True`, enables automatic selection of the appropriate server based on the chosen tool when multiple servers are configured via `MCPClient`. |
+| `server_manager`          | BaseServerManager   | No       | None    | Custom server manager instance                                                                                                                  |
+| `verbose`                 | bool                | No       | False   | Enable verbose logging during execution                                                                                                         |
+| `agent_id`                | str                 | No       | None    | Remote agent ID for cloud execution                                                                                                             |
+| `api_key`                 | str                 | No       | None    | API key for remote execution. If None, checks MCP_USE_API_KEY env var.                                                                          |
+| `base_url`                | str                 | No       | "https://cloud.mcp-use.com" | Base URL for remote API calls                                                                                                               |
+| `callbacks`               | list                | No       | None    | List of LangChain callback handlers                                                                                                             |
+| `chat_id`                 | str                 | No       | None    | Chat ID for conversation continuity across sessions                                                                                             |
+| `retry_on_error`          | bool                | No       | True    | Whether to retry tool calls that fail due to validation errors                                                                                  |
+| `max_retries_per_step`    | int                 | No       | 2       | Maximum number of retries for validation errors per step                                                                                        |
 
 **When to use different parameters**:
 
@@ -227,6 +253,22 @@ agent = MCPAgent(
   - Useful when certain tools might be dangerous or unnecessary for a specific task
   - Can be updated after initialization using `set_disallowed_tools()`
 
+- **Remote execution (agent_id)**:
+  - Use when you want to run agents in the cloud without local LLM setup
+  - Provide `agent_id` instead of `llm` for cloud execution
+  - Useful for serverless deployments or when you don't want to manage local models
+  - API key can be provided directly or via `MCP_USE_API_KEY` environment variable
+
+- **Error handling and retries**:
+  - `retry_on_error`: Enable automatic retry on validation errors
+  - `max_retries_per_step`: Control how many times to retry failed tool calls
+  - Useful for handling transient errors or improving reliability
+
+- **Verbose logging**:
+  - `verbose`: Enable detailed logging during agent execution
+  - Helpful for debugging and monitoring agent behavior
+  - Shows reasoning, tool calls, and results in detail
+
 ### Core Methods
 
 #### run
@@ -237,7 +279,9 @@ Runs the agent with a given query.
 result = await agent.run(
     query="Find information about Python libraries",
     max_steps=25,
-    stop_on_first_result=False
+    manage_connector=True,
+    external_history=None,
+    output_schema=None
 )
 ```
 
@@ -245,16 +289,16 @@ result = await agent.run(
 | ---------------------- | ---- | -------- | ------- | -------------------------------- |
 | `query`                | str  | Yes      | -       | The query to run                 |
 | `max_steps`            | int  | No       | None    | Overrides the instance max_steps |
-| `stop_on_first_result` | bool | No       | False   | Whether to stop at first result  |
-| `server_name`          | str  | No       | None    | Specific server to use           |
-| `callbacks`            | list | No       | None    | Callback functions for events    |
+| `manage_connector`     | bool | No       | True    | Whether to handle connector lifecycle |
+| `external_history`     | list[BaseMessage] | No | None | External conversation history |
+| `output_schema`        | type[T] | No     | None    | Pydantic model for structured output |
 
 **When to use different parameters**:
 
 - **max_steps**: Override the instance default for specific queries
-- **stop_on_first_result**: Use True for simple lookups, False for thorough exploration
-- **server_name**: Specify when using multiple servers for different tasks
-- **callbacks**: Add for monitoring or logging specific runs
+- **manage_connector**: Set to False when you want to manage connector lifecycle manually
+- **external_history**: Use when you want to provide conversation history from another source
+- **output_schema**: Use when you need structured output in a specific Pydantic model format
 
 #### reset
 
@@ -401,6 +445,64 @@ except Exception as e:
 ```
 
 ## Advanced Usage
+
+### Remote Agent Usage
+
+Use agents in the cloud without local LLM setup:
+
+```python
+from mcp_use import MCPAgent
+
+# Create remote agent
+agent = MCPAgent(
+    agent_id="your_agent_id",
+    api_key="your_api_key",  # Optional, can use MCP_USE_API_KEY env var
+    base_url="https://cloud.mcp-use.com"  # Optional, defaults to cloud service
+)
+
+# Use the same interface as local agents
+result = await agent.run("Search for information about Python libraries")
+
+# Streaming works the same way
+async for step in agent.stream("What's the weather like?"):
+    if isinstance(step, str):
+        print(f"Final result: {step}")
+    else:
+        action, observation = step
+        print(f"Tool: {action.tool}, Result: {observation}")
+```
+
+### Structured Output
+
+Get structured results using Pydantic models:
+
+```python
+from pydantic import BaseModel, Field
+from mcp_use import MCPAgent, MCPClient
+from langchain_openai import ChatOpenAI
+
+class WeatherInfo(BaseModel):
+    temperature: float = Field(description="Temperature in Celsius")
+    condition: str = Field(description="Weather condition")
+    location: str = Field(description="Location name")
+    humidity: int = Field(description="Humidity percentage")
+
+# Create agent
+agent = MCPAgent(
+    llm=ChatOpenAI(model="gpt-4o"),
+    client=MCPClient.from_config_file("config.json")
+)
+
+# Get structured output
+weather: WeatherInfo = await agent.run(
+    "What's the weather like in London?",
+    output_schema=WeatherInfo
+)
+
+print(f"Temperature: {weather.temperature}°C")
+print(f"Condition: {weather.condition}")
+print(f"Humidity: {weather.humidity}%")
+```
 
 ### Multi-Server Configuration
 
