@@ -90,6 +90,7 @@
               "agent/llm-integration",
               "agent/server-manager",
               "agent/streaming",
+              "agent/pretty-printing",
               "agent/structured-output",
               "agent/interactive-chat-patterns"
             ]
