@@ -256,13 +256,11 @@ agent = MCPAgent(
 - **Remote execution (agent_id)**:
   - Use when you want to run agents in the cloud without local LLM setup
   - Provide `agent_id` instead of `llm` for cloud execution
-  - Useful for serverless deployments or when you don't want to manage local models
   - API key can be provided directly or via `MCP_USE_API_KEY` environment variable
 
 - **Error handling and retries**:
   - `retry_on_error`: Enable automatic retry on validation errors
   - `max_retries_per_step`: Control how many times to retry failed tool calls
-  - Useful for handling transient errors or improving reliability
 
 - **Verbose logging**:
   - `verbose`: Enable detailed logging during agent execution

@@ -167,7 +167,7 @@ Methods for managing the agent's lifecycle and configuration.
 ### set_system_message
 
 ```python
-def set_system_message(message: str) -> None:
+def set_system_message(message: str) -> None
 ```
 
 Set a new system message for the agent.
@@ -175,7 +175,7 @@ Set a new system message for the agent.
 ### get_system_message
 
 ```python
-def get_system_message() -> SystemMessage | None:
+def get_system_message() -> SystemMessage | None
 ```
 
 Get the current system message.
@@ -186,7 +186,7 @@ Get the current system message.
 ### add_to_history
 
 ```python
-def add_to_history(message: BaseMessage) -> None:
+def add_to_history(message: BaseMessage) -> None
 ```
 
 Add a message to the conversation history.
@@ -197,7 +197,7 @@ Add a message to the conversation history.
 ### close
 
 ```python
-async def close() -> None:
+async def close() -> None
 ```
 
 Close the MCP connection and clean up resources.
@@ -211,7 +211,6 @@ agent = MCPAgent(
     agent_id="your_agent_id",
     api_key="your_api_key",  # Optional, can use MCP_USE_API_KEY env var
     base_url="https://cloud.mcp-use.com",  # Optional, defaults to cloud service
-    chat_id="optional_chat_id"  # Optional, for conversation continuity
 )
 
 # Use the same interface
@@ -222,7 +221,6 @@ result = await agent.run("What's the weather like?")
 - `agent_id` (str): Remote agent ID for cloud execution
 - `api_key` (str, optional): API key for authentication. If None, checks MCP_USE_API_KEY environment variable
 - `base_url` (str, optional): Base URL for remote API calls. Defaults to "https://cloud.mcp-use.com"
-- `chat_id` (str, optional): Chat ID for conversation continuity across sessions
 
 ## Advanced Configuration
 
@@ -241,18 +239,6 @@ agent = MCPAgent(
 - `retry_on_error` (bool): Whether to retry tool calls that fail due to validation errors
 - `max_retries_per_step` (int): Maximum number of retries for validation errors per step
 
-### Verbose Logging
-
-```python
-agent = MCPAgent(
-    llm=llm,
-    client=client,
-    verbose=True  # Enable verbose logging during execution
-)
-```
-
-**Parameters:**
-- `verbose` (bool): Enable verbose logging for agent execution steps
 
 ### Custom Callbacks
 
