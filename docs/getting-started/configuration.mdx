@@ -39,7 +39,8 @@ For a basic setup, you need both client and agent configuration:
 
 ### 1. Client Setup
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPClient
 
 # Configure your MCP servers
@@ -53,12 +54,31 @@ config = {
     }
 }
 
-client = MCPClient.from_dict(config)
+client = MCPClient(config)
 ```
+
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
+
+// Configure your MCP servers
+const config = {
+    mcpServers: {
+        playwright: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            env: { DISPLAY: ':1' }
+        }
+    }
+}
+
+const client = new MCPClient(config)
+```
+</CodeGroup>
 
 ### 2. Agent Setup
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPAgent
 from langchain_openai import ChatOpenAI
 
@@ -67,9 +87,20 @@ llm = ChatOpenAI(model="gpt-4o")
 agent = MCPAgent(llm=llm, client=client)
 ```
 
+```typescript TypeScript
+import { MCPAgent } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+
+// Configure your agent with an LLM
+const llm = new ChatOpenAI({ model: 'gpt-4o' })
+const agent = new MCPAgent({ llm, client })
+```
+</CodeGroup>
+
 ### 3. Basic Usage
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 
 async def main():
@@ -78,6 +109,16 @@ async def main():
 
 asyncio.run(main())
 ```
+
+```typescript TypeScript
+async function main() {
+    const result = await agent.run('Search for information about climate change')
+    console.log(result)
+}
+
+main().catch(console.error)
+```
+</CodeGroup>
 
 ## Configuration Paths
 
@@ -104,7 +145,9 @@ asyncio.run(main())
 ## Common Configuration Patterns
 
 ### Development Setup
-```python
+
+<CodeGroup>
+```python Python
 # Simple development configuration
 from dotenv import load_dotenv
 load_dotenv()
@@ -118,8 +161,29 @@ agent = MCPAgent(
 )
 ```
 
+```typescript TypeScript
+// Simple development configuration
+import { config } from 'dotenv'
+import { loadConfigFile, MCPAgent, MCPClient } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+
+config()
+
+const configuration = await loadConfigFile('dev-config.json')
+const client = new MCPClient(configuration)
+const agent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o' }),
+    client,
+    maxSteps: 10,
+    verbose: true
+})
+```
+</CodeGroup>
+
 ### Production Setup
-```python
+
+<CodeGroup>
+```python Python
 # Production configuration with restrictions
 agent = MCPAgent(
     llm=ChatOpenAI(model="gpt-4o", temperature=0.1),
@@ -131,8 +195,23 @@ agent = MCPAgent(
 )
 ```
 
+```typescript TypeScript
+// Production configuration with restrictions
+const agent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.1 }),
+    client,
+    maxSteps: 30,
+    disallowedTools: ['file_system', 'shell'],
+    useServerManager: true,
+    memoryEnabled: true
+})
+```
+</CodeGroup>
+
 ### Multi-Server Setup
-```python
+
+<CodeGroup>
+```python Python
 # Complex multi-server configuration
 client = MCPClient.from_config_file("multi-server.json")
 agent = MCPAgent(
@@ -142,6 +221,19 @@ agent = MCPAgent(
     system_prompt="You have access to web browsing, file operations, and API tools."
 )
 ```
+
+```typescript TypeScript
+// Complex multi-server configuration
+const config = await loadConfigFile('multi-server.json')
+const client = new MCPClient(config)
+const agent = new MCPAgent({
+    llm,
+    client,
+    useServerManager: true,  // Auto-select servers
+    systemPrompt: 'You have access to web browsing, file operations, and API tools.'
+})
+```
+</CodeGroup>
 
 ## What's Next?
 

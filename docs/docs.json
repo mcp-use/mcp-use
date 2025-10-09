@@ -74,6 +74,7 @@
                 "group": "Advanced Features",
                 "icon": "sparkle",
                 "pages": [
+                  "client/middleware",
                   "client/sampling",
                   "client/elicitation",
                   "client/notifications",
@@ -165,6 +166,18 @@
             "pages": [
                   "changelog/1_3_11"
                 ]
+          }
+        ]
+      },
+      {
+        "tab": "Blog",
+        "icon": "book",
+        "groups": [
+          {
+            "group": "Blog",
+            "pages": [
+              "blog/middleware"
+            ]
           }
         ]
       }

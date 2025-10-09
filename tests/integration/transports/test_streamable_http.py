@@ -15,8 +15,10 @@ async def server_process():
     print(f"Starting server: python {server_path}")
 
     # Start the server process
+    import sys
+
     process = subprocess.Popen(
-        ["python", str(server_path), "--transport", "streamable-http"],
+        [sys.executable, str(server_path), "--transport", "streamable-http"],
         cwd=str(server_path.parent),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

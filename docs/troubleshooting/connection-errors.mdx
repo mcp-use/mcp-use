@@ -422,14 +422,22 @@ sudo ufw disable
 
 **Solutions**:
 ```dockerfile
+# Install Node.js and npm
+RUN apt-get update && apt-get install -y nodejs npm && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pyproject.toml ./
+
+# Install in editable mode
+COPY . .
+RUN pip install -e ".[dev,anthropic,openai]"
+
 # Expose necessary ports
 EXPOSE 8000
 
-# Install required dependencies
-RUN apt-get update && apt-get install -y nodejs npm
-
 # Set proper networking
-CMD ["python", "main.py", "--host", "0.0.0.0"]
+CMD ["python", "main.py", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ```yaml
@@ -440,7 +448,6 @@ services:
     build: .
     ports:
       - "8000:8000"
-    network_mode: "host"  # For localhost server access
 ```
 
 ### Volume Mounting

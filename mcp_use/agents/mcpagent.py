@@ -281,9 +281,12 @@ class MCPAgent:
         )
 
         # Update conversation history if memory is enabled
+        # Note: The system message should not be included in the conversation history,
+        # as it will be automatically added using the create_tool_calling_agent function with the prompt parameter
         if self.memory_enabled:
-            history_without_system = [msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)]
-            self._conversation_history = [self._system_message] + history_without_system
+            self._conversation_history = [
+                msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)
+            ]
 
     def _create_agent(self) -> AgentExecutor:
         """Create the LangChain agent with the configured system message.
@@ -297,14 +300,25 @@ class MCPAgent:
         if self._system_message:
             system_content = self._system_message.content
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_content),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ]
-        )
+        if self.memory_enabled:
+            # Query already in chat_history — don't re-inject it
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system_content),
+                    MessagesPlaceholder(variable_name="chat_history"),
+                    ("human", "{input}"),
+                    MessagesPlaceholder(variable_name="agent_scratchpad"),
+                ]
+            )
+        else:
+            # No memory — inject input directly
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system_content),
+                    ("human", "{input}"),
+                    MessagesPlaceholder(variable_name="agent_scratchpad"),
+                ]
+            )
 
         tool_names = [tool.name for tool in self._tools]
         logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
@@ -335,10 +349,6 @@ class MCPAgent:
         """Clear the conversation history."""
         self._conversation_history = []
 
-        # Re-add the system message if it exists
-        if self._system_message and self.memory_enabled:
-            self._conversation_history = [self._system_message]
-
     def add_to_history(self, message: BaseMessage) -> None:
         """Add a message to the conversation history.
 
@@ -363,15 +373,6 @@ class MCPAgent:
             message: The new system message content.
         """
         self._system_message = SystemMessage(content=message)
-
-        # Update conversation history if memory is enabled
-        if self.memory_enabled:
-            # Remove old system message if it exists
-            history_without_system = [msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)]
-            self._conversation_history = history_without_system
-
-            # Add new system message
-            self._conversation_history.insert(0, self._system_message)
 
         # Recreate the agent with the new system message if initialized
         if self._initialized and self._tools:
@@ -547,10 +548,6 @@ class MCPAgent:
 
             display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
             logger.info(f"💬 Received query: '{display_query}'")
-
-            # Add the user query to conversation history if memory is enabled
-            if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
 
             # Use the provided history or the internal history
             history_to_use = external_history if external_history is not None else self._conversation_history
@@ -801,6 +798,9 @@ class MCPAgent:
                 except Exception as e:
                     logger.error(f"❌ Final structured output attempt failed: {e}")
                     raise RuntimeError(f"Failed to generate structured output after {steps} steps: {str(e)}") from e
+
+            if self.memory_enabled:
+                self.add_to_history(HumanMessage(content=query))
 
             if self.memory_enabled and not output_schema:
                 self.add_to_history(AIMessage(content=self._normalize_output(result)))
@@ -1089,9 +1089,6 @@ class MCPAgent:
         effective_max_steps = max_steps or self.max_steps
         self._agent_executor.max_iterations = effective_max_steps
 
-        if self.memory_enabled:
-            self.add_to_history(HumanMessage(content=query))
-
         history_to_use = external_history if external_history is not None else self._conversation_history
         inputs = {"input": query, "chat_history": history_to_use}
 
@@ -1104,6 +1101,10 @@ class MCPAgent:
                         if not isinstance(message, ToolAgentAction):
                             self.add_to_history(message)
             yield event
+
+        if self.memory_enabled:
+            self.add_to_history(HumanMessage(content=query))
+
         # 5. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
         #  when the agent was initialized in this generator and is not client-managed

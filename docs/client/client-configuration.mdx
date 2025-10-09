@@ -105,11 +105,12 @@ For a complete example of using multiple servers, see the [multi-server example]
 
 There are several ways to create an MCPClient:
 
-### From Dictionary
+### From Dictionary/Object
 
 Create configuration programmatically:
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPClient
 
 config = {
@@ -125,22 +126,49 @@ config = {
 client = MCPClient(config)
 ```
 
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
+
+const config = {
+    mcpServers: {
+        playwright: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            env: { DISPLAY: ':1' }
+        }
+    }
+}
+
+const client = new MCPClient(config)
+```
+</CodeGroup>
+
 ### From Configuration File
 
 Load configuration from a JSON file:
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPClient
 
 client = MCPClient.from_config_file("config.json")
 ```
+
+```typescript TypeScript
+import { MCPClient, loadConfigFile } from 'mcp-use'
+
+const config = await loadConfigFile('config.json')
+const client = new MCPClient(config)
+```
+</CodeGroup>
 
 
 ### With Sandbox Options
 
 Enable sandboxed execution:
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPClient
 from mcp_use.types.sandbox import SandboxOptions
 
@@ -155,6 +183,12 @@ client = MCPClient.from_dict(
     sandbox_options=sandbox_options
 )
 ```
+
+```typescript TypeScript
+// Note: Sandbox mode is not yet supported in the TypeScript library
+// This is a planned feature for a future release
+```
+</CodeGroup>
 
 ## Best Practices
 

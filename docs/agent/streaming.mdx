@@ -10,7 +10,8 @@ mcp-use supports multiple approaches for streaming agent output, allowing you to
 
 The `stream` method provides a clean interface for receiving intermediate steps during agent execution. Each step represents a tool call and its result.
 
-```python step_streaming.py
+<CodeGroup>
+```python Python
 import asyncio
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
@@ -26,7 +27,7 @@ async def step_streaming_example():
         }
     }
 
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     llm = ChatOpenAI(model="gpt-4")
     agent = MCPAgent(llm=llm, client=client)
 
@@ -51,11 +52,50 @@ if __name__ == "__main__":
     asyncio.run(step_streaming_example())
 ```
 
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+async function stepStreamingExample() {
+    // Setup agent
+    const config = {
+        mcpServers: {
+            playwright: {
+                command: 'npx',
+                args: ['@playwright/mcp@latest']
+            }
+        }
+    }
+
+    const client = new MCPClient(config)
+    const llm = new ChatOpenAI({ model: 'gpt-4' })
+    const agent = new MCPAgent({ llm, client })
+
+    // Stream the agent's steps
+    console.log('🤖 Agent is working...')
+    console.log('-'.repeat(50))
+
+    for await (const step of agent.stream('Search for the latest Python news and summarize it')) {
+        console.log(`\n🔧 Tool: ${step.action.tool}`)
+        console.log(`📝 Input: ${JSON.stringify(step.action.toolInput)}`)
+        const result = step.observation.substring(0, 100)
+        console.log(`📄 Result: ${result}${step.observation.length > 100 ? '...' : ''}`)
+    }
+
+    console.log('\n🎉 Done!')
+    await client.closeAllSessions()
+}
+
+stepStreamingExample().catch(console.error)
+```
+</CodeGroup>
+
 ## Low-Level Event Streaming
 
 For more granular control, use the `stream_events` method to get real-time output events:
 
-```python basic_streaming.py
+<CodeGroup>
+```python Python
 import asyncio
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
@@ -71,7 +111,7 @@ async def basic_streaming_example():
         }
     }
 
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     llm = ChatOpenAI(model="gpt-4")
     agent = MCPAgent(llm=llm, client=client)
 
@@ -85,6 +125,46 @@ async def basic_streaming_example():
 if __name__ == "__main__":
     asyncio.run(basic_streaming_example())
 ```
+
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+async function basicStreamingExample() {
+    // Setup agent
+    const config = {
+        mcpServers: {
+            playwright: {
+                command: 'npx',
+                args: ['@playwright/mcp@latest']
+            }
+        }
+    }
+
+    const client = new MCPClient(config)
+    const llm = new ChatOpenAI({ model: 'gpt-4' })
+    const agent = new MCPAgent({ llm, client })
+
+    // Stream the agent's response
+    console.log('Agent is working...')
+
+    for await (const event of agent.streamEvents('Search for the latest Python news and summarize it')) {
+        if (event.event === 'on_chat_model_stream') {
+            // Stream LLM output token by token
+            const text = event.data?.chunk?.text
+            if (text) {
+                process.stdout.write(text)
+            }
+        }
+    }
+
+    console.log('\n\nDone!')
+    await client.closeAllSessions()
+}
+
+basicStreamingExample().catch(console.error)
+```
+</CodeGroup>
 
 <Tip>
 The streaming API is based on LangChain's `stream_events` method. For more details on event types and data structure, check the [LangChain streaming documentation](https://python.langchain.com/docs/how_to/streaming/).
@@ -157,7 +237,7 @@ class StreamingUI:
 async def streaming_ui_example():
     config = {"mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]}}}
 
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     llm = ChatOpenAI(model="gpt-4", streaming=True)
     agent = MCPAgent(llm=llm, client=client)
 
@@ -237,7 +317,7 @@ async def create_agent():
             }
         }
     }
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     llm = ChatOpenAI(model="gpt-4", streaming=True)
     return MCPAgent(llm=llm, client=client)
 

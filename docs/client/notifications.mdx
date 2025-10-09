@@ -55,7 +55,8 @@ On the client, you create a `message_handler` function and pass it to the `MCPCl
 
 Since the `message_handler` receives all message types (requests, notifications, exceptions), you need to check the type of the incoming message to handle it correctly. Notifications are of type `mcp.types.ServerNotification`, and their specific type is stored in the `.root` attribute.
 
-```python filename="client.py"
+<CodeGroup>
+```python Python
 import asyncio
 import mcp.types as types
 from mcp_use import MCPClient
@@ -105,6 +106,32 @@ async def test_notifications(primitive_server):
     finally:
         await client.close_all_sessions()
 ```
+
+```typescript TypeScript
+// ⚠️ Notification handlers are not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient, types } from 'mcp-use'
+
+// The message handler receives all server-sent messages
+async function handleMessages(message: any) {
+    // Check notification types and handle accordingly
+    // ...
+}
+
+const config = {
+    mcpServers: {
+        PrimitiveServer: { url: `${primitiveServer}/mcp` }
+    }
+}
+
+const client = new MCPClient(config, { messageHandler: handleMessages })
+*/
+```
+</CodeGroup>
 
 <Callout>
   The `message_handler` is a powerful catch-all for any message from the server. By inspecting the message type, you can build rich, responsive applications that react to server-side events in real time.

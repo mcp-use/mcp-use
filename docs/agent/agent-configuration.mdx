@@ -33,11 +33,19 @@ Since agents use LLM providers that require API keys, you need to configure them
     GOOGLE_API_KEY=your_api_key_here
     ```
 
-    Load it in Python:
-    ```python
+    Load it in your application:
+
+    <CodeGroup>
+    ```python Python
     from dotenv import load_dotenv
     load_dotenv()
     ```
+
+    ```typescript TypeScript
+    import { config } from 'dotenv'
+    config()
+    ```
+    </CodeGroup>
 
     <Tip>
     This method keeps your keys organized and makes them available to your Python runtime.
@@ -52,11 +60,18 @@ Since agents use LLM providers that require API keys, you need to configure them
     export ANTHROPIC_API_KEY="your_api_key_here"
     ```
 
-    Access them in Python:
-    ```python
+    Access them in your application:
+
+    <CodeGroup>
+    ```python Python
     import os
     api_key = os.getenv("OPENAI_API_KEY", "")
     ```
+
+    ```typescript TypeScript
+    const apiKey = process.env.OPENAI_API_KEY || ''
+    ```
+    </CodeGroup>
   </Tab>
 
   <Tab title="System Configuration">
@@ -72,7 +87,8 @@ Since agents use LLM providers that require API keys, you need to configure them
 
 When creating an MCPAgent, you can configure several parameters to customize its behavior:
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPAgent, MCPClient
 from langchain_openai import ChatOpenAI
 
@@ -97,6 +113,33 @@ agent = MCPAgent(
 )
 ```
 
+```typescript TypeScript
+import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+
+// Basic configuration
+const config = await loadConfigFile('config.json')
+const agent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.7 }),
+    client: new MCPClient(config),
+    maxSteps: 30
+})
+
+// Advanced configuration
+const advancedAgent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.7 }),
+    client: new MCPClient(config),
+    maxSteps: 30,
+    serverName: undefined,
+    autoInitialize: true,
+    memoryEnabled: true,
+    systemPrompt: 'Custom instructions for the agent',
+    additionalInstructions: 'Additional guidelines for specific tasks',
+    disallowedTools: ['file_system', 'network', 'shell']  // Restrict potentially dangerous tools
+})
+```
+</CodeGroup>
+
 ### Available Parameters
 
 - `llm`: Any LangChain-compatible language model (required)
@@ -116,7 +159,8 @@ agent = MCPAgent(
 
 You can restrict which tools are available to the agent for security or to limit its capabilities. Here's a complete example showing how to set up an agent with restricted tool access:
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 import os
 from dotenv import load_dotenv
@@ -141,7 +185,7 @@ async def main():
     }
 
     # Create MCPClient from configuration dictionary
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
 
     # Create LLM
     llm = ChatOpenAI(model="gpt-4o")
@@ -164,9 +208,59 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+```typescript TypeScript
+import { config } from 'dotenv'
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+async function main() {
+    // Load environment variables
+    config()
+
+    // Create configuration object
+    const configuration = {
+        mcpServers: {
+            playwright: {
+                command: 'npx',
+                args: ['@playwright/mcp@latest'],
+                env: {
+                    DISPLAY: ':1'
+                }
+            }
+        }
+    }
+
+    // Create MCPClient from configuration object
+    const client = new MCPClient(configuration)
+
+    // Create LLM
+    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+
+    // Create agent with restricted tools
+    const agent = new MCPAgent({
+        llm,
+        client,
+        maxSteps: 30,
+        disallowedTools: ['file_system', 'network']  // Restrict potentially dangerous tools
+    })
+
+    // Run the query
+    const result = await agent.run(
+        'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
+    )
+    console.log(`\nResult: ${result}`)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+</CodeGroup>
+
 You can also manage tool restrictions dynamically:
 
-```python
+<CodeGroup>
+```python Python
 # Update restrictions after initialization
 agent.set_disallowed_tools(["file_system", "network", "shell", "database"])
 await agent.initialize()  # Reinitialize to apply changes
@@ -175,6 +269,17 @@ await agent.initialize()  # Reinitialize to apply changes
 restricted_tools = agent.get_disallowed_tools()
 print(f"Restricted tools: {restricted_tools}")
 ```
+
+```typescript TypeScript
+// Update restrictions after initialization
+agent.setDisallowedTools(['file_system', 'network', 'shell', 'database'])
+await agent.initialize()  // Reinitialize to apply changes
+
+// Check current restrictions
+const restrictedTools = agent.getDisallowedTools()
+console.log(`Restricted tools: ${restrictedTools}`)
+```
+</CodeGroup>
 
 This feature is useful for:
 
@@ -245,7 +350,8 @@ The Server Manager is an agent-level feature that enables dynamic server selecti
 
 To improve efficiency and potentially reduce agent confusion when many tools are available, you can enable the Server Manager by setting `use_server_manager=True` when creating the `MCPAgent`.
 
-```python
+<CodeGroup>
+```python Python
 # Enable server manager for automatic server selection
 agent = MCPAgent(
     llm=llm,
@@ -254,11 +360,22 @@ agent = MCPAgent(
 )
 ```
 
+```typescript TypeScript
+// Enable server manager for automatic server selection
+const agent = new MCPAgent({
+    llm,
+    client,
+    useServerManager: true  // Enable dynamic server selection
+})
+```
+</CodeGroup>
+
 ### How It Works
 
 When enabled, the agent will automatically select the appropriate server based on the tool chosen by the LLM for each step. This avoids connecting to unnecessary servers and can improve performance with large numbers of available servers.
 
-```python
+<CodeGroup>
+```python Python
 # Multi-server setup with server manager
 client = MCPClient.from_config_file("multi_server_config.json")
 agent = MCPAgent(
@@ -272,6 +389,23 @@ result = await agent.run(
     "Search for a place in Barcelona on Airbnb, then Google nearby restaurants."
 )
 ```
+
+```typescript TypeScript
+// Multi-server setup with server manager
+const config = await loadConfigFile('multi_server_config.json')
+const client = new MCPClient(config)
+const agent = new MCPAgent({
+    llm,
+    client,
+    useServerManager: true
+})
+
+// The agent automatically selects servers based on tool usage
+const result = await agent.run(
+    'Search for a place in Barcelona on Airbnb, then Google nearby restaurants.'
+)
+```
+</CodeGroup>
 
 ### Benefits
 
@@ -294,7 +428,8 @@ For more details on server manager implementation, see the [Server Manager](./se
 
 MCPAgent supports conversation memory to maintain context across interactions:
 
-```python
+<CodeGroup>
+```python Python
 # Enable memory (default)
 agent = MCPAgent(
     llm=llm,
@@ -310,13 +445,31 @@ agent = MCPAgent(
 )
 ```
 
+```typescript TypeScript
+// Enable memory (default)
+const agent = new MCPAgent({
+    llm,
+    client,
+    memoryEnabled: true
+})
+
+// Disable memory for stateless interactions
+const statelessAgent = new MCPAgent({
+    llm,
+    client,
+    memoryEnabled: false
+})
+```
+</CodeGroup>
+
 ## System Prompt Customization
 
 You can customize the agent's behavior through system prompts:
 
 ### Custom System Prompt
 
-```python
+<CodeGroup>
+```python Python
 custom_prompt = """
 You are a helpful assistant specialized in data analysis.
 Always provide detailed explanations for your reasoning.
@@ -330,17 +483,42 @@ agent = MCPAgent(
 )
 ```
 
+```typescript TypeScript
+const customPrompt = `
+You are a helpful assistant specialized in data analysis.
+Always provide detailed explanations for your reasoning.
+When working with data, prioritize accuracy over speed.
+`
+
+const agent = new MCPAgent({
+    llm,
+    client,
+    systemPrompt: customPrompt
+})
+```
+</CodeGroup>
+
 ### Additional Instructions
 
 Add task-specific instructions without replacing the base system prompt:
 
-```python
+<CodeGroup>
+```python Python
 agent = MCPAgent(
     llm=llm,
     client=client,
     additional_instructions="Focus on finding recent information from the last 6 months."
 )
 ```
+
+```typescript TypeScript
+const agent = new MCPAgent({
+    llm,
+    client,
+    additionalInstructions: 'Focus on finding recent information from the last 6 months.'
+})
+```
+</CodeGroup>
 
 ### System Prompt Templates
 
