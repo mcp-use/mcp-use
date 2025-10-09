@@ -14,7 +14,7 @@ from .middleware import Middleware, MiddlewareContext, NextFunctionT
 
 # Constants for performance thresholds
 SLOW_THRESHOLD_MS = 1000  # 1 second
-FAST_THRESHOLD_MS = 50    # 50ms
+FAST_THRESHOLD_MS = 50  # 50ms
 MAX_SLOW_CONTEXTS = 100
 MAX_FAST_CONTEXTS = 100
 MAX_ERROR_TIMESTAMPS = 1000
@@ -133,7 +133,9 @@ class PerformanceMetricsMiddleware(Middleware):
                     )
                     # Keep only last MAX_SLOW_CONTEXTS slow contexts
                     if len(self.performance_data["slow_contexts"]) > MAX_SLOW_CONTEXTS:
-                        self.performance_data["slow_contexts"] = self.performance_data["slow_contexts"][-MAX_SLOW_CONTEXTS:]
+                        self.performance_data["slow_contexts"] = self.performance_data["slow_contexts"][
+                            -MAX_SLOW_CONTEXTS:
+                        ]
 
                 if duration_ms < self.performance_data["fast_threshold_ms"]:
                     self.performance_data["fast_contexts"].append(
@@ -146,7 +148,9 @@ class PerformanceMetricsMiddleware(Middleware):
                     )
                     # Keep only last MAX_FAST_CONTEXTS fast contexts
                     if len(self.performance_data["fast_contexts"]) > MAX_FAST_CONTEXTS:
-                        self.performance_data["fast_contexts"] = self.performance_data["fast_contexts"][-MAX_FAST_CONTEXTS:]
+                        self.performance_data["fast_contexts"] = self.performance_data["fast_contexts"][
+                            -MAX_FAST_CONTEXTS:
+                        ]
 
             return result
 
@@ -263,7 +267,9 @@ class ErrorTrackingMiddleware(Middleware):
         # Calculate error rate over time windows
         now = time.time()
         recent_errors = [t for t in self.error_data["error_timestamps"] if now - t < SECONDS_PER_HOUR]  # Last hour
-        very_recent_errors = [t for t in self.error_data["error_timestamps"] if now - t < 5 * SECONDS_PER_MINUTE]  # Last 5 min
+        very_recent_errors = [
+            t for t in self.error_data["error_timestamps"] if now - t < 5 * SECONDS_PER_MINUTE
+        ]  # Last 5 min
 
         return {
             "total_errors": sum(self.error_data["error_counts"].values()),
