@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 from mcp_use.client import MCPClient
 from mcp_use.connectors.base import BaseConnector
+from mcp_use.output import OutputConfig, format_and_print_result, format_error, format_stream_with_panels
 from mcp_use.telemetry.telemetry import Telemetry
 from mcp_use.telemetry.utils import extract_model_info
 
@@ -75,6 +76,8 @@ class MCPAgent:
         chat_id: str | None = None,
         retry_on_error: bool = True,
         max_retries_per_step: int = 2,
+        output_config: OutputConfig | None = None,
+        pretty_print: bool = True,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -96,7 +99,16 @@ class MCPAgent:
             callbacks: List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler.
             retry_on_error: Whether to retry tool calls that fail due to validation errors.
             max_retries_per_step: Maximum number of retries for validation errors per step.
+            output_config: Configuration for output formatting. Uses defaults if None.
+            pretty_print: Whether to format output with pretty printing.
         """
+        self.output_config = output_config or OutputConfig()
+        self.pretty_print = pretty_print
+
+        # Suppress logging when auto formatting is enabled
+        if self.pretty_print:
+            logging.getLogger("mcp_use").setLevel(logging.ERROR)
+
         # Handle remote execution
         if agent_id is not None:
             self._remote_agent = RemoteAgent(agent_id=agent_id, api_key=api_key, base_url=base_url, chat_id=chat_id)
@@ -125,6 +137,7 @@ class MCPAgent:
         self.verbose = verbose
         self.retry_on_error = retry_on_error
         self.max_retries_per_step = max_retries_per_step
+
         # System prompt configuration
         self.system_prompt = system_prompt  # User-provided full prompt override
         # User can provide a template override, otherwise use the imported default
@@ -433,6 +446,7 @@ class MCPAgent:
         external_history: list[BaseMessage] | None = None,
         track_execution: bool = True,
         output_schema: type[T] | None = None,
+        pretty_print: bool | None = None,
     ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
         """Run the agent and yield intermediate steps as an async generator.
 
@@ -446,10 +460,41 @@ class MCPAgent:
             output_schema: Optional Pydantic BaseModel class for structured output.
                 If provided, the agent will attempt structured output at finish points
                 and continue execution if required information is missing.
-
+            pretty_print: Whether to format output with pretty printing.
         Yields:
             Intermediate steps as (AgentAction, str) tuples, followed by the final result.
             If output_schema is provided, yields structured output as instance of the schema.
+        """
+        # Create internal generator
+        internal_stream = self._stream_internal(
+            query, max_steps, manage_connector, external_history, track_execution, output_schema
+        )
+        pretty_print = self.pretty_print or pretty_print
+
+        if pretty_print:
+            async for item in format_stream_with_panels(
+                query=query,
+                stream=internal_stream,
+                config=self.output_config,
+                stream_intermediate_steps=self.output_config.show_steps,
+            ):
+                yield item
+        else:
+            async for item in internal_stream:
+                yield item
+
+    async def _stream_internal(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        manage_connector: bool = True,
+        external_history: list[BaseMessage] | None = None,
+        track_execution: bool = True,
+        output_schema: type[T] | None = None,
+    ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
+        """Internal stream implementation.
+
+        This is the core streaming logic, separated to allow wrapping with formatting.
         """
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
@@ -768,8 +813,7 @@ class MCPAgent:
             if not output_schema:
                 yield result
 
-        except Exception as e:
-            logger.error(f"❌ Error running query: {e}")
+        except Exception:
             if initialized_here and manage_connector:
                 logger.info("🧹 Cleaning up resources after initialization error in stream")
                 await self.close()
@@ -828,6 +872,7 @@ class MCPAgent:
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
+        pretty_print: bool | None = None,
     ) -> str | T:
         """Run a query using the MCP tools and return the final result.
 
@@ -846,6 +891,7 @@ class MCPAgent:
                 internal conversation history.
             output_schema: Optional Pydantic BaseModel class for structured output.
                 If provided, the agent will attempt to return an instance of this model.
+            pretty_print: Whether to format output with pretty printing.
 
         Returns:
             The result of running the query as a string, or if output_schema is provided,
@@ -869,16 +915,35 @@ class MCPAgent:
             )
             ```
         """
+        pretty_print = self.pretty_print or pretty_print
+
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
+            start_time = time.time()
             result = await self._remote_agent.run(query, max_steps, external_history, output_schema)
+
+            if pretty_print and result is not None:
+                execution_time_ms = int((time.time() - start_time) * 1000)
+                format_and_print_result(
+                    query=query,
+                    result=result,
+                    execution_time_ms=execution_time_ms,
+                    config=self.output_config,
+                )
+
             return result
 
         success = True
         start_time = time.time()
 
         generator = self.stream(
-            query, max_steps, manage_connector, external_history, track_execution=False, output_schema=output_schema
+            query,
+            max_steps,
+            manage_connector,
+            external_history,
+            track_execution=False,
+            output_schema=output_schema,
+            pretty_print=pretty_print,
         )
         error = None
         steps_taken = 0
@@ -889,9 +954,18 @@ class MCPAgent:
         except Exception as e:
             success = False
             error = str(e)
-            logger.error(f"❌ Error during agent execution: {e}")
+
+            if pretty_print:
+                format_error(
+                    query=query,
+                    error=str(e),
+                    config=self.output_config,
+                )
+
             raise
         finally:
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
             self.telemetry.track_agent_execution(
                 execution_method="run",
                 query=query,
@@ -912,10 +986,11 @@ class MCPAgent:
                 tools_used_count=len(self.tools_used_names),
                 tools_used_names=self.tools_used_names,
                 response=str(self._normalize_output(result)),
-                execution_time_ms=int((time.time() - start_time) * 1000),
+                execution_time_ms=execution_time_ms,
                 error_type=error,
                 conversation_history_length=len(self._conversation_history),
             )
+
         return result
 
     async def _attempt_structured_output(
