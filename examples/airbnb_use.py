@@ -39,6 +39,7 @@ async def run_airbnb_example():
         "good reviews. Show me the top 3 options.",
         max_steps=30,
     )
+    print(result)
 
 
 if __name__ == "__main__":

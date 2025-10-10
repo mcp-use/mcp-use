@@ -50,7 +50,7 @@ async def main():
         "Hello can you give me a list of files and directories in the current directory",
         max_steps=30,
     )
-
+    print(result)
 
 if __name__ == "__main__":
     # Run the appropriate example

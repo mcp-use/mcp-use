@@ -59,7 +59,7 @@ async def run_multi_server_example():
         "Write the result in the current directory in restaurant.txt",
         max_steps=30,
     )
-
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(run_multi_server_example())

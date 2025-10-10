@@ -29,6 +29,7 @@ async def main():
 
     result = await agent.run(query="What are my latest linear tickets")
 
+    print(result)
 
 if __name__ == "__main__":
     import asyncio

@@ -41,6 +41,7 @@ async def run_blender_example():
             "Create an inflatable cube with soft material and a plane as ground.",
             max_steps=30,
         )
+        print(result)
 
     finally:
         # Ensure we clean up resources properly

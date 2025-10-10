@@ -45,6 +45,7 @@ async def main():
         "Find the best restaurant in San Francisco USING GOOGLE SEARCH",
         max_steps=30,
     )
+    print(result)
 
 
 if __name__ == "__main__":
