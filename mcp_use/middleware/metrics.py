@@ -12,6 +12,16 @@ from typing import Any
 
 from .middleware import Middleware, MiddlewareContext, NextFunctionT
 
+# Constants for performance thresholds
+SLOW_THRESHOLD_MS = 1000  # 1 second
+FAST_THRESHOLD_MS = 50  # 50ms
+MAX_SLOW_CONTEXTS = 100
+MAX_FAST_CONTEXTS = 100
+MAX_ERROR_TIMESTAMPS = 1000
+MAX_RECENT_ERRORS = 50
+SECONDS_PER_HOUR = 3600
+SECONDS_PER_MINUTE = 60
+
 
 class MetricsMiddleware(Middleware):
     """Collects basic metrics about MCP contexts including counts, durations, and errors."""
@@ -20,8 +30,8 @@ class MetricsMiddleware(Middleware):
         self.metrics = {
             "total_contexts": 0,
             "total_errors": 0,
-            "method_counts": {},
-            "method_durations": {},
+            "method_counts": defaultdict(int),
+            "method_durations": defaultdict(list),
             "active_contexts": 0,
             "start_time": time.time(),
         }
@@ -39,19 +49,20 @@ class MetricsMiddleware(Middleware):
 
             async with self.lock:
                 self.metrics["active_contexts"] -= 1
-                if context.method not in self.metrics["method_durations"]:
-                    self.metrics["method_durations"][context.method] = []
-                self.metrics["method_durations"][context.method].append(duration)
+                self._record_duration(context.method, duration)
 
             return result
         except Exception:
+            duration = time.time() - context.timestamp
             async with self.lock:
                 self.metrics["total_errors"] += 1
                 self.metrics["active_contexts"] -= 1
-                if context.method not in self.metrics["method_durations"]:
-                    self.metrics["method_durations"][context.method] = []
-                self.metrics["method_durations"][context.method].append(time.time() - context.timestamp)
+                self._record_duration(context.method, duration)
             raise
+
+    def _record_duration(self, method: str, duration: float) -> None:
+        """Record duration for a method in a thread-safe manner."""
+        self.metrics["method_durations"][method].append(duration)
 
     def get_metrics(self) -> dict[str, Any]:
         """Get current metrics snapshot."""
@@ -89,8 +100,8 @@ class PerformanceMetricsMiddleware(Middleware):
             "connector_performance": defaultdict(list),
             "slow_contexts": [],  # contexts over threshold
             "fast_contexts": [],  # Fastest contexts
-            "slow_threshold_ms": 1000,  # 1 second
-            "fast_threshold_ms": 50,  # 50ms
+            "slow_threshold_ms": SLOW_THRESHOLD_MS,
+            "fast_threshold_ms": FAST_THRESHOLD_MS,
         }
         self.lock = asyncio.Lock()
 
@@ -107,7 +118,7 @@ class PerformanceMetricsMiddleware(Middleware):
                 self.performance_data["connector_performance"][context.connection_id].append(duration_ms)
 
                 # Track hourly patterns
-                hour = int(time.time() // 3600)
+                hour = int(time.time() // SECONDS_PER_HOUR)
                 self.performance_data["hourly_counts"][hour] += 1
 
                 # Identify slow/fast contexts
@@ -120,9 +131,11 @@ class PerformanceMetricsMiddleware(Middleware):
                             "timestamp": context.timestamp,
                         }
                     )
-                    # Keep only last 100 slow contexts
-                    if len(self.performance_data["slow_contexts"]) > 100:
-                        self.performance_data["slow_contexts"] = self.performance_data["slow_contexts"][-100:]
+                    # Keep only last MAX_SLOW_CONTEXTS slow contexts
+                    if len(self.performance_data["slow_contexts"]) > MAX_SLOW_CONTEXTS:
+                        self.performance_data["slow_contexts"] = self.performance_data["slow_contexts"][
+                            -MAX_SLOW_CONTEXTS:
+                        ]
 
                 if duration_ms < self.performance_data["fast_threshold_ms"]:
                     self.performance_data["fast_contexts"].append(
@@ -133,9 +146,11 @@ class PerformanceMetricsMiddleware(Middleware):
                             "timestamp": context.timestamp,
                         }
                     )
-                    # Keep only last 100 fast contexts
-                    if len(self.performance_data["fast_contexts"]) > 100:
-                        self.performance_data["fast_contexts"] = self.performance_data["fast_contexts"][-100:]
+                    # Keep only last MAX_FAST_CONTEXTS fast contexts
+                    if len(self.performance_data["fast_contexts"]) > MAX_FAST_CONTEXTS:
+                        self.performance_data["fast_contexts"] = self.performance_data["fast_contexts"][
+                            -MAX_FAST_CONTEXTS:
+                        ]
 
             return result
 
@@ -236,13 +251,13 @@ class ErrorTrackingMiddleware(Middleware):
                 }
                 self.error_data["recent_errors"].append(error_info)
 
-                # Keep only last 50 errors
-                if len(self.error_data["recent_errors"]) > 50:
-                    self.error_data["recent_errors"] = self.error_data["recent_errors"][-50:]
+                # Keep only last MAX_RECENT_ERRORS errors
+                if len(self.error_data["recent_errors"]) > MAX_RECENT_ERRORS:
+                    self.error_data["recent_errors"] = self.error_data["recent_errors"][-MAX_RECENT_ERRORS:]
 
-                # Keep only last 1000 timestamps
-                if len(self.error_data["error_timestamps"]) > 1000:
-                    self.error_data["error_timestamps"] = self.error_data["error_timestamps"][-1000:]
+                # Keep only last MAX_ERROR_TIMESTAMPS timestamps
+                if len(self.error_data["error_timestamps"]) > MAX_ERROR_TIMESTAMPS:
+                    self.error_data["error_timestamps"] = self.error_data["error_timestamps"][-MAX_ERROR_TIMESTAMPS:]
 
             raise  # Re-raise the error
 
@@ -251,8 +266,10 @@ class ErrorTrackingMiddleware(Middleware):
 
         # Calculate error rate over time windows
         now = time.time()
-        recent_errors = [t for t in self.error_data["error_timestamps"] if now - t < 3600]  # Last hour
-        very_recent_errors = [t for t in self.error_data["error_timestamps"] if now - t < 300]  # Last 5 min
+        recent_errors = [t for t in self.error_data["error_timestamps"] if now - t < SECONDS_PER_HOUR]  # Last hour
+        very_recent_errors = [
+            t for t in self.error_data["error_timestamps"] if now - t < 5 * SECONDS_PER_MINUTE
+        ]  # Last 5 min
 
         return {
             "total_errors": sum(self.error_data["error_counts"].values()),
