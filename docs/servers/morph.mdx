@@ -1,0 +1,47 @@
+# Morph (Fast Apply) MCP Server
+
+Morph provides fast, robust code edits through an MCP server. This page shows how to run Morph with **mcp-use**.
+
+## Quickstart
+
+1. **Install and set env**
+
+```bash
+pip install -e .
+pip install python-dotenv langchain-openai
+
+export MORPH_API_KEY="sk_your_key_here"
+export ALL_TOOLS=false   # safer default: exposes only the Morph edit tool
+```
+
+2. **Run the agent example**
+
+```bash
+python examples/morph_fast_apply.py
+```
+
+3. **(Optional) Explore tools via adapter**
+
+```bash
+python examples/morph_tools_langchain.py
+```
+
+## Config (JSON)
+
+```json
+{
+  "mcpServers": {
+    "filesystem-with-morph": {
+      "command": "npx",
+      "args": ["@morph-llm/morph-fast-apply"],
+      "env": { "MORPH_API_KEY": "${MORPH_API_KEY}", "ALL_TOOLS": "false" }
+    }
+  }
+}
+```
+
+### Notes
+
+* Set `ALL_TOOLS=true` to enable Morph's broader filesystem tools (powerful but less sandboxed).
+* Keep `ALL_TOOLS=false` for CI and public demos.
+* `MCPClient.from_config_file(...)` will launch the Morph server and discover tools automatically.

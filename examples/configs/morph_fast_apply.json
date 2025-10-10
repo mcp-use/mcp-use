@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "filesystem-with-morph": {
+      "command": "npx",
+      "args": ["@morph-llm/morph-fast-apply"],
+      "env": {
+        "MORPH_API_KEY": "${MORPH_API_KEY}",
+        "ALL_TOOLS": "false"
+      }
+    }
+  }
+}
