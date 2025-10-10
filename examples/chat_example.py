@@ -64,7 +64,7 @@ async def run_memory_chat():
 
             try:
                 # Run the agent with the user input (memory handling is automatic)
-                await agent.run(user_input)
+                result = await agent.run(user_input)
 
             except Exception as e:
                 print(f"\nError: {e}")

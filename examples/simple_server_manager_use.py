@@ -93,14 +93,14 @@ async def main():
 
     # Run the agent with a query that uses the custom tool
     print("--- First run: calling hello_world ---")
-    await agent.run("Use the hello_world tool", manage_connector=False)
+    result = await agent.run("Use the hello_world tool", manage_connector=False)
 
     # Clear the conversation history to avoid confusion
     agent.clear_conversation_history()
 
     # Run the agent again to show that the new tool is available
     print("\n--- Second run: calling the new dynamic tool ---")
-    await agent.run("Use the dynamic_tool_1", manage_connector=False)
+    result = await agent.run("Use the dynamic_tool_1", manage_connector=False)
 
     # Manually close the agent
     await agent.close()

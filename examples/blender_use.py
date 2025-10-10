@@ -37,7 +37,7 @@ async def run_blender_example():
 
     try:
         # Run the query
-        await agent.run(
+        result = await agent.run(
             "Create an inflatable cube with soft material and a plane as ground.",
             max_steps=30,
         )

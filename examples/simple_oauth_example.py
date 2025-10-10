@@ -27,7 +27,7 @@ async def main():
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     agent = MCPAgent(llm=llm, client=client)
 
-    await agent.run(query="What are my latest linear tickets")
+    result = await agent.run(query="What are my latest linear tickets")
 
 
 if __name__ == "__main__":

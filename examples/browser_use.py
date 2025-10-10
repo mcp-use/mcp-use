@@ -33,7 +33,7 @@ async def main():
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
 
     # Run the query
-    await agent.run(
+    result = await agent.run(
         """
         Navigate to https://github.com/mcp-use/mcp-use, give a star to the project and write
         a summary of the project.

@@ -46,7 +46,7 @@ async def main():
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
 
     # Run the query
-    await agent.run(
+    result = await agent.run(
         "Hello can you give me a list of files and directories in the current directory",
         max_steps=30,
     )

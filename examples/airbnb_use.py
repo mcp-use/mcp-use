@@ -33,7 +33,7 @@ async def run_airbnb_example():
     agent = MCPAgent(llm=llm, client=client, max_steps=30, use_server_manager=True)
 
     # Run a query to search for accommodations
-    await agent.run(
+    result = await agent.run(
         "Find me a nice place to stay in Barcelona for 2 adults "
         "for a week in August. I prefer places with a pool and "
         "good reviews. Show me the top 3 options.",

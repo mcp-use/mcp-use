@@ -50,7 +50,7 @@ async def main():
 
     try:
         # Run the same test query
-        await agent.run(
+        result = await agent.run(
             """
             Run echo "test" and then echo "second test" again and then add 1 + 1
             """,
