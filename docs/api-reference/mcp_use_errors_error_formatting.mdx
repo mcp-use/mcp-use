@@ -1,0 +1,31 @@
+---
+title: "Error Formatting"
+description: "Error Formatting API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/errors/error_formatting.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/errors/error_formatting.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/errors/error_formatting.py</a>
+</Callout>
+
+
+## format_error
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `function` format_error
+
+Formats an exception into a structured format that can be understood by LLMs.
+
+
+**Parameters**
+><ParamField body="error" type="Exception" required="True" >   The exception to format. </ParamField>
+><ParamField body="context" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="dict" >A dictionary containing the formatted error.</ResponseField>
+
+**Signature**
+```python wrap
+def format_error(error: Exception, context):
+```
+</Card>

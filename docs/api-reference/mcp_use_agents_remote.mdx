@@ -1,0 +1,79 @@
+---
+title: "Remote"
+description: "Remote agent implementation for executing agents via API API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py</a>
+</Callout>
+
+Remote agent implementation for executing agents via API.
+
+## RemoteAgent
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` RemoteAgent
+
+Agent that executes remotely via API.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize remote agent.
+
+
+**Parameters**
+><ParamField body="agent_id" type="str" required="True" >   The ID of the remote agent to execute </ParamField>
+><ParamField body="chat_id" type="str | None" default="None" >   The ID of the chat session to use. If None, a new chat session will be created. </ParamField>
+><ParamField body="api_key" type="str | None" default="None" >   API key for authentication. If None, will check MCP_USE_API_KEY env var </ParamField>
+><ParamField body="base_url" type="str" default='https://cloud.mcp-use.com' >   Base URL for the remote API </ParamField>
+
+**Signature**
+```python wrap
+def __init__(agent_id: str, chat_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com"):
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` close
+
+Close the HTTP client.
+
+**Signature**
+```python wrap
+def close():
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` run
+
+Run a query on the remote agent.
+
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   The query to execute </ParamField>
+><ParamField body="max_steps" type="int | None" default="None" >   Maximum number of steps (default: 10) </ParamField>
+><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   External history (not supported yet for remote execution) </ParamField>
+><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic model for structured output </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str | mcp_use.agents.remote.T" >The result from the remote agent execution (string or structured output)</ResponseField>
+
+**Signature**
+```python wrap
+def run(
+query: str,
+    max_steps: int | None = None,
+    external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
+    output_schema: type[~T] | None = None
+):
+```
+
+</Card>
+
+</Card>

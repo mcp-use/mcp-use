@@ -1,0 +1,52 @@
+---
+title: "Http"
+description: "HTTP connector for MCP implementations API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/http.py</a>
+</Callout>
+
+HTTP connector for MCP implementations.
+
+This module provides a connector for communicating with MCP implementations
+through HTTP APIs with SSE or Streamable HTTP for transport.
+
+## HttpConnector
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` HttpConnector
+
+Connector for MCP implementations using HTTP transport with SSE or streamable HTTP.
+
+    This connector uses HTTP/SSE or streamable HTTP to communicate with remote MCP implementations,
+    using a connection manager to handle the proper lifecycle management.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize a new HTTP connector.
+
+
+**Parameters**
+><ParamField body="base_url" type="str" required="True" >   The base URL of the MCP HTTP API. </ParamField>
+><ParamField body="headers" type="dict[str, str] | None" default="None" >   Optional additional headers. </ParamField>
+><ParamField body="timeout" type="float" default="5" >   Timeout for HTTP operations in seconds. </ParamField>
+><ParamField body="sse_read_timeout" type="float" default="300" >   Timeout for SSE read operations in seconds. </ParamField>
+><ParamField body="auth" type="str | dict[str, typing.Any] | httpx.Auth | None" default="None" >   Authentication method - can be: </ParamField>
+><ParamField body="sampling_callback" type="mcp.client.session.SamplingFnT | None" default="None" >   Optional sampling callback. </ParamField>
+><ParamField body="elicitation_callback" type="mcp.client.session.ElicitationFnT | None" default="None" >   Optional elicitation callback. </ParamField>
+><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
+><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
+><ParamField body="middleware" type="list[mcp_use.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+
+**Signature**
+```python wrap
+def __init__(base_url: str, headers: dict[str, str] | None = None, timeout: float = 5, sse_read_timeout: float = 300, auth: str | dict[str, typing.Any] | httpx.Auth | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.middleware.middleware.Middleware] | None = None):
+```
+
+</Card>
+
+</Card>

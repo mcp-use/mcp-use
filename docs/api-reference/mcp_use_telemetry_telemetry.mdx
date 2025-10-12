@@ -1,0 +1,45 @@
+---
+title: "Telemetry"
+description: "Telemetry API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/telemetry.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/telemetry.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/telemetry.py</a>
+</Callout>
+
+
+## get_cache_home
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `function` get_cache_home
+
+Get platform-appropriate cache directory.
+
+**Returns**
+><ResponseField name="returns" type="pathlib.Path" />
+
+**Signature**
+```python wrap
+def get_cache_home():
+```
+</Card>
+
+
+## requires_telemetry
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `function` requires_telemetry
+
+Decorator that skips function execution if telemetry is disabled
+
+**Parameters**
+><ParamField body="func" type="Callable" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Callable" />
+
+**Signature**
+```python wrap
+def requires_telemetry(func: Callable):
+```
+</Card>

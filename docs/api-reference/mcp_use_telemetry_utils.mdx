@@ -1,0 +1,89 @@
+---
+title: "Utils"
+description: "Utility functions for extracting model information from LangChain LLMs API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/utils.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/utils.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/telemetry/utils.py</a>
+</Callout>
+
+Utility functions for extracting model information from LangChain LLMs.
+
+This module provides utilities to extract provider and model information
+from LangChain language models for telemetry purposes.
+
+
+## extract_model_info
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `function` extract_model_info
+
+Extract both provider and model name from LangChain LLM.
+
+
+**Parameters**
+><ParamField body="llm" type="langchain_core.language_models.base.BaseLanguageModel" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="tuple[str, str]" >Tuple of (provider, model_name)</ResponseField>
+
+**Signature**
+```python wrap
+def extract_model_info(llm: langchain_core.language_models.base.BaseLanguageModel):
+```
+</Card>
+
+
+## get_model_name
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `function` get_model_name
+
+Extract the model name from LangChain LLM using BaseChatModel standards.
+
+**Parameters**
+><ParamField body="llm" type="langchain_core.language_models.base.BaseLanguageModel" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def get_model_name(llm: langchain_core.language_models.base.BaseLanguageModel):
+```
+</Card>
+
+
+## get_model_provider
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `function` get_model_provider
+
+Extract the model provider from LangChain LLM using BaseChatModel standards.
+
+**Parameters**
+><ParamField body="llm" type="langchain_core.language_models.base.BaseLanguageModel" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def get_model_provider(llm: langchain_core.language_models.base.BaseLanguageModel):
+```
+</Card>
+
+
+## get_package_version
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `function` get_package_version
+
+Get the current mcp-use package version.
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def get_package_version():
+```
+</Card>

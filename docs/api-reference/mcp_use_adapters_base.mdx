@@ -1,0 +1,91 @@
+---
+title: "Base"
+description: "Base adapter interface for MCP tools API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py</a>
+</Callout>
+
+Base adapter interface for MCP tools.
+
+This module provides the abstract base class that all MCP tool adapters should inherit from.
+
+## BaseAdapter
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` BaseAdapter
+
+Abstract base class for converting MCP tools to other framework formats.
+
+    This class defines the common interface that all adapter implementations
+    should follow to ensure consistency across different frameworks.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize a new adapter.
+
+
+**Parameters**
+><ParamField body="disallowed_tools" type="list[str] | None" default="None" >   list of tool names that should not be available. </ParamField>
+
+**Signature**
+```python wrap
+def __init__(disallowed_tools: list[str] | None = None):
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` create_tools
+
+Create tools from an MCPClient instance.
+
+        This is the recommended way to create tools from an MCPClient, as it handles
+        session creation and connector extraction automatically.
+
+        Example:
+            ```python
+            from mcp_use.client import MCPClient
+            from mcp_use.adapters import YourAdapter
+
+            client = MCPClient.from_config_file("config.json")
+            tools = await YourAdapter.create_tools(client)
+            ```
+
+**Parameters**
+><ParamField body="client" type="MCPClient" required="True" >   The MCPClient to extract tools from. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="list[mcp_use.adapters.base.T]" >A list of tools in the target framework's format.</ResponseField>
+
+**Signature**
+```python wrap
+def create_tools(client: MCPClient):
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` load_tools_for_connector
+
+Dynamically load tools for a specific connector.
+
+
+**Parameters**
+><ParamField body="connector" type="mcp_use.connectors.base.BaseConnector" required="True" >   The connector to load tools for. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="list[mcp_use.adapters.base.T]" >The list of tools that were loaded in the target framework's format.</ResponseField>
+
+**Signature**
+```python wrap
+def load_tools_for_connector(connector: mcp_use.connectors.base.BaseConnector):
+```
+
+</Card>
+
+</Card>

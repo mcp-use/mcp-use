@@ -1,0 +1,45 @@
+---
+title: "Websocket"
+description: "WebSocket connector for MCP implementations API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py</a>
+</Callout>
+
+WebSocket connector for MCP implementations.
+
+This module provides a connector for communicating with MCP implementations
+through WebSocket connections.
+
+## WebSocketConnector
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` WebSocketConnector
+
+Connector for MCP implementations using WebSocket transport.
+
+    This connector uses WebSockets to communicate with remote MCP implementations,
+    using a connection manager to handle the proper lifecycle management.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize a new WebSocket connector.
+
+
+**Parameters**
+><ParamField body="url" type="str" required="True" >   The WebSocket URL to connect to. </ParamField>
+><ParamField body="headers" type="dict[str, str] | None" default="None" >   Optional additional headers. </ParamField>
+><ParamField body="auth" type="str | dict[str, typing.Any] | httpx.Auth | None" default="None" >   Authentication method - can be: </ParamField>
+
+**Signature**
+```python wrap
+def __init__(url: str, headers: dict[str, str] | None = None, auth: str | dict[str, typing.Any] | httpx.Auth | None = None):
+```
+
+</Card>
+
+</Card>

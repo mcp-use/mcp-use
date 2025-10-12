@@ -1,0 +1,45 @@
+---
+title: "Stdio"
+description: "StdIO connection management for MCP implementations API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/stdio.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/stdio.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/stdio.py</a>
+</Callout>
+
+StdIO connection management for MCP implementations.
+
+This module provides a connection manager for stdio-based MCP connections
+that ensures proper task isolation and resource cleanup.
+
+## StdioConnectionManager
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` StdioConnectionManager
+
+Connection manager for stdio-based MCP connections.
+
+    This class handles the proper task isolation for stdio_client context managers
+    to prevent the "cancel scope in different task" error. It runs the stdio_client
+    in a dedicated task and manages its lifecycle.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize a new stdio connection manager.
+
+
+**Parameters**
+><ParamField body="server_params" type="mcp.client.stdio.StdioServerParameters" required="True" >   The parameters for the stdio server </ParamField>
+><ParamField body="errlog" type="TextIO" default="<_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>" >   The error log stream </ParamField>
+
+**Signature**
+```python wrap
+def __init__(server_params: mcp.client.stdio.StdioServerParameters, errlog: TextIO = <_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>):
+```
+
+</Card>
+
+</Card>

@@ -1,0 +1,73 @@
+---
+title: "Sandbox"
+description: "Sandbox connector for MCP implementations API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py</a>
+</Callout>
+
+Sandbox connector for MCP implementations.
+
+This module provides a connector for communicating with MCP implementations
+that are executed inside a sandbox environment (currently using E2B).
+
+## SandboxConnector
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` SandboxConnector
+
+Connector for MCP implementations running in a sandbox environment.
+
+    This connector runs a user-defined stdio command within a sandbox environment,
+    currently implemented using E2B, potentially wrapped by a utility like 'supergateway'
+    to expose its stdio.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize a new sandbox connector.
+
+
+**Parameters**
+><ParamField body="command" type="str" required="True" >   String value </ParamField>
+><ParamField body="args" type="list[str]" required="True" >   List of items </ParamField>
+><ParamField body="env" type="dict[str, str] | None" default="None" >   Environment variables for the user's MCP server command. </ParamField>
+><ParamField body="e2b_options" type="mcp_use.types.sandbox.SandboxOptions | None" default="None" >   Configuration options for the E2B sandbox environment. </ParamField>
+><ParamField body="timeout" type="float" default="5" >   Timeout for the sandbox process in seconds. </ParamField>
+><ParamField body="sse_read_timeout" type="float" default="300" >   Timeout for the SSE connection in seconds. </ParamField>
+><ParamField body="sampling_callback" type="mcp.client.session.SamplingFnT | None" default="None" >   Optional sampling callback. </ParamField>
+><ParamField body="elicitation_callback" type="mcp.client.session.ElicitationFnT | None" default="None" >   Optional elicitation callback. </ParamField>
+><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
+><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
+><ParamField body="middleware" type="list[mcp_use.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+
+**Signature**
+```python wrap
+def __init__(command: str, args: list[str], env: dict[str, str] | None = None, e2b_options: mcp_use.types.sandbox.SandboxOptions | None = None, timeout: float = 5, sse_read_timeout: float = 300, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.middleware.middleware.Middleware] | None = None):
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` wait_for_server_response
+
+Wait for the server to respond to HTTP requests.
+
+**Parameters**
+><ParamField body="base_url" type="str" required="True" >   The base URL to check for server readiness </ParamField>
+><ParamField body="timeout" type="int" default="30" >   Maximum time to wait in seconds </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="bool" >True if server is responding, raises TimeoutError otherwise</ResponseField>
+
+**Signature**
+```python wrap
+def wait_for_server_response(base_url: str, timeout: int = 30):
+```
+
+</Card>
+
+</Card>

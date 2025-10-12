@@ -1,0 +1,117 @@
+---
+title: "Oauth Callback"
+description: "OAuth callback server implementation API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth_callback.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth_callback.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth_callback.py</a>
+</Callout>
+
+OAuth callback server implementation.
+
+## CallbackResponse
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` CallbackResponse
+
+Response data from OAuth callback.
+
+**Attributes**
+>
+<ParamField body="code" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="state" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="error" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="error_description" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="error_uri" type="str | None" required="True" >   String value </ParamField>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+**Parameters**
+><ParamField body="code" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="state" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error_description" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error_uri" type="str | None" default="None" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(code: str | None = None, state: str | None = None, error: str | None = None, error_description: str | None = None, error_uri: str | None = None):
+```
+
+</Card>
+
+</Card>
+
+
+## OAuthCallbackServer
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` OAuthCallbackServer
+
+Local server to handle OAuth callback.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize the callback server.
+
+
+**Parameters**
+><ParamField body="port" type="int" required="True" >   Port to listen on. </ParamField>
+
+**Signature**
+```python wrap
+def __init__(port: int):
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` shutdown
+
+Shutdown the callback server.
+
+**Signature**
+```python wrap
+def shutdown():
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` start
+
+Start the callback server and return the redirect URI.
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def start():
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` wait_for_code
+
+Wait for the OAuth callback with a timeout (default 5 minutes).
+
+**Parameters**
+><ParamField body="timeout" type="float" default="300" >   Timeout duration </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp_use.auth.oauth_callback.CallbackResponse" />
+
+**Signature**
+```python wrap
+def wait_for_code(timeout: float = 300):
+```
+
+</Card>
+
+</Card>

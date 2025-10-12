@@ -1,0 +1,43 @@
+---
+title: "Websocket"
+description: "WebSocket connection management for MCP implementations API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/websocket.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/websocket.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/websocket.py</a>
+</Callout>
+
+WebSocket connection management for MCP implementations.
+
+This module provides a connection manager for WebSocket-based MCP connections.
+
+## WebSocketConnectionManager
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` WebSocketConnectionManager
+
+Connection manager for WebSocket-based MCP connections.
+
+    This class handles the lifecycle of WebSocket connections, ensuring proper
+    connection establishment and cleanup.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize a new WebSocket connection manager.
+
+
+**Parameters**
+><ParamField body="url" type="str" required="True" >   The WebSocket URL to connect to </ParamField>
+><ParamField body="headers" type="dict[str, str] | None" default="None" >   Optional HTTP headers </ParamField>
+
+**Signature**
+```python wrap
+def __init__(url: str, headers: dict[str, str] | None = None):
+```
+
+</Card>
+
+</Card>

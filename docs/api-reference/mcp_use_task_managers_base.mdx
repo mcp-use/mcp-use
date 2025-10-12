@@ -1,0 +1,83 @@
+---
+title: "Base"
+description: "Connection management for MCP implementations API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/base.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/base.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/base.py</a>
+</Callout>
+
+Connection management for MCP implementations.
+
+This module provides an abstract base class for different types of connection
+managers used in MCP connectors.
+
+## ConnectionManager
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` ConnectionManager
+
+Abstract base class for connection managers.
+
+    This class defines the interface for different types of connection managers
+    used with MCP connectors.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize a new connection manager.
+
+**Signature**
+```python wrap
+def __init__():
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` get_streams
+
+Get the current connection streams.
+
+
+**Returns**
+><ResponseField name="returns" type="mcp_use.task_managers.base.T | None" >The current connection (typically a tuple of read_stream, write_stream) or None if not connected.</ResponseField>
+
+**Signature**
+```python wrap
+def get_streams():
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` start
+
+Start the connection manager and establish a connection.
+
+
+**Returns**
+><ResponseField name="returns" type="mcp_use.task_managers.base.T" >The established connection.</ResponseField>
+
+**Signature**
+```python wrap
+def start():
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` stop
+
+Stop the connection manager and close the connection.
+
+**Signature**
+```python wrap
+def stop():
+```
+
+</Card>
+
+</Card>

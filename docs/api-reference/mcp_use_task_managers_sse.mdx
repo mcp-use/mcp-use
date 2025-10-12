@@ -1,0 +1,48 @@
+---
+title: "Sse"
+description: "SSE connection management for MCP implementations API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/sse.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/sse.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/task_managers/sse.py</a>
+</Callout>
+
+SSE connection management for MCP implementations.
+
+This module provides a connection manager for SSE-based MCP connections
+that ensures proper task isolation and resource cleanup.
+
+## SseConnectionManager
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` SseConnectionManager
+
+Connection manager for SSE-based MCP connections.
+
+    This class handles the proper task isolation for sse_client context managers
+    to prevent the "cancel scope in different task" error. It runs the sse_client
+    in a dedicated task and manages its lifecycle.
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize a new SSE connection manager.
+
+
+**Parameters**
+><ParamField body="url" type="str" required="True" >   The SSE endpoint URL </ParamField>
+><ParamField body="headers" type="dict[str, str] | None" default="None" >   Optional HTTP headers </ParamField>
+><ParamField body="timeout" type="float" default="5" >   Timeout for HTTP operations in seconds </ParamField>
+><ParamField body="sse_read_timeout" type="float" default="300" >   Timeout for SSE read operations in seconds </ParamField>
+><ParamField body="auth" type="httpx.Auth | None" default="None" >   Optional httpx.Auth instance for authentication </ParamField>
+
+**Signature**
+```python wrap
+def __init__(url: str, headers: dict[str, str] | None = None, timeout: float = 5, sse_read_timeout: float = 300, auth: httpx.Auth | None = None):
+```
+
+</Card>
+
+</Card>

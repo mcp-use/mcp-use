@@ -1,0 +1,45 @@
+---
+title: "Bearer"
+description: "Bearer token authentication support API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/bearer.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/bearer.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/bearer.py</a>
+</Callout>
+
+Bearer token authentication support.
+
+## BearerAuth
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` BearerAuth
+
+Bearer token authentication for HTTP requests.
+
+**Attributes**
+>
+<ParamField body="token" type="pydantic.types.SecretStr" required="True" >   String value </ParamField>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Create a new model by parsing and validating input data from keyword arguments.
+
+        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+        validated to form a valid model.
+
+        `self` is explicitly positional-only to allow `self` as a field name.
+
+**Parameters**
+><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(data: Any):
+```
+
+</Card>
+
+</Card>

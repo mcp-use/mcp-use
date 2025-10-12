@@ -1,0 +1,49 @@
+---
+title: "Base Tool"
+description: "Base Tool API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/base_tool.py"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/base_tool.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/base_tool.py</a>
+</Callout>
+
+## MCPServerTool
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `class` MCPServerTool
+
+Base tool for MCP server operations.
+
+**Attributes**
+>
+<ParamField body="name" type="ClassVar" required="True" >   Name identifier </ParamField>
+<ParamField body="description" type="ClassVar" required="True" >   Parameter value </ParamField>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `method` __init__
+
+Initialize with server manager.
+
+**Parameters**
+><ParamField body="server_manager" required="True" >   Server name or configuration </ParamField>
+
+**Signature**
+```python wrap
+def __init__(server_manager):
+```
+
+</Card>
+
+<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+### `property` server_manager
+
+**Signature**
+```python wrap
+def server_manager():
+```
+
+</Card>
+
+</Card>
