@@ -1,0 +1,256 @@
+---
+title: "Client"
+description: "Client for managing MCP servers and sessions API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py</a>
+</Callout>
+
+Client for managing MCP servers and sessions.
+
+This module provides a high-level client that manages MCP servers, connectors,
+and sessions from configuration.
+
+## MCPClient
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPClient</div>
+
+Client for managing MCP servers and sessions.
+
+    This class provides a unified interface for working with MCP servers,
+    handling configuration, connector creation, and session management.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.client import MCPClient
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize a new MCP client.
+
+
+**Parameters**
+><ParamField body="config" type="str | dict[str, typing.Any] | None" default="None" >   Either a dict containing configuration or a path to a JSON config file. </ParamField>
+><ParamField body="allowed_servers" type="list[str] | None" default="None" >   Server name or configuration </ParamField>
+><ParamField body="sandbox" type="bool" default="False" >   Whether to use sandboxed execution mode for running MCP servers. </ParamField>
+><ParamField body="sandbox_options" type="mcp_use.types.sandbox.SandboxOptions | None" default="None" >   Optional sandbox configuration options. </ParamField>
+><ParamField body="sampling_callback" type="mcp.client.session.SamplingFnT | None" default="None" >   Optional sampling callback function. </ParamField>
+><ParamField body="elicitation_callback" type="mcp.client.session.ElicitationFnT | None" default="None" >   Callback function </ParamField>
+><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
+><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
+><ParamField body="middleware" type="list[mcp_use.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+
+**Signature**
+```python wrap
+def __init__(config: str | dict[str, typing.Any] | None = None, allowed_servers: list[str] | None = None, sandbox: bool = False, sandbox_options: mcp_use.types.sandbox.SandboxOptions | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.middleware.middleware.Middleware] | None = None):
+```
+
+</Card>
+<Card type="info">
+### `method` add_middleware
+
+Add a middleware.
+
+
+
+**Parameters**
+><ParamField body="middleware" type="mcp_use.middleware.middleware.Middleware" required="True" >   The middleware to add </ParamField>
+
+**Signature**
+```python wrap
+def add_middleware(middleware: mcp_use.middleware.middleware.Middleware):
+```
+
+</Card>
+
+<Card type="info">
+### `method` add_server
+
+Add a server configuration.
+
+
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   The name to identify this server. </ParamField>
+><ParamField body="server_config" type="dict[str, Any]" required="True" >   The server configuration. </ParamField>
+
+**Signature**
+```python wrap
+def add_server(name: str, server_config: dict[str, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` close_all_sessions
+
+Close all active sessions.
+
+        This method ensures all sessions are closed even if some fail.
+
+
+**Signature**
+```python wrap
+def close_all_sessions():
+```
+
+</Card>
+
+<Card type="info">
+### `method` close_session
+
+Close a session.
+
+
+
+**Parameters**
+><ParamField body="server_name" type="str" required="True" >   The name of the server to close the session for. </ParamField>
+
+**Signature**
+```python wrap
+def close_session(server_name: str):
+```
+
+</Card>
+
+<Card type="info">
+### `method` create_all_sessions
+
+Create sessions for all configured servers.
+
+
+
+**Parameters**
+><ParamField body="auto_initialize" type="bool" default="True" >   Whether to automatically initialize the sessions. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="dict[str, mcp_use.session.MCPSession]" >Dictionary mapping server names to their MCPSession instances.</ResponseField>
+
+**Signature**
+```python wrap
+def create_all_sessions(auto_initialize: bool = True):
+```
+
+</Card>
+
+<Card type="info">
+### `method` create_session
+
+Create a session for the specified server.
+
+
+
+**Parameters**
+><ParamField body="server_name" type="str" required="True" >   The name of the server to create a session for. </ParamField>
+><ParamField body="auto_initialize" type="bool" default="True" >   Whether to automatically initialize the session. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp_use.session.MCPSession" >The created MCPSession.</ResponseField>
+
+**Signature**
+```python wrap
+def create_session(server_name: str, auto_initialize: bool = True):
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_all_active_sessions
+
+Get all active sessions.
+
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, mcp_use.session.MCPSession]" >Dictionary mapping server names to their MCPSession instances.</ResponseField>
+
+**Signature**
+```python wrap
+def get_all_active_sessions():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_server_names
+
+Get the list of configured server names.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[str]" >List of server names.</ResponseField>
+
+**Signature**
+```python wrap
+def get_server_names():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_session
+
+Get an existing session.
+
+
+
+**Parameters**
+><ParamField body="server_name" type="str" required="True" >   The name of the server to get the session for. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp_use.session.MCPSession" >The MCPSession for the specified server.</ResponseField>
+
+**Signature**
+```python wrap
+def get_session(server_name: str):
+```
+
+</Card>
+
+<Card type="info">
+### `method` remove_server
+
+Remove a server configuration.
+
+
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   The name of the server to remove. </ParamField>
+
+**Signature**
+```python wrap
+def remove_server(name: str):
+```
+
+</Card>
+
+<Card type="info">
+### `method` save_config
+
+Save the current configuration to a file.
+
+
+
+**Parameters**
+><ParamField body="filepath" type="str" required="True" >   The path to save the configuration to. </ParamField>
+
+**Signature**
+```python wrap
+def save_config(filepath: str):
+```
+
+</Card>
+
+</div>
