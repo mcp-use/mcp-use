@@ -20,6 +20,10 @@ Builds the final system prompt string using a template, tool descriptions,
     and optional additional instructions.
 
 
+```python
+from mcp_use.agents.prompts.system_prompt_builder import build_system_prompt_content
+```
+
 **Parameters**
 ><ParamField body="template" type="str" required="True" >   The system prompt template string (must contain '{tool_descriptions}'). </ParamField>
 ><ParamField body="tool_description_lines" type="list[str]" required="True" >   A list of formatted tool description strings. </ParamField>
@@ -49,6 +53,10 @@ Creates the final SystemMessage object for the agent.
     Handles selecting the correct template, generating tool descriptions,
     and incorporating user overrides and additional instructions.
 
+
+```python
+from mcp_use.agents.prompts.system_prompt_builder import create_system_message
+```
 
 **Parameters**
 ><ParamField body="tools" type="list[langchain_core.tools.base.BaseTool]" required="True" >   List of available tools. </ParamField>
@@ -84,6 +92,10 @@ tools: list[langchain_core.tools.base.BaseTool],
 
 Generates a list of formatted tool descriptions, excluding disallowed tools.
 
+
+```python
+from mcp_use.agents.prompts.system_prompt_builder import generate_tool_descriptions
+```
 
 **Parameters**
 ><ParamField body="tools" type="list[langchain_core.tools.base.BaseTool]" required="True" >   The list of available BaseTool objects. </ParamField>

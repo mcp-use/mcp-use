@@ -24,6 +24,10 @@ Simple loading spinner similar to UV's style.
 
 </div>
 </RandomGradientBackground>
+```python
+from mcp_use.cli import Spinner
+```
+
 <Card type="info">
 ### `method` __init__
 
@@ -74,6 +78,10 @@ def stop(success_message = None):
 
 Create agent file in nested project folder.
 
+```python
+from mcp_use.cli import create_agent_structure
+```
+
 **Parameters**
 ><ParamField body="project_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
 ><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
@@ -92,6 +100,10 @@ def create_agent_structure(project_dir: pathlib.Path, project_name: str, project
 ### `function` create_common_files
 
 Create common project files.
+
+```python
+from mcp_use.cli import create_common_files
+```
 
 **Parameters**
 ><ParamField body="project_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
@@ -112,6 +124,10 @@ def create_common_files(project_dir: pathlib.Path, project_name: str, project_ty
 
 Create example files.
 
+```python
+from mcp_use.cli import create_example_files
+```
+
 **Parameters**
 ><ParamField body="project_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
 ><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
@@ -129,6 +145,10 @@ def create_example_files(project_dir: pathlib.Path, project_name: str):
 ### `function` create_project
 
 Create the project structure.
+
+```python
+from mcp_use.cli import create_project
+```
 
 **Parameters**
 ><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
@@ -151,6 +171,10 @@ def create_project(project_name: str, project_type: str):
 
 Create server file in nested project folder.
 
+```python
+from mcp_use.cli import create_server_structure
+```
+
 **Parameters**
 ><ParamField body="project_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
 ><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
@@ -169,6 +193,10 @@ def create_server_structure(project_dir: pathlib.Path, project_name: str):
 
 Get project name from user.
 
+```python
+from mcp_use.cli import get_project_name
+```
+
 **Returns**
 ><ResponseField name="returns" type="str" />
 
@@ -185,6 +213,10 @@ def get_project_name():
 ### `function` get_project_type
 
 Get project type from user.
+
+```python
+from mcp_use.cli import get_project_type
+```
 
 **Returns**
 ><ResponseField name="returns" type="str" />
@@ -203,6 +235,10 @@ def get_project_type():
 
 Handle the create command.
 
+```python
+from mcp_use.cli import handle_create
+```
+
 **Signature**
 ```python wrap
 def handle_create():
@@ -217,6 +253,10 @@ def handle_create():
 
 Handle the deploy command (placeholder for future implementation).
 
+```python
+from mcp_use.cli import handle_deploy
+```
+
 **Signature**
 ```python wrap
 def handle_deploy():
@@ -230,6 +270,10 @@ def handle_deploy():
 ### `function` main
 
 Main entry point for the CLI.
+
+```python
+from mcp_use.cli import main
+```
 
 **Parameters**
 ><ParamField body="args" default="None" >   Parameter value </ParamField>
@@ -248,6 +292,10 @@ def main(args = None):
 
 Print the CLI header.
 
+```python
+from mcp_use.cli import print_header
+```
+
 **Signature**
 ```python wrap
 def print_header():
@@ -261,6 +309,10 @@ def print_header():
 ### `function` show_help
 
 Show the main help message.
+
+```python
+from mcp_use.cli import show_help
+```
 
 **Signature**
 ```python wrap

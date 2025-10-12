@@ -31,6 +31,10 @@ ClientSession wrapper that uses callback-based middleware.
 
 </div>
 </RandomGradientBackground>
+```python
+from mcp_use.middleware.middleware import CallbackClientSession
+```
+
 <Card type="info">
 ### `method` __init__
 
@@ -188,6 +192,10 @@ Extended context for MCP responses with middleware metadata.
 
 </div>
 </RandomGradientBackground>
+```python
+from mcp_use.middleware.middleware import MCPResponseContext
+```
+
 <Card type="info">
 **Attributes**
 >
@@ -230,6 +238,10 @@ Base class for middlewares with hooks.
 
 </div>
 </RandomGradientBackground>
+```python
+from mcp_use.middleware.middleware import Middleware
+```
+
 <Card type="info">
 ### `method` __call__
 
@@ -434,6 +446,10 @@ Unified, typed context for all middleware operations.
 
 </div>
 </RandomGradientBackground>
+```python
+from mcp_use.middleware.middleware import MiddlewareContext
+```
+
 <Card type="info">
 **Attributes**
 >
@@ -476,6 +492,10 @@ Manages middleware callbacks for MCP requests.
 
 </div>
 </RandomGradientBackground>
+```python
+from mcp_use.middleware.middleware import MiddlewareManager
+```
+
 <Card type="info">
 ### `method` __init__
 
@@ -538,6 +558,10 @@ Protocol for the `call_next` function passed to middleware.
 
 </div>
 </RandomGradientBackground>
+```python
+from mcp_use.middleware.middleware import NextFunctionT
+```
+
 <Card type="info">
 ### `method` __init__
 

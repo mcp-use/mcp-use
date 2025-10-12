@@ -24,6 +24,10 @@ Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
     create_connector_from_config(server_config)
 
+```python
+from mcp_use.config import create_connector_from_config
+```
+
 **Parameters**
 ><ParamField body="server_config" type="dict[str, Any]" required="True" >   The server configuration section </ParamField>
 ><ParamField body="sandbox" type="bool" default="False" >   Whether to use sandboxed execution mode for running MCP servers. </ParamField>
@@ -61,6 +65,10 @@ server_config: dict[str,
 
 Load a configuration file.
 
+
+```python
+from mcp_use.config import load_config_file
+```
 
 **Parameters**
 ><ParamField body="filepath" type="str" required="True" >   Path to the configuration file </ParamField>

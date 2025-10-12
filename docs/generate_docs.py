@@ -498,6 +498,12 @@ def generate_class_docs(cls: type, module_name: str) -> str:
     docs.append("</div>")
     docs.append("</RandomGradientBackground>")
 
+    # Add import example below gradient
+    docs.append("```python")
+    docs.append(f"from {module_name} import {class_name}")
+    docs.append("```")
+    docs.append("")
+
     # Class attributes/fields - focus on type annotations for Pydantic models
     class_attributes = []
 
@@ -735,6 +741,12 @@ def generate_function_docs(func: Any, module_name: str) -> str:
     if docstring:
         docs.append(process_docstring(docstring))
         docs.append("")
+
+    # Add import example before parameters
+    docs.append("```python")
+    docs.append(f"from {module_name} import {func_name}")
+    docs.append("```")
+    docs.append("")
 
     # Parameters section
     sig = inspect.signature(func)

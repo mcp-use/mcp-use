@@ -30,6 +30,10 @@ Manages observability callbacks for MCP agents.
 
 </div>
 </RandomGradientBackground>
+```python
+from mcp_use.observability.callbacks_manager import ObservabilityManager
+```
+
 <Card type="info">
 ### `method` __init__
 
@@ -136,6 +140,10 @@ def has_callbacks():
 Create a new ObservabilityManager instance.
 
 
+```python
+from mcp_use.observability.callbacks_manager import create_manager
+```
+
 **Parameters**
 ><ParamField body="custom_callbacks" type="list | None" default="None" >   Optional list of custom callbacks. </ParamField>
 
@@ -156,6 +164,10 @@ def create_manager(custom_callbacks: list | None = None):
 
 Get the default ObservabilityManager instance.
 
+
+```python
+from mcp_use.observability.callbacks_manager import get_default_manager
+```
 
 **Returns**
 ><ResponseField name="returns" type="mcp_use.observability.callbacks_manager.ObservabilityManager" >The default ObservabilityManager instance (singleton).</ResponseField>
