@@ -877,8 +877,16 @@ def generate_module_docs(module_name: str, output_dir: str) -> None:
     print(f"Generated documentation for {module_name} -> {output_path}")
 
 
-def find_python_modules(package_dir: str) -> list[str]:
-    """Find all Python modules in a package directory, excluding __init__.py files."""
+def find_python_modules(package_dir: str, exclude_patterns: list[str] | None = None) -> list[str]:
+    """Find all Python modules in a package directory, excluding __init__.py files.
+
+    Args:
+        package_dir: The package directory to search
+        exclude_patterns: List of patterns to exclude (e.g., ['telemetry', 'internal'])
+    """
+    if exclude_patterns is None:
+        exclude_patterns = []
+
     modules = []
     package_path = Path(package_dir)
 
@@ -894,7 +902,11 @@ def find_python_modules(package_dir: str) -> list[str]:
             # This is a module
             rel_path = py_file.relative_to(package_path.parent)
             module_name = str(rel_path.with_suffix("")).replace("/", ".")
-            if module_name not in modules:
+
+            # Check if module matches any exclusion pattern
+            should_exclude = any(pattern in module_name for pattern in exclude_patterns)
+
+            if not should_exclude and module_name not in modules:
                 modules.append(module_name)
 
     return sorted(modules)
@@ -1298,8 +1310,10 @@ def main():
     print("🔄 Generating API documentation...")
 
     # Step 1: Generate all API docs
-    modules = find_python_modules(package_dir)
-    print(f"Found {len(modules)} modules")
+    # Exclude telemetry and other private modules
+    exclude_patterns = ["telemetry"]
+    modules = find_python_modules(package_dir, exclude_patterns)
+    print(f"Found {len(modules)} modules (excluding: {', '.join(exclude_patterns)})")
 
     # Generate docs for each module
     success_count = 0

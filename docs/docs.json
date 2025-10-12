@@ -253,15 +253,6 @@
             ]
           },
           {
-            "group": "Telemetry",
-            "icon": "chart-line",
-            "pages": [
-              "api-reference/mcp_use_telemetry_events",
-              "api-reference/mcp_use_telemetry_telemetry",
-              "api-reference/mcp_use_telemetry_utils"
-            ]
-          },
-          {
             "group": "Types",
             "icon": "type",
             "pages": [
