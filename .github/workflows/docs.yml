@@ -34,11 +34,11 @@ jobs:
 
     - name: Check for documentation changes
       run: |
-        if [ -n "$(git status --porcelain)" ]; then
+        if [ -n "$(git status --porcelain docs/)" ]; then
           echo "❌ API documentation is out of date!"
           echo ""
           echo "The following files have been modified:"
-          git status --porcelain
+          git status --porcelain docs/
           echo ""
           echo "Please run the following command to update the documentation:"
           echo "cd docs && uv run python generate_docs.py ../mcp_use api-reference docs.json"
