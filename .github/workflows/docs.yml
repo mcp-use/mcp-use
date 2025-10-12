@@ -36,6 +36,11 @@ jobs:
     - name: Generate API documentation
       run: cd docs && uv run python generate_docs.py ../mcp_use api-reference docs.json
 
+    - name: Check for broken links
+      run: |
+        cd docs
+        mint broken-links
+
     - name: Check for documentation changes
       id: check_docs
       run: |

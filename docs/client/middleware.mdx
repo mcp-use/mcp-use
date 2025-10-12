@@ -28,7 +28,6 @@ You implement middleware by subclassing `Middleware` and overriding one or more 
 Hooks are typed to the specific MCP method so you get strong IDE assistance when overriding specific operations like `on_call_tool`.
 
 ## Quick Start
-
 ```python
 from mcp.types import CallToolRequestParams, CallToolResult
 from mcp_use import MCPClient
@@ -291,5 +290,5 @@ dev_client  = MCPClient(config=dev_config)  # default logging only
 
 <Note>
 See the examples directory for a complete working example:
-- [`examples/example_middleware.py`](../../examples/example_middleware.py)
+- [`examples/example_middleware.py`](https://github.com/mcp-use/mcp-use/blob/main/examples/example_middleware.py)
 </Note>

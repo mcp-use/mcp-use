@@ -255,35 +255,35 @@ const agent = yourFramework.createAgent({ tools })
 
 ### Tips for Implementing an Adapter
 
-<Accordion title="Implementation Guidelines">
-  <AccordionItem title="Schema Conversion">
+<AccordionGroup>
+  <Accordion title="Schema Conversion">
     Most frameworks have their own way of handling argument schemas. You'll need to convert the MCP tool's JSON Schema to your framework's format.
 
     <Tip>
     Look at the LangChain adapter implementation as a reference for handling schema conversion patterns.
     </Tip>
-  </AccordionItem>
+  </Accordion>
 
-  <AccordionItem title="Tool Execution">
+  <Accordion title="Tool Execution">
     When a tool is called in your framework, you'll need to pass the call to the connector's `call_tool` method and handle the result.
 
     <Warning>
     Always ensure proper async/await handling when calling MCP tools, as they are inherently asynchronous.
     </Warning>
-  </AccordionItem>
+  </Accordion>
 
-  <AccordionItem title="Result Parsing">
+  <Accordion title="Result Parsing">
     MCP tools return structured data with types like text, images, or embedded resources. Your adapter should parse these into a format your framework understands.
-  </AccordionItem>
+  </Accordion>
 
-  <AccordionItem title="Error Handling">
+  <Accordion title="Error Handling">
     Ensure your adapter handles errors gracefully, both during tool conversion and execution.
 
     <Note>
     The base adapter provides logging utilities to help with error reporting and debugging.
     </Note>
-  </AccordionItem>
-</Accordion>
+  </Accordion>
+</AccordionGroup>
 
 
 ## Conclusion
