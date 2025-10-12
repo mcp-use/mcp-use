@@ -62,10 +62,12 @@ Initialize a new MCPAgent instance.
 ><ParamField body="chat_id" type="str | None" default="None" >   String value </ParamField>
 ><ParamField body="retry_on_error" type="bool" default="True" >   Whether to retry tool calls that fail due to validation errors. </ParamField>
 ><ParamField body="max_retries_per_step" type="int" default="2" >   Maximum number of retries for validation errors per step. </ParamField>
+><ParamField body="output_config" type="mcp_use.output.config.OutputConfig | None" default="None" >   Configuration for output formatting. Uses defaults if None. </ParamField>
+><ParamField body="pretty_print" type="bool" default="True" >   Whether to format output with pretty printing. </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.MCPClient | None = None, connectors: list[mcp_use.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.managers.base.BaseServerManager | None = None, verbose: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True, max_retries_per_step: int = 2):
+def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.MCPClient | None = None, connectors: list[mcp_use.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.managers.base.BaseServerManager | None = None, verbose: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True, max_retries_per_step: int = 2, output_config: mcp_use.output.config.OutputConfig | None = None, pretty_print: bool = True):
 ```
 
 </Card>
@@ -210,6 +212,7 @@ Run a query using the MCP tools and return the final result.
 ><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
 ><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
+><ParamField body="pretty_print" type="bool | None" default="None" >   Whether to format output with pretty printing. </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="str | mcp_use.agents.mcpagent.T" >The result of running the query as a string, or if output_schema is provided, an instance of the specified Pydantic model.</ResponseField>
@@ -221,7 +224,8 @@ query: str,
     max_steps: int | None = None,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
-    output_schema: type[~T] | None = None
+    output_schema: type[~T] | None = None,
+    pretty_print: bool | None = None
 ):
 ```
 
@@ -280,6 +284,7 @@ Run the agent and yield intermediate steps as an async generator.
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
 ><ParamField body="track_execution" type="bool" default="True" >   Whether to track execution for telemetry. </ParamField>
 ><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
+><ParamField body="pretty_print" type="bool | None" default="None" >   Whether to format output with pretty printing. </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="AsyncGenerator" />
@@ -292,7 +297,8 @@ query: str,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
     track_execution: bool = True,
-    output_schema: type[~T] | None = None
+    output_schema: type[~T] | None = None,
+    pretty_print: bool | None = None
 ):
 ```
 

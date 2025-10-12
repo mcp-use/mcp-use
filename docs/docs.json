@@ -243,6 +243,17 @@
             ]
           },
           {
+            "group": "Output",
+            "icon": "code",
+            "pages": [
+              "api-reference/mcp_use_output_config",
+              "api-reference/mcp_use_output_formatter",
+              "api-reference/mcp_use_output_integration",
+              "api-reference/mcp_use_output_printer",
+              "api-reference/mcp_use_output_types"
+            ]
+          },
+          {
             "group": "Task Managers",
             "icon": "command",
             "pages": [

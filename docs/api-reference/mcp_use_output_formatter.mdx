@@ -1,0 +1,74 @@
+---
+title: "Formatter"
+description: "Output formatters for MCP agent responses API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/output/formatter.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/output/formatter.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/output/formatter.py</a>
+</Callout>
+
+Output formatters for MCP agent responses.
+
+This module provides functions to format agent outputs
+using the rich library for terminal display.
+
+
+## format_error
+<Card type="info">
+### `function` format_error
+
+Format and display an error.
+
+
+```python
+from mcp_use.output.formatter import format_error
+```
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   The user's query </ParamField>
+><ParamField body="error" type="str" required="True" >   The error message </ParamField>
+><ParamField body="config" type="mcp_use.output.config.OutputConfig | None" default="None" >   Output configuration </ParamField>
+
+**Signature**
+```python wrap
+def format_error(query: str, error: str, config: mcp_use.output.config.OutputConfig | None = None):
+```
+
+</Card>
+
+
+## format_output
+<Card type="info">
+### `function` format_output
+
+Format and display query and response in clean panels.
+
+
+```python
+from mcp_use.output.formatter import format_output
+```
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   The user's query/message </ParamField>
+><ParamField body="response" type="Any" required="True" >   The agent's response </ParamField>
+><ParamField body="execution_time_s" type="float | None" default="None" >   Execution time in seconds </ParamField>
+><ParamField body="steps" type="list[dict[str, typing.Any]] | None" default="None" >   Optional reasoning steps to display </ParamField>
+><ParamField body="config" type="mcp_use.output.config.OutputConfig | None" default="None" >   Output configuration </ParamField>
+
+**Signature**
+```python wrap
+def format_output(
+query: str,
+    response: Any,
+    execution_time_s: float | None = None,
+    steps: list[dict[str,
+    typing.Any]] | None = None,
+    config: mcp_use.output.config.OutputConfig | None = None
+):
+```
+
+</Card>

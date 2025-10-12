@@ -1,0 +1,172 @@
+---
+title: "Printer"
+description: "Pretty printer using rich library API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/output/printer.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/output/printer.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/output/printer.py</a>
+</Callout>
+
+Pretty printer using rich library.
+
+This module provides the core printing functionality using rich
+for terminal output with tables, colors, and live updates.
+
+## PanelPrinter
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> PanelPrinter</div>
+
+Clean panel-based printer for agent outputs.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.output.printer import PanelPrinter
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize the panel printer.
+
+
+**Parameters**
+><ParamField body="config" type="mcp_use.output.config.OutputConfig | None" default="None" >   Output configuration (uses defaults if None) </ParamField>
+
+**Signature**
+```python wrap
+def __init__(config: mcp_use.output.config.OutputConfig | None = None):
+```
+
+</Card>
+<Card type="info">
+### `method` print_error
+
+Print error in a panel.
+
+
+
+**Parameters**
+><ParamField body="error" type="str" required="True" >   Error message </ParamField>
+><ParamField body="query" type="str | None" default="None" >   Optional query that caused the error </ParamField>
+
+**Signature**
+```python wrap
+def print_error(error: str, query: str | None = None):
+```
+
+</Card>
+
+<Card type="info">
+### `method` print_message_and_response
+
+Print query and response in separate panels.
+
+
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   The user's query/message </ParamField>
+><ParamField body="response" type="Any" required="True" >   The agent's response </ParamField>
+><ParamField body="execution_time_s" type="float | None" default="None" >   Execution time in seconds </ParamField>
+><ParamField body="steps" type="list[dict[str, typing.Any]] | None" default="None" >   Optional reasoning steps to display </ParamField>
+
+**Signature**
+```python wrap
+def print_message_and_response(
+query: str,
+    response: Any,
+    execution_time_s: float | None = None,
+    steps: list[dict[str,
+    typing.Any]] | None = None
+):
+```
+
+</Card>
+
+</div>
+
+## StreamPrinter
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> StreamPrinter</div>
+
+Panel-based printer for streaming agent outputs with live updates.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.output.printer import StreamPrinter
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize the stream printer.
+
+
+**Parameters**
+><ParamField body="config" type="mcp_use.output.config.OutputConfig | None" default="None" >   Output configuration (uses defaults if None) </ParamField>
+
+**Signature**
+```python wrap
+def __init__(config: mcp_use.output.config.OutputConfig | None = None):
+```
+
+</Card>
+<Card type="info">
+### `method` run_with_panels
+
+Run agent stream with live panel updates.
+
+
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   User's query </ParamField>
+><ParamField body="agent_stream" required="True" >   Async generator from agent </ParamField>
+><ParamField body="stream_intermediate_steps" type="bool" default="False" >   Whether to show steps during streaming </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" >Final result from agent</ResponseField>
+
+**Signature**
+```python wrap
+def run_with_panels(query: str, agent_stream, stream_intermediate_steps: bool = False):
+```
+
+</Card>
+
+</div>
+
+
+## escape_markdown_tags
+<Card type="info">
+### `function` escape_markdown_tags
+
+Escape special tags in markdown content.
+
+```python
+from mcp_use.output.printer import escape_markdown_tags
+```
+
+**Parameters**
+><ParamField body="content" type="str" required="True" >   String value </ParamField>
+><ParamField body="tags" type="set[str]" required="True" >   String value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def escape_markdown_tags(content: str, tags: set[str]):
+```
+
+</Card>
