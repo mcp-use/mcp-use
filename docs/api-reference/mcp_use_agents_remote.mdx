@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/remote.py</a>
 </Callout>
@@ -13,12 +15,16 @@ Remote agent implementation for executing agents via API.
 
 ## RemoteAgent
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` RemoteAgent
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> RemoteAgent</div>
 
 Agent that executes remotely via API.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize remote agent.
@@ -36,11 +42,11 @@ def __init__(agent_id: str, chat_id: str | None = None, api_key: str | None = No
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` close
 
 Close the HTTP client.
+
 
 **Signature**
 ```python wrap
@@ -49,10 +55,11 @@ def close():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` run
 
 Run a query on the remote agent.
+
 
 
 **Parameters**
@@ -76,4 +83,4 @@ query: str,
 
 </Card>
 
-</Card>
+</div>

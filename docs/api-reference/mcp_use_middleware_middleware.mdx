@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/middleware/middleware.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/middleware/middleware.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/middleware/middleware.py</a>
 </Callout>
@@ -20,12 +22,16 @@ This module provides a robust and extensible middleware architecture:
 
 ## CallbackClientSession
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` CallbackClientSession
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> CallbackClientSession</div>
 
 ClientSession wrapper that uses callback-based middleware.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 **Parameters**
@@ -39,9 +45,9 @@ def __init__(client_session: mcp.client.session.ClientSession, connector_id: str
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` call_tool
+
 
 **Parameters**
 ><ParamField body="name" type="str" required="True" >   Name identifier </ParamField>
@@ -59,8 +65,9 @@ def call_tool(name: str, arguments: dict[str, Any], args, kwargs):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_prompt
+
 
 **Parameters**
 ><ParamField body="name" type="str" required="True" >   Name identifier </ParamField>
@@ -77,8 +84,9 @@ def get_prompt(name: str, args, kwargs):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` initialize
+
 
 **Parameters**
 ><ParamField body="args" required="True" >   Parameter value </ParamField>
@@ -94,8 +102,9 @@ def initialize(args, kwargs):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` list_prompts
+
 
 **Parameters**
 ><ParamField body="args" required="True" >   Parameter value </ParamField>
@@ -111,8 +120,9 @@ def list_prompts(args, kwargs):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` list_resources
+
 
 **Parameters**
 ><ParamField body="args" required="True" >   Parameter value </ParamField>
@@ -128,8 +138,9 @@ def list_resources(args, kwargs):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` list_tools
+
 
 **Parameters**
 ><ParamField body="args" required="True" >   Parameter value </ParamField>
@@ -145,8 +156,9 @@ def list_tools(args, kwargs):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` read_resource
+
 
 **Parameters**
 ><ParamField body="uri" type="str" required="True" >   String value </ParamField>
@@ -163,15 +175,20 @@ def read_resource(uri: str, args, kwargs):
 
 </Card>
 
-</Card>
+</div>
 
 ## MCPResponseContext
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` MCPResponseContext
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPResponseContext</div>
 
 Extended context for MCP responses with middleware metadata.
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="request_id" type="str" required="True" >   String value </ParamField>
@@ -181,7 +198,9 @@ Extended context for MCP responses with middleware metadata.
 <ParamField body="metadata" type="dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
 <ParamField body="jsonrpc_response" type="mcp.types.JSONRPCResponse | None" required="True" >   Parameter value </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 **Parameters**
@@ -198,20 +217,24 @@ def __init__(request_id: str, result: Any, error: Exception | None, duration: fl
 ```
 
 </Card>
-
-</Card>
+</div>
 
 ## Middleware
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` Middleware
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> Middleware</div>
 
 Base class for middlewares with hooks.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __call__
 
 Main entry point that orchestrates the chain
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -230,8 +253,9 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` on_call_tool
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -250,8 +274,9 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` on_get_prompt
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -270,8 +295,9 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` on_initialize
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -290,8 +316,9 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` on_list_prompts
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -310,8 +337,9 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` on_list_resources
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -330,8 +358,9 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` on_list_tools
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -350,8 +379,9 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` on_read_resource
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -370,8 +400,9 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` on_request
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -390,15 +421,20 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-</Card>
+</div>
 
 ## MiddlewareContext
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` MiddlewareContext
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MiddlewareContext</div>
 
 Unified, typed context for all middleware operations.
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="id" type="str" required="True" >   String value </ParamField>
@@ -408,7 +444,9 @@ Unified, typed context for all middleware operations.
 <ParamField body="timestamp" type="float" required="True" >   Parameter value </ParamField>
 <ParamField body="metadata" type="dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 **Parameters**
@@ -425,17 +463,20 @@ def __init__(id: str, method: str, params: mcp_use.middleware.middleware.T, conn
 ```
 
 </Card>
-
-</Card>
+</div>
 
 ## MiddlewareManager
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` MiddlewareManager
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MiddlewareManager</div>
 
 Manages middleware callbacks for MCP requests.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 **Signature**
@@ -444,11 +485,11 @@ def __init__():
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` add_middleware
 
 Add a middleware callback.
+
 
 **Parameters**
 ><ParamField body="callback" type="mcp_use.middleware.middleware.Middleware" required="True" >   Callback function </ParamField>
@@ -460,11 +501,12 @@ def add_middleware(callback: mcp_use.middleware.middleware.Middleware):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` process_request
 
 Runs the full middleware chain, captures timing and errors,
         and returns a structured MCPResponseContext.
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -483,16 +525,20 @@ context: mcp_use.middleware.middleware.MiddlewareContext,
 
 </Card>
 
-</Card>
+</div>
 
 ## NextFunctionT
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` NextFunctionT
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> NextFunctionT</div>
 
 Protocol for the `call_next` function passed to middleware.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 **Parameters**
@@ -505,9 +551,9 @@ def __init__(args, kwargs):
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` __call__
+
 
 **Parameters**
 ><ParamField body="context" type="mcp_use.middleware.middleware.MiddlewareContext" required="True" >   Parameter value </ParamField>
@@ -522,4 +568,4 @@ def __call__(context: mcp_use.middleware.middleware.MiddlewareContext):
 
 </Card>
 
-</Card>
+</div>

@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/auth/oauth.py</a>
 </Callout>
@@ -13,14 +15,19 @@ OAuth authentication support for MCP clients.
 
 ## ClientRegistrationResponse
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` ClientRegistrationResponse
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ClientRegistrationResponse</div>
 
 Dynamic Client Registration response.
 
     It represents the response from an OAuth server
     when you dinamically register a new OAuth client.
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="client_id" type="str" required="True" >   MCP client instance </ParamField>
@@ -33,7 +40,9 @@ Dynamic Client Registration response.
 <ParamField body="client_name" type="str | None" required="True" >   MCP client instance </ParamField>
 <ParamField body="token_endpoint_auth_method" type="str | None" required="True" >   String value </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Create a new model by parsing and validating input data from keyword arguments.
@@ -52,13 +61,14 @@ def __init__(data: Any):
 ```
 
 </Card>
-
-</Card>
+</div>
 
 ## FileTokenStorage
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` FileTokenStorage
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> FileTokenStorage</div>
 
 File-based token storage.
 
@@ -69,7 +79,9 @@ File-based token storage.
     - Deleting tokens when they're revoked
     - Organizing tokens by server URL
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize token storage.
@@ -84,11 +96,11 @@ def __init__(base_dir: pathlib.Path | None = None):
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` delete_tokens
 
 Delete tokens for a server.
+
 
 **Parameters**
 ><ParamField body="server_url" type="str" required="True" >   Server name or configuration </ParamField>
@@ -100,10 +112,11 @@ def delete_tokens(server_url: str):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` load_tokens
 
 Load tokens from file.
+
 
 **Parameters**
 ><ParamField body="server_url" type="str" required="True" >   Server name or configuration </ParamField>
@@ -118,10 +131,11 @@ def load_tokens(server_url: str):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` save_tokens
 
 Save tokens to file.
+
 
 **Parameters**
 ><ParamField body="server_url" type="str" required="True" >   Server name or configuration </ParamField>
@@ -134,12 +148,14 @@ def save_tokens(server_url: str, tokens: dict[str, Any]):
 
 </Card>
 
-</Card>
+</div>
 
 ## OAuth
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` OAuth
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> OAuth</div>
 
 OAuth authentication handler for MCP clients.
 
@@ -150,7 +166,9 @@ OAuth authentication handler for MCP clients.
     - Registers client dynamically when possible
     - Manages token storage and refresh automaticlly
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize OAuth handler.
@@ -171,11 +189,11 @@ def __init__(server_url: str, token_storage: mcp_use.auth.oauth.FileTokenStorage
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` authenticate
 
 Perform OAuth authentication flow.
+
 
 **Returns**
 ><ResponseField name="returns" type="mcp_use.auth.bearer.BearerAuth" />
@@ -187,10 +205,11 @@ def authenticate():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` initialize
 
 Initialize OAuth and return bearer auth if tokens exist.
+
 
 **Parameters**
 ><ParamField body="client" type="httpx.AsyncClient" required="True" >   MCP client instance </ParamField>
@@ -205,10 +224,11 @@ def initialize(client: httpx.AsyncClient):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` refresh_token
 
 Refresh the access token if possible.
+
 
 **Returns**
 ><ResponseField name="returns" type="mcp_use.auth.bearer.BearerAuth | None" />
@@ -220,25 +240,32 @@ def refresh_token():
 
 </Card>
 
-</Card>
+</div>
 
 ## OAuthClientProvider
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` OAuthClientProvider
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> OAuthClientProvider</div>
 
 OAuth client provider configuration for a specific server.
 
     This contains all the information needed to authenticate with an OAuth server
     without needing to discover metadata or register clients dynamically.
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="id" type="str" required="True" >   String value </ParamField>
 <ParamField body="display_name" type="str" required="True" >   Name identifier </ParamField>
 <ParamField body="metadata" type="mcp_use.auth.oauth.ServerOAuthMetadata | dict[str, typing.Any]" required="True" >   Dictionary of key-value pairs </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Create a new model by parsing and validating input data from keyword arguments.
@@ -257,11 +284,11 @@ def __init__(data: Any):
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `property` oauth_metadata
 
 Get OAuth metadata as ServerOAuthMetadata instance.
+
 
 **Returns**
 ><ResponseField name="returns" type="mcp_use.auth.oauth.ServerOAuthMetadata" />
@@ -273,12 +300,14 @@ def oauth_metadata():
 
 </Card>
 
-</Card>
+</div>
 
 ## ServerOAuthMetadata
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` ServerOAuthMetadata
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ServerOAuthMetadata</div>
 
 OAuth metadata from MCP server with flexible field support.
     It is essentially a configuration that tells MCP client:
@@ -288,6 +317,9 @@ OAuth metadata from MCP server with flexible field support.
     - Which OAuth features are supported
     - Where to register new users with DCR
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="issuer" type="pydantic.networks.HttpUrl" required="True" >   Parameter value </ParamField>
@@ -306,7 +338,9 @@ OAuth metadata from MCP server with flexible field support.
 <ParamField body="claims_supported" type="list[str] | None" required="True" >   List of items </ParamField>
 <ParamField body="code_challenge_methods_supported" type="list[str] | None" required="True" >   List of items </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Create a new model by parsing and validating input data from keyword arguments.
@@ -325,19 +359,23 @@ def __init__(data: Any):
 ```
 
 </Card>
-
-</Card>
+</div>
 
 ## TokenData
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` TokenData
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> TokenData</div>
 
 OAuth token data.
 
     This is the information received after
     successfull authentication
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="access_token" type="str" required="True" >   String value </ParamField>
@@ -346,7 +384,9 @@ OAuth token data.
 <ParamField body="refresh_token" type="str | None" required="True" >   String value </ParamField>
 <ParamField body="scope" type="str | None" required="True" >   String value </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Create a new model by parsing and validating input data from keyword arguments.
@@ -365,5 +405,4 @@ def __init__(data: Any):
 ```
 
 </Card>
-
-</Card>
+</div>

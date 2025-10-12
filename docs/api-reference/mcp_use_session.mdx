@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/session.py</a>
 </Callout>
@@ -16,15 +18,19 @@ which handles authentication, initialization, and tool discovery.
 
 ## MCPSession
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` MCPSession
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPSession</div>
 
 Session manager for MCP connections.
 
     This class manages the lifecycle of an MCP connection, including
     authentication, initialization, and tool discovery.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize a new MCP session.
@@ -40,11 +46,11 @@ def __init__(connector: mcp_use.connectors.base.BaseConnector, auto_connect: boo
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` call_tool
 
 Call an MCP tool.
+
 
 
 **Parameters**
@@ -67,10 +73,11 @@ name: str,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` connect
 
 Connect to the MCP implementation.
+
 
 **Signature**
 ```python wrap
@@ -79,10 +86,11 @@ def connect():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` disconnect
 
 Disconnect from the MCP implementation.
+
 
 **Signature**
 ```python wrap
@@ -91,10 +99,11 @@ def disconnect():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_prompt
 
 Get a prompt by name.
+
 
 
 **Parameters**
@@ -111,10 +120,11 @@ def get_prompt(name: str, arguments: dict[str, typing.Any] | None = None):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` initialize
 
 Initialize the MCP session and discover available tools.
+
 
 
 **Returns**
@@ -127,10 +137,11 @@ def initialize():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `property` is_connected
 
 Check if the connector is connected.
+
 
 
 **Returns**
@@ -143,10 +154,11 @@ def is_connected():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` list_prompts
 
 List all available prompts from the MCP server.
+
 
 
 **Returns**
@@ -159,10 +171,11 @@ def list_prompts():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` list_resources
 
 List all available resources from the MCP server.
+
 
 
 **Returns**
@@ -175,10 +188,11 @@ def list_resources():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` list_tools
 
 List all available tools from the MCP server.
+
 
 
 **Returns**
@@ -191,10 +205,11 @@ def list_tools():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` read_resource
 
 Read a resource by URI.
+
 
 
 **Parameters**
@@ -210,4 +225,4 @@ def read_resource(uri: pydantic.networks.AnyUrl):
 
 </Card>
 
-</Card>
+</div>

@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/adapters/base.py</a>
 </Callout>
@@ -15,15 +17,19 @@ This module provides the abstract base class that all MCP tool adapters should i
 
 ## BaseAdapter
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` BaseAdapter
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> BaseAdapter</div>
 
 Abstract base class for converting MCP tools to other framework formats.
 
     This class defines the common interface that all adapter implementations
     should follow to ensure consistency across different frameworks.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize a new adapter.
@@ -38,8 +44,7 @@ def __init__(disallowed_tools: list[str] | None = None):
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` create_tools
 
 Create tools from an MCPClient instance.
@@ -56,6 +61,7 @@ Create tools from an MCPClient instance.
             tools = await YourAdapter.create_tools(client)
             ```
 
+
 **Parameters**
 ><ParamField body="client" type="MCPClient" required="True" >   The MCPClient to extract tools from. </ParamField>
 
@@ -69,10 +75,11 @@ def create_tools(client: MCPClient):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` load_tools_for_connector
 
 Dynamically load tools for a specific connector.
+
 
 
 **Parameters**
@@ -88,4 +95,4 @@ def load_tools_for_connector(connector: mcp_use.connectors.base.BaseConnector):
 
 </Card>
 
-</Card>
+</div>

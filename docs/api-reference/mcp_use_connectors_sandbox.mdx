@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/sandbox.py</a>
 </Callout>
@@ -16,8 +18,10 @@ that are executed inside a sandbox environment (currently using E2B).
 
 ## SandboxConnector
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` SandboxConnector
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> SandboxConnector</div>
 
 Connector for MCP implementations running in a sandbox environment.
 
@@ -25,7 +29,9 @@ Connector for MCP implementations running in a sandbox environment.
     currently implemented using E2B, potentially wrapped by a utility like 'supergateway'
     to expose its stdio.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize a new sandbox connector.
@@ -50,11 +56,11 @@ def __init__(command: str, args: list[str], env: dict[str, str] | None = None, e
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` wait_for_server_response
 
 Wait for the server to respond to HTTP requests.
+
 
 **Parameters**
 ><ParamField body="base_url" type="str" required="True" >   The base URL to check for server readiness </ParamField>
@@ -70,4 +76,4 @@ def wait_for_server_response(base_url: str, timeout: int = 30):
 
 </Card>
 
-</Card>
+</div>

@@ -5,24 +5,33 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/list_servers_tool.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/list_servers_tool.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/list_servers_tool.py</a>
 </Callout>
 
 ## ListServersTool
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` ListServersTool
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ListServersTool</div>
 
 Tool for listing available MCP servers.
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="name" type="ClassVar" required="True" >   Name identifier </ParamField>
 <ParamField body="description" type="ClassVar" required="True" >   Parameter value </ParamField>
 <ParamField body="args_schema" type="ClassVar" required="True" >   Parameter value </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Initialize with server manager.
@@ -36,17 +45,20 @@ def __init__(server_manager):
 ```
 
 </Card>
-
-</Card>
+</div>
 
 ## listServersInput
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` listServersInput
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> listServersInput</div>
 
 Empty input for listing available servers
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Create a new model by parsing and validating input data from keyword arguments.
@@ -65,5 +77,4 @@ def __init__(data: Any):
 ```
 
 </Card>
-
-</Card>
+</div>

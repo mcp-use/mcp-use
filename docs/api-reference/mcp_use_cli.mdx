@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py</a>
 </Callout>
@@ -13,12 +15,16 @@ MCP-Use CLI Tool - All-in-one CLI for creating and deploying MCP projects.
 
 ## Spinner
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` Spinner
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> Spinner</div>
 
 Simple loading spinner similar to UV's style.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 **Parameters**
@@ -30,11 +36,11 @@ def __init__(message: str = "Loading"):
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` start
 
 Start the spinner.
+
 
 **Signature**
 ```python wrap
@@ -43,10 +49,11 @@ def start():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` stop
 
 Stop the spinner and optionally print success message.
+
 
 **Parameters**
 ><ParamField body="success_message" default="None" >   Parameter value </ParamField>
@@ -58,11 +65,11 @@ def stop(success_message = None):
 
 </Card>
 
-</Card>
+</div>
 
 
 ## create_agent_structure
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` create_agent_structure
 
 Create agent file in nested project folder.
@@ -76,11 +83,12 @@ Create agent file in nested project folder.
 ```python wrap
 def create_agent_structure(project_dir: pathlib.Path, project_name: str, project_type: str):
 ```
+
 </Card>
 
 
 ## create_common_files
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` create_common_files
 
 Create common project files.
@@ -94,11 +102,12 @@ Create common project files.
 ```python wrap
 def create_common_files(project_dir: pathlib.Path, project_name: str, project_type: str):
 ```
+
 </Card>
 
 
 ## create_example_files
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` create_example_files
 
 Create example files.
@@ -111,11 +120,12 @@ Create example files.
 ```python wrap
 def create_example_files(project_dir: pathlib.Path, project_name: str):
 ```
+
 </Card>
 
 
 ## create_project
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` create_project
 
 Create the project structure.
@@ -131,11 +141,12 @@ Create the project structure.
 ```python wrap
 def create_project(project_name: str, project_type: str):
 ```
+
 </Card>
 
 
 ## create_server_structure
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` create_server_structure
 
 Create server file in nested project folder.
@@ -148,11 +159,12 @@ Create server file in nested project folder.
 ```python wrap
 def create_server_structure(project_dir: pathlib.Path, project_name: str):
 ```
+
 </Card>
 
 
 ## get_project_name
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` get_project_name
 
 Get project name from user.
@@ -164,11 +176,12 @@ Get project name from user.
 ```python wrap
 def get_project_name():
 ```
+
 </Card>
 
 
 ## get_project_type
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` get_project_type
 
 Get project type from user.
@@ -180,11 +193,12 @@ Get project type from user.
 ```python wrap
 def get_project_type():
 ```
+
 </Card>
 
 
 ## handle_create
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` handle_create
 
 Handle the create command.
@@ -193,11 +207,12 @@ Handle the create command.
 ```python wrap
 def handle_create():
 ```
+
 </Card>
 
 
 ## handle_deploy
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` handle_deploy
 
 Handle the deploy command (placeholder for future implementation).
@@ -206,11 +221,12 @@ Handle the deploy command (placeholder for future implementation).
 ```python wrap
 def handle_deploy():
 ```
+
 </Card>
 
 
 ## main
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` main
 
 Main entry point for the CLI.
@@ -222,11 +238,12 @@ Main entry point for the CLI.
 ```python wrap
 def main(args = None):
 ```
+
 </Card>
 
 
 ## print_header
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` print_header
 
 Print the CLI header.
@@ -235,11 +252,12 @@ Print the CLI header.
 ```python wrap
 def print_header():
 ```
+
 </Card>
 
 
 ## show_help
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` show_help
 
 Show the main help message.
@@ -248,4 +266,5 @@ Show the main help message.
 ```python wrap
 def show_help():
 ```
+
 </Card>

@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/websocket.py</a>
 </Callout>
@@ -16,15 +18,19 @@ through WebSocket connections.
 
 ## WebSocketConnector
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` WebSocketConnector
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> WebSocketConnector</div>
 
 Connector for MCP implementations using WebSocket transport.
 
     This connector uses WebSockets to communicate with remote MCP implementations,
     using a connection manager to handle the proper lifecycle management.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize a new WebSocket connector.
@@ -41,5 +47,4 @@ def __init__(url: str, headers: dict[str, str] | None = None, auth: str | dict[s
 ```
 
 </Card>
-
-</Card>
+</div>

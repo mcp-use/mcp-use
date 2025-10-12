@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py</a>
 </Callout>
@@ -15,15 +17,19 @@ This module provides a base class for agents that use MCP tools.
 
 ## BaseAgent
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` BaseAgent
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> BaseAgent</div>
 
 Base class for agents that use MCP tools.
 
     This abstract class defines the interface for agents that use MCP tools.
     Agents are responsible for integrating LLMs with MCP tools.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize a new agent.
@@ -38,14 +44,14 @@ def __init__(session: mcp_use.session.MCPSession):
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` initialize
 
 Initialize the agent.
 
         This method should prepare the agent for use, including initializing
         the MCP session and setting up any necessary components.
+
 
 **Signature**
 ```python wrap
@@ -54,10 +60,11 @@ def initialize():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` run
 
 Run the agent with a query.
+
 
 
 **Parameters**
@@ -74,10 +81,11 @@ def run(query: str, max_steps: int = 10):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` step
 
 Perform a single step of the agent.
+
 
 
 **Parameters**
@@ -94,4 +102,4 @@ def step(query: str, previous_steps: list[dict[str, typing.Any]] | None = None):
 
 </Card>
 
-</Card>
+</div>

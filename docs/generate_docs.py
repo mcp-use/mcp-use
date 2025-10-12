@@ -482,14 +482,21 @@ def generate_class_docs(cls: type, module_name: str) -> str:
     docs.append(f"## {class_name}")
     docs.append("")
 
-    # Class Card with image
-    docs.append('<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">')
-    docs.append(f"### `class` {class_name}")
+    # Class Card with gradient background
+    docs.append("<div>")
+    docs.append('<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">')
+    docs.append('<div className="text-black">')
+    docs.append(
+        f'<div className="text-black font-bold text-xl mb-2 mt-8">'
+        f'<code className="!text-black">class</code> {class_name}</div>'
+    )
     docs.append("")
 
     if docstring:
         docs.append(process_docstring(docstring))
         docs.append("")
+    docs.append("</div>")
+    docs.append("</RandomGradientBackground>")
 
     # Class attributes/fields - focus on type annotations for Pydantic models
     class_attributes = []
@@ -506,6 +513,7 @@ def generate_class_docs(cls: type, module_name: str) -> str:
                 class_attributes.append((name, annotation))
 
     if class_attributes:
+        docs.append('<Card type="info">')
         docs.append("**Attributes**")
         docs.append(">")
         for name, annotation in class_attributes:
@@ -516,15 +524,15 @@ def generate_class_docs(cls: type, module_name: str) -> str:
             param_field = generate_param_field(name, param, "")
             docs.append(param_field)
         docs.append("")
+        docs.append("</Card>")
+        docs.append("")
 
     # Constructor
     if hasattr(cls, "__init__"):
         init_method = cls.__init__
         if init_method != object.__init__:
-            # Constructor Card with image
-            docs.append(
-                '<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">'
-            )
+            # Constructor Card
+            docs.append('<Card type="info">')
             docs.append("### `method` __init__")
             docs.append("")
 
@@ -555,13 +563,14 @@ def generate_class_docs(cls: type, module_name: str) -> str:
                 docs.append(f"def __init__{sig_str}:")
                 docs.append("```")
                 docs.append("")
+
+                docs.append("</Card>")
+
             except Exception:
                 docs.append("Error generating parameters")
                 docs.append("")
-
-            # Close the constructor Card
-            docs.append("</Card>")
-            docs.append("")
+                docs.append("</Card>")
+                docs.append("")
 
     # Methods - only include methods defined in this module (including async methods and properties)
     for name, method in inspect.getmembers(
@@ -596,10 +605,8 @@ def generate_class_docs(cls: type, module_name: str) -> str:
             and is_property_in_module
             and not is_inherited
         ):
-            # Method/Property Card with image
-            docs.append(
-                '<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">'
-            )
+            # Method/Property Card
+            docs.append('<Card type="info">')
             if isinstance(method, property):
                 docs.append(f"### `property` {name}")
             else:
@@ -614,7 +621,23 @@ def generate_class_docs(cls: type, module_name: str) -> str:
                 if method_docstring:
                     docs.append(process_docstring(method_docstring))
                     docs.append("")
+            else:
+                # Regular method handling
+                sig = inspect.signature(method)
+                param_docs = extract_param_docs(get_docstring(method))
+                params_to_show = [
+                    (name_param, param) for name_param, param in sig.parameters.items() if name_param != "self"
+                ]
 
+                # Add description outside callout
+                if method_docstring:
+                    docs.append(process_docstring(method_docstring))
+                    docs.append("")
+
+            docs.append("")
+
+            # Handle properties differently from regular methods
+            if isinstance(method, property):
                 # Add return type for properties
                 if hasattr(method, "fget") and method.fget:
                     sig = inspect.signature(method.fget)
@@ -633,18 +656,6 @@ def generate_class_docs(cls: type, module_name: str) -> str:
                 docs.append("```")
                 docs.append("")
             else:
-                # Regular method handling
-                sig = inspect.signature(method)
-                param_docs = extract_param_docs(get_docstring(method))
-                params_to_show = [
-                    (name_param, param) for name_param, param in sig.parameters.items() if name_param != "self"
-                ]
-
-                # Add description outside callout
-                if method_docstring:
-                    docs.append(process_docstring(method_docstring))
-                    docs.append("")
-
                 # Add parameters in callout
                 if params_to_show:
                     docs.append("**Parameters**")
@@ -695,12 +706,11 @@ def generate_class_docs(cls: type, module_name: str) -> str:
                 docs.append("Error generating parameters")
                 docs.append("")
 
-            # Close the method/property Card
             docs.append("</Card>")
             docs.append("")
 
     # Close the main class Card
-    docs.append("</Card>")
+    docs.append("</div>")
 
     return "\n".join(docs)
 
@@ -716,8 +726,8 @@ def generate_function_docs(func: Any, module_name: str) -> str:
     docs.append("")
     docs.append(f"## {func_name}")
 
-    # Function Card with image
-    docs.append('<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">')
+    # Function Card
+    docs.append('<Card type="info">')
     docs.append(f"### `function` {func_name}")
     docs.append("")
 
@@ -790,6 +800,7 @@ def generate_function_docs(func: Any, module_name: str) -> str:
         docs.append(f"def {func_name}():")
 
     docs.append("```")
+    docs.append("")
     docs.append("</Card>")
 
     return "\n".join(docs)
@@ -833,6 +844,8 @@ def generate_module_docs(module_name: str, output_dir: str) -> None:
     for key, value in frontmatter.items():
         content.append(f'{key}: "{value}"')
     content.append("---")
+    content.append("")
+    content.append('import {RandomGradientBackground} from "/snippets/gradient.jsx"')
     content.append("")
     # GitHub source code callout
     content.append('<Callout type="info" title="Source Code">')

@@ -5,24 +5,33 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/search_tools.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/search_tools.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/search_tools.py</a>
 </Callout>
 
 ## SearchToolsTool
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` SearchToolsTool
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> SearchToolsTool</div>
 
 Tool for searching for tools across all MCP servers using semantic search.
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="name" type="ClassVar" required="True" >   Name identifier </ParamField>
 <ParamField body="description" type="ClassVar" required="True" >   Parameter value </ParamField>
 <ParamField body="args_schema" type="ClassVar" required="True" >   Parameter value </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Initialize with server manager and create a search tool.
@@ -36,18 +45,21 @@ def __init__(server_manager):
 ```
 
 </Card>
-
-</Card>
+</div>
 
 ## ToolSearchEngine
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` ToolSearchEngine
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ToolSearchEngine</div>
 
 Provides semantic search capabilities for MCP tools.
     Uses vector similarity for semantic search with optional result caching.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize the tool search engine.
@@ -63,11 +75,11 @@ def __init__(server_manager = None, use_caching: bool = True):
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` index_tools
 
 Index all tools from all servers for search.
+
 
 
 **Parameters**
@@ -80,10 +92,11 @@ def index_tools(server_tools: dict[str, list[langchain_core.tools.base.BaseTool]
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` search
 
 Search for tools that match the query using semantic search.
+
 
 
 **Parameters**
@@ -100,10 +113,11 @@ def search(query: str, top_k: int = 5):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` search_tools
 
 Search for tools across all MCP servers using semantic search.
+
 
 
 **Parameters**
@@ -121,10 +135,11 @@ def search_tools(query: str, top_k: int = 100, active_server: str = None):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` start_indexing
 
 Index the tools from the server manager.
+
 
 **Signature**
 ```python wrap
@@ -133,21 +148,28 @@ def start_indexing():
 
 </Card>
 
-</Card>
+</div>
 
 ## ToolSearchInput
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` ToolSearchInput
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ToolSearchInput</div>
 
 Input for searching for tools across MCP servers
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
 <ParamField body="top_k" type="int" required="True" >   Integer value </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Create a new model by parsing and validating input data from keyword arguments.
@@ -166,5 +188,4 @@ def __init__(data: Any):
 ```
 
 </Card>
-
-</Card>
+</div>

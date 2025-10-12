@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/callbacks_manager.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/callbacks_manager.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/observability/callbacks_manager.py</a>
 </Callout>
@@ -16,15 +18,19 @@ from various platforms (Langfuse, Laminar, etc.) in a clean and extensible way.
 
 ## ObservabilityManager
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` ObservabilityManager
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ObservabilityManager</div>
 
 Manages observability callbacks for MCP agents.
 
     This class provides a centralized way to collect and manage callbacks
     from various observability platforms (Langfuse, Laminar, etc.).
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize the ObservabilityManager.
@@ -39,11 +45,11 @@ def __init__(custom_callbacks: list | None = None):
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` add_callback
 
 Add a callback to the custom callbacks list.
+
 
 
 **Parameters**
@@ -56,10 +62,11 @@ def add_callback(callback):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` clear_callbacks
 
 Clear all custom callbacks.
+
 
 **Signature**
 ```python wrap
@@ -68,10 +75,11 @@ def clear_callbacks():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_callbacks
 
 Get the list of callbacks to use.
+
 
 
 **Returns**
@@ -84,10 +92,11 @@ def get_callbacks():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_handler_names
 
 Get the names of available handlers.
+
 
 
 **Returns**
@@ -100,10 +109,11 @@ def get_handler_names():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` has_callbacks
 
 Check if any callbacks are available.
+
 
 
 **Returns**
@@ -116,11 +126,11 @@ def has_callbacks():
 
 </Card>
 
-</Card>
+</div>
 
 
 ## create_manager
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` create_manager
 
 Create a new ObservabilityManager instance.
@@ -136,11 +146,12 @@ Create a new ObservabilityManager instance.
 ```python wrap
 def create_manager(custom_callbacks: list | None = None):
 ```
+
 </Card>
 
 
 ## get_default_manager
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` get_default_manager
 
 Get the default ObservabilityManager instance.
@@ -153,4 +164,5 @@ Get the default ObservabilityManager instance.
 ```python wrap
 def get_default_manager():
 ```
+
 </Card>

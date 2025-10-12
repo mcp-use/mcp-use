@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/client.py</a>
 </Callout>
@@ -16,15 +18,19 @@ and sessions from configuration.
 
 ## MCPClient
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` MCPClient
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPClient</div>
 
 Client for managing MCP servers and sessions.
 
     This class provides a unified interface for working with MCP servers,
     handling configuration, connector creation, and session management.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize a new MCP client.
@@ -47,11 +53,11 @@ def __init__(config: str | dict[str, typing.Any] | None = None, allowed_servers:
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` add_middleware
 
 Add a middleware.
+
 
 
 **Parameters**
@@ -64,10 +70,11 @@ def add_middleware(middleware: mcp_use.middleware.middleware.Middleware):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` add_server
 
 Add a server configuration.
+
 
 
 **Parameters**
@@ -81,12 +88,13 @@ def add_server(name: str, server_config: dict[str, Any]):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` close_all_sessions
 
 Close all active sessions.
 
         This method ensures all sessions are closed even if some fail.
+
 
 **Signature**
 ```python wrap
@@ -95,10 +103,11 @@ def close_all_sessions():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` close_session
 
 Close a session.
+
 
 
 **Parameters**
@@ -111,10 +120,11 @@ def close_session(server_name: str):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` create_all_sessions
 
 Create sessions for all configured servers.
+
 
 
 **Parameters**
@@ -130,10 +140,11 @@ def create_all_sessions(auto_initialize: bool = True):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` create_session
 
 Create a session for the specified server.
+
 
 
 **Parameters**
@@ -150,10 +161,11 @@ def create_session(server_name: str, auto_initialize: bool = True):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_all_active_sessions
 
 Get all active sessions.
+
 
 
 **Returns**
@@ -166,10 +178,11 @@ def get_all_active_sessions():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_server_names
 
 Get the list of configured server names.
+
 
 
 **Returns**
@@ -182,10 +195,11 @@ def get_server_names():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_session
 
 Get an existing session.
+
 
 
 **Parameters**
@@ -201,10 +215,11 @@ def get_session(server_name: str):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` remove_server
 
 Remove a server configuration.
+
 
 
 **Parameters**
@@ -217,10 +232,11 @@ def remove_server(name: str):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` save_config
 
 Save the current configuration to a file.
+
 
 
 **Parameters**
@@ -233,4 +249,4 @@ def save_config(filepath: str):
 
 </Card>
 
-</Card>
+</div>

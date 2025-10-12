@@ -5,21 +5,27 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/server_manager.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/server_manager.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/server_manager.py</a>
 </Callout>
 
 ## ServerManager
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` ServerManager
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ServerManager</div>
 
 Manages MCP servers and provides tools for server selection and management.
 
     This class allows an agent to discover and select which MCP server to use,
     dynamically activating the tools for the selected server.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize the server manager.
@@ -35,11 +41,11 @@ def __init__(client: mcp_use.client.MCPClient, adapter: mcp_use.adapters.base.Ba
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_active_server_tools
 
 Get tools from the currently active server.
+
 
 
 **Returns**
@@ -52,10 +58,11 @@ def get_active_server_tools():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_management_tools
 
 Get the server management tools.
+
 
 
 **Returns**
@@ -68,4 +75,4 @@ def get_management_tools():
 
 </Card>
 
-</Card>
+</div>

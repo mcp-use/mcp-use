@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/config.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/config.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/config.py</a>
 </Callout>
@@ -15,7 +17,7 @@ This module provides functionality to load MCP configuration from JSON files.
 
 
 ## create_connector_from_config
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` create_connector_from_config
 
 Create a connector based on server configuration.
@@ -49,11 +51,12 @@ server_config: dict[str,
     middleware: list[mcp_use.middleware.middleware.Middleware] | None = None
 ):
 ```
+
 </Card>
 
 
 ## load_config_file
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` load_config_file
 
 Load a configuration file.
@@ -69,4 +72,5 @@ Load a configuration file.
 ```python wrap
 def load_config_file(filepath: str):
 ```
+
 </Card>

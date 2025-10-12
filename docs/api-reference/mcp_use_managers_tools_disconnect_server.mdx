@@ -5,18 +5,24 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/disconnect_server.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/disconnect_server.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/managers/tools/disconnect_server.py</a>
 </Callout>
 
 ## DisconnectServerInput
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` DisconnectServerInput
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> DisconnectServerInput</div>
 
 Empty input for disconnecting from the current server
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Create a new model by parsing and validating input data from keyword arguments.
@@ -35,23 +41,29 @@ def __init__(data: Any):
 ```
 
 </Card>
-
-</Card>
+</div>
 
 ## DisconnectServerTool
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` DisconnectServerTool
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> DisconnectServerTool</div>
 
 Tool for disconnecting from the currently active MCP server.
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="name" type="ClassVar" required="True" >   Name identifier </ParamField>
 <ParamField body="description" type="ClassVar" required="True" >   Parameter value </ParamField>
 <ParamField body="args_schema" type="ClassVar" required="True" >   Parameter value </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Initialize with server manager.
@@ -65,5 +77,4 @@ def __init__(server_manager):
 ```
 
 </Card>
-
-</Card>
+</div>

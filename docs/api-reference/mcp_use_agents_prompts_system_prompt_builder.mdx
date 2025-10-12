@@ -5,13 +5,15 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py</a>
 </Callout>
 
 
 ## build_system_prompt_content
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` build_system_prompt_content
 
 Builds the final system prompt string using a template, tool descriptions,
@@ -34,11 +36,12 @@ template: str,
     additional_instructions: str | None = None
 ):
 ```
+
 </Card>
 
 
 ## create_system_message
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` create_system_message
 
 Creates the final SystemMessage object for the agent.
@@ -71,11 +74,12 @@ tools: list[langchain_core.tools.base.BaseTool],
     additional_instructions: str | None = None
 ):
 ```
+
 </Card>
 
 
 ## generate_tool_descriptions
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `function` generate_tool_descriptions
 
 Generates a list of formatted tool descriptions, excluding disallowed tools.
@@ -95,4 +99,5 @@ tools: list[langchain_core.tools.base.BaseTool],
     disallowed_tools: list[str] | None = None
 ):
 ```
+
 </Card>

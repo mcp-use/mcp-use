@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py</a>
 </Callout>
@@ -16,15 +18,19 @@ to provide a simple interface for using MCP tools with different LLMs.
 
 ## MCPAgent
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` MCPAgent
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPAgent</div>
 
 Main class for using MCP tools with various LLM providers.
 
     This class provides a unified interface for using MCP tools with different LLM providers
     through LangChain's agent framework, with customizable system prompts and conversation memory.
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</div>
+</RandomGradientBackground>
+<Card type="info">
 ### `method` __init__
 
 Initialize a new MCPAgent instance.
@@ -59,11 +65,11 @@ def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None =
 ```
 
 </Card>
-
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` add_to_history
 
 Add a message to the conversation history.
+
 
 
 **Parameters**
@@ -76,10 +82,11 @@ def add_to_history(message: langchain_core.messages.base.BaseMessage):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` clear_conversation_history
 
 Clear the conversation history.
+
 
 **Signature**
 ```python wrap
@@ -88,10 +95,11 @@ def clear_conversation_history():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` close
 
 Close the MCP connection with improved error handling.
+
 
 **Signature**
 ```python wrap
@@ -100,10 +108,11 @@ def close():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_conversation_history
 
 Get the current conversation history.
+
 
 
 **Returns**
@@ -116,10 +125,11 @@ def get_conversation_history():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_disallowed_tools
 
 Get the list of tools that are not available to the agent.
+
 
 
 **Returns**
@@ -132,10 +142,11 @@ def get_disallowed_tools():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` get_system_message
 
 Get the current system message.
+
 
 
 **Returns**
@@ -148,10 +159,11 @@ def get_system_message():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` initialize
 
 Initialize the MCP client and agent.
+
 
 **Signature**
 ```python wrap
@@ -160,7 +172,7 @@ def initialize():
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` run
 
 Run a query using the MCP tools and return the final result.
@@ -187,6 +199,7 @@ Run a query using the MCP tools and return the final result.
             )
             ```
 
+
 **Parameters**
 ><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
 ><ParamField body="max_steps" type="int | None" default="None" >   Optional maximum number of steps to take. </ParamField>
@@ -210,12 +223,13 @@ query: str,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` set_disallowed_tools
 
 Set the list of tools that should not be available to the agent.
 
         This will take effect the next time the agent is initialized.
+
 
 
 **Parameters**
@@ -228,10 +242,11 @@ def set_disallowed_tools(disallowed_tools: list[str]):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` set_system_message
 
 Set a new system message.
+
 
 
 **Parameters**
@@ -244,7 +259,7 @@ def set_system_message(message: str):
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` stream
 
 Run the agent and yield intermediate steps as an async generator.
@@ -252,6 +267,7 @@ Run the agent and yield intermediate steps as an async generator.
         Yields:
             Intermediate steps as (AgentAction, str) tuples, followed by the final result.
             If output_schema is provided, yields structured output as instance of the schema.
+
 
 **Parameters**
 ><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
@@ -278,7 +294,7 @@ query: str,
 
 </Card>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+<Card type="info">
 ### `method` stream_events
 
 Asynchronous streaming interface.
@@ -287,6 +303,7 @@ Asynchronous streaming interface.
 
             async for chunk in agent.astream("hello"):
                 print(chunk, end="|", flush=True)
+
 
 **Parameters**
 ><ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
@@ -309,4 +326,4 @@ query: str,
 
 </Card>
 
-</Card>
+</div>

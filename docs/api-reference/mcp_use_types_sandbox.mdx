@@ -5,6 +5,8 @@ icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/types/sandbox.py"
 ---
 
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/types/sandbox.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/types/sandbox.py</a>
 </Callout>
@@ -13,21 +15,28 @@ Type definitions for sandbox-related configurations.
 
 ## SandboxOptions
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
-### `class` SandboxOptions
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> SandboxOptions</div>
 
 Configuration options for sandbox execution.
 
     This type defines the configuration options available when running
     MCP servers in a sandboxed environment (e.g., using E2B).
 
+</div>
+</RandomGradientBackground>
+<Card type="info">
 **Attributes**
 >
 <ParamField body="api_key" type="str" required="True" >   String value </ParamField>
 <ParamField body="sandbox_template_id" type="NotRequired" required="True" >   Parameter value </ParamField>
 <ParamField body="supergateway_command" type="NotRequired" required="True" >   Parameter value </ParamField>
 
-<Card type="info" img="http://localhost:3000/gradient-generator/api/random?width=800&height=50">
+</Card>
+
+<Card type="info">
 ### `method` __init__
 
 Initialize self.  See help(type(self)) for accurate signature.
@@ -42,5 +51,4 @@ def __init__(args, kwargs):
 ```
 
 </Card>
-
-</Card>
+</div>
