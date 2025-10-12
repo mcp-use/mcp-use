@@ -1274,6 +1274,7 @@ def update_docs_json(docs_json_path: str, api_reference_dir: str) -> None:
     # Write updated docs.json
     with open(docs_json_path, "w", encoding="utf-8") as f:
         json.dump(docs_config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 
     print(f"Updated {docs_json_path} with {len(mdx_files)} API reference files")
     print(f"Organized into {len(api_groups)} groups")
