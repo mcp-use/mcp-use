@@ -701,7 +701,6 @@ def generate_class_docs(cls: type, module_name: str) -> str:
 
     # Close the main class Card
     docs.append("</Card>")
-    docs.append("")
 
     return "\n".join(docs)
 
