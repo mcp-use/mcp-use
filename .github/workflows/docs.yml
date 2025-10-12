@@ -1,0 +1,49 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    name: Generate and validate API documentation
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install uv
+      run: pip install uv
+
+    - name: Install dependencies
+      run: uv pip install -e .
+
+    - name: Generate API documentation
+      run: cd docs && uv run python generate_docs.py ../mcp_use api-reference docs.json
+
+    - name: Check for documentation changes
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "❌ API documentation is out of date!"
+          echo ""
+          echo "The following files have been modified:"
+          git status --porcelain
+          echo ""
+          echo "Please run the following command to update the documentation:"
+          echo "cd docs && uv run python generate_docs.py ../mcp_use api-reference docs.json"
+          echo ""
+          echo "Then commit the changes:"
+          echo "git add docs/api-reference/ docs/docs.json"
+          echo "git commit -m 'docs: update API documentation'"
+          exit 1
+        else
+          echo "✅ API documentation is up to date"
+        fi

@@ -3,9 +3,16 @@
   "theme": "maple",
   "name": "mcp_use",
   "colors": {
-    "primary": "#000000",
+    "primary": "#0C0C0C",
     "light": "#ffffff",
-    "dark": "#000000"
+    "dark": "#0C0C0C"
+  },
+  "background": {
+    "decoration": "grid",
+    "color": {
+      "light": "#ffffff",
+      "dark": "#0C0C0C"
+    }
   },
   "favicon": "/favicon.svg",
   "contextual": {
@@ -13,7 +20,11 @@
       "copy",
       "view",
       "chatgpt",
-      "claude"
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
     ]
   },
   "icons": {
