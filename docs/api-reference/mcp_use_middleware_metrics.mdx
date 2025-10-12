@@ -1,0 +1,185 @@
+---
+title: "Metrics"
+description: "Metrics middleware for MCP contexts API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/middleware/metrics.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/middleware/metrics.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/middleware/metrics.py</a>
+</Callout>
+
+Metrics middleware for MCP contexts.
+
+Classes for collecting comprehensive metrics about MCP context patterns,
+performance, and errors with simple instantiation.
+
+## CombinedAnalyticsMiddleware
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> CombinedAnalyticsMiddleware</div>
+
+Comprehensive middleware combining metrics, performance, and error tracking.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.middleware.metrics import CombinedAnalyticsMiddleware
+```
+
+<Card type="info">
+### `method` __init__
+
+**Signature**
+```python wrap
+def __init__():
+```
+
+</Card>
+<Card type="info">
+### `method` get_combined_analytics
+
+Get all analytics data in one comprehensive report.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def get_combined_analytics():
+```
+
+</Card>
+
+</div>
+
+## ErrorTrackingMiddleware
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ErrorTrackingMiddleware</div>
+
+Error tracking and analysis middleware for detailed error analytics.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.middleware.metrics import ErrorTrackingMiddleware
+```
+
+<Card type="info">
+### `method` __init__
+
+**Signature**
+```python wrap
+def __init__():
+```
+
+</Card>
+<Card type="info">
+### `method` get_error_analytics
+
+Get detailed error analytics.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def get_error_analytics():
+```
+
+</Card>
+
+</div>
+
+## MetricsMiddleware
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MetricsMiddleware</div>
+
+Collects basic metrics about MCP contexts including counts, durations, and errors.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.middleware.metrics import MetricsMiddleware
+```
+
+<Card type="info">
+### `method` __init__
+
+**Signature**
+```python wrap
+def __init__():
+```
+
+</Card>
+<Card type="info">
+### `method` get_metrics
+
+Get current metrics snapshot.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def get_metrics():
+```
+
+</Card>
+
+</div>
+
+## PerformanceMetricsMiddleware
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> PerformanceMetricsMiddleware</div>
+
+Advanced performance metrics including percentiles, throughput, and performance trends.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.middleware.metrics import PerformanceMetricsMiddleware
+```
+
+<Card type="info">
+### `method` __init__
+
+**Signature**
+```python wrap
+def __init__():
+```
+
+</Card>
+<Card type="info">
+### `method` get_performance_metrics
+
+Get detailed performance statistics.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def get_performance_metrics():
+```
+
+</Card>
+
+</div>

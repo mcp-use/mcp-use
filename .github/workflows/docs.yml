@@ -1,0 +1,100 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    name: Generate and validate API documentation
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install uv
+      run: pip install uv
+
+    - name: Create virtual environment
+      run: uv venv
+
+    - name: Install dependencies
+      run: uv pip install -e .
+
+    - name: Generate API documentation
+      run: cd docs && uv run python generate_docs.py ../mcp_use api-reference docs.json
+
+    - name: Check for documentation changes
+      id: check_docs
+      run: |
+        if [ -n "$(git status --porcelain docs/)" ]; then
+          echo "docs_outdated=true" >> $GITHUB_OUTPUT
+          echo "❌ API documentation is out of date!"
+          echo ""
+          echo "The following files have been modified:"
+          MODIFIED=$(git status --porcelain docs/)
+          echo "$MODIFIED"
+          echo "modified_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$MODIFIED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "docs_outdated=false" >> $GITHUB_OUTPUT
+          echo "✅ API documentation is up to date"
+        fi
+
+    - name: Comment on PR
+      if: steps.check_docs.outputs.docs_outdated == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const comment = `## ❌ API Documentation Out of Date
+
+          The API documentation needs to be regenerated. Please run the following commands:
+
+          \`\`\`bash
+          cd docs
+          uv run python generate_docs.py ../mcp_use api-reference docs.json
+          \`\`\`
+
+          Then commit the changes:
+
+          \`\`\`bash
+          git add docs/api-reference/ docs/docs.json
+          git commit -m "docs: update API documentation"
+          \`\`\`
+
+          <details>
+          <summary>Modified files</summary>
+
+          \`\`\`
+          ${process.env.MODIFIED_FILES}
+          \`\`\`
+          </details>`;
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+      env:
+        MODIFIED_FILES: ${{ steps.check_docs.outputs.modified_files }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Fail if docs are outdated
+      if: steps.check_docs.outputs.docs_outdated == 'true'
+      run: |
+        echo "Please update the API documentation and commit the changes."
+        exit 1
