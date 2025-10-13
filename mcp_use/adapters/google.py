@@ -58,7 +58,7 @@ class GoogleMCPAdapter(BaseAdapter):
         self.tool_executors[tool_name] = lambda **kwargs: connector.read_resource(mcp_resource.uri)
 
         function_declaration = types.FunctionDeclaration(
-            name=mcp_resource.name,
+            name=tool_name,
             description=mcp_resource.description,
             parameters_json_schema={"input_schema": {"type": "object", "properties": {}}},
         )
