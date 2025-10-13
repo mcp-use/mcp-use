@@ -114,8 +114,7 @@
                   "agent/structured-output",
                   "agent/streaming",
                   "agent/interactive-chat-patterns",
-                  "agent/pretty-printing",
-                  
+                  "agent/pretty-printing"
                 ]
               },
               "agent/server-manager"
