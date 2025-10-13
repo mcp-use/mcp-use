@@ -27,15 +27,15 @@ class GoogleMCPAdapter(BaseAdapter):
         # This map stores the actual async function to call for each tool.
         self.tool_executors: dict[str, Callable[..., Coroutine[Any, Any, Any]]] = {}
 
-        self._connector_tool_map: dict[BaseConnector, list[types.Tool]] = {}
-        self._connector_resource_map: dict[BaseConnector, list[types.Tool]] = {}
-        self._connector_prompt_map: dict[BaseConnector, list[types.Tool]] = {}
+        self._connector_tool_map: dict[BaseConnector, list[types.FunctionDeclaration]] = {}
+        self._connector_resource_map: dict[BaseConnector, list[types.FunctionDeclaration]] = {}
+        self._connector_prompt_map: dict[BaseConnector, list[types.FunctionDeclaration]] = {}
 
-        self.tools: list[types.Tool] = []
-        self.resources: list[types.Tool] = []
-        self.prompts: list[types.Tool] = []
+        self.tools: list[types.FunctionDeclaration] = []
+        self.resources: list[types.FunctionDeclaration] = []
+        self.prompts: list[types.FunctionDeclaration] = []
 
-    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> types.Tool:
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> types.FunctionDeclaration:
         """Convert an MCP tool to the Anthropic tool format."""
         if mcp_tool.name in self.disallowed_tools:
             return None
@@ -46,10 +46,9 @@ class GoogleMCPAdapter(BaseAdapter):
         function_declaration = types.FunctionDeclaration(
             name=mcp_tool.name, description=mcp_tool.description, parameters_json_schema=fixed_schema
         )
-        google_tool = types.Tool(function_declarations=[function_declaration])
-        return google_tool
+        return function_declaration
 
-    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> types.Tool:
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> types.FunctionDeclaration:
         """Convert an MCP resource to a readable tool in Anthropic format."""
         tool_name = _sanitize_for_tool_name(f"resource_{mcp_resource.name}")
 
@@ -63,10 +62,9 @@ class GoogleMCPAdapter(BaseAdapter):
             description=mcp_resource.description,
             parameters_json_schema={"input_schema": {"type": "object", "properties": {}}},
         )
-        google_tool = types.Tool(function_declarations=[function_declaration])
-        return google_tool
+        return function_declaration
 
-    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> types.Tool:
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> types.FunctionDeclaration:
         """Convert an MCP prompt to a usable tool in Anthropic format."""
         if mcp_prompt.name in self.disallowed_tools:
             return None
@@ -90,5 +88,4 @@ class GoogleMCPAdapter(BaseAdapter):
         function_declaration = types.FunctionDeclaration(
             name=mcp_prompt.name, description=mcp_prompt.description, parameters_json_schema=parameters_schema
         )
-        google_tool = types.Tool(function_declarations=[function_declaration])
-        return google_tool
+        return function_declaration

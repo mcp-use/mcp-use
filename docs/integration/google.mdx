@@ -4,3 +4,330 @@ description: "Use mcp-use tools, resources, and prompts directly with the Google
 tag: "New"
 icon: "bot"
 ---
+
+# Using mcp-use with Google
+
+The Google adapter allows you to seamlessly integrate tools, resources, and prompts from any MCP server with the Google Python SDK. This enables you to use `mcp-use` as a comprehensive tool provider for your Google-powered agents.
+
+## How it Works
+
+The `GoogleMCPAdapter` converts not only tools but also resources and prompts from your active MCP servers into a format compatible with Google's tool-calling feature. It maps each of these MCP constructs to a callable function that the Google model can request.
+
+-   **Tools** are converted directly to Google functions.
+-   **Resources** are converted into functions that take no arguments and read the resource's content.
+-   **Prompts** are converted into functions that accept the prompt's arguments.
+
+The adapter maintains a mapping of these generated functions to their actual execution logic, allowing you to easily call them when requested by the model.
+
+## Step-by-Step Guide
+
+Here's how to use the adapter to provide MCP tools, resources, and prompts to a Google Chat Completion.
+
+### Step 1: Initialize MCPClient
+
+First, set up your `MCPClient` with the desired MCP servers. This part of the process is the same as any other `mcp-use` application.
+
+```python
+from mcp_use import MCPClient
+
+config = {
+    "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
+}
+
+client = MCPClient(config=config)
+```
+
+### Step 2: Create the Google Adapter
+
+Next, instantiate the `GoogleMCPAdapter`. This adapter will be responsible for converting MCP constructs into a format Google can understand.
+
+```python
+from mcp_use.adapters import GoogleMCPAdapter
+
+# Creates the adapter for Google's format
+adapter = GoogleMCPAdapter()
+```
+<Tip>
+You can pass a `disallowed_tools` list to the adapter's constructor to prevent specific tools, resources, or prompts from being exposed to the model.
+</Tip>
+
+### Step 3: Generate Google-Compatible Tools
+
+Use the `create_all` method on the adapter to inspect all connected MCP servers and generate a list of tools, resources and prompts in the Google function-calling format.
+
+```python
+from google.genai import types
+
+# Convert tools from active connectors to the Google's format
+# this will populates the list of tools, resources and prompts
+await adapter.create_all(client)
+
+# If you decided to create all tools (list concatenation)
+all_tools = adapter.tools + adapter.resources + adapter.prompts
+google_tools = [types.Tool(function_declarations=all_tools)]
+```
+
+This list will include functions generated from your MCP tools, resources, and prompts.
+
+<Tip>
+If you don't want to create all tools, you can call single functions. For example, if you only want to use tools and resources, you can do the following:
+
+```python
+await adapter.create_tools(client)
+await adapter.create_resources(client)
+
+# Then, you can decide which ones to use:
+active_tools = adapter.tools + adapter.resources
+google_tools = [types.Tool(function_declarations=active_tools)]
+```
+</Tip>
+
+### Step 4: Make the Initial API Call
+
+Now, you can use the generated `google_tools` in a call to the Google API. The model will use the descriptions of these tools to decide if it needs to call any of them to answer the user's query.
+
+```python
+from google import genai
+from google.genai import types
+
+gemini = genai.Client()
+
+messages = [
+    types.Content(
+        role="user",
+        parts=[
+            types.Part.from_text(
+                text="Please search on the internet using browser: 'What time is it in Favignana now!'"
+            )
+        ],
+    )
+]
+# Initial request
+response = gemini.models.generate_content(
+    model="gemini-flash-lite-latest", contents=messages, config=types.GenerateContentConfig(tools=google_tools)
+)
+```
+
+### Step 5: Execute Tool Calls
+
+If the model decides to use one or more tools, you need to iterate through the function calls, execute the corresponding functions, and append the results to your message history.
+
+The `GoogleMCPAdapter` makes this easy by providing a `tool_executors` dictionary and a `parse_result` method.
+
+```python
+# Do multiple tool calls if needed
+while response.function_calls:
+    for function_call in response.function_calls:
+        function_call_content = response.candidates[0].content
+
+        messages.append(function_call_content)
+
+        tool_name = function_call.name
+        arguments = function_call.args
+
+        # 1. Use the adapter's map to get the correct executor
+        executor = adapter.tool_executors[tool_name]
+
+        if not executor:
+            function_response_content = types.Content(
+                role="tool",
+                parts=[
+                    types.Part.from_function_response(
+                        name=tool_name,
+                        response={"error": "No executor found for the tool requested"},
+                    )
+                ],
+            )
+        else:
+            try:
+                # 2. Execute the tool using the retrieved function
+                print(f"Executing tool: {tool_name}({arguments})")
+                tool_result = await executor(**arguments)
+
+                # 3. Use the adapter's universal parser
+                content = adapter.parse_result(tool_result)
+                function_response = {"result": content}
+
+                # Build function response message
+                function_response_part = types.Part.from_function_response(
+                    name=tool_name,
+                    response=function_response,
+                )
+                function_response_content = types.Content(role="tool", parts=[function_response_part])
+            except Exception as e:
+                function_response_content = types.Content(
+                    role="tool",
+                    parts=[
+                        types.Part.from_function_response(
+                            name=tool_name,
+                            response={"error": str(e)},
+                        )
+                    ],
+                )
+        # 4. Append the tool's result to the conversation history
+        messages.append(function_response_content)
+```
+The `adapter.parse_result(tool_result)` method simplifies the process by correctly formatting the output, whether it's from a standard tool, a resource, or a prompt.
+
+### Step 6: Get the Final Response
+
+Finally, send the updated message history which now includes the tool call results back to the model. This allows the model to use the information gathered from the tools to formulate its final answer.
+
+```python
+# Send the tool's result back to the model to get the next response
+response = gemini.models.generate_content(
+    model="gemini-flash-lite-latest",
+    contents=messages,
+    config=types.GenerateContentConfig(tools=google_tools),
+)
+
+# Get final response, the loop has finished
+print("\n--- Final response from the model ---")
+if response.text:
+    print(response.text)
+```
+
+## Complete Example
+
+For reference, here is the complete, runnable code for integrating mcp-use with the Google SDK.
+
+```python
+import asyncio
+
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+from mcp_use import MCPClient
+from mcp_use.adapters import GoogleMCPAdapter
+
+# This example demonstrates how to use our integration
+# adapaters to use MCP tools and convert to the right format.
+# In particularly, this example uses the GoogleMCPAdapter.
+
+load_dotenv()
+
+
+async def main():
+    config = {
+        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
+    }
+
+    try:
+        client = MCPClient(config=config)
+
+        # Creates the adapter for Anthropic's format
+        adapter = GoogleMCPAdapter()
+
+        # Convert tools from active connectors to the Anthropic's format
+        await adapter.create_all(client)
+
+        # List concatenation (if you loaded all tools)
+        all_tools = adapter.tools + adapter.resources + adapter.prompts
+        google_tools = [types.Tool(function_declarations=all_tools)]
+
+        # If you don't want to create all tools, you can call single functions
+        # await adapter.create_tools(client)
+        # await adapter.create_resources(client)
+        # await adapter.create_prompts(client)
+
+        # Use tools with Google's SDK (not agent in this case)
+        gemini = genai.Client()
+
+        messages = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(
+                        text="Please search on the internet using browser: 'What time is it in Favignana now!'"
+                    )
+                ],
+            )
+        ]
+        # Initial request
+        response = gemini.models.generate_content(
+            model="gemini-flash-lite-latest", contents=messages, config=types.GenerateContentConfig(tools=google_tools)
+        )
+
+        if not response.function_calls:
+            print("The model didn't do any tool call!")
+            return
+
+        # Do multiple tool calls if needed
+        while response.function_calls:
+            for function_call in response.function_calls:
+                function_call_content = response.candidates[0].content
+
+                messages.append(function_call_content)
+
+                tool_name = function_call.name
+                arguments = function_call.args
+
+                # Use the adapter's map to get the correct executor
+                executor = adapter.tool_executors[tool_name]
+
+                if not executor:
+                    print(f"Error: Unknown tool '{tool_name}' requested by model.")
+                    function_response_content = types.Content(
+                        role="tool",
+                        parts=[
+                            types.Part.from_function_response(
+                                name=tool_name,
+                                response={"error": "No executor found for the tool requested"},
+                            )
+                        ],
+                    )
+                else:
+                    try:
+                        # Execute the tool using the retrieved function
+                        print(f"Executing tool: {tool_name}({arguments})")
+                        tool_result = await executor(**arguments)
+
+                        # Use the adapter's universal parser
+                        content = adapter.parse_result(tool_result)
+                        function_response = {"result": content}
+
+                        # Build function response message
+                        function_response_part = types.Part.from_function_response(
+                            name=tool_name,
+                            response=function_response,
+                        )
+                        function_response_content = types.Content(role="tool", parts=[function_response_part])
+                    except Exception as e:
+                        print(f"An unexpected error occurred while executing tool {tool_name}: {e}")
+                        function_response_content = types.Content(
+                            role="tool",
+                            parts=[
+                                types.Part.from_function_response(
+                                    name=tool_name,
+                                    response={"error": str(e)},
+                                )
+                            ],
+                        )
+                # Append the tool's result to the conversation history
+                messages.append(function_response_content)
+                # Send the tool's result back to the model to get the next response
+
+            response = gemini.models.generate_content(
+                model="gemini-flash-lite-latest",
+                contents=messages,
+                config=types.GenerateContentConfig(tools=google_tools),
+            )
+
+        # Get final response, the loop has finished
+        print("\n--- Final response from the model ---")
+        if response.text:
+            print(response.text)
+        else:
+            print("The model did not return a final text response.")
+            print(response)
+
+        gemini.close()
+    except Exception as e:
+        print(f"Error: {e}")
+        raise e
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
