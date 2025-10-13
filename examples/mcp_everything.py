@@ -31,7 +31,7 @@ async def main():
         """,
         max_steps=30,
     )
-    print(result)
+    print(f"\nResult: {result}")
 
 
 if __name__ == "__main__":

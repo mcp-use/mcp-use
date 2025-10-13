@@ -11,7 +11,7 @@ import asyncio
 import os
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 
 from mcp_use import MCPAgent, MCPClient
 
@@ -24,10 +24,10 @@ async def run_airbnb_example():
     # Create MCPClient with Airbnb configuration
     client = MCPClient.from_config_file(os.path.join(os.path.dirname(__file__), "airbnb_mcp.json"))
     # Create LLM - you can choose between different models
-    # llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
     # Alternative models:
     # llm = init_chat_model(model="llama-3.1-8b-instant", model_provider="groq")
-    llm = ChatOpenAI(model="gpt-4o")
+    # llm = ChatOpenAI(model="gpt-4o")
 
     # Create agent with the client
     agent = MCPAgent(llm=llm, client=client, max_steps=30, use_server_manager=True)
@@ -39,7 +39,7 @@ async def run_airbnb_example():
         "good reviews. Show me the top 3 options.",
         max_steps=30,
     )
-    print(result)
+    print(f"\nResult: {result}")
 
 
 if __name__ == "__main__":

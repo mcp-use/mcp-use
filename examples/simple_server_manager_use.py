@@ -95,6 +95,7 @@ async def main():
     print("--- First run: calling hello_world ---")
     result = await agent.run("Use the hello_world tool", manage_connector=False)
     print(result)
+
     # Clear the conversation history to avoid confusion
     agent.clear_conversation_history()
 
@@ -102,6 +103,7 @@ async def main():
     print("\n--- Second run: calling the new dynamic tool ---")
     result = await agent.run("Use the dynamic_tool_1", manage_connector=False)
     print(result)
+
     # Manually close the agent
     await agent.close()
 

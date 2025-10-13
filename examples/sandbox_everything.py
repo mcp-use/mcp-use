@@ -56,7 +56,7 @@ async def main():
             """,
             max_steps=30,
         )
-        print(result)
+        print(f"\nResult: {result}")
     finally:
         # Ensure we clean up resources properly
         await client.close_all_sessions()
