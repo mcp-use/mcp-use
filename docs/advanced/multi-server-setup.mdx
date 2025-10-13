@@ -62,7 +62,8 @@ Create a configuration file that defines multiple servers:
 
 ### Basic Approach (Manual Server Selection)
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
@@ -86,17 +87,46 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+
+async function main() {
+    // Load multi-server configuration
+    const config = await loadConfigFile('multi_server_config.json')
+    const client = new MCPClient(config)
+
+    // Create agent (all servers will be connected)
+    const llm = new ChatOpenAI({ model: 'gpt-4' })
+    const agent = new MCPAgent({ llm, client })
+
+    // Agent has access to tools from all servers
+    const result = await agent.run(
+        'Search for Python tutorials online, save the best ones to a file, ' +
+        'then create a database table to track my learning progress'
+    )
+    console.log(result)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+</CodeGroup>
+
 ### Advanced Approach (Server Manager)
 
 Enable the server manager for more efficient resource usage:
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 
 async def main():
     client = MCPClient.from_config_file("multi_server_config.json")
+    llm = ChatOpenAI(model="gpt-4")
 
     # Enable server manager for dynamic server selection
     agent = MCPAgent(
@@ -116,6 +146,37 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+
+async function main() {
+    const config = await loadConfigFile('multi_server_config.json')
+    const client = new MCPClient(config)
+    const llm = new ChatOpenAI({ model: 'gpt-4' })
+
+    // Enable server manager for dynamic server selection
+    const agent = new MCPAgent({
+        llm,
+        client,
+        useServerManager: true,  // Only connects to servers as needed
+        maxSteps: 30
+    })
+
+    // The agent will automatically choose appropriate servers
+    const result = await agent.run(
+        'Research the latest AI papers, summarize them in a markdown file, ' +
+        'and commit the file to my research repository on GitHub'
+    )
+    console.log(result)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+</CodeGroup>
 
 ## Configuration Patterns
 
@@ -147,13 +208,24 @@ if __name__ == "__main__":
 ```
 
 Usage example:
-```python
+
+<CodeGroup>
+```python Python
 result = await agent.run(
     "Scrape product data from example-store.com, "
     "clean and analyze it with pandas, "
     "then save the results as CSV and Excel files"
 )
 ```
+
+```typescript TypeScript
+const result = await agent.run(
+    'Scrape product data from example-store.com, ' +
+    'clean and analyze it with pandas, ' +
+    'then save the results as CSV and Excel files'
+)
+```
+</CodeGroup>
 
 ### Development Workflow
 
@@ -181,13 +253,24 @@ result = await agent.run(
 ```
 
 Usage example:
-```python
+
+<CodeGroup>
+```python Python
 result = await agent.run(
     "Create a new Python function to calculate fibonacci numbers, "
     "write unit tests for it, run the tests, "
     "and if they pass, commit the changes to the current git branch"
 )
 ```
+
+```typescript TypeScript
+const result = await agent.run(
+    'Create a new Python function to calculate fibonacci numbers, ' +
+    'write unit tests for it, run the tests, ' +
+    'and if they pass, commit the changes to the current git branch'
+)
+```
+</CodeGroup>
 
 ### Research and Documentation
 
@@ -250,9 +333,11 @@ Reference them in your configuration:
 
 You can conditionally include servers based on availability:
 
-```python
+<CodeGroup>
+```python Python
 import os
 import asyncio
+from langchain_openai import ChatOpenAI
 from mcp_use import MCPClient, MCPAgent
 
 async def create_agent_with_available_servers():
@@ -278,9 +363,47 @@ async def create_agent_with_available_servers():
             "env": {"DATABASE_URL": os.getenv("DATABASE_URL")}
         }
 
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     return MCPAgent(llm=ChatOpenAI(model="gpt-4"), client=client)
 ```
+
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPClient, MCPAgent } from 'mcp-use'
+
+async function createAgentWithAvailableServers() {
+    const config: any = { mcpServers: {} }
+
+    // Always include filesystem
+    config.mcpServers.filesystem = {
+        command: 'mcp-server-filesystem',
+        args: ['/workspace']
+    }
+
+    // Include GitHub server if token is available
+    if (process.env.GITHUB_TOKEN) {
+        config.mcpServers.github = {
+            command: 'mcp-server-github',
+            env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN }
+        }
+    }
+
+    // Include database server if URL is available
+    if (process.env.DATABASE_URL) {
+        config.mcpServers.postgres = {
+            command: 'mcp-server-postgres',
+            env: { DATABASE_URL: process.env.DATABASE_URL }
+        }
+    }
+
+    const client = new MCPClient(config)
+    return new MCPAgent({
+        llm: new ChatOpenAI({ model: 'gpt-4' }),
+        client
+    })
+}
+```
+</CodeGroup>
 
 ## Performance Optimization
 
@@ -290,7 +413,8 @@ The server manager provides several performance benefits:
 
 <Tabs>
   <Tab title="Lazy Loading">
-    ```python
+    <CodeGroup>
+    ```python Python
     # Without server manager - all servers start immediately
     agent = MCPAgent(llm=llm, client=client, use_server_manager=False)
     # Result: All 5 servers start, consuming resources
@@ -299,9 +423,21 @@ The server manager provides several performance benefits:
     agent = MCPAgent(llm=llm, client=client, use_server_manager=True)
     # Result: Only the required servers start for each task
     ```
+
+    ```typescript TypeScript
+    // Without server manager - all servers start immediately
+    const agent = new MCPAgent({ llm, client, useServerManager: false })
+    // Result: All 5 servers start, consuming resources
+
+    // With server manager - servers start only when needed
+    const agentOptimized = new MCPAgent({ llm, client, useServerManager: true })
+    // Result: Only the required servers start for each task
+    ```
+    </CodeGroup>
   </Tab>
   <Tab title="Resource Management">
-    ```python
+    <CodeGroup>
+    ```python Python
     # Server manager automatically manages connections
     agent = MCPAgent(
         llm=llm,
@@ -310,9 +446,21 @@ The server manager provides several performance benefits:
         max_concurrent_servers=3  # Limit concurrent connections
     )
     ```
+
+    ```typescript TypeScript
+    // Server manager automatically manages connections
+    const agent = new MCPAgent({
+        llm,
+        client,
+        useServerManager: true,
+        maxConcurrentServers: 3  // Limit concurrent connections
+    })
+    ```
+    </CodeGroup>
   </Tab>
   <Tab title="Error Isolation">
-    ```python
+    <CodeGroup>
+    ```python Python
     # If one server fails, others continue working
     agent = MCPAgent(
         llm=llm,
@@ -321,6 +469,17 @@ The server manager provides several performance benefits:
         ignore_server_errors=True  # Continue on server failures
     )
     ```
+
+    ```typescript TypeScript
+    // If one server fails, others continue working
+    const agent = new MCPAgent({
+        llm,
+        client,
+        useServerManager: true,
+        ignoreServerErrors: true  // Continue on server failures
+    })
+    ```
+    </CodeGroup>
   </Tab>
 </Tabs>
 
@@ -328,7 +487,8 @@ The server manager provides several performance benefits:
 
 Control which tools are available to prevent confusion:
 
-```python
+<CodeGroup>
+```python Python
 # Restrict to specific tool types
 agent = MCPAgent(
     llm=llm,
@@ -346,6 +506,25 @@ agent = MCPAgent(
 )
 ```
 
+```typescript TypeScript
+// Restrict to specific tool types
+const agent = new MCPAgent({
+    llm,
+    client,
+    allowedTools: ['file_read', 'file_write', 'web_search'],
+    disallowedTools: ['system_exec', 'network_request']
+})
+
+// Or filter by server
+const agentFiltered = new MCPAgent({
+    llm,
+    client,
+    allowedServers: ['filesystem', 'playwright'],
+    useServerManager: true
+})
+```
+</CodeGroup>
+
 ## Troubleshooting Multi-Server Setups
 
 ### Common Issues
@@ -353,18 +532,32 @@ agent = MCPAgent(
 <AccordionGroup>
   <Accordion title="Server startup failures">
     Check server logs and ensure all dependencies are installed:
-    ```python
+
+    <CodeGroup>
+    ```python Python
     import logging
     logging.basicConfig(level=logging.DEBUG)
 
     # Enable detailed logging
     client = MCPClient.from_config_file("config.json", debug=True)
     ```
+
+    ```typescript TypeScript
+    import { logger } from 'mcp-use'
+
+    // Enable detailed logging
+    logger.level = 'debug'
+    const config = await loadConfigFile('config.json')
+    const client = new MCPClient(config)
+    ```
+    </CodeGroup>
   </Accordion>
 
   <Accordion title="Tool name conflicts">
     Different servers might provide tools with the same name:
-    ```python
+
+    <CodeGroup>
+    ```python Python
     # Use server prefixes to avoid conflicts
     agent = MCPAgent(
         llm=llm,
@@ -372,11 +565,23 @@ agent = MCPAgent(
         use_tool_prefixes=True  # Tools become "server_name.tool_name"
     )
     ```
+
+    ```typescript TypeScript
+    // Use server prefixes to avoid conflicts
+    const agent = new MCPAgent({
+        llm,
+        client,
+        useToolPrefixes: true  // Tools become "server_name.tool_name"
+    })
+    ```
+    </CodeGroup>
   </Accordion>
 
   <Accordion title="Performance issues">
     Too many servers can slow down the agent:
-    ```python
+
+    <CodeGroup>
+    ```python Python
     # Limit concurrent servers
     agent = MCPAgent(
         llm=llm,
@@ -385,6 +590,17 @@ agent = MCPAgent(
         max_concurrent_servers=3
     )
     ```
+
+    ```typescript TypeScript
+    // Limit concurrent servers
+    const agent = new MCPAgent({
+        llm,
+        client,
+        useServerManager: true,
+        maxConcurrentServers: 3
+    })
+    ```
+    </CodeGroup>
   </Accordion>
 </AccordionGroup>
 
@@ -392,9 +608,11 @@ agent = MCPAgent(
 
 Enable comprehensive debugging:
 
-```python
+<CodeGroup>
+```python Python
 import logging
 from mcp_use import MCPAgent, MCPClient
+from langchain_openai import ChatOpenAI
 
 # Enable debug logging
 logging.basicConfig(
@@ -409,6 +627,8 @@ client = MCPClient.from_config_file(
     timeout=30  # Increase timeout for debugging
 )
 
+llm = ChatOpenAI(model="gpt-4")
+
 # Create agent with verbose output
 agent = MCPAgent(
     llm=llm,
@@ -418,6 +638,30 @@ agent = MCPAgent(
     verbose=True
 )
 ```
+
+```typescript TypeScript
+import { logger, MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+
+// Enable debug logging
+logger.level = 'debug'
+
+// Create client with debug mode
+const config = await loadConfigFile('multi_server_config.json')
+const client = new MCPClient(config)
+
+const llm = new ChatOpenAI({ model: 'gpt-4' })
+
+// Create agent with verbose output
+const agent = new MCPAgent({
+    llm,
+    client,
+    useServerManager: true,
+    debug: true,
+    verbose: true
+})
+```
+</CodeGroup>
 
 ## Best Practices
 

@@ -13,14 +13,25 @@ This guide will get you started with mcp_use in **under 5 minutes**. We'll cover
 ## Installation
 
 <CodeGroup>
-  ```bash pip
+  ```bash Python (pip)
   pip install mcp-use
   ```
 
-  ```bash from source
+  ```bash TypeScript (npm)
+  npm install mcp-use
+  ```
+
+  ```bash Python (source)
   git clone https://github.com/mcp-use/mcp-use.git
   cd mcp-use
   pip install -e .
+  ```
+
+  ```bash TypeScript (source)
+  git clone https://github.com/mcp-use/mcp-use.git
+  cd mcp-use-ts
+  npm install
+  npm run build
   ```
 </CodeGroup>
 
@@ -33,20 +44,36 @@ Installing from source gives you access to the latest features and examples!
 mcp_use works with various LLM providers through LangChain. You'll need to install the appropriate LangChain provider package for your chosen LLM:
 
 <CodeGroup>
-  ```bash OpenAI
+  ```bash Python (OpenAI)
   pip install langchain-openai
   ```
 
-  ```bash Anthropic
+  ```bash TypeScript (OpenAI)
+  npm install @langchain/openai
+  ```
+
+  ```bash Python (Anthropic)
   pip install langchain-anthropic
   ```
 
-  ```bash Google
+  ```bash TypeScript (Anthropic)
+  npm install @langchain/anthropic
+  ```
+
+  ```bash Python (Google)
   pip install langchain-google-genai
   ```
 
-  ```bash Groq
+  ```bash TypeScript (Google)
+  npm install @langchain/google-genai
+  ```
+
+  ```bash Python (Groq)
   pip install langchain-groq
+  ```
+
+  ```bash TypeScript (Groq)
+  npm install @langchain/groq
   ```
 </CodeGroup>
 
@@ -75,56 +102,115 @@ GOOGLE_API_KEY=your_api_key_here
 
 Here's a simple example to get you started:
 
-```python
-import asyncio
-import os
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from mcp_use import MCPAgent, MCPClient
+<CodeGroup>
+  ```python Python
+  import asyncio
+  import os
+  from dotenv import load_dotenv
+  from langchain_openai import ChatOpenAI
+  from mcp_use import MCPAgent, MCPClient
 
-async def main():
-    # Load environment variables
-    load_dotenv()
+  async def main():
+      # Load environment variables
+      load_dotenv()
 
-    # Create configuration dictionary
-    config = {
-      "mcpServers": {
-        "playwright": {
-          "command": "npx",
-          "args": ["@playwright/mcp@latest"],
-          "env": {
-            "DISPLAY": ":1"
+      # Create configuration dictionary
+      config = {
+        "mcpServers": {
+          "playwright": {
+            "command": "npx",
+            "args": ["@playwright/mcp@latest"],
+            "env": {
+              "DISPLAY": ":1"
+            }
           }
         }
       }
-    }
 
-    # Create MCPClient from configuration dictionary
-    client = MCPClient.from_dict(config)
+      # Create MCPClient from configuration dictionary
+      client = MCPClient(config)
 
-    # Create LLM
-    llm = ChatOpenAI(model="gpt-4o")
+      # Create LLM
+      llm = ChatOpenAI(model="gpt-4o")
 
-    # Create agent with the client
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+      # Create agent with the client
+      agent = MCPAgent(llm=llm, client=client, max_steps=30)
 
-    # Run the query
-    result = await agent.run(
-        "Find the best restaurant in San Francisco USING GOOGLE SEARCH",
-    )
-    print(f"\nResult: {result}")
+      # Run the query
+      result = await agent.run(
+          "Find the best restaurant in San Francisco USING GOOGLE SEARCH",
+      )
+      print(f"\nResult: {result}")
 
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+  if __name__ == "__main__":
+      asyncio.run(main())
+  ```
+
+  ```typescript TypeScript
+  import { ChatOpenAI } from '@langchain/openai'
+  import { config } from 'dotenv'
+  import { MCPAgent, MCPClient } from 'mcp-use'
+
+  async function main() {
+      // Load environment variables
+      config()
+
+      // Create configuration object
+      const configuration = {
+        mcpServers: {
+          playwright: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            env: {
+              DISPLAY: ':1'
+            }
+          }
+        }
+      }
+
+      // Create MCPClient from configuration object
+      const client = new MCPClient(configuration)
+
+      // Create LLM
+      const llm = new ChatOpenAI({ model: 'gpt-4o' })
+
+      // Create agent with the client
+      const agent = new MCPAgent({
+        llm,
+        client,
+        maxSteps: 30
+      })
+
+      // Run the query
+      const result = await agent.run(
+          'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
+      )
+      console.log(`\nResult: ${result}`)
+
+      // Clean up
+      await client.closeAllSessions()
+  }
+
+  main().catch(console.error)
+  ```
+</CodeGroup>
 
 ## Configuration Options
 
 You can also load servers configuration from a config file:
 
-```python
-client = MCPClient.from_config_file("browser_mcp.json")
-```
+<CodeGroup>
+  ```python Python
+  client = MCPClient.from_config_file("browser_mcp.json")
+  ```
+
+  ```typescript TypeScript
+  import { loadConfigFile } from 'mcp-use'
+
+  const config = await loadConfigFile("browser_mcp.json")
+  const client = new MCPClient(config)
+  ```
+</CodeGroup>
 
 Example configuration file (`browser_mcp.json`):
 
@@ -155,10 +241,27 @@ mcp_use supports **any MCP server**. Check out the [Awesome MCP Servers](https:/
 
 Stream agent responses as they're generated:
 
-```python
-async for chunk in agent.astream("your query here"):
-    print(chunk, end="", flush=True)
-```
+<CodeGroup>
+  ```python Python
+  async for chunk in agent.astream("your query here"):
+      print(chunk, end="", flush=True)
+  ```
+
+  ```typescript TypeScript
+  // Stream intermediate steps
+  for await (const step of agent.stream("your query here")) {
+      console.log(`Tool: ${step.action.tool}`)
+      console.log(`Result: ${step.observation}`)
+  }
+
+  // Or stream token-level events
+  for await (const event of agent.streamEvents("your query here")) {
+      if (event.event === 'on_chat_model_stream') {
+          process.stdout.write(event.data?.chunk?.text || '')
+      }
+  }
+  ```
+</CodeGroup>
 
 <Tip>
 Uses LangChain's streaming API. See [streaming documentation](https://python.langchain.com/docs/how_to/streaming/) for more details.

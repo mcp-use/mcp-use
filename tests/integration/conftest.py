@@ -14,8 +14,12 @@ async def primitive_server():
     server_path = Path(__file__).parent / "servers_for_testing" / "primitive_server.py"
     logger.info(f"Starting primitive server: python {server_path}")
 
+    # Use sys.executable to ensure we use the same Python interpreter
+    # that has the required dependencies installed
+    import sys
+
     process = subprocess.Popen(
-        ["python", str(server_path)],
+        [sys.executable, str(server_path)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -44,8 +48,12 @@ async def auth_server():
     server_path = Path(__file__).parent / "servers_for_testing" / "auth_server.py"
     logger.info(f"Starting auth server: python {server_path}")
 
+    # Use sys.executable to ensure we use the same Python interpreter
+    # that has the required dependencies installed
+    import sys
+
     process = subprocess.Popen(
-        ["python", str(server_path)],
+        [sys.executable, str(server_path)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

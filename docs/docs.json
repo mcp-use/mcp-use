@@ -3,9 +3,16 @@
   "theme": "maple",
   "name": "mcp_use",
   "colors": {
-    "primary": "#000000",
+    "primary": "#0C0C0C",
     "light": "#ffffff",
-    "dark": "#000000"
+    "dark": "#0C0C0C"
+  },
+  "background": {
+    "decoration": "grid",
+    "color": {
+      "light": "#ffffff",
+      "dark": "#0C0C0C"
+    }
   },
   "favicon": "/favicon.svg",
   "contextual": {
@@ -13,7 +20,11 @@
       "copy",
       "view",
       "chatgpt",
-      "claude"
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
     ]
   },
   "icons": {
@@ -74,13 +85,14 @@
                 "group": "Advanced Features",
                 "icon": "sparkle",
                 "pages": [
+                  "client/middleware",
                   "client/sampling",
                   "client/elicitation",
                   "client/notifications",
                   "client/logging"
                 ]
               },
-                "client/authentication"
+              "client/authentication"
             ]
           },
           {
@@ -94,12 +106,25 @@
           {
             "group": "Agent Configuration",
             "pages": [
-              "agent/agent-configuration",
-              "agent/llm-integration",
-              "agent/server-manager",
-              "agent/streaming",
-              "agent/structured-output",
-              "agent/interactive-chat-patterns"
+              {
+                "group": "Overview",
+                "icon": "globe",
+                "pages": [
+                  "agent/agent-configuration",
+                  "agent/llm-integration"
+                ]
+              },
+              {
+                "group": "Core Features",
+                "icon": "list-plus",
+                "pages": [
+                  "agent/memory-management",
+                  "agent/structured-output",
+                  "agent/streaming",
+                  "agent/interactive-chat-patterns"
+                ]
+              },
+              "agent/server-manager"
             ]
           },
           {
@@ -134,12 +159,125 @@
         "icon": "terminal",
         "groups": [
           {
-            "group": "API Reference",
+            "group": "Adapters",
+            "icon": "plug-2",
             "pages": [
-              "api-reference/introduction",
-              "api-reference/mcpagent",
-              "api-reference/mcpclient",
-              "api-reference/adapters"
+              "api-reference/mcp_use_adapters_base",
+              "api-reference/mcp_use_adapters_langchain_adapter"
+            ]
+          },
+          {
+            "group": "Agents",
+            "icon": "code",
+            "pages": [
+              "api-reference/mcp_use_agents_base",
+              "api-reference/mcp_use_agents_mcpagent",
+              {
+                "group": "Prompts",
+                "icon": "volume-2",
+                "pages": [
+                  "api-reference/mcp_use_agents_prompts_system_prompt_builder",
+                  "api-reference/mcp_use_agents_prompts_templates"
+                ]
+              },
+              "api-reference/mcp_use_agents_remote"
+            ]
+          },
+          {
+            "group": "Auth",
+            "icon": "key",
+            "pages": [
+              "api-reference/mcp_use_auth_bearer",
+              "api-reference/mcp_use_auth_oauth",
+              "api-reference/mcp_use_auth_oauth_callback"
+            ]
+          },
+          {
+            "group": "Connectors",
+            "icon": "cable",
+            "pages": [
+              "api-reference/mcp_use_connectors_base",
+              "api-reference/mcp_use_connectors_http",
+              "api-reference/mcp_use_connectors_sandbox",
+              "api-reference/mcp_use_connectors_stdio",
+              "api-reference/mcp_use_connectors_utils",
+              "api-reference/mcp_use_connectors_websocket"
+            ]
+          },
+          {
+            "group": "Core",
+            "icon": "package",
+            "pages": [
+              "api-reference/mcp_use_cli",
+              "api-reference/mcp_use_client",
+              "api-reference/mcp_use_config",
+              "api-reference/mcp_use_exceptions",
+              "api-reference/mcp_use_logging",
+              "api-reference/mcp_use_session",
+              "api-reference/mcp_use_utils"
+            ]
+          },
+          {
+            "group": "Errors",
+            "icon": "triangle-alert",
+            "pages": [
+              "api-reference/mcp_use_errors_error_formatting"
+            ]
+          },
+          {
+            "group": "Managers",
+            "icon": "users",
+            "pages": [
+              "api-reference/mcp_use_managers_base",
+              "api-reference/mcp_use_managers_server_manager",
+              {
+                "group": "Tools",
+                "icon": "tool",
+                "pages": [
+                  "api-reference/mcp_use_managers_tools_base_tool",
+                  "api-reference/mcp_use_managers_tools_connect_server",
+                  "api-reference/mcp_use_managers_tools_disconnect_server",
+                  "api-reference/mcp_use_managers_tools_get_active_server",
+                  "api-reference/mcp_use_managers_tools_list_servers_tool",
+                  "api-reference/mcp_use_managers_tools_search_tools"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Middleware",
+            "icon": "layers",
+            "pages": [
+              "api-reference/mcp_use_middleware_logging",
+              "api-reference/mcp_use_middleware_metrics",
+              "api-reference/mcp_use_middleware_middleware"
+            ]
+          },
+          {
+            "group": "Observability",
+            "icon": "eye",
+            "pages": [
+              "api-reference/mcp_use_observability_callbacks_manager",
+              "api-reference/mcp_use_observability_laminar",
+              "api-reference/mcp_use_observability_langfuse"
+            ]
+          },
+          {
+            "group": "Task Managers",
+            "icon": "command",
+            "pages": [
+              "api-reference/mcp_use_task_managers_base",
+              "api-reference/mcp_use_task_managers_sse",
+              "api-reference/mcp_use_task_managers_stdio",
+              "api-reference/mcp_use_task_managers_streamable_http",
+              "api-reference/mcp_use_task_managers_websocket"
+            ]
+          },
+          {
+            "group": "Types",
+            "icon": "type",
+            "pages": [
+              "api-reference/mcp_use_types_sandbox"
             ]
           }
         ]
@@ -160,18 +298,29 @@
         "tab": "Changelog",
         "icon": "history",
         "groups": [
-
           {
             "group": "Changelog",
             "pages": [
-                  "changelog/changelog"
-                ]
+              "changelog/changelog"
+            ]
           },
           {
             "group": "Versions",
             "pages": [
-                  "changelog/1_3_11"
-                ]
+              "changelog/1_3_11"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Blog",
+        "icon": "book",
+        "groups": [
+          {
+            "group": "Blog",
+            "pages": [
+              "blog/middleware"
+            ]
           }
         ]
       }

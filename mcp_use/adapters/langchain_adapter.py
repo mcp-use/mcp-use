@@ -80,7 +80,7 @@ class LangChainAdapter(BaseAdapter):
                 """
                 raise NotImplementedError("MCP tools only support async operations")
 
-            async def _arun(self, **kwargs: Any) -> Any:
+            async def _arun(self, **kwargs: Any) -> str | dict:
                 """Asynchronously execute the tool with given arguments.
 
                 Args:
@@ -97,8 +97,7 @@ class LangChainAdapter(BaseAdapter):
                 try:
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     try:
-                        # Use the helper function to parse the result
-                        return adapter_self._parse_mcp_tool_result(tool_result)
+                        return str(tool_result.content)
                     except Exception as e:
                         # Log the exception for debugging
                         logger.error(f"Error parsing tool result: {e}")

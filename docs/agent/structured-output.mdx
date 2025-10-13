@@ -19,7 +19,8 @@ When you provide an `output_schema` parameter, the agent:
 
 ## Basic Example
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
@@ -51,9 +52,51 @@ async def main():
 asyncio.run(main())
 ```
 
+```typescript TypeScript
+import { z } from 'zod'
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+// Define the schema using Zod
+const WeatherInfo = z.object({
+    city: z.string().describe('City name'),
+    temperature: z.number().describe('Temperature in Celsius'),
+    condition: z.string().describe('Weather condition'),
+    humidity: z.number().describe('Humidity percentage')
+})
+
+// TypeScript type inferred from schema
+type WeatherInfo = z.infer<typeof WeatherInfo>
+
+async function main() {
+    // Setup client and agent
+    const client = new MCPClient({ mcpServers: {...} })
+    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+    const agent = new MCPAgent({ llm, client })
+
+    // Get structured output
+    const weather = await agent.run(
+        'Get the current weather in San Francisco',
+        undefined, // maxSteps
+        undefined, // manageConnector
+        undefined, // externalHistory
+        WeatherInfo // output schema
+    )
+
+    console.log(`Temperature in ${weather.city}: ${weather.temperature}°C`)
+    console.log(`Condition: ${weather.condition}`)
+    console.log(`Humidity: ${weather.humidity}%`)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+</CodeGroup>
+
 ## Key Benefits
 
-- **Type Safety**: Get Pydantic models with full IDE support and validation
+- **Type Safety**: Get Pydantic (Python) or Zod (TypeScript) models with full IDE support and validation
 - **Intelligent Gathering**: Agent knows what information is required and won't stop until it has everything
 - **Automatic Retry**: Missing fields trigger continued execution automatically
 - **Field Validation**: Built-in validation for required fields, data types, and constraints

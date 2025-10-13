@@ -80,7 +80,8 @@ You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) t
 
 ### Configuration Example:
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPClient
 from mcp_use.types.sandbox import SandboxOptions
 
@@ -106,6 +107,13 @@ client = MCPClient(
 )
 ```
 
+```typescript TypeScript
+// ⚠️ Sandbox execution is not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+```
+</CodeGroup>
+
 ## Choosing the Right Connection Type
 
 The choice of connection type depends on your specific use case:
@@ -130,4 +138,4 @@ For example:
 
 This automatic inference simplifies the configuration process and ensures the appropriate connection type is used without requiring explicit specification.
 
-For more details on connection configuration, see the [Configuration Guide](./configuration).
+For more details on connection configuration, see the [Configuration Guide](/getting-started/configuration).

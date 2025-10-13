@@ -26,7 +26,8 @@ You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) t
 
 To enable sandboxed execution, use the sandbox parameter when creating the MCPClient:
 
-```python
+<CodeGroup>
+```python Python
 from mcp_use import MCPClient
 from mcp_use.types.sandbox import SandboxOptions
 
@@ -52,6 +53,39 @@ client = MCPClient.from_dict(
 )
 ```
 
+```typescript TypeScript
+// ⚠️ Sandbox execution is not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient } from 'mcp-use'
+
+const sandboxOptions = {
+    apiKey: 'your_e2b_api_key',  // Or use E2B_API_KEY environment variable
+    sandboxTemplateId: 'code-interpreter-v1',
+    supergatewayCommand: 'npx -y supergateway'  // Optional
+}
+
+const client = new MCPClient(
+    {
+        mcpServers: {
+            command_line: {
+                command: 'npx',
+                args: ['-y', '@modelcontextprotocol/server-everything']
+            }
+        }
+    },
+    {
+        sandbox: true,
+        sandboxOptions
+    }
+)
+*/
+```
+</CodeGroup>
+
 ### Available Sandbox Options
 
 The `SandboxOptions` type provides the following configuration options:
@@ -68,9 +102,16 @@ To use sandboxed execution, you need an E2B API key. You can provide it in two w
 
 1. Directly in the sandbox options:
 
-   ```python
+   <CodeGroup>
+   ```python Python
    sandbox_options = {"api_key": "your_e2b_api_key"}
    ```
+
+   ```typescript TypeScript
+   // ⚠️ Not yet supported - see above for details
+   // When supported: sandboxOptions = { apiKey: 'your_e2b_api_key' }
+   ```
+   </CodeGroup>
 
 2. Through the environment variable:
    ```bash
