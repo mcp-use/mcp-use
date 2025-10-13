@@ -87,7 +87,8 @@
             "group": "Integrations",
             "pages": [
               "integration/openai",
-              "integration/anthropic"
+              "integration/anthropic",
+              "integration/google"
             ]
           },
           {

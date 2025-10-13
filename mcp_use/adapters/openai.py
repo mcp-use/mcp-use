@@ -10,7 +10,8 @@ from .base import BaseAdapter
 
 def _sanitize_for_tool_name(name: str) -> str:
     """Sanitizes a string to be a valid tool name for OpenAI."""
-    # OpenAI tool names can only contain a-z, A-Z, 0-9, and underscores, and must be 64 characters or less.
+    # OpenAI tool names can only contain a-z, A-Z, 0-9, and underscores,
+    # and must be 64 characters or less.
     return re.sub(r"[^a-zA-Z0-9_]+", "_", name).strip("_")[:64]
 
 
