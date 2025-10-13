@@ -130,12 +130,25 @@ class RemoteAgent:
 
         # Parse into the Pydantic model
         try:
+            logger.info(f"🔍 Attempting to validate result_data against {output_schema.__name__}")
+            logger.info(f"🔍 Result data type: {type(result_data)}")
+            logger.info(f"🔍 Result data: {result_data}")
             return output_schema.model_validate(result_data)
         except Exception as e:
-            logger.warning(f"Failed to parse structured output: {e}")
+            logger.warning(f"❌ Failed to parse structured output: {e}")
+            logger.warning(f"🔍 Validation error details: {type(e).__name__}: {str(e)}")
+            logger.warning(f"🔍 Result data that failed validation: {result_data}")
+
             # Fallback: try to parse it as raw content if the model has a content field
             if hasattr(output_schema, "model_fields") and "content" in output_schema.model_fields:
-                return output_schema.model_validate({"content": str(result_data)})
+                logger.info("🔄 Attempting fallback with content field")
+                try:
+                    fallback_result = output_schema.model_validate({"content": str(result_data)})
+                    logger.info("✅ Fallback parsing succeeded")
+                    return fallback_result
+                except Exception as fallback_e:
+                    logger.error(f"❌ Fallback parsing also failed: {fallback_e}")
+                    raise
             raise
 
     async def _upsert_chat_session(self) -> str:
@@ -154,7 +167,7 @@ class RemoteAgent:
         headers = {"Content-Type": "application/json", "x-api-key": self.api_key}
         chat_url = f"{self.base_url}{API_CHATS_ENDPOINT}"
 
-        logger.info(f"📝 Upserting chat session for agent {self.agent_id}")
+        logger.info(f"📝 [{self.chat_id}] Upserting chat session for agent {self.agent_id}")
 
         try:
             chat_response = await self._client.post(chat_url, json=chat_payload, headers=headers)
@@ -163,9 +176,9 @@ class RemoteAgent:
             chat_data = chat_response.json()
             chat_id = chat_data["id"]
             if chat_response.status_code == 201:
-                logger.info(f"✅ New chat session created: {chat_id}")
+                logger.info(f"✅ [{self.chat_id}] New chat session created")
             else:
-                logger.info(f"✅ Resumed chat session: {chat_id}")
+                logger.info(f"✅ [{self.chat_id}] Resumed chat session")
 
             return chat_id
 
@@ -195,7 +208,7 @@ class RemoteAgent:
             logger.warning("External history is not yet supported for remote execution")
 
         if not self._session_established:
-            logger.info(f"🔧 Establishing chat session for agent {self.agent_id}")
+            logger.info(f"🔧 [{self.chat_id}] Establishing chat session for agent {self.agent_id}")
             self.chat_id = await self._upsert_chat_session()
             self._session_established = True
 
@@ -210,21 +223,26 @@ class RemoteAgent:
         headers = {"Content-Type": "application/json", "x-api-key": self.api_key, "Accept": "text/event-stream"}
 
         try:
-            logger.info(f"🌐 Connecting to HTTP stream for agent {self.agent_id}")
+            logger.info(f"🌐 [{self.chat_id}] Connecting to HTTP stream for agent {self.agent_id}")
 
             async with self._client.stream("POST", stream_url, headers=headers, json=request_payload) as response:
-                logger.info(f"✅ HTTP stream connection established for chat {chat_id}")
+                logger.info(f"✅ [{self.chat_id}] HTTP stream connection established")
 
                 if response.status_code != 200:
                     error_text = await response.aread()
                     raise RuntimeError(f"Failed to stream from remote agent: {error_text.decode()}")
 
                 # Read the streaming response line by line
-                async for line in response.aiter_lines():
-                    if line:
-                        yield line
-
-                logger.info("✅ Agent execution stream completed")
+                try:
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield line
+                except UnicodeDecodeError as e:
+                    logger.error(f"❌ [{self.chat_id}] UTF-8 decoding error at position {e.start}: {e.reason}")
+                    logger.error(f"❌ [{self.chat_id}] Error occurred while reading stream for agent {self.agent_id}")
+                    # Try to read raw bytes and decode with error handling
+                    logger.info(f"🔄 [{self.chat_id}] Attempting to read raw bytes with error handling...")
+                logger.info(f"✅ [{self.chat_id}] Agent execution stream completed")
 
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
@@ -235,7 +253,7 @@ class RemoteAgent:
             else:
                 raise RuntimeError(f"Failed to stream from remote agent: {status_code} - {response_text}") from e
         except Exception as e:
-            logger.error(f"❌ An error occurred during HTTP streaming: {e}")
+            logger.error(f"❌ [{self.chat_id}] An error occurred during HTTP streaming: {e}")
             raise RuntimeError(f"Failed to stream from remote agent: {str(e)}") from e
 
     async def run(
@@ -257,7 +275,7 @@ class RemoteAgent:
         try:
             # Consume the ENTIRE stream to ensure proper execution
             async for event in self.stream(query, max_steps, external_history, output_schema):
-                logger.debug(f"Processing stream event: {event[:100] if len(event) > 100 else event}...")
+                logger.debug(f"[{self.chat_id}] Processing stream event: {event}...")
 
                 # Parse AI SDK format events to extract final result
                 # The events follow the AI SDK streaming protocol
@@ -299,17 +317,24 @@ class RemoteAgent:
 
             # For structured output, try to parse the result
             if output_schema:
+                logger.info(f"🔍 Attempting structured output parsing for schema: {output_schema.__name__}")
+                logger.info(f"🔍 Raw final result type: {type(final_result)}")
+                logger.info(f"🔍 Raw final result length: {len(str(final_result)) if final_result else 0}")
+                logger.info(f"🔍 Raw final result preview: {str(final_result)[:500] if final_result else 'None'}...")
+
                 if isinstance(final_result, str) and final_result:
                     try:
                         # Try to parse as JSON first
                         parsed_result = json.loads(final_result)
-                        logger.info("Successfully parsed structured result as JSON")
+                        logger.info("✅ Successfully parsed structured result as JSON")
                         return self._parse_structured_response(parsed_result, output_schema)
-                    except json.JSONDecodeError:
-                        logger.warning("Could not parse result as JSON, attempting direct parsing")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"❌ Could not parse result as JSON: {e}")
+                        logger.warning(f"🔍 Raw string content: {final_result[:1000]}...")
                         # Try to parse directly
                         return self._parse_structured_response({"content": final_result}, output_schema)
                 else:
+                    logger.warning(f"❌ Final result is empty or not string: {final_result}")
                     # Try to parse the result directly
                     return self._parse_structured_response(final_result, output_schema)
 
