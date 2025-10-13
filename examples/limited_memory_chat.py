@@ -1,8 +1,9 @@
 """
-Simple chat example using MCPAgent with built-in conversation memory.
+Simple chat example using MCPAgent with limited conversation memory.
 
-This example demonstrates how to use the MCPAgent with its built-in
-conversation history capabilities for better contextual interactions.
+This example demonstrates how to use the MCPAgent with limited
+conversation history for better contextual interactions while
+keeping memory usage controlled.
 
 Special thanks to https://github.com/microsoft/playwright-mcp for the server.
 """
@@ -10,13 +11,14 @@ Special thanks to https://github.com/microsoft/playwright-mcp for the server.
 import asyncio
 
 from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 
 from mcp_use import MCPAgent, MCPClient
 
 
-async def run_memory_chat():
-    """Run a chat using MCPAgent's built-in conversation memory."""
+async def run_limited_memory_chat():
+    """Run a chat using MCPAgent with limited conversation memory."""
     # Load environment variables for API keys
     load_dotenv()
 
@@ -26,22 +28,26 @@ async def run_memory_chat():
     # Create MCPClient from config file
     client = MCPClient(config=config)
     llm = ChatOpenAI(model="gpt-4o-mini")
-
-    # Create agent with memory_enabled=True
+    # Create agent with memory_enabled=False but pass external history
     agent = MCPAgent(
         llm=llm,
         client=client,
         max_steps=15,
-        memory_enabled=True,  # Enable built-in conversation memory
+        memory_enabled=True,  # Disable built-in memory, use external history
     )
 
-    print("\n===== Interactive MCP Chat =====")
+    # Configuration: Limited history mode
+    MAX_HISTORY_MESSAGES = 5
+
+    print("\n===== Interactive MCP Chat (Limited Memory) =====")
     print("Type 'exit' or 'quit' to end the conversation")
     print("Type 'clear' to clear conversation history")
     print("==================================\n")
 
     try:
-        # Main chat loop
+        # Main chat loop with limited history
+        external_history = []
+
         while True:
             # Get user input
             user_input = input("\nYou: ")
@@ -53,17 +59,22 @@ async def run_memory_chat():
 
             # Check for clear history command
             if user_input.lower() == "clear":
-                agent.clear_conversation_history()
+                external_history = []
                 print("Conversation history cleared.")
                 continue
 
             # Get response from agent
-            print("\nAssistant: ", end="", flush=True)
-
             try:
-                # Run the agent with the user input (memory handling is automatic)
-                result = await agent.run(user_input)
-                print(result)
+                # Limit history to last N messages
+                limited_history = external_history[-MAX_HISTORY_MESSAGES:] if external_history else []
+                # Run the agent with the user input and limited history
+                print("\nAssistant: ", end="", flush=True)
+                response = await agent.run(user_input, external_history=limited_history)
+                print(response)
+                # Add to external history
+                external_history.append(HumanMessage(content=user_input))
+                external_history.append(AIMessage(content=response))
+
             except Exception as e:
                 print(f"\nError: {e}")
 
@@ -74,4 +85,4 @@ async def run_memory_chat():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_memory_chat())
+    asyncio.run(run_limited_memory_chat())

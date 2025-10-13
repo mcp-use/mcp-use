@@ -98,13 +98,27 @@
           {
             "group": "Agent Configuration",
             "pages": [
-              "agent/agent-configuration",
-              "agent/llm-integration",
-              "agent/server-manager",
-              "agent/streaming",
-              "agent/pretty-printing",
-              "agent/structured-output",
-              "agent/interactive-chat-patterns"
+              {
+                "group": "Overview",
+                "icon": "globe",
+                "pages": [
+                  "agent/agent-configuration",
+                  "agent/llm-integration"
+                ]
+              },
+              {
+                "group": "Core Features",
+                "icon": "list-plus",
+                "pages": [
+                  "agent/memory-management",
+                  "agent/structured-output",
+                  "agent/streaming",
+                  "agent/interactive-chat-patterns",
+                  "agent/pretty-printing",
+                  
+                ]
+              },
+              "agent/server-manager"
             ]
           },
           {
