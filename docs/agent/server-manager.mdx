@@ -8,7 +8,7 @@ icon: 'server-cog'
 
 The Server Manager is the brain behind intelligent MCP server orchestration. It transforms your agent from a static tool user into a dynamic, adaptive assistant that can discover, connect to, and intelligently utilize tools from multiple MCP servers on-demand.
 
-## 🎯 What Makes It Special
+## What Makes It Special
 
 Instead of overwhelming your agent with hundreds of tools from all servers at once, the Server Manager:
 
@@ -18,7 +18,7 @@ Instead of overwhelming your agent with hundreds of tools from all servers at on
 - **Provides semantic search** across all server tools
 - **Manages connection lifecycle** efficiently
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```mermaid
 graph TB
@@ -30,7 +30,7 @@ graph TB
     SM --> Tools[Dynamic Tools]
 ```
 
-## 🔄 Dynamic Tool Loading Process
+## Dynamic Tool Loading Process
 
 ```mermaid
 sequenceDiagram
@@ -41,7 +41,7 @@ sequenceDiagram
     Agent->>Server: Use tools directly
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 Enable the Server Manager in your agent:
 
@@ -64,11 +64,11 @@ client = MCPClient.from_dict({
     }
 })
 
-# 🎯 Enable Server Manager
+# Enable Server Manager
 agent = MCPAgent(
     llm=ChatOpenAI(model="gpt-4"),
     client=client,
-    use_server_manager=True  # ✨ This is the magic switch!
+    use_server_manager=True  # This is the magic switch!
 )
 ```
 
@@ -90,22 +90,22 @@ const client = new MCPClient({
     }
 })
 
-// 🎯 Enable Server Manager
+// Enable Server Manager
 const agent = new MCPAgent({
     llm: new ChatOpenAI({ model: 'gpt-4' }),
     client,
-    useServerManager: true  // ✨ This is the magic switch!
+    useServerManager: true  // This is the magic switch!
 })
 ```
 </CodeGroup>
 
 
-## 🔍 Tool Discovery Flow
+## Tool Discovery Flow
 
 
 
 
-## 🛠️ Management Tools Deep Dive
+## Management Tools Deep Dive
 
 ### Core Server Management
 
@@ -154,7 +154,7 @@ graph LR
     Connect --> Use[Use Tools]
 ```
 
-## 🎭 Real-World Use Cases
+## Real-World Use Cases
 
 ### 1. Multi-Server Data Pipeline
 
@@ -219,7 +219,7 @@ What tools do I need for this?
 ```
 </CodeGroup>
 
-## 🚀 Performance Benefits
+## Performance Benefits
 
 The Server Manager provides focused tool access:
 
@@ -230,13 +230,13 @@ The Server Manager provides focused tool access:
 
 The Server Manager provides these powerful capabilities:
 
-- **🔗 Dynamic Tool Addition**: Server tools automatically added with full schemas
-- **⚡ Real-time Updates**: Tool list updates immediately when connecting/disconnecting
-- **🧹 Clean Architecture**: Direct tool access with proper schemas
-- **🎯 Model Understanding**: Tools come with native schemas and validation
-- **📊 Smart Logging**: Detailed insights into tool changes and server status
+- **Dynamic Tool Addition**: Server tools automatically added with full schemas
+- **Real-time Updates**: Tool list updates immediately when connecting/disconnecting
+- **Clean Architecture**: Direct tool access with proper schemas
+- **Model Understanding**: Tools come with native schemas and validation
+- **Smart Logging**: Detailed insights into tool changes and server status
 
-## 🏁 Complete Example
+## Complete Example
 
 <CodeGroup>
 ```python Python
@@ -276,7 +276,7 @@ async def demo_server_manager():
     Guide me through each step and show me how you discover and use the right tools.
     """)
 
-    print("🎉 Task completed!")
+    print("Task completed!")
     print(result)
 
     await agent.close()
@@ -321,7 +321,7 @@ async function demoServerManager() {
     Guide me through each step and show me how you discover and use the right tools.
     `)
 
-    console.log('🎉 Task completed!')
+    console.log('Task completed!')
     console.log(result)
 
     await client.closeAllSessions()
@@ -331,7 +331,7 @@ demoServerManager().catch(console.error)
 ```
 </CodeGroup>
 
-The Server Manager transforms your MCP agent from a static tool user into an intelligent, adaptive assistant that can dynamically discover and utilize the perfect tools for any task! 🚀
+The Server Manager transforms your MCP agent from a static tool user into an intelligent, adaptive assistant that can dynamically discover and utilize the perfect tools for any task!
 
 
 
