@@ -294,7 +294,8 @@ agent = MCPAgent(llm=llm, client=client)
 
 ### Debug Model Behavior
 
-```python
+<CodeGroup>
+```python Python
 # Enable verbose logging to see model interactions
 agent = MCPAgent(
     llm=llm,
@@ -302,5 +303,15 @@ agent = MCPAgent(
     verbose=True  # Shows detailed model interactions
 )
 ```
+
+```typescript TypeScript
+// Enable verbose logging to see model interactions
+const agent = new MCPAgent({
+    llm,
+    client,
+    verbose: true  // Shows detailed model interactions
+})
+```
+</CodeGroup>
 
 For more LLM providers and detailed integration examples, visit the [LangChain Chat Models documentation](https://python.langchain.com/docs/integrations/chat/).

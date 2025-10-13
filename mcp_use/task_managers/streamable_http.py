@@ -8,6 +8,7 @@ that ensures proper task isolation and resource cleanup.
 from datetime import timedelta
 from typing import Any
 
+import httpx
 from mcp.client.streamable_http import streamablehttp_client
 
 from ..logging import logger
@@ -28,6 +29,7 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
         headers: dict[str, str] | None = None,
         timeout: float = 5,
         read_timeout: float = 60 * 5,
+        auth: httpx.Auth | None = None,
     ):
         """Initialize a new streamable HTTP connection manager.
 
@@ -36,12 +38,14 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
             headers: Optional HTTP headers
             timeout: Timeout for HTTP operations in seconds
             read_timeout: Timeout for HTTP read operations in seconds
+            auth: Optional httpx.Auth instance for authentication
         """
         super().__init__()
         self.url = url
         self.headers = headers or {}
         self.timeout = timedelta(seconds=timeout)
         self.read_timeout = timedelta(seconds=read_timeout)
+        self.auth = auth
         self._http_ctx = None
 
     async def _establish_connection(self) -> tuple[Any, Any]:
@@ -59,6 +63,7 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
             headers=self.headers,
             timeout=self.timeout,
             sse_read_timeout=self.read_timeout,
+            auth=self.auth,
         )
 
         # Enter the context manager. Ignoring the session id callback

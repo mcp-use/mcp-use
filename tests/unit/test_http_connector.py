@@ -10,7 +10,9 @@ import aiohttp
 from mcp import McpError
 from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
 
+from mcp_use.auth.bearer import BearerAuth
 from mcp_use.connectors.http import HttpConnector
+from mcp_use.middleware.middleware import CallbackClientSession
 from mcp_use.task_managers import SseConnectionManager
 
 
@@ -23,7 +25,7 @@ class TestHttpConnectorInitialization(unittest.TestCase):
         connector = HttpConnector(base_url="http://localhost:8000")
 
         self.assertEqual(connector.base_url, "http://localhost:8000")
-        self.assertIsNone(connector.auth_token)
+        self.assertIsNone(connector._auth)
         self.assertEqual(connector.headers, {})
         self.assertIsNone(connector.client_session)
         self.assertIsNone(connector._connection_manager)
@@ -32,10 +34,11 @@ class TestHttpConnectorInitialization(unittest.TestCase):
 
     def test_init_with_auth_token(self, _):
         """Test initialization with auth token."""
-        connector = HttpConnector(base_url="http://localhost:8000", auth_token="test_token")
+        connector = HttpConnector(base_url="http://localhost:8000", auth="test_token")
 
         self.assertEqual(connector.base_url, "http://localhost:8000")
-        self.assertEqual(connector.auth_token, "test_token")
+        self.assertIsInstance(connector._auth, BearerAuth)
+        self.assertEqual(connector._auth.token.get_secret_value(), "test_token")
         self.assertEqual(connector.headers, {"Authorization": "Bearer test_token"})
         self.assertIsNone(connector.client_session)
         self.assertIsNone(connector._connection_manager)
@@ -48,7 +51,7 @@ class TestHttpConnectorInitialization(unittest.TestCase):
         connector = HttpConnector(base_url="http://localhost:8000", headers=headers)
 
         self.assertEqual(connector.base_url, "http://localhost:8000")
-        self.assertIsNone(connector.auth_token)
+        self.assertIsNone(connector._auth)
         self.assertEqual(connector.headers, headers)
         self.assertIsNone(connector.client_session)
         self.assertIsNone(connector._connection_manager)
@@ -58,13 +61,13 @@ class TestHttpConnectorInitialization(unittest.TestCase):
     def test_init_with_auth_token_and_headers(self, _):
         """Test initialization with both auth token and headers."""
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        connector = HttpConnector(base_url="http://localhost:8000", auth_token="test_token", headers=headers)
+        connector = HttpConnector(base_url="http://localhost:8000", auth="test_token", headers=headers)
 
         expected_headers = headers.copy()
         expected_headers["Authorization"] = "Bearer test_token"
 
         self.assertEqual(connector.base_url, "http://localhost:8000")
-        self.assertEqual(connector.auth_token, "test_token")
+        self.assertEqual(connector._auth.token.get_secret_value(), "test_token")
         self.assertEqual(connector.headers, expected_headers)
         self.assertIsNone(connector.client_session)
         self.assertIsNone(connector._connection_manager)
@@ -191,7 +194,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         await self.connector.connect()
 
         # Verify streamable HTTP connection manager was used
-        mock_cm_class.assert_called_once_with("http://localhost:8000", {}, 5, 300)
+        mock_cm_class.assert_called_once_with("http://localhost:8000", {}, 5, 300, auth=None)
         mock_cm_instance.start.assert_called_once()
 
         # Verify client session was created and initialized
@@ -213,7 +216,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_client_session_instance.list_prompts.assert_called_once()
 
         # Verify final state
-        self.assertEqual(self.connector.client_session, mock_client_session_instance)
+        self.assertIsInstance(self.connector.client_session, CallbackClientSession)
         self.assertEqual(self.connector._connection_manager, mock_cm_instance)
         self.assertTrue(self.connector._connected)
         self.assertTrue(self.connector._initialized)

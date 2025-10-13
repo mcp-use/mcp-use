@@ -26,7 +26,8 @@ Direct tool calls are appropriate when:
 
 Here's how to call tools directly using the MCPClient:
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 from mcp_use import MCPClient
 
@@ -42,7 +43,7 @@ async def call_tool_example():
     }
 
     # Create client from configuration
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
 
     try:
         # Initialize all configured sessions
@@ -77,6 +78,59 @@ if __name__ == "__main__":
     asyncio.run(call_tool_example())
 ```
 
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
+
+async function callToolExample() {
+    // Configure the MCP server
+    const config = {
+        mcpServers: {
+            everything: {
+                command: 'npx',
+                args: ['-y', '@modelcontextprotocol/server-everything']
+            }
+        }
+    }
+
+    // Create client from configuration
+    const client = new MCPClient(config)
+
+    try {
+        // Initialize all configured sessions
+        await client.createAllSessions()
+
+        // Get the session for a specific server
+        const session = client.getSession('everything')
+
+        // List available tools
+        const tools = await session.listTools()
+        const toolNames = tools.map(t => t.name)
+        console.log(`Available tools: ${toolNames}`)
+
+        // Call a specific tool with arguments
+        const result = await session.callTool(
+            'add',
+            { a: 1, b: 2 }
+        )
+
+        // Handle the result
+        if (result.isError) {
+            console.error(`Error: ${result.content}`)
+        } else {
+            console.log(`Tool result: ${result.content}`)
+            console.log(`Text result: ${result.content[0].text}`)
+        }
+
+    } finally {
+        // Clean up resources
+        await client.closeAllSessions()
+    }
+}
+
+callToolExample().catch(console.error)
+```
+</CodeGroup>
+
 ## Working with Tool Results
 
 The `call_tool` method returns a `CallToolResult` object with the following attributes:
@@ -87,7 +141,8 @@ The `call_tool` method returns a `CallToolResult` object with the following attr
 
 ### Accessing Results
 
-```python
+<CodeGroup>
+```python Python
 # Call a tool
 result = await session.call_tool(
     name="get_weather",
@@ -108,11 +163,36 @@ else:
         print(f"Temperature: {structured.get('temperature')}")
 ```
 
+```typescript TypeScript
+// Call a tool
+const result = await session.callTool(
+    'get_weather',
+    { location: 'San Francisco' }
+)
+
+// Check for errors
+if (result.isError) {
+    console.error(`Tool error: ${result.content}`)
+} else {
+    // Access text content
+    const textResult = result.content[0].text
+    console.log(`Weather: ${textResult}`)
+
+    // Access structured content if available
+    if (result.structuredContent) {
+        const structured = result.structuredContent
+        console.log(`Temperature: ${structured.temperature}`)
+    }
+}
+```
+</CodeGroup>
+
 ## Multiple Server Example
 
 You can work with multiple MCP servers and call tools from each:
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 from mcp_use import MCPClient
 
@@ -131,7 +211,7 @@ async def multi_server_example():
         }
     }
 
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
 
     try:
         await client.create_all_sessions()
@@ -159,13 +239,62 @@ if __name__ == "__main__":
     asyncio.run(multi_server_example())
 ```
 
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
+
+async function multiServerExample() {
+    const config = {
+        mcpServers: {
+            filesystem: {
+                command: 'npx',
+                args: ['-y', '@modelcontextprotocol/server-filesystem'],
+                env: { FILE_PATH: '/tmp' }
+            },
+            time: {
+                command: 'npx',
+                args: ['-y', '@modelcontextprotocol/server-time']
+            }
+        }
+    }
+
+    const client = new MCPClient(config)
+
+    try {
+        await client.createAllSessions()
+
+        // Call tool from filesystem server
+        const fsSession = client.getSession('filesystem')
+        const files = await fsSession.callTool(
+            'list_files',
+            { path: '/tmp' }
+        )
+        console.log(`Files: ${files.content[0].text}`)
+
+        // Call tool from time server
+        const timeSession = client.getSession('time')
+        const currentTime = await timeSession.callTool(
+            'get_current_time',
+            {}
+        )
+        console.log(`Current time: ${currentTime.content[0].text}`)
+
+    } finally {
+        await client.closeAllSessions()
+    }
+}
+
+multiServerExample().catch(console.error)
+```
+</CodeGroup>
+
 ## Discovering Available Tools
 
 Before calling tools, you may want to discover what's available:
 
-```python
+<CodeGroup>
+```python Python
 async def discover_tools():
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     await client.create_all_sessions()
 
     try:
@@ -187,11 +316,41 @@ async def discover_tools():
         await client.close_all_sessions()
 ```
 
+```typescript TypeScript
+async function discoverTools() {
+    const client = new MCPClient(config)
+    await client.createAllSessions()
+
+    try {
+        const session = client.getSession('my_server')
+
+        // Get all tools
+        const tools = await session.listTools()
+
+        for (const tool of tools) {
+            console.log(`Tool: ${tool.name}`)
+            console.log(`  Description: ${tool.description}`)
+
+            // Print input schema if available
+            if (tool.inputSchema) {
+                console.log(`  Parameters: ${JSON.stringify(tool.inputSchema)}`)
+            }
+            console.log()
+        }
+
+    } finally {
+        await client.closeAllSessions()
+    }
+}
+```
+</CodeGroup>
+
 ## Error Handling
 
 Always handle potential errors when making direct tool calls:
 
-```python
+<CodeGroup>
+```python Python
 async def safe_tool_call():
     try:
         result = await session.call_tool(
@@ -212,6 +371,32 @@ async def safe_tool_call():
         print(f"Failed to call tool: {e}")
         return None
 ```
+
+```typescript TypeScript
+async function safeToolCall() {
+    try {
+        const result = await session.callTool(
+            'some_tool',
+            { param: 'value' }
+        )
+
+        if (result.isError) {
+            // Handle tool-specific errors
+            const errorMsg = result.content?.[0]?.text || 'Unknown error'
+            console.error(`Tool returned error: ${errorMsg}`)
+            return null
+        }
+
+        return result.content[0].text
+
+    } catch (error) {
+        // Handle connection or other errors
+        console.error(`Failed to call tool: ${error}`)
+        return null
+    }
+}
+```
+</CodeGroup>
 
 ## Limitations
 

@@ -1,0 +1,333 @@
+---
+title: "Mcpagent"
+description: "MCP: Main integration module with customizable system prompt API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py</a>
+</Callout>
+
+MCP: Main integration module with customizable system prompt.
+
+This module provides the main MCPAgent class that integrates all components
+to provide a simple interface for using MCP tools with different LLMs.
+
+## MCPAgent
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPAgent</div>
+
+Main class for using MCP tools with various LLM providers.
+
+    This class provides a unified interface for using MCP tools with different LLM providers
+    through LangChain's agent framework, with customizable system prompts and conversation memory.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.agents.mcpagent import MCPAgent
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize a new MCPAgent instance.
+
+
+**Parameters**
+><ParamField body="llm" type="langchain_core.language_models.base.BaseLanguageModel | None" default="None" >   The LangChain LLM to use. Not required if agent_id is provided for remote execution. </ParamField>
+><ParamField body="client" type="mcp_use.client.MCPClient | None" default="None" >   The MCPClient to use. If provided, connector is ignored. </ParamField>
+><ParamField body="connectors" type="list[mcp_use.connectors.base.BaseConnector] | None" default="None" >   A list of MCP connectors to use if client is not provided. </ParamField>
+><ParamField body="max_steps" type="int" default="5" >   The maximum number of steps to take. </ParamField>
+><ParamField body="auto_initialize" type="bool" default="False" >   Whether to automatically initialize the agent when run is called. </ParamField>
+><ParamField body="memory_enabled" type="bool" default="True" >   Whether to maintain conversation history for context. </ParamField>
+><ParamField body="system_prompt" type="str | None" default="None" >   Complete system prompt to use (overrides template if provided). </ParamField>
+><ParamField body="system_prompt_template" type="str | None" default="None" >   Template for system prompt with {tool_descriptions} placeholder. </ParamField>
+><ParamField body="additional_instructions" type="str | None" default="None" >   Extra instructions to append to the system prompt. </ParamField>
+><ParamField body="disallowed_tools" type="list[str] | None" default="None" >   List of tool names that should not be available to the agent. </ParamField>
+><ParamField body="tools_used_names" type="list[str] | None" default="None" >   List of tools </ParamField>
+><ParamField body="use_server_manager" type="bool" default="False" >   Whether to use server manager mode instead of exposing all tools. </ParamField>
+><ParamField body="server_manager" type="mcp_use.managers.base.BaseServerManager | None" default="None" >   Server name or configuration </ParamField>
+><ParamField body="verbose" type="bool" default="False" >   Enable debug/verbose mode </ParamField>
+><ParamField body="agent_id" type="str | None" default="None" >   Remote agent ID for remote execution. If provided, creates a remote agent. </ParamField>
+><ParamField body="api_key" type="str | None" default="None" >   API key for remote execution. If None, checks MCP_USE_API_KEY env var. </ParamField>
+><ParamField body="base_url" type="str" default='https://cloud.mcp-use.com' >   Base URL for remote API calls. </ParamField>
+><ParamField body="callbacks" type="list | None" default="None" >   List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler. </ParamField>
+><ParamField body="chat_id" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="retry_on_error" type="bool" default="True" >   Whether to retry tool calls that fail due to validation errors. </ParamField>
+><ParamField body="max_retries_per_step" type="int" default="2" >   Maximum number of retries for validation errors per step. </ParamField>
+
+**Signature**
+```python wrap
+def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.MCPClient | None = None, connectors: list[mcp_use.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.managers.base.BaseServerManager | None = None, verbose: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True, max_retries_per_step: int = 2):
+```
+
+</Card>
+<Card type="info">
+### `method` add_to_history
+
+Add a message to the conversation history.
+
+
+
+**Parameters**
+><ParamField body="message" type="langchain_core.messages.base.BaseMessage" required="True" >   The message to add. </ParamField>
+
+**Signature**
+```python wrap
+def add_to_history(message: langchain_core.messages.base.BaseMessage):
+```
+
+</Card>
+
+<Card type="info">
+### `method` clear_conversation_history
+
+Clear the conversation history.
+
+
+**Signature**
+```python wrap
+def clear_conversation_history():
+```
+
+</Card>
+
+<Card type="info">
+### `method` close
+
+Close the MCP connection with improved error handling.
+
+
+**Signature**
+```python wrap
+def close():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_conversation_history
+
+Get the current conversation history.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[langchain_core.messages.base.BaseMessage]" >The list of conversation messages.</ResponseField>
+
+**Signature**
+```python wrap
+def get_conversation_history():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_disallowed_tools
+
+Get the list of tools that are not available to the agent.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[str]" >List of tool names that are not available.</ResponseField>
+
+**Signature**
+```python wrap
+def get_disallowed_tools():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_system_message
+
+Get the current system message.
+
+
+
+**Returns**
+><ResponseField name="returns" type="langchain_core.messages.system.SystemMessage | None" >The current system message, or None if not set.</ResponseField>
+
+**Signature**
+```python wrap
+def get_system_message():
+```
+
+</Card>
+
+<Card type="info">
+### `method` initialize
+
+Initialize the MCP client and agent.
+
+
+**Signature**
+```python wrap
+def initialize():
+```
+
+</Card>
+
+<Card type="info">
+### `method` run
+
+Run a query using the MCP tools and return the final result.
+
+        This method uses the streaming implementation internally and returns
+        the final result after consuming all intermediate steps. If output_schema
+        is provided, the agent will be schema-aware and return structured output.
+
+        Example:
+            ```python
+            # Regular usage
+            result = await agent.run("What's the weather like?")
+
+            # Structured output usage
+            from pydantic import BaseModel, Field
+
+            class WeatherInfo(BaseModel):
+                temperature: float = Field(description="Temperature in Celsius")
+                condition: str = Field(description="Weather condition")
+
+            weather: WeatherInfo = await agent.run(
+                "What's the weather like?",
+                output_schema=WeatherInfo
+            )
+            ```
+
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
+><ParamField body="max_steps" type="int | None" default="None" >   Optional maximum number of steps to take. </ParamField>
+><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
+><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
+><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str | mcp_use.agents.mcpagent.T" >The result of running the query as a string, or if output_schema is provided, an instance of the specified Pydantic model.</ResponseField>
+
+**Signature**
+```python wrap
+def run(
+query: str,
+    max_steps: int | None = None,
+    manage_connector: bool = True,
+    external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
+    output_schema: type[~T] | None = None
+):
+```
+
+</Card>
+
+<Card type="info">
+### `method` set_disallowed_tools
+
+Set the list of tools that should not be available to the agent.
+
+        This will take effect the next time the agent is initialized.
+
+
+
+**Parameters**
+><ParamField body="disallowed_tools" type="list[str]" required="True" >   List of tool names that should not be available. </ParamField>
+
+**Signature**
+```python wrap
+def set_disallowed_tools(disallowed_tools: list[str]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` set_system_message
+
+Set a new system message.
+
+
+
+**Parameters**
+><ParamField body="message" type="str" required="True" >   The new system message content. </ParamField>
+
+**Signature**
+```python wrap
+def set_system_message(message: str):
+```
+
+</Card>
+
+<Card type="info">
+### `method` stream
+
+Run the agent and yield intermediate steps as an async generator.
+
+        Yields:
+            Intermediate steps as (AgentAction, str) tuples, followed by the final result.
+            If output_schema is provided, yields structured output as instance of the schema.
+
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
+><ParamField body="max_steps" type="int | None" default="None" >   Optional maximum number of steps to take. </ParamField>
+><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
+><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
+><ParamField body="track_execution" type="bool" default="True" >   Whether to track execution for telemetry. </ParamField>
+><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="AsyncGenerator" />
+
+**Signature**
+```python wrap
+def stream(
+query: str,
+    max_steps: int | None = None,
+    manage_connector: bool = True,
+    external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
+    track_execution: bool = True,
+    output_schema: type[~T] | None = None
+):
+```
+
+</Card>
+
+<Card type="info">
+### `method` stream_events
+
+Asynchronous streaming interface.
+
+        Example::
+
+            async for chunk in agent.astream("hello"):
+                print(chunk, end="|", flush=True)
+
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
+><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
+><ParamField body="manage_connector" type="bool" default="True" >   Connector instance </ParamField>
+><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   List of items </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="AsyncIterator" />
+
+**Signature**
+```python wrap
+def stream_events(
+query: str,
+    max_steps: int | None = None,
+    manage_connector: bool = True,
+    external_history: list[langchain_core.messages.base.BaseMessage] | None = None
+):
+```
+
+</Card>
+
+</div>

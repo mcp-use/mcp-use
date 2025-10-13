@@ -1,0 +1,115 @@
+---
+title: "System Prompt Builder"
+description: "System Prompt Builder API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/prompts/system_prompt_builder.py</a>
+</Callout>
+
+
+## build_system_prompt_content
+<Card type="info">
+### `function` build_system_prompt_content
+
+Builds the final system prompt string using a template, tool descriptions,
+    and optional additional instructions.
+
+
+```python
+from mcp_use.agents.prompts.system_prompt_builder import build_system_prompt_content
+```
+
+**Parameters**
+><ParamField body="template" type="str" required="True" >   The system prompt template string (must contain '{tool_descriptions}'). </ParamField>
+><ParamField body="tool_description_lines" type="list[str]" required="True" >   A list of formatted tool description strings. </ParamField>
+><ParamField body="additional_instructions" type="str | None" default="None" >   Optional extra instructions to append. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str" >The fully formatted system prompt content string.</ResponseField>
+
+**Signature**
+```python wrap
+def build_system_prompt_content(
+template: str,
+    tool_description_lines: list[str],
+    additional_instructions: str | None = None
+):
+```
+
+</Card>
+
+
+## create_system_message
+<Card type="info">
+### `function` create_system_message
+
+Creates the final SystemMessage object for the agent.
+
+    Handles selecting the correct template, generating tool descriptions,
+    and incorporating user overrides and additional instructions.
+
+
+```python
+from mcp_use.agents.prompts.system_prompt_builder import create_system_message
+```
+
+**Parameters**
+><ParamField body="tools" type="list[langchain_core.tools.base.BaseTool]" required="True" >   List of available tools. </ParamField>
+><ParamField body="system_prompt_template" type="str" required="True" >   The default system prompt template. </ParamField>
+><ParamField body="server_manager_template" type="str" required="True" >   The template to use when server manager is active. </ParamField>
+><ParamField body="use_server_manager" type="bool" required="True" >   Flag indicating if server manager mode is enabled. </ParamField>
+><ParamField body="disallowed_tools" type="list[str] | None" default="None" >   List of tool names to exclude. </ParamField>
+><ParamField body="user_provided_prompt" type="str | None" default="None" >   A complete system prompt provided by the user, overriding templates. </ParamField>
+><ParamField body="additional_instructions" type="str | None" default="None" >   Extra instructions to append to the template-based prompt. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="langchain_core.messages.system.SystemMessage" >A SystemMessage object containing the final prompt content.</ResponseField>
+
+**Signature**
+```python wrap
+def create_system_message(
+tools: list[langchain_core.tools.base.BaseTool],
+    system_prompt_template: str,
+    server_manager_template: str,
+    use_server_manager: bool,
+    disallowed_tools: list[str] | None = None,
+    user_provided_prompt: str | None = None,
+    additional_instructions: str | None = None
+):
+```
+
+</Card>
+
+
+## generate_tool_descriptions
+<Card type="info">
+### `function` generate_tool_descriptions
+
+Generates a list of formatted tool descriptions, excluding disallowed tools.
+
+
+```python
+from mcp_use.agents.prompts.system_prompt_builder import generate_tool_descriptions
+```
+
+**Parameters**
+><ParamField body="tools" type="list[langchain_core.tools.base.BaseTool]" required="True" >   The list of available BaseTool objects. </ParamField>
+><ParamField body="disallowed_tools" type="list[str] | None" default="None" >   A list of tool names to exclude. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="list[str]" >A list of strings, each describing a tool in the format &quot;- tool_name: description&quot;.</ResponseField>
+
+**Signature**
+```python wrap
+def generate_tool_descriptions(
+tools: list[langchain_core.tools.base.BaseTool],
+    disallowed_tools: list[str] | None = None
+):
+```
+
+</Card>

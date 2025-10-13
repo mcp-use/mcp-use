@@ -18,7 +18,9 @@ icon: "download"
 ## Installing mcp_use
 
 <Info>
-  **Prerequisites**: Please install [Python](https://python.org/) (version 3.11 or higher) before proceeding.
+  **Prerequisites**:
+  - For Python: Install [Python](https://python.org/) (version 3.11 or higher)
+  - For TypeScript: Install [Node.js](https://nodejs.org/) (version 18 or higher)
 </Info>
 
 <Steps>
@@ -26,16 +28,28 @@ icon: "download"
     Install mcp_use using your preferred package manager:
     <CodeGroup>
 
-    ```bash pip
+    ```bash Python (pip)
     pip install mcp-use
     ```
 
-    ```bash Poetry
+    ```bash TypeScript (npm)
+    npm install mcp-use
+    ```
+
+    ```bash Python (Poetry)
     poetry add mcp-use
     ```
 
-    ```bash Conda
+    ```bash TypeScript (yarn)
+    yarn add mcp-use
+    ```
+
+    ```bash Python (Conda)
     conda install -c conda-forge mcp-use
+    ```
+
+    ```bash TypeScript (pnpm)
+    pnpm add mcp-use
     ```
 
     </CodeGroup>
@@ -44,20 +58,36 @@ icon: "download"
     Choose and install your preferred LangChain provider:
     <CodeGroup>
 
-    ```bash OpenAI
+    ```bash Python (OpenAI)
     pip install langchain-openai
     ```
 
-    ```bash Anthropic
+    ```bash TypeScript (OpenAI)
+    npm install @langchain/openai
+    ```
+
+    ```bash Python (Anthropic)
     pip install langchain-anthropic
     ```
 
-    ```bash Google
+    ```bash TypeScript (Anthropic)
+    npm install @langchain/anthropic
+    ```
+
+    ```bash Python (Google)
     pip install langchain-google-genai
     ```
 
-    ```bash Groq
+    ```bash TypeScript (Google)
+    npm install @langchain/google-genai
+    ```
+
+    ```bash Python (Groq)
     pip install langchain-groq
+    ```
+
+    ```bash TypeScript (Groq)
+    npm install @langchain/groq
     ```
 
     </CodeGroup>
@@ -75,10 +105,17 @@ icon: "download"
   <Step title="Verify installation">
     Test your installation with a simple script:
 
-    ```python test_install.py
+    <CodeGroup>
+    ```python Python
     from mcp_use import MCPAgent, MCPClient
     print("mcp_use installed successfully!")
     ```
+
+    ```typescript TypeScript
+    import { MCPAgent, MCPClient } from 'mcp-use'
+    console.log('mcp_use installed successfully!')
+    ```
+    </CodeGroup>
   </Step>
 </Steps>
 
@@ -88,16 +125,30 @@ If you want to contribute or use the latest features, install from source:
 
 <CodeGroup>
 
-```bash Git Clone
+```bash Python (Git Clone)
 git clone https://github.com/mcp-use/mcp-use.git
 cd mcp-use
 pip install -e .
 ```
 
-```bash Development Mode
+```bash TypeScript (Git Clone)
+git clone https://github.com/mcp-use/mcp-use.git
+cd mcp-use-ts
+npm install
+npm run build
+```
+
+```bash Python (Dev Mode)
 git clone https://github.com/mcp-use/mcp-use.git
 cd mcp-use
 pip install -e ".[dev]"
+```
+
+```bash TypeScript (Dev Mode)
+git clone https://github.com/mcp-use/mcp-use.git
+cd mcp-use-ts
+npm install
+npm run dev
 ```
 
 </CodeGroup>
@@ -200,9 +251,10 @@ LOG_LEVEL=INFO
 MCP_SERVER_PATH=/path/to/mcp/servers
 ```
 
-Load environment variables in your Python scripts:
+Load environment variables in your scripts:
 
-```python
+<CodeGroup>
+```python Python
 from dotenv import load_dotenv
 import os
 
@@ -212,11 +264,22 @@ load_dotenv()
 openai_key = os.getenv("OPENAI_API_KEY")
 ```
 
+```typescript TypeScript
+import { config } from 'dotenv'
+
+config()
+
+// Your API keys are now available as environment variables
+const openaiKey = process.env.OPENAI_API_KEY
+```
+</CodeGroup>
+
 ## Verification
 
 Verify your installation works correctly:
 
-```python verify_setup.py
+<CodeGroup>
+```python Python
 import asyncio
 import os
 from dotenv import load_dotenv
@@ -237,7 +300,7 @@ async def verify_installation():
     }
 
     try:
-        client = MCPClient.from_dict(config)
+        client = MCPClient(config)
         print("✅ MCPClient created successfully")
 
         llm = ChatOpenAI(model="gpt-3.5-turbo")
@@ -255,6 +318,49 @@ async def verify_installation():
 if __name__ == "__main__":
     asyncio.run(verify_installation())
 ```
+
+```typescript TypeScript
+import { config } from 'dotenv'
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+async function verifyInstallation() {
+    config()
+
+    // Simple configuration for testing
+    const configuration = {
+        mcpServers: {
+            test: {
+                command: 'echo',
+                args: ['Hello from MCP!']
+            }
+        }
+    }
+
+    try {
+        const client = new MCPClient(configuration)
+        console.log('✅ MCPClient created successfully')
+
+        const llm = new ChatOpenAI({ model: 'gpt-3.5-turbo' })
+        console.log('✅ LLM initialized successfully')
+
+        const agent = new MCPAgent({ llm, client })
+        console.log('✅ MCPAgent created successfully')
+
+        console.log('\n🎉 Installation verified! You\'re ready to use mcp_use.')
+
+        // Clean up
+        await client.closeAllSessions()
+
+    } catch (error) {
+        console.error('❌ Verification failed:', error)
+        console.error('Please check your installation and API keys.')
+    }
+}
+
+verifyInstallation().catch(console.error)
+```
+</CodeGroup>
 
 ## Next Steps
 

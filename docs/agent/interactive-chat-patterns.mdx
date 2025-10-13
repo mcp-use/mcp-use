@@ -11,7 +11,9 @@ your `MCPAgent`, maintaining context and memory across multiple queries.
 
 ## Basic chat loop
 Here's a basic chat-loop with conversation memory enabled:
-```python chat_loop.py
+
+<CodeGroup>
+```python Python
 import asyncio
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -38,7 +40,7 @@ async def basic_chat_loop():
     }
 
     # Create client and agent
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     llm = ChatOpenAI(model="gpt-4o")
 
     agent = MCPAgent(llm=llm,
@@ -58,7 +60,7 @@ async def basic_chat_loop():
             if user_input.lower() in ['quit', 'exit']:
                 print("👋 Goodbye!")
                 break
-            
+
             if user_input.lower() == 'clear':
                 agent.clear_conversation_history()
                 print("🧹 Conversation history cleared.")
@@ -67,7 +69,7 @@ async def basic_chat_loop():
             # Skip empty messages
             if not user_input:
                 continue
-            
+
             try:
                 print("\n🤖 Assistant: ", end="", flush=True)
                 response = await agent.run(user_input)
@@ -85,11 +87,103 @@ if __name__ == "__main__":
     asyncio.run(basic_chat_loop())
 ```
 
+```typescript TypeScript
+import readline from 'node:readline'
+import { config } from 'dotenv'
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+config() // Load environment variables
+
+async function basicChatLoop() {
+    // MCP server configuration
+    const configuration = {
+        mcpServers: {
+            playwright: {
+                command: 'npx',
+                args: ['@playwright/mcp@latest'],
+                env: { DISPLAY: ':1' }
+            },
+            filesystem: {
+                command: 'npx',
+                args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp']
+            }
+        }
+    }
+
+    // Create client and agent
+    const client = new MCPClient(configuration)
+    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+
+    const agent = new MCPAgent({
+        llm,
+        client,
+        memoryEnabled: true, // Enable memory to track conversation history
+        maxSteps: 20
+    })
+
+    // Some initial messages
+    console.log('🤖 MCP Agent Chat')
+    console.log('Type \'quit/exit\' to exit the chat.')
+    console.log('Type \'clear\' to clear conversation history')
+
+    // Create readline interface
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    })
+
+    const question = (prompt: string): Promise<string> => {
+        return new Promise((resolve) => {
+            rl.question(prompt, resolve)
+        })
+    }
+
+    try {
+        while (true) {
+            const userInput = await question('\nYou: ')
+
+            if (['quit', 'exit'].includes(userInput.toLowerCase())) {
+                console.log('👋 Goodbye!')
+                break
+            }
+
+            if (userInput.toLowerCase() === 'clear') {
+                agent.clearConversationHistory()
+                console.log('🧹 Conversation history cleared.')
+                continue
+            }
+
+            // Skip empty messages
+            if (!userInput) {
+                continue
+            }
+
+            try {
+                process.stdout.write('\n🤖 Assistant: ')
+                const response = await agent.run(userInput)
+                console.log(response)
+            } catch (error) {
+                console.error(`\n❌ Error: ${error}`)
+                console.log('Please try again or type \'exit\' to quit.')
+            }
+        }
+    } finally {
+        rl.close()
+        await client.closeAllSessions()
+    }
+}
+
+basicChatLoop().catch(console.error)
+```
+</CodeGroup>
+
 ## Streaming Chat Loop
 
 Here's a chat loop with streaming responses enabled:
 
-```python chat_loop_streaming.py
+<CodeGroup>
+```python Python
 import asyncio
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -112,14 +206,14 @@ async def streaming_chat_loop():
     }
 
     # Create client and agent
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     llm = ChatOpenAI(model="gpt-4o")
 
     agent = MCPAgent(llm=llm,
         client=client,
         memory_enabled=True, # Enable memory to track conversation history
         max_steps=20)
-    
+
     # Some initial messages
     print("🤖 MCP Agent Chat (Streaming)")
     print("Type 'quit/exit' to exit the chat.")
@@ -132,7 +226,7 @@ async def streaming_chat_loop():
             if user_input.lower() in ['quit', 'exit']:
                 print("👋 Goodbye!")
                 break
-            
+
             if user_input.lower() == 'clear':
                 agent.clear_conversation_history()
                 print("🧹 Conversation history cleared.")
@@ -140,7 +234,7 @@ async def streaming_chat_loop():
 
             if not user_input: # Skip empty messages
                 continue
-            
+
             try:
                 print("\n🤖 Assistant: ", end="", flush=True)
 
@@ -161,11 +255,103 @@ if __name__ == "__main__":
     asyncio.run(streaming_chat_loop())
 ```
 
+```typescript TypeScript
+import readline from 'node:readline'
+import { config } from 'dotenv'
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+config() // Load environment variables
+
+async function streamingChatLoop() {
+    // MCP server configuration
+    const configuration = {
+        mcpServers: {
+            playwright: {
+                command: 'npx',
+                args: ['@playwright/mcp@latest'],
+                env: { DISPLAY: ':1' }
+            }
+        }
+    }
+
+    // Create client and agent
+    const client = new MCPClient(configuration)
+    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+
+    const agent = new MCPAgent({
+        llm,
+        client,
+        memoryEnabled: true, // Enable memory to track conversation history
+        maxSteps: 20
+    })
+
+    // Some initial messages
+    console.log('🤖 MCP Agent Chat (Streaming)')
+    console.log('Type \'quit/exit\' to exit the chat.')
+    console.log('Type \'clear\' to clear conversation history')
+
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    })
+
+    const question = (prompt: string): Promise<string> => {
+        return new Promise((resolve) => {
+            rl.question(prompt, resolve)
+        })
+    }
+
+    try {
+        while (true) {
+            const userInput = await question('\nYou: ')
+
+            if (['quit', 'exit'].includes(userInput.toLowerCase())) {
+                console.log('👋 Goodbye!')
+                break
+            }
+
+            if (userInput.toLowerCase() === 'clear') {
+                agent.clearConversationHistory()
+                console.log('🧹 Conversation history cleared.')
+                continue
+            }
+
+            if (!userInput) { // Skip empty messages
+                continue
+            }
+
+            try {
+                process.stdout.write('\n🤖 Assistant: ')
+
+                // Stream the response
+                for await (const step of agent.stream(userInput)) {
+                    // In TypeScript, stream returns steps rather than text chunks
+                    // You might want to use streamEvents for token-level streaming
+                    console.log(`\nTool: ${step.action.tool}`)
+                    console.log(`Result: ${step.observation}`)
+                }
+            } catch (error) {
+                console.error(`\n❌ Error: ${error}`)
+                console.log('Please try again or type \'exit\' to quit.')
+            }
+        }
+    } finally {
+        rl.close()
+        await client.closeAllSessions()
+    }
+}
+
+streamingChatLoop().catch(console.error)
+```
+</CodeGroup>
+
 ## Chat Loop with Structured I/O
 
 It's possible to create a chat loop that can handle both natural language and structured inputs, allowing users to request specific tasks or analyses in a structured format. Here's an example of how to implement this:
 
-```python
+<CodeGroup>
+```python Python
 import asyncio
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -195,7 +381,7 @@ async def structured_chat_loop():
     }
 
     # Create client and agent
-    client = MCPClient.from_dict(config)
+    client = MCPClient(config)
     llm = ChatOpenAI(model="gpt-4o")
 
     agent = MCPAgent(
@@ -256,6 +442,117 @@ async def structured_chat_loop():
 if __name__ == "__main__":
     asyncio.run(structured_chat_loop())
 ```
+
+```typescript TypeScript
+import readline from 'node:readline'
+import { z } from 'zod'
+import { config } from 'dotenv'
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+config() // Load environment variables
+
+// Define the schema using Zod
+const TaskRequest = z.object({
+    taskType: z.string().optional().describe('The type of task to perform'),
+    description: z.string().optional().describe('Detailed description of the task'),
+    priority: z.string().optional().describe('Priority level: low, medium, high')
+})
+
+type TaskRequest = z.infer<typeof TaskRequest>
+
+async function structuredChatLoop() {
+    // MCP server configuration
+    const configuration = {
+        mcpServers: {
+            playwright: {
+                command: 'npx',
+                args: ['@playwright/mcp@latest'],
+                env: { DISPLAY: ':1' }
+            }
+        }
+    }
+
+    // Create client and agent
+    const client = new MCPClient(configuration)
+    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+
+    const agent = new MCPAgent({
+        llm,
+        client,
+        memoryEnabled: true, // Enable memory to track conversation history
+        maxSteps: 20
+    })
+
+    // Initial messages
+    console.log('🤖 MCP Agent Chat (Structured)')
+    console.log('You can chat naturally or request structured task analysis')
+    console.log('Type \'task\' to create a structured task request')
+
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    })
+
+    const question = (prompt: string): Promise<string> => {
+        return new Promise((resolve) => {
+            rl.question(prompt, resolve)
+        })
+    }
+
+    try {
+        while (true) {
+            const userInput = await question('\nYou: ')
+            if (['exit', 'quit'].includes(userInput.toLowerCase())) {
+                console.log('👋 Goodbye!')
+                break
+            }
+
+            try {
+                if (userInput.toLowerCase() === 'task') {
+                    console.log('\n📋 Creating structured task...')
+                    const taskDescription = await question('Describe your task: ')
+
+                    const task = await agent.run(
+                        `Analyze a task with the following description: ${taskDescription}`,
+                        undefined, // maxSteps
+                        undefined, // manageConnector
+                        undefined, // externalHistory
+                        TaskRequest // output schema
+                    )
+
+                    // Print task analysis
+                    console.log('\n✅ Task Analysis:')
+                    console.log(`• Type: ${task.taskType}`)
+                    console.log(`• Description: ${task.description}`)
+                    console.log(`• Priority: ${task.priority || 'low'}`)
+
+                    const proceed = await question('\nDo you want to proceed with this task? (y/n)')
+                    if (proceed.toLowerCase() === 'y') {
+                        const response = await agent.run(
+                            `Execute the following task: ${task.description}`
+                        )
+                        console.log(`\n🤖 Assistant: ${response}`)
+                    }
+                } else {
+                    // Regular conversation
+                    const response = await agent.run(userInput)
+                    console.log(`\n🤖 Assistant: ${response}`)
+                }
+            } catch (error) {
+                console.error(`❌ Error: ${error}`)
+                console.log('Please try again or type \'exit\' to quit.')
+            }
+        }
+    } finally {
+        rl.close()
+        await client.closeAllSessions()
+    }
+}
+
+structuredChatLoop().catch(console.error)
+```
+</CodeGroup>
 
 ## Next Steps
 

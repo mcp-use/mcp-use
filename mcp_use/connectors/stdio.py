@@ -11,6 +11,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
 from ..logging import logger
+from ..middleware import CallbackClientSession, Middleware
 from ..task_managers import StdioConnectionManager
 from .base import BaseConnector
 
@@ -33,6 +34,7 @@ class StdioConnector(BaseConnector):
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        middleware: list[Middleware] | None = None,
     ):
         """Initialize a new stdio connector.
 
@@ -49,6 +51,7 @@ class StdioConnector(BaseConnector):
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            middleware=middleware,
         )
         self.command = command
         self.args = args or []  # Ensure args is never None
@@ -71,7 +74,7 @@ class StdioConnector(BaseConnector):
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
-            self.client_session = ClientSession(
+            raw_client_session = ClientSession(
                 read_stream,
                 write_stream,
                 sampling_callback=self.sampling_callback,
@@ -80,7 +83,12 @@ class StdioConnector(BaseConnector):
                 logging_callback=self.logging_callback,
                 client_info=self.client_info,
             )
-            await self.client_session.__aenter__()
+            await raw_client_session.__aenter__()
+
+            # Wrap with middleware
+            self.client_session = CallbackClientSession(
+                raw_client_session, self.public_identifier, self.middleware_manager
+            )
 
             # Mark as connected
             self._connected = True
@@ -98,4 +106,4 @@ class StdioConnector(BaseConnector):
     @property
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
-        return {"type": "stdio", "command&args": f"{self.command} {' '.join(self.args)}"}
+        return f"stdio:{self.command} {' '.join(self.args)}"

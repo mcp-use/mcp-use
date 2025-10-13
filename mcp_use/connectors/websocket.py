@@ -10,6 +10,7 @@ import json
 import uuid
 from typing import Any
 
+import httpx
 from mcp.types import Tool
 from websockets import ClientConnection
 
@@ -28,21 +29,29 @@ class WebSocketConnector(BaseConnector):
     def __init__(
         self,
         url: str,
-        auth_token: str | None = None,
         headers: dict[str, str] | None = None,
+        auth: str | dict[str, Any] | httpx.Auth | None = None,
     ):
         """Initialize a new WebSocket connector.
 
         Args:
             url: The WebSocket URL to connect to.
-            auth_token: Optional authentication token.
             headers: Optional additional headers.
+            auth: Authentication method - can be:
+                - A string token: Use Bearer token authentication
+                - A dict: Not supported for WebSocket (will log warning)
+                - An httpx.Auth object: Not supported for WebSocket (will log warning)
         """
         self.url = url
-        self.auth_token = auth_token
         self.headers = headers or {}
-        if auth_token:
-            self.headers["Authorization"] = f"Bearer {auth_token}"
+
+        # Handle authentication - WebSocket only supports bearer tokens
+        # An auth field it's not needed
+        if auth is not None:
+            if isinstance(auth, str):
+                self.headers["Authorization"] = f"Bearer {auth}"
+            else:
+                logger.warning("WebSocket connector only supports bearer token authentication")
 
         self.ws: ClientConnection | None = None
         self._connection_manager: ConnectionManager | None = None
@@ -245,4 +254,4 @@ class WebSocketConnector(BaseConnector):
     @property
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
-        return {"type": "websocket", "url": self.url}
+        return f"websocket:{self.url}"

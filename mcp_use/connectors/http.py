@@ -5,12 +5,19 @@ This module provides a connector for communicating with MCP implementations
 through HTTP APIs with SSE or Streamable HTTP for transport.
 """
 
+from typing import Any
+
 import httpx
 from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
 
+from mcp_use.auth.oauth import OAuthClientProvider
+
+from ..auth import BearerAuth, OAuth
+from ..exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from ..logging import logger
+from ..middleware import CallbackClientSession, Middleware
 from ..task_managers import SseConnectionManager, StreamableHttpConnectionManager
 from .base import BaseConnector
 
@@ -25,23 +32,27 @@ class HttpConnector(BaseConnector):
     def __init__(
         self,
         base_url: str,
-        auth_token: str | None = None,
         headers: dict[str, str] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        auth: str | dict[str, Any] | httpx.Auth | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        middleware: list[Middleware] | None = None,
     ):
         """Initialize a new HTTP connector.
 
         Args:
             base_url: The base URL of the MCP HTTP API.
-            auth_token: Optional authentication token.
             headers: Optional additional headers.
             timeout: Timeout for HTTP operations in seconds.
             sse_read_timeout: Timeout for SSE read operations in seconds.
+            auth: Authentication method - can be:
+                - A string token: Use Bearer token authentication
+                - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
+                - An httpx.Auth object: Use custom authentication
             sampling_callback: Optional sampling callback.
             elicitation_callback: Optional elicitation callback.
         """
@@ -50,20 +61,89 @@ class HttpConnector(BaseConnector):
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            middleware=middleware,
         )
         self.base_url = base_url.rstrip("/")
-        self.auth_token = auth_token
         self.headers = headers or {}
-        if auth_token:
-            self.headers["Authorization"] = f"Bearer {auth_token}"
         self.timeout = timeout
         self.sse_read_timeout = sse_read_timeout
+        self._auth: httpx.Auth | None = None
+        self._oauth: OAuth | None = None
+
+        # Handle authentication
+        if auth is not None:
+            self._set_auth(auth)
+
+    def _set_auth(self, auth: str | dict[str, Any] | httpx.Auth) -> None:
+        """Set authentication method.
+
+        Args:
+            auth: Authentication method - can be:
+                - A string token: Use Bearer token authentication
+                - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
+                - An httpx.Auth object: Use custom authentication
+        """
+        if isinstance(auth, str):
+            # Treat as bearer token
+            self._auth = BearerAuth(token=auth)
+            self.headers["Authorization"] = f"Bearer {auth}"
+        elif isinstance(auth, dict):
+            # Check if this is an OAuth provider configuration
+            if "oauth_provider" in auth:
+                oauth_provider = auth["oauth_provider"]
+                if isinstance(oauth_provider, dict):
+                    oauth_provider = OAuthClientProvider(**oauth_provider)
+                self._oauth = OAuth(
+                    self.base_url,
+                    scope=auth.get("scope"),
+                    client_id=auth.get("client_id"),
+                    client_secret=auth.get("client_secret"),
+                    callback_port=auth.get("callback_port"),
+                    oauth_provider=oauth_provider,
+                )
+                self._oauth_config = auth
+            else:
+                self._oauth = OAuth(
+                    self.base_url,
+                    scope=auth.get("scope"),
+                    client_id=auth.get("client_id"),
+                    client_secret=auth.get("client_secret"),
+                    callback_port=auth.get("callback_port"),
+                )
+                self._oauth_config = auth
+        elif isinstance(auth, httpx.Auth):
+            self._auth = auth
+        else:
+            raise ValueError(f"Invalid auth type: {type(auth)}")
 
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
         if self._connected:
             logger.debug("Already connected to MCP implementation")
             return
+
+        # Handle OAuth if needed
+        if self._oauth:
+            try:
+                # Create a temporary client for OAuth metadata discovery
+                async with httpx.AsyncClient() as client:
+                    bearer_auth = await self._oauth.initialize(client)
+                    if not bearer_auth:
+                        # Need to perform OAuth flow
+                        logger.info("OAuth authentication required")
+                        bearer_auth = await self._oauth.authenticate()
+
+                    # Update auth and headers
+                    self._auth = bearer_auth
+                    self.headers["Authorization"] = f"Bearer {bearer_auth.token.get_secret_value()}"
+            except OAuthDiscoveryError:
+                # OAuth discovery failed - it means server doesn't support OAuth default urls
+                logger.debug("OAuth discovery failed, continuing without initialization.")
+                self._oauth = None
+                self._auth = None
+            except OAuthAuthenticationError as e:
+                logger.error(f"OAuth initialization failed: {e}")
+                raise
 
         # Try streamable HTTP first (new transport), fall back to SSE (old transport)
         # This implements backwards compatibility per MCP specification
@@ -74,14 +154,14 @@ class HttpConnector(BaseConnector):
             # First, try the new streamable HTTP transport
             logger.debug(f"Attempting streamable HTTP connection to: {self.base_url}")
             connection_manager = StreamableHttpConnectionManager(
-                self.base_url, self.headers, self.timeout, self.sse_read_timeout
+                self.base_url, self.headers, self.timeout, self.sse_read_timeout, auth=self._auth
             )
 
             # Test if this is a streamable HTTP server by attempting initialization
             read_stream, write_stream = await connection_manager.start()
 
             # Test if this actually works by trying to create a client session and initialize it
-            test_client = ClientSession(
+            raw_test_client = ClientSession(
                 read_stream,
                 write_stream,
                 sampling_callback=self.sampling_callback,
@@ -90,14 +170,17 @@ class HttpConnector(BaseConnector):
                 logging_callback=self.logging_callback,
                 client_info=self.client_info,
             )
-            await test_client.__aenter__()
+            await raw_test_client.__aenter__()
+
+            # Wrap test client with middleware temporarily for testing
+            test_client = CallbackClientSession(raw_test_client, self.public_identifier, self.middleware_manager)
 
             try:
                 # Try to initialize - this is where streamable HTTP vs SSE difference should show up
                 result = await test_client.initialize()
+                logger.debug(f"Streamable HTTP initialization result: {result}")
 
                 # If we get here, streamable HTTP works
-
                 self.client_session = test_client
                 self.transport_type = "streamable HTTP"
                 self._initialized = True  # Mark as initialized since we just called initialize()
@@ -126,29 +209,28 @@ class HttpConnector(BaseConnector):
                 else:
                     self._prompts = []
 
+            # Only McpError is raised from client's initialization because
+            # exceptions are handled internally.
             except McpError as mcp_error:
-                # This is a protocol error, not a transport error
-                # The server is reachable and speaking MCP, but rejecting our request
-                logger.error("MCP protocol error during initialization: %s", mcp_error)
-
+                logger.error("MCP protocol error during initialization: %s", mcp_error.error)
                 # Clean up the test client
                 try:
-                    await test_client.__aexit__(None, None, None)
+                    await raw_test_client.__aexit__(None, None, None)
                 except Exception:
                     pass
-
-                # Don't try SSE fallback for protocol errors - the server is working,
-                # it just doesn't like our request
                 raise mcp_error
 
             except Exception as init_error:
-                # Clean up the test client
+                # This catches non-McpError exceptions, like a direct httpx timeout
+                # but in the most cases this won't happen. It's for safety.
                 try:
-                    await test_client.__aexit__(None, None, None)
+                    await raw_test_client.__aexit__(None, None, None)
                 except Exception:
                     pass
                 raise init_error
 
+        # Exception from the inner try is propagated here and in
+        # the most cases is an McpError, so checking instances is useless
         except Exception as streamable_error:
             logger.debug(f"Streamable HTTP failed: {streamable_error}")
 
@@ -159,30 +241,23 @@ class HttpConnector(BaseConnector):
                 except Exception:
                     pass
 
-            # Check if this is a 4xx error that indicates we should try SSE fallback
-            should_fallback = False
-            if isinstance(streamable_error, httpx.HTTPStatusError):
-                if streamable_error.response.status_code in [404, 405]:
-                    should_fallback = True
-            elif "405 Method Not Allowed" in str(streamable_error) or "404 Not Found" in str(streamable_error):
-                should_fallback = True
-            else:
-                # For other errors, still try fallback but they might indicate
-                # real connectivity issues
-                should_fallback = True
+            # It doesn't make sense to check error types. Because client
+            # always return a McpError, if he can't reach the server
+            # because it's offline, or if it has an auth problem.
+            should_fallback = True
 
             if should_fallback:
                 try:
                     # Fall back to the old SSE transport
                     logger.debug(f"Attempting SSE fallback connection to: {self.base_url}")
                     connection_manager = SseConnectionManager(
-                        self.base_url, self.headers, self.timeout, self.sse_read_timeout
+                        self.base_url, self.headers, self.timeout, self.sse_read_timeout, auth=self._auth
                     )
 
                     read_stream, write_stream = await connection_manager.start()
 
                     # Create the client session for SSE
-                    self.client_session = ClientSession(
+                    raw_client_session = ClientSession(
                         read_stream,
                         write_stream,
                         sampling_callback=self.sampling_callback,
@@ -191,10 +266,26 @@ class HttpConnector(BaseConnector):
                         logging_callback=self.logging_callback,
                         client_info=self.client_info,
                     )
-                    await self.client_session.__aenter__()
+                    await raw_client_session.__aenter__()
+
+                    # Wrap with middleware
+                    self.client_session = CallbackClientSession(
+                        raw_client_session, self.public_identifier, self.middleware_manager
+                    )
                     self.transport_type = "SSE"
 
-                except Exception as sse_error:
+                except* Exception as sse_error:
+                    # Get the exception from the ExceptionGroup, and here we will get the correct type.
+                    sse_error = sse_error.exceptions[0]
+                    if isinstance(sse_error, httpx.HTTPStatusError) and sse_error.response.status_code in [
+                        401,
+                        403,
+                        407,
+                    ]:
+                        raise OAuthAuthenticationError(
+                            f"Server requires authentication (HTTP {sse_error.response.status_code}) "
+                            "but auth failed. Please provide auth configuration manually."
+                        ) from sse_error
                     logger.error(
                         f"Both transport methods failed. Streamable HTTP: {streamable_error}, SSE: {sse_error}"
                     )
@@ -210,4 +301,5 @@ class HttpConnector(BaseConnector):
     @property
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
-        return {"type": self.transport_type, "base_url": self.base_url}
+        transport_type = getattr(self, "transport_type", "http")
+        return f"{transport_type}:{self.base_url}"
