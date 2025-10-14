@@ -62,22 +62,50 @@ def close():
 <Card type="info">
 ### `method` run
 
-Run a query on the remote agent.
-
+Executes the agent and returns the final result.
+        This method uses HTTP streaming to avoid timeouts for long-running tasks.
+        It consumes the entire stream and returns only the final result.
 
 
 **Parameters**
-><ParamField body="query" type="str" required="True" >   The query to execute </ParamField>
-><ParamField body="max_steps" type="int | None" default="None" >   Maximum number of steps (default: 10) </ParamField>
-><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   External history (not supported yet for remote execution) </ParamField>
-><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic model for structured output </ParamField>
+><ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
+><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
+><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   List of items </ParamField>
+><ParamField body="output_schema" type="type[~T] | None" default="None" >   Parameter value </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="str | mcp_use.agents.remote.T" >The result from the remote agent execution (string or structured output)</ResponseField>
+><ResponseField name="returns" type="str | mcp_use.agents.remote.T" />
 
 **Signature**
 ```python wrap
 def run(
+query: str,
+    max_steps: int | None = None,
+    external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
+    output_schema: type[~T] | None = None
+):
+```
+
+</Card>
+
+<Card type="info">
+### `method` stream
+
+Stream the execution of a query on the remote agent using HTTP streaming.
+
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
+><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
+><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   List of items </ParamField>
+><ParamField body="output_schema" type="type[~T] | None" default="None" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="AsyncGenerator" />
+
+**Signature**
+```python wrap
+def stream(
 query: str,
     max_steps: int | None = None,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,

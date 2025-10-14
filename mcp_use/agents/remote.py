@@ -4,6 +4,7 @@ Remote agent implementation for executing agents via API.
 
 import json
 import os
+from collections.abc import AsyncGenerator
 from typing import Any, TypeVar
 from uuid import UUID
 
@@ -17,7 +18,7 @@ T = TypeVar("T", bound=BaseModel)
 
 # API endpoint constants
 API_CHATS_ENDPOINT = "/api/v1/chats/get-or-create"
-API_CHAT_EXECUTE_ENDPOINT = "/api/v1/chats/{chat_id}/execute"
+API_CHAT_STREAM_ENDPOINT = "/api/v1/chats/{chat_id}/stream"
 API_CHAT_DELETE_ENDPOINT = "/api/v1/chats/{chat_id}"
 
 UUID_ERROR_MESSAGE = """A UUID is a 36 character string of the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \n
@@ -129,12 +130,25 @@ class RemoteAgent:
 
         # Parse into the Pydantic model
         try:
+            logger.info(f"🔍 Attempting to validate result_data against {output_schema.__name__}")
+            logger.info(f"🔍 Result data type: {type(result_data)}")
+            logger.info(f"🔍 Result data: {result_data}")
             return output_schema.model_validate(result_data)
         except Exception as e:
-            logger.warning(f"Failed to parse structured output: {e}")
+            logger.warning(f"❌ Failed to parse structured output: {e}")
+            logger.warning(f"🔍 Validation error details: {type(e).__name__}: {str(e)}")
+            logger.warning(f"🔍 Result data that failed validation: {result_data}")
+
             # Fallback: try to parse it as raw content if the model has a content field
             if hasattr(output_schema, "model_fields") and "content" in output_schema.model_fields:
-                return output_schema.model_validate({"content": str(result_data)})
+                logger.info("🔄 Attempting fallback with content field")
+                try:
+                    fallback_result = output_schema.model_validate({"content": str(result_data)})
+                    logger.info("✅ Fallback parsing succeeded")
+                    return fallback_result
+                except Exception as fallback_e:
+                    logger.error(f"❌ Fallback parsing also failed: {fallback_e}")
+                    raise
             raise
 
     async def _upsert_chat_session(self) -> str:
@@ -153,7 +167,7 @@ class RemoteAgent:
         headers = {"Content-Type": "application/json", "x-api-key": self.api_key}
         chat_url = f"{self.base_url}{API_CHATS_ENDPOINT}"
 
-        logger.info(f"📝 Upserting chat session for agent {self.agent_id}")
+        logger.info(f"📝 [{self.chat_id}] Upserting chat session for agent {self.agent_id}")
 
         try:
             chat_response = await self._client.post(chat_url, json=chat_payload, headers=headers)
@@ -162,9 +176,9 @@ class RemoteAgent:
             chat_data = chat_response.json()
             chat_id = chat_data["id"]
             if chat_response.status_code == 201:
-                logger.info(f"✅ New chat session created: {chat_id}")
+                logger.info(f"✅ [{self.chat_id}] New chat session created")
             else:
-                logger.info(f"✅ Resumed chat session: {chat_id}")
+                logger.info(f"✅ [{self.chat_id}] Resumed chat session")
 
             return chat_id
 
@@ -182,6 +196,66 @@ class RemoteAgent:
         except Exception as e:
             raise RuntimeError(f"Failed to create chat session: {str(e)}") from e
 
+    async def stream(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        external_history: list[BaseMessage] | None = None,
+        output_schema: type[T] | None = None,
+    ) -> AsyncGenerator[str, None]:
+        """Stream the execution of a query on the remote agent using HTTP streaming."""
+        if external_history is not None:
+            logger.warning("External history is not yet supported for remote execution")
+
+        if not self._session_established:
+            logger.info(f"🔧 [{self.chat_id}] Establishing chat session for agent {self.agent_id}")
+            self.chat_id = await self._upsert_chat_session()
+            self._session_established = True
+
+        chat_id = self.chat_id
+        stream_url = f"{self.base_url}{API_CHAT_STREAM_ENDPOINT.format(chat_id=chat_id)}"
+
+        # Prepare the request payload
+        request_payload = {"messages": [{"role": "user", "content": query}], "max_steps": max_steps or 30}
+        if output_schema is not None:
+            request_payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
+
+        headers = {"Content-Type": "application/json", "x-api-key": self.api_key, "Accept": "text/event-stream"}
+
+        try:
+            logger.info(f"🌐 [{self.chat_id}] Connecting to HTTP stream for agent {self.agent_id}")
+
+            async with self._client.stream("POST", stream_url, headers=headers, json=request_payload) as response:
+                logger.info(f"✅ [{self.chat_id}] HTTP stream connection established")
+
+                if response.status_code != 200:
+                    error_text = await response.aread()
+                    raise RuntimeError(f"Failed to stream from remote agent: {error_text.decode()}")
+
+                # Read the streaming response line by line
+                try:
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield line
+                except UnicodeDecodeError as e:
+                    logger.error(f"❌ [{self.chat_id}] UTF-8 decoding error at position {e.start}: {e.reason}")
+                    logger.error(f"❌ [{self.chat_id}] Error occurred while reading stream for agent {self.agent_id}")
+                    # Try to read raw bytes and decode with error handling
+                    logger.info(f"🔄 [{self.chat_id}] Attempting to read raw bytes with error handling...")
+                logger.info(f"✅ [{self.chat_id}] Agent execution stream completed")
+
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            response_text = e.response.text
+
+            if status_code == 404:
+                raise RuntimeError(f"Chat or agent not found: {response_text}") from e
+            else:
+                raise RuntimeError(f"Failed to stream from remote agent: {status_code} - {response_text}") from e
+        except Exception as e:
+            logger.error(f"❌ [{self.chat_id}] An error occurred during HTTP streaming: {e}")
+            raise RuntimeError(f"Failed to stream from remote agent: {str(e)}") from e
+
     async def run(
         self,
         query: str,
@@ -189,137 +263,89 @@ class RemoteAgent:
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
     ) -> str | T:
-        """Run a query on the remote agent.
-
-        Args:
-            query: The query to execute
-            max_steps: Maximum number of steps (default: 10)
-            external_history: External history (not supported yet for remote execution)
-            output_schema: Optional Pydantic model for structured output
-
-        Returns:
-            The result from the remote agent execution (string or structured output)
         """
-        if external_history is not None:
-            logger.warning("External history is not yet supported for remote execution")
+        Executes the agent and returns the final result.
+        This method uses HTTP streaming to avoid timeouts for long-running tasks.
+        It consumes the entire stream and returns only the final result.
+        """
+        final_result = None
+        steps_taken = 0
+        finished = False
 
         try:
-            logger.info(f"🌐 Executing query on remote agent {self.agent_id}")
+            # Consume the ENTIRE stream to ensure proper execution
+            async for event in self.stream(query, max_steps, external_history, output_schema):
+                logger.debug(f"[{self.chat_id}] Processing stream event: {event}...")
 
-            # Step 1: Ensure chat session exists on the backend by upserting.
-            # This happens once per agent instance.
-            if not self._session_established:
-                logger.info(f"🔧 Establishing chat session for agent {self.agent_id}")
-                self.chat_id = await self._upsert_chat_session()
-                self._session_established = True
+                # Parse AI SDK format events to extract final result
+                # The events follow the AI SDK streaming protocol
+                if event.startswith("0:"):  # Text event
+                    try:
+                        text_data = json.loads(event[2:])  # Remove "0:" prefix
+                        if final_result is None:
+                            final_result = ""
+                        final_result += text_data
+                        result_preview = final_result[:200] if len(final_result) > 200 else final_result
+                        logger.debug(f"Accumulated text result: {result_preview}...")
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse text event: {event[:100]}")
+                        continue
 
-            chat_id = self.chat_id
+                elif event.startswith("9:"):  # Tool call event
+                    steps_taken += 1
+                    logger.debug(f"Tool call executed, total steps: {steps_taken}")
 
-            # Step 2: Execute the agent within the chat context
-            execution_payload = {"query": query, "max_steps": max_steps or 10}
+                elif event.startswith("d:"):  # Finish event
+                    logger.debug("Received finish event, marking as finished")
+                    finished = True
+                    # Continue consuming to ensure stream cleanup
 
-            # Add structured output schema if provided
-            if output_schema is not None:
-                execution_payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
-                logger.info(f"🔧 Using structured output with schema: {output_schema.__name__}")
+                elif event.startswith("3:"):  # Error event
+                    try:
+                        error_data = json.loads(event[2:])
+                        error_msg = error_data if isinstance(error_data, str) else json.dumps(error_data)
+                        raise RuntimeError(f"Agent execution failed: {error_msg}")
+                    except json.JSONDecodeError as e:
+                        raise RuntimeError("Agent execution failed with unknown error") from e
 
-            headers = {"Content-Type": "application/json", "x-api-key": self.api_key}
-            execution_url = f"{self.base_url}{API_CHAT_EXECUTE_ENDPOINT.format(chat_id=chat_id)}"
-            logger.info(f"🚀 Executing agent in chat {chat_id}")
+            # Log completion of stream consumption
+            logger.info(f"Stream consumption complete. Finished: {finished}, Steps taken: {steps_taken}")
 
-            response = await self._client.post(execution_url, json=execution_payload, headers=headers)
-            response.raise_for_status()
+            if final_result is None:
+                logger.warning(f"No final result captured from stream (structured output: {output_schema is not None})")
+                final_result = ""  # Return empty string instead of error message
 
-            result = response.json()
-            logger.info(f"🔧 Response: {result}")
-            logger.info("✅ Remote execution completed successfully")
+            # For structured output, try to parse the result
+            if output_schema:
+                logger.info(f"🔍 Attempting structured output parsing for schema: {output_schema.__name__}")
+                logger.info(f"🔍 Raw final result type: {type(final_result)}")
+                logger.info(f"🔍 Raw final result length: {len(str(final_result)) if final_result else 0}")
+                logger.info(f"🔍 Raw final result preview: {str(final_result)[:500] if final_result else 'None'}...")
 
-            # Check for error responses (even with 200 status)
-            if isinstance(result, dict):
-                # Check for actual error conditions (not just presence of error field)
-                if result.get("status") == "error" or (result.get("error") is not None):
-                    error_msg = result.get("error", str(result))
-                    logger.error(f"❌ Remote agent execution failed: {error_msg}")
-                    raise RuntimeError(f"Remote agent execution failed: {error_msg}")
-
-                # Check if the response indicates agent initialization failure
-                if "failed to initialize" in str(result):
-                    logger.error(f"❌ Agent initialization failed: {result}")
-                    raise RuntimeError(
-                        f"Agent initialization failed on remote server. "
-                        f"This usually indicates:\n"
-                        f"• Invalid agent configuration (LLM model, system prompt)\n"
-                        f"• Missing or invalid MCP server configurations\n"
-                        f"• Network connectivity issues with MCP servers\n"
-                        f"• Missing environment variables or credentials\n"
-                        f"Raw error: {result}"
-                    )
-
-            # Handle structured output
-            if output_schema is not None:
-                return self._parse_structured_response(result, output_schema)
+                if isinstance(final_result, str) and final_result:
+                    try:
+                        # Try to parse as JSON first
+                        parsed_result = json.loads(final_result)
+                        logger.info("✅ Successfully parsed structured result as JSON")
+                        return self._parse_structured_response(parsed_result, output_schema)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"❌ Could not parse result as JSON: {e}")
+                        logger.warning(f"🔍 Raw string content: {final_result[:1000]}...")
+                        # Try to parse directly
+                        return self._parse_structured_response({"content": final_result}, output_schema)
+                else:
+                    logger.warning(f"❌ Final result is empty or not string: {final_result}")
+                    # Try to parse the result directly
+                    return self._parse_structured_response(final_result, output_schema)
 
             # Regular string output
-            if isinstance(result, dict) and "result" in result:
-                return result["result"]
-            elif isinstance(result, str):
-                return result
-            else:
-                return str(result)
+            return final_result if isinstance(final_result, str) else str(final_result)
 
-        except httpx.HTTPStatusError as e:
-            status_code = e.response.status_code
-            response_text = e.response.text
-
-            # Provide specific error messages based on status code
-            if status_code == 401:
-                logger.error(f"❌ Authentication failed: {response_text}")
-                raise RuntimeError(
-                    "Authentication failed: Invalid or missing API key. "
-                    "Please check your API key and ensure the MCP_USE_API_KEY environment variable is set correctly."
-                ) from e
-            elif status_code == 403:
-                logger.error(f"❌ Access forbidden: {response_text}")
-                raise RuntimeError(
-                    f"Access denied: You don't have permission to execute agent '{self.agent_id}'. "
-                    "Check if the agent exists and you have the necessary permissions."
-                ) from e
-            elif status_code == 404:
-                logger.error(f"❌ Agent not found: {response_text}")
-                raise RuntimeError(
-                    f"Agent not found: Agent '{self.agent_id}' does not exist or you don't have access to it. "
-                    "Please verify the agent ID and ensure it exists in your account."
-                ) from e
-            elif status_code == 422:
-                logger.error(f"❌ Validation error: {response_text}")
-                raise RuntimeError(
-                    f"Request validation failed: {response_text}. "
-                    "Please check your query parameters and output schema format."
-                ) from e
-            elif status_code == 500:
-                logger.error(f"❌ Server error: {response_text}")
-                raise RuntimeError(
-                    "Internal server error occurred during agent execution. "
-                    "Please try again later or contact support if the issue persists."
-                ) from e
-            else:
-                logger.error(f"❌ Remote execution failed with status {status_code}: {response_text}")
-                raise RuntimeError(f"Remote agent execution failed: {status_code} - {response_text}") from e
-        except httpx.TimeoutException as e:
-            logger.error(f"❌ Remote execution timed out: {e}")
-            raise RuntimeError(
-                "Remote agent execution timed out. The server may be overloaded or the query is taking too long to "
-                "process. Try again or use a simpler query."
-            ) from e
-        except httpx.ConnectError as e:
-            logger.error(f"❌ Remote execution connection error: {e}")
-            raise RuntimeError(
-                f"Remote agent connection failed: Cannot connect to {self.base_url}. "
-                f"Check if the server is running and the URL is correct."
-            ) from e
+        except RuntimeError:
+            raise
         except Exception as e:
-            logger.error(f"❌ Remote execution error: {e}")
-            raise RuntimeError(f"Remote agent execution failed: {str(e)}") from e
+            logger.error(f"Error executing agent: {e}")
+            raise RuntimeError(f"Failed to execute agent: {str(e)}") from e
 
     async def close(self) -> None:
         """Close the HTTP client."""
