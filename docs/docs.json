@@ -299,6 +299,7 @@
           {
             "group": "Versions",
             "pages": [
+              "changelog/1_3_12",
               "changelog/1_3_11"
             ]
           }

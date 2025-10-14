@@ -1,0 +1,85 @@
+---
+title: "Version 1.3.12"
+description: "Middleware introduction and documentation updates"
+icon: "layers"
+---
+
+![Release Image 1.3.12](/images/Release1.3.12.png)
+This release focuses on middleware introduction and comprehensive documentation improvements. The most significant additions include a new middleware system and automatic API documentation generation.
+
+## New Features
+
+### Middleware System
+**[PR #269](https://github.com/mcp-use/mcp-use/pull/269)**
+
+Introduced a comprehensive middleware system that allows for request/response interception and processing. The middleware framework supports custom logic injection, metrics collection, and request transformation capabilities.
+
+For a detailed technical deep-dive into the middleware architecture and design decisions, see our [Middleware Pipeline blog post](/blog/middleware).
+
+### Automatic API Documentation
+**[PR #301](https://github.com/mcp-use/mcp-use/pull/301)**
+
+Implemented automatic API documentation generation to streamline the development workflow. This feature automatically generates comprehensive API references from code annotations and docstrings, ensuring documentation stays current with code changes.
+
+## Bug Fixes & Improvements
+
+### Tool Result Standardization
+**[PR #288](https://github.com/mcp-use/mcp-use/pull/288)**
+
+Fixed tool result formatting to ensure consistent output across different MCP servers and tools. The system now returns tool results in a standardized format, improving compatibility and predictability.
+
+### Duplicate User Message Prevention
+**[PR #287](https://github.com/mcp-use/mcp-use/pull/287)**
+
+Resolved an issue where user messages were being duplicated in conversation history, particularly when memory features were enabled. The fix ensures clean conversation tracking and prevents redundant message storage.
+
+### Agent Memory Enhancement
+**[PR #187](https://github.com/mcp-use/mcp-use/pull/187)**
+
+Improved agent memory handling to prevent duplicate user queries when memory is enabled. This enhancement ensures more efficient memory usage and cleaner conversation flow.
+
+### Test Server Execution Fix
+**[PR #298](https://github.com/mcp-use/mcp-use/pull/298)**
+
+Fixed test server execution issues by properly using executable paths for shared dependencies. This improvement ensures reliable test execution across different environments.
+
+## Maintenance & Documentation
+
+### Middleware Metrics Enhancement
+**[PR #299](https://github.com/mcp-use/mcp-use/pull/299)**
+
+Enhanced middleware metrics collection for better performance and maintainability. The updated system provides more accurate metrics and improved observability for MCP operations.
+
+### Documentation Enhancements
+**[PRs #301](https://github.com/mcp-use/mcp-use/pull/301), [#282](https://github.com/mcp-use/mcp-use/pull/282)**
+
+Comprehensive documentation updates including:
+- Enhanced API reference generation
+- Updated TypeScript integration examples
+- Removed deprecated `from_dict` method references
+- Improved developer onboarding materials
+
+### Docker Networking Documentation
+**[PR #286](https://github.com/mcp-use/mcp-use/pull/286)**
+
+Added documentation addressing common Docker networking issues, helping developers troubleshoot containerized MCP server deployments.
+
+### Limited Memory Example
+**[Commit 6a807a1](https://github.com/mcp-use/mcp-use/commit/6a807a1)**
+
+Added practical example demonstrating limited memory usage patterns for MCP agents, showcasing efficient memory management techniques.
+
+## Automated Updates
+
+### Dependency Management
+**[PR #267](https://github.com/mcp-use/mcp-use/pull/267) by @github-actions[bot]**
+
+Regular automated updates to dependent package information, ensuring compatibility with the latest ecosystem versions and maintaining security posture.
+
+### Documentation Workflow Improvements
+**[PRs #173](https://github.com/mcp-use/mcp-use/pull/173), [#301](https://github.com/mcp-use/mcp-use/pull/301)**
+
+Enhanced documentation workflows with:
+- Mintlify CLI integration for improved documentation generation
+- Link checking to ensure documentation integrity
+- Automated API reference updates
