@@ -47,16 +47,16 @@
     },
     "tabs": [
       {
-        "tab": "Documentation",
-        "icon": "book",
+        "tab": "Python",
+        "icon": "python",
         "groups": [
           {
             "group": "Getting Started",
             "pages": [
-              "getting-started/index",
-              "getting-started/quickstart",
-              "getting-started/installation",
-              "getting-started/configuration"
+              "python/getting-started/index",
+              "python/getting-started/quickstart",
+              "python/getting-started/installation",
+              "python/getting-started/configuration"
             ]
           },
           {
@@ -66,33 +66,33 @@
                 "group": "Overview",
                 "icon": "globe",
                 "pages": [
-                  "client/client-configuration",
-                  "client/connection-types",
-                  "client/sandbox",
-                  "client/direct-tool-calls"
+                  "python/client/client-configuration",
+                  "python/client/connection-types",
+                  "python/client/sandbox",
+                  "python/client/direct-tool-calls"
                 ]
               },
               {
                 "group": "Core Features",
                 "icon": "list-plus",
                 "pages": [
-                  "client/tools",
-                  "client/resources",
-                  "client/prompts"
+                  "python/client/tools",
+                  "python/client/resources",
+                  "python/client/prompts"
                 ]
               },
               {
                 "group": "Advanced Features",
                 "icon": "sparkle",
                 "pages": [
-                  "client/middleware",
-                  "client/sampling",
-                  "client/elicitation",
-                  "client/notifications",
-                  "client/logging"
+                  "python/client/middleware",
+                  "python/client/sampling",
+                  "python/client/elicitation",
+                  "python/client/notifications",
+                  "python/client/logging"
                 ]
               },
-              "client/authentication"
+              "python/client/authentication"
             ]
           },
           {
@@ -102,136 +102,136 @@
                 "group": "Overview",
                 "icon": "globe",
                 "pages": [
-                  "agent/agent-configuration",
-                  "agent/llm-integration"
+                  "python/agent/agent-configuration",
+                  "python/agent/llm-integration"
                 ]
               },
               {
                 "group": "Core Features",
                 "icon": "list-plus",
                 "pages": [
-                  "agent/memory-management",
-                  "agent/structured-output",
-                  "agent/streaming",
-                  "agent/interactive-chat-patterns"
+                  "python/agent/memory-management",
+                  "python/agent/structured-output",
+                  "python/agent/streaming",
+                  "python/agent/interactive-chat-patterns"
                 ]
               },
-              "agent/server-manager"
+              "python/agent/server-manager"
             ]
           },
           {
             "group": "Advanced Usage",
             "pages": [
-              "advanced/building-custom-agents",
-              "advanced/logging",
-              "advanced/multi-server-setup",
-              "advanced/security"
+              "python/advanced/building-custom-agents",
+              "python/advanced/logging",
+              "python/advanced/multi-server-setup",
+              "python/advanced/security"
             ]
           },
           {
             "group": "Development",
             "pages": [
-              "development",
-              "development/telemetry",
-              "development/observability"
+              "python/development",
+              "python/development/telemetry",
+              "python/development/observability"
             ]
           },
           {
             "group": "Troubleshooting",
             "pages": [
-              "troubleshooting/common-issues",
-              "troubleshooting/performance",
-              "troubleshooting/connection-errors"
+              "python/troubleshooting/common-issues",
+              "python/troubleshooting/performance",
+              "python/troubleshooting/connection-errors"
             ]
           }
         ]
       },
       {
-        "tab": "API Reference",
+        "tab": "Python API Reference",
         "icon": "terminal",
         "groups": [
           {
             "group": "Adapters",
             "icon": "plug-2",
             "pages": [
-              "api-reference/mcp_use_adapters_base",
-              "api-reference/mcp_use_adapters_langchain_adapter"
+              "python/api-reference/mcp_use_adapters_base",
+              "python/api-reference/mcp_use_adapters_langchain_adapter"
             ]
           },
           {
             "group": "Agents",
             "icon": "code",
             "pages": [
-              "api-reference/mcp_use_agents_base",
-              "api-reference/mcp_use_agents_mcpagent",
+              "python/api-reference/mcp_use_agents_base",
+              "python/api-reference/mcp_use_agents_mcpagent",
               {
                 "group": "Prompts",
                 "icon": "volume-2",
                 "pages": [
-                  "api-reference/mcp_use_agents_prompts_system_prompt_builder",
-                  "api-reference/mcp_use_agents_prompts_templates"
+                  "python/api-reference/mcp_use_agents_prompts_system_prompt_builder",
+                  "python/api-reference/mcp_use_agents_prompts_templates"
                 ]
               },
-              "api-reference/mcp_use_agents_remote"
+              "python/api-reference/mcp_use_agents_remote"
             ]
           },
           {
             "group": "Auth",
             "icon": "key",
             "pages": [
-              "api-reference/mcp_use_auth_bearer",
-              "api-reference/mcp_use_auth_oauth",
-              "api-reference/mcp_use_auth_oauth_callback"
+              "python/api-reference/mcp_use_auth_bearer",
+              "python/api-reference/mcp_use_auth_oauth",
+              "python/api-reference/mcp_use_auth_oauth_callback"
             ]
           },
           {
             "group": "Connectors",
             "icon": "cable",
             "pages": [
-              "api-reference/mcp_use_connectors_base",
-              "api-reference/mcp_use_connectors_http",
-              "api-reference/mcp_use_connectors_sandbox",
-              "api-reference/mcp_use_connectors_stdio",
-              "api-reference/mcp_use_connectors_utils",
-              "api-reference/mcp_use_connectors_websocket"
+              "python/api-reference/mcp_use_connectors_base",
+              "python/api-reference/mcp_use_connectors_http",
+              "python/api-reference/mcp_use_connectors_sandbox",
+              "python/api-reference/mcp_use_connectors_stdio",
+              "python/api-reference/mcp_use_connectors_utils",
+              "python/api-reference/mcp_use_connectors_websocket"
             ]
           },
           {
             "group": "Core",
             "icon": "package",
             "pages": [
-              "api-reference/mcp_use_cli",
-              "api-reference/mcp_use_client",
-              "api-reference/mcp_use_config",
-              "api-reference/mcp_use_exceptions",
-              "api-reference/mcp_use_logging",
-              "api-reference/mcp_use_session",
-              "api-reference/mcp_use_utils"
+              "python/api-reference/mcp_use_cli",
+              "python/api-reference/mcp_use_client",
+              "python/api-reference/mcp_use_config",
+              "python/api-reference/mcp_use_exceptions",
+              "python/api-reference/mcp_use_logging",
+              "python/api-reference/mcp_use_session",
+              "python/api-reference/mcp_use_utils"
             ]
           },
           {
             "group": "Errors",
             "icon": "triangle-alert",
             "pages": [
-              "api-reference/mcp_use_errors_error_formatting"
+              "python/api-reference/mcp_use_errors_error_formatting"
             ]
           },
           {
             "group": "Managers",
             "icon": "users",
             "pages": [
-              "api-reference/mcp_use_managers_base",
-              "api-reference/mcp_use_managers_server_manager",
+              "python/api-reference/mcp_use_managers_base",
+              "python/api-reference/mcp_use_managers_server_manager",
               {
                 "group": "Tools",
                 "icon": "tool",
                 "pages": [
-                  "api-reference/mcp_use_managers_tools_base_tool",
-                  "api-reference/mcp_use_managers_tools_connect_server",
-                  "api-reference/mcp_use_managers_tools_disconnect_server",
-                  "api-reference/mcp_use_managers_tools_get_active_server",
-                  "api-reference/mcp_use_managers_tools_list_servers_tool",
-                  "api-reference/mcp_use_managers_tools_search_tools"
+                  "python/api-reference/mcp_use_managers_tools_base_tool",
+                  "python/api-reference/mcp_use_managers_tools_connect_server",
+                  "python/api-reference/mcp_use_managers_tools_disconnect_server",
+                  "python/api-reference/mcp_use_managers_tools_get_active_server",
+                  "python/api-reference/mcp_use_managers_tools_list_servers_tool",
+                  "python/api-reference/mcp_use_managers_tools_search_tools"
                 ]
               }
             ]
@@ -240,36 +240,48 @@
             "group": "Middleware",
             "icon": "layers",
             "pages": [
-              "api-reference/mcp_use_middleware_logging",
-              "api-reference/mcp_use_middleware_metrics",
-              "api-reference/mcp_use_middleware_middleware"
+              "python/api-reference/mcp_use_middleware_logging",
+              "python/api-reference/mcp_use_middleware_metrics",
+              "python/api-reference/mcp_use_middleware_middleware"
             ]
           },
           {
             "group": "Observability",
             "icon": "eye",
             "pages": [
-              "api-reference/mcp_use_observability_callbacks_manager",
-              "api-reference/mcp_use_observability_laminar",
-              "api-reference/mcp_use_observability_langfuse"
+              "python/api-reference/mcp_use_observability_callbacks_manager",
+              "python/api-reference/mcp_use_observability_laminar",
+              "python/api-reference/mcp_use_observability_langfuse"
             ]
           },
           {
             "group": "Task Managers",
             "icon": "command",
             "pages": [
-              "api-reference/mcp_use_task_managers_base",
-              "api-reference/mcp_use_task_managers_sse",
-              "api-reference/mcp_use_task_managers_stdio",
-              "api-reference/mcp_use_task_managers_streamable_http",
-              "api-reference/mcp_use_task_managers_websocket"
+              "python/api-reference/mcp_use_task_managers_base",
+              "python/api-reference/mcp_use_task_managers_sse",
+              "python/api-reference/mcp_use_task_managers_stdio",
+              "python/api-reference/mcp_use_task_managers_streamable_http",
+              "python/api-reference/mcp_use_task_managers_websocket"
             ]
           },
           {
             "group": "Types",
             "icon": "type",
             "pages": [
-              "api-reference/mcp_use_types_sandbox"
+              "python/api-reference/mcp_use_types_sandbox"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "TypeScript",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "typescript/index"
             ]
           }
         ]
@@ -281,7 +293,7 @@
           {
             "group": "Community",
             "pages": [
-              "community/showcase"
+              "python/community/showcase"
             ]
           }
         ]
@@ -293,14 +305,14 @@
           {
             "group": "Changelog",
             "pages": [
-              "changelog/changelog"
+              "python/changelog/changelog"
             ]
           },
           {
             "group": "Versions",
             "pages": [
-              "changelog/1_3_12",
-              "changelog/1_3_11"
+              "python/changelog/1_3_12",
+              "python/changelog/1_3_11"
             ]
           }
         ]
@@ -312,7 +324,7 @@
           {
             "group": "Blog",
             "pages": [
-              "blog/middleware"
+              "python/blog/middleware"
             ]
           }
         ]

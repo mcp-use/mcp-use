@@ -1,0 +1,87 @@
+name: Python Release
+
+on:
+  release:
+    types: [published]
+
+# Required for PyPI trusted publishing
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check-version-and-publish:
+    # Only run for Python releases (tags starting with python-v)
+    if: startsWith(github.event.release.tag_name, 'python-v')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/python
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine wheel tomli
+
+      - name: Verify version match
+        id: check-version
+        run: |
+          # Extract current version from pyproject.toml
+          PYPROJECT_VERSION=$(python -c "
+          import tomli
+          with open('pyproject.toml', 'rb') as f:
+              data = tomli.load(f)
+          print(data['project']['version'])
+          ")
+
+          # Get release tag version (remove 'python-v' prefix)
+          RELEASE_VERSION="${{ github.event.release.tag_name }}"
+          RELEASE_VERSION=${RELEASE_VERSION#python-v}
+
+          echo "PyProject version: $PYPROJECT_VERSION"
+          echo "Release version: $RELEASE_VERSION"
+
+          if [ "$PYPROJECT_VERSION" = "$RELEASE_VERSION" ]; then
+            echo "✅ Versions match! Proceeding with PyPI publish"
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "version=$PYPROJECT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Version mismatch! PyProject: $PYPROJECT_VERSION, Release: $RELEASE_VERSION"
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Build package
+        if: steps.check-version.outputs.should_publish == 'true'
+        run: |
+          python -m build
+
+      - name: Check if already published to PyPI
+        if: steps.check-version.outputs.should_publish == 'true'
+        id: check-pypi
+        run: |
+          # Check if this version exists on PyPI
+          VERSION="${{ steps.check-version.outputs.version }}"
+          if pip index versions mcp-use | grep -q "Available versions: .*$VERSION"; then
+            echo "Version $VERSION already exists on PyPI"
+            echo "publish_needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION not found on PyPI, will publish"
+            echo "publish_needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to PyPI
+        if: steps.check-pypi.outputs.publish_needed == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: libraries/python/dist/

@@ -1,0 +1,388 @@
+---
+title: "Common Issues"
+description: "Solutions to frequently encountered problems with mcp_use"
+icon: "circle-help"
+---
+
+This guide covers the most common issues users encounter when working with mcp_use and their solutions.
+
+## Installation Issues
+
+### ImportError: No module named 'mcp_use'
+
+**Problem**: Cannot import mcp_use after installation.
+
+**Solutions**:
+1. Verify installation in correct environment:
+   ```bash
+   pip list | grep mcp-use
+   ```
+
+2. Check Python path:
+   ```python
+   import sys
+   print(sys.path)
+   ```
+
+3. Reinstall in correct environment:
+   ```bash
+   pip uninstall mcp-use
+   pip install mcp-use
+   ```
+
+### LangChain Provider Not Found
+
+**Problem**: Error importing LangChain providers like `langchain_openai`.
+
+**Solution**: Install the specific LangChain provider:
+```bash
+pip install langchain-openai  # for OpenAI
+pip install langchain-anthropic  # for Anthropic
+pip install langchain-groq  # for Groq
+```
+
+## Configuration Issues
+
+### API Key Not Found
+
+**Problem**: `APIKeyNotFoundError` or similar authentication errors.
+
+**Solutions**:
+1. Check environment variables:
+   ```bash
+   echo $OPENAI_API_KEY
+   ```
+
+2. Verify `.env` file location and contents:
+   ```bash
+   cat .env
+   ```
+
+3. Ensure `load_dotenv()` is called:
+   ```python
+   from dotenv import load_dotenv
+   load_dotenv()  # Add this before using API keys
+   ```
+
+### Invalid Configuration File
+
+**Problem**: JSON parsing errors when loading configuration.
+
+**Solutions**:
+1. Validate JSON syntax:
+   ```python
+   import json
+   with open('config.json', 'r') as f:
+       config = json.load(f)  # Will show syntax errors
+   ```
+
+2. Check file encoding (should be UTF-8):
+   ```bash
+   file -i config.json
+   ```
+
+3. Verify all required fields are present:
+   ```json
+   {
+     "mcpServers": {
+       "server_name": {
+         "command": "command_here",
+         "args": ["arg1", "arg2"]
+       }
+     }
+   }
+   ```
+
+## MCP Server Issues
+
+### Server Not Found
+
+**Problem**: `FileNotFoundError` when trying to start MCP server.
+
+**Solutions**:
+1. Check if server is installed:
+   ```bash
+   which npx  # for Node.js servers
+   which python  # for Python servers
+   ```
+
+2. Test server manually:
+   ```bash
+   npx @playwright/mcp@latest --version
+   ```
+
+3. Use full path in configuration:
+   ```json
+   {
+     "mcpServers": {
+       "playwright": {
+         "command": "/usr/local/bin/npx",
+         "args": ["@playwright/mcp@latest"]
+       }
+     }
+   }
+   ```
+
+### Server Connection Timeout
+
+**Problem**: Server takes too long to start or respond.
+
+**Solutions**:
+1. Increase timeout in agent configuration:
+   ```python
+   agent = MCPAgent(
+       llm=llm,
+       client=client,
+       timeout=60  # Increase from default 30 seconds
+   )
+   ```
+
+2. Check server logs for issues:
+   ```python
+   import logging
+   logging.basicConfig(level=logging.DEBUG)
+   ```
+
+3. Test server independently:
+   ```bash
+   timeout 30 npx @playwright/mcp@latest
+   ```
+
+### Permission Denied
+
+**Problem**: Server cannot access files or directories.
+
+**Solutions**:
+1. Check file permissions:
+   ```bash
+   ls -la /path/to/directory
+   ```
+
+2. Update server configuration with accessible paths:
+   ```json
+   {
+     "mcpServers": {
+       "filesystem": {
+         "command": "mcp-server-filesystem",
+         "args": ["/home/user/workspace"]  # Use accessible directory
+       }
+     }
+   }
+   ```
+
+3. Run with appropriate user permissions:
+   ```bash
+   sudo chown -R $USER:$USER /path/to/directory
+   ```
+
+## Agent Runtime Issues
+
+### No Tools Available
+
+**Problem**: Agent reports no tools are available.
+
+**Solutions**:
+1. Verify server connection:
+   ```python
+   client = MCPClient.from_config_file("config.json")
+   await client.create_all_sessions()
+   session = client.get_session("server_name")  # Replace with actual server name
+   tools = await session.list_tools()
+   print(f"Available tools: {len(tools)}")
+   ```
+
+2. Check for server startup errors:
+   ```python
+   agent = MCPAgent(llm=llm, client=client, debug=True)
+   ```
+
+3. Verify server compatibility:
+   ```bash
+   npx @playwright/mcp@latest --help
+   ```
+
+### Tool Execution Failures
+
+**Problem**: Tools fail during execution with unclear errors.
+
+**Solutions**:
+1. Enable verbose logging:
+   ```python
+   import logging
+   logging.basicConfig(level=logging.DEBUG)
+
+   agent = MCPAgent(llm=llm, client=client, verbose=True)
+   ```
+
+2. Test tools individually:
+   ```python
+   from mcp_use.adapters import LangChainAdapter
+
+   adapter = LangChainAdapter()
+   tools = await adapter.create_tools(client)
+
+   # Test specific tool
+   result = await tools[0].ainvoke({"input": "test"})
+   ```
+
+3. Check tool arguments:
+   ```python
+   for tool in tools:
+       print(f"Tool: {tool.name}")
+       print(f"Description: {tool.description}")
+       print(f"Args: {tool.args}")
+   ```
+
+### Memory/Performance Issues
+
+**Problem**: Agent uses too much memory or runs slowly.
+
+**Solutions**:
+1. Enable server manager:
+   ```python
+   agent = MCPAgent(
+       llm=llm,
+       client=client,
+       use_server_manager=True  # Only connects servers when needed
+   )
+   ```
+
+2. Limit concurrent servers:
+   ```python
+   agent = MCPAgent(
+       llm=llm,
+       client=client,
+       max_concurrent_servers=3
+   )
+   ```
+
+3. Restrict available tools:
+   ```python
+   agent = MCPAgent(
+       llm=llm,
+       client=client,
+       allowed_tools=["file_read", "file_write"],  # Limit tool set
+       max_steps=10  # Limit execution steps
+   )
+   ```
+
+## LLM-Specific Issues
+
+### Model Not Supporting Tools
+
+**Problem**: LLM doesn't support function calling.
+
+**Solution**: Use a tool-calling capable model:
+```python
+# ✅ Good - supports tool calling
+llm = ChatOpenAI(model="gpt-4")
+llm = ChatAnthropic(model="claude-3-sonnet-20240229")
+
+# ❌ Bad - doesn't support tool calling
+llm = OpenAI(model="gpt-3.5-turbo-instruct")  # Completion model
+```
+
+### Rate Limiting
+
+**Problem**: API rate limits being exceeded.
+
+**Solutions**:
+1. Add delays between requests:
+   ```python
+   agent = MCPAgent(
+       llm=llm,
+       client=client,
+       delay_between_steps=1.0  # 1 second delay
+   )
+   ```
+
+2. Use different model tier:
+   ```python
+   llm = ChatOpenAI(
+       model="gpt-3.5-turbo",  # Lower rate limits
+       max_retries=3,
+       retry_delay=2
+   )
+   ```
+
+### Model Compatibility Issues
+
+**Problem**: Some models don't support tools or don't work well with MCP servers.
+
+**Solution**: Many models either don't support tool calling or have poor compatibility with MCP servers. If you encounter a model that doesn't behave well, please [open a pull request](https://github.com/mcp-use/mcp-use/pulls) with proof of the issue and add it to the list of incompatible models below.
+
+**Known Incompatible Models**:
+- *List will be updated as issues are reported*
+
+When reporting model compatibility issues, please include:
+- Model name and version
+- Specific error messages
+- Test case demonstrating the issue
+- Expected vs actual behavior
+
+## Environment-Specific Issues
+
+### Docker/Container Issues
+
+**Problem**: MCP servers not working in containerized environments.
+
+**Solutions**:
+1. Install Node.js in container:
+   ```dockerfile
+   RUN apt-get update && apt-get install -y nodejs npm
+   ```
+
+2. Mount necessary directories:
+   ```bash
+   docker run -v /host/workspace:/container/workspace myapp
+   ```
+
+3. Set proper environment variables:
+   ```bash
+   docker run -e DISPLAY=:0 -e NODE_PATH=/usr/local/lib/node_modules myapp
+   ```
+
+### Windows-Specific Issues
+
+**Problem**: Path or command issues on Windows.
+
+**Solutions**:
+1. Use Windows-style paths:
+   ```json
+   {
+     "mcpServers": {
+       "filesystem": {
+         "command": "mcp-server-filesystem",
+         "args": ["C:\\Users\\YourName\\workspace"]
+       }
+     }
+   }
+   ```
+
+2. Use `cmd` for Node.js commands:
+   ```json
+   {
+     "mcpServers": {
+       "playwright": {
+         "command": "cmd",
+         "args": ["/c", "npx", "@playwright/mcp@latest"]
+       }
+     }
+   }
+   ```
+
+## Getting Help
+
+If you continue experiencing issues:
+
+1. **Check logs**: Enable debug logging and review error messages
+2. **Search issues**: Look through [GitHub issues](https://github.com/mcp-use/mcp-use/issues)
+3. **Create issue**: Report bugs with:
+   - Complete error messages
+   - Configuration files (remove API keys)
+   - Environment details (OS, Python version, etc.)
+   - Steps to reproduce
+
+<Tip>
+Most issues are related to configuration, environment setup, or missing dependencies. Double-check these basics before diving into complex debugging.
+</Tip>

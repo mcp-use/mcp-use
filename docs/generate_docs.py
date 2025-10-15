@@ -848,7 +848,9 @@ def generate_module_docs(module_name: str, output_dir: str) -> None:
     description = generate_module_description(module_name, module_docstring)
 
     # Generate GitHub URL for source code
-    github_url = f"https://github.com/mcp-use/mcp-use/blob/main/{module_name.replace('.', '/')}.py"
+    # Handle library-specific paths
+    module_path = module_name.replace('.', '/')
+    github_url = f"https://github.com/mcp-use/mcp-use/blob/main/libraries/python/{module_path}.py"
 
     frontmatter = {"title": title, "description": description, "icon": icon, "github": github_url}
 
@@ -1245,7 +1247,7 @@ def generate_api_reference_groups(packages: dict[str, dict[str, list[dict[str, s
                 # Add root items directly to subpackages list (no Overview section)
                 if "root" in packages[package] and packages[package]["root"]:
                     root_modules = sorted(packages[package]["root"], key=lambda x: x["display_name"])
-                    root_pages = [f"api-reference/{module['module']}" for module in root_modules]
+                    root_pages = [f"python/api-reference/{module['module']}" for module in root_modules]
                     subpackages.extend(root_pages)
 
                 # Add other subpackages - only create subsections if they have more than 1 item
@@ -1259,7 +1261,7 @@ def generate_api_reference_groups(packages: dict[str, dict[str, list[dict[str, s
                     if len(modules) > 1:
                         subpackage_info = get_subpackage_display_info(subpackage_name)
                         sorted_modules = sorted(modules, key=lambda x: x["display_name"])
-                        pages = [f"api-reference/{module['module']}" for module in sorted_modules]
+                        pages = [f"python/api-reference/{module['module']}" for module in sorted_modules]
 
                         subpackages.append(
                             {"group": subpackage_info["name"], "icon": subpackage_info["icon"], "pages": pages}
@@ -1267,13 +1269,13 @@ def generate_api_reference_groups(packages: dict[str, dict[str, list[dict[str, s
                     else:
                         # Single module - add directly to root level
                         module = modules[0]
-                        subpackages.append(f"api-reference/{module['module']}")
+                        subpackages.append(f"python/api-reference/{module['module']}")
 
                 group = {"group": package_info["name"], "icon": package_info["icon"], "pages": subpackages}
             else:
                 # Simple structure without subpackages
                 modules = sorted(packages[package]["root"], key=lambda x: x["display_name"])
-                pages = [f"api-reference/{module['module']}" for module in modules]
+                pages = [f"python/api-reference/{module['module']}" for module in modules]
 
                 group = {"group": package_info["name"], "icon": package_info["icon"], "pages": pages}
 
@@ -1303,8 +1305,9 @@ def update_docs_json(docs_json_path: str, api_reference_dir: str) -> None:
     api_groups = generate_api_reference_groups(packages)
 
     # Update the navigation structure
+    # Handle both "API Reference" and "Python API Reference" tab names
     for tab in docs_config["navigation"]["tabs"]:
-        if tab["tab"] == "API Reference":
+        if "API Reference" in tab["tab"]:
             tab["groups"] = api_groups
             break
 
@@ -1328,8 +1331,11 @@ def main():
     output_dir = sys.argv[2] if len(sys.argv) > 2 else "api-reference"
     docs_json_path = sys.argv[3] if len(sys.argv) > 3 else "docs.json"
 
-    # Add parent directory to Python path to import the package
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Add the directory containing the package to Python path
+    # Convert package_dir (e.g., ../libraries/python/mcp_use) to absolute path
+    package_abs_path = os.path.abspath(package_dir)
+    # Get the parent directory that contains the package
+    parent_dir = os.path.dirname(package_abs_path)
     sys.path.insert(0, parent_dir)
 
     print("🔄 Generating API documentation...")

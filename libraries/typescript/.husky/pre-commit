@@ -1,0 +1,1 @@
+cd packages/mcp-use && npx lint-staged

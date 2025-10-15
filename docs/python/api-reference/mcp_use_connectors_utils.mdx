@@ -1,0 +1,37 @@
+---
+title: "Utils"
+description: "Utils API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/utils.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/utils.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/connectors/utils.py</a>
+</Callout>
+
+
+## is_stdio_server
+<Card type="info">
+### `function` is_stdio_server
+
+Check if the server configuration is for a stdio server.
+
+
+```python
+from mcp_use.connectors.utils import is_stdio_server
+```
+
+**Parameters**
+><ParamField body="server_config" type="dict[str, Any]" required="True" >   The server configuration section </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="bool" >True if the server is a stdio server, False otherwise</ResponseField>
+
+**Signature**
+```python wrap
+def is_stdio_server(server_config: dict[str, Any]):
+```
+
+</Card>

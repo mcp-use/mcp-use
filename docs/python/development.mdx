@@ -1,0 +1,115 @@
+---
+title: Development
+description: "Contributing to mcp_use"
+icon: "code"
+---
+
+# Development Guide
+
+This guide will help you set up your development environment and contribute to mcp_use.
+
+## Prerequisites
+
+- Python 3.11 or higher
+- Git
+- Node.js and npm (for MCP server dependencies)
+
+## Setting Up Development Environment
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/mcp-use/mcp-use.git
+cd mcp-use
+```
+
+2. Install development dependencies:
+
+```bash
+pip install -e ".[dev]"
+```
+
+3. Install pre-commit hooks:
+
+```bash
+pre-commit install
+```
+
+## Code Style
+
+mcp_use uses Ruff for code formatting and linting. The project follows these style guidelines:
+
+- Use type hints for all function parameters and return values
+- Follow PEP 8 style guide
+- Use docstrings for all public functions and classes
+- Keep functions focused and single-purpose
+
+## Running Tests
+
+The project uses pytest for testing. To run the test suite:
+
+```bash
+pytest
+```
+
+For more specific test runs:
+
+```bash
+# Run tests with coverage
+pytest --cov=mcp_use
+
+# Run specific test file
+pytest tests/test_client.py
+
+# Run tests with verbose output
+pytest -v
+```
+
+## Documentation
+
+Documentation is written in MDX format and uses Mintlify for rendering. To preview documentation changes:
+
+1. Install Mintlify CLI:
+
+```bash
+npm i -g mintlify
+```
+
+2. Run the development server:
+
+```bash
+mintlify dev
+```
+
+## Contributing
+
+1. Create a new branch for your feature:
+
+```bash
+git checkout -b feature/your-feature-name
+```
+
+2. Make your changes and commit them:
+
+```bash
+git add .
+git commit -m "Description of your changes"
+```
+
+3. Push your changes and create a pull request:
+
+```bash
+git push origin feature/your-feature-name
+```
+
+## Project Structure
+
+```
+mcp-use/
+├── mcp_use/           # Main package code
+├── tests/             # Test files
+├── examples/          # Example usage
+├── docs/             # Documentation
+├── static/           # Static assets
+└── pyproject.toml    # Project configuration
+```

@@ -1,0 +1,173 @@
+---
+title: "Telemetry"
+description: "Understanding MCP-use's telemetry system"
+icon: "chart-line"
+---
+
+## Overview
+
+MCP-use includes an **opt-out telemetry system** that helps us understand how the library is being used in practice. This data enables us to:
+
+- **Prioritize development** based on real usage patterns
+- **Optimize performance** for common workflows
+- **Improve compatibility** with popular model providers
+- **Focus on the most valuable features**
+
+<Warning>
+**Privacy First**: All telemetry is **anonymized** and can be **completely disabled** with a single environment variable.
+</Warning>
+
+## What We Collect
+
+### Agent Execution Data
+When you use `MCPAgent.run()` or `MCPAgent.astream()`, we collect:
+
+- **Query and response content** (to understand use cases)
+- **Model provider and name** (e.g., "openai", "gpt-4")
+- **MCP servers connected** (types and count, not specific URLs/paths)
+- **Tools used** (which MCP tools are popular)
+- **Performance metrics** (execution time, steps taken)
+- **Configuration settings** (memory enabled, max steps, etc.)
+
+### System Information
+- **Package version** (for version adoption tracking)
+- **Error types** (for debugging and improvement)
+- **Package download analytics** (via Scarf for distribution insights)
+
+### What We DON'T Collect
+- **Personal information** (no names, emails, or identifiers)
+- **Server URLs or file paths** (only connection types)
+- **API keys or credentials** (never transmitted)
+- **IP addresses** (PostHog configured with `disable_geoip=False`)
+
+## How to Disable Telemetry
+
+### Environment Variable (Recommended)
+```bash
+export MCP_USE_ANONYMIZED_TELEMETRY=false
+```
+
+### In Your Code
+```python
+import os
+os.environ["MCP_USE_ANONYMIZED_TELEMETRY"] = "false"
+
+# Now use MCP-use normally - no telemetry will be collected
+from mcp_use import MCPAgent
+```
+
+### Verification
+When telemetry is disabled, you'll see this debug message:
+```
+DEBUG: Telemetry disabled
+```
+
+When enabled, you'll see:
+```
+INFO: Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable.
+```
+
+## Data Storage and Privacy
+
+### Anonymous User IDs
+- A random UUID is generated and stored locally in your cache directory
+- **Linux/Unix**: `~/.cache/mcp_use/telemetry_user_id`
+- **macOS**: `~/Library/Caches/mcp_use/telemetry_user_id`
+- **Windows**: `%LOCALAPPDATA%\mcp_use\telemetry_user_id`
+
+### Data Transmission
+- Data is sent to both **PostHog** (EU servers: `https://eu.i.posthog.com`) and **Scarf** (`https://mcpuse.gateway.scarf.sh/simple/`)
+- **No personal information** is ever transmitted
+- Data is used only for **aggregate analysis** and **package usage analytics**
+
+## Example Telemetry Event
+
+Here's what a typical telemetry event looks like:
+
+```json
+{
+  "event": "mcp_agent_execution",
+  "distinct_id": "550e8400-e29b-41d4-a716-446655440000",
+  "properties": {
+    "mcp_use_version": "1.3.0",
+    "execution_method": "run",
+    "query": "Help me analyze sales data from the CSV file",
+    "response": "I'll help you analyze the sales data...",
+    "model_provider": "openai",
+    "model_name": "gpt-4",
+    "server_count": 2,
+    "server_identifiers": [
+      {"type": "stdio", "command": "python -m server"},
+      {"type": "http", "base_url": "localhost:8080"}
+    ],
+    "tools_used_names": ["read_file", "analyze_data"],
+    "execution_time_ms": 2500,
+    "success": true
+  }
+}
+```
+
+## Benefits to the Community
+
+### For Users
+- **Better library** through data-driven improvements
+- **Faster issue resolution** via error pattern detection
+- **Feature prioritization** based on actual usage
+
+### For Developers
+- **Compatibility insights** for new model providers
+- **Performance optimization** targets
+- **Usage pattern understanding** for better APIs
+
+## Technical Implementation
+
+### Clean Architecture
+The telemetry system uses a **decorator pattern** that ensures:
+- **Zero overhead** when disabled
+- **No exceptions** if PostHog or Scarf services are unavailable
+- **Graceful degradation** in all failure scenarios
+- **Dual telemetry** to both PostHog and Scarf for comprehensive analytics
+
+### Code Example
+```python
+# This is how telemetry works internally:
+@requires_telemetry
+def track_agent_execution(self, ...):
+    # This method only executes if telemetry is enabled
+    # If disabled, it returns None immediately
+    pass
+```
+
+## Frequently Asked Questions
+
+### Can I see what data is being sent?
+Yes! Set your logging level to DEBUG to see telemetry events:
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+### Does telemetry affect performance?
+- **When disabled**: Zero performance impact
+- **When enabled**: Minimal impact (async data transmission)
+
+### Can I opt out after using the library?
+Yes! Set the environment variable and restart your application. You can also delete the user ID file to reset your anonymous identifier.
+
+### Is this GDPR compliant?
+Yes. The telemetry system:
+- Collects no personal data
+- Uses anonymous identifiers
+- Provides easy opt-out
+- Processes data for legitimate business interests (software improvement)
+
+## Support
+
+If you have questions about telemetry:
+- **Disable it**: Use `MCP_USE_ANONYMIZED_TELEMETRY=false`
+- **Report issues**: [GitHub Issues](https://github.com/anthropics/mcp-use/issues)
+- **Check logs**: Enable DEBUG logging to see telemetry activity
+
+<Note>
+Remember: Telemetry helps us build a better library for everyone, but **your privacy comes first**. We've designed the system to be transparent, minimal, and easily disabled.
+</Note>

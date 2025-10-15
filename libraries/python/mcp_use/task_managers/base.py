@@ -1,0 +1,145 @@
+"""
+Connection management for MCP implementations.
+
+This module provides an abstract base class for different types of connection
+managers used in MCP connectors.
+"""
+
+import asyncio
+from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
+
+from ..logging import logger
+
+# Type variable for connection types
+T = TypeVar("T")
+
+
+class ConnectionManager(Generic[T], ABC):
+    """Abstract base class for connection managers.
+
+    This class defines the interface for different types of connection managers
+    used with MCP connectors.
+    """
+
+    def __init__(self) -> None:
+        """Initialize a new connection manager."""
+        self._ready_event = asyncio.Event()
+        self._done_event = asyncio.Event()
+        self._stop_event = asyncio.Event()
+        self._exception: Exception | None = None
+        self._connection: T | None = None
+        self._task: asyncio.Task[None] | None = None
+
+    @abstractmethod
+    async def _establish_connection(self) -> T:
+        """Establish the connection.
+
+        This method should be implemented by subclasses to establish
+        the specific type of connection needed.
+
+        Returns:
+            The established connection.
+
+        Raises:
+            Exception: If connection cannot be established.
+        """
+        pass
+
+    @abstractmethod
+    async def _close_connection(self) -> None:
+        """Close the connection.
+
+        This method should be implemented by subclasses to close
+        the specific type of connection.
+
+        """
+        pass
+
+    async def start(self) -> T:
+        """Start the connection manager and establish a connection.
+
+        Returns:
+            The established connection.
+
+        Raises:
+            Exception: If connection cannot be established.
+        """
+        # Reset state
+        self._ready_event.clear()
+        self._done_event.clear()
+        self._exception = None
+
+        # Create a task to establish and maintain the connection
+        self._task = asyncio.create_task(self._connection_task(), name=f"{self.__class__.__name__}_task")
+
+        # Wait for the connection to be ready or fail
+        await self._ready_event.wait()
+
+        # If there was an exception, raise it
+        if self._exception:
+            raise self._exception
+
+        # Return the connection
+        if self._connection is None:
+            raise RuntimeError("Connection was not established")
+        return self._connection
+
+    async def stop(self) -> None:
+        """Stop the connection manager and close the connection."""
+        # Signal stop to the connection task instead of cancelling it, avoids
+        # propagating CancelledError to unrelated tasks.
+        if self._task and not self._task.done():
+            logger.debug(f"Signaling stop to {self.__class__.__name__} task")
+            self._stop_event.set()
+            # Wait for it to finish gracefully
+            await self._task
+
+        # Ensure cleanup completed
+        await self._done_event.wait()
+        logger.debug(f"{self.__class__.__name__} task completed")
+
+    def get_streams(self) -> T | None:
+        """Get the current connection streams.
+
+        Returns:
+            The current connection (typically a tuple of read_stream, write_stream) or None if not connected.
+        """
+        return self._connection
+
+    async def _connection_task(self) -> None:
+        """Run the connection task.
+
+        This task establishes and maintains the connection until cancelled.
+        """
+        logger.debug(f"Starting {self.__class__.__name__} task")
+        try:
+            # Establish the connection
+            self._connection = await self._establish_connection()
+            logger.debug(f"{self.__class__.__name__} connected successfully")
+
+            # Signal that the connection is ready
+            self._ready_event.set()
+
+            # Wait until stop is requested
+            await self._stop_event.wait()
+
+        except Exception as e:
+            # Store the exception
+            self._exception = e
+            logger.error(f"Error in {self.__class__.__name__} task: {e}")
+
+            # Signal that the connection is ready (with error)
+            self._ready_event.set()
+
+        finally:
+            # Close the connection if it was established
+            if self._connection is not None:
+                try:
+                    await self._close_connection()
+                except Exception as e:
+                    logger.warning(f"Error closing connection in {self.__class__.__name__}: {e}")
+                self._connection = None
+
+            # Signal that the connection is done
+            self._done_event.set()

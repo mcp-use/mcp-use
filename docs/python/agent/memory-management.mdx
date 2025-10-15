@@ -1,0 +1,137 @@
+---
+title: Memory Management
+description: Learn how to manage conversation memory in MCPAgent with different memory modes
+icon: brain
+---
+
+# Memory Management
+
+MCPAgent provides flexible memory management options to control how conversation history is handled. You can choose between three different memory modes depending on your use case.
+
+## Memory Modes
+
+### 1. Self-Managed Memory (`memory_enabled=True`)
+
+When `memory_enabled=True`, the agent automatically manages conversation history internally. This is the simplest option for most use cases.
+
+```python
+from mcp_use import MCPAgent, MCPClient
+from langchain_openai import ChatOpenAI
+
+client = MCPClient(config=config)
+llm = ChatOpenAI(model="gpt-4o-mini")
+
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    memory_enabled=True  # Agent manages memory internally
+)
+
+# The agent will automatically maintain conversation context
+response = await agent.run("Hello, my name is Alice")
+response = await agent.run("What's my name?")  # Agent remembers Alice
+```
+
+### 2. No Memory (`memory_enabled=False`)
+
+When `memory_enabled=False`, the agent has no internal memory and treats each interaction independently.
+
+```python
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    memory_enabled=False  # No internal memory
+)
+
+# Each interaction is independent
+response = await agent.run("Hello, my name is Alice")
+response = await agent.run("What's my name?")  # Agent doesn't remember Alice
+```
+
+### 3. External Memory Management
+
+You can provide conversation history externally for full control over memory management. This allows you to implement custom memory strategies like limited history, persistence, or filtering.
+
+```python
+from langchain_core.messages import HumanMessage, AIMessage
+
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    memory_enabled=True  # Can be True or False
+)
+
+# External history management
+external_history = []
+
+# First interaction
+response1 = await agent.run("Hello, my name is Alice", external_history=external_history)
+external_history.append(HumanMessage(content="Hello, my name is Alice"))
+external_history.append(AIMessage(content=response1))
+
+# Second interaction with limited history
+limited_history = external_history[-4:]  # Keep only last 4 messages
+response2 = await agent.run("What's my name?", external_history=limited_history)
+external_history.append(HumanMessage(content="What's my name?"))
+external_history.append(AIMessage(content=response2))
+```
+
+## Memory Strategies
+
+### Unlimited History
+
+Keep all conversation history for maximum context:
+
+```python
+# Use all external history
+response = await agent.run(user_input, external_history=external_history)
+```
+
+### Limited History
+
+Limit conversation history to manage memory usage and context length:
+
+```python
+# Keep only last N messages
+MAX_HISTORY_MESSAGES = 5
+limited_history = external_history[-MAX_HISTORY_MESSAGES:] if external_history else []
+response = await agent.run(user_input, external_history=limited_history)
+```
+
+### Sliding Window
+
+Implement a sliding window approach to maintain recent context while discarding older messages:
+
+```python
+def get_sliding_window_history(history, window_size=10):
+    """Return the last window_size messages from history"""
+    return history[-window_size:] if history else []
+
+# Usage
+sliding_history = get_sliding_window_history(external_history, window_size=10)
+response = await agent.run(user_input, external_history=sliding_history)
+```
+
+## Best Practices
+
+1. **For Simple Use Cases**: Use `memory_enabled=True` for automatic memory management
+2. **For Stateless Operations**: Use `memory_enabled=False` when each interaction should be independent
+3. **For Custom Control**: Use external memory management when you need specific memory strategies
+4. **Memory Limits**: Consider implementing memory limits to prevent context overflow with large conversations
+5. **Persistence**: For long-running applications, consider persisting conversation history to external storage
+
+## Examples
+
+See the following examples for practical implementations:
+
+- [`chat_example.py`](https://github.com/mcp-use/mcp-use/tree/main/examples/chat_example.py) - Unlimited memory with external management
+- [`limited_memory_chat.py`](https://github.com/mcp-use/mcp-use/tree/main/examples/limited_memory_chat.py) - Limited memory with sliding window
+
+## Configuration Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `memory_enabled` | bool | `True` | Enable/disable internal memory management |
+| `external_history` | List[BaseMessage] | `None` | External conversation history to use |
+
+The `external_history` parameter takes precedence over internal memory when provided, allowing you to override the agent's internal memory with your own implementation.

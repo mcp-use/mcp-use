@@ -1,0 +1,317 @@
+---
+title: "LLM Integration"
+description: "Integrate any LLM with mcp_use through LangChain"
+icon: "brain"
+---
+
+# LLM Integration Guide
+
+mcp_use supports integration with **any** Language Learning Model (LLM) that is compatible with LangChain. This guide covers how to use different LLM providers with mcp_use and emphasizes the flexibility to use any LangChain-supported model.
+
+<Note>
+**Key Requirement**: Your chosen LLM must support **tool calling** (also known as function calling) to work with MCP tools. Most modern LLMs support this feature.
+</Note>
+
+## Universal LLM Support
+
+mcp_use leverages LangChain's architecture to support any LLM that implements the LangChain interface. This means you can use virtually any model from any provider, including:
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="robot">
+    GPT-4, GPT-4o, GPT-3.5 Turbo
+  </Card>
+  <Card title="Anthropic" icon="anthropic">
+    Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
+  </Card>
+  <Card title="Google" icon="google">
+    Gemini Pro, Gemini Flash, PaLM
+  </Card>
+  <Card title="Open Source" icon="code">
+    Llama, Mistral, CodeLlama via various providers
+  </Card>
+</CardGroup>
+
+## Popular Provider Examples
+
+### OpenAI
+
+```python
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+# Initialize OpenAI model
+llm = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.7,
+    api_key="your-api-key"  # Or set OPENAI_API_KEY env var
+)
+
+# Create agent
+agent = MCPAgent(llm=llm, client=client)
+```
+
+### Anthropic Claude
+
+```python
+from langchain_anthropic import ChatAnthropic
+from mcp_use import MCPAgent, MCPClient
+
+# Initialize Claude model
+llm = ChatAnthropic(
+    model="claude-3-5-sonnet-20241022",
+    temperature=0.7,
+    api_key="your-api-key"  # Or set ANTHROPIC_API_KEY env var
+)
+
+# Create agent
+agent = MCPAgent(llm=llm, client=client)
+```
+
+### Google Gemini
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+from mcp_use import MCPAgent, MCPClient
+
+# Initialize Gemini model
+llm = ChatGoogleGenerativeAI(
+    model="gemini-pro",
+    temperature=0.7,
+    google_api_key="your-api-key"  # Or set GOOGLE_API_KEY env var
+)
+
+# Create agent
+agent = MCPAgent(llm=llm, client=client)
+```
+
+### Groq (Fast Inference)
+
+```python
+from langchain_groq import ChatGroq
+from mcp_use import MCPAgent, MCPClient
+
+# Initialize Groq model
+llm = ChatGroq(
+    model="llama-3.1-70b-versatile",
+    temperature=0.7,
+    api_key="your-api-key"  # Or set GROQ_API_KEY env var
+)
+
+# Create agent
+agent = MCPAgent(llm=llm, client=client)
+```
+
+### Local Models with Ollama
+
+```python
+from langchain_ollama import ChatOllama
+from mcp_use import MCPAgent, MCPClient
+
+# Initialize local Ollama model
+llm = ChatOllama(
+    model="llama3.1:8b",
+    base_url="http://localhost:11434",  # Default Ollama URL
+    temperature=0.7
+)
+
+# Create agent
+agent = MCPAgent(llm=llm, client=client)
+```
+
+## Model Requirements
+
+### Tool Calling Support
+
+For MCP tools to work properly, your chosen model **must support tool calling**. Most modern LLMs support this:
+
+✅ **Supported Models:**
+- OpenAI: GPT-4, GPT-4o, GPT-3.5 Turbo
+- Anthropic: Claude 3+ series
+- Google: Gemini Pro, Gemini Flash
+- Groq: Llama 3.1, Mixtral models
+- Most recent open-source models
+
+❌ **Not Supported:**
+- Basic completion models without tool calling
+- Very old model versions
+- Models without function calling capabilities
+
+### Checking Tool Support
+
+You can verify if a model supports tools:
+
+```python
+# Check if the model supports tool calling
+if hasattr(llm, 'bind_tools') or hasattr(llm, 'with_tools'):
+    print("✅ Model supports tool calling")
+else:
+    print("❌ Model may not support tool calling")
+```
+
+## Model Configuration Tips
+
+### Temperature Settings
+
+Different tasks benefit from different temperature settings:
+
+```python
+# For precise, deterministic tasks
+llm = ChatOpenAI(model="gpt-4o", temperature=0.1)
+
+# For creative tasks
+llm = ChatOpenAI(model="gpt-4o", temperature=0.8)
+
+# Balanced approach (recommended)
+llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+```
+
+### Model-Specific Parameters
+
+Each provider has unique parameters you can configure:
+
+```python
+# OpenAI with custom parameters
+llm = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.7,
+    max_tokens=4000,
+    top_p=0.9,
+    frequency_penalty=0.1,
+    presence_penalty=0.1
+)
+
+# Anthropic with custom parameters
+llm = ChatAnthropic(
+    model="claude-3-5-sonnet-20241022",
+    temperature=0.7,
+    max_tokens=4000,
+    top_p=0.9
+)
+```
+
+## Cost Optimization
+
+### Choosing Cost-Effective Models
+
+Consider your use case when selecting models:
+
+| Use Case | Recommended Models | Reason |
+|----------|-------------------|--------|
+| Development/Testing | GPT-3.5 Turbo, Claude Haiku | Lower cost, good performance |
+| Production/Complex | GPT-4o, Claude Sonnet | Best performance |
+| High Volume | Groq models | Fast inference, competitive pricing |
+| Privacy/Local | Ollama models | No API costs, data stays local |
+
+### Token Management
+
+```python
+# Set reasonable token limits
+llm = ChatOpenAI(
+    model="gpt-4o",
+    max_tokens=2000,  # Limit response length
+    temperature=0.7
+)
+
+# Monitor usage in your application
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    max_steps=10  # Limit agent steps to control costs
+)
+```
+
+## Environment Setup
+
+Always use environment variables for API keys:
+
+```bash
+# .env file
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=AI...
+GROQ_API_KEY=gsk_...
+```
+
+```python
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables
+
+# Now LangChain will automatically use the keys
+llm = ChatOpenAI(model="gpt-4o")  # No need to pass api_key
+```
+
+## Advanced Integration
+
+### Custom Model Wrappers
+
+You can create custom wrappers for specialized models:
+
+```python
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import BaseMessage
+
+class CustomModelWrapper(BaseChatModel):
+    """Custom wrapper for your model"""
+
+    def _generate(self, messages, stop=None, **kwargs):
+        # Your custom model implementation
+        pass
+
+    def _llm_type(self):
+        return "custom_model"
+
+# Use with mcp_use
+llm = CustomModelWrapper()
+agent = MCPAgent(llm=llm, client=client)
+```
+
+### Model Switching
+
+Switch between models dynamically:
+
+```python
+def get_model_for_task(task_type: str):
+    if task_type == "complex_reasoning":
+        return ChatOpenAI(model="gpt-4o", temperature=0.1)
+    elif task_type == "creative":
+        return ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.8)
+    else:
+        return ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
+
+# Use different models for different tasks
+llm = get_model_for_task("complex_reasoning")
+agent = MCPAgent(llm=llm, client=client)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Model doesn't support tools"**: Ensure your model supports function calling
+2. **API key errors**: Check environment variables and API key validity
+3. **Rate limiting**: Implement retry logic or use different models
+4. **Token limits**: Adjust max_tokens or use models with larger context windows
+
+### Debug Model Behavior
+
+<CodeGroup>
+```python Python
+# Enable verbose logging to see model interactions
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    verbose=True  # Shows detailed model interactions
+)
+```
+
+```typescript TypeScript
+// Enable verbose logging to see model interactions
+const agent = new MCPAgent({
+    llm,
+    client,
+    verbose: true  // Shows detailed model interactions
+})
+```
+</CodeGroup>
+
+For more LLM providers and detailed integration examples, visit the [LangChain Chat Models documentation](https://python.langchain.com/docs/integrations/chat/).

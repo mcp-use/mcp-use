@@ -1,0 +1,68 @@
+{
+  "name": "mcp-use-ts-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "pnpm run build:mcp-use && pnpm run build:other",
+    "build:mcp-use": "pnpm --filter mcp-use build",
+    "build:other": "pnpm --filter '{packages/*}' --filter '!mcp-use' build",
+    "test": "pnpm run -r test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:strict": "eslint . --max-warnings 0",
+    "dev": "pnpm run -r --parallel dev",
+    "changeset": "changeset",
+    "version": "changeset version && pnpm install --no-frozen-lockfile",
+    "release": "pnpm build && changeset publish",
+    "version:check": "changeset status"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.28.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.11",
+    "tsup": "^8.5.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.20.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
+  },
+  "packageManager": "pnpm@10.6.1",
+  "pnpm": {
+    "patchedDependencies": {
+    },
+    "overrides": {
+      "mcp-use": "workspace:*",
+      "@mcp-use/inspector": "workspace:*",
+      "@mcp-use/cli": "workspace:*",
+      "create-mcp-use-app": "workspace:*",
+      "react": "^19.2.0",
+      "react-dom": "^19.2.0"
+    }
+  },
+  "dependencies": {
+    "@eslint/js": "^9.37.0"
+  }
+}

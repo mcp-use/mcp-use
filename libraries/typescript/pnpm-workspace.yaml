@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+  - 'test_app'
+  - 'packages/mcp-use/examples/client/react'
+  - 'packages/mcp-use/examples/server/simple'
+  - 'packages/create-mcp-use-app/src/templates/ui'
+  - 'packages/create-mcp-use-app/src/templates/uiresource'

@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "composite": true
+  },
+  "references": [
+    { "path": "./packages/mcp-use" },
+    { "path": "./packages/inspector" },
+    { "path": "./packages/cli" },
+    { "path": "./packages/create-mcp-use-app" },
+    { "path": "./test_app" }
+  ]
+}

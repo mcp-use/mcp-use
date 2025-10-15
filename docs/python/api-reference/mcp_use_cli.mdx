@@ -1,0 +1,322 @@
+---
+title: "Cli"
+description: "MCP-Use CLI Tool - All-in-one CLI for creating and deploying MCP projects API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/cli.py</a>
+</Callout>
+
+MCP-Use CLI Tool - All-in-one CLI for creating and deploying MCP projects.
+
+## Spinner
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> Spinner</div>
+
+Simple loading spinner similar to UV's style.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.cli import Spinner
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="message" type="str" default='Loading' >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(message: str = "Loading"):
+```
+
+</Card>
+<Card type="info">
+### `method` start
+
+Start the spinner.
+
+
+**Signature**
+```python wrap
+def start():
+```
+
+</Card>
+
+<Card type="info">
+### `method` stop
+
+Stop the spinner and optionally print success message.
+
+
+**Parameters**
+><ParamField body="success_message" default="None" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def stop(success_message = None):
+```
+
+</Card>
+
+</div>
+
+
+## create_agent_structure
+<Card type="info">
+### `function` create_agent_structure
+
+Create agent file in nested project folder.
+
+```python
+from mcp_use.cli import create_agent_structure
+```
+
+**Parameters**
+><ParamField body="project_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
+><ParamField body="project_type" type="str" required="True" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def create_agent_structure(project_dir: pathlib.Path, project_name: str, project_type: str):
+```
+
+</Card>
+
+
+## create_common_files
+<Card type="info">
+### `function` create_common_files
+
+Create common project files.
+
+```python
+from mcp_use.cli import create_common_files
+```
+
+**Parameters**
+><ParamField body="project_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
+><ParamField body="project_type" type="str" required="True" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def create_common_files(project_dir: pathlib.Path, project_name: str, project_type: str):
+```
+
+</Card>
+
+
+## create_example_files
+<Card type="info">
+### `function` create_example_files
+
+Create example files.
+
+```python
+from mcp_use.cli import create_example_files
+```
+
+**Parameters**
+><ParamField body="project_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
+
+**Signature**
+```python wrap
+def create_example_files(project_dir: pathlib.Path, project_name: str):
+```
+
+</Card>
+
+
+## create_project
+<Card type="info">
+### `function` create_project
+
+Create the project structure.
+
+```python
+from mcp_use.cli import create_project
+```
+
+**Parameters**
+><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
+><ParamField body="project_type" type="str" required="True" >   String value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def create_project(project_name: str, project_type: str):
+```
+
+</Card>
+
+
+## create_server_structure
+<Card type="info">
+### `function` create_server_structure
+
+Create server file in nested project folder.
+
+```python
+from mcp_use.cli import create_server_structure
+```
+
+**Parameters**
+><ParamField body="project_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+><ParamField body="project_name" type="str" required="True" >   Name identifier </ParamField>
+
+**Signature**
+```python wrap
+def create_server_structure(project_dir: pathlib.Path, project_name: str):
+```
+
+</Card>
+
+
+## get_project_name
+<Card type="info">
+### `function` get_project_name
+
+Get project name from user.
+
+```python
+from mcp_use.cli import get_project_name
+```
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def get_project_name():
+```
+
+</Card>
+
+
+## get_project_type
+<Card type="info">
+### `function` get_project_type
+
+Get project type from user.
+
+```python
+from mcp_use.cli import get_project_type
+```
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def get_project_type():
+```
+
+</Card>
+
+
+## handle_create
+<Card type="info">
+### `function` handle_create
+
+Handle the create command.
+
+```python
+from mcp_use.cli import handle_create
+```
+
+**Signature**
+```python wrap
+def handle_create():
+```
+
+</Card>
+
+
+## handle_deploy
+<Card type="info">
+### `function` handle_deploy
+
+Handle the deploy command (placeholder for future implementation).
+
+```python
+from mcp_use.cli import handle_deploy
+```
+
+**Signature**
+```python wrap
+def handle_deploy():
+```
+
+</Card>
+
+
+## main
+<Card type="info">
+### `function` main
+
+Main entry point for the CLI.
+
+```python
+from mcp_use.cli import main
+```
+
+**Parameters**
+><ParamField body="args" default="None" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def main(args = None):
+```
+
+</Card>
+
+
+## print_header
+<Card type="info">
+### `function` print_header
+
+Print the CLI header.
+
+```python
+from mcp_use.cli import print_header
+```
+
+**Signature**
+```python wrap
+def print_header():
+```
+
+</Card>
+
+
+## show_help
+<Card type="info">
+### `function` show_help
+
+Show the main help message.
+
+```python
+from mcp_use.cli import show_help
+```
+
+**Signature**
+```python wrap
+def show_help():
+```
+
+</Card>
