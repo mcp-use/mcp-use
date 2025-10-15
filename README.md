@@ -450,23 +450,7 @@ You can configure multiple servers in your configuration file:
 ```
 
 ## Usage
-
-The `MCPClient` class provides methods for managing connections to multiple servers. When creating an `MCPAgent`, you can provide an `MCPClient` configured with multiple servers.
-
-By default, the agent will have access to tools from all configured servers. If you need to target a specific server for a particular task, you can specify the `server_name` when calling the `agent.run()` method.
-
-```python
-# Example: Manually selecting a server for a specific task
-result = await agent.run(
-    "Search for Airbnb listings in Barcelona",
-    server_name="airbnb" # Explicitly use the airbnb server
-)
-
-result_google = await agent.run(
-    "Find restaurants near the first result using Google Search",
-    server_name="playwright" # Explicitly use the playwright server
-)
-```
+**There is no server_name argument in the run method.**
 
 ## Dynamic Server Selection (Server Manager)
 
