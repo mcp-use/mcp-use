@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
+import { Command } from 'commander'
 import { execSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
-import { Command } from 'commander'
+import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -59,8 +59,8 @@ function getCurrentPackageVersions() {
     )
     versions['@mcp-use/inspector'] = inspectorPackage.version
   } catch (error) {
-    console.warn('⚠️  Could not read workspace package versions, using defaults')
-    console.warn(`   Error: ${error}`)
+    // console.warn('⚠️  Could not read workspace package versions, using defaults')
+    // console.warn(`   Error: ${error}`)
   }
   
   return versions
