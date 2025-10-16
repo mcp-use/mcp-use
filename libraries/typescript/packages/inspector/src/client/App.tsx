@@ -1,6 +1,5 @@
 import { InspectorDashboard } from '@/components/client/InspectorDashboard'
 import { Layout } from '@/components/client/Layout'
-import { ServerDetail } from '@/components/client/ServerDetail'
 import { ServerList } from '@/components/client/ServerList'
 import { Toaster } from '@/components/ui/sonner'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
@@ -16,7 +15,7 @@ function App() {
             <Routes>
               <Route path="/" element={<InspectorDashboard />} />
               <Route path="/servers" element={<ServerList />} />
-              <Route path="/servers/:serverId" element={<ServerDetail />} />
+              <Route path="/servers/:serverId" element={null} />
             </Routes>
           </Layout>
         </Router>

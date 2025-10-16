@@ -11,6 +11,80 @@ interface ServerIconProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
+interface FaviconCache {
+  base64: string
+  timestamp: number
+}
+
+const FAVICON_CACHE_KEY = 'mcp-inspector-favicon-cache'
+const CACHE_TTL_MS = 10 * 24 * 60 * 60 * 1000 // 10 days in milliseconds
+
+// Helper functions for favicon cache
+const getFaviconCache = (): Record<string, FaviconCache> => {
+  try {
+    const cached = localStorage.getItem(FAVICON_CACHE_KEY)
+    if (cached) {
+      return JSON.parse(cached)
+    }
+  } catch (error) {
+    console.error('Failed to load favicon cache:', error)
+  }
+  return {}
+}
+
+const setFaviconCache = (domain: string, base64: string) => {
+  try {
+    const cache = getFaviconCache()
+    cache[domain] = {
+      base64,
+      timestamp: Date.now(),
+    }
+    localStorage.setItem(FAVICON_CACHE_KEY, JSON.stringify(cache))
+  } catch (error) {
+    console.error('Failed to save favicon cache:', error)
+  }
+}
+
+const getCachedFavicon = (domain: string): string | null => {
+  try {
+    const cache = getFaviconCache()
+    const cached = cache[domain]
+
+    if (cached) {
+      const age = Date.now() - cached.timestamp
+      if (age < CACHE_TTL_MS) {
+        return cached.base64
+      } else {
+        // Cache expired, remove it
+        delete cache[domain]
+        localStorage.setItem(FAVICON_CACHE_KEY, JSON.stringify(cache))
+      }
+    }
+  } catch (error) {
+    console.error('Failed to get cached favicon:', error)
+  }
+  return null
+}
+
+const fetchAndCacheImage = async (
+  url: string,
+  domain: string
+): Promise<string> => {
+  const response = await fetch(url)
+  const blob = await response.blob()
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64 = reader.result as string
+      setFaviconCache(domain, base64)
+      resolve(base64)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
 export function ServerIcon({
   serverUrl,
   serverName,
@@ -26,6 +100,7 @@ export function ServerIcon({
     sm: 'w-6 h-6',
     md: 'w-8 h-8',
     lg: 'w-12 h-12',
+    xs: 'w-4 h-4',
   }
 
   useEffect(() => {
@@ -61,6 +136,15 @@ export function ServerIcon({
         if (isLocalServer) {
           // For local servers, skip favicon fetching and go straight to fallback
           setFaviconError(true)
+          setIsLoading(false)
+          return
+        }
+
+        // Check cache first
+        const cachedFavicon = getCachedFavicon(domain)
+        if (cachedFavicon) {
+          setFaviconUrl(cachedFavicon)
+          setIsLoading(false)
           return
         }
 
@@ -100,8 +184,14 @@ export function ServerIcon({
               ])
 
               if (response.ok) {
+                // Fetch and cache the image as base64
+                const base64Image = await fetchAndCacheImage(
+                  currentFaviconUrl,
+                  domain
+                )
                 setImageLoading(true)
-                setFaviconUrl(currentFaviconUrl)
+                setFaviconUrl(base64Image)
+                setIsLoading(false)
                 return
               }
             } catch {

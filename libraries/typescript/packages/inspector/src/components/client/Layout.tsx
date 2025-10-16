@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import {
+  Command,
   FolderOpen,
   MessageCircle,
   MessageSquare,
@@ -582,9 +583,24 @@ export function Layout({ children }: LayoutProps) {
               )}
             </div>
 
-            {/* Right side: Theme Toggle + Discord Button + Deploy Button + Logo */}
+            {/* Right side: Theme Toggle + Command Palette + Discord Button + Deploy Button + Logo */}
             <div className="flex items-center gap-4">
               <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full"
+                    onClick={() => setIsCommandPaletteOpen(true)}
+                  >
+                    <Command className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Command Palette</p>
+                </TooltipContent>
+              </Tooltip>
               <Button
                 variant="ghost"
                 className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full"
