@@ -9,7 +9,6 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import open from 'open'
 import { MCPInspector } from '../server/mcp-inspector.js'
-
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
@@ -24,24 +23,25 @@ function isValidUrl(urlString: string): boolean {
 }
 
 // Find available port starting from 8080
-async function findAvailablePort(startPort = 8080): Promise<number> {
+async function findAvailablePort(startPort = 8080, maxAttempts = 100): Promise<number> {
   const net = await import('node:net')
   
-  for (let port = startPort; port < startPort + 100; port++) {
+  for (let port = startPort; port < startPort + maxAttempts; port++) {
     try {
       await new Promise<void>((resolve, reject) => {
         const server = net.createServer()
         server.listen(port, () => {
           server.close(() => resolve())
         })
-        server.on('error', () => reject(new Error(`Port ${port} is in use`)))
+        server.on('error', (err) => reject(err))
       })
       return port
-    } catch {
+    } catch (error) {
+      // Port is in use, try next one
       continue
     }
   }
-  throw new Error(`No available port found starting from ${startPort}`)
+  throw new Error(`No available port found after trying ${maxAttempts} ports starting from ${startPort}`)
 }
 
 // Parse command line arguments
@@ -60,12 +60,12 @@ for (let i = 0; i < args.length; i++) {
     mcpUrl = url
     i++
   } else if (args[i] === '--port' && i + 1 < args.length) {
-    const parsedPort = parseInt(args[i + 1], 10)
-    if (isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+    const parsedPort = Number.parseInt(args[i + 1], 10)
+    if (Number.isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
       console.error(`Error: Port must be a number between 1 and 65535, got: ${args[i + 1]}`)
       process.exit(1)
     }
-    startPort = parsedPort
+    startPort = parsedPort;
     i++
   } else if (args[i] === '--help' || args[i] === '-h') {
     console.log(`
@@ -99,7 +99,6 @@ const app = new Hono()
 app.use('*', cors())
 app.use('*', logger())
 
-
 // Health check
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
@@ -115,8 +114,9 @@ app.get('/api/servers', async (c) => {
     return c.json({ servers })
   }
   catch (error) {
-    console.error('Failed to list servers:', error)
-    return c.json({ error: 'Failed to list servers' }, 500)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to list servers:', message, error)
+    return c.json({ error: 'Failed to list servers', details: message }, 500)
   }
 })
 
@@ -124,12 +124,18 @@ app.get('/api/servers', async (c) => {
 app.post('/api/servers/connect', async (c) => {
   try {
     const { url, command } = await c.req.json()
+    // Validate URL format for security
+    if (url && !isValidUrl(url)) {
+      return c.json({ error: 'Invalid URL format. Must start with http://, https://, ws://, or wss://' }, 400)
+    }
+    
     const server = await mcpInspector.connectToServer(url, command)
     return c.json({ server })
   }
   catch (error) {
-    console.error('Failed to connect to server:', error)
-    return c.json({ error: 'Failed to connect to server' }, 500)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to connect to server:', message, error)
+    return c.json({ error: 'Failed to connect to server', details: message }, 500)
   }
 })
 
@@ -144,8 +150,9 @@ app.get('/api/servers/:id', async (c) => {
     return c.json({ server })
   }
   catch (error) {
-    console.error('Failed to get server details:', error)
-    return c.json({ error: 'Failed to get server details' }, 500)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to get server details:', message, error)
+    return c.json({ error: 'Failed to get server details', details: message }, 500)
   }
 })
 
@@ -160,8 +167,9 @@ app.post('/api/servers/:id/tools/:toolName/execute', async (c) => {
     return c.json({ result })
   }
   catch (error) {
-    console.error('Failed to execute tool:', error)
-    return c.json({ error: 'Failed to execute tool' }, 500)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to execute tool:', message, error)
+    return c.json({ error: 'Failed to execute tool', details: message }, 500)
   }
 })
 
@@ -173,8 +181,9 @@ app.get('/api/servers/:id/tools', async (c) => {
     return c.json({ tools })
   }
   catch (error) {
-    console.error('Failed to get server tools:', error)
-    return c.json({ error: 'Failed to get server tools' }, 500)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to get server tools:', message, error)
+    return c.json({ error: 'Failed to get server tools', details: message }, 500)
   }
 })
 
@@ -186,8 +195,9 @@ app.get('/api/servers/:id/resources', async (c) => {
     return c.json({ resources })
   }
   catch (error) {
-    console.error('Failed to get server resources:', error)
-    return c.json({ error: 'Failed to get server resources' }, 500)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to get server resources:', message, error)
+    return c.json({ error: 'Failed to get server resources', details: message }, 500)
   }
 })
 
@@ -199,8 +209,9 @@ app.delete('/api/servers/:id', async (c) => {
     return c.json({ success: true })
   }
   catch (error) {
-    console.error('Failed to disconnect server:', error)
-    return c.json({ error: 'Failed to disconnect server' }, 500)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to disconnect server:', message, error)
+    return c.json({ error: 'Failed to disconnect server', details: message }, 500)
   }
 })
 
@@ -212,11 +223,9 @@ if (existsSync(clientDistPath)) {
   app.get('/inspector/assets/*', (c) => {
     const path = c.req.path.replace('/inspector/assets/', 'assets/')
     const fullPath = join(clientDistPath, path)
-    
     if (existsSync(fullPath)) {
       const content = readFileSync(fullPath)
-      
-      // Set appropriate content type based on file extension
+        // Set appropriate content type based on file extension
       if (path.endsWith('.js')) {
         c.header('Content-Type', 'application/javascript')
       } else if (path.endsWith('.css')) {
@@ -224,10 +233,8 @@ if (existsSync(clientDistPath)) {
       } else if (path.endsWith('.svg')) {
         c.header('Content-Type', 'image/svg+xml')
       }
-      
-      return c.body(content)
+        return c.body(content)
     }
-    
     return c.notFound()
   })
   
@@ -283,26 +290,21 @@ if (existsSync(clientDistPath)) {
 async function startServer() {
   try {
     const port = await findAvailablePort(startPort)
-    
     serve({
       fetch: app.fetch,
       port,
     })
-    
     console.log(`🚀 MCP Inspector running on http://localhost:${port}`)
-    
     if (mcpUrl) {
       console.log(`📡 Auto-connecting to: ${mcpUrl}`)
     }
-    
     // Auto-open browser
     try {
       await open(`http://localhost:${port}`)
       console.log(`🌐 Browser opened automatically`)
-    } catch (error) {
+    } catch {
       console.log(`🌐 Please open http://localhost:${port} in your browser`)
     }
-    
     return { port, fetch: app.fetch }
   } catch (error) {
     console.error('Failed to start server:', error)
