@@ -25,6 +25,7 @@ export {
   ExternalUrlUIResource,
   RawHtmlUIResource,
   RemoteDomUIResource,
+  AppsSdkUIResource,
   WidgetConfig,
   WidgetManifest,
   DiscoverWidgetsOptions,

@@ -313,19 +313,28 @@ export class McpServer {
    * either as tools (with parameters) or as resources (static access). The tool
    * allows dynamic parameter passing while the resource provides discoverable access.
    *
+   * Supports multiple UI resource types:
+   * - externalUrl: Legacy MCP-UI iframe-based widgets
+   * - rawHtml: Legacy MCP-UI raw HTML content
+   * - remoteDom: Legacy MCP-UI Remote DOM scripting
+   * - appsSdk: OpenAI Apps SDK compatible widgets (text/html+skybridge)
+   *
    * @param definition - Configuration for the UI widget
    * @param definition.name - Unique identifier for the resource
-   * @param definition.widget - Widget name (matches directory in dist/resources/mcp-use/widgets)
+   * @param definition.type - Type of UI resource (externalUrl, rawHtml, remoteDom, appsSdk)
    * @param definition.title - Human-readable title for the widget
    * @param definition.description - Description of the widget's functionality
    * @param definition.props - Widget properties configuration with types and defaults
    * @param definition.size - Preferred iframe size [width, height] (e.g., ['800px', '600px'])
    * @param definition.annotations - Resource annotations for discovery
+   * @param definition.appsSdkMetadata - Apps SDK specific metadata (CSP, widget description, etc.)
    * @returns The server instance for method chaining
    *
    * @example
    * ```typescript
+   * // Legacy MCP-UI widget
    * server.uiResource({
+   *   type: 'externalUrl',
    *   name: 'kanban-board',
    *   widget: 'kanban-board',
    *   title: 'Kanban Board',
@@ -335,19 +344,37 @@ export class McpServer {
    *       type: 'array',
    *       description: 'Initial tasks to display',
    *       required: false
-   *     },
-   *     theme: {
-   *       type: 'string',
-   *       default: 'light'
    *     }
    *   },
    *   size: ['900px', '600px']
+   * })
+   * 
+   * // Apps SDK widget
+   * server.uiResource({
+   *   type: 'appsSdk',
+   *   name: 'kanban-board',
+   *   title: 'Kanban Board',
+   *   description: 'Interactive task management board',
+   *   htmlTemplate: `
+   *     <div id="kanban-root"></div>
+   *     <style>${kanbanCSS}</style>
+   *     <script type="module">${kanbanJS}</script>
+   *   `,
+   *   appsSdkMetadata: {
+   *     'openai/widgetDescription': 'Displays an interactive kanban board',
+   *     'openai/widgetCSP': {
+   *       connect_domains: [],
+   *       resource_domains: ['https://cdn.example.com']
+   *     }
+   *   }
    * })
    * ```
    */
   uiResource(definition: UIResourceDefinition): this {
     // Determine tool name based on resource type
-    const toolName = definition.type === 'externalUrl' ? `ui_${definition.widget}` : `ui_${definition.name}`
+    const toolName = definition.type === 'externalUrl'
+      ? `ui_${definition.widget}`
+      : `ui_${definition.name}`
     const displayName = definition.title || definition.name
 
     // Determine resource URI and mimeType based on type
@@ -367,8 +394,12 @@ export class McpServer {
         resourceUri = `ui://widget/${definition.name}`
         mimeType = 'application/vnd.mcp-ui.remote-dom+javascript'
         break
+      case 'appsSdk':
+        resourceUri = `ui://widget/${definition.name}`
+        mimeType = 'text/html+skybridge'
+        break
       default:
-        throw new Error(`Unsupported UI resource type. Must be one of: externalUrl, rawHtml, remoteDom`)
+        throw new Error(`Unsupported UI resource type. Must be one of: externalUrl, rawHtml, remoteDom, appsSdk`)
     }
 
     // Register the resource
@@ -394,14 +425,50 @@ export class McpServer {
     })
 
     // Register the tool - returns UIResource with parameters
+    // For Apps SDK, include the outputTemplate metadata
+    const toolMetadata: Record<string, unknown> = {}
+
+    if (definition.type === 'appsSdk' && definition.appsSdkMetadata) {
+      // Add Apps SDK tool metadata
+      toolMetadata['openai/outputTemplate'] = resourceUri
+
+      // Copy over other Apps SDK metadata fields to tool metadata
+      if (definition.appsSdkMetadata['openai/toolInvocation/invoking']) {
+        toolMetadata['openai/toolInvocation/invoking'] = definition.appsSdkMetadata['openai/toolInvocation/invoking']
+      }
+      if (definition.appsSdkMetadata['openai/toolInvocation/invoked']) {
+        toolMetadata['openai/toolInvocation/invoked'] = definition.appsSdkMetadata['openai/toolInvocation/invoked']
+      }
+      if (definition.appsSdkMetadata['openai/widgetAccessible']) {
+        toolMetadata['openai/widgetAccessible'] = definition.appsSdkMetadata['openai/widgetAccessible']
+      }
+    }
+
     this.tool({
       name: toolName,
       description: definition.description || `Display ${displayName}`,
       inputs: this.convertPropsToInputs(definition.props),
+      metadata: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
       fn: async (params) => {
         // Create the UIResource with user-provided params
         const uiResource = this.createWidgetUIResource(definition, params)
 
+        // For Apps SDK, return structuredContent in the response
+        if (definition.type === 'appsSdk') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Displaying ${displayName}`
+              },
+              uiResource
+            ],
+            // structuredContent will be injected as window.openai.toolOutput by Apps SDK
+            structuredContent: params
+          }
+        }
+
+        // For other types, return standard response
         return {
           content: [
             {
