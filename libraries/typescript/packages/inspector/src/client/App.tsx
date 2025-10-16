@@ -1,11 +1,11 @@
+import { InspectorDashboard } from '@/components/client/InspectorDashboard'
+import { Layout } from '@/components/client/Layout'
+import { ServerDetail } from '@/components/client/ServerDetail'
+import { ServerList } from '@/components/client/ServerList'
+import { Toaster } from '@/components/ui/sonner'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
-import { InspectorDashboard } from './components/InspectorDashboard'
-import { Layout } from './components/Layout'
-import { ServerDetail } from './components/ServerDetail'
-import { ServerList } from './components/ServerList'
 import { McpProvider } from './context/McpContext'
 import { ThemeProvider } from './context/ThemeContext'
-import { Toaster } from '@/components/ui/sonner'
 
 function App() {
   return (
