@@ -68,8 +68,8 @@ function ConnectionTester({
 }) {
   const callbackUrl =
     typeof window !== 'undefined'
-      ? new URL('/oauth/callback', window.location.origin).toString()
-      : '/oauth/callback'
+      ? new URL('/inspector/oauth/callback', window.location.origin).toString()
+      : '/inspector/oauth/callback'
 
   // Apply proxy configuration
   let finalUrl = config.url
@@ -108,14 +108,31 @@ function ConnectionTester({
       // Don't clear storage on success - we want to keep the connection alive
       // The real McpConnectionWrapper will take over
       onSuccess()
-    } else if (mcpHook.state === 'failed' || mcpHook.error) {
+    } else if (
+      mcpHook.state === 'authenticating' ||
+      mcpHook.state === 'pending_auth'
+    ) {
+      // Authentication is in progress - keep waiting for OAuth callback
+      return
+    } else if (mcpHook.state === 'failed' && mcpHook.error) {
+      // If there's an authUrl available, authentication is in progress - don't fail yet
+      if (mcpHook.authUrl) {
+        return
+      }
       hasCalledRef.current = true
-      const errorMessage = mcpHook.error || 'Failed to connect to server'
+      const errorMessage = mcpHook.error
       // Clear storage on failure to clean up the failed connection attempt
       mcpHook.clearStorage()
       onFailure(errorMessage)
     }
-  }, [mcpHook.state, mcpHook.error, onSuccess, onFailure, mcpHook])
+  }, [
+    mcpHook.state,
+    mcpHook.error,
+    mcpHook.authUrl,
+    onSuccess,
+    onFailure,
+    mcpHook,
+  ])
 
   return null
 }
@@ -164,8 +181,8 @@ export function InspectorDashboard() {
   const [clientId, setClientId] = useState('')
   const [redirectUrl, setRedirectUrl] = useState(
     typeof window !== 'undefined'
-      ? new URL('/oauth/callback', window.location.origin).toString()
-      : '/oauth/callback'
+      ? new URL('/inspector/oauth/callback', window.location.origin).toString()
+      : '/inspector/oauth/callback'
   )
   const [scope, setScope] = useState('')
 

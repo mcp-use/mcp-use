@@ -147,8 +147,8 @@ export function Layout({ children }: LayoutProps) {
   const [clientId, setClientId] = useState('')
   const [redirectUrl, setRedirectUrl] = useState(
     typeof window !== 'undefined'
-      ? new URL('/oauth/callback', window.location.origin).toString()
-      : 'http://localhost:3000/oauth/callback'
+      ? new URL('/inspector/oauth/callback', window.location.origin).toString()
+      : 'http://localhost:3000/inspector/oauth/callback'
   )
   const [scope, setScope] = useState('')
 

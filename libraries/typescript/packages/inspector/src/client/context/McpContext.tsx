@@ -1,6 +1,14 @@
-import type { ReactNode } from 'react'
 import { useMcp } from 'mcp-use/react'
-import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 interface MCPConnection {
   id: string
@@ -21,7 +29,16 @@ interface MCPConnection {
 
 interface McpContextType {
   connections: MCPConnection[]
-  addConnection: (url: string, name?: string, proxyConfig?: { proxyAddress?: string, proxyToken?: string, customHeaders?: Record<string, string> }, transportType?: 'http' | 'sse') => void
+  addConnection: (
+    url: string,
+    name?: string,
+    proxyConfig?: {
+      proxyAddress?: string
+      proxyToken?: string
+      customHeaders?: Record<string, string>
+    },
+    transportType?: 'http' | 'sse'
+  ) => void
   removeConnection: (id: string) => void
   getConnection: (id: string) => MCPConnection | undefined
   autoConnect: boolean
@@ -36,24 +53,39 @@ interface SavedConnection {
   id: string
   url: string
   name: string
-  proxyConfig?: { proxyAddress?: string, proxyToken?: string, customHeaders?: Record<string, string> }
+  proxyConfig?: {
+    proxyAddress?: string
+    proxyToken?: string
+    customHeaders?: Record<string, string>
+  }
   transportType?: 'http' | 'sse'
 }
 
-function McpConnectionWrapper({ url, name, proxyConfig, transportType, onUpdate, onRemove: _onRemove }: {
+function McpConnectionWrapper({
+  url,
+  name,
+  proxyConfig,
+  transportType,
+  onUpdate,
+  onRemove: _onRemove,
+}: {
   url: string
   name: string
-  proxyConfig?: { proxyAddress?: string, proxyToken?: string, customHeaders?: Record<string, string> }
+  proxyConfig?: {
+    proxyAddress?: string
+    proxyToken?: string
+    customHeaders?: Record<string, string>
+  }
   transportType?: 'http' | 'sse'
   onUpdate: (connection: MCPConnection) => void
   onRemove: () => void
 }) {
   // Configure OAuth callback URL
-  // Use /oauth/callback (which redirects to /inspector/oauth/callback) for compatibility
-  // with existing OAuth app configurations
-  const callbackUrl = typeof window !== 'undefined'
-    ? new URL('/oauth/callback', window.location.origin).toString()
-    : '/oauth/callback'
+  // Use /inspector/oauth/callback for proper routing in the inspector
+  const callbackUrl =
+    typeof window !== 'undefined'
+      ? new URL('/inspector/oauth/callback', window.location.origin).toString()
+      : '/inspector/oauth/callback'
 
   // Apply proxy configuration if provided
   let finalUrl = url
@@ -84,7 +116,8 @@ function McpConnectionWrapper({ url, name, proxyConfig, transportType, onUpdate,
   const mcpHook = useMcp({
     url: finalUrl,
     callbackUrl,
-    customHeaders: Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
+    customHeaders:
+      Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
     transportType: transportType || 'http', // Default to 'http' for Streamable HTTP
   })
   const onUpdateRef = useRef(onUpdate)
@@ -121,20 +154,20 @@ function McpConnectionWrapper({ url, name, proxyConfig, transportType, onUpdate,
 
         // Only update if something actually changed
         const prev = prevConnectionRef.current
-        if (!prev
-          || prev.state !== connection.state
-          || prev.error !== connection.error
-          || prev.authUrl !== connection.authUrl
-          || prev.tools.length !== connection.tools.length
-          || prev.resources.length !== connection.resources.length
-          || prev.prompts.length !== connection.prompts.length
+        if (
+          !prev ||
+          prev.state !== connection.state ||
+          prev.error !== connection.error ||
+          prev.authUrl !== connection.authUrl ||
+          prev.tools.length !== connection.tools.length ||
+          prev.resources.length !== connection.resources.length ||
+          prev.prompts.length !== connection.prompts.length
         ) {
           prevConnectionRef.current = connection
           onUpdateRef.current(connection)
         }
       })
-    }
-    else {
+    } else {
       // Fallback for environments without queueMicrotask
       const connection: MCPConnection = {
         id: url,
@@ -155,13 +188,14 @@ function McpConnectionWrapper({ url, name, proxyConfig, transportType, onUpdate,
 
       // Only update if something actually changed
       const prev = prevConnectionRef.current
-      if (!prev
-        || prev.state !== connection.state
-        || prev.error !== connection.error
-        || prev.authUrl !== connection.authUrl
-        || prev.tools.length !== connection.tools.length
-        || prev.resources.length !== connection.resources.length
-        || prev.prompts.length !== connection.prompts.length
+      if (
+        !prev ||
+        prev.state !== connection.state ||
+        prev.error !== connection.error ||
+        prev.authUrl !== connection.authUrl ||
+        prev.tools.length !== connection.tools.length ||
+        prev.resources.length !== connection.resources.length ||
+        prev.prompts.length !== connection.prompts.length
       ) {
         prevConnectionRef.current = connection
         onUpdateRef.current(connection)
@@ -182,11 +216,17 @@ function McpConnectionWrapper({ url, name, proxyConfig, transportType, onUpdate,
 }
 
 export function McpProvider({ children }: { children: ReactNode }) {
-  const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([])
-  const [activeConnections, setActiveConnections] = useState<Map<string, MCPConnection>>(new Map())
+  const [savedConnections, setSavedConnections] = useState<SavedConnection[]>(
+    []
+  )
+  const [activeConnections, setActiveConnections] = useState<
+    Map<string, MCPConnection>
+  >(new Map())
   const [connectionVersion, setConnectionVersion] = useState(0)
   const [autoConnect, setAutoConnectState] = useState<boolean>(true)
-  const [manualConnections, setManualConnections] = useState<Set<string>>(new Set())
+  const [manualConnections, setManualConnections] = useState<Set<string>>(
+    new Set()
+  )
 
   // Load saved connections and auto-connect setting from localStorage on mount
   useEffect(() => {
@@ -196,34 +236,47 @@ export function McpProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(saved)
         // Validate and filter out invalid connections
         const validConnections = Array.isArray(parsed)
-          ? parsed.filter((conn: any) => {
-              // Ensure connection has valid structure with string url and id
-              return conn
-                && typeof conn === 'object'
-                && typeof conn.id === 'string'
-                && typeof conn.url === 'string'
-                && typeof conn.name === 'string'
-            }).map((conn: any) => {
-              // Migrate existing connections to include transportType
-              if (!conn.transportType) {
-                conn.transportType = 'http' // Default to 'http' for Streamable HTTP
-              }
-              return conn
-            })
+          ? parsed
+              .filter((conn: any) => {
+                // Ensure connection has valid structure with string url and id
+                return (
+                  conn &&
+                  typeof conn === 'object' &&
+                  typeof conn.id === 'string' &&
+                  typeof conn.url === 'string' &&
+                  typeof conn.name === 'string'
+                )
+              })
+              .map((conn: any) => {
+                // Migrate existing connections to include transportType
+                if (!conn.transportType) {
+                  conn.transportType = 'http' // Default to 'http' for Streamable HTTP
+                }
+                return conn
+              })
           : []
 
         // If we filtered out any invalid connections or migrated transport types, update localStorage
-        const hasChanges = validConnections.length !== parsed.length
-          || validConnections.some((conn: any) => conn.transportType === 'http' && !parsed.find((p: any) => p.id === conn.id && p.transportType))
+        const hasChanges =
+          validConnections.length !== parsed.length ||
+          validConnections.some(
+            (conn: any) =>
+              conn.transportType === 'http' &&
+              !parsed.find((p: any) => p.id === conn.id && p.transportType)
+          )
 
         if (hasChanges) {
-          console.warn('Updated connections in localStorage with transport type migration')
-          localStorage.setItem('mcp-inspector-connections', JSON.stringify(validConnections))
+          console.warn(
+            'Updated connections in localStorage with transport type migration'
+          )
+          localStorage.setItem(
+            'mcp-inspector-connections',
+            JSON.stringify(validConnections)
+          )
         }
 
         setSavedConnections(validConnections)
-      }
-      catch (error) {
+      } catch (error) {
         console.error('Failed to parse saved connections:', error)
         // Clear corrupted localStorage
         localStorage.removeItem('mcp-inspector-connections')
@@ -231,41 +284,58 @@ export function McpProvider({ children }: { children: ReactNode }) {
     }
 
     // Load auto-connect setting
-    const autoConnectSetting = localStorage.getItem('mcp-inspector-auto-connect')
+    const autoConnectSetting = localStorage.getItem(
+      'mcp-inspector-auto-connect'
+    )
     if (autoConnectSetting !== null) {
       setAutoConnectState(autoConnectSetting === 'true')
     }
   }, [])
 
   const updateConnection = useCallback((connection: MCPConnection) => {
-    setActiveConnections(prev => new Map(prev).set(connection.id, connection))
-    setConnectionVersion(v => v + 1)
+    setActiveConnections((prev) => new Map(prev).set(connection.id, connection))
+    setConnectionVersion((v) => v + 1)
   }, [])
 
-  const addConnection = useCallback((url: string, name?: string, proxyConfig?: { proxyAddress?: string, proxyToken?: string, customHeaders?: Record<string, string> }, transportType?: 'http' | 'sse') => {
-    const connectionName = name || url
-    const newConnection: SavedConnection = {
-      id: url,
-      url,
-      name: connectionName,
-      proxyConfig,
-      transportType: transportType || 'http', // Default to 'http' for Streamable HTTP
-    }
-
-    setSavedConnections((prev) => {
-      // Check if connection already exists
-      if (prev.some(c => c.id === url)) {
-        return prev
+  const addConnection = useCallback(
+    (
+      url: string,
+      name?: string,
+      proxyConfig?: {
+        proxyAddress?: string
+        proxyToken?: string
+        customHeaders?: Record<string, string>
+      },
+      transportType?: 'http' | 'sse'
+    ) => {
+      const connectionName = name || url
+      const newConnection: SavedConnection = {
+        id: url,
+        url,
+        name: connectionName,
+        proxyConfig,
+        transportType: transportType || 'http', // Default to 'http' for Streamable HTTP
       }
-      const updated = [...prev, newConnection]
-      localStorage.setItem('mcp-inspector-connections', JSON.stringify(updated))
-      return updated
-    })
-  }, [])
+
+      setSavedConnections((prev) => {
+        // Check if connection already exists
+        if (prev.some((c) => c.id === url)) {
+          return prev
+        }
+        const updated = [...prev, newConnection]
+        localStorage.setItem(
+          'mcp-inspector-connections',
+          JSON.stringify(updated)
+        )
+        return updated
+      })
+    },
+    []
+  )
 
   const removeConnection = useCallback((id: string) => {
     setSavedConnections((prev) => {
-      const updated = prev.filter(c => c.id !== id)
+      const updated = prev.filter((c) => c.id !== id)
       localStorage.setItem('mcp-inspector-connections', JSON.stringify(updated))
       return updated
     })
@@ -277,8 +347,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
         // Clear storage and remove connection
         try {
           connection.clearStorage()
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Failed to clear storage:', error)
         }
         next.delete(id)
@@ -287,36 +356,43 @@ export function McpProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const getConnection = useCallback((id: string) => {
-    // First check active connections
-    const activeConn = activeConnections.get(id)
-    if (activeConn) {
-      return activeConn
-    }
-
-    // If not active, check if it's a saved connection and return placeholder
-    const savedConn = savedConnections.find(conn => conn.id === id)
-    if (savedConn) {
-      return {
-        id: savedConn.id,
-        url: savedConn.url,
-        name: savedConn.name,
-        state: 'disconnected' as const,
-        tools: [],
-        resources: [],
-        prompts: [],
-        error: null,
-        authUrl: null,
-        callTool: async () => { throw new Error('Not connected') },
-        readResource: async () => { throw new Error('Not connected') },
-        authenticate: () => {},
-        retry: () => {},
-        clearStorage: () => {},
+  const getConnection = useCallback(
+    (id: string) => {
+      // First check active connections
+      const activeConn = activeConnections.get(id)
+      if (activeConn) {
+        return activeConn
       }
-    }
 
-    return undefined
-  }, [activeConnections, savedConnections])
+      // If not active, check if it's a saved connection and return placeholder
+      const savedConn = savedConnections.find((conn) => conn.id === id)
+      if (savedConn) {
+        return {
+          id: savedConn.id,
+          url: savedConn.url,
+          name: savedConn.name,
+          state: 'disconnected' as const,
+          tools: [],
+          resources: [],
+          prompts: [],
+          error: null,
+          authUrl: null,
+          callTool: async () => {
+            throw new Error('Not connected')
+          },
+          readResource: async () => {
+            throw new Error('Not connected')
+          },
+          authenticate: () => {},
+          retry: () => {},
+          clearStorage: () => {},
+        }
+      }
+
+      return undefined
+    },
+    [activeConnections, savedConnections]
+  )
 
   const setAutoConnect = useCallback((value: boolean) => {
     setAutoConnectState(value)
@@ -329,7 +405,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const connectServer = useCallback((id: string) => {
-    setManualConnections(prev => new Set(prev).add(id))
+    setManualConnections((prev) => new Set(prev).add(id))
   }, [])
 
   const disconnectServer = useCallback((id: string) => {
@@ -346,8 +422,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
         // Clear storage and remove connection
         try {
           connection.clearStorage()
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Failed to clear storage:', error)
         }
         next.delete(id)
@@ -378,35 +453,58 @@ export function McpProvider({ children }: { children: ReactNode }) {
         prompts: [],
         error: null,
         authUrl: null,
-        callTool: async () => { throw new Error('Not connected') },
-        readResource: async () => { throw new Error('Not connected') },
+        callTool: async () => {
+          throw new Error('Not connected')
+        },
+        readResource: async () => {
+          throw new Error('Not connected')
+        },
         authenticate: () => {},
         retry: () => {},
         clearStorage: () => {},
       }
     })
 
-    console.warn('[McpContext] Connections updated, version:', connectionVersion, 'count:', conns.length, 'states:', conns.map(c => `${c.id}:${c.state}`))
+    console.warn(
+      '[McpContext] Connections updated, version:',
+      connectionVersion,
+      'count:',
+      conns.length,
+      'states:',
+      conns.map((c) => `${c.id}:${c.state}`)
+    )
     return conns
   }, [activeConnections, savedConnections, connectionVersion])
 
   // Memoize the context value to prevent unnecessary re-renders and HMR issues
-  const contextValue = useMemo(() => ({
-    connections,
-    addConnection,
-    removeConnection,
-    getConnection,
-    autoConnect,
-    setAutoConnect,
-    connectServer,
-    disconnectServer,
-  }), [connections, addConnection, removeConnection, getConnection, autoConnect, setAutoConnect, connectServer, disconnectServer])
+  const contextValue = useMemo(
+    () => ({
+      connections,
+      addConnection,
+      removeConnection,
+      getConnection,
+      autoConnect,
+      setAutoConnect,
+      connectServer,
+      disconnectServer,
+    }),
+    [
+      connections,
+      addConnection,
+      removeConnection,
+      getConnection,
+      autoConnect,
+      setAutoConnect,
+      connectServer,
+      disconnectServer,
+    ]
+  )
 
   return (
     <McpContext value={contextValue}>
       {savedConnections
-        .filter(saved => autoConnect || manualConnections.has(saved.id))
-        .map(saved => (
+        .filter((saved) => autoConnect || manualConnections.has(saved.id))
+        .map((saved) => (
           <McpConnectionWrapper
             key={saved.id}
             url={saved.url}
