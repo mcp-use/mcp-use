@@ -1,13 +1,6 @@
 import LogoAnimated from '@/components/LogoAnimated'
 import { Button } from '@/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -34,14 +27,15 @@ import {
   Wrench,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useInspector } from '../../client/context/InspectorContext'
 import { useMcpContext } from '../../client/context/McpContext'
+import { useKeyboardShortcuts } from '../../client/hooks/useKeyboardShortcuts'
 import { AnimatedThemeToggler } from './AnimatedThemeToggler'
 import { ChatTab } from './ChatTab'
 import { CommandPalette } from './CommandPalette'
-import { ConnectionSettingsForm } from './ConnectionSettingsForm'
 import type { CustomHeader } from './CustomHeadersEditor'
 import { PromptsTab } from './PromptsTab'
 import { ResourcesTab } from './ResourcesTab'
@@ -119,8 +113,13 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { connections, addConnection } = useMcpContext()
-  const [activeTab, setActiveTab] = useState('tools')
-  const [selectedServerId, setSelectedServerId] = useState<string | null>(null)
+  const {
+    selectedServerId,
+    setSelectedServerId,
+    activeTab,
+    setActiveTab,
+    navigateToItem,
+  } = useInspector()
   const [configLoaded, setConfigLoaded] = useState(false)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [isAutoConnecting, setIsAutoConnecting] = useState(false)
@@ -130,6 +129,11 @@ export function Layout({ children }: LayoutProps) {
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
     null
   )
+
+  // Refs for search inputs in tabs
+  const toolsSearchRef = useRef<{ focusSearch: () => void }>(null)
+  const promptsSearchRef = useRef<{ focusSearch: () => void }>(null)
+  const resourcesSearchRef = useRef<{ focusSearch: () => void }>(null)
 
   // Form state for connection options
   const [transportType, setTransportType] = useState('SSE')
@@ -167,17 +171,52 @@ export function Layout({ children }: LayoutProps) {
       return
     }
     setSelectedServerId(serverId)
-    navigate(`/servers/${encodeURIComponent(serverId)}`)
+    navigate(`/?server=${encodeURIComponent(serverId)}`)
   }
 
   const handleCommandPaletteNavigate = (
     tab: 'tools' | 'prompts' | 'resources',
-    itemName?: string
+    itemName?: string,
+    serverId?: string
   ) => {
-    setActiveTab(tab)
-    // Store the item name to be selected in the respective tab
-    if (itemName) {
-      sessionStorage.setItem(`selected-${tab}`, itemName)
+    console.warn('[Layout] handleCommandPaletteNavigate called:', {
+      tab,
+      itemName,
+      serverId,
+    })
+
+    // If a serverId is provided, navigate to that server
+    if (serverId) {
+      const server = connections.find((c) => c.id === serverId)
+      console.warn('[Layout] Server lookup:', {
+        serverId,
+        serverFound: !!server,
+        serverState: server?.state,
+      })
+
+      if (!server || server.state !== 'ready') {
+        console.warn('[Layout] Server not ready, showing error')
+        toast.error('Server is not connected and cannot be inspected')
+        return
+      }
+
+      console.warn('[Layout] Calling navigateToItem:', {
+        serverId,
+        tab,
+        itemName,
+      })
+      // Use the context's navigateToItem to set all state atomically
+      navigateToItem(serverId, tab, itemName)
+      // Navigate using query params
+      console.warn(
+        '[Layout] Navigating to:',
+        `/?server=${encodeURIComponent(serverId)}`
+      )
+      navigate(`/?server=${encodeURIComponent(serverId)}`)
+    } else {
+      console.warn('[Layout] No serverId, just updating tab to:', tab)
+      // No serverId provided, just update the tab for the current server
+      setActiveTab(tab)
     }
   }
 
@@ -275,7 +314,7 @@ export function Layout({ children }: LayoutProps) {
         setIsAutoConnecting(true)
         addConnection(autoConnectUrl, 'Local MCP Server', undefined, 'http')
         // Navigate immediately but keep loading screen visible a bit longer to avoid flash
-        navigate(`/servers/${encodeURIComponent(autoConnectUrl)}`)
+        navigate(`/?server=${encodeURIComponent(autoConnectUrl)}`)
         setTimeout(() => {
           setIsAutoConnecting(false)
         }, 1000)
@@ -308,37 +347,39 @@ export function Layout({ children }: LayoutProps) {
       .catch(() => {
         setConfigLoaded(true)
       })
-  }, [configLoaded, connections, addConnection])
+  }, [configLoaded, connections, addConnection, navigate])
 
-  // Handle navigation logic based on current route and server selection
+  // Handle navigation logic based on query parameters
   useEffect(() => {
-    const isServerRoute = location.pathname.startsWith('/servers/')
-    const serverIdFromRoute = location.pathname.split('/servers/')[1]
+    const searchParams = new URLSearchParams(location.search)
+    const serverParam = searchParams.get('server')
 
-    if (isServerRoute && serverIdFromRoute) {
-      // Decode the server ID from the route
-      const decodedServerId = decodeURIComponent(serverIdFromRoute)
-      setSelectedServerId(decodedServerId)
-    } else if (!isServerRoute) {
-      // If we're not on a server route, clear the selected server
-      setSelectedServerId(null)
+    if (serverParam) {
+      // Decode the server ID from query param
+      const decodedServerId = decodeURIComponent(serverParam)
+      // Only update if different to avoid unnecessary re-renders
+      if (decodedServerId !== selectedServerId) {
+        setSelectedServerId(decodedServerId)
+      }
+    } else {
+      // No server param, clear the selected server
+      if (selectedServerId !== null) {
+        setSelectedServerId(null)
+      }
     }
-  }, [location.pathname])
+  }, [location.search, selectedServerId, setSelectedServerId])
 
-  // If no server is selected and we're on a server route, navigate to root
+  // If server param exists but connection fails, navigate to root
   // But only after we've given connections time to load and establish
   useEffect(() => {
-    const serverIdFromRoute = location.pathname.split('/servers/')[1]
-    const decodedServerId = serverIdFromRoute
-      ? decodeURIComponent(serverIdFromRoute)
-      : null
+    const searchParams = new URLSearchParams(location.search)
+    const serverParam = searchParams.get('server')
 
-    const isServerRoute = location.pathname.startsWith('/servers/')
-    const hasServerId = selectedServerId === decodedServerId
-
-    if (!isServerRoute || !hasServerId || !configLoaded) {
+    if (!serverParam || !configLoaded) {
       return
     }
+
+    const decodedServerId = decodeURIComponent(serverParam)
 
     // Check if any connection exists for this server
     const serverConnection = connections.find(
@@ -373,32 +414,55 @@ export function Layout({ children }: LayoutProps) {
     }, 3000)
 
     return () => clearTimeout(timeoutId)
-  }, [
-    selectedServer,
-    location.pathname,
-    navigate,
-    selectedServerId,
-    connections,
-    configLoaded,
-  ])
+  }, [location.search, navigate, connections, configLoaded])
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      // Cmd+K or Ctrl+K to open command palette
-      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
-        event.preventDefault()
-        setIsCommandPaletteOpen(true)
+  // Centralized keyboard shortcuts
+  useKeyboardShortcuts({
+    onCommandPalette: () => setIsCommandPaletteOpen(true),
+    onToolsTab: () => {
+      if (selectedServer) {
+        setActiveTab('tools')
       }
-      // Escape to close command palette
-      if (event.key === 'Escape') {
-        setIsCommandPaletteOpen(false)
+    },
+    onPromptsTab: () => {
+      if (selectedServer) {
+        setActiveTab('prompts')
       }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
+    },
+    onResourcesTab: () => {
+      if (selectedServer) {
+        setActiveTab('resources')
+      }
+    },
+    onChatTab: () => {
+      if (selectedServer) {
+        setActiveTab('chat')
+      }
+    },
+    onHome: () => {
+      navigate('/')
+    },
+    onFocusSearch: () => {
+      // Focus the search bar based on the active tab
+      if (activeTab === 'tools' && toolsSearchRef.current) {
+        toolsSearchRef.current.focusSearch()
+      } else if (activeTab === 'prompts' && promptsSearchRef.current) {
+        promptsSearchRef.current.focusSearch()
+      } else if (activeTab === 'resources' && resourcesSearchRef.current) {
+        resourcesSearchRef.current.focusSearch()
+      }
+    },
+    onBlurSearch: () => {
+      // Blur the search bar based on the active tab
+      if (activeTab === 'tools' && toolsSearchRef.current) {
+        toolsSearchRef.current.blurSearch()
+      } else if (activeTab === 'prompts' && promptsSearchRef.current) {
+        promptsSearchRef.current.blurSearch()
+      } else if (activeTab === 'resources' && resourcesSearchRef.current) {
+        resourcesSearchRef.current.blurSearch()
+      }
+    },
+  })
 
   // Show loading spinner during auto-connection
   if (isAutoConnecting) {
@@ -530,20 +594,6 @@ export function Layout({ children }: LayoutProps) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-
-                {/* Gear icon button for selected server */}
-                {selectedServer && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 cursor-pointer"
-                    onClick={() =>
-                      handleOpenConnectionOptions(selectedServer.id)
-                    }
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                )}
               </div>
 
               {/* Tabs */}
@@ -591,22 +641,18 @@ export function Layout({ children }: LayoutProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full"
+                    className=" hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md py-0 flex gap-1"
                     onClick={() => setIsCommandPaletteOpen(true)}
                   >
-                    <Command className="h-4 w-4" />
+                    <Command className="size-4" />
+                    <span className="text-base font-mono">K</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Command Palette</p>
                 </TooltipContent>
               </Tooltip>
-              <Button
-                variant="ghost"
-                className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full"
-                size="sm"
-                asChild
-              >
+              <Button variant="ghost" size="sm" asChild>
                 <a
                   href="https://discord.gg/XkNkSkMz3V"
                   className="flex items-center gap-2"
@@ -617,57 +663,7 @@ export function Layout({ children }: LayoutProps) {
                   Discord
                 </a>
               </Button>
-              {/* <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Rocket className="h-4 w-4" />
-                    Deploy
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Deploy Your MCP Server</DialogTitle>
-                    <DialogDescription>
-                      Choose how you'd like to deploy your MCP server
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <Button
-                      variant="outline"
-                      className="h-auto p-4 flex flex-col items-start gap-2"
-                      onClick={() => {
-                        // Mock implementation for hosted deployment
-                        // TODO: Implement actual deployment logic
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Rocket className="h-4 w-4" />
-                        <span className="font-medium">Hosted on MCP Use</span>
-                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded">Free</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground dark:text-zinc-400 text-left">
-                        Deploy your server to our managed infrastructure with zero configuration
-                      </p>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-auto p-4 flex flex-col items-start gap-2"
-                      onClick={() => {
-                        // Mock implementation for Docker deployment
-                        // TODO: Implement actual deployment logic
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 bg-blue-500 rounded" />
-                        <span className="font-medium">Docker</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground dark:text-zinc-400 text-left">
-                        Get Docker configuration files to deploy on your own infrastructure
-                      </p>
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog> */}
+
               <LogoAnimated state="expanded" />
             </div>
           </div>
@@ -677,18 +673,21 @@ export function Layout({ children }: LayoutProps) {
         <main className="flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto">
           {selectedServer && activeTab === 'tools' ? (
             <ToolsTab
+              ref={toolsSearchRef}
               tools={selectedServer.tools}
               callTool={selectedServer.callTool}
               isConnected={selectedServer.state === 'ready'}
             />
           ) : selectedServer && activeTab === 'prompts' ? (
             <PromptsTab
+              ref={promptsSearchRef}
               prompts={selectedServer.prompts}
               callPrompt={selectedServer.callTool} // Using callTool for now, should be callPrompt when available
               isConnected={selectedServer.state === 'ready'}
             />
           ) : selectedServer && activeTab === 'resources' ? (
             <ResourcesTab
+              ref={resourcesSearchRef}
               resources={selectedServer.resources}
               readResource={selectedServer.readResource}
               isConnected={selectedServer.state === 'ready'}
@@ -718,52 +717,6 @@ export function Layout({ children }: LayoutProps) {
         />
 
         {/* Connection Options Dialog */}
-        <Dialog
-          open={connectionOptionsOpen}
-          onOpenChange={setConnectionOptionsOpen}
-        >
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingConnectionId
-                  ? 'Edit Connection Options'
-                  : 'Connection Options'}
-              </DialogTitle>
-              <DialogDescription>
-                Configure connection settings for your MCP server
-              </DialogDescription>
-            </DialogHeader>
-
-            <ConnectionSettingsForm
-              transportType={transportType}
-              setTransportType={setTransportType}
-              url={url}
-              setUrl={setUrl}
-              connectionType={connectionType}
-              setConnectionType={setConnectionType}
-              customHeaders={customHeaders}
-              setCustomHeaders={setCustomHeaders}
-              requestTimeout={requestTimeout}
-              setRequestTimeout={setRequestTimeout}
-              resetTimeoutOnProgress={resetTimeoutOnProgress}
-              setResetTimeoutOnProgress={setResetTimeoutOnProgress}
-              maxTotalTimeout={maxTotalTimeout}
-              setMaxTotalTimeout={setMaxTotalTimeout}
-              proxyAddress={proxyAddress}
-              setProxyAddress={setProxyAddress}
-              proxyToken={proxyToken}
-              setProxyToken={setProxyToken}
-              clientId={clientId}
-              setClientId={setClientId}
-              redirectUrl={redirectUrl}
-              setRedirectUrl={setRedirectUrl}
-              scope={scope}
-              setScope={setScope}
-              onSave={handleSaveConnectionOptions}
-              onCancel={() => setConnectionOptionsOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
       </div>
     </TooltipProvider>
   )

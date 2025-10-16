@@ -1,8 +1,8 @@
 import { InspectorDashboard } from '@/components/client/InspectorDashboard'
 import { Layout } from '@/components/client/Layout'
-import { ServerList } from '@/components/client/ServerList'
 import { Toaster } from '@/components/ui/sonner'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import { InspectorProvider } from './context/InspectorContext'
 import { McpProvider } from './context/McpContext'
 import { ThemeProvider } from './context/ThemeContext'
 
@@ -10,16 +10,16 @@ function App() {
   return (
     <ThemeProvider>
       <McpProvider>
-        <Router basename="/inspector">
-          <Layout>
-            <Routes>
-              <Route path="/" element={<InspectorDashboard />} />
-              <Route path="/servers" element={<ServerList />} />
-              <Route path="/servers/:serverId" element={null} />
-            </Routes>
-          </Layout>
-        </Router>
-        <Toaster position="top-center" />
+        <InspectorProvider>
+          <Router basename="/inspector">
+            <Layout>
+              <Routes>
+                <Route path="/" element={<InspectorDashboard />} />
+              </Routes>
+            </Layout>
+          </Router>
+          <Toaster position="top-center" />
+        </InspectorProvider>
       </McpProvider>
     </ThemeProvider>
   )

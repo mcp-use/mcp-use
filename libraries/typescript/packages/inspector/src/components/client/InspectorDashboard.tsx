@@ -1,51 +1,22 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NotFound } from '@/components/ui/not-found'
 import { RandomGradientBackground } from '@/components/ui/random-gradient-background'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import {
-  CircleMinus,
-  Cog,
-  Copy,
-  FileText,
-  Loader2,
-  RotateCcw,
-  Shield,
-} from 'lucide-react'
+import { CircleMinus, Copy, Loader2, RotateCcw } from 'lucide-react'
 import { useMcp } from 'mcp-use/react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useMcpContext } from '../../client/context/McpContext'
+import { ConnectionSettingsForm } from './ConnectionSettingsForm'
 import type { CustomHeader } from './CustomHeadersEditor'
-import { CustomHeadersEditor } from './CustomHeadersEditor'
 
 // Temporary connection tester component
 function ConnectionTester({
@@ -187,9 +158,6 @@ export function InspectorDashboard() {
   const [scope, setScope] = useState('')
 
   // UI state
-  const [headersDialogOpen, setHeadersDialogOpen] = useState(false)
-  const [authDialogOpen, setAuthDialogOpen] = useState(false)
-  const [configDialogOpen, setConfigDialogOpen] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [autoSwitch, setAutoSwitch] = useState(true)
   const hasShownToastRef = useRef(false)
@@ -375,7 +343,7 @@ export function InspectorDashboard() {
       toast.error('Server is not connected and cannot be inspected')
       return
     }
-    navigate(`/servers/${encodeURIComponent(connection.id)}`)
+    navigate(`/?server=${encodeURIComponent(connection.id)}`)
   }
 
   // Monitor connecting servers and remove them from the set when they connect or fail
@@ -420,7 +388,7 @@ export function InspectorDashboard() {
     ) {
       console.warn('[InspectorDashboard] Navigating to server:', connection.id)
       setPendingNavigation(null)
-      navigate(`/servers/${encodeURIComponent(connection.id)}`)
+      navigate(`/?server=${encodeURIComponent(connection.id)}`)
     }
     // Only cancel navigation if connection truly failed with no data loaded
     else if (
@@ -435,58 +403,6 @@ export function InspectorDashboard() {
       setPendingNavigation(null)
     }
   }, [connections, pendingNavigation, navigate])
-
-  const handleExportServerEntry = async () => {
-    if (!url.trim()) {
-      toast.error('Please enter a URL first')
-      return
-    }
-
-    const serverEntry = {
-      type: 'streamable-http',
-      url,
-      note: 'For Streamable HTTP connections, add this URL directly in your MCP Client',
-    }
-
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(serverEntry, null, 2))
-      toast.success(
-        'Streamable HTTP URL has been copied. Use this URL directly in your MCP Client.'
-      )
-    } catch {
-      toast.error('Failed to copy server entry to clipboard')
-    }
-  }
-
-  const handleExportServersFile = async () => {
-    if (!url.trim()) {
-      toast.error('Please enter a URL first')
-      return
-    }
-
-    const serversFile = {
-      mcpServers: {
-        'default-server': {
-          type: 'streamable-http',
-          url,
-          note: 'For Streamable HTTP connections, add this URL directly in your MCP Client',
-        },
-      },
-    }
-
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(serversFile, null, 2))
-      toast.success(
-        "Servers configuration has been copied to clipboard. Add this to your mcp.json file. Current testing server will be added as 'default-server'"
-      )
-    } catch {
-      toast.error('Failed to copy servers file to clipboard')
-    }
-  }
-
-  const enabledHeadersCount = customHeaders.filter(
-    (h) => h.name && h.value
-  ).length
 
   return (
     <div className="flex items-start justify-start gap-4 h-full relative">
@@ -700,350 +616,39 @@ export function InspectorDashboard() {
         <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
           <h3 className="text-xl font-semibold text-white mb-2">Connect</h3>
 
-          {/* Transport Type */}
-          <div className="space-y-2">
-            <Label className="text-white/90">Transport Type</Label>
-            <Select value={transportType} onValueChange={setTransportType}>
-              <SelectTrigger className="w-full bg-white/10 border-white/20 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="SSE">Streamable HTTP</SelectItem>
-                <SelectItem value="WebSocket">
-                  Server-Sent Events (SSE)
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* URL */}
-          <div className="space-y-2">
-            <Label className="text-white/90">URL</Label>
-            <Input
-              placeholder="http://localhost:3001/sse"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-            />
-          </div>
-
-          {/* Connection Type */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-white/90">Connection Type</Label>
-              <div className="flex items-center gap-2">
-                <Label
-                  htmlFor="auto-switch"
-                  className="text-xs text-white/70 cursor-pointer"
-                >
-                  Auto-switch
-                </Label>
-                <Switch
-                  id="auto-switch"
-                  checked={autoSwitch}
-                  onCheckedChange={(value) => {
-                    setAutoSwitch(value)
-                    localStorage.setItem(
-                      'mcp-inspector-auto-switch',
-                      String(value)
-                    )
-                  }}
-                  className="scale-75"
-                />
-              </div>
-            </div>
-            <Select value={connectionType} onValueChange={setConnectionType}>
-              <SelectTrigger className="w-full bg-white/10 border-white/20 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Direct">Direct</SelectItem>
-                <SelectItem value="Via Proxy">Via Proxy</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Export Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="absolute top-2 right-2 text-white  hover:bg-white/20 z-10 dark:hover:bg-white/20"
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={handleExportServerEntry}>
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Server Entry
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportServersFile}>
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Servers File
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Configuration Buttons Row */}
-          <div className="flex gap-3">
-            {/* Authentication Button */}
-            <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="flex-1 justify-center bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Shield className="w-4 h-4 mr-2" />
-                  Authentication
-                  {(clientId || scope) && (
-                    <Badge variant="secondary" className="ml-2">
-                      OAuth 2.0
-                    </Badge>
-                  )}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Authentication</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium">OAuth 2.0 Flow</h4>
-
-                  {/* Client ID */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Client ID</Label>
-                    <Input
-                      placeholder="Client ID"
-                      value={clientId}
-                      onChange={(e) => setClientId(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Redirect URL */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Redirect URL</Label>
-                    <Input
-                      value={redirectUrl}
-                      onChange={(e) => setRedirectUrl(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Scope */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Scope</Label>
-                    <Input
-                      placeholder="Scope (space-separated)"
-                      value={scope}
-                      onChange={(e) => setScope(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button onClick={() => setAuthDialogOpen(false)}>
-                      Save
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Custom Headers Button */}
-            <Dialog
-              open={headersDialogOpen}
-              onOpenChange={setHeadersDialogOpen}
-            >
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="flex-1 justify-center bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Custom Headers
-                  {enabledHeadersCount > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {enabledHeadersCount}
-                    </Badge>
-                  )}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Custom Headers</DialogTitle>
-                </DialogHeader>
-                <CustomHeadersEditor
-                  headers={customHeaders}
-                  onChange={setCustomHeaders}
-                  onSave={() => setHeadersDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
-
-            {/* Configuration Button */}
-            <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="flex-1 justify-center bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Cog className="w-4 h-4 mr-2" />
-                  Configuration
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Configuration</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {/* Request Timeout */}
-                  <div className="space-y-2">
-                    <Label className="text-sm flex items-center gap-1">
-                      Request Timeout
-                      <span className="text-muted-foreground text-xs">(?)</span>
-                    </Label>
-                    <Input
-                      type="number"
-                      value={requestTimeout}
-                      onChange={(e) => setRequestTimeout(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Reset Timeout on Progress */}
-                  <div className="space-y-2">
-                    <Label className="text-sm flex items-center gap-1">
-                      Reset Timeout on Progress
-                      <span className="text-muted-foreground text-xs">(?)</span>
-                    </Label>
-                    <Select
-                      value={resetTimeoutOnProgress}
-                      onValueChange={setResetTimeoutOnProgress}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="True">True</SelectItem>
-                        <SelectItem value="False">False</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Maximum Total Timeout */}
-                  <div className="space-y-2">
-                    <Label className="text-sm flex items-center gap-1">
-                      Maximum Total Timeout
-                      <span className="text-muted-foreground text-xs">(?)</span>
-                    </Label>
-                    <Input
-                      type="number"
-                      value={maxTotalTimeout}
-                      onChange={(e) => setMaxTotalTimeout(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Inspector Proxy Address */}
-                  <div className="space-y-2">
-                    <Label className="text-sm flex items-center gap-1">
-                      Inspector Proxy Address
-                      <span className="text-muted-foreground text-xs">(?)</span>
-                    </Label>
-                    <Input
-                      value={proxyAddress}
-                      onChange={(e) => setProxyAddress(e.target.value)}
-                      placeholder=""
-                    />
-                  </div>
-
-                  {/* Proxy Session Token */}
-                  <div className="space-y-2">
-                    <Label className="text-sm flex items-center gap-1">
-                      Proxy Session Token
-                      <span className="text-muted-foreground text-xs">(?)</span>
-                    </Label>
-                    <Input
-                      value={proxyToken}
-                      onChange={(e) => setProxyToken(e.target.value)}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button onClick={() => setConfigDialogOpen(false)}>
-                      Save
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Connect Button */}
-          <Button
-            onClick={handleAddConnection}
-            disabled={!url.trim() || isConnecting}
-            className="w-full bg-white text-black hover:bg-white/90 font-semibold mt-4"
-          >
-            {isConnecting ? (
-              <>
-                <svg
-                  className="w-4 h-4 mr-2 animate-spin"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                Connecting...
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
-                Connect
-              </>
-            )}
-          </Button>
+          <ConnectionSettingsForm
+            transportType={transportType}
+            setTransportType={setTransportType}
+            url={url}
+            setUrl={setUrl}
+            connectionType={connectionType}
+            setConnectionType={setConnectionType}
+            customHeaders={customHeaders}
+            setCustomHeaders={setCustomHeaders}
+            requestTimeout={requestTimeout}
+            setRequestTimeout={setRequestTimeout}
+            resetTimeoutOnProgress={resetTimeoutOnProgress}
+            setResetTimeoutOnProgress={setResetTimeoutOnProgress}
+            maxTotalTimeout={maxTotalTimeout}
+            setMaxTotalTimeout={setMaxTotalTimeout}
+            proxyAddress={proxyAddress}
+            setProxyAddress={setProxyAddress}
+            proxyToken={proxyToken}
+            setProxyToken={setProxyToken}
+            clientId={clientId}
+            setClientId={setClientId}
+            redirectUrl={redirectUrl}
+            setRedirectUrl={setRedirectUrl}
+            scope={scope}
+            setScope={setScope}
+            autoSwitch={autoSwitch}
+            setAutoSwitch={setAutoSwitch}
+            onConnect={handleAddConnection}
+            variant="styled"
+            showConnectButton={true}
+            showExportButton={true}
+            isConnecting={isConnecting}
+          />
         </div>
         <RandomGradientBackground className="absolute inset-0" />
       </div>

@@ -1,6 +1,6 @@
+import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
 
 /**
  * HoverDrawLogo (timed sequence)
@@ -40,9 +40,9 @@ export default function LogoAnimated({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'flex items-center transition-opacity',
-        state === 'expanded' ? 'space-x-3' : '',
-        className,
+        'flex items-center transition-opacity -my-3',
+        state === 'expanded' ? 'space-x-2' : '',
+        className
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -54,7 +54,7 @@ export default function LogoAnimated({
           animate={isHovered ? 'hover' : 'rest'}
           className={cn(
             'text-foreground',
-            state === 'expanded' ? 'size-[24px]' : 'size-[20px]',
+            state === 'expanded' ? 'size-[40px]' : 'size-[20px]'
           )}
         >
           {/* FILLED SHAPES (1: fade out, 3: fade back in) */}
@@ -114,9 +114,11 @@ export default function LogoAnimated({
         </motion.svg>
       </div>
       {state === 'expanded' && (
-        <div className="font-ubuntu flex items-center">
-          <h1 className="text-xl font-bold">mcp-use</h1>
-          <span className="text-base text-muted-foreground ml-2">Inspector</span>
+        <div className="font-ubuntu flex flex-col items-start -space-y-1 mr-3">
+          <h1 className="text-xl font-medium">mcp-use</h1>
+          <span className="text-lg text-muted-foreground tracking-wide font-sans font-light">
+            Inspector
+          </span>
         </div>
       )}
     </a>
@@ -130,7 +132,7 @@ function AnimatedStrokePath({
   total,
 }: {
   d: string
-  times: { T0: number, T1: number, T2: number, T3: number }
+  times: { T0: number; T1: number; T2: number; T3: number }
   total: number
 }) {
   const { T0, T1, T2, T3 } = times
@@ -165,7 +167,7 @@ function AnimatedStrokeCircle({
   cx: number
   cy: number
   r: number
-  times: { T0: number, T1: number, T2: number, T3: number }
+  times: { T0: number; T1: number; T2: number; T3: number }
   total: number
 }) {
   const { T0, T1, T2, T3 } = times

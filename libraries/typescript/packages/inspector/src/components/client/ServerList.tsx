@@ -121,7 +121,7 @@ export function ServerList() {
                   <div className="flex items-center space-x-2">
                     <Button asChild variant="outline" size="sm">
                       <Link
-                        to={`/servers/${encodeURIComponent(connection.id)}`}
+                        to={`/?server=${encodeURIComponent(connection.id)}`}
                       >
                         Inspect
                       </Link>
