@@ -282,6 +282,7 @@ class RemoteAgent:
                 if event.startswith("0:"):  # Text event
                     try:
                         text_data = json.loads(event[2:])  # Remove "0:" prefix
+                        # Normal text accumulation
                         if final_result is None:
                             final_result = ""
                         final_result += text_data
@@ -307,6 +308,18 @@ class RemoteAgent:
                         raise RuntimeError(f"Agent execution failed: {error_msg}")
                     except json.JSONDecodeError as e:
                         raise RuntimeError("Agent execution failed with unknown error") from e
+
+                elif event.startswith("f:"):  # Structured final event
+                    try:
+                        structured_data = json.loads(event[2:])  # Remove "f:" prefix
+                        logger.info(f"📋 [{self.chat_id}] Received structured final event")
+
+                        # Replace accumulated text with structured output
+                        final_result = structured_data
+                        logger.info(f"📋 [{self.chat_id}] Replaced accumulated text with structured output")
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse structured final event: {event[:100]}")
+                        continue
 
             # Log completion of stream consumption
             logger.info(f"Stream consumption complete. Finished: {finished}, Steps taken: {steps_taken}")
