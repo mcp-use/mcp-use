@@ -433,4 +433,383 @@ describe('MCP-UI Adapter', () => {
       expect(resource.resource.text).toBe('http://localhost:3000/mcp-use/widgets/')
     })
   })
+
+  describe('Apps SDK Integration', () => {
+    describe('External URL with Apps SDK', () => {
+      it('should create Apps SDK template with metadata for external URL', () => {
+        const definition: ExternalUrlUIResource = {
+          type: 'externalUrl',
+          name: 'weather-widget',
+          widget: 'weather',
+          title: 'Weather Widget',
+          encoding: 'text',
+          adapters: {
+            appsSdk: {
+              enabled: true,
+              config: { intentHandling: 'prompt' }
+            }
+          },
+          appsSdkMetadata: {
+            'openai/widgetDescription': 'Interactive weather forecast',
+            'openai/widgetPrefersBorder': true,
+            'openai/widgetAccessible': true
+          }
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {
+          city: 'San Francisco'
+        }, urlConfig)
+
+        // External URLs keep their MIME type but add _meta
+        expect(resource.type).toBe('resource')
+        expect(resource.resource.uri).toBe('ui://widget/weather-widget')
+        expect(resource.resource.text).toContain('http://localhost:3000/mcp-use/widgets/weather')
+        expect(resource.resource.text).toContain('city=San+Francisco')
+
+        // Check that metadata is present (if supported by @mcp-ui/server)
+        if ('_meta' in resource.resource) {
+          expect((resource.resource as any)._meta).toBeDefined()
+        }
+      })
+
+      it('should create external URL with CSP metadata', () => {
+        const definition: ExternalUrlUIResource = {
+          type: 'externalUrl',
+          name: 'analytics-widget',
+          widget: 'analytics',
+          adapters: {
+            appsSdk: {
+              enabled: true
+            }
+          },
+          appsSdkMetadata: {
+            'openai/widgetDescription': 'Analytics dashboard',
+            'openai/widgetCSP': {
+              connect_domains: ['api.analytics.com'],
+              resource_domains: ['cdn.analytics.com']
+            }
+          }
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        expect(resource.type).toBe('resource')
+        expect(resource.resource.uri).toBe('ui://widget/analytics-widget')
+      })
+
+      it('should create regular external URL resource without adapter', () => {
+        const definition: ExternalUrlUIResource = {
+          type: 'externalUrl',
+          name: 'regular-widget',
+          widget: 'regular',
+          // No adapters specified
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        expect(resource.resource.mimeType).toBe('text/uri-list')
+        expect('_meta' in resource.resource).toBe(false)
+      })
+    })
+
+    describe('Raw HTML with Apps SDK', () => {
+      it('should create Apps SDK template for raw HTML with bridge script', () => {
+        const htmlContent = '<div><h1>Calculator</h1><button>Calculate</button></div>'
+        const definition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'calculator',
+          htmlContent,
+          title: 'Calculator Widget',
+          adapters: {
+            appsSdk: {
+              enabled: true,
+              config: { intentHandling: 'prompt' }
+            }
+          },
+          appsSdkMetadata: {
+            'openai/widgetDescription': 'Interactive calculator',
+            'openai/widgetPrefersBorder': true
+          }
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        // Raw HTML with Apps SDK should have skybridge MIME type
+        expect(resource.type).toBe('resource')
+        expect(resource.resource.uri).toBe('ui://widget/calculator')
+        expect(resource.resource.mimeType).toBe('text/html+skybridge')
+
+        // Bridge script should be injected
+        expect(resource.resource.text).toContain('<script>')
+        expect(resource.resource.text).toContain('MCPUIAppsSdkAdapter')
+        expect(resource.resource.text).toContain(htmlContent)
+
+        // Metadata should be present
+        if ('_meta' in resource.resource) {
+          expect((resource.resource as any)._meta['openai/widgetDescription']).toBe('Interactive calculator')
+        }
+      })
+
+      it('should create regular HTML resource without adapter', () => {
+        const htmlContent = '<p>Regular HTML</p>'
+        const definition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'regular-html',
+          htmlContent,
+          // No adapters specified
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        expect(resource.resource.mimeType).toBe('text/html')
+        expect(resource.resource.text).toBe(htmlContent)
+        expect('_meta' in resource.resource).toBe(false)
+      })
+
+      it('should handle Apps SDK with blob encoding', () => {
+        const htmlContent = '<div>Complex Widget</div>'
+        const definition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'complex-widget',
+          htmlContent,
+          encoding: 'blob',
+          adapters: {
+            appsSdk: {
+              enabled: true
+            }
+          }
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        expect(resource.resource.mimeType).toBe('text/html+skybridge')
+        expect(resource.resource.blob).toBeDefined()
+        expect(resource.resource.text).toBeUndefined()
+
+        // Decode and verify bridge script is present
+        const decoded = Buffer.from(resource.resource.blob!, 'base64').toString()
+        expect(decoded).toContain('<script>')
+        expect(decoded).toContain('MCPUIAppsSdkAdapter')
+      })
+
+      it('should pass config to bridge script', () => {
+        const htmlContent = '<div>Test</div>'
+        const definition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'config-test',
+          htmlContent,
+          adapters: {
+            appsSdk: {
+              enabled: true,
+              config: { intentHandling: 'prompt' }
+            }
+          }
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        // Config should be passed to initAdapter
+        expect(resource.resource.text).toContain('initAdapter')
+        expect(resource.resource.text).toContain('"intentHandling":"prompt"')
+      })
+    })
+
+    describe('Remote DOM with Apps SDK', () => {
+      it('should create Remote DOM with Apps SDK metadata', () => {
+        const script = `
+          const button = document.createElement('ui-button');
+          button.setAttribute('label', 'Click me');
+          root.appendChild(button);
+        `
+        const definition: RemoteDomUIResource = {
+          type: 'remoteDom',
+          name: 'remote-button',
+          script,
+          framework: 'react',
+          adapters: {
+            appsSdk: {
+              enabled: true
+            }
+          },
+          appsSdkMetadata: {
+            'openai/widgetDescription': 'Interactive button widget',
+            'openai/widgetAccessible': true
+          }
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        // Remote DOM keeps its MIME type
+        expect(resource.type).toBe('resource')
+        expect(resource.resource.uri).toBe('ui://widget/remote-button')
+        expect(resource.resource.mimeType).toContain('application/vnd.mcp-ui.remote-dom+javascript')
+        expect(resource.resource.mimeType).toContain('framework=react')
+        expect(resource.resource.text).toBe(script)
+
+        // Metadata should be present
+        if ('_meta' in resource.resource) {
+          expect((resource.resource as any)._meta['openai/widgetDescription']).toBe('Interactive button widget')
+        }
+      })
+
+      it('should create regular Remote DOM resource without adapter', () => {
+        const script = 'const div = document.createElement("div");'
+        const definition: RemoteDomUIResource = {
+          type: 'remoteDom',
+          name: 'regular-dom',
+          script,
+          // No adapters specified
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        expect(resource.resource.mimeType).toContain('application/vnd.mcp-ui.remote-dom+javascript')
+        expect('_meta' in resource.resource).toBe(false)
+      })
+    })
+
+    describe('Metadata Handling', () => {
+      it('should handle all Apps SDK metadata fields', () => {
+        const definition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'full-metadata',
+          htmlContent: '<div>Test</div>',
+          adapters: {
+            appsSdk: {
+              enabled: true,
+              config: { intentHandling: 'prompt' }
+            }
+          },
+          appsSdkMetadata: {
+            'openai/widgetDescription': 'Full metadata test',
+            'openai/widgetPrefersBorder': true,
+            'openai/widgetAccessible': true,
+            'openai/widgetCSP': {
+              connect_domains: ['api.example.com', 'cdn.example.com'],
+              resource_domains: ['assets.example.com']
+            }
+          }
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        expect(resource.resource.mimeType).toBe('text/html+skybridge')
+
+        // All metadata fields should be present
+        if ('_meta' in resource.resource) {
+          const meta = (resource.resource as any)._meta
+          expect(meta['openai/widgetDescription']).toBe('Full metadata test')
+          expect(meta['openai/widgetPrefersBorder']).toBe(true)
+          expect(meta['openai/widgetAccessible']).toBe(true)
+          expect(meta['openai/widgetCSP']).toBeDefined()
+          expect(meta['openai/widgetCSP'].connect_domains).toEqual(['api.example.com', 'cdn.example.com'])
+        }
+      })
+
+      it('should handle minimal metadata', () => {
+        const definition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'minimal-metadata',
+          htmlContent: '<div>Minimal</div>',
+          adapters: {
+            appsSdk: {
+              enabled: true
+            }
+          }
+          // No appsSdkMetadata
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        expect(resource.resource.mimeType).toBe('text/html+skybridge')
+        // Should work even without metadata
+      })
+    })
+
+    describe('Mixed Usage Pattern', () => {
+      it('should support creating both template and embedded resources', () => {
+        // Apps SDK template (for ChatGPT) - with adapter enabled
+        const templateDefinition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'forecast-template',
+          htmlContent: '<div id="forecast"></div>',
+          adapters: {
+            appsSdk: {
+              enabled: true
+            }
+          },
+          appsSdkMetadata: {
+            'openai/widgetDescription': 'Weather forecast widget'
+          }
+        }
+
+        const template = createUIResourceFromDefinition(templateDefinition, {}, urlConfig)
+
+        // Regular embedded resource (for MCP-UI hosts) - without adapter
+        const embeddedDefinition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'forecast-embedded',
+          htmlContent: '<div id="forecast">Sunny, 72°F</div>',
+          // No adapters - this is for standard MCP-UI hosts
+        }
+
+        const embedded = createUIResourceFromDefinition(embeddedDefinition, {}, urlConfig)
+
+        // Template has Apps SDK features
+        expect(template.resource.mimeType).toBe('text/html+skybridge')
+        expect(template.resource.text).toContain('MCPUIAppsSdkAdapter')
+
+        // Embedded is standard MCP-UI
+        expect(embedded.resource.mimeType).toBe('text/html')
+        expect(embedded.resource.text).toBe('<div id="forecast">Sunny, 72°F</div>')
+        expect(embedded.resource.text).not.toContain('MCPUIAppsSdkAdapter')
+      })
+    })
+
+    describe('Adapter Configuration', () => {
+      it('should pass intentHandling config to adapter', () => {
+        const testCases = [
+          { intentHandling: 'prompt' as const },
+          { intentHandling: 'ignore' as const }
+        ]
+
+        testCases.forEach(({ intentHandling }) => {
+          const definition: RawHtmlUIResource = {
+            type: 'rawHtml',
+            name: `test-${intentHandling}`,
+            htmlContent: '<div>Test</div>',
+            adapters: {
+              appsSdk: {
+                enabled: true,
+                config: { intentHandling }
+              }
+            }
+          }
+
+          const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+          expect(resource.resource.text).toContain(`"intentHandling":"${intentHandling}"`)
+        })
+      })
+
+      it('should handle adapter with no config', () => {
+        const definition: RawHtmlUIResource = {
+          type: 'rawHtml',
+          name: 'no-config',
+          htmlContent: '<div>Test</div>',
+          adapters: {
+            appsSdk: {
+              enabled: true
+              // No config provided
+            }
+          }
+        }
+
+        const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+        expect(resource.resource.mimeType).toBe('text/html+skybridge')
+        expect(resource.resource.text).toContain('initAdapter')
+      })
+    })
+  })
 })
