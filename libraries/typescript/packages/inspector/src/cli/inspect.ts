@@ -4,16 +4,24 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { exec } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
+import open from 'open'
 import { MCPInspector } from '../server/mcp-inspector.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const execAsync = promisify(exec)
+
+// Validate URL format
+function isValidUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString)
+    return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'ws:' || url.protocol === 'wss:'
+  } catch {
+    return false
+  }
+}
 
 // Find available port starting from 8080
 async function findAvailablePort(startPort = 8080): Promise<number> {
@@ -43,10 +51,21 @@ let startPort = 8080
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--url' && i + 1 < args.length) {
-    mcpUrl = args[i + 1]
+    const url = args[i + 1]
+    if (!isValidUrl(url)) {
+      console.error(`Error: Invalid URL format: ${url}`)
+      console.error('URL must start with http://, https://, ws://, or wss://')
+      process.exit(1)
+    }
+    mcpUrl = url
     i++
   } else if (args[i] === '--port' && i + 1 < args.length) {
-    startPort = parseInt(args[i + 1], 10)
+    const parsedPort = parseInt(args[i + 1], 10)
+    if (isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+      console.error(`Error: Port must be a number between 1 and 65535, got: ${args[i + 1]}`)
+      process.exit(1)
+    }
+    startPort = parsedPort
     i++
   } else if (args[i] === '--help' || args[i] === '-h') {
     console.log(`
@@ -95,7 +114,8 @@ app.get('/api/servers', async (c) => {
     const servers = await mcpInspector.listServers()
     return c.json({ servers })
   }
-  catch {
+  catch (error) {
+    console.error('Failed to list servers:', error)
     return c.json({ error: 'Failed to list servers' }, 500)
   }
 })
@@ -107,7 +127,8 @@ app.post('/api/servers/connect', async (c) => {
     const server = await mcpInspector.connectToServer(url, command)
     return c.json({ server })
   }
-  catch {
+  catch (error) {
+    console.error('Failed to connect to server:', error)
     return c.json({ error: 'Failed to connect to server' }, 500)
   }
 })
@@ -122,7 +143,8 @@ app.get('/api/servers/:id', async (c) => {
     }
     return c.json({ server })
   }
-  catch {
+  catch (error) {
+    console.error('Failed to get server details:', error)
     return c.json({ error: 'Failed to get server details' }, 500)
   }
 })
@@ -137,7 +159,8 @@ app.post('/api/servers/:id/tools/:toolName/execute', async (c) => {
     const result = await mcpInspector.executeTool(id, toolName, input)
     return c.json({ result })
   }
-  catch {
+  catch (error) {
+    console.error('Failed to execute tool:', error)
     return c.json({ error: 'Failed to execute tool' }, 500)
   }
 })
@@ -149,7 +172,8 @@ app.get('/api/servers/:id/tools', async (c) => {
     const tools = await mcpInspector.getServerTools(id)
     return c.json({ tools })
   }
-  catch {
+  catch (error) {
+    console.error('Failed to get server tools:', error)
     return c.json({ error: 'Failed to get server tools' }, 500)
   }
 })
@@ -161,7 +185,8 @@ app.get('/api/servers/:id/resources', async (c) => {
     const resources = await mcpInspector.getServerResources(id)
     return c.json({ resources })
   }
-  catch {
+  catch (error) {
+    console.error('Failed to get server resources:', error)
     return c.json({ error: 'Failed to get server resources' }, 500)
   }
 })
@@ -173,7 +198,8 @@ app.delete('/api/servers/:id', async (c) => {
     await mcpInspector.disconnectServer(id)
     return c.json({ success: true })
   }
-  catch {
+  catch (error) {
+    console.error('Failed to disconnect server:', error)
     return c.json({ error: 'Failed to disconnect server' }, 500)
   }
 })
@@ -183,12 +209,12 @@ const clientDistPath = join(__dirname, '../../dist/client')
 
 if (existsSync(clientDistPath)) {
   // Serve static assets from /inspector/assets/* (matching Vite's base path)
-  app.get('/inspector/assets/*', async (c) => {
+  app.get('/inspector/assets/*', (c) => {
     const path = c.req.path.replace('/inspector/assets/', 'assets/')
     const fullPath = join(clientDistPath, path)
     
     if (existsSync(fullPath)) {
-      const content = await import('node:fs').then(fs => fs.readFileSync(fullPath))
+      const content = readFileSync(fullPath)
       
       // Set appropriate content type based on file extension
       if (path.endsWith('.js')) {
@@ -214,7 +240,7 @@ if (existsSync(clientDistPath)) {
   app.get('*', (c) => {
     const indexPath = join(clientDistPath, 'index.html')
     if (existsSync(indexPath)) {
-      const content = import('node:fs').then(fs => fs.readFileSync(indexPath, 'utf-8'))
+      const content = readFileSync(indexPath, 'utf-8')
       return c.html(content)
     }
     return c.html(`
@@ -271,8 +297,7 @@ async function startServer() {
     
     // Auto-open browser
     try {
-      const command = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open'
-      await execAsync(`${command} http://localhost:${port}`)
+      await open(`http://localhost:${port}`)
       console.log(`🌐 Browser opened automatically`)
     } catch (error) {
       console.log(`🌐 Please open http://localhost:${port} in your browser`)
