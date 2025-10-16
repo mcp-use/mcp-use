@@ -4,10 +4,10 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { exec } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { MCPInspector } from '../server/mcp-inspector.js'
 
@@ -53,7 +53,7 @@ for (let i = 0; i < args.length; i++) {
 MCP Inspector - Inspect and debug MCP servers
 
 Usage:
-  npx @mcp-use/inspect [options]
+  npx @mcp-use/inspector [options]
 
 Options:
   --url <url>    MCP server URL to auto-connect to (e.g., http://localhost:3000/mcp)
@@ -62,13 +62,13 @@ Options:
 
 Examples:
   # Run inspector with auto-connect
-  npx @mcp-use/inspect --url http://localhost:3000/mcp
+  npx @mcp-use/inspector --url http://localhost:3000/mcp
 
   # Run starting from custom port
-  npx @mcp-use/inspect --url http://localhost:3000/mcp --port 9000
+  npx @mcp-use/inspector --url http://localhost:3000/mcp --port 9000
 
   # Run without auto-connect
-  npx @mcp-use/inspect
+  npx @mcp-use/inspector
 `)
     process.exit(0)
   }
