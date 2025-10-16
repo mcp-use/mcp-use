@@ -42,10 +42,10 @@ export class McpServer {
       version: config.version,
     })
     this.app = express()
-    
+
     // Parse JSON bodies
     this.app.use(express.json())
-    
+
     // TODO enable override
     // Enable CORS by default
     this.app.use((req, res, next) => {
@@ -171,7 +171,7 @@ export class McpServer {
         complete: undefined // Optional: callback for auto-completion
       }
     )
-    
+
     // Create metadata object with optional fields
     const metadata: any = {}
     if (resourceTemplateDefinition.resourceTemplate.name) {
@@ -189,7 +189,7 @@ export class McpServer {
     if (resourceTemplateDefinition.annotations) {
       metadata.annotations = resourceTemplateDefinition.annotations
     }
-    
+
     this.server.resource(
       resourceTemplateDefinition.name,
       template,
@@ -213,11 +213,14 @@ export class McpServer {
    * Tools are functions that perform actions, computations, or operations and
    * return results. They accept structured input parameters and return structured output.
    * 
+   * Supports Apps SDK metadata for ChatGPT integration via the _meta field.
+   * 
    * @param toolDefinition - Configuration object containing tool metadata and handler function
    * @param toolDefinition.name - Unique identifier for the tool
    * @param toolDefinition.description - Human-readable description of what the tool does
    * @param toolDefinition.inputs - Array of input parameter definitions with types and validation
    * @param toolDefinition.fn - Async function that executes the tool logic with provided parameters
+   * @param toolDefinition._meta - Optional metadata for the tool (e.g. Apps SDK metadata)
    * @returns The server instance for method chaining
    * 
    * @example
@@ -232,16 +235,23 @@ export class McpServer {
    *   fn: async ({ expression, precision = 2 }) => {
    *     const result = eval(expression)
    *     return { result: Number(result.toFixed(precision)) }
+   *   },
+   *   _meta: {
+   *     'openai/outputTemplate': 'ui://widgets/calculator',
+   *     'openai/toolInvocation/invoking': 'Calculating...',
+   *     'openai/toolInvocation/invoked': 'Calculation complete'
    *   }
    * })
    * ```
    */
   tool(toolDefinition: ToolDefinition): this {
     const inputSchema = this.createToolInputSchema(toolDefinition.inputs || [])
+
     this.server.tool(
       toolDefinition.name,
       toolDefinition.description ?? "",
       inputSchema,
+      { _meta: toolDefinition.metadata },
       async (params: any) => {
         return await toolDefinition.fn(params)
       },
@@ -532,7 +542,7 @@ export class McpServer {
    */
   private async mountMcp(): Promise<void> {
     if (this.mcpMounted) return
-    
+
     const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js')
 
     const endpoint = '/mcp'
@@ -611,10 +621,10 @@ export class McpServer {
   async listen(port?: number): Promise<void> {
     await this.mountMcp()
     this.serverPort = port || 3001
-    
+
     // Mount inspector after we know the port
     this.mountInspector()
-    
+
     this.app.listen(this.serverPort, () => {
       console.log(`[SERVER] Listening on http://localhost:${this.serverPort}`)
       console.log(`[MCP] Endpoints: http://localhost:${this.serverPort}/mcp`)
@@ -648,7 +658,7 @@ export class McpServer {
 
     // Try to dynamically import the inspector package
     // Using dynamic import makes it truly optional - won't fail if not installed
-     
+
     // @ts-ignore - Optional peer dependency, may not be installed during build
     import('@mcp-use/inspector')
       .then(({ mountInspector }) => {
@@ -897,27 +907,27 @@ export class McpServer {
    */
   private parseTemplateUri(template: string, uri: string): Record<string, string> {
     const params: Record<string, string> = {}
-    
+
     // Convert template to a regex pattern
     // Escape special regex characters except {}
     let regexPattern = template.replace(/[.*+?^$()[\]\\|]/g, '\\$&')
-    
+
     // Replace {param} with named capture groups
     const paramNames: string[] = []
     regexPattern = regexPattern.replace(/\\\{([^}]+)\\\}/g, (_, paramName) => {
       paramNames.push(paramName)
       return '([^/]+)'
     })
-    
+
     const regex = new RegExp(`^${regexPattern}$`)
     const match = uri.match(regex)
-    
+
     if (match) {
       paramNames.forEach((paramName, index) => {
         params[paramName] = match[index + 1]
       })
     }
-    
+
     return params
   }
 }

@@ -1,5 +1,6 @@
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js'
 import type { ResourceAnnotations } from './common.js'
+import type { AdaptersConfig } from '@mcp-ui/server'
 
 // UIResourceContent type from MCP-UI
 export type UIResourceContent = {
@@ -11,6 +12,37 @@ export type UIResourceContent = {
     | { text: string; blob?: never }
     | { blob: string; text?: never }
   )
+}
+
+/**
+ * Apps SDK metadata fields
+ * @note Contains widget/resource-level metadata
+ */
+export interface AppsSdkMetadata extends Record<string, unknown> {
+  /** Description of the widget for Apps SDK */
+  'openai/widgetDescription'?: string
+  /** Content Security Policy for the widget */
+  'openai/widgetCSP'?: {
+    connect_domains?: string[]
+    resource_domains?: string[]
+  }
+  /** Whether the widget prefers a border */
+  'openai/widgetPrefersBorder'?: boolean
+  /** Whether the widget is accessible */
+  'openai/widgetAccessible'?: boolean
+}
+
+/**
+ * Apps SDK tool metadata fields
+ * @note Contains tool-specific metadata for tool invocation.
+ */
+export interface AppsSdkToolMetadata extends AppsSdkMetadata {
+  /** URI of the output template resource */
+  'openai/outputTemplate'?: string
+  /** Status text while tool is invoking */
+  'openai/toolInvocation/invoking'?: string
+  /** Status text after tool has invoked */
+  'openai/toolInvocation/invoked'?: string
 }
 
 // Handler types
@@ -97,6 +129,10 @@ interface BaseUIResourceDefinition {
   annotations?: ResourceAnnotations
   /** Encoding for the resource content (defaults to 'text') */
   encoding?: UIEncoding
+  /** Adapter configuration */
+  adapters?: AdaptersConfig,
+  /** Apps SDK metadata fields */
+  appsSdkMetadata?: AppsSdkMetadata
 }
 
 /**

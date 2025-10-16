@@ -5,13 +5,16 @@
  * into @mcp-ui/server compatible resource objects.
  *
  * Ref: https://mcpui.dev/guide/server/typescript/usage-examples
+ * Apps SDK: https://mcpui.dev/guide/apps-sdk
  */
 
-import { createUIResource } from '@mcp-ui/server'
+import { createUIResource, type AdaptersConfig } from '@mcp-ui/server'
+
 import type {
   UIResourceContent,
   UIResourceDefinition,
-  UIEncoding
+  UIEncoding,
+  AppsSdkMetadata
 } from '../types/resource.js'
 
 /**
@@ -60,17 +63,23 @@ export function buildWidgetUrl(
  * @param uri - Resource URI (must start with ui://)
  * @param iframeUrl - URL to load in iframe
  * @param encoding - Encoding type ('text' or 'blob')
+ * @param adapters - Adapter configuration (e.g., Apps SDK)
+ * @param metadata - Additional metadata for the resource
  * @returns UIResourceContent object
  */
 export function createExternalUrlResource(
   uri: string,
   iframeUrl: string,
-  encoding: UIEncoding = 'text'
+  encoding: UIEncoding = 'text',
+  adapters?: AdaptersConfig,
+  metadata?: AppsSdkMetadata
 ): UIResourceContent {
   return createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: 'externalUrl', iframeUrl },
-    encoding
+    encoding,
+    adapters: adapters,
+    metadata: metadata,
   })
 }
 
@@ -80,17 +89,23 @@ export function createExternalUrlResource(
  * @param uri - Resource URI (must start with ui://)
  * @param htmlString - HTML content to render
  * @param encoding - Encoding type ('text' or 'blob')
+ * @param adapters - Adapter configuration (e.g., Apps SDK)
+ * @param metadata - Additional metadata for the resource
  * @returns UIResourceContent object
  */
 export function createRawHtmlResource(
   uri: string,
   htmlString: string,
-  encoding: UIEncoding = 'text'
+  encoding: UIEncoding = 'text',
+  adapters?: AdaptersConfig,
+  metadata?: AppsSdkMetadata
 ): UIResourceContent {
   return createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: 'rawHtml', htmlString },
-    encoding
+    encoding,
+    adapters: adapters,
+    metadata: metadata
   })
 }
 
@@ -101,18 +116,24 @@ export function createRawHtmlResource(
  * @param script - JavaScript code for remote DOM manipulation
  * @param framework - Framework for remote DOM ('react' or 'webcomponents')
  * @param encoding - Encoding type ('text' or 'blob')
+ * @param adapters - Adapter configuration (e.g., Apps SDK)
+ * @param metadata - Additional metadata for the resource
  * @returns UIResourceContent object
  */
 export function createRemoteDomResource(
   uri: string,
   script: string,
   framework: 'react' | 'webcomponents' = 'react',
-  encoding: UIEncoding = 'text'
+  encoding: UIEncoding = 'text',
+  adapters?: AdaptersConfig,
+  metadata?: AppsSdkMetadata
 ): UIResourceContent {
   return createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: 'remoteDom', script, framework },
-    encoding
+    encoding,
+    adapters: adapters,
+    metadata: metadata
   })
 }
 
@@ -134,20 +155,22 @@ export function createUIResourceFromDefinition(
 ): UIResourceContent {
   const uri = `ui://widget/${definition.name}` as `ui://${string}`
   const encoding = definition.encoding || 'text'
+  const adapters = definition.adapters
+  const metadata = definition.appsSdkMetadata
 
   switch (definition.type) {
     case 'externalUrl': {
       const widgetUrl = buildWidgetUrl(definition.widget, params, config)
-      return createExternalUrlResource(uri, widgetUrl, encoding)
+      return createExternalUrlResource(uri, widgetUrl, encoding, adapters, metadata)
     }
 
     case 'rawHtml': {
-      return createRawHtmlResource(uri, definition.htmlContent, encoding)
+      return createRawHtmlResource(uri, definition.htmlContent, encoding, adapters, metadata)
     }
 
     case 'remoteDom': {
       const framework = definition.framework || 'react'
-      return createRemoteDomResource(uri, definition.script, framework, encoding)
+      return createRemoteDomResource(uri, definition.script, framework, encoding, adapters, metadata)
     }
 
     default: {
