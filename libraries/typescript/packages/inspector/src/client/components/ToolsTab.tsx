@@ -1,5 +1,5 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
-import { Check, Clock, Copy, Play, Save, Search, Trash2, Wrench, Zap } from 'lucide-react'
+import { Check, Clock, Copy, Maximize, Play, Save, Search, Trash2, Wrench, Zap } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { usePrismTheme } from '@/client/hooks/usePrismTheme'
@@ -222,6 +222,24 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
     }
   }, [results])
 
+  const handleFullscreen = useCallback(async (index: number) => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      }
+      else {
+        // Find the specific tool result div
+        const resultDiv = document.querySelector(`[data-result-index="${index}"]`)
+        if (resultDiv) {
+          await resultDiv.requestFullscreen()
+        }
+      }
+    }
+    catch (error) {
+      console.error('Failed to toggle fullscreen:', error)
+    }
+  }, [])
+
   const saveRequest = useCallback(() => {
     if (!selectedTool)
       return
@@ -338,10 +356,10 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel defaultSize={33}>
         {/* Left pane: Tools list with search */}
-        <div className="flex flex-col h-full border-r dark:border-zinc-700 p-6 bg-white dark:bg-zinc-800">
+        <div className="flex flex-col h-full border-r dark:border-zinc-700 p-6 bg-white dark:bg-black">
           <div className="p-0 ">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2 bg-zinc-100 dark:bg-zinc-700 rounded-full">
+              <TabsList className="grid w-full grid-cols-2 bg-bla dark:bg-black rounded-full">
                 <TabsTrigger value="tools">
                   Tools
                   <Badge className="ml-2" variant="outline">{filteredTools.length}</Badge>
@@ -357,12 +375,12 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
                 placeholder="Search tools by name or description "
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-10 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-all border-none rounded-full"
+                className="pl-10 p-4 rounded-xl bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800"
               />
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto overflow-x-visible mt-6 space-y-5 p-2">
+          <div className="flex-1 overflow-y-auto overflow-x-visible mt-6 space-y-5 p-0">
             {activeTab === 'tools'
               ? (
                   <>
@@ -378,18 +396,23 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
                             <div
                               key={tool.name}
                               className={cn(
-                                'cursor-pointer transition-all rounded-md border-none hover:bg-zinc-100 dark:hover:bg-zinc-700 shadow-none p-2',
-                                selectedTool?.name === tool.name && 'ring-2 ring-zinc-200 dark:ring-zinc-600 bg-zinc-100 dark:bg-zinc-700',
+                                'cursor-pointer transition-all rounded-[20px] bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-2',
+                                selectedTool?.name === tool.name && 'border-2 border-zinc-200 dark:border-zinc-600',
                               )}
                               onClick={() => handleToolSelect(tool)}
                             >
-                              <div className="px-2">
-                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{tool.name}</div>
-                                {tool.description && (
-                                  <div className="text-xs text-gray-600 dark:text-gray-400">
-                                    {tool.description}
-                                  </div>
-                                )}
+                              <div className="flex items-center gap-3">
+                                <div className="bg-blue-500/20 rounded-full p-3 flex items-center justify-center">
+                                  <Wrench className="h-5 w-5 text-blue-500" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{tool.name}</div>
+                                  {tool.description && (
+                                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                      {tool.description}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))
@@ -456,7 +479,7 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
           <ResizablePanel defaultSize={40}>
 
             {/* Right pane: Tool form */}
-            <div className="flex flex-col h-full bg-white dark:bg-zinc-800">
+            <div className="flex flex-col h-full bg-white dark:bg-black">
               {selectedTool
                 ? (
                     <div className="flex flex-col h-full">
@@ -464,9 +487,9 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="space-x-2 flex items-center">
-                              <span className="bg-blue-100 text-blue-400 rounded-full p-2 aspect-square flex items-center justify-center">
-                                <Wrench className="size-4" />
-                              </span>
+                              <div className="bg-blue-500/20 rounded-full p-3 flex items-center justify-center">
+                                <Wrench className="h-5 w-5 text-blue-500" />
+                              </div>
                               <div>
                                 <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                   {selectedTool.name}
@@ -549,7 +572,7 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
           <ResizablePanel defaultSize={60}>
 
             {/* Bottom section: Results */}
-            <div className="flex flex-col h-full bg-white dark:bg-zinc-800 border-t dark:border-zinc-700">
+            <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
               <div className="flex-1 overflow-y-auto h-full">
                 {results.length > 0
                   ? (
@@ -563,7 +586,7 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
                           const hasMcpUIResources = mcpUIResources.length > 0
 
                           return (
-                            <div key={index} className="space-y-0 flex-1 h-full">
+                            <div key={index} className="space-y-0 flex-1 h-full" data-result-index={index}>
                               <div className={`flex items-center gap-2 px-4 pt-2 ${hasMcpUIResources ? 'border-b border-gray-200 dark:border-zinc-600 pb-2' : ''}`}>
                                 <h3 className="text-sm font-medium">Response</h3>
                                 <div className="flex items-center gap-1">
@@ -613,20 +636,28 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
                                     </div>
                                   </div>
                                 )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => copyResult(index)}
-                                  className="ml-auto"
-                                >
-                                  {copiedResult === index
-                                    ? (
-                                        <Check className="h-4 w-4" />
-                                      )
-                                    : (
-                                        <Copy className="h-4 w-4" />
-                                      )}
-                                </Button>
+                                <div className="flex items-center gap-1 ml-auto">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => copyResult(index)}
+                                  >
+                                    {copiedResult === index
+                                      ? (
+                                          <Check className="h-4 w-4" />
+                                        )
+                                      : (
+                                          <Copy className="h-4 w-4" />
+                                        )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleFullscreen(index)}
+                                  >
+                                    <Maximize className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
 
                               {result.error

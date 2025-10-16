@@ -1,5 +1,5 @@
 import { CheckCircle2, Code, Copy, Database, Loader2, Play, Zap } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,7 +8,7 @@ import { useMcpContext } from '../context/McpContext'
 
 export function ServerDetail() {
   const { serverId } = useParams()
-  const { getConnection } = useMcpContext()
+  const { getConnection, connectServer } = useMcpContext()
   const decodedServerId = serverId ? decodeURIComponent(serverId) : ''
   const connection = getConnection(decodedServerId)
 
@@ -16,6 +16,15 @@ export function ServerDetail() {
   const [toolInput, setToolInput] = useState('{}')
   const [toolResult, setToolResult] = useState<any>(null)
   const [isExecuting, setIsExecuting] = useState(false)
+
+  // Auto-connect the server when viewing its details page
+  // This ensures the server connects even if auto-connect is disabled globally
+  useEffect(() => {
+    if (decodedServerId && connection?.state === 'disconnected') {
+      console.warn('[ServerDetail] Auto-connecting server for details page:', decodedServerId)
+      connectServer(decodedServerId)
+    }
+  }, [decodedServerId, connection?.state, connectServer])
 
   const handleExecuteTool = async (toolName: string) => {
     if (!connection)

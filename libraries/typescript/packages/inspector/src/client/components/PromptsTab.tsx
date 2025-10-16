@@ -243,7 +243,7 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel defaultSize={33}>
         {/* Left pane: Prompts list with search */}
-        <div className="flex flex-col h-full border-r dark:border-zinc-700 p-6 bg-white dark:bg-zinc-800">
+        <div className="flex flex-col h-full border-r dark:border-zinc-700 p-6 bg-white dark:bg-black">
           <div className="p-0 ">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-2 bg-zinc-100 dark:bg-zinc-700 rounded-full">
@@ -262,7 +262,7 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
                 placeholder="Search prompts by name or description"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-10 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-all border-none rounded-full"
+                className="pl-10 p-4 rounded-xl bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800"
               />
             </div>
           </div>
@@ -311,7 +311,7 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
 
       <ResizablePanel defaultSize={67}>
         {/* Right pane: Prompt details and execution */}
-        <div className="flex flex-col h-full bg-white dark:bg-zinc-800 p-6">
+        <div className="flex flex-col h-full bg-white dark:bg-black p-6">
           {selectedPrompt
             ? (
                 <>

@@ -7,6 +7,7 @@
   --font-family-ubuntu: Ubuntu, sans-serif;
 
   --animate-pulse: pulse var(--duration) ease-out infinite;
+  --animate-aurora: aurora 60s linear infinite;
 
   @keyframes pulse {
     0%,
@@ -15,6 +16,15 @@
     }
     50% {
       box-shadow: 0 0 0 8px var(--pulse-color);
+    }
+  }
+
+  @keyframes aurora {
+    from {
+      background-position: 50% 50%, 50% 50%;
+    }
+    to {
+      background-position: 350% 50%, 350% 50%;
     }
   }
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { CustomHeader } from './CustomHeadersEditor'
-import { Cog, FileText, FolderOpen, MessageCircle, MessageSquare, Settings, Shield, Wrench } from 'lucide-react'
+import { FolderOpen, MessageCircle, MessageSquare, Settings, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -10,7 +10,6 @@ import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import {
   Dialog,
@@ -18,7 +17,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '../../components/ui/dialog'
 import {
   DropdownMenu,
@@ -28,14 +26,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu'
-import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { useMcpContext } from '../context/McpContext'
 import { AnimatedThemeToggler } from './AnimatedThemeToggler'
 import { ChatTab } from './ChatTab'
 import { CommandPalette } from './CommandPalette'
-import { CustomHeadersEditor } from './CustomHeadersEditor'
+import { ConnectionSettingsForm } from './ConnectionSettingsForm'
 import { PromptsTab } from './PromptsTab'
 import { ResourcesTab } from './ResourcesTab'
 import { ServerIcon } from './ServerIcon'
@@ -128,10 +123,6 @@ export function Layout({ children }: LayoutProps) {
   )
   const [scope, setScope] = useState('')
 
-  // UI state for sub-dialogs
-  const [headersDialogOpen, setHeadersDialogOpen] = useState(false)
-  const [authDialogOpen, setAuthDialogOpen] = useState(false)
-  const [configDialogOpen, setConfigDialogOpen] = useState(false)
 
   const tabs = [
     { id: 'tools', label: 'Tools', icon: Wrench },
@@ -188,7 +179,6 @@ export function Layout({ children }: LayoutProps) {
     toast.success('Connection options saved')
   }
 
-  const enabledHeadersCount = customHeaders.filter(h => h.name && h.value).length
 
   const selectedServer = connections.find(c => c.id === selectedServerId)
 
@@ -353,7 +343,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <TooltipProvider>
-      <div className="h-screen bg-[#f3f3f3] dark:bg-zinc-900 flex flex-col px-4 py-4 gap-4">
+      <div className="h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 py-4 gap-4">
         {/* Header */}
         <header className=" w-full mx-auto">
           <div className="flex items-center justify-between">
@@ -469,7 +459,7 @@ export function Layout({ children }: LayoutProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11"
+                    className="h-11 w-11 cursor-pointer"
                     onClick={() => handleOpenConnectionOptions(selectedServer.id)}
                   >
                     <Settings className="h-4 w-4" />
@@ -514,7 +504,7 @@ export function Layout({ children }: LayoutProps) {
 
             {/* Right side: Theme Toggle + Discord Button + Deploy Button + Logo */}
             <div className="flex items-center gap-4">
-              <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors" />
+              <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
               <Button
                 variant="ghost"
                 className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full"
@@ -588,7 +578,7 @@ export function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 w-full mx-auto bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto">
+        <main className="flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto">
           {selectedServer && activeTab === 'tools'
             ? (
                 <ToolsTab
@@ -651,238 +641,34 @@ export function Layout({ children }: LayoutProps) {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
-              {/* Transport Type */}
-              <div className="space-y-2">
-                <Label>Transport Type</Label>
-                <Select value={transportType} onValueChange={setTransportType}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SSE">Streamable HTTP</SelectItem>
-                    <SelectItem value="WebSocket">WebSocket</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* URL */}
-              <div className="space-y-2">
-                <Label>URL</Label>
-                <Input
-                  placeholder="http://localhost:3001/sse"
-                  value={url}
-                  onChange={e => setUrl(e.target.value)}
-                />
-              </div>
-
-              {/* Connection Type */}
-              <div className="space-y-2">
-                <Label>Connection Type</Label>
-                <Select value={connectionType} onValueChange={setConnectionType}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Direct">Direct</SelectItem>
-                    <SelectItem value="Via Proxy">Via Proxy</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Configuration Buttons Row */}
-              <div className="flex gap-3">
-                {/* Authentication Button */}
-                <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex-1 justify-center"
-                    >
-                      <Shield className="w-4 h-4 mr-2" />
-                      Authentication
-                      {(clientId || scope) && (
-                        <Badge variant="secondary" className="ml-2">
-                          OAuth 2.0
-                        </Badge>
-                      )}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Authentication</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-medium">OAuth 2.0 Flow</h4>
-
-                      {/* Client ID */}
-                      <div className="space-y-2">
-                        <Label className="text-sm">Client ID</Label>
-                        <Input
-                          placeholder="Client ID"
-                          value={clientId}
-                          onChange={e => setClientId(e.target.value)}
-                        />
-                      </div>
-
-                      {/* Redirect URL */}
-                      <div className="space-y-2">
-                        <Label className="text-sm">Redirect URL</Label>
-                        <Input
-                          value={redirectUrl}
-                          onChange={e => setRedirectUrl(e.target.value)}
-                        />
-                      </div>
-
-                      {/* Scope */}
-                      <div className="space-y-2">
-                        <Label className="text-sm">Scope</Label>
-                        <Input
-                          placeholder="Scope (space-separated)"
-                          value={scope}
-                          onChange={e => setScope(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button onClick={() => setAuthDialogOpen(false)}>
-                          Save
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Custom Headers Button */}
-                <Dialog open={headersDialogOpen} onOpenChange={setHeadersDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex-1 justify-center"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      Custom Headers
-                      {enabledHeadersCount > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {enabledHeadersCount}
-                        </Badge>
-                      )}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Custom Headers</DialogTitle>
-                    </DialogHeader>
-                    <CustomHeadersEditor
-                      headers={customHeaders}
-                      onChange={setCustomHeaders}
-                      onSave={() => setHeadersDialogOpen(false)}
-                    />
-                  </DialogContent>
-                </Dialog>
-
-                {/* Configuration Button */}
-                <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex-1 justify-center"
-                    >
-                      <Cog className="w-4 h-4 mr-2" />
-                      Configuration
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Configuration</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      {/* Request Timeout */}
-                      <div className="space-y-2">
-                        <Label className="text-sm flex items-center gap-1">
-                          Request Timeout
-                          <span className="text-muted-foreground text-xs">(?)</span>
-                        </Label>
-                        <Input
-                          type="number"
-                          value={requestTimeout}
-                          onChange={e => setRequestTimeout(e.target.value)}
-                        />
-                      </div>
-
-                      {/* Reset Timeout on Progress */}
-                      <div className="space-y-2">
-                        <Label className="text-sm flex items-center gap-1">
-                          Reset Timeout on Progress
-                          <span className="text-muted-foreground text-xs">(?)</span>
-                        </Label>
-                        <Select value={resetTimeoutOnProgress} onValueChange={setResetTimeoutOnProgress}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="True">True</SelectItem>
-                            <SelectItem value="False">False</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Maximum Total Timeout */}
-                      <div className="space-y-2">
-                        <Label className="text-sm flex items-center gap-1">
-                          Maximum Total Timeout
-                          <span className="text-muted-foreground text-xs">(?)</span>
-                        </Label>
-                        <Input
-                          type="number"
-                          value={maxTotalTimeout}
-                          onChange={e => setMaxTotalTimeout(e.target.value)}
-                        />
-                      </div>
-
-                      {/* Inspector Proxy Address */}
-                      <div className="space-y-2">
-                        <Label className="text-sm flex items-center gap-1">
-                          Inspector Proxy Address
-                          <span className="text-muted-foreground text-xs">(?)</span>
-                        </Label>
-                        <Input
-                          value={proxyAddress}
-                          onChange={e => setProxyAddress(e.target.value)}
-                          placeholder=""
-                        />
-                      </div>
-
-                      {/* Proxy Session Token */}
-                      <div className="space-y-2">
-                        <Label className="text-sm flex items-center gap-1">
-                          Proxy Session Token
-                          <span className="text-muted-foreground text-xs">(?)</span>
-                        </Label>
-                        <Input
-                          value={proxyToken}
-                          onChange={e => setProxyToken(e.target.value)}
-                          className="font-mono text-xs"
-                        />
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button onClick={() => setConfigDialogOpen(false)}>
-                          Save
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              {/* Save Button */}
-              <div className="flex justify-end">
-                <Button onClick={handleSaveConnectionOptions}>
-                  Save Connection Options
-                </Button>
-              </div>
-            </div>
+            <ConnectionSettingsForm
+              transportType={transportType}
+              setTransportType={setTransportType}
+              url={url}
+              setUrl={setUrl}
+              connectionType={connectionType}
+              setConnectionType={setConnectionType}
+              customHeaders={customHeaders}
+              setCustomHeaders={setCustomHeaders}
+              requestTimeout={requestTimeout}
+              setRequestTimeout={setRequestTimeout}
+              resetTimeoutOnProgress={resetTimeoutOnProgress}
+              setResetTimeoutOnProgress={setResetTimeoutOnProgress}
+              maxTotalTimeout={maxTotalTimeout}
+              setMaxTotalTimeout={setMaxTotalTimeout}
+              proxyAddress={proxyAddress}
+              setProxyAddress={setProxyAddress}
+              proxyToken={proxyToken}
+              setProxyToken={setProxyToken}
+              clientId={clientId}
+              setClientId={setClientId}
+              redirectUrl={redirectUrl}
+              setRedirectUrl={setRedirectUrl}
+              scope={scope}
+              setScope={setScope}
+              onSave={handleSaveConnectionOptions}
+              onCancel={() => setConnectionOptionsOpen(false)}
+            />
           </DialogContent>
         </Dialog>
       </div>

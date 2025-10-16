@@ -24,6 +24,10 @@ interface McpContextType {
   addConnection: (url: string, name?: string, proxyConfig?: { proxyAddress?: string, proxyToken?: string, customHeaders?: Record<string, string> }, transportType?: 'http' | 'sse') => void
   removeConnection: (id: string) => void
   getConnection: (id: string) => MCPConnection | undefined
+  autoConnect: boolean
+  setAutoConnect: (autoConnect: boolean) => void
+  connectServer: (id: string) => void
+  disconnectServer: (id: string) => void
 }
 
 const McpContext = createContext<McpContextType | undefined>(undefined)
@@ -181,8 +185,10 @@ export function McpProvider({ children }: { children: ReactNode }) {
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([])
   const [activeConnections, setActiveConnections] = useState<Map<string, MCPConnection>>(new Map())
   const [connectionVersion, setConnectionVersion] = useState(0)
+  const [autoConnect, setAutoConnectState] = useState<boolean>(true)
+  const [manualConnections, setManualConnections] = useState<Set<string>>(new Set())
 
-  // Load saved connections from localStorage on mount
+  // Load saved connections and auto-connect setting from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('mcp-inspector-connections')
     if (saved) {
@@ -222,6 +228,12 @@ export function McpProvider({ children }: { children: ReactNode }) {
         // Clear corrupted localStorage
         localStorage.removeItem('mcp-inspector-connections')
       }
+    }
+
+    // Load auto-connect setting
+    const autoConnectSetting = localStorage.getItem('mcp-inspector-auto-connect')
+    if (autoConnectSetting !== null) {
+      setAutoConnectState(autoConnectSetting === 'true')
     }
   }, [])
 
@@ -276,15 +288,107 @@ export function McpProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const getConnection = useCallback((id: string) => {
-    return activeConnections.get(id)
-  }, [activeConnections])
+    // First check active connections
+    const activeConn = activeConnections.get(id)
+    if (activeConn) {
+      return activeConn
+    }
+
+    // If not active, check if it's a saved connection and return placeholder
+    const savedConn = savedConnections.find(conn => conn.id === id)
+    if (savedConn) {
+      return {
+        id: savedConn.id,
+        url: savedConn.url,
+        name: savedConn.name,
+        state: 'disconnected' as const,
+        tools: [],
+        resources: [],
+        prompts: [],
+        error: null,
+        authUrl: null,
+        callTool: async () => { throw new Error('Not connected') },
+        readResource: async () => { throw new Error('Not connected') },
+        authenticate: () => {},
+        retry: () => {},
+        clearStorage: () => {},
+      }
+    }
+
+    return undefined
+  }, [activeConnections, savedConnections])
+
+  const setAutoConnect = useCallback((value: boolean) => {
+    setAutoConnectState(value)
+    localStorage.setItem('mcp-inspector-auto-connect', String(value))
+
+    // If disabling auto-connect, clear manual connections
+    if (!value) {
+      setManualConnections(new Set())
+    }
+  }, [])
+
+  const connectServer = useCallback((id: string) => {
+    setManualConnections(prev => new Set(prev).add(id))
+  }, [])
+
+  const disconnectServer = useCallback((id: string) => {
+    setManualConnections((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+
+    setActiveConnections((prev) => {
+      const next = new Map(prev)
+      const connection = next.get(id)
+      if (connection) {
+        // Clear storage and remove connection
+        try {
+          connection.clearStorage()
+        }
+        catch (error) {
+          console.error('Failed to clear storage:', error)
+        }
+        next.delete(id)
+      }
+      return next
+    })
+  }, [])
 
   // Use connectionVersion to force array recreation when connections update
   const connections = useMemo(() => {
-    const conns = Array.from(activeConnections.values())
+    // Maintain order based on savedConnections, not activeConnections
+    // This ensures the order doesn't change when a server connects/disconnects
+    const conns = savedConnections.map((saved) => {
+      // Use active connection if it exists, otherwise create placeholder
+      const activeConn = activeConnections.get(saved.id)
+      if (activeConn) {
+        return activeConn
+      }
+
+      // Create a placeholder connection for disconnected servers
+      return {
+        id: saved.id,
+        url: saved.url,
+        name: saved.name,
+        state: 'disconnected' as const,
+        tools: [],
+        resources: [],
+        prompts: [],
+        error: null,
+        authUrl: null,
+        callTool: async () => { throw new Error('Not connected') },
+        readResource: async () => { throw new Error('Not connected') },
+        authenticate: () => {},
+        retry: () => {},
+        clearStorage: () => {},
+      }
+    })
+
     console.warn('[McpContext] Connections updated, version:', connectionVersion, 'count:', conns.length, 'states:', conns.map(c => `${c.id}:${c.state}`))
     return conns
-  }, [activeConnections, connectionVersion])
+  }, [activeConnections, savedConnections, connectionVersion])
 
   // Memoize the context value to prevent unnecessary re-renders and HMR issues
   const contextValue = useMemo(() => ({
@@ -292,21 +396,27 @@ export function McpProvider({ children }: { children: ReactNode }) {
     addConnection,
     removeConnection,
     getConnection,
-  }), [connections, addConnection, removeConnection, getConnection])
+    autoConnect,
+    setAutoConnect,
+    connectServer,
+    disconnectServer,
+  }), [connections, addConnection, removeConnection, getConnection, autoConnect, setAutoConnect, connectServer, disconnectServer])
 
   return (
     <McpContext value={contextValue}>
-      {savedConnections.map(saved => (
-        <McpConnectionWrapper
-          key={saved.id}
-          url={saved.url}
-          name={saved.name}
-          proxyConfig={saved.proxyConfig}
-          transportType={saved.transportType}
-          onUpdate={updateConnection}
-          onRemove={() => removeConnection(saved.id)}
-        />
-      ))}
+      {savedConnections
+        .filter(saved => autoConnect || manualConnections.has(saved.id))
+        .map(saved => (
+          <McpConnectionWrapper
+            key={saved.id}
+            url={saved.url}
+            name={saved.name}
+            proxyConfig={saved.proxyConfig}
+            transportType={saved.transportType}
+            onUpdate={updateConnection}
+            onRemove={() => removeConnection(saved.id)}
+          />
+        ))}
       {children}
     </McpContext>
   )

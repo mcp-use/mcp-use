@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
+import chalk from 'chalk'
+import { Command } from 'commander'
+import inquirer from 'inquirer'
 import { exec } from 'node:child_process'
-import { promisify } from 'node:util'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Command } from 'commander'
-import chalk from 'chalk'
+import { promisify } from 'node:util'
 import ora from 'ora'
-import inquirer from 'inquirer'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
