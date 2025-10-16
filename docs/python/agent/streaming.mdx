@@ -305,7 +305,7 @@ import asyncio
 import json
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
-
+import time
 app = FastAPI()
 
 async def create_agent():
@@ -328,10 +328,12 @@ async def stream_agent_response(query: str):
     async def event_generator():
         agent = await create_agent()
 
-        async for event in agent.stream_events(query, version="v1"):
+        async for event in agent.stream_events(query):
             event_type = event.get("event")
-            data = event.get("data", {})
-
+            if event_type == "on_chat_model_stream":
+                data = event["data"]["chunk"].content
+            else:
+                data = ""
             # Format as SSE
             sse_data = {
                 "type": event_type,
