@@ -10,7 +10,7 @@ import time
 from collections import Counter, defaultdict
 from typing import Any
 
-from .middleware import Middleware, MiddlewareContext, NextFunctionT
+from mcp_use.client.middleware.middleware import Middleware, MiddlewareContext, NextFunctionT
 
 # Constants for performance thresholds
 SLOW_THRESHOLD_MS = 1000  # 1 second

@@ -11,8 +11,8 @@ from typing import Any
 import httpx
 from mcp.client.streamable_http import streamablehttp_client
 
-from ..logging import logger
-from .base import ConnectionManager
+from mcp_use.client.task_managers.base import ConnectionManager
+from mcp_use.logging import logger
 
 
 class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):

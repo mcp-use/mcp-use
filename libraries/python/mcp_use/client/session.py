@@ -11,7 +11,7 @@ from typing import Any
 from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResult, Resource, Tool
 from pydantic import AnyUrl
 
-from .connectors.base import BaseConnector
+from mcp_use.client.connectors.base import BaseConnector
 
 
 class MCPSession:

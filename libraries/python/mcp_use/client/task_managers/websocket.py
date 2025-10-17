@@ -8,8 +8,8 @@ from typing import Any
 
 from mcp.client.websocket import websocket_client
 
-from ..logging import logger
-from .base import ConnectionManager
+from mcp_use.client.task_managers.base import ConnectionManager
+from mcp_use.logging import logger
 
 
 class WebSocketConnectionManager(ConnectionManager[tuple[Any, Any]]):

@@ -12,7 +12,7 @@ from importlib.metadata import version
 from .logging import MCP_USE_DEBUG, Logger, logger  # isort: skip
 
 # Now import other modules - observability must come after logging
-from . import observability  # noqa: E402
+from .agents import observability  # noqa: E402
 from .agents.mcpagent import MCPAgent
 from .client import MCPClient
 from .config import load_config_file

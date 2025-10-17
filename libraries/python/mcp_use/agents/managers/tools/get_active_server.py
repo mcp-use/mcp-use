@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel
 
-from .base_tool import MCPServerTool
+from mcp_use.agents.managers.tools.base_tool import MCPServerTool
 
 
 class CurrentServerInput(BaseModel):

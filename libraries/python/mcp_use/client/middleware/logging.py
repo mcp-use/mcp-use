@@ -7,8 +7,8 @@ Simple debug logging for all MCP requests and responses.
 import time
 from typing import Any
 
-from ..logging import logger
-from .middleware import Middleware, MiddlewareContext, NextFunctionT
+from mcp_use.client.middleware.middleware import Middleware, MiddlewareContext, NextFunctionT
+from mcp_use.logging import logger
 
 
 class LoggingMiddleware(Middleware):

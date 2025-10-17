@@ -17,10 +17,10 @@ from mcp.types import (
 )
 from pydantic import BaseModel, Field, create_model
 
-from ..connectors.base import BaseConnector
-from ..errors.error_formatting import format_error
-from ..logging import logger
-from .base import BaseAdapter
+from mcp_use.agents.adapters.base import BaseAdapter
+from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.errors.error_formatting import format_error
+from mcp_use.logging import logger
 
 
 class LangChainAdapter(BaseAdapter):

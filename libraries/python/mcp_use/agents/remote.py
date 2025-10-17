@@ -12,7 +12,7 @@ import httpx
 from langchain.schema import BaseMessage
 from pydantic import BaseModel
 
-from ..logging import logger
+from mcp_use.logging import logger
 
 T = TypeVar("T", bound=BaseModel)
 

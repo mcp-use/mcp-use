@@ -29,10 +29,9 @@ from mcp.types import (
 from pydantic import AnyUrl
 
 import mcp_use
-
-from ..logging import logger
-from ..middleware import Middleware, MiddlewareManager
-from ..task_managers import ConnectionManager
+from mcp_use.client.middleware import Middleware, MiddlewareManager
+from mcp_use.client.task_managers import ConnectionManager
+from mcp_use.logging import logger
 
 
 class BaseConnector(ABC):

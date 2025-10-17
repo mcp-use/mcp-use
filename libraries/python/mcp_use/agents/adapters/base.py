@@ -9,9 +9,9 @@ from typing import TypeVar
 
 from mcp.types import Prompt, Resource, Tool
 
-from ..client import MCPClient
-from ..connectors.base import BaseConnector
-from ..logging import logger
+from mcp_use.client import MCPClient
+from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.logging import logger
 
 # Generic type for the tools created by the adapter
 T = TypeVar("T")

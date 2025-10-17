@@ -11,12 +11,11 @@ from typing import Any
 
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
-from mcp_use.types.sandbox import SandboxOptions
-
-from .config import create_connector_from_config, load_config_file
-from .logging import logger
-from .middleware import Middleware, default_logging_middleware
-from .session import MCPSession
+from mcp_use.client.config import create_connector_from_config, load_config_file
+from mcp_use.client.connectors.sandbox import SandboxOptions
+from mcp_use.client.middleware import Middleware, default_logging_middleware
+from mcp_use.client.session import MCPSession
+from mcp_use.logging import logger
 
 
 class MCPClient:

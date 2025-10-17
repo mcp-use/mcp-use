@@ -13,10 +13,10 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 from authlib.oauth2 import OAuth2Error
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
 
-from ..exceptions import OAuthAuthenticationError, OAuthDiscoveryError
-from ..logging import logger
-from .bearer import BearerAuth
-from .oauth_callback import OAuthCallbackServer
+from mcp_use.client.auth.bearer import BearerAuth
+from mcp_use.client.auth.oauth_callback import OAuthCallbackServer
+from mcp_use.client.exceptions import OAuthAuthenticationError, OAuthDiscoveryError
+from mcp_use.logging import logger
 
 
 class ServerOAuthMetadata(BaseModel):

@@ -9,11 +9,13 @@ from typing import Any
 
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
-from mcp_use.types.sandbox import SandboxOptions
-
-from .connectors import BaseConnector, HttpConnector, SandboxConnector, StdioConnector, WebSocketConnector
-from .connectors.utils import is_stdio_server
-from .middleware import Middleware
+from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.client.connectors.http import HttpConnector
+from mcp_use.client.connectors.sandbox import SandboxConnector, SandboxOptions
+from mcp_use.client.connectors.stdio import StdioConnector
+from mcp_use.client.connectors.utils import is_stdio_server
+from mcp_use.client.connectors.websocket import WebSocketConnector
+from mcp_use.client.middleware import Middleware
 
 
 def load_config_file(filepath: str) -> dict[str, Any]:

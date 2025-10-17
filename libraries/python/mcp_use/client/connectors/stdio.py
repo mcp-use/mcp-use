@@ -10,10 +10,10 @@ import sys
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
-from ..logging import logger
-from ..middleware import CallbackClientSession, Middleware
-from ..task_managers import StdioConnectionManager
-from .base import BaseConnector
+from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.client.middleware import CallbackClientSession, Middleware
+from mcp_use.client.task_managers import StdioConnectionManager
+from mcp_use.logging import logger
 
 
 class StdioConnector(BaseConnector):

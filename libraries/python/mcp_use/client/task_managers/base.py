@@ -9,7 +9,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from ..logging import logger
+from mcp_use.logging import logger
 
 # Type variable for connection types
 T = TypeVar("T")

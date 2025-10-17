@@ -11,8 +11,8 @@ from typing import Any, TextIO
 from mcp import StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from ..logging import logger
-from .base import ConnectionManager
+from mcp_use.client.task_managers.base import ConnectionManager
+from mcp_use.logging import logger
 
 
 class StdioConnectionManager(ConnectionManager[tuple[Any, Any]]):

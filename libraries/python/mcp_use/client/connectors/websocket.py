@@ -14,9 +14,9 @@ import httpx
 from mcp.types import Tool
 from websockets import ClientConnection
 
-from ..logging import logger
-from ..task_managers import ConnectionManager, WebSocketConnectionManager
-from .base import BaseConnector
+from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.client.task_managers import ConnectionManager, WebSocketConnectionManager
+from mcp_use.logging import logger
 
 
 class WebSocketConnector(BaseConnector):

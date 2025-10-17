@@ -6,8 +6,8 @@ from typing import ClassVar
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from ...logging import logger
-from .base_tool import MCPServerTool
+from mcp_use.agents.managers.tools.base_tool import MCPServerTool
+from mcp_use.logging import logger
 
 
 class ToolSearchInput(BaseModel):

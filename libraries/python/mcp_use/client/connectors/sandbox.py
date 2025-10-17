@@ -14,9 +14,9 @@ import aiohttp
 from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
-from ..logging import logger
-from ..middleware import CallbackClientSession, Middleware
-from ..task_managers import SseConnectionManager
+from mcp_use.client.middleware import CallbackClientSession, Middleware
+from mcp_use.client.task_managers import SseConnectionManager
+from mcp_use.logging import logger
 
 # Import E2B SDK components (optional dependency)
 try:

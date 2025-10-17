@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse
 from starlette.routing import Route
 
-from ..logging import logger
+from mcp_use.logging import logger
 
 
 @dataclass
