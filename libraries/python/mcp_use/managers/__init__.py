@@ -1,4 +1,6 @@
 # mcp_use/managers/__init__.py
+import warnings
+
 from typing_extensions import deprecated
 
 from mcp_use.agents.managers.server_manager import ServerManager as _ServerManager
@@ -19,6 +21,12 @@ from mcp_use.agents.managers.tools import (
 )
 from mcp_use.agents.managers.tools import (
     SearchToolsTool as _SearchToolsTool,
+)
+
+warnings.warn(
+    "mcp_use.managers is deprecated. Use mcp_use.agents.managers. This import will be removed in version 1.4.0",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 

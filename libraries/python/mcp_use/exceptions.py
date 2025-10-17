@@ -1,4 +1,6 @@
 # mcp_use/exceptions.py
+import warnings
+
 from typing_extensions import deprecated
 
 from mcp_use.client.exceptions import (
@@ -15,6 +17,12 @@ from mcp_use.client.exceptions import (
 )
 from mcp_use.client.exceptions import (
     OAuthDiscoveryError as _OAuthDiscoveryError,
+)
+
+warnings.warn(
+    "mcp_use.exceptions is deprecated. Use mcp_use.client.exceptions. This import will be removed in version 1.4.0",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 

@@ -1,4 +1,6 @@
 # mcp_use/middleware/metrics.py
+import warnings
+
 from typing_extensions import deprecated
 
 from mcp_use.client.middleware.metrics import (
@@ -12,6 +14,14 @@ from mcp_use.client.middleware.metrics import (
 )
 from mcp_use.client.middleware.metrics import (
     PerformanceMetricsMiddleware as _PerformanceMetricsMiddleware,
+)
+
+warnings.warn(
+    "mcp_use.middleware.metrics is deprecated. "
+    "Use mcp_use.client.middleware.metrics. "
+    "This import will be removed in version 1.4.0",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 

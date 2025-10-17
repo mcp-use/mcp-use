@@ -1,4 +1,6 @@
 # mcp_use/task_managers/__init__.py
+import warnings
+
 from typing_extensions import deprecated
 
 from mcp_use.client.task_managers import (
@@ -15,6 +17,14 @@ from mcp_use.client.task_managers import (
 )
 from mcp_use.client.task_managers import (
     WebSocketConnectionManager as _WebSocketConnectionManager,
+)
+
+warnings.warn(
+    "mcp_use.task_managers is deprecated. "
+    "Use mcp_use.client.task_managers. "
+    "This import will be removed in version 1.4.0",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 

@@ -1,4 +1,6 @@
 # mcp_use/config.py
+import warnings
+
 from typing_extensions import deprecated
 
 from mcp_use.client.config import (
@@ -6,6 +8,12 @@ from mcp_use.client.config import (
 )
 from mcp_use.client.config import (
     load_config_file as _load_config_file,
+)
+
+warnings.warn(
+    "mcp_use.config is deprecated. Use mcp_use.client.config. This import will be removed in version 1.4.0",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 
