@@ -403,6 +403,11 @@ class OAuth:
         # Try well-known endpoint first
         parsed = urlparse(self.server_url)
 
+        # Edge case for Zapier MCP server specific endpoint - no OAuth discovery needed
+        if parsed.netloc == "mcp.zapier.com" and "/api/mcp/s/" in parsed.path:
+            logger.info("Detected Zapier MCP server specific URL, skipping OAuth discovery")
+            raise OAuthDiscoveryError("If you need Zapier to use OAuth, use the /a/ endpoint instead")
+
         # Edge case for GH that doesn't have metadata discovery
         if parsed.netloc == "api.githubcopilot.com":
             logger.debug("Detected GitHub MCP server, using its metadata")
