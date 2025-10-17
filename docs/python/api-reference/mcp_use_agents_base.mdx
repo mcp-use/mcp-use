@@ -2,13 +2,13 @@
 title: "Base"
 description: "Base agent interface for MCP tools API Documentation"
 icon: "code"
-github: "https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/base.py"
 ---
 
 import {RandomGradientBackground} from "/snippets/gradient.jsx"
 
 <Callout type="info" title="Source Code">
-View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/base.py</a>
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/base.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/base.py</a>
 </Callout>
 
 Base agent interface for MCP tools.
@@ -40,11 +40,11 @@ Initialize a new agent.
 
 
 **Parameters**
-><ParamField body="session" type="mcp_use.session.MCPSession" required="True" >   The MCP session to use for tool calls. </ParamField>
+><ParamField body="session" type="mcp_use.client.session.MCPSession" required="True" >   The MCP session to use for tool calls. </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(session: mcp_use.session.MCPSession):
+def __init__(session: mcp_use.client.session.MCPSession):
 ```
 
 </Card>
