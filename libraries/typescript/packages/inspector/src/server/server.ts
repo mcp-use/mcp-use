@@ -1,13 +1,34 @@
-import { exec } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { promisify } from 'node:util'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { exec } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { MCPInspector } from './mcp-inspector.js'
 import { checkClientFiles, getClientDistPath, getContentType, handleChatRequest } from './shared-utils.js'
+
+// Helper function to format error responses with context and timestamp
+function formatErrorResponse(error: unknown, context: string) {
+  const timestamp = new Date().toISOString()
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+  const errorStack = error instanceof Error ? error.stack : undefined
+
+  // Log detailed error server-side for debugging
+  console.error(`[${timestamp}] Error in ${context}:`, {
+    message: errorMessage,
+    stack: errorStack,
+  })
+
+  return {
+    error: errorMessage,
+    context,
+    timestamp,
+    // Only include stack in development mode
+    ...(process.env.NODE_ENV === 'development' && errorStack ? { stack: errorStack } : {}),
+  }
+}
 
 const execAsync = promisify(exec)
 
@@ -86,8 +107,8 @@ app.post('/api/servers/:id/tools/:toolName/execute', async (c) => {
     const result = await mcpInspector.executeTool(id, toolName, input)
     return c.json({ result })
   }
-  catch {
-    return c.json({ error: 'Failed to execute tool' }, 500)
+  catch (error) {
+    return c.json(formatErrorResponse(error, `executeTool(${c.req.param('id')}, ${c.req.param('toolName')})`), 500)
   }
 })
 
@@ -98,8 +119,8 @@ app.get('/api/servers/:id/tools', async (c) => {
     const tools = await mcpInspector.getServerTools(id)
     return c.json({ tools })
   }
-  catch {
-    return c.json({ error: 'Failed to get server tools' }, 500)
+  catch (error) {
+    return c.json(formatErrorResponse(error, `getServerTools(${c.req.param('id')})`), 500)
   }
 })
 
@@ -110,8 +131,8 @@ app.get('/api/servers/:id/resources', async (c) => {
     const resources = await mcpInspector.getServerResources(id)
     return c.json({ resources })
   }
-  catch {
-    return c.json({ error: 'Failed to get server resources' }, 500)
+  catch (error) {
+    return c.json(formatErrorResponse(error, `getServerResources(${c.req.param('id')})`), 500)
   }
 })
 
@@ -122,8 +143,8 @@ app.delete('/api/servers/:id', async (c) => {
     await mcpInspector.disconnectServer(id)
     return c.json({ success: true })
   }
-  catch {
-    return c.json({ error: 'Failed to disconnect server' }, 500)
+  catch (error) {
+    return c.json(formatErrorResponse(error, `disconnectServer(${c.req.param('id')})`), 500)
   }
 })
 
@@ -135,26 +156,19 @@ app.post('/inspector/api/chat', async (c) => {
     return c.json(result)
   }
   catch (error) {
-    console.error('Chat API error:', error)
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to process chat request',
-    }, 500)
+    return c.json(formatErrorResponse(error, 'handleChatRequest'), 500)
   }
 })
 
 // MCP Proxy endpoint - proxies MCP requests to target servers
+// WARNING: This proxy endpoint does not implement authentication.
+// For production use, consider adding authentication or restricting access to localhost only.
 app.all('/inspector/api/proxy/*', async (c) => {
   try {
     const targetUrl = c.req.header('X-Target-URL')
-    const proxyToken = c.req.header('X-Proxy-Token')
 
     if (!targetUrl) {
       return c.json({ error: 'X-Target-URL header is required' }, 400)
-    }
-
-    // Validate proxy token if provided
-    if (proxyToken && proxyToken !== 'c96aeb0c195aa9c7d3846b90aec9bc5fcdd5df97b3049aaede8f5dd1a15d2d87') {
-      return c.json({ error: 'Invalid proxy token' }, 401)
     }
 
     // Forward the request to the target MCP server
@@ -201,10 +215,7 @@ app.all('/inspector/api/proxy/*', async (c) => {
     })
   }
   catch (error) {
-    console.error('Proxy error:', error)
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to proxy request',
-    }, 500)
+    return c.json(formatErrorResponse(error, 'proxyRequest'), 500)
   }
 })
 

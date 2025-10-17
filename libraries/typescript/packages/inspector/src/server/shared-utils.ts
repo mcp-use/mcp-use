@@ -7,16 +7,61 @@ import { fileURLToPath } from 'node:url'
  * Shared utilities for MCP Inspector server functionality
  */
 
+interface LLMConfig {
+  provider: 'openai' | 'anthropic'
+  model: string
+  apiKey: string
+  temperature?: number
+}
+
+interface OAuthTokens {
+  access_token: string
+  token_type?: string
+  [key: string]: unknown
+}
+
+interface AuthConfig {
+  type?: string
+  clientId?: string
+  redirectUri?: string
+  scope?: string
+  username?: string
+  password?: string
+  token?: string
+  oauthTokens?: OAuthTokens
+  [key: string]: unknown
+}
+
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+interface ToolCall {
+  name: string
+  arguments: Record<string, unknown>
+  result?: unknown
+}
+
+// Type for LangChain LLM models - using any for flexibility with dynamic imports
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type BaseLLM = any
+
+interface ServerConfig {
+  url: string
+  headers?: Record<string, string>
+  [key: string]: unknown
+}
 
 /**
  * Handle chat API request with MCP agent
  */
 export async function handleChatRequest(requestBody: {
   mcpServerUrl: string
-  llmConfig: any
-  authConfig?: any
-  messages: any[]
-}): Promise<{ content: string; toolCalls: any[] }> {
+  llmConfig: LLMConfig
+  authConfig?: AuthConfig
+  messages: ChatMessage[]
+}): Promise<{ content: string; toolCalls: ToolCall[] }> {
   const { mcpServerUrl, llmConfig, authConfig, messages } = requestBody
 
   if (!mcpServerUrl || !llmConfig || !messages) {
@@ -27,7 +72,7 @@ export async function handleChatRequest(requestBody: {
   const { MCPAgent, MCPClient } = await import('mcp-use')
 
   // Create LLM instance based on provider
-  let llm: any
+  let llm: BaseLLM
   if (llmConfig.provider === 'openai') {
     // @ts-ignore - Dynamic import of peer dependency available through mcp-use
     const { ChatOpenAI } = await import('@langchain/openai')
@@ -61,7 +106,7 @@ export async function handleChatRequest(requestBody: {
   const serverName = `inspector-${Date.now()}`
 
   // Add server with potential authentication headers
-  const serverConfig: any = { url: mcpServerUrl }
+  const serverConfig: ServerConfig = { url: mcpServerUrl }
 
   // Handle authentication - support both custom auth and OAuth
   if (authConfig && authConfig.type !== 'none') {

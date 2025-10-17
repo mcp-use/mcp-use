@@ -144,9 +144,6 @@ export function Layout({ children }: LayoutProps) {
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState('True')
   const [maxTotalTimeout, setMaxTotalTimeout] = useState('60000')
   const [proxyAddress, setProxyAddress] = useState('')
-  const [proxyToken, setProxyToken] = useState(
-    'c96aeb0c195aa9c7d3846b90aec9bc5fcdd5df97b3049aaede8f5dd1a15d2d87'
-  )
 
   // OAuth fields
   const [clientId, setClientId] = useState('')

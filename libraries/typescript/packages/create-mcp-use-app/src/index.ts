@@ -3,17 +3,37 @@
 import chalk from 'chalk'
 import { Command } from 'commander'
 import inquirer from 'inquirer'
-import { exec } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
 import ora from 'ora'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-const execAsync = promisify(exec)
+// Helper function to run package manager commands securely using spawn
+function runPackageManager(packageManager: string, args: string[], cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(packageManager, args, {
+      cwd,
+      stdio: 'inherit',
+      shell: false // Disable shell to prevent command injection
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`Process exited with code ${code}`))
+      }
+    })
+
+    child.on('error', (err) => {
+      reject(err)
+    })
+  })
+}
 
 const program = new Command()
 
@@ -71,11 +91,14 @@ function getCurrentPackageVersions() {
     )
     versions['@mcp-use/inspector'] = inspectorPackage.version
   } catch (error) {
-    // Silently use defaults when not in workspace (normal for published package)
-    // Only log in development mode
+    // Use defaults when not in workspace (normal for published package)
+    // Log error details in development mode for debugging
     if (process.env.NODE_ENV === 'development') {
       console.warn('⚠️  Could not read workspace package versions, using defaults')
-      console.warn(`   Error: ${error}`)
+      console.warn(`   Error: ${error instanceof Error ? error.message : String(error)}`)
+      if (error instanceof Error && error.stack) {
+        console.warn(`   Stack: ${error.stack}`)
+      }
     }
   }
   
@@ -137,39 +160,65 @@ program
         selectedTemplate = await promptForTemplate()
       }
 
-      console.log(chalk.cyan(`🚀 Creating MCP server "${projectName}"...`))
+      // Validate project name
+      const sanitizedProjectName = projectName!.trim()
+      if (!sanitizedProjectName) {
+        console.error(chalk.red('❌ Project name cannot be empty'))
+        process.exit(1)
+      }
 
-      const projectPath = resolve(process.cwd(), projectName!)
+      // Security: Validate project name doesn't contain path traversal
+      if (sanitizedProjectName.includes('..') || sanitizedProjectName.includes('/') || sanitizedProjectName.includes('\\')) {
+        console.error(chalk.red('❌ Project name cannot contain path separators or ".."'))
+        console.error(chalk.yellow('   Use simple names like "my-mcp-server"'))
+        process.exit(1)
+      }
+
+      // Validate against common protected directory names
+      const protectedNames = ['node_modules', '.git', '.env', 'package.json', 'src', 'dist']
+      if (protectedNames.includes(sanitizedProjectName.toLowerCase())) {
+        console.error(chalk.red(`❌ Cannot use protected name "${sanitizedProjectName}"`))
+        console.error(chalk.yellow('   Please choose a different project name'))
+        process.exit(1)
+      }
+
+      console.log(chalk.cyan(`🚀 Creating MCP server "${sanitizedProjectName}"...`))
+
+      const projectPath = resolve(process.cwd(), sanitizedProjectName)
 
       // Check if directory already exists
       if (existsSync(projectPath)) {
-        console.error(`❌ Directory "${projectName}" already exists!`)
+        console.error(chalk.red(`❌ Directory "${sanitizedProjectName}" already exists!`))
+        console.error(chalk.yellow('   Please choose a different name or remove the existing directory'))
         process.exit(1)
       }
 
       // Create project directory
       mkdirSync(projectPath, { recursive: true })
 
+      // Validate template name
+      const validatedTemplate = validateTemplateName(selectedTemplate)
+      
       // Get current package versions
       const versions = getCurrentPackageVersions()
       
       // Copy template files
-      await copyTemplate(projectPath, selectedTemplate, versions, options.dev)
+      await copyTemplate(projectPath, validatedTemplate, versions, options.dev)
 
       // Update package.json with project name
-      updatePackageJson(projectPath, projectName!)
+      updatePackageJson(projectPath, sanitizedProjectName)
 
       // Install dependencies if requested
       if (options.install) {
         const spinner = ora('Installing packages...').start()
         try {
-          await execAsync('pnpm install', { cwd: projectPath })
+          await runPackageManager('pnpm', ['install'], projectPath)
           spinner.succeed('Packages installed successfully')
         }
         catch {
           spinner.text = 'pnpm not found, trying npm...'
           try {
-            await execAsync('npm install', { cwd: projectPath })
+            await runPackageManager('npm', ['install'], projectPath)
             spinner.succeed('Packages installed successfully')
           }
           catch (error) {
@@ -186,10 +235,10 @@ program
       }
       console.log('')
       console.log(chalk.bold('📁 Project structure:'))
-      console.log(`   ${projectName}/`)
+      console.log(`   ${sanitizedProjectName}/`)
       console.log('   ├── src/')
       console.log('   │   └── server.ts')
-      if (selectedTemplate === 'ui') {
+      if (validatedTemplate === 'ui') {
         console.log('   ├── resources/')
         console.log('   │   ├── data-visualization.tsx')
         console.log('   │   ├── kanban-board.tsx')
@@ -201,7 +250,7 @@ program
       console.log('   └── README.md')
       console.log('')
       console.log(chalk.bold('🚀 To get started:'))
-      console.log(chalk.cyan(`   cd ${projectName!}`))
+      console.log(chalk.cyan(`   cd ${sanitizedProjectName}`))
       if (!options.install) {
         console.log(chalk.cyan('   npm install'))
       }
@@ -222,11 +271,32 @@ program
     }
   })
 
+// Validate and sanitize template name to prevent path traversal
+function validateTemplateName(template: string): string {
+  const sanitized = template.trim()
+  
+  // Security: Prevent path traversal attacks
+  if (sanitized.includes('..') || sanitized.includes('/') || sanitized.includes('\\')) {
+    console.error(chalk.red('❌ Invalid template name'))
+    console.error(chalk.yellow('   Template name cannot contain path separators'))
+    process.exit(1)
+  }
+  
+  // Only allow alphanumeric characters, hyphens, and underscores
+  if (!/^[a-zA-Z0-9_-]+$/.test(sanitized)) {
+    console.error(chalk.red('❌ Invalid template name'))
+    console.error(chalk.yellow('   Template name can only contain letters, numbers, hyphens, and underscores'))
+    process.exit(1)
+  }
+  
+  return sanitized
+}
+
 async function copyTemplate(projectPath: string, template: string, versions: Record<string, string>, isDevelopment: boolean = false) {
   const templatePath = join(__dirname, 'templates', template)
 
   if (!existsSync(templatePath)) {
-    console.error(`❌ Template "${template}" not found!`)
+    console.error(chalk.red(`❌ Template "${template}" not found!`))
     
     // Dynamically list available templates
     const templatesDir = join(__dirname, 'templates')

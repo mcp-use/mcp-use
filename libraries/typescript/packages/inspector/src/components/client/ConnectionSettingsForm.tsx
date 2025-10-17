@@ -48,8 +48,6 @@ interface ConnectionSettingsFormProps {
   setMaxTotalTimeout: (value: string) => void
   proxyAddress: string
   setProxyAddress: (value: string) => void
-  proxyToken: string
-  setProxyToken: (value: string) => void
 
   // OAuth fields
   clientId: string
@@ -93,8 +91,6 @@ export function ConnectionSettingsForm({
   setMaxTotalTimeout,
   proxyAddress,
   setProxyAddress,
-  proxyToken,
-  setProxyToken,
   clientId,
   setClientId,
   redirectUrl,
@@ -481,19 +477,6 @@ export function ConnectionSettingsForm({
                   value={proxyAddress}
                   onChange={(e) => setProxyAddress(e.target.value)}
                   placeholder=""
-                />
-              </div>
-
-              {/* Proxy Session Token */}
-              <div className="space-y-2">
-                <Label className="text-sm flex items-center gap-1">
-                  Proxy Session Token
-                  <span className="text-muted-foreground text-xs">(?)</span>
-                </Label>
-                <Input
-                  value={proxyToken}
-                  onChange={(e) => setProxyToken(e.target.value)}
-                  className="font-mono text-xs"
                 />
               </div>
 

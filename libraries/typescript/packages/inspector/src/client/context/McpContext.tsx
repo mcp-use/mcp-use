@@ -34,7 +34,6 @@ interface McpContextType {
     name?: string,
     proxyConfig?: {
       proxyAddress?: string
-      proxyToken?: string
       customHeaders?: Record<string, string>
     },
     transportType?: 'http' | 'sse'
@@ -55,7 +54,6 @@ interface SavedConnection {
   name: string
   proxyConfig?: {
     proxyAddress?: string
-    proxyToken?: string
     customHeaders?: Record<string, string>
   }
   transportType?: 'http' | 'sse'
@@ -73,7 +71,6 @@ function McpConnectionWrapper({
   name: string
   proxyConfig?: {
     proxyAddress?: string
-    proxyToken?: string
     customHeaders?: Record<string, string>
   }
   transportType?: 'http' | 'sse'
@@ -100,10 +97,6 @@ function McpConnectionWrapper({
     // Construct the final proxy URL by combining proxy base with original path
     finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${originalUrl.pathname}${originalUrl.search}`
 
-    // Add proxy token as header if provided
-    if (proxyConfig.proxyToken) {
-      customHeaders['X-Proxy-Token'] = proxyConfig.proxyToken
-    }
     // Add original URL as a header so the proxy knows where to forward the request
     customHeaders['X-Target-URL'] = url
   }

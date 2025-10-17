@@ -51,9 +51,6 @@ function ConnectionTester({
     const originalUrl = new URL(config.url)
     finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${originalUrl.pathname}${originalUrl.search}`
 
-    if (config.proxyConfig.proxyToken) {
-      customHeaders['X-Proxy-Token'] = config.proxyConfig.proxyToken
-    }
     customHeaders['X-Target-URL'] = config.url
   }
 
@@ -144,10 +141,6 @@ export function InspectorDashboard() {
   const [proxyAddress, setProxyAddress] = useState(
     `${window.location.origin}/inspector/api/proxy`
   )
-  const [proxyToken, setProxyToken] = useState(
-    'c96aeb0c195aa9c7d3846b90aec9bc5fcdd5df97b3049aaede8f5dd1a15d2d87'
-  )
-
   // OAuth fields
   const [clientId, setClientId] = useState('')
   const [redirectUrl, setRedirectUrl] = useState(
@@ -168,7 +161,6 @@ export function InspectorDashboard() {
     name: string
     proxyConfig?: {
       proxyAddress?: string
-      proxyToken?: string
       customHeaders?: Record<string, string>
     }
     transportType?: 'http' | 'sse'
@@ -194,7 +186,6 @@ export function InspectorDashboard() {
       connectionType === 'Via Proxy' && proxyAddress.trim()
         ? {
             proxyAddress: proxyAddress.trim(),
-            proxyToken: proxyToken.trim(),
             customHeaders: customHeaders.reduce((acc, header) => {
               if (header.name && header.value) {
                 acc[header.name] = header.value
@@ -223,14 +214,7 @@ export function InspectorDashboard() {
       proxyConfig,
       transportType: actualTransportType,
     })
-  }, [
-    url,
-    connectionType,
-    proxyAddress,
-    proxyToken,
-    customHeaders,
-    transportType,
-  ])
+  }, [url, connectionType, proxyAddress, customHeaders, transportType])
 
   // Handle successful connection
   const handleConnectionSuccess = useCallback(() => {
@@ -633,8 +617,6 @@ export function InspectorDashboard() {
             setMaxTotalTimeout={setMaxTotalTimeout}
             proxyAddress={proxyAddress}
             setProxyAddress={setProxyAddress}
-            proxyToken={proxyToken}
-            setProxyToken={setProxyToken}
             clientId={clientId}
             setClientId={setClientId}
             redirectUrl={redirectUrl}
