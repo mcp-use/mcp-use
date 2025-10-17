@@ -15,14 +15,14 @@ mcp_use configuration is organized into two main areas: **Client Configuration**
 mcp_use follows a clear separation between client-side and agent-side concerns:
 
 <CardGroup cols={2}>
-  <Card title="Client Configuration" icon="server" href="/client/client-configuration">
+  <Card title="Client Configuration" icon="server" href="/python/client/client-configuration">
     **MCPClient Setup**
     - MCP server connections
     - Multi-server configurations
     - Sandboxed execution
     - Connection types
   </Card>
-  <Card title="Agent Configuration" icon="brain" href="/agent/agent-configuration">
+  <Card title="Agent Configuration" icon="brain" href="/python/agent/agent-configuration">
     **MCPAgent Setup**
     - API key management
     - LLM integration
@@ -126,19 +126,19 @@ main().catch(console.error)
   <Step title="Client Configuration">
     Set up your MCPClient to connect to MCP servers. This includes configuring server connections, managing API keys, and setting up multi-server environments.
 
-    **Start here:** [Client Configuration Guide →](/client/client-configuration)
+    **Start here:** [Client Configuration Guide →](/python/client/client-configuration)
   </Step>
 
   <Step title="Agent Configuration">
     Configure your MCPAgent's behavior, including LLM integration, tool restrictions, memory settings, and custom prompts.
 
-    **Continue with:** [Agent Configuration Guide →](/agent/agent-configuration)
+    **Continue with:** [Agent Configuration Guide →](/python/agent/agent-configuration)
   </Step>
 
   <Step title="Advanced Topics">
     Explore connection types, server management, and LLM integration patterns for complex use cases.
 
-    **Learn more:** [Connection Types](/client/connection-types) | [Server Manager](/agent/server-manager) | [LLM Integration](/agent/llm-integration)
+    **Learn more:** [Connection Types](/python/client/connection-types) | [Server Manager](/python/agent/server-manager) | [LLM Integration](/python/agent/llm-integration)
   </Step>
 </Steps>
 
@@ -238,10 +238,10 @@ const agent = new MCPAgent({
 ## What's Next?
 
 <CardGroup cols={3}>
-  <Card title="Client Configuration" icon="server" href="/client/client-configuration">
+  <Card title="Client Configuration" icon="server" href="/python/client/client-configuration">
     Learn how to configure MCPClient and connect to MCP servers
   </Card>
-  <Card title="Agent Configuration" icon="brain" href="/agent/agent-configuration">
+  <Card title="Agent Configuration" icon="brain" href="/python/agent/agent-configuration">
     Discover how to customize MCPAgent behavior and LLM integration
   </Card>
   <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
@@ -250,5 +250,5 @@ const agent = new MCPAgent({
 </CardGroup>
 
 <Tip>
-**New to mcp_use?** Start with the [Quickstart Guide](/getting-started/quickstart) for a basic introduction, then return here for detailed configuration options.
+**New to mcp_use?** Start with the [Quickstart Guide](/python/getting-started/quickstart) for a basic introduction, then return here for detailed configuration options.
 </Tip>

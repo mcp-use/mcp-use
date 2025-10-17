@@ -45,9 +45,9 @@ async def long_running_task(task_name: str, ctx: Context, steps: int = 5) -> str
 The `fastmcp` server context provides several methods for sending specific notifications. Here are the ones you can use and the corresponding type to check for in your client's `message_handler`:
 
 -   `ctx.report_progress(...)` sends a `types.ProgressNotification`. This is used to report the progress of a long-running operation.
--   `ctx.send_tool_list_changed()` sends a `types.ToolListChangedNotification`. This signals that the tool list has changed (see [Tools documentation](/client/tools)).
--   `ctx.send_resource_list_changed()` sends a `types.ResourceListChangedNotification`. This signals that the resource list has changed (see [Resources documentation](/client/resources)).
--   `ctx.send_prompt_list_changed()` sends a `types.PromptListChangedNotification`. This signals that the prompt list has changed (see [Prompts documentation](/client/prompts)).
+-   `ctx.send_tool_list_changed()` sends a `types.ToolListChangedNotification`. This signals that the tool list has changed (see [Tools documentation](/python/client/tools)).
+-   `ctx.send_resource_list_changed()` sends a `types.ResourceListChangedNotification`. This signals that the resource list has changed (see [Resources documentation](/python/client/resources)).
+-   `ctx.send_prompt_list_changed()` sends a `types.PromptListChangedNotification`. This signals that the prompt list has changed (see [Prompts documentation](/python/client/prompts)).
 
 ## Client-Side: Handling Notifications
 
