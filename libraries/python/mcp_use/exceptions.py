@@ -1,31 +1,38 @@
-"""MCP-use exceptions."""
+# mcp_use/exceptions.py
+from typing_extensions import deprecated
+
+from mcp_use.client.exceptions import (
+    ConfigurationError as _ConfigurationError,
+)
+from mcp_use.client.exceptions import (
+    ConnectionError as _ConnectionError,
+)
+from mcp_use.client.exceptions import (
+    MCPError as _MCPError,
+)
+from mcp_use.client.exceptions import (
+    OAuthAuthenticationError as _OAuthAuthenticationError,
+)
+from mcp_use.client.exceptions import (
+    OAuthDiscoveryError as _OAuthDiscoveryError,
+)
 
 
-class MCPError(Exception):
-    """Base exception for MCP-use."""
-
-    pass
+@deprecated("Use mcp_use.client.exceptions.MCPError")
+class MCPError(_MCPError): ...
 
 
-class OAuthDiscoveryError(MCPError):
-    """OAuth discovery auth metadata error"""
-
-    pass
+@deprecated("Use mcp_use.client.exceptions.OAuthDiscoveryError")
+class OAuthDiscoveryError(_OAuthDiscoveryError): ...
 
 
-class OAuthAuthenticationError(MCPError):
-    """OAuth authentication-related errors"""
-
-    pass
+@deprecated("Use mcp_use.client.exceptions.OAuthAuthenticationError")
+class OAuthAuthenticationError(_OAuthAuthenticationError): ...
 
 
-class ConnectionError(MCPError):
-    """Connection-related errors."""
-
-    pass
+@deprecated("Use mcp_use.client.exceptions.ConnectionError")
+class ConnectionError(_ConnectionError): ...
 
 
-class ConfigurationError(MCPError):
-    """Configuration-related errors."""
-
-    pass
+@deprecated("Use mcp_use.client.exceptions.ConfigurationError")
+class ConfigurationError(_ConfigurationError): ...
