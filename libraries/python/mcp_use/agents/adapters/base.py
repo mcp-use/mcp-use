@@ -9,7 +9,7 @@ from typing import TypeVar
 
 from mcp.types import Prompt, Resource, Tool
 
-from mcp_use.client import MCPClient
+from mcp_use.client.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.logging import logger
 
