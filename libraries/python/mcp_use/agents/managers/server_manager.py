@@ -11,6 +11,7 @@ from mcp_use.agents.managers.tools import (
 )
 from mcp_use.client import MCPClient
 from mcp_use.logging import logger
+from mcp_use.telemetry.telemetry import telemetry
 
 
 class ServerManager(BaseServerManager):
@@ -33,6 +34,7 @@ class ServerManager(BaseServerManager):
         self.initialized_servers: dict[str, bool] = {}
         self._server_tools: dict[str, list[BaseTool]] = {}
 
+    @telemetry("server_manager_initialize")
     async def initialize(self) -> None:
         """Initialize the server manager and prepare server management tools."""
         # Make sure we have server configurations

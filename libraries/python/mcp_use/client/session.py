@@ -12,6 +12,7 @@ from mcp.types import CallToolResult, GetPromptResult, Prompt, ReadResourceResul
 from pydantic import AnyUrl
 
 from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.telemetry.telemetry import telemetry
 
 
 class MCPSession:
@@ -63,6 +64,7 @@ class MCPSession:
         """Disconnect from the MCP implementation."""
         await self.connector.disconnect()
 
+    @telemetry("session_initialize")
     async def initialize(self) -> dict[str, Any]:
         """Initialize the MCP session and discover available tools.
 
@@ -88,6 +90,7 @@ class MCPSession:
         return self.connector.is_connected
 
     # Convenience methods for MCP operations
+    @telemetry("session_call_tool")
     async def call_tool(
         self, name: str, arguments: dict[str, Any], read_timeout_seconds: timedelta | None = None
     ) -> CallToolResult:
@@ -106,6 +109,7 @@ class MCPSession:
         """
         return await self.connector.call_tool(name, arguments, read_timeout_seconds)
 
+    @telemetry("session_list_tools")
     async def list_tools(self) -> list[Tool]:
         """List all available tools from the MCP server.
 
@@ -114,6 +118,7 @@ class MCPSession:
         """
         return await self.connector.list_tools()
 
+    @telemetry("session_list_resources")
     async def list_resources(self) -> list[Resource]:
         """List all available resources from the MCP server.
 
@@ -122,6 +127,7 @@ class MCPSession:
         """
         return await self.connector.list_resources()
 
+    @telemetry("session_read_resource")
     async def read_resource(self, uri: AnyUrl) -> ReadResourceResult:
         """Read a resource by URI.
 
@@ -133,6 +139,7 @@ class MCPSession:
         """
         return await self.connector.read_resource(uri)
 
+    @telemetry("session_list_prompts")
     async def list_prompts(self) -> list[Prompt]:
         """List all available prompts from the MCP server.
 
@@ -141,6 +148,7 @@ class MCPSession:
         """
         return await self.connector.list_prompts()
 
+    @telemetry("session_get_prompt")
     async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> GetPromptResult:
         """Get a prompt by name.
 

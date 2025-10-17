@@ -12,6 +12,7 @@ from mcp.types import Prompt, Resource, Tool
 from mcp_use.client.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.logging import logger
+from mcp_use.telemetry.telemetry import telemetry
 
 # Generic type for the tools created by the adapter
 T = TypeVar("T")
@@ -33,6 +34,7 @@ class BaseAdapter(ABC):
         self.disallowed_tools = disallowed_tools or []
         self._connector_tool_map: dict[BaseConnector, list[T]] = {}
 
+    @telemetry("adapter_create_tools")
     async def create_tools(self, client: "MCPClient") -> list[T]:
         """Create tools from an MCPClient instance.
 
@@ -68,6 +70,7 @@ class BaseAdapter(ABC):
         # Create tools from connectors
         return await self._create_tools_from_connectors(connectors)
 
+    @telemetry("adapter_load_tools")
     async def load_tools_for_connector(self, connector: BaseConnector) -> list[T]:
         """Dynamically load tools for a specific connector.
 

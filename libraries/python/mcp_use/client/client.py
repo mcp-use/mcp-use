@@ -16,6 +16,7 @@ from mcp_use.client.connectors.sandbox import SandboxOptions
 from mcp_use.client.middleware import Middleware, default_logging_middleware
 from mcp_use.client.session import MCPSession
 from mcp_use.logging import logger
+from mcp_use.telemetry.telemetry import telemetry
 
 
 class MCPClient:
@@ -129,6 +130,7 @@ class MCPClient:
             logging_callback=logging_callback,
         )
 
+    @telemetry("client_add_server")
     def add_server(
         self,
         name: str,
@@ -145,6 +147,7 @@ class MCPClient:
 
         self.config["mcpServers"][name] = server_config
 
+    @telemetry("client_remove_server")
     def remove_server(self, name: str) -> None:
         """Remove a server configuration.
 
@@ -190,6 +193,7 @@ class MCPClient:
         with open(filepath, "w") as f:
             json.dump(self.config, f, indent=2)
 
+    @telemetry("client_create_session")
     async def create_session(self, server_name: str, auto_initialize: bool = True) -> MCPSession:
         """Create a session for the specified server.
 
@@ -238,6 +242,7 @@ class MCPClient:
 
         return session
 
+    @telemetry("client_create_all_sessions")
     async def create_all_sessions(
         self,
         auto_initialize: bool = True,
@@ -292,6 +297,7 @@ class MCPClient:
         """
         return {name: self.sessions[name] for name in self.active_sessions if name in self.sessions}
 
+    @telemetry("client_close_session")
     async def close_session(self, server_name: str) -> None:
         """Close a session.
 
@@ -324,6 +330,7 @@ class MCPClient:
             if server_name in self.active_sessions:
                 self.active_sessions.remove(server_name)
 
+    @telemetry("client_close_all_sessions")
     async def close_all_sessions(self) -> None:
         """Close all active sessions.
 

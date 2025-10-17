@@ -35,6 +35,8 @@ from mcp.types import (
     ReadResourceResult,
 )
 
+from mcp_use.telemetry.telemetry import telemetry
+
 # Generig TypeVars for context and results
 T = TypeVar("T")
 R = TypeVar("R", covariant=True)
@@ -153,10 +155,12 @@ class MiddlewareManager:
     def __init__(self):
         self.middlewares: list[Middleware] = []
 
+    @telemetry("middleware_add")
     def add_middleware(self, callback: Middleware) -> None:
         """Add a middleware callback."""
         self.middlewares.append(callback)
 
+    @telemetry("middleware_process_request")
     async def process_request(self, context: MiddlewareContext, original_call: Callable) -> MCPResponseContext:
         """
         Runs the full middleware chain, captures timing and errors,

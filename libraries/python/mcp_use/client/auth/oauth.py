@@ -17,6 +17,7 @@ from mcp_use.client.auth.bearer import BearerAuth
 from mcp_use.client.auth.oauth_callback import OAuthCallbackServer
 from mcp_use.client.exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from mcp_use.logging import logger
+from mcp_use.telemetry.telemetry import telemetry
 
 
 class ServerOAuthMetadata(BaseModel):
@@ -222,6 +223,7 @@ class OAuth:
         self._bearer_auth: BearerAuth | None = None
         logger.debug(f"OAuth initialized with scope='{self.scope}', client_id='{self.client_id}'")
 
+    @telemetry("oauth_initialize")
     async def initialize(self, client: httpx.AsyncClient) -> BearerAuth | None:
         """Initialize OAuth and return bearer auth if tokens exist."""
         logger.debug(f"OAuth.initialize called for {self.server_url}")
@@ -250,6 +252,7 @@ class OAuth:
         logger.debug("OAuth.initialize finished, no valid token available yet")
         return None
 
+    @telemetry("oauth_authenticate")
     async def authenticate(self) -> BearerAuth:
         """Perform OAuth authentication flow."""
         logger.debug("OAuth.authenticate called")
@@ -583,6 +586,7 @@ class OAuth:
 
         return None
 
+    @telemetry("oauth_refresh_token")
     async def refresh_token(self) -> BearerAuth | None:
         """Refresh the access token if possible."""
         logger.debug("Attempting to refresh token")

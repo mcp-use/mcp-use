@@ -35,7 +35,7 @@ from mcp_use.agents.remote import RemoteAgent
 from mcp_use.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.logging import logger
-from mcp_use.telemetry.telemetry import Telemetry
+from mcp_use.telemetry.telemetry import Telemetry, telemetry
 from mcp_use.telemetry.utils import extract_model_info
 
 set_debug(logger.level == logging.DEBUG)
@@ -424,6 +424,7 @@ class MCPAgent:
                 steps_taken += 1
         return final_result, steps_taken
 
+    @telemetry("agent_stream")
     async def stream(
         self,
         query: str,
@@ -820,6 +821,7 @@ class MCPAgent:
                 logger.info("🧹 Closing agent after stream completion")
                 await self.close()
 
+    @telemetry("agent_run")
     async def run(
         self,
         query: str,
@@ -1037,6 +1039,7 @@ class MCPAgent:
             logger.info("🧹 Closing agent after generator completion")
             await self.close()
 
+    @telemetry("agent_stream_events")
     async def stream_events(
         self,
         query: str,

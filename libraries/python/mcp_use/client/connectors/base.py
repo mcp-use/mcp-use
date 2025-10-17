@@ -32,6 +32,7 @@ import mcp_use
 from mcp_use.client.middleware import Middleware, MiddlewareManager
 from mcp_use.client.task_managers import ConnectionManager
 from mcp_use.logging import logger
+from mcp_use.telemetry.telemetry import telemetry
 
 
 class BaseConnector(ABC):
@@ -93,6 +94,7 @@ class BaseConnector(ABC):
             await self.message_handler(message)
 
     @abstractmethod
+    @telemetry("connector_connect")
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
         pass
@@ -103,6 +105,7 @@ class BaseConnector(ABC):
         """Get the identifier for the connector."""
         pass
 
+    @telemetry("connector_disconnect")
     async def disconnect(self) -> None:
         """Close the connection to the MCP implementation."""
         if not self._connected:
@@ -156,6 +159,7 @@ class BaseConnector(ABC):
         if errors:
             logger.warning(f"Encountered {len(errors)} errors during resource cleanup")
 
+    @telemetry("connector_initialize")
     async def initialize(self) -> dict[str, Any]:
         """Initialize the MCP session and return session information."""
         if not self.client_session:
@@ -347,6 +351,7 @@ class BaseConnector(ABC):
                     "Connection to MCP server has been lost. Auto-reconnection is disabled. Please reconnect manually."
                 )
 
+    @telemetry("connector_call_tool")
     async def call_tool(
         self, name: str, arguments: dict[str, Any], read_timeout_seconds: timedelta | None = None
     ) -> CallToolResult:
@@ -380,6 +385,7 @@ class BaseConnector(ABC):
                 # Re-raise the original error if it's not connection-related
                 raise
 
+    @telemetry("connector_list_tools")
     async def list_tools(self) -> list[Tool]:
         """List all available tools from the MCP implementation."""
 
@@ -399,6 +405,7 @@ class BaseConnector(ABC):
             logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
             return []
 
+    @telemetry("connector_list_resources")
     async def list_resources(self) -> list[Resource]:
         """List all available resources from the MCP implementation."""
 
@@ -418,6 +425,7 @@ class BaseConnector(ABC):
             logger.warning(f"Error listing resources for connector {self.public_identifier}: {e}")
             return []
 
+    @telemetry("connector_read_resource")
     async def read_resource(self, uri: AnyUrl) -> ReadResourceResult:
         """Read a resource by URI."""
         await self._ensure_connected()
@@ -426,6 +434,7 @@ class BaseConnector(ABC):
         result = await self.client_session.read_resource(uri)
         return result
 
+    @telemetry("connector_list_prompts")
     async def list_prompts(self) -> list[Prompt]:
         """List all available prompts from the MCP implementation."""
 
@@ -444,6 +453,7 @@ class BaseConnector(ABC):
             logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
             return []
 
+    @telemetry("connector_get_prompt")
     async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> GetPromptResult:
         """Get a prompt by name."""
         await self._ensure_connected()

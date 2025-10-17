@@ -21,6 +21,7 @@ from mcp_use.agents.adapters.base import BaseAdapter
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.errors.error_formatting import format_error
 from mcp_use.logging import logger
+from mcp_use.telemetry.telemetry import telemetry
 
 
 class LangChainAdapter(BaseAdapter):
@@ -35,6 +36,7 @@ class LangChainAdapter(BaseAdapter):
         super().__init__(disallowed_tools)
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
 
+    @telemetry("adapter_fix_schema")
     def fix_schema(self, schema: dict) -> dict:
         """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
 
@@ -57,6 +59,7 @@ class LangChainAdapter(BaseAdapter):
                 schema[key] = self.fix_schema(value)  # Apply recursively
         return schema
 
+    @telemetry("adapter_convert_tool")
     def _convert_tool(self, mcp_tool: dict[str, Any], connector: BaseConnector) -> BaseTool:
         """Convert an MCP tool to LangChain's tool format.
 

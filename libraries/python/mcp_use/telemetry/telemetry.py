@@ -1,6 +1,7 @@
 import logging
 import os
 import platform
+import time
 import uuid
 from collections.abc import Callable
 from functools import wraps
@@ -11,7 +12,7 @@ from posthog import Posthog
 from scarf import ScarfEventLogger
 
 from mcp_use.logging import MCP_USE_DEBUG
-from mcp_use.telemetry.events import BaseTelemetryEvent, MCPAgentExecutionEvent
+from mcp_use.telemetry.events import BaseTelemetryEvent, FeatureUsageEvent, MCPAgentExecutionEvent
 from mcp_use.telemetry.utils import get_package_version
 from mcp_use.utils import singleton
 
@@ -28,6 +29,52 @@ def requires_telemetry(func: Callable) -> Callable:
         return func(self, *args, **kwargs)
 
     return wrapper
+
+
+def telemetry(feature_name: str, additional_properties: dict[str, Any] | None = None):
+    """Decorator to automatically track feature usage"""
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            start_time = time.time()
+            success = True
+            error_type = None
+
+            try:
+                result = func(self, *args, **kwargs)
+                return result
+            except Exception as e:
+                success = False
+                error_type = type(e).__name__
+                raise
+            finally:
+                execution_time_ms = int((time.time() - start_time) * 1000)
+
+                # Get telemetry instance (try common patterns)
+                telemetry = None
+                if hasattr(self, "telemetry"):
+                    telemetry = self.telemetry
+                elif hasattr(self, "_telemetry"):
+                    telemetry = self._telemetry
+                else:
+                    # Fallback to singleton instance
+                    telemetry = Telemetry()
+
+                if telemetry:
+                    telemetry.telemetry(
+                        feature_name=feature_name,
+                        class_name=self.__class__.__name__,
+                        method_name=func.__name__,
+                        success=success,
+                        execution_time_ms=execution_time_ms,
+                        error_type=error_type,
+                        additional_properties=additional_properties,
+                    )
+
+        return wrapper
+
+    return decorator
 
 
 def get_cache_home() -> Path:
@@ -269,6 +316,29 @@ class Telemetry:
             execution_time_ms=execution_time_ms,
             error_type=error_type,
             conversation_history_length=conversation_history_length,
+        )
+        self.capture(event)
+
+    @requires_telemetry
+    def telemetry(
+        self,
+        feature_name: str,
+        class_name: str,
+        method_name: str,
+        success: bool,
+        execution_time_ms: int | None = None,
+        error_type: str | None = None,
+        additional_properties: dict[str, Any] | None = None,
+    ) -> None:
+        """Track feature usage across the library"""
+        event = FeatureUsageEvent(
+            feature_name=feature_name,
+            class_name=class_name,
+            method_name=method_name,
+            success=success,
+            execution_time_ms=execution_time_ms,
+            error_type=error_type,
+            additional_properties=additional_properties,
         )
         self.capture(event)
 
