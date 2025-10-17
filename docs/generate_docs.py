@@ -1455,7 +1455,9 @@ def main():
         print(
             "Usage: python generate_docs.py <package_dir> [output_dir] [docs_json_path]"
         )
-        print("Example: python generate_docs.py ../mcp_use api-reference docs.json")
+        print(
+            "Example: python generate_docs.py ../libraries/python/mcp_use python/api-reference docs.json"
+        )
         sys.exit(1)
 
     package_dir = sys.argv[1]
