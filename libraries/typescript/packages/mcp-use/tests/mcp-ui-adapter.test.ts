@@ -11,6 +11,7 @@ import {
   createExternalUrlResource,
   createRawHtmlResource,
   createRemoteDomResource,
+  createAppsSdkResource,
   createUIResourceFromDefinition,
   type UrlConfig
 } from '../src/server/adapters/mcp-ui-adapter.js'
@@ -21,7 +22,8 @@ import {
 import type {
   ExternalUrlUIResource,
   RawHtmlUIResource,
-  RemoteDomUIResource
+  RemoteDomUIResource,
+  AppsSdkUIResource
 } from 'mcp-use/server'
 
 describe('MCP-UI Adapter', () => {
@@ -810,6 +812,207 @@ describe('MCP-UI Adapter', () => {
         expect(resource.resource.mimeType).toBe('text/html+skybridge')
         expect(resource.resource.text).toContain('initAdapter')
       })
+    })
+  })
+
+  describe('Apps SDK Resource Type', () => {
+    it('should create Apps SDK resource with HTML template', () => {
+      const htmlTemplate = `
+        <div id="kanban-root"></div>
+        <style>
+          .kanban { display: flex; }
+        </style>
+        <script type="module">
+          // Widget code here
+          const data = window.openai?.toolOutput;
+          console.log('Data:', data);
+        </script>
+      `
+
+      const definition: AppsSdkUIResource = {
+        type: 'appsSdk',
+        name: 'kanban-board',
+        title: 'Kanban Board',
+        description: 'Interactive task board',
+        htmlTemplate,
+        appsSdkMetadata: {
+          'openai/widgetDescription': 'Displays an interactive kanban board',
+          'openai/widgetPrefersBorder': true
+        }
+      }
+
+      const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+      expect(resource.type).toBe('resource')
+      expect(resource.resource.uri).toBe('ui://widget/kanban-board')
+      expect(resource.resource.mimeType).toBe('text/html+skybridge')
+      expect(resource.resource.text).toContain('<div id="kanban-root"></div>')
+      expect(resource.resource.text).toContain('window.openai?.toolOutput')
+    })
+
+    it('should create Apps SDK resource with full metadata', () => {
+      const definition: AppsSdkUIResource = {
+        type: 'appsSdk',
+        name: 'analytics-dashboard',
+        title: 'Analytics Dashboard',
+        htmlTemplate: '<div id="analytics"></div>',
+        appsSdkMetadata: {
+          'openai/widgetDescription': 'Real-time analytics dashboard',
+          'openai/widgetPrefersBorder': false,
+          'openai/widgetAccessible': true,
+          'openai/widgetCSP': {
+            connect_domains: ['api.analytics.com', 'ws.analytics.com'],
+            resource_domains: ['cdn.analytics.com', 'fonts.googleapis.com']
+          },
+          'openai/toolInvocation/invoking': 'Loading analytics...',
+          'openai/toolInvocation/invoked': 'Analytics loaded'
+        }
+      }
+
+      const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+      expect(resource.resource.mimeType).toBe('text/html+skybridge')
+      expect(resource.resource.text).toBe('<div id="analytics"></div>')
+
+      // Metadata should be present
+      if ('_meta' in resource.resource) {
+        const meta = (resource.resource as any)._meta
+        expect(meta['openai/widgetDescription']).toBe('Real-time analytics dashboard')
+        expect(meta['openai/widgetPrefersBorder']).toBe(false)
+        expect(meta['openai/widgetAccessible']).toBe(true)
+        expect(meta['openai/widgetCSP']).toEqual({
+          connect_domains: ['api.analytics.com', 'ws.analytics.com'],
+          resource_domains: ['cdn.analytics.com', 'fonts.googleapis.com']
+        })
+      }
+    })
+
+    it('should create Apps SDK resource with widget domain', () => {
+      const definition: AppsSdkUIResource = {
+        type: 'appsSdk',
+        name: 'maps-widget',
+        htmlTemplate: '<div id="map"></div>',
+        appsSdkMetadata: {
+          'openai/widgetDomain': 'chatgpt.com',
+          'openai/widgetDescription': 'Interactive map widget'
+        }
+      }
+
+      const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+      expect(resource.resource.mimeType).toBe('text/html+skybridge')
+      if ('_meta' in resource.resource) {
+        expect((resource.resource as any)._meta['openai/widgetDomain']).toBe('chatgpt.com')
+      }
+    })
+
+    it('should create Apps SDK resource without metadata', () => {
+      const definition: AppsSdkUIResource = {
+        type: 'appsSdk',
+        name: 'simple-widget',
+        htmlTemplate: '<div>Simple</div>'
+        // No metadata
+      }
+
+      const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+      expect(resource.type).toBe('resource')
+      expect(resource.resource.uri).toBe('ui://widget/simple-widget')
+      expect(resource.resource.mimeType).toBe('text/html+skybridge')
+      expect(resource.resource.text).toBe('<div>Simple</div>')
+    })
+
+    it('should create Apps SDK resource directly using createAppsSdkResource', () => {
+      const htmlTemplate = '<div id="widget"><h1>Hello</h1></div>'
+      const metadata = {
+        'openai/widgetDescription': 'Test widget',
+        'openai/widgetPrefersBorder': true
+      }
+
+      const resource = createAppsSdkResource(
+        'ui://widget/test',
+        htmlTemplate,
+        metadata
+      )
+
+      expect(resource.type).toBe('resource')
+      expect(resource.resource.uri).toBe('ui://widget/test')
+      expect(resource.resource.mimeType).toBe('text/html+skybridge')
+      expect(resource.resource.text).toBe(htmlTemplate)
+
+      if ('_meta' in resource.resource) {
+        expect((resource.resource as any)._meta['openai/widgetDescription']).toBe('Test widget')
+      }
+    })
+
+    it('should create Apps SDK resource with complex HTML template', () => {
+      const htmlTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { margin: 0; padding: 20px; font-family: system-ui; }
+    .container { max-width: 1200px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    // Access structured data from tool output
+    const toolOutput = window.openai?.toolOutput || {};
+    
+    // Render UI based on data
+    const root = document.getElementById('root');
+    root.innerHTML = \`<h1>\${toolOutput.title || 'Dashboard'}</h1>\`;
+    
+    // Listen for tool invocations if accessible
+    if (window.openai?.tools) {
+      window.openai.tools.on('invoke', (result) => {
+        console.log('Tool invoked:', result);
+      });
+    }
+  </script>
+</body>
+</html>
+      `.trim()
+
+      const definition: AppsSdkUIResource = {
+        type: 'appsSdk',
+        name: 'dashboard',
+        title: 'Dashboard Widget',
+        htmlTemplate,
+        appsSdkMetadata: {
+          'openai/widgetDescription': 'Interactive dashboard with tool access',
+          'openai/widgetAccessible': true
+        }
+      }
+
+      const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+      expect(resource.resource.text).toContain('<!DOCTYPE html>')
+      expect(resource.resource.text).toContain('window.openai?.toolOutput')
+      expect(resource.resource.text).toContain('window.openai?.tools')
+      expect(resource.resource.mimeType).toBe('text/html+skybridge')
+    })
+
+    it('should properly handle locale metadata', () => {
+      const definition: AppsSdkUIResource = {
+        type: 'appsSdk',
+        name: 'localized-widget',
+        htmlTemplate: '<div id="content"></div>',
+        appsSdkMetadata: {
+          'openai/locale': 'fr-FR',
+          'openai/widgetDescription': 'Widget localisé'
+        }
+      }
+
+      const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
+
+      if ('_meta' in resource.resource) {
+        expect((resource.resource as any)._meta['openai/locale']).toBe('fr-FR')
+        expect((resource.resource as any)._meta['openai/widgetDescription']).toBe('Widget localisé')
+      }
     })
   })
 })
