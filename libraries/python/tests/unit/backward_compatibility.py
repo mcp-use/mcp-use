@@ -76,7 +76,7 @@ def test_backward_compatibility():
         from mcp_use.task_managers import WebSocketConnectionManager
 
         # Types
-        from mcp_use.types import SandboxOptions
+        from mcp_use.types.sandbox import SandboxOptions
 
         # Server manager package
         from mcp_use.managers import ServerManager
