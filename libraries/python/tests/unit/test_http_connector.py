@@ -10,13 +10,13 @@ import aiohttp
 from mcp import McpError
 from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
 
-from mcp_use.auth.bearer import BearerAuth
-from mcp_use.connectors.http import HttpConnector
-from mcp_use.middleware.middleware import CallbackClientSession
-from mcp_use.task_managers import SseConnectionManager
+from mcp_use.client.auth.bearer import BearerAuth
+from mcp_use.client.connectors.http import HttpConnector
+from mcp_use.client.middleware.middleware import CallbackClientSession
+from mcp_use.client.task_managers import SseConnectionManager
 
 
-@patch("mcp_use.connectors.base.logger")
+@patch("mcp_use.client.connectors.base.logger")
 class TestHttpConnectorInitialization(unittest.TestCase):
     """Tests for HttpConnector initialization."""
 
@@ -80,7 +80,7 @@ class TestHttpConnectorInitialization(unittest.TestCase):
         self.assertEqual(connector.base_url, "http://localhost:8000")
 
 
-@patch("mcp_use.connectors.base.logger")
+@patch("mcp_use.client.connectors.base.logger")
 class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
     """Tests for HttpConnector connection methods."""
 
@@ -97,9 +97,9 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.mock_client_session = MagicMock()
         self.mock_client_session.__aenter__ = AsyncMock()
 
-    @patch("mcp_use.connectors.http.SseConnectionManager")
-    @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
-    @patch("mcp_use.connectors.http.ClientSession")
+    @patch("mcp_use.client.connectors.http.SseConnectionManager")
+    @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
+    @patch("mcp_use.client.connectors.http.ClientSession")
     async def test_connect_with_sse(self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, _):
         """Test connecting to the MCP implementation using SSE fallback."""
         # Setup streamable HTTP to fail during initialization
@@ -162,8 +162,8 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertTrue(self.connector._connected)
         self.assertIsNotNone(self.connector.client_session)
 
-    @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
-    @patch("mcp_use.connectors.http.ClientSession")
+    @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
+    @patch("mcp_use.client.connectors.http.ClientSession")
     async def test_connect_with_streamable_http(self, mock_client_session_class, mock_cm_class, _):
         """Test connecting to the MCP implementation using streamable HTTP."""
         # Setup streamable HTTP connection manager
@@ -224,7 +224,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertEqual(len(self.connector._resources), 1)
         self.assertEqual(len(self.connector._prompts), 1)
 
-    @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
+    @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     async def test_sse_connect_already_connected(self, mock_cm_class, _):
         """Test connecting when already connected."""
         # Set up the connector as already connected
@@ -236,8 +236,8 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         # Verify connection manager was not created or started
         mock_cm_class.assert_not_called()
 
-    @patch("mcp_use.connectors.http.SseConnectionManager")
-    @patch("mcp_use.connectors.http.StreamableHttpConnectionManager")
+    @patch("mcp_use.client.connectors.http.SseConnectionManager")
+    @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     async def test_connect_failure(self, mock_streamable_cm_class, mock_sse_cm_class, _):
         """Test handling connection failures."""
         # Setup mocks for streamable HTTP failure
@@ -299,7 +299,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertFalse(self.connector._connected)
 
 
-@patch("mcp_use.connectors.base.logger")
+@patch("mcp_use.client.connectors.base.logger")
 class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
     """Tests for HttpConnector operations."""
 

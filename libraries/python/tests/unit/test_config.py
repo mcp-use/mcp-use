@@ -8,10 +8,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from mcp_use.auth import BearerAuth
-from mcp_use.config import create_connector_from_config, load_config_file
-from mcp_use.connectors import HttpConnector, SandboxConnector, StdioConnector, WebSocketConnector
-from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.client.auth.bearer import BearerAuth
+from mcp_use.client.config import create_connector_from_config, load_config_file
+from mcp_use.client.connectors import HttpConnector, SandboxConnector, StdioConnector, WebSocketConnector
+from mcp_use.client.connectors.sandbox import SandboxOptions
 
 
 class TestConfigLoading(unittest.TestCase):

@@ -9,15 +9,15 @@ import pytest
 from mcp.types import CallToolResult, Tool
 from pydantic import AnyUrl
 
-from mcp_use.connectors.stdio import StdioConnector
-from mcp_use.middleware.middleware import CallbackClientSession
-from mcp_use.task_managers.stdio import StdioConnectionManager
+from mcp_use.client.connectors.stdio import StdioConnector
+from mcp_use.client.middleware.middleware import CallbackClientSession
+from mcp_use.client.task_managers.stdio import StdioConnectionManager
 
 
 @pytest.fixture(autouse=True)
 def mock_logger():
     """Mock the logger to prevent errors during tests."""
-    with patch("mcp_use.connectors.base.logger") as mock_logger:
+    with patch("mcp_use.client.connectors.base.logger") as mock_logger:
         yield mock_logger
 
 
@@ -60,9 +60,9 @@ class TestStdioConnectorConnection:
     """Tests for StdioConnector connection methods."""
 
     @pytest.mark.asyncio
-    @patch("mcp_use.connectors.stdio.StdioConnectionManager")
-    @patch("mcp_use.connectors.stdio.ClientSession")
-    @patch("mcp_use.connectors.stdio.logger")
+    @patch("mcp_use.client.connectors.stdio.StdioConnectionManager")
+    @patch("mcp_use.client.connectors.stdio.ClientSession")
+    @patch("mcp_use.client.connectors.stdio.logger")
     async def test_connect(self, mock_stdio_logger, mock_client_session, mock_connection_manager):
         """Test connecting to the MCP implementation."""
         # Setup mocks
@@ -100,7 +100,7 @@ class TestStdioConnectorConnection:
         assert connector._connection_manager == mock_manager_instance
 
     @pytest.mark.asyncio
-    @patch("mcp_use.connectors.stdio.logger")
+    @patch("mcp_use.client.task_managers.stdio.logger")
     async def test_connect_already_connected(self, mock_stdio_logger):
         """Test connecting when already connected."""
         connector = StdioConnector()
@@ -113,10 +113,10 @@ class TestStdioConnectorConnection:
         assert connector.client_session is None
 
     @pytest.mark.asyncio
-    @patch("mcp_use.connectors.stdio.StdioConnectionManager")
-    @patch("mcp_use.connectors.stdio.ClientSession")
-    @patch("mcp_use.connectors.stdio.logger")
-    @patch("mcp_use.connectors.base.logger")
+    @patch("mcp_use.client.connectors.stdio.StdioConnectionManager")
+    @patch("mcp_use.client.connectors.stdio.ClientSession")
+    @patch("mcp_use.client.connectors.stdio.logger")
+    @patch("mcp_use.client.connectors.base.logger")
     async def test_connect_error(
         self,
         mock_base_logger,
