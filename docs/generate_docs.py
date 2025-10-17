@@ -11,9 +11,6 @@ import sys
 from pathlib import Path
 from typing import Any, Union
 
-# Global constant for gradient generator URL
-GRADIENT_GENERATOR_URL = "http://localhost:3000/gradient-generator/api/random?width=800&height=100"
-
 
 def get_docstring(obj: Any) -> str:
     """Extract docstring from an object."""
@@ -39,7 +36,10 @@ def format_type_annotation(annotation: Any) -> str:
                 if len(non_none_args) == 1:
                     return f"{format_type_annotation(non_none_args[0])} | None"
                 else:
-                    return " | ".join(format_type_annotation(arg) for arg in non_none_args) + " | None"
+                    return (
+                        " | ".join(format_type_annotation(arg) for arg in non_none_args)
+                        + " | None"
+                    )
             else:
                 return " | ".join(format_type_annotation(arg) for arg in args)
         elif origin is list:
@@ -52,7 +52,9 @@ def format_type_annotation(annotation: Any) -> str:
             return "dict"
         elif origin is tuple:
             if args:
-                return f"tuple[{', '.join(format_type_annotation(arg) for arg in args)}]"
+                return (
+                    f"tuple[{', '.join(format_type_annotation(arg) for arg in args)}]"
+                )
             return "tuple"
         elif origin is set:
             if args:
@@ -64,7 +66,9 @@ def format_type_annotation(annotation: Any) -> str:
         module = annotation.__module__
         name = annotation.__name__
         # Skip built-in types and common stdlib types
-        if module in ("builtins", "typing", "collections.abc") or module.startswith("typing"):
+        if module in ("builtins", "typing", "collections.abc") or module.startswith(
+            "typing"
+        ):
             return name
         # For external modules, show the full path
         return f"{module}.{name}"
@@ -100,7 +104,12 @@ def process_docstring(docstring: str) -> str:
             in_code_block = True
             processed_lines.append("```python wrap")
             continue
-        elif in_code_block and stripped and not line.startswith(" ") and not line.startswith("\t"):
+        elif (
+            in_code_block
+            and stripped
+            and not line.startswith(" ")
+            and not line.startswith("\t")
+        ):
             # End of code block
             in_code_block = False
             processed_lines.append("```")
@@ -115,19 +124,35 @@ def process_docstring(docstring: str) -> str:
         else:
             # Check for Args:, Parameters:, Returns:, Warns:, Raises: sections
             if stripped.lower().startswith(
-                ("args:", "parameters:", "returns:", "return:", "warns:", "warn:", "raises:", "raise:")
+                (
+                    "args:",
+                    "parameters:",
+                    "returns:",
+                    "return:",
+                    "warns:",
+                    "warn:",
+                    "raises:",
+                    "raise:",
+                )
             ):
                 in_args_section = True
                 skip_line = True  # Skip the section header line itself
                 continue
             # Check for end of section
-            elif in_args_section and stripped.lower().startswith(("yields:", "note:", "example:", "usage:")):
+            elif in_args_section and stripped.lower().startswith(
+                ("yields:", "note:", "example:", "usage:")
+            ):
                 in_args_section = False
                 processed_lines.append(line)
             # Skip lines in args section
             elif in_args_section:
                 # Check if this line starts a new section (not indented)
-                if stripped and not line.startswith(" ") and not line.startswith("\t") and ":" in stripped:
+                if (
+                    stripped
+                    and not line.startswith(" ")
+                    and not line.startswith("\t")
+                    and ":" in stripped
+                ):
                     in_args_section = False
                     processed_lines.append(line)
                 # Otherwise skip this line (it's part of args section)
@@ -212,11 +237,15 @@ def extract_param_docs(docstring: str) -> dict[str, str]:
                     current_param = param_part
                     current_desc = [parts[1].strip()] if parts[1].strip() else []
         # Continuation of current parameter description
-        elif current_param and (stripped.startswith(" ") or stripped == "" or stripped.startswith("-")):
+        elif current_param and (
+            stripped.startswith(" ") or stripped == "" or stripped.startswith("-")
+        ):
             if stripped:
                 current_desc.append(stripped)
         # End of args section
-        elif in_args_section and stripped.lower().startswith(("returns:", "raises:", "yields:", "note:", "example:")):
+        elif in_args_section and stripped.lower().startswith(
+            ("returns:", "raises:", "yields:", "note:", "example:")
+        ):
             if current_param and current_desc:
                 param_docs[current_param] = " ".join(current_desc).strip()
             in_args_section = False
@@ -353,7 +382,9 @@ def extract_return_docs(docstring: str) -> str:
                 return_desc.append(desc_part)
             in_returns_section = True
         # Continuation of return description
-        elif in_returns_section and (line.startswith(" ") or stripped == "" or stripped.startswith("-")):
+        elif in_returns_section and (
+            line.startswith(" ") or stripped == "" or stripped.startswith("-")
+        ):
             # Check if this line starts a new section (like "Example:")
             if stripped and stripped.lower().endswith(":"):
                 break
@@ -361,7 +392,16 @@ def extract_return_docs(docstring: str) -> str:
                 return_desc.append(stripped)
         # End of returns section
         elif in_returns_section and stripped.lower().startswith(
-            ("raises:", "yields:", "note:", "example:", "args:", "parameters:", "warns:", "warn:")
+            (
+                "raises:",
+                "yields:",
+                "note:",
+                "example:",
+                "args:",
+                "parameters:",
+                "warns:",
+                "warn:",
+            )
         ):
             break
 
@@ -389,12 +429,23 @@ def extract_warns_docs(docstring: str) -> list[str]:
             warn_desc.append(stripped.split(":", 1)[1].strip())
             in_warns_section = True
         # Continuation of warn description
-        elif in_warns_section and (stripped.startswith(" ") or stripped == "" or stripped.startswith("-")):
+        elif in_warns_section and (
+            stripped.startswith(" ") or stripped == "" or stripped.startswith("-")
+        ):
             if stripped:
                 warn_desc.append(stripped)
         # End of warns section
         elif in_warns_section and stripped.lower().startswith(
-            ("raises:", "yields:", "note:", "example:", "args:", "parameters:", "returns:", "return:")
+            (
+                "raises:",
+                "yields:",
+                "note:",
+                "example:",
+                "args:",
+                "parameters:",
+                "returns:",
+                "return:",
+            )
         ):
             break
 
@@ -422,12 +473,24 @@ def extract_raises_docs(docstring: str) -> list[str]:
             raise_desc.append(stripped.split(":", 1)[1].strip())
             in_raises_section = True
         # Continuation of raise description
-        elif in_raises_section and (stripped.startswith(" ") or stripped == "" or stripped.startswith("-")):
+        elif in_raises_section and (
+            stripped.startswith(" ") or stripped == "" or stripped.startswith("-")
+        ):
             if stripped:
                 raise_desc.append(stripped)
         # End of raises section
         elif in_raises_section and stripped.lower().startswith(
-            ("warns:", "warn:", "yields:", "note:", "example:", "args:", "parameters:", "returns:", "return:")
+            (
+                "warns:",
+                "warn:",
+                "yields:",
+                "note:",
+                "example:",
+                "args:",
+                "parameters:",
+                "returns:",
+                "return:",
+            )
         ):
             break
 
@@ -484,7 +547,9 @@ def generate_class_docs(cls: type, module_name: str) -> str:
 
     # Class Card with gradient background
     docs.append("<div>")
-    docs.append('<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">')
+    docs.append(
+        '<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">'
+    )
     docs.append('<div className="text-black">')
     docs.append(
         f'<div className="text-black font-bold text-xl mb-2 mt-8">'
@@ -514,7 +579,8 @@ def generate_class_docs(cls: type, module_name: str) -> str:
             if (
                 not name.startswith("_")
                 and not name.startswith("model_")
-                and name not in ["computed_fields", "config", "extra", "fields", "fields_set"]
+                and name
+                not in ["computed_fields", "config", "extra", "fields", "fields_set"]
             ):
                 class_attributes.append((name, annotation))
 
@@ -526,7 +592,9 @@ def generate_class_docs(cls: type, module_name: str) -> str:
             # Create a mock parameter object for the annotation
             from inspect import Parameter
 
-            param = Parameter(name, Parameter.POSITIONAL_OR_KEYWORD, annotation=annotation)
+            param = Parameter(
+                name, Parameter.POSITIONAL_OR_KEYWORD, annotation=annotation
+            )
             param_field = generate_param_field(name, param, "")
             docs.append(param_field)
         docs.append("")
@@ -546,7 +614,11 @@ def generate_class_docs(cls: type, module_name: str) -> str:
                 init_docstring = get_docstring(init_method)
                 sig = inspect.signature(init_method)
                 param_docs = extract_param_docs(get_docstring(init_method))
-                params_to_show = [(name, param) for name, param in sig.parameters.items() if name != "self"]
+                params_to_show = [
+                    (name, param)
+                    for name, param in sig.parameters.items()
+                    if name != "self"
+                ]
 
                 # Add description outside callout
                 if init_docstring:
@@ -580,7 +652,10 @@ def generate_class_docs(cls: type, module_name: str) -> str:
 
     # Methods - only include methods defined in this module (including async methods and properties)
     for name, method in inspect.getmembers(
-        cls, predicate=lambda x: inspect.isfunction(x) or inspect.iscoroutinefunction(x) or isinstance(x, property)
+        cls,
+        predicate=lambda x: inspect.isfunction(x)
+        or inspect.iscoroutinefunction(x)
+        or isinstance(x, property),
     ):
         # For properties, check if the getter function is defined in this module
         is_property_in_module = False
@@ -596,13 +671,17 @@ def generate_class_docs(cls: type, module_name: str) -> str:
             if hasattr(method, "fget") and method.fget:
                 # Check if this property is defined in a parent class
                 for base_cls in cls.__bases__:
-                    if hasattr(base_cls, name) and isinstance(getattr(base_cls, name), property):
+                    if hasattr(base_cls, name) and isinstance(
+                        getattr(base_cls, name), property
+                    ):
                         is_inherited = True
                         break
         else:
             # Check if this method is defined in a parent class
             for base_cls in cls.__bases__:
-                if hasattr(base_cls, name) and inspect.isfunction(getattr(base_cls, name)):
+                if hasattr(base_cls, name) and inspect.isfunction(
+                    getattr(base_cls, name)
+                ):
                     is_inherited = True
                     break
 
@@ -632,7 +711,9 @@ def generate_class_docs(cls: type, module_name: str) -> str:
                 sig = inspect.signature(method)
                 param_docs = extract_param_docs(get_docstring(method))
                 params_to_show = [
-                    (name_param, param) for name_param, param in sig.parameters.items() if name_param != "self"
+                    (name_param, param)
+                    for name_param, param in sig.parameters.items()
+                    if name_param != "self"
                 ]
 
                 # Add description outside callout
@@ -674,7 +755,10 @@ def generate_class_docs(cls: type, module_name: str) -> str:
             # Generate return type and signature
             try:
                 # Return type (skip for properties as they're handled separately)
-                if not isinstance(method, property) and sig.return_annotation != inspect.Signature.empty:
+                if (
+                    not isinstance(method, property)
+                    and sig.return_annotation != inspect.Signature.empty
+                ):
                     return_type = format_type_annotation(sig.return_annotation)
                     return_desc = extract_return_docs(get_docstring(method))
 
@@ -682,7 +766,9 @@ def generate_class_docs(cls: type, module_name: str) -> str:
                     if return_type not in ["None", "NoneType"]:
                         docs.append("**Returns**")
                         # Use ResponseField for better formatting
-                        response_field = generate_response_field("returns", return_type, return_desc)
+                        response_field = generate_response_field(
+                            "returns", return_type, return_desc
+                        )
                         docs.append(f">{response_field}")
                         docs.append("")
 
@@ -768,7 +854,9 @@ def generate_function_docs(func: Any, module_name: str) -> str:
         # Only show Returns section if there's a meaningful return type (not None)
         if return_type not in ["None", "NoneType"]:
             docs.append("**Returns**")
-            response_field = generate_response_field("returns", return_type, return_desc)
+            response_field = generate_response_field(
+                "returns", return_type, return_desc
+            )
             docs.append(f">{response_field}")
             docs.append("")
 
@@ -849,10 +937,15 @@ def generate_module_docs(module_name: str, output_dir: str) -> None:
 
     # Generate GitHub URL for source code
     # Handle library-specific paths
-    module_path = module_name.replace('.', '/')
+    module_path = module_name.replace(".", "/")
     github_url = f"https://github.com/mcp-use/mcp-use/blob/main/libraries/python/{module_path}.py"
 
-    frontmatter = {"title": title, "description": description, "icon": icon, "github": github_url}
+    frontmatter = {
+        "title": title,
+        "description": description,
+        "icon": icon,
+        "github": github_url,
+    }
 
     content.append("---")
     for key, value in frontmatter.items():
@@ -881,7 +974,9 @@ def generate_module_docs(module_name: str, output_dir: str) -> None:
     classes = [
         (name, obj)
         for name, obj in members
-        if inspect.isclass(obj) and not name.startswith("_") and is_defined_in_module(obj, module_name)
+        if inspect.isclass(obj)
+        and not name.startswith("_")
+        and is_defined_in_module(obj, module_name)
     ]
     for _, cls in classes:
         content.append(generate_class_docs(cls, module_name))
@@ -891,7 +986,9 @@ def generate_module_docs(module_name: str, output_dir: str) -> None:
     functions = [
         (name, obj)
         for name, obj in members
-        if inspect.isfunction(obj) and not name.startswith("_") and is_defined_in_module(obj, module_name)
+        if inspect.isfunction(obj)
+        and not name.startswith("_")
+        and is_defined_in_module(obj, module_name)
     ]
     for _, func in functions:
         content.append(generate_function_docs(func, module_name))
@@ -904,7 +1001,9 @@ def generate_module_docs(module_name: str, output_dir: str) -> None:
     print(f"Generated documentation for {module_name} -> {output_path}")
 
 
-def find_python_modules(package_dir: str, exclude_patterns: list[str] | None = None) -> list[str]:
+def find_python_modules(
+    package_dir: str, exclude_patterns: list[str] | None = None
+) -> list[str]:
     """Find all Python modules in a package directory, excluding __init__.py files.
 
     Args:
@@ -1020,7 +1119,9 @@ def get_module_info_from_filename(filename: str) -> dict[str, str]:
     return {"module": name, "display_name": display_name, "icon": icon}
 
 
-def organize_modules_by_path(files: list[str]) -> dict[str, dict[str, list[dict[str, str]]]]:
+def organize_modules_by_path(
+    files: list[str],
+) -> dict[str, dict[str, list[dict[str, str]]]]:
     """Organize modules by file path structure with nested groups."""
     packages = {}
 
@@ -1228,7 +1329,9 @@ def get_subpackage_display_info(subpackage: str) -> dict[str, str]:
     return {"name": display_name, "icon": icon}
 
 
-def generate_api_reference_groups(packages: dict[str, dict[str, list[dict[str, str]]]]) -> list[dict[str, Any]]:
+def generate_api_reference_groups(
+    packages: dict[str, dict[str, list[dict[str, str]]]],
+) -> list[dict[str, Any]]:
     """Generate API reference groups from organized packages with nested structure."""
     groups = []
 
@@ -1246,8 +1349,13 @@ def generate_api_reference_groups(packages: dict[str, dict[str, list[dict[str, s
 
                 # Add root items directly to subpackages list (no Overview section)
                 if "root" in packages[package] and packages[package]["root"]:
-                    root_modules = sorted(packages[package]["root"], key=lambda x: x["display_name"])
-                    root_pages = [f"python/api-reference/{module['module']}" for module in root_modules]
+                    root_modules = sorted(
+                        packages[package]["root"], key=lambda x: x["display_name"]
+                    )
+                    root_pages = [
+                        f"python/api-reference/{module['module']}"
+                        for module in root_modules
+                    ]
                     subpackages.extend(root_pages)
 
                 # Add other subpackages - only create subsections if they have more than 1 item
@@ -1260,24 +1368,45 @@ def generate_api_reference_groups(packages: dict[str, dict[str, list[dict[str, s
                     # Only create subsection if there's more than 1 module
                     if len(modules) > 1:
                         subpackage_info = get_subpackage_display_info(subpackage_name)
-                        sorted_modules = sorted(modules, key=lambda x: x["display_name"])
-                        pages = [f"python/api-reference/{module['module']}" for module in sorted_modules]
+                        sorted_modules = sorted(
+                            modules, key=lambda x: x["display_name"]
+                        )
+                        pages = [
+                            f"python/api-reference/{module['module']}"
+                            for module in sorted_modules
+                        ]
 
                         subpackages.append(
-                            {"group": subpackage_info["name"], "icon": subpackage_info["icon"], "pages": pages}
+                            {
+                                "group": subpackage_info["name"],
+                                "icon": subpackage_info["icon"],
+                                "pages": pages,
+                            }
                         )
                     else:
                         # Single module - add directly to root level
                         module = modules[0]
                         subpackages.append(f"python/api-reference/{module['module']}")
 
-                group = {"group": package_info["name"], "icon": package_info["icon"], "pages": subpackages}
+                group = {
+                    "group": package_info["name"],
+                    "icon": package_info["icon"],
+                    "pages": subpackages,
+                }
             else:
                 # Simple structure without subpackages
-                modules = sorted(packages[package]["root"], key=lambda x: x["display_name"])
-                pages = [f"python/api-reference/{module['module']}" for module in modules]
+                modules = sorted(
+                    packages[package]["root"], key=lambda x: x["display_name"]
+                )
+                pages = [
+                    f"python/api-reference/{module['module']}" for module in modules
+                ]
 
-                group = {"group": package_info["name"], "icon": package_info["icon"], "pages": pages}
+                group = {
+                    "group": package_info["name"],
+                    "icon": package_info["icon"],
+                    "pages": pages,
+                }
 
             groups.append(group)
 
@@ -1323,7 +1452,9 @@ def update_docs_json(docs_json_path: str, api_reference_dir: str) -> None:
 def main():
     """Main function."""
     if len(sys.argv) < 2:
-        print("Usage: python generate_docs.py <package_dir> [output_dir] [docs_json_path]")
+        print(
+            "Usage: python generate_docs.py <package_dir> [output_dir] [docs_json_path]"
+        )
         print("Example: python generate_docs.py ../mcp_use api-reference docs.json")
         sys.exit(1)
 
