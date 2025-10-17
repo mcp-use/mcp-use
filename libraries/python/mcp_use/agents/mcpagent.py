@@ -1051,7 +1051,7 @@ class MCPAgent:
 
         Example::
 
-            async for chunk in agent.astream("hello"):
+            async for chunk in agent.stream("hello"):
                 print(chunk, end="|", flush=True)
         """
         start_time = time.time()
