@@ -243,7 +243,7 @@ Stream agent responses as they're generated:
 
 <CodeGroup>
   ```python Python
-  async for chunk in agent.astream("your query here"):
+  async for chunk in agent.stream("your query here"):
       print(chunk, end="", flush=True)
   ```
 
