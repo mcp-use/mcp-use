@@ -23,20 +23,20 @@ from langchain_core.tools import BaseTool
 from langchain_core.utils.input import get_color_mapping
 from pydantic import BaseModel
 
+from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter
+from mcp_use.agents.managers.base import BaseServerManager
+from mcp_use.agents.managers.server_manager import ServerManager
+
 # Import observability manager
 from mcp_use.agents.observability import ObservabilityManager
 from mcp_use.agents.prompts.system_prompt_builder import create_system_message
 from mcp_use.agents.prompts.templates import DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE
 from mcp_use.agents.remote import RemoteAgent
 from mcp_use.client import MCPClient
-from mcp_use.connectors.base import BaseConnector
+from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.logging import logger
 from mcp_use.telemetry.telemetry import Telemetry
 from mcp_use.telemetry.utils import extract_model_info
-
-from ..adapters.langchain_adapter import LangChainAdapter
-from ..logging import logger
-from ..managers.base import BaseServerManager
-from ..managers.server_manager import ServerManager
 
 set_debug(logger.level == logging.DEBUG)
 
