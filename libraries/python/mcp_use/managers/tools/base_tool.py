@@ -1,19 +1,8 @@
-from typing import ClassVar
+# mcp_use/managers/tools/base_tool.py
+from typing_extensions import deprecated
 
-from langchain_core.tools import BaseTool
+from mcp_use.agents.managers.tools.base_tool import MCPServerTool as _MCPServerTool
 
 
-class MCPServerTool(BaseTool):
-    """Base tool for MCP server operations."""
-
-    name: ClassVar[str] = "mcp_server_tool"
-    description: ClassVar[str] = "Base tool for MCP server operations."
-
-    def __init__(self, server_manager):
-        """Initialize with server manager."""
-        super().__init__()
-        self._server_manager = server_manager
-
-    @property
-    def server_manager(self):
-        return self._server_manager
+@deprecated("Use mcp_use.agents.managers.tools.base_tool.MCPServerTool")
+class MCPServerTool(_MCPServerTool): ...
