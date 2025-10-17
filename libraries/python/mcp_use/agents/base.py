@@ -7,7 +7,7 @@ This module provides a base class for agents that use MCP tools.
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..session import MCPSession
+from mcp_use.client.session import MCPSession
 
 
 class BaseAgent(ABC):

@@ -13,7 +13,7 @@ import pytest
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
 
-from mcp_use.managers.tools.search_tools import SearchToolsTool, ToolSearchEngine, ToolSearchInput
+from mcp_use.agents.managers.tools.search_tools import SearchToolsTool, ToolSearchEngine, ToolSearchInput
 
 
 class MockTool(BaseTool):
@@ -34,7 +34,7 @@ class TestSearchToolsIssue138:
         self.mock_server_manager = Mock()
         self.mock_server_manager.active_server = "test_server"
 
-    @patch("mcp_use.managers.tools.search_tools.logger")
+    @patch("mcp_use.agents.managers.tools.search_tools.logger")
     async def test_tool_search_engine_consistent_return_type_with_results(self, mock_logger):
         """Test that ToolSearchEngine.search_tools() returns string when results found"""
         search_engine = ToolSearchEngine()
@@ -130,7 +130,7 @@ class TestSearchToolsIssue138:
                 # Re-raise other ValueErrors
                 raise
 
-    @patch("mcp_use.managers.tools.search_tools.logger")
+    @patch("mcp_use.agents.managers.tools.search_tools.logger")
     def test_format_search_results_method_exists(self, mock_logger):
         """Test that _format_search_results method exists and works correctly"""
         search_engine = ToolSearchEngine()
@@ -156,7 +156,7 @@ class TestSearchToolsIssue138:
         assert isinstance(formatted, str)
         assert "Search results" in formatted
 
-    @patch("mcp_use.managers.tools.search_tools.logger")
+    @patch("mcp_use.agents.managers.tools.search_tools.logger")
     async def test_server_manager_active_server_marking(self, mock_logger):
         """Test that active server is properly marked in results"""
         search_engine = ToolSearchEngine()

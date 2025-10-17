@@ -91,3 +91,61 @@ class MCPAgentExecutionEvent(BaseTelemetryEvent):
             "error_type": self.error_type,
             "conversation_history_length": self.conversation_history_length,
         }
+
+
+@dataclass
+class FeatureUsageEvent(BaseTelemetryEvent):
+    """Event for tracking feature usage across the library"""
+
+    feature_name: str
+    class_name: str
+    method_name: str
+    success: bool
+    execution_time_ms: int | None = None
+    error_type: str | None = None
+    additional_properties: dict[str, Any] | None = None
+
+    @property
+    def name(self) -> str:
+        return "feature_usage"
+
+    @property
+    def properties(self) -> dict[str, Any]:
+        props = {
+            "feature_name": self.feature_name,
+            "class_name": self.class_name,
+            "method_name": self.method_name,
+            "success": self.success,
+            "execution_time_ms": self.execution_time_ms,
+            "error_type": self.error_type,
+        }
+        if self.additional_properties:
+            props.update(self.additional_properties)
+        return props
+
+
+@dataclass
+class CLICommandEvent(BaseTelemetryEvent):
+    """Event for tracking CLI command usage"""
+
+    command: str
+    success: bool
+    execution_time_ms: int | None = None
+    error_type: str | None = None
+    additional_properties: dict[str, Any] | None = None
+
+    @property
+    def name(self) -> str:
+        return "cli_command"
+
+    @property
+    def properties(self) -> dict[str, Any]:
+        props = {
+            "command": self.command,
+            "success": self.success,
+            "execution_time_ms": self.execution_time_ms,
+            "error_type": self.error_type,
+        }
+        if self.additional_properties:
+            props.update(self.additional_properties)
+        return props

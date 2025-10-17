@@ -10,10 +10,9 @@ import pytest
 
 # Use MagicMock instead of importing from mcp.types
 # from mcp.types import CallToolResult, Tool
-from mcp_use.connectors.sandbox import SandboxConnector
-from mcp_use.middleware.middleware import CallbackClientSession
-from mcp_use.task_managers import SseConnectionManager
-from mcp_use.types.sandbox import SandboxOptions
+from mcp_use.client.connectors.sandbox import SandboxConnector, SandboxOptions
+from mcp_use.client.middleware.middleware import CallbackClientSession
+from mcp_use.client.task_managers import SseConnectionManager
 
 
 # Mock the sandbox module for tests
@@ -42,8 +41,8 @@ class MockSandbox:
 def mock_logger():
     """Mock the logger to prevent errors during tests."""
     with (
-        patch("mcp_use.connectors.base.logger") as mock_base_logger,
-        patch("mcp_use.connectors.sandbox.logger") as mock_sandbox_logger,
+        patch("mcp_use.client.connectors.base.logger") as mock_base_logger,
+        patch("mcp_use.client.connectors.sandbox.logger") as mock_sandbox_logger,
     ):
         # Set level attribute to an integer for comparison in the logger
         mock_sandbox_logger.handlers = []
@@ -55,8 +54,8 @@ def mock_logger():
 def mock_sandbox_modules():
     """Mock the E2B sandbox modules."""
     with (
-        patch("mcp_use.connectors.sandbox.Sandbox", MockSandbox),
-        patch("mcp_use.connectors.sandbox.CommandHandle", MockCommandHandle),
+        patch("mcp_use.client.connectors.sandbox.Sandbox", MockSandbox),
+        patch("mcp_use.client.connectors.sandbox.CommandHandle", MockCommandHandle),
     ):
         yield
 
@@ -117,8 +116,8 @@ class TestSandboxConnectorConnection:
     """Tests for SandboxConnector connection methods."""
 
     @pytest.mark.asyncio
-    @patch("mcp_use.connectors.sandbox.SseConnectionManager")
-    @patch("mcp_use.connectors.sandbox.ClientSession")
+    @patch("mcp_use.client.connectors.sandbox.SseConnectionManager")
+    @patch("mcp_use.client.connectors.sandbox.ClientSession")
     async def test_connect(self, mock_client_session, mock_connection_manager, mock_sandbox_modules):
         """Test connecting to the MCP implementation in sandbox."""
         # Setup mocks
@@ -177,8 +176,8 @@ class TestSandboxConnectorConnection:
         assert connector.sandbox is None
 
     @pytest.mark.asyncio
-    @patch("mcp_use.connectors.sandbox.logger")
-    @patch("mcp_use.connectors.sandbox.Sandbox")
+    @patch("mcp_use.client.connectors.sandbox.logger")
+    @patch("mcp_use.client.connectors.sandbox.Sandbox")
     async def test_connect_error(self, mock_sandbox_class, mock_logger, mock_sandbox_modules):
         """Test connection error handling."""
         # Setup mocks to raise an exception during sandbox creation
@@ -243,7 +242,7 @@ class TestSandboxConnectorCleanup:
 
         # Mock super()._cleanup_resources method
         with patch(
-            "mcp_use.connectors.base.BaseConnector._cleanup_resources", new_callable=AsyncMock
+            "mcp_use.client.connectors.base.BaseConnector._cleanup_resources", new_callable=AsyncMock
         ) as mock_super_cleanup:
             # Call cleanup
             await connector._cleanup_resources()
@@ -265,7 +264,7 @@ class TestSandboxConnectorCleanup:
             assert connector.base_url is None
 
     @pytest.mark.asyncio
-    @patch("mcp_use.connectors.sandbox.logger")
+    @patch("mcp_use.client.connectors.sandbox.logger")
     async def test_cleanup_resources_with_exceptions(self, mock_logger, mock_sandbox_modules):
         """Test cleanup handles exceptions gracefully."""
         # Create connector with resources to clean up
@@ -286,7 +285,7 @@ class TestSandboxConnectorCleanup:
 
         # Mock super()._cleanup_resources method
         with patch(
-            "mcp_use.connectors.base.BaseConnector._cleanup_resources", new_callable=AsyncMock
+            "mcp_use.client.connectors.base.BaseConnector._cleanup_resources", new_callable=AsyncMock
         ) as mock_super_cleanup:
             # Call cleanup
             await connector._cleanup_resources()

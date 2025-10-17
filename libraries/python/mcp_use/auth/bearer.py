@@ -1,17 +1,16 @@
-"""Bearer token authentication support."""
+# mcp_use/auth/bearer.py
+import warnings
 
-from collections.abc import Generator
+from typing_extensions import deprecated
 
-import httpx
-from pydantic import BaseModel, SecretStr
+from mcp_use.client.auth.bearer import BearerAuth as _BearerAuth
+
+warnings.warn(
+    "mcp_use.auth.bearer is deprecated. Use mcp_use.client.auth.bearer. This import will be removed in version 1.4.0",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
-class BearerAuth(httpx.Auth, BaseModel):
-    """Bearer token authentication for HTTP requests."""
-
-    token: SecretStr
-
-    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
-        """Apply bearer token authentication to the request."""
-        request.headers["Authorization"] = f"Bearer {self.token.get_secret_value()}"
-        yield request
+@deprecated("Use mcp_use.client.auth.bearer.BearerAuth")
+class BearerAuth(_BearerAuth): ...

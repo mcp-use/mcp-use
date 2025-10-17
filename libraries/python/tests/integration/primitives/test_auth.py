@@ -6,7 +6,7 @@ import pytest
 from httpx import Auth, Request
 
 from mcp_use import MCPClient, set_debug
-from mcp_use.auth.bearer import BearerAuth
+from mcp_use.client.auth.bearer import BearerAuth
 
 set_debug(2)
 
@@ -34,9 +34,9 @@ async def test_bearer_auth(auth_server):
 
 
 @pytest.mark.asyncio
-@patch("mcp_use.auth.oauth.secrets.token_urlsafe")
-@patch("mcp_use.auth.oauth.webbrowser.open")
-@patch("mcp_use.auth.oauth.OAuthCallbackServer")
+@patch("secrets.token_urlsafe")
+@patch("webbrowser.open")
+@patch("mcp_use.client.auth.oauth.OAuthCallbackServer")
 async def test_oauth_provider(mock_callback_server_class, mock_webbrowser_open, mock_token_urlsafe, auth_server):
     """Test OAuth with pre-configured provider metadata."""
     await clean_token()
@@ -131,9 +131,9 @@ async def test_custom_client(auth_server):
 
 
 @pytest.mark.asyncio
-@patch("mcp_use.auth.oauth.secrets.token_urlsafe")
-@patch("mcp_use.auth.oauth.webbrowser.open")
-@patch("mcp_use.auth.oauth.OAuthCallbackServer")
+@patch("secrets.token_urlsafe")
+@patch("webbrowser.open")
+@patch("mcp_use.client.auth.oauth.OAuthCallbackServer")
 async def test_oauth_complete_flow(mock_callback_server_class, mock_webbrowser_open, mock_token_urlsafe, auth_server):
     """Test OAuth complete flow, with metadata discovery, DCR and auth token."""
     await clean_token()

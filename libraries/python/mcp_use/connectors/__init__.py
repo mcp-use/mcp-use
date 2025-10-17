@@ -1,20 +1,46 @@
-"""
-Connectors for various MCP transports.
+# mcp_use/connectors/__init__.py
+import warnings
 
-This module provides interfaces for connecting to MCP implementations
-through different transport mechanisms.
-"""
+from typing_extensions import deprecated
 
-from .base import BaseConnector  # noqa: F401
-from .http import HttpConnector  # noqa: F401
-from .sandbox import SandboxConnector  # noqa: F401
-from .stdio import StdioConnector  # noqa: F401
-from .websocket import WebSocketConnector  # noqa: F401
+from mcp_use.client.connectors import (
+    BaseConnector as _BaseConnector,
+)
+from mcp_use.client.connectors import (
+    HttpConnector as _HttpConnector,
+)
+from mcp_use.client.connectors import (
+    SandboxConnector as _SandboxConnector,
+)
+from mcp_use.client.connectors import (
+    StdioConnector as _StdioConnector,
+)
+from mcp_use.client.connectors import (
+    WebSocketConnector as _WebSocketConnector,
+)
 
-__all__ = [
-    "BaseConnector",
-    "StdioConnector",
-    "HttpConnector",
-    "WebSocketConnector",
-    "SandboxConnector",
-]
+warnings.warn(
+    "mcp_use.connectors is deprecated. Use mcp_use.client.connectors. This import will be removed in version 1.4.0",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
+@deprecated("Use mcp_use.client.connectors.BaseConnector")
+class BaseConnector(_BaseConnector): ...
+
+
+@deprecated("Use mcp_use.client.connectors.StdioConnector")
+class StdioConnector(_StdioConnector): ...
+
+
+@deprecated("Use mcp_use.client.connectors.HttpConnector")
+class HttpConnector(_HttpConnector): ...
+
+
+@deprecated("Use mcp_use.client.connectors.WebSocketConnector")
+class WebSocketConnector(_WebSocketConnector): ...
+
+
+@deprecated("Use mcp_use.client.connectors.SandboxConnector")
+class SandboxConnector(_SandboxConnector): ...
