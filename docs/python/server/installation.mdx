@@ -1,0 +1,201 @@
+---
+title: "Installation & Setup"
+description: "Install and configure the mcp-use server framework"
+icon: "download"
+---
+
+# Installation & Setup
+
+<Info>
+This guide covers installing the mcp-use server framework and setting up your development environment.
+</Info>
+
+## Installation
+
+Install mcp-use with the server framework support:
+
+```bash
+# Using pip
+pip install mcp-use[server]
+
+# Using uv (recommended)
+uv add mcp-use[server]
+
+# Using poetry
+poetry add mcp-use[server]
+```
+
+## Requirements
+
+The server framework requires:
+
+- **Python 3.8+**: Modern Python features and async support
+- **Official MCP SDK**: Automatically installed as a dependency
+- **FastAPI**: For HTTP server and documentation features
+- **Pydantic**: For data validation and serialization
+
+## Official SDK Compatibility
+
+<Info>
+The mcp-use server framework is built on top of the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk). This ensures full compatibility with existing MCP clients and tools that adhere to the Model Context Protocol. mcp-use extends the SDK's core functionality, providing enhanced features without introducing breaking changes.
+</Info>
+
+### Seamless Integration
+
+You can seamlessly integrate mcp-use servers with any client designed for the official SDK, leveraging the robust foundation while benefiting from mcp-use's additional capabilities:
+
+- **Zero Breaking Changes**: All existing MCP clients work out of the box
+- **Enhanced Features**: Built-in documentation, inspector UI, and improved logging
+- **Protocol Compliance**: Full adherence to MCP protocol specifications
+- **Easy Migration**: Existing MCP servers can be easily upgraded to mcp-use
+
+### Compatibility Matrix
+
+| Feature | Official SDK | mcp-use | Notes |
+|---------|--------------|---------|-------|
+| MCP Protocol | ✅ | ✅ | Full compliance |
+| Tools | ✅ | ✅ | Enhanced with decorators |
+| Resources | ✅ | ✅ | Enhanced with decorators |
+| Prompts | ✅ | ✅ | Enhanced with decorators |
+| Documentation | ❌ | ✅ | Built-in OpenAPI/Swagger |
+| Inspector UI | ❌ | ✅ | Real-time monitoring |
+| Enhanced Logging | ❌ | ✅ | Structured JSON logging |
+| Health Checks | ❌ | ✅ | Built-in endpoints |
+| Metrics | ❌ | ✅ | Prometheus compatible |
+
+## Verification
+
+Verify your installation:
+
+```python
+from mcp_use.server import MCPServer
+
+# Check if server framework is available
+server = MCPServer(
+    name="test-server",
+    version="1.0.0"
+)
+
+print(f"✅ mcp-use server framework installed successfully!")
+print(f"Server: {server.name} v{server.version}")
+```
+
+## Development Setup
+
+### Project Structure
+
+For a new MCP server project:
+
+```
+my-mcp-server/
+├── pyproject.toml          # Project configuration
+├── README.md               # Project documentation
+├── src/
+│   └── my_server/
+│       ├── __init__.py
+│       ├── server.py       # Main server file
+│       └── tools/          # Tool implementations
+│           ├── __init__.py
+│           └── example.py
+└── tests/                  # Test files
+    └── test_server.py
+```
+
+### pyproject.toml
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "my-mcp-server"
+version = "1.0.0"
+description = "My awesome MCP server"
+dependencies = [
+    "mcp-use[server]>=1.3.0",
+]
+
+[project.scripts]
+my-server = "my_server.server:main"
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+```
+
+### Environment Variables
+
+Configure your development environment:
+
+```bash
+# .env file
+MCP_SERVER_PORT=3001
+MCP_SERVER_HOST=localhost
+MCP_LOG_LEVEL=INFO
+MCP_LOG_FORMAT=json
+MCP_DOCS_ENABLED=true
+MCP_INSPECTOR_ENABLED=true
+```
+
+## Configuration
+
+### Basic Configuration
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="my-server",
+    version="1.0.0",
+    description="My MCP server",
+    # Optional configuration
+    docs_enabled=True,        # Enable documentation endpoints
+    inspector_enabled=True,   # Enable inspector UI
+    log_level="INFO",         # Logging level
+    log_format="json"         # Log format (json or text)
+)
+```
+
+### Advanced Configuration
+
+```python
+from mcp_use.server import MCPServer, ServerConfig
+
+config = ServerConfig(
+    name="my-server",
+    version="1.0.0",
+    description="My MCP server",
+    # Documentation settings
+    docs_enabled=True,
+    docs_title="My Server API",
+    docs_description="API documentation for my MCP server",
+    # Inspector settings
+    inspector_enabled=True,
+    inspector_title="My Server Inspector",
+    # Logging settings
+    log_level="INFO",
+    log_format="json",
+    log_file="server.log",
+    # Server settings
+    host="0.0.0.0",
+    port=3001,
+    # CORS settings
+    cors_origins=["*"],
+    cors_methods=["GET", "POST", "PUT", "DELETE"],
+    # Health check settings
+    health_check_enabled=True,
+    health_check_path="/health"
+)
+
+server = MCPServer(config)
+```
+
+## Next Steps
+
+- [Quickstart Guide](/python/server/quickstart) - Build your first server
+- [Configuration Reference](/python/server/configuration) - Complete configuration options
+- [Advanced Features](/python/server/advanced) - Documentation and inspector features

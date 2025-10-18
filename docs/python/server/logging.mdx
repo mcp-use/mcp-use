@@ -1,0 +1,46 @@
+---
+title: "MCP-Specific Logging"
+description: "Enhanced logging system designed specifically for MCP servers"
+icon: "activity"
+---
+
+# MCP-Specific Logging
+
+<Card title="" img="./images/Logging.jpg" horizontal="true"/>
+
+<Info>
+mcp-use provides informative logging about which MCP endpoints are hit, making it easy to understand server activity and debug issues.
+</Info>
+
+## What is MCP-Specific Logging?
+
+MCP-specific logging provides detailed information about which MCP endpoints are being accessed, including the specific endpoint name and request details.
+
+## Why Use MCP-Specific Logging?
+
+This type of logging is super useful because:
+- **Clear visibility** into which MCP endpoints are being hit
+- **Easy debugging** of MCP protocol interactions
+- **Request tracking** with endpoint names and status codes
+- **Better understanding** of server usage patterns
+- **Token usage visibility** - approximate display of tokens your server occupies in the model's context window
+
+## Example Log Output
+
+<img src="./images/Logging.jpg" alt="MCP endpoint logging example" />
+
+As you can see, the logs clearly show which MCP endpoints are being accessed, such as:
+- `[initialize]` - Server initialization
+- `[tools/list]` - Listing available tools
+- `[tools/call:echone]` - Calling a specific tool
+- `[resources/list]` - Listing available resources
+- `[ping]` - Health check requests
+
+The logs also display approximate token counts (e.g., "Tokens: 214") to give you visibility into how much context your server uses. This addresses a common criticism of MCP servers occupying too much of the model's context window.
+
+This makes it much easier to understand what's happening with your MCP server and debug any issues.
+
+## Next Steps
+
+- [Inspector UI](/python/server/inspector) - Monitor logs in real-time
+- [Running the Server](/python/server/running) - How to run your server

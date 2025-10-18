@@ -60,6 +60,19 @@
             ]
           },
           {
+            "group": "MCP Server",
+            "pages": [
+              "python/server/index",
+              "python/server/installation",
+              "python/server/quickstart",
+              "python/server/running",
+              "python/server/compatibility",
+              "python/server/inspector",
+              "python/server/logging",
+              "python/server/openmcp"
+            ]
+          },
+          {
             "group": "MCP Client",
             "pages": [
               {
@@ -257,6 +270,13 @@
               "python/api-reference/mcp_use_client",
               "python/api-reference/mcp_use_logging",
               "python/api-reference/mcp_use_utils"
+            ]
+          },
+          {
+            "group": "Server",
+            "icon": "server",
+            "pages": [
+              "python/api-reference/mcp_use_server"
             ]
           },
           {

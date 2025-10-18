@@ -1,0 +1,170 @@
+---
+title: "Official SDK Compatibility"
+description: "Full compatibility with the official MCP Python SDK"
+icon: "check"
+---
+
+# Official SDK Compatibility
+
+<Card title="" img="./images/MCP.jpg" horizontal="true"/>
+
+<Info>
+The mcp-use server framework is built on top of the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk). This ensures full compatibility with existing MCP clients and tools that adhere to the Model Context Protocol. mcp-use extends the SDK's core functionality, providing enhanced features without introducing breaking changes.
+</Info>
+
+## Zero Breaking Changes
+
+mcp-use extends the official MCP Python SDK rather than replacing it, ensuring:
+
+- **All existing MCP clients work out of the box**
+- **Full protocol compliance** with MCP specifications
+- **Easy migration** from existing MCP servers
+- **Enhanced features** without breaking existing functionality
+
+## Compatibility Matrix
+
+| Feature | Official SDK | mcp-use | Notes |
+|---------|--------------|---------|-------|
+| MCP Protocol | ✅ | ✅ | Full compliance |
+| Tools | ✅ | ✅ | Enhanced with decorators |
+| Resources | ✅ | ✅ | Enhanced with decorators |
+| Prompts | ✅ | ✅ | Enhanced with decorators |
+| Documentation | ❌ | ✅ | Built-in OpenAPI/Swagger |
+| Inspector UI | ❌ | ✅ | Real-time monitoring |
+| Enhanced Logging | ❌ | ✅ | Structured JSON logging |
+| Health Checks | ❌ | ✅ | Built-in endpoints |
+| Metrics | ❌ | ✅ | Prometheus compatible |
+
+## Migration Guide
+
+### From Official SDK
+
+If you have an existing MCP server built with the official SDK, you can easily migrate to mcp-use:
+
+#### Before (Official SDK)
+
+```python
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+
+server = Server("my-server")
+
+@server.list_tools()
+async def list_tools():
+    return [
+        {
+            "name": "greet",
+            "description": "Greet someone",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"}
+                }
+            }
+        }
+    ]
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict):
+    if name == "greet":
+        return f"Hello, {arguments['name']}!"
+    raise ValueError(f"Unknown tool: {name}")
+
+if __name__ == "__main__":
+    stdio_server(server)
+```
+
+#### After (mcp-use)
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="my-server",
+    version="1.0.0"
+)
+
+@server.tool()
+def greet(name: str) -> str:
+    """Greet someone."""
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    server.run(port=3001)
+```
+
+### Key Improvements
+
+1. **Simplified API**: Decorator-based approach instead of manual tool registration
+2. **Automatic Schema Generation**: Type hints automatically generate input/output schemas
+3. **Built-in Features**: Documentation, inspector, and logging come out of the box
+4. **HTTP Support**: Built-in HTTP server with uvicorn integration
+
+## Protocol Compliance
+
+mcp-use maintains full compliance with the MCP protocol specifications:
+
+- **Tool Discovery**: Implements `tools/list` and `tools/call` endpoints
+- **Resource Management**: Implements `resources/list` and `resources/read` endpoints
+- **Prompt Templates**: Implements `prompts/list` and `prompts/get` endpoints
+- **Error Handling**: Proper error responses with MCP-compliant error codes
+- **Session Management**: Full support for MCP session lifecycle
+
+## Client Compatibility
+
+All MCP clients that work with the official SDK will work with mcp-use servers:
+
+- **Claude Desktop**: Full compatibility
+- **ChatGPT**: Full compatibility
+- **Custom MCP Clients**: Full compatibility
+- **mcp-use Client**: Enhanced compatibility with additional features
+
+## Testing Compatibility
+
+You can test your mcp-use server with any MCP client:
+
+```bash
+# Test with mcp-use client
+from mcp_use.client import MCPClient
+
+config = {
+    "mcpServers": {
+        "my-server": {
+            "url": "http://localhost:3001/mcp"
+        }
+    }
+}
+
+client = MCPClient(config)
+session = await client.create_session("my-server")
+
+# List tools
+tools = await session.list_tools()
+print("Available tools:", [tool.name for tool in tools])
+
+# Call a tool
+result = await session.call_tool("greet", {"name": "World"})
+print("Result:", result)
+```
+
+## Best Practices
+
+### Maintaining Compatibility
+
+1. **Use Type Hints**: Always use proper type hints for automatic schema generation
+2. **Follow MCP Conventions**: Use descriptive tool names and clear documentation
+3. **Handle Errors Gracefully**: Return proper error responses for invalid inputs
+4. **Test with Multiple Clients**: Verify compatibility with different MCP clients
+
+### Leveraging mcp-use Features
+
+1. **Use Decorators**: Take advantage of the simplified decorator-based API
+2. **Enable Documentation**: Use the built-in OpenAPI documentation
+3. **Monitor with Inspector**: Use the inspector UI for debugging and monitoring
+4. **Structured Logging**: Use JSON logging for better observability
+
+## Next Steps
+
+- [Installation & Setup](/python/server/installation) - Get started with mcp-use
+- [Quickstart Guide](/python/server/quickstart) - Build your first server
+- [Configuration Reference](/python/server/configuration) - Complete configuration options

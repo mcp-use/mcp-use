@@ -1,0 +1,119 @@
+---
+title: "Quickstart Guide"
+description: "Build your first MCP server with mcp-use in minutes"
+icon: "rocket"
+---
+
+# Quickstart Guide
+
+<Info>
+Build your first MCP server with mcp-use in minutes. This guide shows you the basics of creating tools and running your server.
+</Info>
+
+## Installation
+
+```bash
+pip install mcp-use
+```
+
+## Basic Server
+
+Create `my_server.py`:
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="My Server",
+    version="1.0.0",
+    instructions="A simple example server"
+)
+
+@server.tool()
+def echo(message: str) -> str:
+    """Echo back the provided message."""
+    return f"Echo: {message}"
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", debug=True)
+```
+
+## Running the Server
+
+```bash
+python my_server.py
+```
+
+Your server will be available at `http://localhost:8000`:
+- MCP endpoints: `/mcp`
+- OpenMCP metadata: `/openmcp.json` (debug mode only)
+- Documentation: `/docs` (debug mode only)
+
+## Transport Options
+
+```python
+# Standard input/output (for MCP clients)
+server.run(transport="stdio")
+
+# HTTP server (for web clients)
+server.run(transport="streamable-http", host="0.0.0.0", port=8000)
+```
+
+## Debug Mode
+
+Enable debug mode for development features:
+
+```python
+server = MCPServer(name="My Server", debug=True)
+```
+
+Debug mode provides:
+- `/openmcp.json` endpoint
+- `/docs` endpoint
+- Enhanced logging
+
+## Adding More Tools
+
+```python
+@server.tool()
+def calculate(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+@server.tool()
+def get_time() -> str:
+    """Get current time."""
+    from datetime import datetime
+    return datetime.now().isoformat()
+```
+
+## Complete Example
+
+```python
+from mcp_use.server import MCPServer
+from datetime import datetime
+
+server = MCPServer(
+    name="Example Server",
+    version="1.0.0",
+    instructions="This is an example server with a simple echo tool."
+)
+
+@server.tool()
+def echo(message: str) -> str:
+    """Echo back the provided message."""
+    return f"Echo: {message}"
+
+@server.tool()
+def calculate(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+@server.tool()
+def get_time() -> str:
+    """Get current time."""
+    return datetime.now().isoformat()
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", debug=True)
+```

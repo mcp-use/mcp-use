@@ -1,0 +1,575 @@
+---
+title: "MCPServer"
+description: "Complete API reference for the mcp-use server framework"
+icon: "server"
+---
+
+# MCPServer
+
+<Info>
+The `MCPServer` class is the main entry point for creating MCP servers with the mcp-use framework. It extends the official MCP Python SDK with enhanced features for production use.
+</Info>
+
+## Class Definition
+
+```python
+class MCPServer:
+    """Enhanced MCP server with built-in documentation, inspector, and production features."""
+
+    def __init__(
+        self,
+        name: str,
+        version: str,
+        description: str = "",
+        config: ServerConfig = None
+    ) -> None:
+        """Initialize the MCP server.
+
+        Args:
+            name: Server name
+            version: Server version
+            description: Server description
+            config: Server configuration (optional)
+        """
+```
+
+## Constructor
+
+### MCPServer()
+
+```python
+server = MCPServer(
+    name="my-server",
+    version="1.0.0",
+    description="My MCP server",
+    config=ServerConfig(...)  # Optional
+)
+```
+
+**Parameters:**
+
+- `name` (str): Server name
+- `version` (str): Server version
+- `description` (str, optional): Server description
+- `config` (ServerConfig, optional): Server configuration
+
+**Returns:** `MCPServer` instance
+
+## Tool Management
+
+### @server.tool()
+
+```python
+@server.tool()
+def my_tool(param: str) -> str:
+    """Tool description."""
+    return f"Result: {param}"
+```
+
+**Parameters:**
+
+- `name` (str, optional): Tool name (defaults to function name)
+- `description` (str, optional): Tool description (defaults to docstring)
+- `inputs` (list, optional): Input schema (auto-generated from type hints)
+- `output` (dict, optional): Output schema (auto-generated from return type)
+
+**Returns:** Decorated function
+
+### server.list_tools()
+
+```python
+tools = server.list_tools()
+```
+
+**Returns:** List of registered tools
+
+### server.get_tool()
+
+```python
+tool = server.get_tool("my_tool")
+```
+
+**Parameters:**
+
+- `name` (str): Tool name
+
+**Returns:** Tool definition or None
+
+## Resource Management
+
+### @server.resource()
+
+```python
+@server.resource()
+def my_resource() -> dict:
+    """Resource description."""
+    return {"data": "value"}
+```
+
+**Parameters:**
+
+- `name` (str, optional): Resource name (defaults to function name)
+- `description` (str, optional): Resource description (defaults to docstring)
+- `mime_type` (str, optional): MIME type (defaults to "application/json")
+- `access` (str, optional): Access level ("public", "private", "restricted")
+
+**Returns:** Decorated function
+
+### server.list_resources()
+
+```python
+resources = server.list_resources()
+```
+
+**Returns:** List of registered resources
+
+### server.get_resource()
+
+```python
+resource = server.get_resource("my_resource")
+```
+
+**Parameters:**
+
+- `name` (str): Resource name
+
+**Returns:** Resource definition or None
+
+## Prompt Management
+
+### @server.prompt()
+
+```python
+@server.prompt()
+def my_prompt(context: str) -> str:
+    """Prompt description."""
+    return f"Prompt: {context}"
+```
+
+**Parameters:**
+
+- `name` (str, optional): Prompt name (defaults to function name)
+- `description` (str, optional): Prompt description (defaults to docstring)
+- `args` (list, optional): Argument schema (auto-generated from type hints)
+
+**Returns:** Decorated function
+
+### server.list_prompts()
+
+```python
+prompts = server.list_prompts()
+```
+
+**Returns:** List of registered prompts
+
+### server.get_prompt()
+
+```python
+prompt = server.get_prompt("my_prompt")
+```
+
+**Parameters:**
+
+- `name` (str): Prompt name
+
+**Returns:** Prompt definition or None
+
+## Server Control
+
+### server.run()
+
+```python
+server.run(
+    host="127.0.0.1",
+    port=3001,
+    reload=False,
+    log_level="INFO"
+)
+```
+
+**Parameters:**
+
+- `host` (str, optional): Server host (defaults to "127.0.0.1")
+- `port` (int, optional): Server port (defaults to 3001)
+- `reload` (bool, optional): Auto-reload on changes (defaults to False)
+- `log_level` (str, optional): Log level (defaults to "INFO")
+
+**Returns:** None (blocks until server stops)
+
+### server.start()
+
+```python
+await server.start()
+```
+
+**Returns:** None (async)
+
+### server.stop()
+
+```python
+await server.stop()
+```
+
+**Returns:** None (async)
+
+### server.shutdown()
+
+```python
+await server.shutdown()
+```
+
+**Returns:** None (async)
+
+## Configuration
+
+### server.config
+
+```python
+config = server.config
+```
+
+**Returns:** `ServerConfig` instance
+
+### server.update_config()
+
+```python
+server.update_config(new_config)
+```
+
+**Parameters:**
+
+- `new_config` (ServerConfig): New configuration
+
+**Returns:** None
+
+## Middleware
+
+### server.add_middleware()
+
+```python
+server.add_middleware(middleware_instance)
+```
+
+**Parameters:**
+
+- `middleware_instance`: Middleware instance
+
+**Returns:** None
+
+### server.remove_middleware()
+
+```python
+server.remove_middleware(middleware_instance)
+```
+
+**Parameters:**
+
+- `middleware_instance`: Middleware instance
+
+**Returns:** None
+
+## Caching
+
+### server.add_cache()
+
+```python
+server.add_cache(cache_instance)
+```
+
+**Parameters:**
+
+- `cache_instance`: Cache instance
+
+**Returns:** None
+
+### @server.cached()
+
+```python
+@server.tool()
+@server.cached(ttl=300)
+def expensive_tool(data: str) -> str:
+    """Expensive operation with caching."""
+    return process_data(data)
+```
+
+**Parameters:**
+
+- `ttl` (int, optional): Time to live in seconds
+- `key_func` (callable, optional): Custom cache key function
+
+**Returns:** Decorator
+
+## Logging
+
+### server.logger
+
+```python
+logger = server.logger
+logger.info("Server started")
+```
+
+**Returns:** Logger instance
+
+### server.log()
+
+```python
+server.log("INFO", "Message", extra={"key": "value"})
+```
+
+**Parameters:**
+
+- `level` (str): Log level
+- `message` (str): Log message
+- `extra` (dict, optional): Additional data
+
+**Returns:** None
+
+## Health and Metrics
+
+### server.health_check()
+
+```python
+health = await server.health_check()
+```
+
+**Returns:** Health status dict
+
+### server.get_metrics()
+
+```python
+metrics = await server.get_metrics()
+```
+
+**Returns:** Metrics dict
+
+### server.get_status()
+
+```python
+status = await server.get_status()
+```
+
+**Returns:** Server status dict
+
+## Documentation
+
+### server.generate_docs()
+
+```python
+docs = server.generate_docs()
+```
+
+**Returns:** Documentation dict
+
+### server.get_openapi()
+
+```python
+openapi = server.get_openapi()
+```
+
+**Returns:** OpenAPI specification dict
+
+## Inspector
+
+### server.inspector_enabled
+
+```python
+enabled = server.inspector_enabled
+```
+
+**Returns:** bool
+
+### server.get_inspector_data()
+
+```python
+data = await server.get_inspector_data()
+```
+
+**Returns:** Inspector data dict
+
+## Error Handling
+
+### server.add_error_handler()
+
+```python
+server.add_error_handler(exception_type, handler_func)
+```
+
+**Parameters:**
+
+- `exception_type`: Exception type to handle
+- `handler_func`: Handler function
+
+**Returns:** None
+
+### server.handle_error()
+
+```python
+response = await server.handle_error(exception, request)
+```
+
+**Parameters:**
+
+- `exception`: Exception instance
+- `request`: Request object
+
+**Returns:** Error response
+
+## Events
+
+### server.on_startup()
+
+```python
+@server.on_startup()
+async def startup_handler():
+    """Handle server startup."""
+    print("Server starting...")
+```
+
+**Returns:** Decorator
+
+### server.on_shutdown()
+
+```python
+@server.on_shutdown()
+async def shutdown_handler():
+    """Handle server shutdown."""
+    print("Server shutting down...")
+```
+
+**Returns:** Decorator
+
+### server.on_request()
+
+```python
+@server.on_request()
+async def request_handler(request):
+    """Handle incoming requests."""
+    print(f"Request: {request.method} {request.path}")
+```
+
+**Returns:** Decorator
+
+## Properties
+
+### server.name
+
+```python
+name = server.name
+```
+
+**Returns:** str - Server name
+
+### server.version
+
+```python
+version = server.version
+```
+
+**Returns:** str - Server version
+
+### server.description
+
+```python
+description = server.description
+```
+
+**Returns:** str - Server description
+
+### server.capabilities
+
+```python
+capabilities = server.capabilities
+```
+
+**Returns:** dict - Server capabilities
+
+### server.endpoints
+
+```python
+endpoints = server.endpoints
+```
+
+**Returns:** list - Available endpoints
+
+### server.is_running
+
+```python
+running = server.is_running
+```
+
+**Returns:** bool - Server running status
+
+## Utility Methods
+
+### server.to_dict()
+
+```python
+data = server.to_dict()
+```
+
+**Returns:** dict - Server data
+
+### server.from_dict()
+
+```python
+server = MCPServer.from_dict(data)
+```
+
+**Parameters:**
+
+- `data` (dict): Server data
+
+**Returns:** `MCPServer` instance
+
+### server.validate()
+
+```python
+is_valid = server.validate()
+```
+
+**Returns:** bool - Validation result
+
+## Example Usage
+
+```python
+from mcp_use.server import MCPServer, ServerConfig
+
+# Create server
+server = MCPServer(
+    name="my-server",
+    version="1.0.0",
+    description="My MCP server"
+)
+
+# Add tools
+@server.tool()
+def greet(name: str) -> str:
+    """Greet someone."""
+    return f"Hello, {name}!"
+
+# Add resources
+@server.resource()
+def info() -> dict:
+    """Server information."""
+    return {
+        "name": server.name,
+        "version": server.version
+    }
+
+# Add prompts
+@server.prompt()
+def help_prompt(topic: str) -> str:
+    """Help prompt."""
+    return f"Help with {topic}"
+
+# Start server
+if __name__ == "__main__":
+    server.run(port=3001)
+```
+
+## Related Classes
+
+- [ServerConfig](/python/api-reference/mcp_use_server_config) - Server configuration
+- [ServerMiddleware](/python/api-reference/mcp_use_server_middleware) - Middleware base class
+- [ServerCache](/python/api-reference/mcp_use_server_cache) - Caching system
+- [ServerLogger](/python/api-reference/mcp_use_server_logger) - Logging system
