@@ -38,7 +38,7 @@ export function extractMCPResources(
     }
   }
   catch (e) {
-    console.log('Could not parse tool result for MCP resources:', e)
+    console.error('Could not parse tool result for MCP resources:', e)
   }
 
   return []
