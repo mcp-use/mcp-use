@@ -309,7 +309,7 @@ export function CommandPalette({
       onOpenChange={onOpenChange}
       label="Command Palette"
       className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[51] max-w-[640px] w-full p-2 bg-white dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl overflow-hidden border border-border shadow-[var(--cmdk-shadow)] transition-transform duration-100 ease-out outline-none max-sm:max-w-full"
-      overlayClassName="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+      overlayClassName="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
     >
       <Command.Input
         placeholder="What do you need?"
@@ -353,7 +353,7 @@ export function CommandPalette({
       </Command.List>
 
       {/* Keyboard Shortcuts Footer */}
-      <div className="border-t border-border px-4 py-3 pb-1 flex items-center justify-between text-xs text-muted-foreground bg-zinc-50/50 dark:bg-zinc-900/50">
+      <div className="border-t border-border px-4 py-3 pb-1 flex items-center justify-between text-xs text-muted-foreground ">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">

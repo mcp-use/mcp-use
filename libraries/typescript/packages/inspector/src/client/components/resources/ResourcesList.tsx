@@ -7,7 +7,7 @@ import {
   FileText,
   Globe,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { ListItem } from '@/client/components/shared'
 
 interface ResourcesListProps {
   resources: Resource[]
@@ -95,58 +95,46 @@ export function ResourcesList({
 }: ResourcesListProps) {
   if (resources.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-        <p>No resources available</p>
-        <p className="text-sm">Connect to a server to see resources</p>
+      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+        <Database className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
+        <p className="text-gray-500 dark:text-gray-400">No resources available</p>
       </div>
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-visible mt-6 space-y-5 p-0">
+    <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
       {resources.map((resource, index) => {
-        const typeInfo = getResourceTypeColor(resource.mimeType, resource.uri)
+        const icon = getResourceIcon(resource.mimeType, resource.uri)
+        const description = [
+          resource.description,
+          resource.mimeType && <span key="mime" className="font-mono">{resource.mimeType}</span>,
+        ].filter(Boolean)
+
         return (
-          <div
+          <ListItem
             key={resource.uri}
             id={`resource-${resource.uri}`}
-            className={cn(
-              'cursor-pointer transition-all rounded-[20px] bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-2',
-              selectedResource?.uri === resource.uri
-              && 'border-2 border-zinc-200 dark:border-zinc-600',
-              focusedIndex === index
-              && 'border-2 border-blue-500 dark:border-blue-400',
-            )}
+            isSelected={selectedResource?.uri === resource.uri}
+            isFocused={focusedIndex === index}
+            icon={icon}
+            title={resource.name}
+            description={
+              description.length > 0
+                ? (
+                    <span className="flex flex-col gap-1">
+                      {resource.description && <span>{resource.description}</span>}
+                      {resource.mimeType && (
+                        <span className="text-xs text-gray-500 dark:text-gray-500 font-mono">
+                          {resource.mimeType}
+                        </span>
+                      )}
+                    </span>
+                  )
+                : undefined
+            }
             onClick={() => onResourceSelect(resource)}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  'rounded-full p-3 flex items-center justify-center',
-                  typeInfo.bgColor,
-                )}
-              >
-                <div className={typeInfo.iconColor}>
-                  {getResourceIcon(resource.mimeType, resource.uri)}
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {resource.name}
-                </div>
-                {resource.description && (
-                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    {resource.description}
-                  </div>
-                )}
-                {resource.mimeType && (
-                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-1 font-mono">
-                    {resource.mimeType}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          />
         )
       })}
     </div>

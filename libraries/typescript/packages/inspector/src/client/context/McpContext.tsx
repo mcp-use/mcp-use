@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react'
 
-interface MCPConnection {
+export interface MCPConnection {
   id: string
   url: string
   name: string

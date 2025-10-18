@@ -1,112 +1,19 @@
 import type { ReactNode } from 'react'
 import type { CustomHeader } from './CustomHeadersEditor'
-import {
-  Command,
-  FolderOpen,
-  MessageCircle,
-  MessageSquare,
-  Settings,
-  Wrench,
-} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import LogoAnimated from '@/client/components/LogoAnimated'
-import { Button } from '@/client/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/client/components/ui/dropdown-menu'
-import { ShimmerButton } from '@/client/components/ui/shimmer-button'
 import { Spinner } from '@/client/components/ui/spinner'
-import { Tabs, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/client/components/ui/tooltip'
+import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { useInspector } from '@/client/context/InspectorContext'
 import { useMcpContext } from '@/client/context/McpContext'
 import { useKeyboardShortcuts } from '@/client/hooks/useKeyboardShortcuts'
-import { cn } from '@/lib/utils'
-import { AnimatedThemeToggler } from './AnimatedThemeToggler'
-import { ChatTab } from './ChatTab'
 import { CommandPalette } from './CommandPalette'
-import { PromptsTab } from './PromptsTab'
-import { ResourcesTab } from './ResourcesTab'
-import { ServerIcon } from './ServerIcon'
-import { ToolsTab } from './ToolsTab'
+import { LayoutContent } from './LayoutContent'
+import { LayoutHeader } from './LayoutHeader'
 
 interface LayoutProps {
   children: ReactNode
-}
-
-// Discord Icon Component
-function DiscordIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 -28.5 256 256"
-      className={className}
-      fill="currentColor"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M216.856339,16.5966031 C200.285002,8.84328665 182.566144,3.2084988 164.041564,0 C161.766523,4.11318106 159.108624,9.64549908 157.276099,14.0464379 C137.583995,11.0849896 118.072967,11.0849896 98.7430163,14.0464379 C96.9108417,9.64549908 94.1925838,4.11318106 91.8971895,0 C73.3526068,3.2084988 55.6133949,8.86399117 39.0420583,16.6376612 C5.61752293,67.146514 -3.4433191,116.400813 1.08711069,164.955721 C23.2560196,181.510915 44.7403634,191.567697 65.8621325,198.148576 C71.0772151,190.971126 75.7283628,183.341335 79.7352139,175.300261 C72.104019,172.400575 64.7949724,168.822202 57.8887866,164.667963 C59.7209612,163.310589 61.5131304,161.891452 63.2445898,160.431257 C105.36741,180.133187 151.134928,180.133187 192.754523,160.431257 C194.506336,161.891452 196.298154,163.310589 198.110326,164.667963 C191.183787,168.842556 183.854737,172.420929 176.223542,175.320965 C180.230393,183.341335 184.861538,190.991831 190.096624,198.16893 C211.238746,191.588051 232.743023,181.531619 254.911949,164.955721 C260.227747,108.668201 245.831087,59.8662432 216.856339,16.5966031 Z M85.4738752,135.09489 C72.8290281,135.09489 62.4592217,123.290155 62.4592217,108.914901 C62.4592217,94.5396472 72.607595,82.7145587 85.4738752,82.7145587 C98.3405064,82.7145587 108.709962,94.5189427 108.488529,108.914901 C108.508531,123.290155 98.3405064,135.09489 85.4738752,135.09489 Z M170.525237,135.09489 C157.88039,135.09489 147.510584,123.290155 147.510584,108.914901 C147.510584,94.5396472 157.658606,82.7145587 170.525237,82.7145587 C183.391518,82.7145587 193.761324,94.5189427 193.539891,108.914901 C193.539891,123.290155 183.391518,135.09489 170.525237,135.09489 Z"
-        fillRule="nonzero"
-      />
-    </svg>
-  )
-}
-
-// Pulsing emerald dot component
-function StatusDot({ status }: { status: string }) {
-  const getStatusInfo = (statusValue: string) => {
-    switch (statusValue) {
-      case 'ready':
-        return {
-          color: 'bg-emerald-500',
-          ringColor: 'ring-emerald-500',
-          tooltip: 'Connected',
-        }
-      case 'failed':
-        return {
-          color: 'bg-red-500',
-          ringColor: 'ring-red-500',
-          tooltip: 'Failed',
-        }
-      default:
-        return {
-          color: 'bg-yellow-500',
-          ringColor: 'ring-yellow-500',
-          tooltip: statusValue,
-        }
-    }
-  }
-
-  const { color, ringColor, tooltip } = getStatusInfo(status)
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="relative">
-          {/* Pulsing ring */}
-          <div
-            className={`absolute w-2 h-2 rounded-full ${ringColor} animate-ping`}
-          />
-          {/* Solid dot */}
-          <div className={`relative w-2 h-2 rounded-full ${color}`} />
-        </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>{tooltip}</p>
-      </TooltipContent>
-    </Tooltip>
-  )
 }
 
 export function Layout({ children }: LayoutProps) {
@@ -131,34 +38,27 @@ export function Layout({ children }: LayoutProps) {
   )
 
   // Refs for search inputs in tabs
-  const toolsSearchRef = useRef<{ focusSearch: () => void }>(null)
-  const promptsSearchRef = useRef<{ focusSearch: () => void }>(null)
-  const resourcesSearchRef = useRef<{ focusSearch: () => void }>(null)
+  const toolsSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
+  const promptsSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
+  const resourcesSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
 
   // Form state for connection options
-  const [url, setUrl] = useState('')
-  const [connectionType, setConnectionType] = useState('Direct')
-  const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([])
-  const [requestTimeout, setRequestTimeout] = useState('10000')
-  const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState('True')
-  const [maxTotalTimeout, setMaxTotalTimeout] = useState('60000')
-  const [proxyAddress, setProxyAddress] = useState('')
+  const [_url, setUrl] = useState('')
+  const [_connectionType, _setConnectionType] = useState('Direct')
+  const [_customHeaders, setCustomHeaders] = useState<CustomHeader[]>([])
+  const [_requestTimeout, _setRequestTimeout] = useState('10000')
+  const [_resetTimeoutOnProgress, _setResetTimeoutOnProgress] = useState('True')
+  const [_maxTotalTimeout, _setMaxTotalTimeout] = useState('60000')
+  const [_proxyAddress, _setProxyAddress] = useState('')
 
   // OAuth fields
-  const [clientId, setClientId] = useState('')
-  const [redirectUrl, setRedirectUrl] = useState(
+  const [_clientId, setClientId] = useState('')
+  const [_redirectUrl, _setRedirectUrl] = useState(
     typeof window !== 'undefined'
       ? new URL('/inspector/oauth/callback', window.location.origin).toString()
       : 'http://localhost:3000/inspector/oauth/callback',
   )
-  const [scope, setScope] = useState('')
-
-  const tabs = [
-    { id: 'tools', label: 'Tools', icon: Wrench },
-    { id: 'prompts', label: 'Prompts', icon: MessageSquare },
-    { id: 'resources', label: 'Resources', icon: FolderOpen },
-    { id: 'chat', label: 'Chat', icon: MessageCircle },
-  ]
+  const [_scope, setScope] = useState('')
 
   const handleServerSelect = (serverId: string) => {
     const server = connections.find(c => c.id === serverId)
@@ -239,7 +139,7 @@ export function Layout({ children }: LayoutProps) {
     }
   }
 
-  const handleSaveConnectionOptions = () => {
+  const _handleSaveConnectionOptions = () => {
     // Here you would implement the logic to save/update the connection options
     // For now, we'll just close the dialog
     setConnectionOptionsOpen(false)
@@ -314,9 +214,11 @@ export function Layout({ children }: LayoutProps) {
         addConnection(autoConnectUrl, 'Local MCP Server', undefined, 'http')
         // Navigate immediately but keep loading screen visible a bit longer to avoid flash
         navigate(`/?server=${encodeURIComponent(autoConnectUrl)}`)
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           setIsAutoConnecting(false)
         }, 1000)
+        // Cleanup timeout on unmount
+        return () => clearTimeout(timeoutId)
       }
       setConfigLoaded(true)
       return
@@ -486,234 +388,27 @@ export function Layout({ children }: LayoutProps) {
     <TooltipProvider>
       <div className="h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 py-4 gap-4">
         {/* Header */}
-        <header className=" w-full mx-auto">
-          <div className="flex items-center justify-between">
-            {/* Left side: Server dropdown + Tabs */}
-            <div className="flex items-center space-x-6">
-              {/* Server Selection Dropdown */}
-              <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <ShimmerButton
-                      className={cn(
-                        'min-w-[200px] p-0 px-1 text-sm h-11 justify-start bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200',
-                        !selectedServer && 'pl-4',
-                        selectedServer && 'pr-4',
-                      )}
-                    >
-                      {selectedServer && (
-                        <ServerIcon
-                          serverUrl={selectedServer.url}
-                          serverName={selectedServer.name}
-                          size="md"
-                          className="mr-2"
-                        />
-                      )}
-                      <div className="flex items-center gap-2 flex-1">
-                        <span className="truncate">
-                          {selectedServer
-                            ? selectedServer.name
-                            : 'Select server to inspect'}
-                        </span>
-                        {selectedServer && (
-                          <div className="flex items-center gap-2">
-                            {selectedServer.error
-                              && selectedServer.state !== 'ready' ? (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          // Handle copy error functionality if needed
-                                        }}
-                                        className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
-                                        title="Click to copy error message"
-                                        aria-label="Copy error message to clipboard"
-                                      />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p className="max-w-xs">
-                                        {selectedServer.error}
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                ) : (
-                                  <div
-                                    className={`w-2 h-2 rounded-full ${
-                                      selectedServer.state === 'ready'
-                                        ? 'bg-emerald-600 animate-status-pulse'
-                                        : selectedServer.state === 'failed'
-                                          ? 'bg-rose-600 animate-status-pulse-red'
-                                          : 'bg-yellow-500 animate-status-pulse-yellow'
-                                    }`}
-                                  />
-                                )}
-                          </div>
-                        )}
-                      </div>
-                    </ShimmerButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-[300px]" align="start">
-                    <DropdownMenuLabel>MCP Servers</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {connections.length === 0
-                      ? (
-                          <div className="px-2 py-4 text-sm text-muted-foreground dark:text-zinc-400 text-center">
-                            No servers connected. Go to the dashboard to add one.
-                          </div>
-                        )
-                      : (
-                          connections.map(connection => (
-                            <DropdownMenuItem
-                              key={connection.id}
-                              onClick={() => handleServerSelect(connection.id)}
-                              className="flex items-center gap-3"
-                            >
-                              <ServerIcon
-                                serverUrl={connection.url}
-                                serverName={connection.name}
-                                size="sm"
-                              />
-                              <div className="flex items-center gap-2 flex-1">
-                                <div className="font-medium">{connection.name}</div>
-                                <StatusDot status={connection.state} />
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleOpenConnectionOptions(connection.id)
-                                }}
-                              >
-                                <Settings className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuItem>
-                          ))
-                        )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate('/')}>
-                      <span className="text-blue-600 dark:text-blue-400">
-                        + Add new server
-                      </span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              {/* Tabs */}
-              {selectedServer && (
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList>
-                    {tabs.map((tab) => {
-                      // Get count for the current tab
-                      let count = 0
-                      if (tab.id === 'tools') {
-                        count = selectedServer.tools.length
-                      }
-                      else if (tab.id === 'prompts') {
-                        count = selectedServer.prompts.length
-                      }
-                      else if (tab.id === 'resources') {
-                        count = selectedServer.resources.length
-                      }
-
-                      return (
-                        <TabsTrigger
-                          key={tab.id}
-                          value={tab.id}
-                          icon={tab.icon}
-                        >
-                          <div className="flex items-center gap-2">
-                            {tab.label}
-                            {count > 0 && (
-                              <span className="bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium">
-                                {count}
-                              </span>
-                            )}
-                          </div>
-                        </TabsTrigger>
-                      )
-                    })}
-                  </TabsList>
-                </Tabs>
-              )}
-            </div>
-
-            {/* Right side: Theme Toggle + Command Palette + Discord Button + Deploy Button + Logo */}
-            <div className="flex items-center gap-4">
-              <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className=" hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md py-0 flex gap-1"
-                    onClick={() => setIsCommandPaletteOpen(true)}
-                  >
-                    <Command className="size-4" />
-                    <span className="text-base font-mono">K</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Command Palette</p>
-                </TooltipContent>
-              </Tooltip>
-              <Button variant="ghost" size="sm" asChild>
-                <a
-                  href="https://discord.gg/XkNkSkMz3V"
-                  className="flex items-center gap-2"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <DiscordIcon className="h-4 w-4" />
-                  Discord
-                </a>
-              </Button>
-
-              <LogoAnimated state="expanded" />
-            </div>
-          </div>
-        </header>
+        <LayoutHeader
+          connections={connections}
+          selectedServer={selectedServer}
+          activeTab={activeTab}
+          onServerSelect={handleServerSelect}
+          onTabChange={setActiveTab}
+          onCommandPaletteOpen={() => setIsCommandPaletteOpen(true)}
+          onOpenConnectionOptions={handleOpenConnectionOptions}
+        />
 
         {/* Main Content */}
         <main className="flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto">
-          {selectedServer && activeTab === 'tools' ? (
-            <ToolsTab
-              ref={toolsSearchRef}
-              tools={selectedServer.tools}
-              callTool={selectedServer.callTool}
-              isConnected={selectedServer.state === 'ready'}
-            />
-          ) : selectedServer && activeTab === 'prompts' ? (
-            <PromptsTab
-              ref={promptsSearchRef}
-              prompts={selectedServer.prompts}
-              callPrompt={selectedServer.callTool} // Using callTool for now, should be callPrompt when available
-              isConnected={selectedServer.state === 'ready'}
-            />
-          ) : selectedServer && activeTab === 'resources'
-            ? (
-                <ResourcesTab
-                  ref={resourcesSearchRef}
-                  resources={selectedServer.resources}
-                  readResource={selectedServer.readResource}
-                  isConnected={selectedServer.state === 'ready'}
-                />
-              )
-            : selectedServer && activeTab === 'chat'
-              ? (
-                  <ChatTab
-                    mcpServerUrl={selectedServer.url}
-                    isConnected={selectedServer.state === 'ready'}
-                    oauthState={selectedServer.state}
-                    oauthError={selectedServer.error}
-                  />
-                )
-              : (
-                  children
-                )}
+          <LayoutContent
+            selectedServer={selectedServer}
+            activeTab={activeTab}
+            toolsSearchRef={toolsSearchRef}
+            promptsSearchRef={promptsSearchRef}
+            resourcesSearchRef={resourcesSearchRef}
+          >
+            {children}
+          </LayoutContent>
         </main>
 
         {/* Command Palette */}

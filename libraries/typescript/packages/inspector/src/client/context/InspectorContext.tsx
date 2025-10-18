@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, use, useCallback, useState } from 'react'
 
-type TabType = 'tools' | 'prompts' | 'resources' | 'chat'
+export type TabType = 'tools' | 'prompts' | 'resources' | 'chat'
 
 interface InspectorState {
   selectedServerId: string | null

@@ -9,6 +9,7 @@ export interface KeyboardShortcutHandlers {
   onFocusSearch?: () => void
   onBlurSearch?: () => void
   onCommandPalette?: () => void
+  onNewChat?: () => void
 }
 
 /**
@@ -16,6 +17,7 @@ export interface KeyboardShortcutHandlers {
  *
  * Shortcuts:
  * - Cmd/Ctrl + K: Open command palette
+ * - Cmd/Ctrl + O: Start a new chat
  * - t: Switch to tools tab (when no input focused)
  * - p: Switch to prompts tab (when no input focused)
  * - r: Switch to resources tab (when no input focused)
@@ -38,6 +40,13 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
         event.preventDefault()
         handlers.onCommandPalette?.()
+        return
+      }
+
+      // Cmd/Ctrl + O for new chat (only if handler is registered)
+      if ((event.metaKey || event.ctrlKey) && event.key === 'o' && handlers.onNewChat) {
+        event.preventDefault()
+        handlers.onNewChat()
         return
       }
 

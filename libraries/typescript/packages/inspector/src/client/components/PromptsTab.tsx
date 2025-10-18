@@ -1,5 +1,5 @@
 import type { Prompt } from '@modelcontextprotocol/sdk/types.js'
-import { Check, Clock, Copy, MessageSquare, Play, Search } from 'lucide-react'
+import { Check, Clock, Copy, MessageSquare, Play } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -9,9 +9,8 @@ import {
   useState,
 } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { Badge } from '@/client/components/ui/badge'
+import { ListItem, ListTabHeader } from '@/client/components/shared'
 import { Button } from '@/client/components/ui/button'
-
 import { Input } from '@/client/components/ui/input'
 import { Label } from '@/client/components/ui/label'
 import {
@@ -22,7 +21,6 @@ import {
 import { Textarea } from '@/client/components/ui/textarea'
 import { useInspector } from '@/client/context/InspectorContext'
 import { usePrismTheme } from '@/client/hooks/usePrismTheme'
-import { cn } from '@/lib/utils'
 
 export interface PromptsTabRef {
   focusSearch: () => void
@@ -412,161 +410,96 @@ export function PromptsTab({ ref, prompts, callPrompt, isConnected }: PromptsTab
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel defaultSize={33}>
-        <div className="flex items-center justify-between p-7 pt-5 pb-1 border-r dark:border-zinc-700">
-          <div className="flex items-center gap-2 flex-1">
-            {!isSearchExpanded
-              ? (
-                  <>
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                      {activeTab === 'prompts' ? 'Prompts' : 'History'}
-                    </h2>
-                    {activeTab === 'prompts' && (
-                      <>
-                        <Badge
-                          className="bg-blue-500/20 text-blue-600 dark:text-blue-400 border-transparent"
-                          variant="outline"
-                        >
-                          {filteredPrompts.length}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setIsSearchExpanded(true)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Search className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </>
-                )
-              : (
-                  <Input
-                    ref={searchInputRef}
-                    placeholder="Search prompts..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onBlur={handleSearchBlur}
-                    className="h-8 border-gray-300 dark:border-zinc-600"
-                  />
-                )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setActiveTab(activeTab === 'prompts' ? 'saved' : 'prompts')}
-            className="gap-2"
-          >
-            {activeTab === 'prompts' ? <Clock /> : <MessageSquare />}
-            <span>{activeTab === 'prompts' ? 'History' : 'Prompts'}</span>
-            {activeTab === 'prompts' && results.length > 0 && (
-              <Badge
-                className="bg-purple-500/20 text-purple-600 dark:text-purple-400 border-transparent"
-                variant="outline"
-              >
-                {results.length}
-              </Badge>
-            )}
-          </Button>
-        </div>
+        <ListTabHeader
+          activeTab={activeTab}
+          isSearchExpanded={isSearchExpanded}
+          searchQuery={searchQuery}
+          primaryTabName="prompts"
+          secondaryTabName="saved"
+          primaryTabTitle="Prompts"
+          secondaryTabTitle="History"
+          primaryCount={filteredPrompts.length}
+          secondaryCount={results.length}
+          primaryIcon={MessageSquare}
+          secondaryIcon={Clock}
+          searchPlaceholder="Search prompts..."
+          onSearchExpand={() => setIsSearchExpanded(true)}
+          onSearchChange={setSearchQuery}
+          onSearchBlur={handleSearchBlur}
+          onTabSwitch={() =>
+            setActiveTab(activeTab === 'prompts' ? 'saved' : 'prompts')}
+          searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+        />
         {/* Left pane: Prompts list */}
-        <div className="flex flex-col h-full border-r dark:border-zinc-700 p-4 bg-white dark:bg-black">
-          <div className="flex-1 overflow-y-auto overflow-x-visible mt-0 space-y-3 p-0">
-            {activeTab === 'prompts' ? (
-              <>
-                {filteredPrompts.length === 0
-                  ? (
-                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        <p>No prompts available</p>
-                        <p className="text-sm">
-                          Connect to a server to see prompts
-                        </p>
-                      </div>
-                    )
-                  : (
-                      filteredPrompts.map((prompt, index) => (
-                        <div
-                          key={prompt.name}
-                          id={`prompt-${prompt.name}`}
-                          className={cn(
-                            'cursor-pointer transition-all rounded-[20px] bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-2',
-                            selectedPrompt?.name === prompt.name
-                            && 'border-2 border-zinc-200 dark:border-zinc-600',
-                            focusedIndex === index
-                            && 'border-2 border-blue-500 dark:border-blue-400',
-                          )}
-                          onClick={() => handlePromptSelect(prompt)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="bg-blue-500/20 rounded-full p-3 flex items-center justify-center">
-                              <MessageSquare className="h-5 w-5 text-blue-500" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                {prompt.name}
-                              </div>
-                              {prompt.description && (
-                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                  {prompt.description}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+        <div className="flex flex-col h-full">
+          {activeTab === 'prompts'
+            ? (
+                <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
+                  {filteredPrompts.length === 0
+                    ? (
+                        <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                          <MessageSquare className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
+                          <p className="text-gray-500 dark:text-gray-400">No prompts available</p>
                         </div>
-                      ))
-                    )}
-              </>
-            ) : (
-              <>
-                {results.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <p>No history</p>
-                    <p className="text-sm">
-                      Prompts you execute will appear here
-                    </p>
-                  </div>
-                ) : (
-                  results.map((result, index) => (
-                    <div
-                      key={index}
-                      id={`prompt-result-${index}`}
-                      className={cn(
-                        'cursor-pointer transition-all rounded-[20px] bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-2',
-                        focusedIndex === index
-                        && 'border-2 border-blue-500 dark:border-blue-400',
+                      )
+                    : (
+                        filteredPrompts.map((prompt, index) => (
+                          <ListItem
+                            key={prompt.name}
+                            id={`prompt-${prompt.name}`}
+                            isSelected={selectedPrompt?.name === prompt.name}
+                            isFocused={focusedIndex === index}
+                            icon={<MessageSquare className="h-4 w-4" />}
+                            title={prompt.name}
+                            description={prompt.description}
+                            onClick={() => handlePromptSelect(prompt)}
+                          />
+                        ))
                       )}
-                      onClick={() => {
-                        const prompt = prompts.find(
-                          p => p.name === result.promptName,
-                        )
-                        if (prompt) {
-                          handlePromptSelect(prompt)
-                          setPromptArgs(result.args)
-                          // Don't switch tabs - let user stay in history view
-                          // setActiveTab('prompts')
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="bg-purple-500/20 rounded-full p-3 flex items-center justify-center">
-                          <Clock className="h-5 w-5 text-purple-500" />
+                </div>
+              )
+            : (
+                <div className="flex-1 overflow-y-auto border-r dark:border-zinc-700">
+                  {results.length === 0
+                    ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <p>No history</p>
+                          <p className="text-sm">
+                            Prompts you execute will appear here
+                          </p>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {result.promptName}
-                          </div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            {new Date(result.timestamp).toLocaleString()}
-                          </div>
+                      )
+                    : (
+                        <div className="space-y-2 p-4">
+                          {results.map((result, index) => (
+                            <div
+                              key={index}
+                              id={`prompt-result-${index}`}
+                              className="p-3 bg-gray-100 dark:bg-zinc-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-zinc-700"
+                              onClick={() => {
+                                const prompt = prompts.find(
+                                  p => p.name === result.promptName,
+                                )
+                                if (prompt) {
+                                  handlePromptSelect(prompt)
+                                  setPromptArgs(result.args)
+                                  // Don't switch tabs - let user stay in history view
+                                  // setActiveTab('prompts')
+                                }
+                              }}
+                            >
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                {result.promptName}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {new Date(result.timestamp).toLocaleString()}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </>
-            )}
-          </div>
+                      )}
+                </div>
+              )}
         </div>
       </ResizablePanel>
 

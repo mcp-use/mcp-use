@@ -49,6 +49,7 @@ export function ResourcesTab({ ref, resources, readResource, isConnected }: Reso
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const resourceDisplayRef = useRef<HTMLDivElement>(null)
 
   // Expose focusSearch and blurSearch methods via ref
   useImperativeHandle(ref, () => ({
@@ -263,31 +264,22 @@ export function ResourcesTab({ ref, resources, readResource, isConnected }: Reso
     }
   }, [currentResult])
 
-  const handleFullscreen = useCallback(() => {
-    if (!currentResult)
+  const handleFullscreen = useCallback(async () => {
+    if (!resourceDisplayRef.current)
       return
-    const newWindow = window.open('', '_blank', 'width=800,height=600')
-    if (newWindow) {
-      newWindow.document.write(`
-          <html>
-            <head>
-              <title>Resource: ${
-                selectedResource?.name || currentResult.uri
-              }</title>
-              <style>
-                body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
-                pre { white-space: pre-wrap; word-wrap: break-word; }
-              </style>
-            </head>
-            <body>
-              <h2>${selectedResource?.name || currentResult.uri}</h2>
-              <pre>${JSON.stringify(currentResult.result, null, 2)}</pre>
-            </body>
-          </html>
-        `)
-      newWindow.document.close()
+
+    try {
+      if (!document.fullscreenElement) {
+        await resourceDisplayRef.current.requestFullscreen()
+      }
+      else {
+        await document.exitFullscreen()
+      }
     }
-  }, [currentResult, selectedResource])
+    catch (error) {
+      console.error('[ResourcesTab] Failed to toggle fullscreen:', error)
+    }
+  }, [])
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
@@ -306,7 +298,7 @@ export function ResourcesTab({ ref, resources, readResource, isConnected }: Reso
           searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
         />
 
-        <div className="flex flex-col h-full border-r dark:border-zinc-700 p-4 bg-white dark:bg-black">
+        <div className="flex flex-col h-full">
           {activeTab === 'resources'
             ? (
                 <ResourcesList
@@ -317,7 +309,7 @@ export function ResourcesTab({ ref, resources, readResource, isConnected }: Reso
                 />
               )
             : (
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto border-r dark:border-zinc-700">
                   {results.length === 0
                     ? (
                         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -326,7 +318,7 @@ export function ResourcesTab({ ref, resources, readResource, isConnected }: Reso
                         </div>
                       )
                     : (
-                        <div className="space-y-2">
+                        <div className="space-y-2 p-4">
                           {results.map(result => (
                             <div
                               key={`${result.uri}-${result.timestamp}`}
@@ -355,15 +347,17 @@ export function ResourcesTab({ ref, resources, readResource, isConnected }: Reso
       <ResizableHandle />
 
       <ResizablePanel defaultSize={67}>
-        <ResourceResultDisplay
-          result={currentResult}
-          isLoading={isLoading}
-          previewMode={previewMode}
-          onTogglePreview={() => setPreviewMode(!previewMode)}
-          onCopy={handleCopy}
-          onDownload={handleDownload}
-          onFullscreen={handleFullscreen}
-        />
+        <div ref={resourceDisplayRef} className="h-full bg-white dark:bg-zinc-900">
+          <ResourceResultDisplay
+            result={currentResult}
+            isLoading={isLoading}
+            previewMode={previewMode}
+            onTogglePreview={() => setPreviewMode(!previewMode)}
+            onCopy={handleCopy}
+            onDownload={handleDownload}
+            onFullscreen={handleFullscreen}
+          />
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   )
