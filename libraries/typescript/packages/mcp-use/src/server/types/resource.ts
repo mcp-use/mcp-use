@@ -81,9 +81,9 @@ export interface AppsSdkToolMetadata extends Record<string, unknown> {
   'openai/resultCanProduceWidget'?: boolean
 }
 
-// Handler types
-export type ResourceHandler = () => Promise<ReadResourceResult>
-export type ResourceTemplateHandler = (uri: URL, params: Record<string, any>) => Promise<ReadResourceResult>
+// Callback types
+export type ReadResourceCallback = () => Promise<ReadResourceResult>
+export type ReadResourceTemplateCallback = (uri: URL, params: Record<string, any>) => Promise<ReadResourceResult>
 
 /**
  * Configuration for a resource template
@@ -105,7 +105,7 @@ export interface ResourceTemplateDefinition {
   title?: string
   description?: string
   annotations?: ResourceAnnotations
-  fn: ResourceTemplateHandler
+  readCallback: ReadResourceTemplateCallback
 }
 
 export interface ResourceDefinition {
@@ -121,8 +121,8 @@ export interface ResourceDefinition {
   mimeType: string
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations
-  /** Async function that returns the resource content */
-  fn: ResourceHandler
+  /** Async callback function that returns the resource content */
+  readCallback: ReadResourceCallback
 }
 
 /**

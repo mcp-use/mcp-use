@@ -59,7 +59,7 @@ server.tool({
   name: 'list-widgets',
   title: 'List Available Widgets',
   description: 'Get a list of all available pizzaz widgets',
-  fn: async () => {
+  cb: async () => {
     const widgets = getPizzazWidgetsSummary()
 
     return {
@@ -84,14 +84,13 @@ server.tool({
   name: 'get-widget-info',
   title: 'Get Widget Information',
   description: 'Get detailed information about a specific widget',
-  parameters: {
-    widgetId: {
-      type: 'string',
-      description: 'Widget ID (e.g., pizza-map, pizza-carousel)',
-      required: true
-    }
-  },
-  fn: async (params) => {
+  inputs: [{
+    name: 'widgetId',
+    type: 'string',
+    description: 'Widget ID (e.g., pizza-map, pizza-carousel)',
+    required: true
+  }],
+  cb: async (params) => {
     const widgets = getPizzazWidgetsSummary()
     const widget = widgets.find(w => w.id === params.widgetId)
 
@@ -134,7 +133,7 @@ server.resource({
   title: 'Server Configuration',
   description: 'Current server configuration and capabilities',
   mimeType: 'application/json',
-  fn: async () => ({
+  readCallback: async () => ({
     contents: [{
       uri: 'config://server',
       mimeType: 'application/json',
