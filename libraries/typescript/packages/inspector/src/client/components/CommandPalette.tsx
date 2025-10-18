@@ -4,10 +4,12 @@ import {
   ExternalLink,
   FileText,
   MessageSquare,
+  Plus,
   Search,
   Wrench,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { McpUseLogo } from './McpUseLogo'
 import { ServerIcon } from './ServerIcon'
@@ -66,10 +68,18 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [search, setSearch] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
 
   // Create global command items
   const globalItems: CommandItem[] = [
-
+    {
+      id: 'connect-server',
+      name: 'Connect Server',
+      description: 'Add a new MCP server connection',
+      type: 'global',
+      category: 'Navigation',
+      action: () => navigate('/'),
+    },
     {
       id: 'mcp-use-website',
       name: 'MCP Use Website',
@@ -240,6 +250,13 @@ export function CommandPalette({
           </div>
         )
       case 'global':
+        if (category === 'Navigation') {
+          return (
+            <div className="bg-gray-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+              <Plus className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+            </div>
+          )
+        }
         if (category === 'Documentation') {
           // Use MCP Use logo for MCP Use related documentation items
           if (itemName?.includes('MCP Use') || itemName?.includes('mcp-use')) {

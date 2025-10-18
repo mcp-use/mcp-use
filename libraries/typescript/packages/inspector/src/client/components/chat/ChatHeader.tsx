@@ -75,7 +75,7 @@ export function ChatHeader({
             onClick={onClearChat}
           >
             New Chat
-            <span className="text-[12px]  border text-zinc-600 p-1 rounded-full border-zinc-500">⌘O</span>
+            <span className="text-[12px]  border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500">⌘O</span>
           </Button>
         )}
         <ConfigurationDialog

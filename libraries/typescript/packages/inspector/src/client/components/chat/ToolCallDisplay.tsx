@@ -44,11 +44,11 @@ export function ToolCallDisplay({
   const getStatusBg = () => {
     switch (state) {
       case 'call':
-        return 'border border-blue-200 dark:border-blue-800'
+        return ' bg-blue-500/20 dark:bg-blue-500/20'
       case 'result':
-        return 'border border-emerald-200 dark:border-emerald-800'
+        return ' bg-emerald-500/20 dark:bg-emerald-500/20'
       case 'error':
-        return 'border border-red-200 dark:border-red-800'
+        return ' bg-red-500/20 dark:bg-red-500/20'
     }
   }
 
