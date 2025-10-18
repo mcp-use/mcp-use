@@ -60,7 +60,7 @@
             ]
           },
           {
-            "group": "Client Configuration",
+            "group": "MCP Client",
             "pages": [
               {
                 "group": "Overview",
@@ -104,7 +104,7 @@
             ]
           },
           {
-            "group": "Agent Configuration",
+            "group": "MCP Agent",
             "pages": [
               {
                 "group": "Overview",
@@ -313,6 +313,7 @@
           {
             "group": "Versions",
             "pages": [
+              "python/changelog/1_3_13",
               "python/changelog/1_3_12",
               "python/changelog/1_3_11"
             ]
