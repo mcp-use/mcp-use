@@ -96,6 +96,14 @@
             ]
           },
           {
+            "group": "Integrations",
+            "pages": [
+              "integration/openai",
+              "integration/anthropic",
+              "integration/google"
+            ]
+          },
+          {
             "group": "Agent Configuration",
             "pages": [
               {

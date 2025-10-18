@@ -1,0 +1,284 @@
+---
+title: "Anthropic"
+description: "Use mcp-use tools, resources, and prompts directly with the Anthropic SDK"
+tag: "New"
+icon: "bot"
+---
+
+# Using mcp-use with Anthropic
+
+The Anthropic adapter allows you to seamlessly integrate tools, resources, and prompts from any MCP server with the Anthropic Python SDK. This enables you to use `mcp-use` as a comprehensive tool provider for your Anthropic-powered agents.
+
+## How it Works
+
+The `AnthropicMCPAdapter` converts not only tools but also resources and prompts from your active MCP servers into a format compatible with Anthropic's tool-calling feature. It maps each of these MCP constructs to a callable function that the Anthropic model can request.
+
+-   **Tools** are converted directly to Anthropic functions.
+-   **Resources** are converted into functions that take no arguments and read the resource's content.
+-   **Prompts** are converted into functions that accept the prompt's arguments.
+
+The adapter maintains a mapping of these generated functions to their actual execution logic, allowing you to easily call them when requested by the model.
+
+## Step-by-Step Guide
+
+Here's how to use the adapter to provide MCP tools, resources, and prompts to an Anthropic Chat Completion.
+
+### Step 1: Initialize MCPClient
+
+First, set up your `MCPClient` with the desired MCP servers. This part of the process is the same as any other `mcp-use` application.
+
+```python
+from mcp_use import MCPClient
+
+config = {
+    "mcpServers": {
+        "airbnb": {"command": "npx", "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]},
+    }
+}
+
+client = MCPClient(config=config)
+```
+
+### Step 2: Create the Anthropic Adapter
+
+Next, instantiate the `AnthropicMCPAdapter`. This adapter will be responsible for converting MCP constructs into a format Anthropic can understand.
+
+```python
+from mcp_use.adapters import AnthropicMCPAdapter
+
+# Creates the adapter for Anthropic's format
+adapter = AnthropicMCPAdapter()
+```
+<Tip>
+You can pass a `disallowed_tools` list to the adapter's constructor to prevent specific tools, resources, or prompts from being exposed to the model.
+</Tip>
+
+### Step 3: Generate Anthropic-Compatible Tools
+
+Use the `create_all` method on the adapter to inspect all connected MCP servers and generate a list of tools, resources and prompts in the Anthropic function-calling format.
+
+```python
+# Convert tools from active connectors to the Anthropic's format
+# this will populates the list of tools, resources and prompts
+await adapter.create_all(client)
+
+# If you decided to create all tools (list concatenation)
+anthropic_tools = adapter.tools + adapter.resources + adapter.prompts
+```
+
+This list will include functions generated from your MCP tools, resources, and prompts.
+
+<Tip>
+If you don't want to create all tools, you can call single functions. For example, if you only want to use tools and resources, you can do the following:
+
+```python
+await adapter.create_tools(client)
+await adapter.create_resources(client)
+
+# Then, you can decide which ones to use:
+anthropic_tools = adapter.tools + adapter.resources
+```
+</Tip>
+
+### Step 4: Make the Initial API Call
+
+Now, you can use the generated `anthropic_tools` in a call to the Anthropic API. The model will use the descriptions of these tools to decide if it needs to call any of them to answer the user's query.
+
+```python
+from anthropic import Anthropic
+
+anthropic = Anthropic()
+messages = [
+    {"role": "user", "content": "Please tell me the cheapest hotel for two people in Trapani."}
+]
+
+response = anthropic.messages.create(
+    model="claude-3-opus-20240229", 
+    messages=messages, 
+    tools=anthropic_tools,
+    max_tokens=1024
+)
+
+messages.append({"role": response.role, "content": response.content})
+```
+
+### Step 5: Execute Tool Calls
+
+If the model decides to use one or more tools, the `response.stop_reason` will be `tool_use`. You need to iterate through the tool use content blocks, execute the corresponding functions, and append the results to your message history.
+
+The `AnthropicMCPAdapter` makes this easy by providing a `tool_executors` dictionary and a `parse_result` method.
+
+```python
+if response.stop_reason == "tool_use":
+    tool_results = []
+    for c in response.content:
+        if c.type != "tool_use":
+            continue
+
+        tool_name = c.name
+        arguments = c.input
+
+        # 1. Use the adapter's map to get the correct executor
+        executor = adapter.tool_executors[tool_name]
+
+        if not executor:
+            content = f"Error: Tool '{tool_name}' not found."
+        else:
+            try:
+                # 2. Execute the tool using the retrieved function
+                print(f"Executing tool: {tool_name}({arguments})")
+                tool_result = await executor(**arguments)
+
+                # 3. Use the adapter's universal parser
+                content = adapter.parse_result(tool_result)
+            except Exception as e:
+                content = f"Error executing tool: {e}"
+
+        # 4. Append the result for this specific tool call
+        tool_results.append(
+            {
+                "type": "tool_result",
+                "tool_use_id": c.id,
+                "content": content,
+            }
+        )
+```
+The `adapter.parse_result(tool_result)` method simplifies the process by correctly formatting the output, whether it's from a standard tool, a resource, or a prompt.
+
+### Step 6: Get the Final Response
+
+Finally, send the updated message history which now includes the tool call results back to the model. This allows the model to use the information gathered from the tools to formulate its final answer.
+
+```python
+if tool_results:
+    messages.append(
+        {
+            "role": "user",
+            "content": tool_results,
+        }
+    )
+    # Get final response
+    final_response = anthropic.messages.create(
+        model="claude-3-opus-20240229", max_tokens=1024, tools=anthropic_tools, messages=messages
+    )
+    print("\n--- Final response from the model ---")
+    print(final_response.content[0].text)
+
+```
+
+## Complete Example
+
+For reference, here is the complete, runnable code for integrating mcp-use with the Anthropic SDK.
+
+```python
+import asyncio
+
+from anthropic import Anthropic
+from dotenv import load_dotenv
+
+from mcp_use import MCPClient
+from mcp_use.adapters import AnthropicMCPAdapter
+
+# This example demonstrates how to use our integration
+# adapaters to use MCP tools and convert to the right format.
+# In particularly, this example uses the AnthropicMCPAdapter.
+
+load_dotenv()
+
+
+async def main():
+    config = {"mcpServers": {"server": {"url": "http://127.0.0.1:8080/mcp"}}}
+
+    try:
+        client = MCPClient(config=config)
+
+        # Creates the adapter for Anthropic's format
+        adapter = AnthropicMCPAdapter()
+
+        # Convert tools from active connectors to the Anthropic's format
+        await adapter.create_all(client)
+
+        # List concatenation (if you loaded all tools)
+        anthropic_tools = adapter.tools + adapter.resources + adapter.prompts
+
+        # If you don't want to create all tools, you can call single functions
+        # await adapter.create_tools(client)
+        # await adapter.create_resources(client)
+        # await adapter.create_prompts(client)
+
+        # Use tools with Anthropic's SDK (not agent in this case)
+        anthropic = Anthropic()
+
+        # Initial request
+        messages = [{"role": "user", "content": "Please could you give me the assistant prompt? My name is vincenzo"}]
+        response = anthropic.messages.create(
+            model="claude-3-opus-20240229", tools=anthropic_tools, max_tokens=1024, messages=messages
+        )
+        messages.append({"role": response.role, "content": response.content})
+
+        print("Claude wants to use tools:", response.stop_reason == "tool_use")
+        print("Number of tool calls:", len([c for c in response.content if c.type == "tool_use"]))
+
+        if response.stop_reason == "tool_use":
+            tool_results = []
+            for c in response.content:
+                if c.type != "tool_use":
+                    continue
+
+                tool_name = c.name
+                arguments = c.input
+
+                # Use the adapter's map to get the correct executor
+                executor = adapter.tool_executors[tool_name]
+
+                if not executor:
+                    print(f"Error: Unknown tool '{tool_name}' requested by model.")
+                    content = f"Error: Tool '{tool_name}' not found."
+                else:
+                    try:
+                        # Execute the tool using the retrieved function
+                        print(f"Executing tool: {tool_name}({arguments})")
+                        tool_result = await executor(**arguments)
+
+                        # Use the adapter's universal parser
+                        content = adapter.parse_result(tool_result)
+                    except Exception as e:
+                        print(f"An unexpected error occurred while executing tool {tool_name}: {e}")
+                        content = f"Error executing tool: {e}"
+
+                # Append the result for this specific tool call
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": c.id,
+                        "content": content,
+                    }
+                )
+
+            if tool_results:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": tool_results,
+                    }
+                )
+                # Get final response
+                final_response = anthropic.messages.create(
+                    model="claude-3-opus-20240229", max_tokens=1024, tools=anthropic_tools, messages=messages
+                )
+                print("\n--- Final response from the model ---")
+                print(final_response.content[0].text)
+            else:
+                final_response = response
+                print("\n--- Final response from the model ---")
+                if final_response.content:
+                    print(final_response.content[0].text)
+
+    except Exception as e:
+        print(f"Error: {e}")
+        raise e
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
