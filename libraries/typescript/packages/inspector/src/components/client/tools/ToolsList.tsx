@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
-import { Wrench, Zap } from 'lucide-react'
+import { Wrench } from 'lucide-react'
 
 interface ToolsListProps {
   tools: Tool[]
@@ -26,7 +26,7 @@ export function ToolsList({
   }
 
   return (
-    <div className="overflow-y-auto h-full border-r dark:border-zinc-700 overscroll-contain">
+    <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
       {tools.map((tool, index) => (
         <button
           key={tool.name}
@@ -34,7 +34,7 @@ export function ToolsList({
           type="button"
           onClick={() => onToolSelect(tool)}
           className={cn(
-            'w-full text-left p-4 border-b dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors group',
+            'w-full text-left cursor-pointer p-4 border-b dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors group',
             selectedTool?.name === tool.name &&
               'bg-blue-50 dark:bg-zinc-800 border-l-4 border-l-blue-500',
             focusedIndex === index &&
@@ -45,13 +45,13 @@ export function ToolsList({
             <div className="flex-shrink-0 mt-1">
               <div
                 className={cn(
-                  'p-2 rounded-lg transition-colors',
+                  'p-3 rounded-full transition-colors',
                   selectedTool?.name === tool.name
                     ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                     : 'bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-zinc-600'
                 )}
               >
-                <Zap className="h-4 w-4" />
+                <Wrench className="h-4 w-4" />
               </div>
             </div>
             <div className="flex-1 min-w-0">

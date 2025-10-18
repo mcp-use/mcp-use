@@ -44,6 +44,33 @@ export function ToolExecutionPanel({
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
               {selectedTool.name}
             </h2>
+            <div className="flex gap-2">
+              <Button
+                onClick={onExecute}
+                disabled={isExecuting || !isConnected}
+              >
+                {isExecuting ? (
+                  <>
+                    <Spinner size="sm" className="mr-2" />
+                    Executing...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Execute
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onSave}
+                disabled={isExecuting}
+                className="gap-2"
+              >
+                <Save className="h-4 w-4" />
+                Save
+              </Button>
+            </div>
           </div>
           {selectedTool.description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
@@ -57,35 +84,6 @@ export function ToolExecutionPanel({
           toolArgs={toolArgs}
           onArgChange={onArgChange}
         />
-
-        <div className="flex gap-2">
-          <Button
-            onClick={onExecute}
-            disabled={isExecuting || !isConnected}
-            className="flex-1"
-          >
-            {isExecuting ? (
-              <>
-                <Spinner size="sm" className="mr-2" />
-                Executing...
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Execute
-              </>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onSave}
-            disabled={isExecuting}
-            className="gap-2"
-          >
-            <Save className="h-4 w-4" />
-            Save
-          </Button>
-        </div>
       </div>
     </div>
   )

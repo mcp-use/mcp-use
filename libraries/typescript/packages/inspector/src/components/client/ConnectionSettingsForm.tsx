@@ -193,6 +193,7 @@ export function ConnectionSettingsForm({
 
   return (
     <div className="space-y-4 relative" onKeyDown={handleKeyDown}>
+      <h3 className="text-xl font-semibold text-white mb-4">Connect</h3>
       {/* Export Dropdown - positioned absolutely on styled variant */}
       {showExportButton && (
         <DropdownMenu>

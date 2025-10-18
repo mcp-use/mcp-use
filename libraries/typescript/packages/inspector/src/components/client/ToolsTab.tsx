@@ -411,7 +411,10 @@ export const ToolsTab = forwardRef<ToolsTabRef, ToolsTabProps>(
 
     return (
       <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel defaultSize={33}>
+        <ResizablePanel
+          defaultSize={33}
+          className="flex flex-col h-full relative"
+        >
           <ToolsTabHeader
             activeTab={activeTab}
             isSearchExpanded={isSearchExpanded}
@@ -444,10 +447,10 @@ export const ToolsTab = forwardRef<ToolsTabRef, ToolsTabProps>(
           )}
         </ResizablePanel>
 
-        <ResizableHandle />
+        <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={67}>
-          <ResizablePanelGroup direction="horizontal">
+          <ResizablePanelGroup direction="vertical">
             <ResizablePanel defaultSize={40}>
               <ToolExecutionPanel
                 selectedTool={selectedTool}
@@ -460,15 +463,10 @@ export const ToolsTab = forwardRef<ToolsTabRef, ToolsTabProps>(
               />
             </ResizablePanel>
 
-            <ResizableHandle />
+            <ResizableHandle withHandle />
 
             <ResizablePanel defaultSize={60}>
               <div className="flex flex-col h-full">
-                <div className="flex-shrink-0 p-7 pt-5 pb-1">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    Results
-                  </h2>
-                </div>
                 <ToolResultDisplay
                   results={results}
                   copiedResult={copiedResult}

@@ -598,8 +598,6 @@ export function InspectorDashboard() {
 
       <div className="w-full relative overflow-hidden h-full p-10 items-center justify-center flex">
         <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
-          <h3 className="text-xl font-semibold text-white mb-2">Connect</h3>
-
           <ConnectionSettingsForm
             transportType={transportType}
             setTransportType={setTransportType}

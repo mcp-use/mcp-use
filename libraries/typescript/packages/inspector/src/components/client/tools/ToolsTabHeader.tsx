@@ -29,7 +29,7 @@ export function ToolsTabHeader({
   searchInputRef,
 }: ToolsTabHeaderProps) {
   return (
-    <div className="flex items-center justify-between p-7 pt-5 pb-1 border-r dark:border-zinc-700">
+    <div className="flex items-center justify-between p-6 py-3 border-r dark:border-zinc-700">
       <div className="flex items-center gap-2 flex-1">
         {!isSearchExpanded ? (
           <>

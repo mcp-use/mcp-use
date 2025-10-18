@@ -44,7 +44,7 @@ interface ToolCall {
 }
 
 // Type for LangChain LLM models - using any for flexibility with dynamic imports
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type BaseLLM = any
 
 interface ServerConfig {
