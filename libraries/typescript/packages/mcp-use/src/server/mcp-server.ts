@@ -247,11 +247,15 @@ export class McpServer {
   tool(toolDefinition: ToolDefinition): this {
     const inputSchema = this.createToolInputSchema(toolDefinition.inputs || [])
 
-    this.server.tool(
+    this.server.registerTool(
       toolDefinition.name,
-      toolDefinition.description ?? "",
-      inputSchema,
-      { _meta: toolDefinition.metadata },
+      {
+        title: toolDefinition.title,
+        description: toolDefinition.description ?? "",
+        inputSchema,
+        annotations: toolDefinition.annotations,
+        _meta: toolDefinition.metadata
+      },
       async (params: any) => {
         return await toolDefinition.fn(params)
       },
@@ -372,9 +376,15 @@ export class McpServer {
    */
   uiResource(definition: UIResourceDefinition): this {
     // Determine tool name based on resource type
-    const toolName = definition.type === 'externalUrl'
-      ? `ui_${definition.widget}`
-      : `ui_${definition.name}`
+    // For Apps SDK, use the name directly without ui_ prefix
+    let toolName: string
+    if (definition.type === 'appsSdk') {
+      toolName = definition.name
+    } else if (definition.type === 'externalUrl') {
+      toolName = `ui_${definition.widget}`
+    } else {
+      toolName = `ui_${definition.name}`
+    }
     const displayName = definition.title || definition.name
 
     // Determine resource URI and mimeType based on type
@@ -449,7 +459,11 @@ export class McpServer {
 
     this.tool({
       name: toolName,
-      description: definition.description || `Display ${displayName}`,
+      title: definition.title,
+      // For Apps SDK, use title as description to match OpenAI's pizzaz reference implementation
+      description: definition.type === 'appsSdk' && definition.title
+        ? definition.title
+        : (definition.description || `Display ${displayName}`),
       inputs: this.convertPropsToInputs(definition.props),
       metadata: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
       fn: async (params) => {
@@ -849,7 +863,7 @@ export class McpServer {
    * // Returns: { query: z.string(), limit: z.number().optional() }
    * ```
    */
-  private createToolInputSchema(inputs: Array<{ name: string, type: string, required?: boolean }>): Record<string, z.ZodSchema> {
+  private createToolInputSchema(inputs: Array<{ name: string, type: string, required?: boolean, description?: string }>): Record<string, z.ZodSchema> {
     const schema: Record<string, z.ZodSchema> = {}
 
     inputs.forEach((input) => {
@@ -872,6 +886,11 @@ export class McpServer {
           break
         default:
           zodType = z.any()
+      }
+
+      // Add description if provided
+      if (input.description) {
+        zodType = zodType.describe(input.description)
       }
 
       if (!input.required) {

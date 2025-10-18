@@ -7,6 +7,8 @@ export type ToolHandler = (params: Record<string, any>) => Promise<CallToolResul
 export interface ToolDefinition {
   /** Unique identifier for the tool */
   name: string
+  /** Human-readable title for the tool (displayed in UI) */
+  title?: string
   /** Description of what the tool does */
   description?: string
   /** Input parameter definitions */
