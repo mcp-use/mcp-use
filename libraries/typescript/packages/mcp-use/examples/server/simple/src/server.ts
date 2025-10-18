@@ -21,7 +21,7 @@ server.tool({
   name: 'hello-world',
   description: 'A simple tool that returns hello world',
   inputs: [],
-  fn: async () => {
+  cb: async () => {
     return {
       content: [
         {
@@ -43,7 +43,7 @@ server.resource({
     audience: ['user', 'assistant'],
     priority: 0.5
   },
-  fn: async () => {
+  readCallback: async () => {
     return {
       contents: [{
         uri: 'resource://test',

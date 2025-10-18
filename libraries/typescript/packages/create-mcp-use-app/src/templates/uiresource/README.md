@@ -17,8 +17,12 @@ The `uiResource` method is a powerful new addition that simplifies widget regist
 
 ```typescript
 // Old way: Manual registration of tool and resource
-server.tool({ /* tool config */ })
-server.resource({ /* resource config */ })
+server.tool({
+  /* tool config */
+})
+server.resource({
+  /* resource config */
+})
 
 // New way: Single method does both!
 server.uiResource({
@@ -27,12 +31,13 @@ server.uiResource({
   title: 'Kanban Board',
   props: {
     initialTasks: { type: 'array', required: false },
-    theme: { type: 'string', default: 'light' }
-  }
+    theme: { type: 'string', default: 'light' },
+  },
 })
 ```
 
 This automatically creates:
+
 - **Tool**: `ui_kanban-board` - Accepts parameters and returns UIResource
 - **Resource**: `ui://widget/kanban-board` - Static access with defaults
 
@@ -49,6 +54,7 @@ npm run dev
 ```
 
 This will start:
+
 - MCP server on port 3000
 - Widget serving at `/mcp-use/widgets/*`
 - Inspector UI at `/inspector`
@@ -72,7 +78,7 @@ import { createMCPServer } from 'mcp-use/server'
 
 const server = createMCPServer('my-server', {
   version: '1.0.0',
-  description: 'Server with UIResource widgets'
+  description: 'Server with UIResource widgets',
 })
 
 // Register a widget - creates both tool and resource
@@ -80,7 +86,7 @@ server.uiResource({
   name: 'my-widget',
   widget: 'my-widget',
   title: 'My Widget',
-  description: 'An interactive widget'
+  description: 'An interactive widget',
 })
 
 server.listen(3000)
@@ -98,24 +104,24 @@ server.uiResource({
     data: {
       type: 'array',
       description: 'Data points to display',
-      required: true
+      required: true,
     },
     chartType: {
       type: 'string',
       description: 'Type of chart (line/bar/pie)',
-      default: 'line'
+      default: 'line',
     },
     theme: {
       type: 'string',
       description: 'Visual theme',
-      default: 'light'
-    }
+      default: 'light',
+    },
   },
   size: ['800px', '400px'], // Preferred iframe size
   annotations: {
     audience: ['user', 'assistant'],
-    priority: 0.8
-  }
+    priority: 0.8,
+  },
 })
 ```
 
@@ -135,7 +141,7 @@ interface MyWidgetProps {
 
 const MyWidget: React.FC<MyWidgetProps> = ({
   initialData = [],
-  theme = 'light'
+  theme = 'light',
 }) => {
   const [data, setData] = useState(initialData)
 
@@ -158,11 +164,7 @@ const MyWidget: React.FC<MyWidgetProps> = ({
     }
   }, [])
 
-  return (
-    <div className={`widget theme-${theme}`}>
-      {/* Your widget UI */}
-    </div>
-  )
+  return <div className={`widget theme-${theme}`}>{/* Your widget UI */}</div>
 }
 
 // Mount the widget
@@ -185,34 +187,40 @@ server.uiResource({
     initialData: {
       type: 'array',
       description: 'Initial data for the widget',
-      required: false
+      required: false,
     },
     theme: {
       type: 'string',
       description: 'Widget theme',
-      default: 'light'
-    }
+      default: 'light',
+    },
   },
-  size: ['600px', '400px']
+  size: ['600px', '400px'],
 })
 ```
 
 ## How It Works
 
 ### Tool Registration
+
 When you call `uiResource`, it automatically creates a tool:
+
 - Name: `ui_[widget-name]`
 - Accepts all props as parameters
 - Returns both text description and UIResource object
 
 ### Resource Registration
+
 Also creates a resource:
+
 - URI: `ui://widget/[widget-name]`
 - Returns UIResource with default prop values
 - Discoverable by MCP clients
 
 ### Parameter Passing
+
 Tool parameters are automatically:
+
 1. Converted to URL query parameters
 2. Complex objects are JSON-stringified
 3. Passed to widget via iframe URL
@@ -228,21 +236,21 @@ const widgets = [
     widget: 'todo-list',
     title: 'Todo List',
     props: {
-      items: { type: 'array', default: [] }
-    }
+      items: { type: 'array', default: [] },
+    },
   },
   {
     name: 'calendar',
     widget: 'calendar',
     title: 'Calendar',
     props: {
-      date: { type: 'string', required: false }
-    }
-  }
+      date: { type: 'string', required: false },
+    },
+  },
 ]
 
 // Register all widgets
-widgets.forEach(widget => server.uiResource(widget))
+widgets.forEach((widget) => server.uiResource(widget))
 ```
 
 ### Mixed Registration
@@ -252,14 +260,16 @@ widgets.forEach(widget => server.uiResource(widget))
 server.uiResource({
   name: 'dashboard',
   widget: 'dashboard',
-  title: 'Analytics Dashboard'
+  title: 'Analytics Dashboard',
 })
 
 // Traditional tool for actions
 server.tool({
   name: 'calculate',
   description: 'Perform calculations',
-  fn: async (params) => { /* ... */ }
+  cb: async (params) => {
+    /* ... */
+  },
 })
 
 // Traditional resource for data
@@ -267,7 +277,9 @@ server.resource({
   name: 'config',
   uri: 'config://app',
   mimeType: 'application/json',
-  fn: async () => { /* ... */ }
+  readCallback: async () => {
+    /* ... */
+  },
 })
 ```
 
@@ -289,6 +301,7 @@ server.resource({
 #### WidgetProps
 
 Each prop can have:
+
 - `type: 'string' | 'number' | 'boolean' | 'object' | 'array'`
 - `required?: boolean` - Whether the prop is required
 - `default?: any` - Default value if not provided
@@ -297,14 +310,17 @@ Each prop can have:
 ## Testing Your Widgets
 
 ### Via Inspector UI
+
 1. Start the server: `npm run dev`
 2. Open: `http://localhost:3000/inspector`
 3. Test tools and resources
 
 ### Direct Browser Access
+
 Visit: `http://localhost:3000/mcp-use/widgets/[widget-name]`
 
 ### Via MCP Client
+
 ```typescript
 // Call as tool
 const result = await client.callTool('ui_kanban-board', {
@@ -328,16 +344,19 @@ const resource = await client.readResource('ui://widget/kanban-board')
 ## Troubleshooting
 
 ### Widget Not Loading
+
 - Ensure widget exists in `dist/resources/mcp-use/widgets/`
 - Check server console for errors
 - Verify widget is registered with `uiResource()`
 
 ### Props Not Passed
+
 - Check URL parameters in browser DevTools
 - Ensure prop names match exactly
 - Complex objects must be JSON-stringified
 
 ### Type Errors
+
 - Import types: `import type { UIResourceDefinition } from 'mcp-use/server'`
 - Ensure mcp-use is updated to latest version
 
@@ -347,8 +366,8 @@ If you have existing code using separate tool/resource:
 
 ```typescript
 // Old pattern
-server.tool({ name: 'show-widget', /* ... */ })
-server.resource({ uri: 'ui://widget', /* ... */ })
+server.tool({ name: 'show-widget' /* ... */ })
+server.resource({ uri: 'ui://widget' /* ... */ })
 
 // New pattern - replace both with:
 server.uiResource({
@@ -361,6 +380,7 @@ server.uiResource({
 ## Future Enhancements
 
 Coming soon:
+
 - Automatic widget discovery from filesystem
 - Widget manifests (widget.json)
 - Prop extraction from TypeScript interfaces

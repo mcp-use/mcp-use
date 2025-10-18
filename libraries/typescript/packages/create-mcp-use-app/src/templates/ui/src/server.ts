@@ -22,7 +22,7 @@ server.tool({
       required: true,
     },
   ],
-  fn: async () => {
+  cb: async () => {
     const uiResource = createUIResource({
       uri: 'ui://widget/kanban-board',
       content: {
@@ -49,7 +49,7 @@ server.resource({
     audience: ['user', 'assistant'],
     priority: 0.7
   },
-  fn: async () => {
+  readCallback: async () => {
     const widgetUrl = `http://localhost:${PORT}/mcp-use/widgets/kanban-board`
     return {
       contents: [{
