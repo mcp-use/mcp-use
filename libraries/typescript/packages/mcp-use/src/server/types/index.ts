@@ -25,9 +25,13 @@ export {
   ExternalUrlUIResource,
   RawHtmlUIResource,
   RemoteDomUIResource,
+  AppsSdkUIResource,
   WidgetConfig,
   WidgetManifest,
-  DiscoverWidgetsOptions
+  DiscoverWidgetsOptions,
+  // Apps SDK types
+  AppsSdkMetadata,
+  AppsSdkToolMetadata
 } from './resource.js'
 
 // Tool types
