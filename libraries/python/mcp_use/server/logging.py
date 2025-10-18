@@ -9,7 +9,7 @@ from uvicorn.logging import AccessFormatter
 
 # Configuration for which library logs to suppress
 SUPPRESSED_LOGGERS = {
-    "uvicorn.error": "CRITICAL",
+    "uvicorn.error": "ERROR",
     "mcp.server.lowlevel.server": "CRITICAL",
     "mcp.server.streamable_http_manager": "CRITICAL",
     "mcp.server.fastmcp": "CRITICAL",
@@ -17,17 +17,17 @@ SUPPRESSED_LOGGERS = {
 }
 
 # Thread-safe storage for MCP method info
-_mcp_methods: dict[str, str] = {}
+_mcp_methods: dict[str, tuple[str, str | None]] = {}
 _mcp_methods_lock = threading.Lock()
 
 
-def store_mcp_method(client_addr: str, method: str) -> None:
+def store_mcp_method(client_addr: str, method: str, session_id: str | None = None) -> None:
     """Store MCP method info for a client."""
     with _mcp_methods_lock:
-        _mcp_methods[client_addr] = method
+        _mcp_methods[client_addr] = (method, session_id)
 
 
-def get_mcp_method(client_addr: str) -> str | None:
+def get_mcp_method(client_addr: str) -> tuple[str, str | None] | None:
     """Get and remove MCP method info for a client."""
     with _mcp_methods_lock:
         return _mcp_methods.pop(client_addr, None)
@@ -46,14 +46,40 @@ class MCPAccessFormatter(AccessFormatter):
 
             if "/mcp" in path and method == "POST":
                 # Try to get the stored MCP method for this client
-                mcp_method = get_mcp_method(client_addr)
-                if mcp_method:
+                mcp_info = get_mcp_method(client_addr)
+                if mcp_info:
+                    mcp_method, session_id = mcp_info
                     # Enhance the path with MCP method info
-                    enhanced_path = f"{path} [{mcp_method}]"
+                    enhanced_path = f"{path}"
+                    if session_id:
+                        enhanced_path += f" [{session_id}]"
+                    enhanced_path += f" [{mcp_method}]"
                     # Update the record args
                     recordcopy.args = record.args[:2] + (enhanced_path,) + record.args[3:]
 
         return super().formatMessage(recordcopy)
+
+
+class MCPErrorFormatter(logging.Formatter):
+    """Custom error formatter that provides helpful messages for common errors."""
+
+    def format(self, record):
+        msg = record.getMessage()
+
+        # Customize port conflict errors
+        if "address already in use" in msg.lower():
+            import re
+
+            port_match = re.search(r"'([^']+)', (\d+)", msg)
+            if port_match:
+                host, port = port_match.groups()
+                return (
+                    f"Port {port} is already in use. Please:\n"
+                    f"  • Stop the process using this port, or\n"
+                    f"  • Use a different port: server.run(transport='streamable-http', port=XXXX)"
+                )
+
+        return msg
 
 
 class MCPEnhancerMiddleware(BaseHTTPMiddleware):
@@ -98,9 +124,12 @@ class MCPEnhancerMiddleware(BaseHTTPMiddleware):
                     else:
                         mcp_method = "batch"
 
+                    # Extract session ID from header
+                    session_id = request.headers.get("mcp-session-id")
+
                     # Store using client address as key
                     client_addr = f"{request.client.host}:{request.client.port}"
-                    store_mcp_method(client_addr, mcp_method)
+                    store_mcp_method(client_addr, mcp_method, session_id)
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     pass
 
@@ -118,8 +147,8 @@ MCP_LOGGING_CONFIG = {
             "()": "mcp_use.server.logging.MCPAccessFormatter",
             "fmt": '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
         },
-        "minimal": {
-            "format": "%(message)s",
+        "error": {
+            "()": "mcp_use.server.logging.MCPErrorFormatter",
         },
     },
     "handlers": {
@@ -128,6 +157,11 @@ MCP_LOGGING_CONFIG = {
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
         },
+        "error": {
+            "formatter": "error",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stderr",
+        },
         "null": {
             "class": "logging.NullHandler",
         },
@@ -135,10 +169,13 @@ MCP_LOGGING_CONFIG = {
     "loggers": {
         # Keep our custom access logs
         "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+        # Show errors with our custom format
+        "uvicorn.error": {"handlers": ["error"], "level": "ERROR", "propagate": False},
         # Silence unwanted startup logs
         **{
             logger_name: {"handlers": ["null"], "level": level, "propagate": False}
             for logger_name, level in SUPPRESSED_LOGGERS.items()
+            if logger_name != "uvicorn.error"
         },
     },
 }
