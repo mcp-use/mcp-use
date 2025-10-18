@@ -1,5 +1,5 @@
-name-template: '$RESOLVED_VERSION 🌈'
-tag-template: '$RESOLVED_VERSION'
+name-template: 'python-v$RESOLVED_VERSION'
+tag-template: 'python-v$RESOLVED_VERSION'
 categories:
   - title: '🚀 Features'
     labels:
