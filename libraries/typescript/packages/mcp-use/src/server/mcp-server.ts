@@ -113,7 +113,7 @@ export class McpServer {
    * ```
    */
   resource(resourceDefinition: ResourceDefinition): this {
-    this.server.resource(
+    this.server.registerResource(
       resourceDefinition.name,
       resourceDefinition.uri,
       {
@@ -190,7 +190,7 @@ export class McpServer {
       metadata.annotations = resourceTemplateDefinition.annotations
     }
 
-    this.server.resource(
+    this.server.registerResource(
       resourceTemplateDefinition.name,
       template,
       metadata,
@@ -299,10 +299,13 @@ export class McpServer {
    */
   prompt(promptDefinition: PromptDefinition): this {
     const argsSchema = this.createPromptArgsSchema(promptDefinition.args || [])
-    this.server.prompt(
+    this.server.registerPrompt(
       promptDefinition.name,
-      promptDefinition.description ?? "",
-      argsSchema,
+      {
+        title: promptDefinition.title,
+        description: promptDefinition.description ?? "",
+        argsSchema,
+      },
       async (params: any) => {
         return await promptDefinition.fn(params)
       },

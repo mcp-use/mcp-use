@@ -6,6 +6,8 @@ export type PromptHandler = (params: Record<string, any>) => Promise<GetPromptRe
 export interface PromptDefinition {
   /** Unique identifier for the prompt */
   name: string
+  /** Human-readable title for the prompt */
+  title?: string
   /** Description of what the prompt does */
   description?: string
   /** Argument definitions */
