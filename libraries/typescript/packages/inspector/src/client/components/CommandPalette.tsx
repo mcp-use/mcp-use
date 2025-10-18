@@ -69,18 +69,7 @@ export function CommandPalette({
 
   // Create global command items
   const globalItems: CommandItem[] = [
-    {
-      id: 'mcp-docs',
-      name: 'MCP Official Documentation',
-      description: 'Learn about the Model Context Protocol',
-      type: 'global',
-      category: 'Documentation',
-      action: () =>
-        window.open(
-          'https://modelcontextprotocol.io/docs/getting-started/intro',
-          '_blank',
-        ),
-    },
+
     {
       id: 'mcp-use-website',
       name: 'MCP Use Website',
@@ -96,6 +85,18 @@ export function CommandPalette({
       type: 'global',
       category: 'Documentation',
       action: () => window.open('https://docs.mcp-use.com', '_blank'),
+    },
+    {
+      id: 'mcp-docs',
+      name: 'MCP Official Documentation',
+      description: 'Learn about the Model Context Protocol',
+      type: 'global',
+      category: 'Documentation',
+      action: () =>
+        window.open(
+          'https://modelcontextprotocol.io/docs/getting-started/intro',
+          '_blank',
+        ),
     },
     {
       id: 'discord',

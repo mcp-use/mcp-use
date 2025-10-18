@@ -1,3 +1,4 @@
+import type { MCPConnection } from '@/client/context/McpContext'
 import { Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -17,7 +18,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/client/components/ui/tooltip'
-import type { MCPConnection } from '@/client/context/McpContext'
 import { cn } from '@/lib/utils'
 import { ServerIcon } from './ServerIcon'
 
@@ -74,42 +74,47 @@ export function ServerDropdown({
                 <div className="flex items-center gap-2">
                   {selectedServer.error
                     && selectedServer.state !== 'ready' ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
                               // Handle copy error functionality if needed
-                            }}
-                            className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
-                            title="Click to copy error message"
-                            aria-label="Copy error message to clipboard"
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs">
-                            {selectedServer.error}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          selectedServer.state === 'ready'
-                            ? 'bg-emerald-600 animate-status-pulse'
-                            : selectedServer.state === 'failed'
-                              ? 'bg-rose-600 animate-status-pulse-red'
-                              : 'bg-yellow-500 animate-status-pulse-yellow'
-                        }`}
-                      />
-                    )}
+                              }}
+                              className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
+                              title="Click to copy error message"
+                              aria-label="Copy error message to clipboard"
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">
+                              {selectedServer.error}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            selectedServer.state === 'ready'
+                              ? 'bg-emerald-600 animate-status-pulse'
+                              : selectedServer.state === 'failed'
+                                ? 'bg-rose-600 animate-status-pulse-red'
+                                : 'bg-yellow-500 animate-status-pulse-yellow'
+                          }`}
+                        />
+                      )}
                 </div>
               )}
             </div>
           </ShimmerButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-[300px]" align="start">
-          <DropdownMenuLabel>MCP Servers</DropdownMenuLabel>
+          <DropdownMenuLabel
+            className="cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            onClick={() => navigate('/')}
+          >
+            MCP Servers
+          </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {connections.length === 0
             ? (
@@ -158,4 +163,3 @@ export function ServerDropdown({
     </div>
   )
 }
-

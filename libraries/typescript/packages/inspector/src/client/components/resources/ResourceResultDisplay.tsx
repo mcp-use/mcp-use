@@ -1,4 +1,4 @@
-import { Brush, Copy, Download, Maximize } from 'lucide-react'
+import { Brush, Code, Copy, Download, Maximize } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -109,10 +109,10 @@ export function ResourceResultDisplay({
               size="sm"
               onClick={onTogglePreview}
               className={
-                previewMode ? 'text-purple-600 dark:text-purple-400' : ''
+                !previewMode ? 'text-purple-600 dark:text-purple-400' : ''
               }
             >
-              <Brush className="h-4 w-4 mr-1" />
+              {previewMode ? <Code className="h-4 w-4 mr-1" /> : <Brush className="h-4 w-4 mr-1" />}
               {previewMode ? 'JSON' : 'Preview'}
             </Button>
           )}
