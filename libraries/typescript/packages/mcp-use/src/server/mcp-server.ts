@@ -395,7 +395,7 @@ export class McpServer {
         mimeType = 'application/vnd.mcp-ui.remote-dom+javascript'
         break
       case 'appsSdk':
-        resourceUri = `ui://widget/${definition.name}`
+        resourceUri = `ui://widget/${definition.name}.html`
         mimeType = 'text/html+skybridge'
         break
       default:
@@ -432,15 +432,18 @@ export class McpServer {
       // Add Apps SDK tool metadata
       toolMetadata['openai/outputTemplate'] = resourceUri
 
-      // Copy over other Apps SDK metadata fields to tool metadata
-      if (definition.appsSdkMetadata['openai/toolInvocation/invoking']) {
-        toolMetadata['openai/toolInvocation/invoking'] = definition.appsSdkMetadata['openai/toolInvocation/invoking']
-      }
-      if (definition.appsSdkMetadata['openai/toolInvocation/invoked']) {
-        toolMetadata['openai/toolInvocation/invoked'] = definition.appsSdkMetadata['openai/toolInvocation/invoked']
-      }
-      if (definition.appsSdkMetadata['openai/widgetAccessible']) {
-        toolMetadata['openai/widgetAccessible'] = definition.appsSdkMetadata['openai/widgetAccessible']
+      // Copy over tool-relevant metadata fields from appsSdkMetadata
+      const toolMetadataFields = [
+        'openai/toolInvocation/invoking',
+        'openai/toolInvocation/invoked',
+        'openai/widgetAccessible',
+        'openai/resultCanProduceWidget'
+      ] as const
+
+      for (const field of toolMetadataFields) {
+        if (definition.appsSdkMetadata[field] !== undefined) {
+          toolMetadata[field] = definition.appsSdkMetadata[field]
+        }
       }
     }
 
@@ -453,15 +456,15 @@ export class McpServer {
         // Create the UIResource with user-provided params
         const uiResource = this.createWidgetUIResource(definition, params)
 
-        // For Apps SDK, return structuredContent in the response
+        // For Apps SDK, return _meta at top level with only text in content
         if (definition.type === 'appsSdk') {
           return {
+            _meta: toolMetadata,
             content: [
               {
                 type: 'text',
                 text: `Displaying ${displayName}`
-              },
-              uiResource
+              }
             ],
             // structuredContent will be injected as window.openai.toolOutput by Apps SDK
             structuredContent: params
