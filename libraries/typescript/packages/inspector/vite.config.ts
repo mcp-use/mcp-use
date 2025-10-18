@@ -12,6 +12,16 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Custom plugin to inject version into HTML
+    {
+      name: 'inject-version',
+      transformIndexHtml(html) {
+        return html.replace(
+          '</head>',
+          `  <script>window.__INSPECTOR_VERSION__ = "${packageJson.version}";</script>\n  </head>`,
+        )
+      },
+    },
     // Custom plugin to handle OAuth callback redirects in dev mode
     {
       name: 'oauth-callback-redirect',

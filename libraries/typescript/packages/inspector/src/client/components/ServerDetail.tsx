@@ -1,14 +1,22 @@
-import { CheckCircle2, Code, Copy, Database, Loader2, Play, Zap } from 'lucide-react'
-import { useState } from 'react'
+import {
+  CheckCircle2,
+  Code,
+  Copy,
+  Database,
+  Loader2,
+  Play,
+  Zap,
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Textarea } from '@/components/ui/textarea'
-import { useMcpContext } from '../context/McpContext'
+import { Button } from '@/client/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/client/components/ui/card'
+import { Textarea } from '@/client/components/ui/textarea'
+import { useMcpContext } from '@/client/context/McpContext'
 
 export function ServerDetail() {
   const { serverId } = useParams()
-  const { getConnection } = useMcpContext()
+  const { getConnection, connectServer } = useMcpContext()
   const decodedServerId = serverId ? decodeURIComponent(serverId) : ''
   const connection = getConnection(decodedServerId)
 
@@ -16,6 +24,18 @@ export function ServerDetail() {
   const [toolInput, setToolInput] = useState('{}')
   const [toolResult, setToolResult] = useState<any>(null)
   const [isExecuting, setIsExecuting] = useState(false)
+
+  // Auto-connect the server when viewing its details page
+  // This ensures the server connects even if auto-connect is disabled globally
+  useEffect(() => {
+    if (decodedServerId && connection?.state === 'disconnected') {
+      console.warn(
+        '[ServerDetail] Auto-connecting server for details page:',
+        decodedServerId,
+      )
+      connectServer(decodedServerId)
+    }
+  }, [decodedServerId, connection?.state, connectServer])
 
   const handleExecuteTool = async (toolName: string) => {
     if (!connection)
@@ -74,7 +94,8 @@ export function ServerDetail() {
               Connected
             </span>
           )}
-          {(connection.state === 'connecting' || connection.state === 'loading') && (
+          {(connection.state === 'connecting'
+            || connection.state === 'loading') && (
             <span className="flex items-center text-sm text-yellow-600">
               <Loader2 className="w-4 h-4 mr-1 animate-spin" />
               {connection.state}
@@ -100,7 +121,9 @@ export function ServerDetail() {
               <CardContent className="space-y-4">
                 {connection.tools.length === 0
                   ? (
-                      <p className="text-sm text-muted-foreground">No tools available</p>
+                      <p className="text-sm text-muted-foreground">
+                        No tools available
+                      </p>
                     )
                   : (
                       connection.tools.map(tool => (
@@ -155,13 +178,17 @@ export function ServerDetail() {
               <CardContent className="space-y-4">
                 {connection.resources.length === 0
                   ? (
-                      <p className="text-sm text-muted-foreground">No resources available</p>
+                      <p className="text-sm text-muted-foreground">
+                        No resources available
+                      </p>
                     )
                   : (
                       connection.resources.map(resource => (
                         <div key={resource.uri} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">{resource.name || resource.uri}</h4>
+                            <h4 className="font-semibold">
+                              {resource.name || resource.uri}
+                            </h4>
                             <Button
                               size="sm"
                               variant="outline"
@@ -176,7 +203,9 @@ export function ServerDetail() {
                             </p>
                           )}
                           <div className="text-xs text-muted-foreground">
-                            <span className="font-mono break-all">{resource.uri}</span>
+                            <span className="font-mono break-all">
+                              {resource.uri}
+                            </span>
                             {resource.mimeType && (
                               <span className="ml-2">
                                 (
@@ -197,13 +226,14 @@ export function ServerDetail() {
               <CardHeader>
                 <CardTitle>
                   Execute Tool:
-                  {' '}
                   {selectedTool}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Input (JSON):</label>
+                  <label className="text-sm font-medium mb-2 block">
+                    Input (JSON):
+                  </label>
                   <Textarea
                     placeholder='{"key": "value"}'
                     value={toolInput}
@@ -239,7 +269,11 @@ export function ServerDetail() {
                   </Button>
                 </div>
                 {toolResult && (
-                  <div className={`border rounded-lg p-4 ${toolResult.error ? 'bg-red-50' : 'bg-muted'}`}>
+                  <div
+                    className={`border rounded-lg p-4 ${
+                      toolResult.error ? 'bg-red-50' : 'bg-muted'
+                    }`}
+                  >
                     <h4 className="font-semibold mb-2">Result:</h4>
                     <pre className="text-sm overflow-auto max-h-96">
                       {JSON.stringify(toolResult, null, 2)}
@@ -255,13 +289,14 @@ export function ServerDetail() {
       {connection.state === 'pending_auth' && (
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              Authentication Required
+            </h3>
             <p className="text-muted-foreground mb-4">
-              This server requires authentication. Click the button below to authenticate.
+              This server requires authentication. Click the button below to
+              authenticate.
             </p>
-            <Button onClick={connection.authenticate}>
-              Authenticate
-            </Button>
+            <Button onClick={connection.authenticate}>Authenticate</Button>
             {connection.authUrl && (
               <div className="mt-4">
                 <a
@@ -281,11 +316,11 @@ export function ServerDetail() {
       {connection.state === 'failed' && connection.error && (
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-red-600 mb-2">Connection Failed</h3>
+            <h3 className="text-lg font-semibold text-red-600 mb-2">
+              Connection Failed
+            </h3>
             <p className="text-muted-foreground mb-4">{connection.error}</p>
-            <Button onClick={connection.retry}>
-              Retry Connection
-            </Button>
+            <Button onClick={connection.retry}>Retry Connection</Button>
           </CardContent>
         </Card>
       )}

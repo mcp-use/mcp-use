@@ -16,10 +16,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noEmit": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "composite": true
   },
   "references": [{ "path": "./tsconfig.node.json" }],
   "include": ["src"],

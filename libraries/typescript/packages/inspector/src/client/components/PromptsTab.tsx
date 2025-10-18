@@ -1,22 +1,31 @@
 import type { Prompt } from '@modelcontextprotocol/sdk/types.js'
-import { Check, Copy, MessageSquare, Play, Search } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Clock, Copy, MessageSquare, Play } from 'lucide-react'
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { usePrismTheme } from '@/client/hooks/usePrismTheme'
-
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { ListItem, ListTabHeader } from '@/client/components/shared'
+import { Button } from '@/client/components/ui/button'
+import { Input } from '@/client/components/ui/input'
+import { Label } from '@/client/components/ui/label'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from '@/components/ui/resizable'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
+} from '@/client/components/ui/resizable'
+import { Textarea } from '@/client/components/ui/textarea'
+import { useInspector } from '@/client/context/InspectorContext'
+import { usePrismTheme } from '@/client/hooks/usePrismTheme'
+
+export interface PromptsTabRef {
+  focusSearch: () => void
+  blurSearch: () => void
+}
 
 interface PromptsTabProps {
   prompts: Prompt[]
@@ -32,8 +41,9 @@ interface PromptResult {
   timestamp: number
 }
 
-export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps) {
+export function PromptsTab({ ref, prompts, callPrompt, isConnected }: PromptsTabProps & { ref?: React.RefObject<PromptsTabRef | null> }) {
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null)
+  const { selectedPromptName, setSelectedPromptName } = useInspector()
   const { prismStyle } = usePrismTheme()
   const [promptArgs, setPromptArgs] = useState<Record<string, unknown>>({})
   const [results, setResults] = useState<PromptResult[]>([])
@@ -41,7 +51,51 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
   const [copiedResult, setCopiedResult] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('prompts')
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const searchInputRef = useRef<globalThis.HTMLInputElement>(null)
+
+  // Expose focusSearch and blurSearch methods via ref
+  useImperativeHandle(ref, () => ({
+    focusSearch: () => {
+      setIsSearchExpanded(true)
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus()
+        }
+      }, 0)
+    },
+    blurSearch: () => {
+      setSearchQuery('')
+      setIsSearchExpanded(false)
+      if (searchInputRef.current) {
+        searchInputRef.current.blur()
+      }
+    },
+  }))
+
+  // Auto-focus search input when expanded
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }, [isSearchExpanded])
+
+  const handleSearchBlur = useCallback(() => {
+    if (!searchQuery.trim()) {
+      setIsSearchExpanded(false)
+    }
+  }, [searchQuery])
+
+  const filteredPrompts = useMemo(() => {
+    if (!searchQuery)
+      return prompts
+    return prompts.filter(
+      prompt =>
+        prompt.name.toLowerCase().includes(searchQuery.toLowerCase())
+        || prompt.description?.toLowerCase().includes(searchQuery.toLowerCase()),
+    )
+  }, [prompts, searchQuery])
 
   const handlePromptSelect = useCallback((prompt: Prompt) => {
     setSelectedPrompt(prompt)
@@ -73,24 +127,135 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
     setPromptArgs(initialArgs)
   }, [])
 
-  // Auto-focus the search input when the component mounts
+  // Reset focused index when filtered prompts change
   useEffect(() => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus()
-    }
-  }, [])
+    setFocusedIndex(-1)
+  }, [searchQuery, activeTab])
 
-  // Handle auto-selection from command palette
+  // Handle keyboard navigation
   useEffect(() => {
-    const selectedPromptName = sessionStorage.getItem('selected-prompts')
-    if (selectedPromptName && prompts.length > 0) {
-      const prompt = prompts.find(p => p.name === selectedPromptName)
-      if (prompt) {
-        handlePromptSelect(prompt)
-        sessionStorage.removeItem('selected-prompts')
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if any input is focused
+      const target = e.target as HTMLElement
+      const isInputFocused
+        = target.tagName === 'INPUT'
+          || target.tagName === 'TEXTAREA'
+          || target.contentEditable === 'true'
+
+      // Don't handle if input is focused or if modifiers are pressed
+      if (isInputFocused || e.metaKey || e.ctrlKey || e.altKey) {
+        return
+      }
+
+      const items = activeTab === 'prompts' ? filteredPrompts : results
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setFocusedIndex((prev) => {
+          const next = prev + 1
+          return next >= items.length ? 0 : next
+        })
+      }
+      else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setFocusedIndex((prev) => {
+          const next = prev - 1
+          return next < 0 ? items.length - 1 : next
+        })
+      }
+      else if (e.key === 'Enter' && focusedIndex >= 0) {
+        e.preventDefault()
+        if (activeTab === 'prompts') {
+          const prompt = filteredPrompts[focusedIndex]
+          if (prompt) {
+            handlePromptSelect(prompt)
+          }
+        }
+        else {
+          const result = results[focusedIndex]
+          if (result) {
+            const prompt = prompts.find(p => p.name === result.promptName)
+            if (prompt) {
+              handlePromptSelect(prompt)
+              setPromptArgs(result.args)
+              // Don't switch tabs - let user stay in history view
+              // setActiveTab('prompts')
+            }
+          }
+        }
       }
     }
-  }, [prompts, handlePromptSelect])
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [
+    focusedIndex,
+    filteredPrompts,
+    results,
+    activeTab,
+    handlePromptSelect,
+    prompts,
+  ])
+
+  // Scroll focused item into view
+  useEffect(() => {
+    if (focusedIndex >= 0) {
+      const itemId
+        = activeTab === 'prompts'
+          ? `prompt-${filteredPrompts[focusedIndex]?.name}`
+          : `prompt-result-${focusedIndex}`
+      const element = document.getElementById(itemId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+  }, [focusedIndex, filteredPrompts, activeTab])
+
+  // Handle auto-selection from context
+  useEffect(() => {
+    console.warn('[PromptsTab] Auto-selection effect triggered:', {
+      selectedPromptName,
+      promptsCount: prompts.length,
+      currentSelectedPrompt: selectedPrompt?.name,
+    })
+
+    if (selectedPromptName && prompts.length > 0) {
+      const prompt = prompts.find(p => p.name === selectedPromptName)
+      console.warn('[PromptsTab] Prompt lookup result:', {
+        selectedPromptName,
+        promptFound: !!prompt,
+        promptName: prompt?.name,
+        shouldSelect: prompt && selectedPrompt?.name !== prompt.name,
+      })
+
+      if (prompt && selectedPrompt?.name !== prompt.name) {
+        console.warn('[PromptsTab] Selecting prompt:', prompt.name)
+        // Clear the selection from context after processing
+        setSelectedPromptName(null)
+        // Use setTimeout to ensure the component is fully rendered
+        setTimeout(() => {
+          handlePromptSelect(prompt)
+          // Scroll to the selected prompt
+          const promptElement = document.getElementById(
+            `prompt-${prompt.name}`,
+          )
+          if (promptElement) {
+            console.warn('[PromptsTab] Scrolling to prompt element')
+            promptElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest',
+            })
+          }
+        }, 100)
+      }
+    }
+  }, [
+    selectedPromptName,
+    prompts,
+    selectedPrompt,
+    handlePromptSelect,
+    setSelectedPromptName,
+  ])
 
   const handleArgChange = useCallback((key: string, value: any) => {
     setPromptArgs(prev => ({ ...prev, [key]: value }))
@@ -105,47 +270,50 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
 
     try {
       const result = await callPrompt(selectedPrompt.name, promptArgs)
-      setResults(prev => [{
-        promptName: selectedPrompt.name,
-        args: promptArgs,
-        result,
-        timestamp,
-      }, ...prev])
+      setResults(prev => [
+        {
+          promptName: selectedPrompt.name,
+          args: promptArgs,
+          result,
+          timestamp,
+        },
+        ...prev,
+      ])
     }
     catch (error) {
-      setResults(prev => [{
-        promptName: selectedPrompt.name,
-        args: promptArgs,
-        result: null,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp,
-      }, ...prev])
+      setResults(prev => [
+        {
+          promptName: selectedPrompt.name,
+          args: promptArgs,
+          result: null,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp,
+        },
+        ...prev,
+      ])
     }
     finally {
       setIsExecuting(false)
     }
   }, [selectedPrompt, promptArgs, callPrompt, isConnected])
 
-  const handleCopyResult = useCallback((index: number) => {
-    const result = results[index]
-    const resultText = result.error ? result.error : JSON.stringify(result.result, null, 2)
-    navigator.clipboard.writeText(resultText)
-    setCopiedResult(index)
-    setTimeout(() => setCopiedResult(null), 2000)
-  }, [results])
-
-  const filteredPrompts = useMemo(() => {
-    if (!searchQuery)
-      return prompts
-    return prompts.filter(prompt =>
-      prompt.name.toLowerCase().includes(searchQuery.toLowerCase())
-      || prompt.description?.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-  }, [prompts, searchQuery])
+  const handleCopyResult = useCallback(
+    (index: number) => {
+      const result = results[index]
+      const resultText = result.error
+        ? result.error
+        : JSON.stringify(result.result, null, 2)
+      navigator.clipboard.writeText(resultText)
+      setCopiedResult(index)
+      setTimeout(() => setCopiedResult(null), 2000)
+    },
+    [results],
+  )
 
   const renderInputField = (key: string, prop: any) => {
     const value = promptArgs[key]
-    const stringValue = typeof value === 'string' ? value : JSON.stringify(value)
+    const stringValue
+      = typeof value === 'string' ? value : JSON.stringify(value)
 
     if (prop.type === 'boolean') {
       return (
@@ -242,68 +410,96 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel defaultSize={33}>
-        {/* Left pane: Prompts list with search */}
-        <div className="flex flex-col h-full border-r dark:border-zinc-700 p-6 bg-white dark:bg-zinc-800">
-          <div className="p-0 ">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2 bg-zinc-100 dark:bg-zinc-700 rounded-full">
-                <TabsTrigger value="prompts">
-                  Prompts
-                  <Badge className="ml-2" variant="outline">{filteredPrompts.length}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="saved">Saved Requests</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div className="mt-4 relative">
-              <Search className="absolute left-3 top-1/2 border-none transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                ref={searchInputRef}
-                placeholder="Search prompts by name or description"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-10 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-all border-none rounded-full"
-              />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto overflow-x-visible mt-6 space-y-5 p-2">
-            {filteredPrompts.length === 0
-              ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-medium">No prompts found</p>
-                    <p className="text-sm">
-                      {searchQuery ? 'Try adjusting your search terms' : 'This server has no prompts available'}
-                    </p>
-                  </div>
-                )
-              : (
-                  filteredPrompts.map(prompt => (
-                    <Card
-                      key={prompt.name}
-                      className={cn(
-                        'cursor-pointer transition-all hover:shadow-md',
-                        selectedPrompt?.name === prompt.name && 'ring-2 ring-blue-500 shadow-md',
-                      )}
-                      onClick={() => handlePromptSelect(prompt)}
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-base font-medium truncate">
-                              {prompt.name}
-                            </CardTitle>
-                            <CardDescription className="text-sm text-gray-600 mt-1 line-clamp-2">
-                              {prompt.description || 'No description available'}
-                            </CardDescription>
-                          </div>
+        <ListTabHeader
+          activeTab={activeTab}
+          isSearchExpanded={isSearchExpanded}
+          searchQuery={searchQuery}
+          primaryTabName="prompts"
+          secondaryTabName="saved"
+          primaryTabTitle="Prompts"
+          secondaryTabTitle="History"
+          primaryCount={filteredPrompts.length}
+          secondaryCount={results.length}
+          primaryIcon={MessageSquare}
+          secondaryIcon={Clock}
+          searchPlaceholder="Search prompts..."
+          onSearchExpand={() => setIsSearchExpanded(true)}
+          onSearchChange={setSearchQuery}
+          onSearchBlur={handleSearchBlur}
+          onTabSwitch={() =>
+            setActiveTab(activeTab === 'prompts' ? 'saved' : 'prompts')}
+          searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+        />
+        {/* Left pane: Prompts list */}
+        <div className="flex flex-col h-full">
+          {activeTab === 'prompts'
+            ? (
+                <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
+                  {filteredPrompts.length === 0
+                    ? (
+                        <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                          <MessageSquare className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
+                          <p className="text-gray-500 dark:text-gray-400">No prompts available</p>
                         </div>
-                      </CardHeader>
-                    </Card>
-                  ))
-                )}
-          </div>
+                      )
+                    : (
+                        filteredPrompts.map((prompt, index) => (
+                          <ListItem
+                            key={prompt.name}
+                            id={`prompt-${prompt.name}`}
+                            isSelected={selectedPrompt?.name === prompt.name}
+                            isFocused={focusedIndex === index}
+                            icon={<MessageSquare className="h-4 w-4" />}
+                            title={prompt.name}
+                            description={prompt.description}
+                            onClick={() => handlePromptSelect(prompt)}
+                          />
+                        ))
+                      )}
+                </div>
+              )
+            : (
+                <div className="flex-1 overflow-y-auto border-r dark:border-zinc-700">
+                  {results.length === 0
+                    ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <p>No history</p>
+                          <p className="text-sm">
+                            Prompts you execute will appear here
+                          </p>
+                        </div>
+                      )
+                    : (
+                        <div className="space-y-2 p-4">
+                          {results.map((result, index) => (
+                            <div
+                              key={index}
+                              id={`prompt-result-${index}`}
+                              className="p-3 bg-gray-100 dark:bg-zinc-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-zinc-700"
+                              onClick={() => {
+                                const prompt = prompts.find(
+                                  p => p.name === result.promptName,
+                                )
+                                if (prompt) {
+                                  handlePromptSelect(prompt)
+                                  setPromptArgs(result.args)
+                                  // Don't switch tabs - let user stay in history view
+                                  // setActiveTab('prompts')
+                                }
+                              }}
+                            >
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                {result.promptName}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {new Date(result.timestamp).toLocaleString()}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                </div>
+              )}
         </div>
       </ResizablePanel>
 
@@ -311,22 +507,27 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
 
       <ResizablePanel defaultSize={67}>
         {/* Right pane: Prompt details and execution */}
-        <div className="flex flex-col h-full bg-white dark:bg-zinc-800 p-6">
+        <div className="flex flex-col h-full bg-white dark:bg-black p-6">
           {selectedPrompt
             ? (
                 <>
                   <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-2">{selectedPrompt.name}</h3>
+                    <h3 className="text-lg font-semibold mb-2">
+                      {selectedPrompt.name}
+                    </h3>
                     <p className="text-sm text-gray-600 mb-4">
                       {selectedPrompt.description || 'No description available'}
                     </p>
 
-                    {selectedPrompt.arguments && Object.keys(selectedPrompt.arguments).length > 0 && (
+                    {selectedPrompt.arguments
+                      && Object.keys(selectedPrompt.arguments).length > 0 && (
                       <div className="space-y-4 mb-6">
-                        <h4 className="text-sm font-medium text-gray-700">Arguments</h4>
+                        <h4 className="text-sm font-medium text-gray-700">
+                          Arguments
+                        </h4>
                         <div className="space-y-4">
-                          {Object.entries(selectedPrompt.arguments).map(([key, prop]) =>
-                            renderInputField(key, prop),
+                          {Object.entries(selectedPrompt.arguments).map(
+                            ([key, prop]) => renderInputField(key, prop),
                           )}
                         </div>
                       </div>
@@ -355,10 +556,15 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
 
                   {results.length > 0 && (
                     <div className="flex-1 overflow-hidden">
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Results</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">
+                        Results
+                      </h4>
                       <div className="space-y-3 overflow-y-auto max-h-96">
                         {results.map((result, index) => (
-                          <div key={index} className="border dark:border-zinc-700 rounded-lg p-3 bg-gray-50 dark:bg-zinc-700">
+                          <div
+                            key={index}
+                            className="border dark:border-zinc-700 rounded-lg p-3 bg-gray-50 dark:bg-zinc-700"
+                          >
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium text-gray-700">
                                 {result.promptName}
@@ -412,7 +618,9 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
                   <div className="text-center">
                     <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium">Select a prompt</p>
-                    <p className="text-sm">Choose a prompt from the list to see details and execute it</p>
+                    <p className="text-sm">
+                      Choose a prompt from the list to see details and execute it
+                    </p>
                   </div>
                 </div>
               )}
@@ -421,3 +629,5 @@ export function PromptsTab({ prompts, callPrompt, isConnected }: PromptsTabProps
     </ResizablePanelGroup>
   )
 }
+
+PromptsTab.displayName = 'PromptsTab'

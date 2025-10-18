@@ -1,7 +1,10 @@
 import { vs, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from '@/client/context/ThemeContext'
 
-export function usePrismTheme() {
+export function usePrismTheme(): {
+  prismStyle: Record<string, any>
+  isDark: boolean
+} {
   const { resolvedTheme } = useTheme()
 
   const getPrismStyle = () => {

@@ -4,7 +4,7 @@ import { Monitor, Moon, SunDim } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { cn } from '@/lib/utils'
-import { useTheme } from '../context/ThemeContext'
+import { useTheme } from '../../client/context/ThemeContext'
 
 interface props {
   className?: string
@@ -107,7 +107,9 @@ export function AnimatedThemeToggler({ className }: props) {
       onClick={changeTheme}
       className={cn(className)}
       aria-label={getThemeLabel()}
-      title={`Current: ${theme === 'system' ? 'Auto' : theme === 'light' ? 'Light' : 'Dark'}`}
+      title={`Current: ${
+        theme === 'system' ? 'Auto' : theme === 'light' ? 'Light' : 'Dark'
+      }`}
     >
       {getThemeIcon()}
     </button>

@@ -1,24 +1,35 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
-import { Check, Clock, Copy, Play, Save, Search, Trash2, Wrench, Zap } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { usePrismTheme } from '@/client/hooks/usePrismTheme'
+import type { SavedRequest, ToolResult } from './tools'
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from '@/components/ui/resizable'
-import { Spinner } from '@/components/ui/spinner'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
-import { isMcpUIResource, McpUIRenderer } from './McpUIRenderer'
+} from '@/client/components/ui/resizable'
+import { useInspector } from '@/client/context/InspectorContext'
+import {
+
+  SavedRequestsList,
+  SaveRequestDialog,
+  ToolExecutionPanel,
+
+  ToolResultDisplay,
+  ToolsList,
+  ToolsTabHeader,
+} from './tools'
+
+export interface ToolsTabRef {
+  focusSearch: () => void
+  blurSearch: () => void
+}
 
 interface ToolsTabProps {
   tools: Tool[]
@@ -26,39 +37,44 @@ interface ToolsTabProps {
   isConnected: boolean
 }
 
-interface ToolResult {
-  toolName: string
-  args: Record<string, unknown>
-  result: any
-  error?: string
-  timestamp: number
-  duration?: number
-}
-
-interface SavedRequest {
-  id: string
-  name: string
-  toolName: string
-  args: Record<string, unknown>
-  savedAt: number
-}
-
 const SAVED_REQUESTS_KEY = 'mcp-inspector-saved-requests'
 
-export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
+export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
+  // State
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null)
-  const { prismStyle } = usePrismTheme()
+  const { selectedToolName, setSelectedToolName } = useInspector()
   const [toolArgs, setToolArgs] = useState<Record<string, unknown>>({})
   const [results, setResults] = useState<ToolResult[]>([])
   const [isExecuting, setIsExecuting] = useState(false)
   const [copiedResult, setCopiedResult] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState('tools')
+  const [activeTab, setActiveTab] = useState<'tools' | 'saved'>('tools')
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([])
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [requestName, setRequestName] = useState('')
   const [previewMode, setPreviewMode] = useState(true)
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Expose focusSearch and blurSearch methods via ref
+  useImperativeHandle(ref, () => ({
+    focusSearch: () => {
+      setIsSearchExpanded(true)
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus()
+        }
+      }, 0)
+    },
+    blurSearch: () => {
+      setSearchQuery('')
+      setIsSearchExpanded(false)
+      if (searchInputRef.current) {
+        searchInputRef.current.blur()
+      }
+    },
+  }))
 
   // Load saved requests from localStorage on mount
   useEffect(() => {
@@ -69,7 +85,7 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
       }
     }
     catch (error) {
-      console.error('Failed to load saved requests:', error)
+      console.error('[ToolsTab] Failed to load saved requests:', error)
     }
   }, [])
 
@@ -80,16 +96,22 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
       setSavedRequests(requests)
     }
     catch (error) {
-      console.error('Failed to save requests:', error)
+      console.error('[ToolsTab] Failed to save requests:', error)
     }
   }, [])
 
-  // Auto-focus the search input when the component mounts
-  useEffect(() => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus()
-    }
-  }, [])
+  // Filter tools based on search query
+  const filteredTools = useMemo(() => {
+    if (!searchQuery.trim())
+      return tools
+
+    const query = searchQuery.toLowerCase()
+    return tools.filter(
+      tool =>
+        tool.name.toLowerCase().includes(query)
+        || tool.description?.toLowerCase().includes(query),
+    )
+  }, [tools, searchQuery])
 
   const handleToolSelect = useCallback((tool: Tool) => {
     setSelectedTool(tool)
@@ -121,33 +143,162 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
     setToolArgs(initialArgs)
   }, [])
 
-  // Handle auto-selection from command palette
-  useEffect(() => {
-    const selectedToolName = sessionStorage.getItem('selected-tools')
-    if (selectedToolName && tools.length > 0) {
-      const tool = tools.find(t => t.name === selectedToolName)
+  const loadSavedRequest = useCallback(
+    (request: SavedRequest) => {
+      const tool = tools.find(t => t.name === request.toolName)
       if (tool) {
-        handleToolSelect(tool)
-        sessionStorage.removeItem('selected-tools')
+        setSelectedTool(tool)
+        setToolArgs(request.args)
       }
+    },
+    [tools],
+  )
+
+  // Auto-focus the search input when expanded
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      searchInputRef.current.focus()
     }
-  }, [tools, handleToolSelect])
+  }, [isSearchExpanded])
 
-  const handleArgChange = useCallback((key: string, value: string) => {
-    setToolArgs((prev) => {
-      const newArgs = { ...prev }
+  const handleSearchBlur = useCallback(() => {
+    if (!searchQuery.trim()) {
+      setIsSearchExpanded(false)
+    }
+  }, [searchQuery])
 
-      // Check the tool's input schema to determine how to handle the value
-      if (selectedTool?.inputSchema?.properties?.[key]) {
-        const prop = selectedTool.inputSchema.properties[key] as any
-        const expectedType = prop.type
+  // Collapse search when switching away from tools tab
+  useEffect(() => {
+    if (activeTab !== 'tools') {
+      setIsSearchExpanded(false)
+    }
+  }, [activeTab])
 
-        if (expectedType === 'string') {
-          // For string parameters, don't parse JSON - treat as literal string
-          newArgs[key] = value
+  // Reset focused index when filtered tools change
+  useEffect(() => {
+    setFocusedIndex(-1)
+  }, [searchQuery, activeTab])
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInputFocused
+        = target.tagName === 'INPUT'
+          || target.tagName === 'TEXTAREA'
+          || target.contentEditable === 'true'
+
+      if (isInputFocused || e.metaKey || e.ctrlKey || e.altKey) {
+        return
+      }
+
+      const items = activeTab === 'tools' ? filteredTools : savedRequests
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setFocusedIndex((prev) => {
+          const next = prev + 1
+          return next >= items.length ? 0 : next
+        })
+      }
+      else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setFocusedIndex((prev) => {
+          const next = prev - 1
+          return next < 0 ? items.length - 1 : next
+        })
+      }
+      else if (e.key === 'Enter' && focusedIndex >= 0) {
+        e.preventDefault()
+        if (activeTab === 'tools') {
+          const tool = filteredTools[focusedIndex]
+          if (tool) {
+            handleToolSelect(tool)
+          }
         }
         else {
-          // For non-string parameters, try to parse as JSON first, fallback to string
+          const request = savedRequests[focusedIndex]
+          if (request) {
+            loadSavedRequest(request)
+          }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [
+    focusedIndex,
+    filteredTools,
+    savedRequests,
+    activeTab,
+    handleToolSelect,
+    loadSavedRequest,
+  ])
+
+  // Scroll focused item into view
+  useEffect(() => {
+    if (focusedIndex >= 0) {
+      const itemId
+        = activeTab === 'tools'
+          ? `tool-${filteredTools[focusedIndex]?.name}`
+          : `saved-${savedRequests[focusedIndex]?.id}`
+      const element = document.getElementById(itemId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+  }, [focusedIndex, filteredTools, savedRequests, activeTab])
+
+  // Handle auto-selection from context
+  useEffect(() => {
+    if (selectedToolName && tools.length > 0) {
+      const tool = tools.find(t => t.name === selectedToolName)
+
+      if (tool && selectedTool?.name !== tool.name) {
+        setSelectedToolName(null)
+        setTimeout(() => {
+          handleToolSelect(tool)
+          const toolElement = document.getElementById(`tool-${tool.name}`)
+          if (toolElement) {
+            toolElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest',
+            })
+          }
+        }, 100)
+      }
+    }
+  }, [
+    selectedToolName,
+    tools,
+    selectedTool,
+    handleToolSelect,
+    setSelectedToolName,
+  ])
+
+  const handleArgChange = useCallback(
+    (key: string, value: string) => {
+      setToolArgs((prev) => {
+        const newArgs = { ...prev }
+
+        if (selectedTool?.inputSchema?.properties?.[key]) {
+          const prop = selectedTool.inputSchema.properties[key] as any
+          const expectedType = prop.type
+
+          if (expectedType === 'string') {
+            newArgs[key] = value
+          }
+          else {
+            try {
+              newArgs[key] = JSON.parse(value)
+            }
+            catch {
+              newArgs[key] = value
+            }
+          }
+        }
+        else {
           try {
             newArgs[key] = JSON.parse(value)
           }
@@ -155,23 +306,15 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
             newArgs[key] = value
           }
         }
-      }
-      else {
-        // Fallback: try to parse as JSON first, fallback to string
-        try {
-          newArgs[key] = JSON.parse(value)
-        }
-        catch {
-          newArgs[key] = value
-        }
-      }
 
-      return newArgs
-    })
-  }, [selectedTool])
+        return newArgs
+      })
+    },
+    [selectedTool],
+  )
 
   const executeTool = useCallback(async () => {
-    if (!selectedTool || !isConnected)
+    if (!selectedTool || isExecuting)
       return
 
     setIsExecuting(true)
@@ -180,611 +323,197 @@ export function ToolsTab({ tools, callTool, isConnected }: ToolsTabProps) {
     try {
       const result = await callTool(selectedTool.name, toolArgs)
       const duration = Date.now() - startTime
-      const newResult: ToolResult = {
-        toolName: selectedTool.name,
-        args: toolArgs,
-        result,
-        timestamp: startTime,
-        duration,
-      }
-      setResults(prev => [newResult, ...prev])
+
+      setResults(prev => [
+        {
+          toolName: selectedTool.name,
+          args: toolArgs,
+          result,
+          timestamp: startTime,
+          duration,
+        },
+        ...prev,
+      ])
     }
     catch (error) {
-      const duration = Date.now() - startTime
-      const newResult: ToolResult = {
-        toolName: selectedTool.name,
-        args: toolArgs,
-        result: null,
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: startTime,
-        duration,
-      }
-      setResults(prev => [newResult, ...prev])
+      setResults(prev => [
+        {
+          toolName: selectedTool.name,
+          args: toolArgs,
+          result: null,
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: startTime,
+          duration: Date.now() - startTime,
+        },
+        ...prev,
+      ])
     }
     finally {
       setIsExecuting(false)
     }
-  }, [selectedTool, toolArgs, callTool, isConnected])
+  }, [selectedTool, toolArgs, isExecuting, callTool])
 
-  const copyResult = useCallback(async (index: number) => {
-    const result = results[index]
-    const textToCopy = result.error
-      ? `Error: ${result.error}`
-      : JSON.stringify(result.result, null, 2)
-
+  const handleCopyResult = useCallback(async (index: number, result: any) => {
     try {
-      await navigator.clipboard.writeText(textToCopy)
+      await navigator.clipboard.writeText(JSON.stringify(result, null, 2))
       setCopiedResult(index)
       setTimeout(() => setCopiedResult(null), 2000)
     }
-    catch (err) {
-      console.error('Failed to copy:', err)
+    catch (error) {
+      console.error('[ToolsTab] Failed to copy result:', error)
     }
-  }, [results])
+  }, [])
+
+  const handleDeleteResult = useCallback((index: number) => {
+    setResults(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
+  const handleFullscreen = useCallback(
+    (index: number) => {
+      const result = results[index]
+      if (result) {
+        const newWindow = window.open('', '_blank', 'width=800,height=600')
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>${result.toolName} Result</title>
+                <style>
+                  body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+                  pre { white-space: pre-wrap; word-wrap: break-word; }
+                </style>
+              </head>
+              <body>
+                <h2>${result.toolName}</h2>
+                <pre>${JSON.stringify(result.result, null, 2)}</pre>
+              </body>
+            </html>
+          `)
+          newWindow.document.close()
+        }
+      }
+    },
+    [results],
+  )
+
+  const openSaveDialog = useCallback(() => {
+    if (!selectedTool)
+      return
+    setRequestName('')
+    setSaveDialogOpen(true)
+  }, [selectedTool])
 
   const saveRequest = useCallback(() => {
     if (!selectedTool)
       return
 
-    const name = requestName.trim() || `${selectedTool.name} - ${new Date().toLocaleString()}`
     const newRequest: SavedRequest = {
       id: `${Date.now()}-${Math.random()}`,
-      name,
+      name:
+          requestName.trim()
+          || `${selectedTool.name} - ${new Date().toLocaleString()}`,
       toolName: selectedTool.name,
       args: toolArgs,
       savedAt: Date.now(),
     }
 
-    const updatedRequests = [newRequest, ...savedRequests]
-    saveSavedRequests(updatedRequests)
-    setRequestName('')
+    saveSavedRequests([...savedRequests, newRequest])
     setSaveDialogOpen(false)
-  }, [selectedTool, toolArgs, requestName, savedRequests, saveSavedRequests])
+    setRequestName('')
+  }, [selectedTool, requestName, toolArgs, savedRequests, saveSavedRequests])
 
-  const loadSavedRequest = useCallback((request: SavedRequest) => {
-    const tool = tools.find(t => t.name === request.toolName)
-    if (tool) {
-      setSelectedTool(tool)
-      setToolArgs(request.args)
-      setActiveTab('tools')
-    }
-  }, [tools])
-
-  const deleteSavedRequest = useCallback((id: string) => {
-    const updatedRequests = savedRequests.filter(req => req.id !== id)
-    saveSavedRequests(updatedRequests)
-  }, [savedRequests, saveSavedRequests])
-
-  // Filter tools based on search query
-  const filteredTools = useMemo(() => {
-    if (!searchQuery.trim())
-      return tools
-
-    const query = searchQuery.toLowerCase()
-    return tools.filter(tool =>
-      tool.name.toLowerCase().includes(query)
-      || tool.description?.toLowerCase().includes(query),
-    )
-  }, [tools, searchQuery])
-
-  const renderInputField = (key: string, prop: any) => {
-    const value = toolArgs[key]
-    const stringValue = typeof value === 'string' ? value : JSON.stringify(value)
-    const typedProp = prop as any
-
-    if (typedProp?.type === 'boolean') {
-      return (
-        <div key={key} className="space-y-2">
-          <Label htmlFor={key} className="text-sm font-medium">
-            {key}
-            {typedProp?.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
-          <div className="flex items-center space-x-2">
-            <input
-              id={key}
-              type="checkbox"
-              checked={Boolean(value)}
-              onChange={e => handleArgChange(key, e.target.checked.toString())}
-              className="rounded border-gray-300"
-              aria-label={`${key} checkbox`}
-            />
-            <span className="text-sm text-gray-600 dark:text-gray-300">{typedProp?.description || ''}</span>
-          </div>
-        </div>
-      )
-    }
-
-    if (typedProp?.type === 'string' && (typedProp?.format === 'multiline' || stringValue.length > 50)) {
-      return (
-        <div key={key} className="space-y-2">
-          <Label htmlFor={key} className="text-sm font-medium">
-            {key}
-            {typedProp?.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
-          <Textarea
-            id={key}
-            value={stringValue}
-            onChange={e => handleArgChange(key, e.target.value)}
-            placeholder={typedProp?.description || `Enter ${key}`}
-            className="min-h-[100px]"
-          />
-          {typedProp?.description && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">{typedProp.description}</p>
-          )}
-        </div>
-      )
-    }
-
-    return (
-      <div key={key} className="space-y-2">
-        <Label htmlFor={key} className="text-sm font-medium">
-          {key}
-          {typedProp?.required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-        <Input
-          id={key}
-          value={stringValue}
-          onChange={e => handleArgChange(key, e.target.value)}
-          placeholder={typedProp?.description || `Enter ${key}`}
-        />
-        {typedProp?.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400">{typedProp.description}</p>
-        )}
-      </div>
-    )
-  }
+  const deleteSavedRequest = useCallback(
+    (id: string) => {
+      saveSavedRequests(savedRequests.filter(r => r.id !== id))
+    },
+    [savedRequests, saveSavedRequests],
+  )
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
-      <ResizablePanel defaultSize={33}>
-        {/* Left pane: Tools list with search */}
-        <div className="flex flex-col h-full border-r dark:border-zinc-700 p-6 bg-white dark:bg-zinc-800">
-          <div className="p-0 ">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2 bg-zinc-100 dark:bg-zinc-700 rounded-full">
-                <TabsTrigger value="tools">
-                  Tools
-                  <Badge className="ml-2" variant="outline">{filteredTools.length}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="saved">Saved Requests</TabsTrigger>
-              </TabsList>
-            </Tabs>
+      <ResizablePanel
+        defaultSize={33}
+        className="flex flex-col h-full relative"
+      >
+        <ToolsTabHeader
+          activeTab={activeTab}
+          isSearchExpanded={isSearchExpanded}
+          searchQuery={searchQuery}
+          filteredToolsCount={filteredTools.length}
+          savedRequestsCount={savedRequests.length}
+          onSearchExpand={() => setIsSearchExpanded(true)}
+          onSearchChange={setSearchQuery}
+          onSearchBlur={handleSearchBlur}
+          onTabSwitch={() =>
+            setActiveTab(activeTab === 'tools' ? 'saved' : 'tools')}
+          searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+        />
 
-            <div className="mt-4 relative">
-              <Search className="absolute left-3 top-1/2 border-none transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
-              <Input
-                ref={searchInputRef}
-                placeholder="Search tools by name or description "
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-10 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-all border-none rounded-full"
+        {activeTab === 'tools'
+          ? (
+              <ToolsList
+                tools={filteredTools}
+                selectedTool={selectedTool}
+                onToolSelect={handleToolSelect}
+                focusedIndex={focusedIndex}
               />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto overflow-x-visible mt-6 space-y-5 p-2">
-            {activeTab === 'tools'
-              ? (
-                  <>
-                    {filteredTools.length === 0
-                      ? (
-                          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                            <p>No tools available</p>
-                            <p className="text-sm">Connect to a server to see tools</p>
-                          </div>
-                        )
-                      : (
-                          filteredTools.map(tool => (
-                            <div
-                              key={tool.name}
-                              className={cn(
-                                'cursor-pointer transition-all rounded-md border-none hover:bg-zinc-100 dark:hover:bg-zinc-700 shadow-none p-2',
-                                selectedTool?.name === tool.name && 'ring-2 ring-zinc-200 dark:ring-zinc-600 bg-zinc-100 dark:bg-zinc-700',
-                              )}
-                              onClick={() => handleToolSelect(tool)}
-                            >
-                              <div className="px-2">
-                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{tool.name}</div>
-                                {tool.description && (
-                                  <div className="text-xs text-gray-600 dark:text-gray-400">
-                                    {tool.description}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                  </>
-                )
-              : (
-                  <>
-                    {savedRequests.length === 0
-                      ? (
-                          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                            <p>No saved requests</p>
-                            <p className="text-sm">Save a tool configuration to reuse it later</p>
-                          </div>
-                        )
-                      : (
-                          savedRequests.map(request => (
-                            <div
-                              key={request.id}
-                              className="cursor-pointer transition-all rounded-md border border-gray-200 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-700 p-3 group"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div
-                                  className="flex-1"
-                                  onClick={() => loadSavedRequest(request)}
-                                >
-                                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{request.name}</div>
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    <Badge variant="outline" className="mr-2">{request.toolName}</Badge>
-                                    <span>{new Date(request.savedAt).toLocaleString()}</span>
-                                  </div>
-                                  {Object.keys(request.args).length > 0 && (
-                                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                                      {Object.keys(request.args).length}
-                                      {' '}
-                                      parameter(s)
-                                    </div>
-                                  )}
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    deleteSavedRequest(request.id)
-                                  }}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                  </>
-                )}
-          </div>
-        </div>
+            )
+          : (
+              <SavedRequestsList
+                savedRequests={savedRequests}
+                onLoadRequest={loadSavedRequest}
+                onDeleteRequest={deleteSavedRequest}
+                focusedIndex={focusedIndex}
+              />
+            )}
       </ResizablePanel>
-      <ResizableHandle withHandle />
-      <ResizablePanel defaultSize={67}>
 
+      <ResizableHandle withHandle />
+
+      <ResizablePanel defaultSize={67}>
         <ResizablePanelGroup direction="vertical">
           <ResizablePanel defaultSize={40}>
-
-            {/* Right pane: Tool form */}
-            <div className="flex flex-col h-full bg-white dark:bg-zinc-800">
-              {selectedTool
-                ? (
-                    <div className="flex flex-col h-full">
-                      <div className="p-4 ">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="space-x-2 flex items-center">
-                              <span className="bg-blue-100 text-blue-400 rounded-full p-2 aspect-square flex items-center justify-center">
-                                <Wrench className="size-4" />
-                              </span>
-                              <div>
-                                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                  {selectedTool.name}
-                                </h3>
-                                {selectedTool.description && (
-                                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedTool.description}</p>
-                                )}
-                              </div>
-                            </div>
-
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setSaveDialogOpen(true)}
-                                  disabled={!selectedTool}
-                                >
-                                  <Save className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Save request</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Button
-                              onClick={executeTool}
-                              disabled={!isConnected || isExecuting}
-                              size="sm"
-                            >
-                              {isExecuting
-                                ? (
-                                    <>
-                                      <Spinner className="size-4 mr-1" />
-                                      Executing...
-                                    </>
-                                  )
-                                : (
-                                    <>
-                                      <Play className="h-4 w-4 mr-1" />
-                                      Execute
-                                    </>
-                                  )}
-                            </Button>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <div className="flex-1 overflow-y-auto p-4">
-                        {selectedTool.inputSchema?.properties
-                          ? (
-                              <div className="space-y-4">
-                                {Object.entries(selectedTool.inputSchema.properties).map(([key, prop]) =>
-                                  renderInputField(key, prop),
-                                )}
-                              </div>
-                            )
-                          : (
-                              <div className="text-center py-8">
-                                <p className="text-gray-500 dark:text-gray-400">This tool has no parameters</p>
-                              </div>
-                            )}
-                      </div>
-                    </div>
-                  )
-                : (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <p className="text-gray-500 dark:text-gray-400 text-lg">Select a tool to get started</p>
-                        <p className="text-gray-400 dark:text-gray-500 text-sm">Choose a tool from the list to configure and execute it</p>
-                      </div>
-                    </div>
-                  )}
-            </div>
+            <ToolExecutionPanel
+              selectedTool={selectedTool}
+              toolArgs={toolArgs}
+              isExecuting={isExecuting}
+              isConnected={isConnected}
+              onArgChange={handleArgChange}
+              onExecute={executeTool}
+              onSave={openSaveDialog}
+            />
           </ResizablePanel>
+
           <ResizableHandle withHandle />
+
           <ResizablePanel defaultSize={60}>
-
-            {/* Bottom section: Results */}
-            <div className="flex flex-col h-full bg-white dark:bg-zinc-800 border-t dark:border-zinc-700">
-              <div className="flex-1 overflow-y-auto h-full">
-                {results.length > 0
-                  ? (
-                      <div className="space-y-4 flex-1 h-full">
-                        {results.map((result, index) => {
-                          // Check if result contains MCP UI resources
-                          const content = result.result?.content || []
-                          const mcpUIResources = content.filter((item: any) =>
-                            item.type === 'resource' && isMcpUIResource(item.resource),
-                          )
-                          const hasMcpUIResources = mcpUIResources.length > 0
-
-                          return (
-                            <div key={index} className="space-y-0 flex-1 h-full">
-                              <div className={`flex items-center gap-2 px-4 pt-2 ${hasMcpUIResources ? 'border-b border-gray-200 dark:border-zinc-600 pb-2' : ''}`}>
-                                <h3 className="text-sm font-medium">Response</h3>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3 text-gray-400" />
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {new Date(result.timestamp).toLocaleTimeString()}
-                                  </span>
-                                </div>
-                                {result.duration !== undefined && (
-                                  <div className="flex items-center gap-1">
-                                    <Zap className="h-3 w-3 text-gray-400" />
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                      {result.duration}
-                                      ms
-                                    </span>
-                                  </div>
-                                )}
-                                {hasMcpUIResources && (
-                                  <div className="flex items-center gap-4 ml-4">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                      URI:
-                                      {' '}
-                                      {mcpUIResources[0]?.resource?.uri || 'No URI'}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        onClick={() => setPreviewMode(true)}
-                                        className={`text-xs font-medium ${
-                                          previewMode
-                                            ? 'text-black dark:text-white'
-                                            : 'text-zinc-500 dark:text-zinc-400'
-                                        }`}
-                                      >
-                                        Preview
-                                      </button>
-                                      <span className="text-xs text-zinc-400">|</span>
-                                      <button
-                                        onClick={() => setPreviewMode(false)}
-                                        className={`text-xs font-medium ${
-                                          !previewMode
-                                            ? 'text-black dark:text-white'
-                                            : 'text-zinc-500 dark:text-zinc-400'
-                                        }`}
-                                      >
-                                        JSON
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => copyResult(index)}
-                                  className="ml-auto"
-                                >
-                                  {copiedResult === index
-                                    ? (
-                                        <Check className="h-4 w-4" />
-                                      )
-                                    : (
-                                        <Copy className="h-4 w-4" />
-                                      )}
-                                </Button>
-                              </div>
-
-                              {result.error
-                                ? (
-                                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 mx-4">
-                                      <p className="text-red-800 dark:text-red-300 font-medium">Error:</p>
-                                      <p className="text-red-700 dark:text-red-400 text-sm">{result.error}</p>
-                                    </div>
-                                  )
-                                : (() => {
-                                    if (hasMcpUIResources) {
-                                      if (previewMode) {
-                                        return (
-                                          <div className="space-y-0 h-full">
-                                            {mcpUIResources.map((item: any, idx: number) => (
-                                              <div key={idx} className="mx-0 size-full">
-                                                <div className="w-full h-full">
-                                                  <McpUIRenderer
-                                                    resource={item.resource}
-                                                    onUIAction={(_action) => {
-                                                    // Handle UI actions here if needed
-                                                    }}
-                                                    className="w-full h-full"
-                                                  />
-                                                </div>
-                                              </div>
-                                            ))}
-                                            {/* Show JSON for non-UI content */}
-                                            {content.filter((item: any) =>
-                                              !(item.type === 'resource' && isMcpUIResource(item.resource)),
-                                            ).length > 0 && (
-                                              <div className="px-4">
-                                                <SyntaxHighlighter
-                                                  language="json"
-                                                  style={prismStyle}
-                                                  customStyle={{
-                                                    margin: 0,
-                                                    padding: 0,
-                                                    border: 'none',
-                                                    borderRadius: 0,
-                                                    fontSize: '1rem',
-                                                    background: 'transparent',
-                                                  }}
-                                                  className="text-gray-900 dark:text-gray-100"
-                                                >
-                                                  {JSON.stringify(
-                                                    content.filter((item: any) =>
-                                                      !(item.type === 'resource' && isMcpUIResource(item.resource)),
-                                                    ),
-                                                    null,
-                                                    2,
-                                                  )}
-                                                </SyntaxHighlighter>
-                                              </div>
-                                            )}
-                                          </div>
-                                        )
-                                      }
-                                      else {
-                                      // JSON mode for MCP UI resources
-                                        return (
-                                          <div className="px-4 pt-4">
-                                            <SyntaxHighlighter
-                                              language="json"
-                                              style={prismStyle}
-                                              customStyle={{
-                                                margin: 0,
-                                                padding: 0,
-                                                border: 'none',
-                                                borderRadius: 0,
-                                                fontSize: '1rem',
-                                                background: 'transparent',
-                                              }}
-                                              className="text-gray-900 dark:text-gray-100"
-                                            >
-                                              {JSON.stringify(result.result, null, 2)}
-                                            </SyntaxHighlighter>
-                                          </div>
-                                        )
-                                      }
-                                    }
-
-                                    // Default: show JSON for non-MCP UI resources
-                                    return (
-                                      <div className="px-4 pt-4">
-                                        <SyntaxHighlighter
-                                          language="json"
-                                          style={prismStyle}
-                                          customStyle={{
-                                            margin: 0,
-                                            padding: 0,
-                                            border: 'none',
-                                            borderRadius: 0,
-                                            fontSize: '1rem',
-                                            background: 'transparent',
-                                          }}
-                                          className="text-gray-900 dark:text-gray-100"
-                                        >
-                                          {JSON.stringify(result.result, null, 2)}
-                                        </SyntaxHighlighter>
-                                      </div>
-                                    )
-                                  })()}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  : (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                          <p className="text-gray-500 dark:text-gray-400">No results yet</p>
-                          <p className="text-gray-400 dark:text-gray-500 text-sm">Execute a tool to see results here</p>
-                        </div>
-                      </div>
-                    )}
-              </div>
+            <div className="flex flex-col h-full">
+              <ToolResultDisplay
+                results={results}
+                copiedResult={copiedResult}
+                previewMode={previewMode}
+                onCopy={handleCopyResult}
+                onDelete={handleDeleteResult}
+                onFullscreen={handleFullscreen}
+                onTogglePreview={() => setPreviewMode(!previewMode)}
+              />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
-
       </ResizablePanel>
 
-      {/* Save Dialog */}
-      {saveDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSaveDialogOpen(false)}>
-          <div className="bg-white dark:bg-zinc-800 rounded-lg p-6 w-[400px] shadow-xl border border-gray-200 dark:border-zinc-700" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Save Request</h3>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="request-name">Request Name (optional)</Label>
-                <Input
-                  id="request-name"
-                  value={requestName}
-                  onChange={e => setRequestName(e.target.value)}
-                  placeholder={`${selectedTool?.name} - ${new Date().toLocaleString()}`}
-                  className="mt-2"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      saveRequest()
-                    }
-                  }}
-                  autoFocus
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={saveRequest}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SaveRequestDialog
+        isOpen={saveDialogOpen}
+        requestName={requestName}
+        defaultPlaceholder={`${
+          selectedTool?.name
+        } - ${new Date().toLocaleString()}`}
+        onRequestNameChange={setRequestName}
+        onSave={saveRequest}
+        onCancel={() => setSaveDialogOpen(false)}
+      />
     </ResizablePanelGroup>
   )
 }
+
+ToolsTab.displayName = 'ToolsTab'
