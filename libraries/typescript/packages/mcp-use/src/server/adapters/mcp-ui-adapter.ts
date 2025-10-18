@@ -218,7 +218,10 @@ export function createUIResourceFromDefinition(
   params: Record<string, any>,
   config: UrlConfig
 ): UIResourceContent {
-  const uri = `ui://widget/${definition.name}` as `ui://${string}`
+  // For Apps SDK, use .html extension following the convention
+  const uri = definition.type === 'appsSdk'
+    ? `ui://widget/${definition.name}.html` as `ui://${string}`
+    : `ui://widget/${definition.name}` as `ui://${string}`
   const encoding = definition.encoding || 'text'
 
   switch (definition.type) {

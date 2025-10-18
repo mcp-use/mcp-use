@@ -816,6 +816,38 @@ describe('MCP-UI Adapter', () => {
   })
 
   describe('Apps SDK Resource Type', () => {
+    it('should create Apps SDK resource with _meta at top level', () => {
+      const htmlTemplate = '<div id="test"></div>'
+      const metadata = {
+        'openai/widgetDescription': 'Test widget',
+        'openai/widgetPrefersBorder': true,
+        'openai/widgetAccessible': true,
+        'openai/widgetCSP': {
+          connect_domains: ['api.example.com'],
+          resource_domains: ['cdn.example.com']
+        }
+      }
+
+      const resource = createAppsSdkResource(
+        'ui://widget/test',
+        htmlTemplate,
+        metadata
+      )
+
+      // Verify _meta is at the top level of resource object
+      expect(resource.type).toBe('resource')
+      expect(resource.resource).toHaveProperty('_meta')
+      expect(resource.resource._meta).toEqual(metadata)
+
+      // Verify structure matches expected Apps SDK format
+      expect(resource.resource.uri).toBe('ui://widget/test')
+      expect(resource.resource.mimeType).toBe('text/html+skybridge')
+      expect(resource.resource.text).toBe(htmlTemplate)
+
+      // _meta should be at same level as uri, mimeType, text
+      expect(Object.keys(resource.resource).sort()).toEqual(['_meta', 'mimeType', 'text', 'uri'].sort())
+    })
+
     it('should create Apps SDK resource with HTML template', () => {
       const htmlTemplate = `
         <div id="kanban-root"></div>
@@ -844,7 +876,7 @@ describe('MCP-UI Adapter', () => {
       const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
 
       expect(resource.type).toBe('resource')
-      expect(resource.resource.uri).toBe('ui://widget/kanban-board')
+      expect(resource.resource.uri).toBe('ui://widget/kanban-board.html')
       expect(resource.resource.mimeType).toBe('text/html+skybridge')
       expect(resource.resource.text).toContain('<div id="kanban-root"></div>')
       expect(resource.resource.text).toContain('window.openai?.toolOutput')
@@ -917,7 +949,7 @@ describe('MCP-UI Adapter', () => {
       const resource = createUIResourceFromDefinition(definition, {}, urlConfig)
 
       expect(resource.type).toBe('resource')
-      expect(resource.resource.uri).toBe('ui://widget/simple-widget')
+      expect(resource.resource.uri).toBe('ui://widget/simple-widget.html')
       expect(resource.resource.mimeType).toBe('text/html+skybridge')
       expect(resource.resource.text).toBe('<div>Simple</div>')
     })

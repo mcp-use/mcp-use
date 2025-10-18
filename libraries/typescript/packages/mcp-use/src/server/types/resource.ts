@@ -8,6 +8,7 @@ export type UIResourceContent = {
   resource: {
     uri: string
     mimeType: string
+    _meta?: AppsSdkMetadata
   } & (
     | { text: string; blob?: never }
     | { blob: string; text?: never }
@@ -75,6 +76,9 @@ export interface AppsSdkToolMetadata extends Record<string, unknown> {
 
   /** Whether the widget can initiate tool calls */
   'openai/widgetAccessible'?: boolean
+
+  /** Whether this tool result can produce a widget */
+  'openai/resultCanProduceWidget'?: boolean
 }
 
 // Handler types
