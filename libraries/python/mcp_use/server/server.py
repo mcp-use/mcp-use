@@ -87,7 +87,7 @@ class MCPServer(FastMCP):
         reload: bool = False,
         debug: bool = False,
     ) -> None:
-        """Run the FastMCP server. Note this is a synchronous function.
+        """Run the MCP server. Note this is a synchronous function.
 
         Args:
             transport: Transport protocol to use ("stdio", "sse", or "streamable-http")
@@ -95,6 +95,7 @@ class MCPServer(FastMCP):
             port: Port to bind to
             mount_path: Optional mount path for SSE transport
             reload: Whether to enable auto-reload
+            debug: Whether to enable debug mode (adds /docs and /openmcp.json endpoints)
         """
         TRANSPORTS = Literal["stdio", "sse", "streamable-http"]
         if transport not in TRANSPORTS.__args__:  # type: ignore
@@ -104,6 +105,7 @@ class MCPServer(FastMCP):
             case "stdio":
                 anyio.run(self.run_stdio_async)
             case "streamable-http":
-                if debug:
+                if debug and not self.debug:
                     self._add_dev_routes()
+                    self.app = self.streamable_http_app()
                 anyio.run(partial(self.run_streamable_http_async, host=host, port=port, reload=reload))
