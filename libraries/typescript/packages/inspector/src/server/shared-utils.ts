@@ -163,48 +163,48 @@ export async function* handleChatRequestStream(requestBody: {
   }
 
   try {
-    // Track current state
-    let currentContent = ''
-    const toolCalls: any[] = []
-    let currentToolCall: any = null
+    // Generate a unique message ID
+    const messageId = `msg-${Date.now()}`
+
+    // Send initial assistant message event (AI SDK format)
+    yield `data: ${JSON.stringify({ type: 'message', id: messageId, role: 'assistant' })}\n\n`
 
     // Use streamEvents to get real-time updates
     for await (const event of agent.streamEvents(lastUserMessage.content)) {
-      // Emit different types of events
+      // Emit text content as it streams
       if (event.event === 'on_chat_model_stream' && event.data?.chunk?.text) {
         const text = event.data.chunk.text
         if (typeof text === 'string' && text.length > 0) {
-          currentContent += text
-          yield JSON.stringify({ type: 'content', data: text }) + '\n'
+          // AI SDK text event format
+          yield `data: ${JSON.stringify({ type: 'text', id: messageId, content: text })}\n\n`
         }
       }
       else if (event.event === 'on_tool_start') {
-        // Tool invocation started
-        currentToolCall = {
+        // Tool invocation started - AI SDK tool-call event
+        const toolCallId = `tool-${event.name}-${Date.now()}`
+        yield `data: ${JSON.stringify({
+          type: 'tool-call',
+          id: messageId,
+          toolCallId,
           toolName: event.name,
-          args: event.data?.input,
-        }
-        yield JSON.stringify({ type: 'tool_start', data: currentToolCall }) + '\n'
+          args: event.data?.input || {},
+        })}\n\n`
       }
       else if (event.event === 'on_tool_end') {
-        // Tool invocation completed
-        if (currentToolCall) {
-          currentToolCall.result = event.data?.output
-          toolCalls.push(currentToolCall)
-          yield JSON.stringify({ type: 'tool_result', data: currentToolCall }) + '\n'
-          currentToolCall = null
-        }
+        // Tool invocation completed - AI SDK tool-result event
+        const toolCallId = `tool-${event.name}-${Date.now()}`
+        yield `data: ${JSON.stringify({
+          type: 'tool-result',
+          id: messageId,
+          toolCallId,
+          toolName: event.name,
+          result: event.data?.output,
+        })}\n\n`
       }
     }
 
-    // Send final message with tool calls
-    yield JSON.stringify({
-      type: 'done',
-      data: {
-        content: currentContent,
-        toolCalls,
-      },
-    }) + '\n'
+    // Send final done event
+    yield `data: ${JSON.stringify({ type: 'done', id: messageId })}\n\n`
   }
   finally {
     // Clean up

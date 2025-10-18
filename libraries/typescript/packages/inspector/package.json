@@ -55,6 +55,7 @@
     "express": "^4.21.2"
   },
   "dependencies": {
+    "@ai-sdk/react": "^1.0.20",
     "@hono/node-server": "^1.19.5",
     "@mcp-ui/client": "^5.12.1",
     "@modelcontextprotocol/sdk": "1.20.0",

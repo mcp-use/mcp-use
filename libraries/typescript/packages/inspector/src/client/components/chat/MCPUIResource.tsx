@@ -48,13 +48,14 @@ export const MCPUIResource = memo(({
   }
 
   return (
-    <div className="my-4 p-4 border rounded-lg bg-card">
+    <div className="my-4 p-0 border h-[350px] rounded-2xl border-zinc-200 overflow-hidden bg-card">
       <UIResourceRenderer
         resource={resource}
         onUIAction={handleUIAction}
         htmlProps={{
           style: {
             maxWidth: '100%',
+            height: '100%',
             overflow: 'auto',
           },
           autoResizeIframe: true,

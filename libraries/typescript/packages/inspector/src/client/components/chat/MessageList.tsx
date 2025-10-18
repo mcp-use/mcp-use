@@ -11,6 +11,16 @@ interface Message {
   role: 'user' | 'assistant'
   content: string | Array<{ index: number, type: string, text: string }>
   timestamp: number
+  parts?: Array<{
+    type: 'text' | 'tool-invocation'
+    text?: string
+    toolInvocation?: {
+      toolName: string
+      args: Record<string, unknown>
+      result?: any
+      state?: 'pending' | 'result' | 'error'
+    }
+  }>
   toolCalls?: Array<{
     toolName: string
     args: Record<string, unknown>
@@ -108,43 +118,95 @@ export const MessageList = memo(({ messages, isLoading }: MessageListProps) => {
         if (message.role === 'assistant') {
           return (
             <div key={message.id} className="space-y-4">
-              <AssistantMessage
-                content={contentStr}
-                timestamp={message.timestamp}
-                _isStreaming={isMessageStreaming(message)}
-              />
+              {/* Handle message parts if available (for proper ordering) */}
+              {message.parts && message.parts.length > 0
+                ? message.parts.map((part, partIndex) => {
+                    const partKey = part.type === 'text'
+                      ? `${message.id}-text-${partIndex}-${part.text?.slice(0, 20)}`
+                      : `${message.id}-tool-${part.toolInvocation?.toolName}-${partIndex}`
 
-              {/* Tool Calls */}
-              {message.toolCalls && message.toolCalls.length > 0 && (
-                <div className="space-y-2">
-                  {message.toolCalls.map((toolCall) => {
-                    // Extract MCP-UI resources from tool result
-                    const resources = extractMCPResources(toolCall.result)
-                    const toolCallKey = `${message.id}-${toolCall.toolName}-${JSON.stringify(toolCall.args).slice(0, 50)}`
-
-                    return (
-                      <div key={toolCallKey}>
-                        <ToolCallDisplay
-                          toolName={toolCall.toolName}
-                          args={toolCall.args}
-                          result={toolCall.result}
-                          state={toolCall.result ? 'result' : 'call'}
+                    if (part.type === 'text') {
+                      return (
+                        <AssistantMessage
+                          key={partKey}
+                          content={part.text || ''}
+                          timestamp={
+                            partIndex === message.parts!.length - 1
+                              ? message.timestamp
+                              : undefined
+                          }
+                          _isStreaming={isMessageStreaming(message)}
                         />
-                        {/* Render extracted MCP-UI resources */}
-                        {resources.map((resource, resourceIdx) => {
-                          const resourceKey = `${toolCallKey}-resource-${resourceIdx}-${resource.uri || resource.mimeType}`
-                          return (
-                            <MCPUIResource
-                              key={resourceKey}
-                              resource={resource}
-                            />
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                      )
+                    }
+                    else if (part.type === 'tool-invocation' && part.toolInvocation) {
+                      // Extract MCP-UI resources from tool result
+                      const resources = extractMCPResources(part.toolInvocation.result)
+
+                      return (
+                        <div key={partKey}>
+                          <ToolCallDisplay
+                            toolName={part.toolInvocation.toolName}
+                            args={part.toolInvocation.args}
+                            result={part.toolInvocation.result}
+                            state={part.toolInvocation.result ? 'result' : 'call'}
+                          />
+                          {/* Render extracted MCP-UI resources */}
+                          {resources.map((resource, resourceIdx) => {
+                            const resourceKey = `${partKey}-resource-${resourceIdx}-${resource.uri || resource.mimeType}`
+                            return (
+                              <MCPUIResource
+                                key={resourceKey}
+                                resource={resource}
+                              />
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+                    return null
+                  })
+                : (
+                    <>
+                      <AssistantMessage
+                        content={contentStr}
+                        timestamp={message.timestamp}
+                        _isStreaming={isMessageStreaming(message)}
+                      />
+
+                      {/* Tool Calls (fallback for non-parts messages) */}
+                      {message.toolCalls && message.toolCalls.length > 0 && (
+                        <div className="space-y-2">
+                          {message.toolCalls.map((toolCall) => {
+                            // Extract MCP-UI resources from tool result
+                            const resources = extractMCPResources(toolCall.result)
+                            const toolCallKey = `${message.id}-${toolCall.toolName}-${JSON.stringify(toolCall.args).slice(0, 50)}`
+
+                            return (
+                              <div key={toolCallKey}>
+                                <ToolCallDisplay
+                                  toolName={toolCall.toolName}
+                                  args={toolCall.args}
+                                  result={toolCall.result}
+                                  state={toolCall.result ? 'result' : 'call'}
+                                />
+                                {/* Render extracted MCP-UI resources */}
+                                {resources.map((resource, resourceIdx) => {
+                                  const resourceKey = `${toolCallKey}-resource-${resourceIdx}-${resource.uri || resource.mimeType}`
+                                  return (
+                                    <MCPUIResource
+                                      key={resourceKey}
+                                      resource={resource}
+                                    />
+                                  )
+                                })}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
             </div>
           )
         }

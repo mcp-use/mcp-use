@@ -179,7 +179,7 @@ app.post('/inspector/api/chat/stream', async (c) => {
 
     return new Response(readable, {
       headers: {
-        'Content-Type': 'application/x-ndjson',
+        'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       },

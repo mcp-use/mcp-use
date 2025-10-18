@@ -53,6 +53,16 @@ interface Message {
   role: 'user' | 'assistant'
   content: string | Array<{ index: number, type: string, text: string }>
   timestamp: number
+  parts?: Array<{
+    type: 'text' | 'tool-invocation'
+    text?: string
+    toolInvocation?: {
+      toolName: string
+      args: Record<string, unknown>
+      result?: any
+      state?: string
+    }
+  }>
   toolCalls?: Array<{
     toolName: string
     args: Record<string, unknown>
@@ -318,11 +328,16 @@ export function ChatTab({
 
       // Create assistant message that will be updated with streaming content
       const assistantMessageId = `assistant-${Date.now()}`
-      let currentContent = ''
-      const currentToolCalls: Array<{
-        toolName: string
-        args: Record<string, unknown>
-        result?: any
+      let currentTextPart = ''
+      const parts: Array<{
+        type: 'text' | 'tool-invocation'
+        text?: string
+        toolInvocation?: {
+          toolName: string
+          args: Record<string, unknown>
+          result?: any
+          state?: string
+        }
       }> = []
 
       // Add empty assistant message to start
@@ -333,7 +348,7 @@ export function ChatTab({
           role: 'assistant',
           content: '',
           timestamp: Date.now(),
-          toolCalls: [],
+          parts: [],
         },
       ])
 
@@ -363,67 +378,112 @@ export function ChatTab({
           if (!line.trim())
             continue
 
-          try {
-            const event = JSON.parse(line)
+          // SSE format: lines start with "data: "
+          if (!line.startsWith('data: '))
+            continue
 
-            if (event.type === 'content') {
-              // Streaming content from LLM
-              currentContent += event.data
-              setMessages(prev =>
-                prev.map(msg =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: currentContent }
-                    : msg,
-                ),
-              )
+          try {
+            const event = JSON.parse(line.slice(6)) // Remove "data: " prefix
+            console.log('[Client received event]', event.type, event.toolName || event.content?.slice?.(0, 30))
+
+            if (event.type === 'message') {
+              // Initial assistant message - just log it
+              console.log('[Message started]', event.id)
             }
-            else if (event.type === 'tool_start') {
-              // Tool invocation started
-              const toolCall = {
-                toolName: event.data.toolName,
-                args: event.data.args,
+            else if (event.type === 'text') {
+              // Streaming text content from LLM
+              currentTextPart += event.content
+
+              // Update or add text part
+              const lastPart = parts[parts.length - 1]
+              if (lastPart && lastPart.type === 'text') {
+                // Update existing text part
+                lastPart.text = currentTextPart
               }
-              currentToolCalls.push(toolCall)
+              else {
+                // Add new text part
+                parts.push({
+                  type: 'text',
+                  text: currentTextPart,
+                })
+              }
+              console.log('[Parts after text]', parts.length, 'parts, text length:', currentTextPart.length)
+
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, toolCalls: [...currentToolCalls] }
+                    ? { ...msg, parts: [...parts] }
                     : msg,
                 ),
               )
             }
-            else if (event.type === 'tool_result') {
-              // Tool invocation completed
-              const toolIndex = currentToolCalls.findIndex(
-                tc => tc.toolName === event.data.toolName,
+            else if (event.type === 'tool-call') {
+              // Tool invocation started - finalize current text and add tool part
+              if (currentTextPart) {
+                currentTextPart = ''
+              }
+
+              parts.push({
+                type: 'tool-invocation',
+                toolInvocation: {
+                  toolName: event.toolName,
+                  args: event.args,
+                  state: 'pending',
+                },
+              })
+              console.log('[Parts after tool-call]', parts.length, 'parts, tool:', event.toolName)
+
+              setMessages(prev =>
+                prev.map(msg =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, parts: [...parts] }
+                    : msg,
+                ),
               )
-              if (toolIndex !== -1) {
-                currentToolCalls[toolIndex].result = event.data.result
+            }
+            else if (event.type === 'tool-result') {
+              // Tool invocation completed
+              const toolPart = parts.find(
+                p =>
+                  p.type === 'tool-invocation'
+                  && p.toolInvocation?.toolName === event.toolName
+                  && !p.toolInvocation?.result,
+              )
+
+              if (toolPart && toolPart.toolInvocation) {
+                toolPart.toolInvocation.result = event.result
+                toolPart.toolInvocation.state = 'result'
+                console.log('[Parts after tool-result]', parts.length, 'parts, updated:', event.toolName)
+
                 setMessages(prev =>
                   prev.map(msg =>
                     msg.id === assistantMessageId
-                      ? { ...msg, toolCalls: [...currentToolCalls] }
+                      ? { ...msg, parts: [...parts] }
                       : msg,
                   ),
                 )
               }
+              else {
+                console.warn('[tool-result] Could not find matching tool part for', event.toolName)
+              }
             }
             else if (event.type === 'done') {
-              // Final update with complete data
+              // Final update - use done data if available
+              console.log('[Done] Final parts:', parts.length)
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === assistantMessageId
                     ? {
                         ...msg,
-                        content: event.data.content || currentContent,
-                        toolCalls: event.data.toolCalls || currentToolCalls,
+                        parts: [...parts],
+                        content: '', // Clear content since we're using parts
                       }
                     : msg,
                 ),
               )
             }
             else if (event.type === 'error') {
-              throw new Error(event.data.message || 'Streaming error')
+              throw new Error(event.message || 'Streaming error')
             }
           }
           catch (parseError) {
@@ -889,8 +949,8 @@ export function ChatTab({
 
       {/* Input Area */}
       {llmConfig && (
-        <div className="border-t dark:border-zinc-700 p-4">
-          <div className="flex gap-2">
+        <div className="w-full flex flex-col justify-center items-center p-4 text-foreground">
+          <div className="relative w-full max-w-3xl backdrop-blur-xl">
             <Textarea
               ref={textareaRef}
               value={inputValue}
@@ -898,26 +958,40 @@ export function ChatTab({
               onKeyDown={handleKeyDown}
               placeholder={
                 isConnected
-                  ? 'Ask a question or request an action...'
+                  ? 'Ask a question'
                   : 'Server not connected'
               }
-              className="resize-none"
-              rows={2}
+              className="p-4 min-h-[150px] rounded-xl bg-zinc-50 z-10 focus:bg-zinc-100 dark:text-white dark:bg-black border-gray-200 dark:border-zinc-800"
               disabled={!isConnected || isLoading}
             />
-            <Button
-              onClick={sendMessage}
-              disabled={!inputValue.trim() || !isConnected || isLoading}
-              className="self-end"
-            >
-              {isLoading
-                ? (
-                    <Spinner className="h-4 w-4" />
-                  )
-                : (
-                    <Send className="h-4 w-4" />
-                  )}
-            </Button>
+            <div className="absolute left-0 p-3 bottom-0 w-full flex justify-end items-end">
+              <div className="flex items-center gap-2">
+                {isLoading
+                  ? (
+                      <button
+                        className="bg-muted hover:bg-muted/80 text-foreground p-3 rounded-full font-medium flex items-center justify-center h-10 transition-colors border border-border aspect-square w-auto min-w-none"
+                        title="Stop streaming"
+                        type="button"
+                        onClick={() => {
+                          // Stop functionality would go here if needed
+                        }}
+                      >
+                        <Spinner className="h-4 w-4" />
+                      </button>
+                    )
+                  : (
+                      <Button
+                        disabled={!inputValue.trim() || !isConnected || isLoading}
+                        className="min-w-none h-auto w-auto aspect-square rounded-full items-center justify-center flex"
+                        title="Send"
+                        type="button"
+                        onClick={sendMessage}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    )}
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -43,7 +43,7 @@ export function mountInspector(app: Express, path: string = '/inspector', mcpSer
   // Chat API endpoint - streaming version
   app.post(`${basePath}/api/chat/stream`, async (req: Request, res: Response) => {
     try {
-      res.setHeader('Content-Type', 'application/x-ndjson')
+      res.setHeader('Content-Type', 'text/event-stream')
       res.setHeader('Cache-Control', 'no-cache')
       res.setHeader('Connection', 'keep-alive')
 
