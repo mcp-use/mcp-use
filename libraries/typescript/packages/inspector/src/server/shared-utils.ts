@@ -54,7 +54,166 @@ interface ServerConfig {
 }
 
 /**
- * Handle chat API request with MCP agent
+ * Handle chat API request with MCP agent (streaming)
+ */
+export async function* handleChatRequestStream(requestBody: {
+  mcpServerUrl: string
+  llmConfig: LLMConfig
+  authConfig?: AuthConfig
+  messages: ChatMessage[]
+}): AsyncGenerator<string, void, void> {
+  const { mcpServerUrl, llmConfig, authConfig, messages } = requestBody
+
+  if (!mcpServerUrl || !llmConfig || !messages) {
+    throw new Error('Missing required fields: mcpServerUrl, llmConfig, messages')
+  }
+
+  // Dynamically import mcp-use and LLM providers
+  const { MCPAgent, MCPClient } = await import('mcp-use')
+
+  // Create LLM instance based on provider
+  let llm: BaseLLM
+  if (llmConfig.provider === 'openai') {
+    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
+    const { ChatOpenAI } = await import('@langchain/openai')
+    llm = new ChatOpenAI({
+      model: llmConfig.model,
+      apiKey: llmConfig.apiKey,
+    })
+  }
+  else if (llmConfig.provider === 'anthropic') {
+    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
+    const { ChatAnthropic } = await import('@langchain/anthropic')
+    llm = new ChatAnthropic({
+      model: llmConfig.model,
+      apiKey: llmConfig.apiKey,
+    })
+  }
+  else if (llmConfig.provider === 'google') {
+    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
+    const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai')
+    llm = new ChatGoogleGenerativeAI({
+      model: llmConfig.model,
+      apiKey: llmConfig.apiKey,
+    })
+  }
+  else {
+    throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`)
+  }
+
+  // Create MCP client and connect to server
+  const client = new MCPClient()
+  const serverName = `inspector-${Date.now()}`
+
+  // Add server with potential authentication headers
+  const serverConfig: ServerConfig = { url: mcpServerUrl }
+
+  // Handle authentication - support both custom auth and OAuth
+  if (authConfig && authConfig.type !== 'none') {
+    serverConfig.headers = {}
+
+    if (authConfig.type === 'basic' && authConfig.username && authConfig.password) {
+      const auth = Buffer.from(`${authConfig.username}:${authConfig.password}`).toString('base64')
+      serverConfig.headers.Authorization = `Basic ${auth}`
+    }
+    else if (authConfig.type === 'bearer' && authConfig.token) {
+      serverConfig.headers.Authorization = `Bearer ${authConfig.token}`
+    }
+    else if (authConfig.type === 'oauth') {
+      // For OAuth, use the tokens passed from the frontend
+      if (authConfig.oauthTokens?.access_token) {
+        const tokenType = authConfig.oauthTokens.token_type
+          ? authConfig.oauthTokens.token_type.charAt(0).toUpperCase() + authConfig.oauthTokens.token_type.slice(1)
+          : 'Bearer'
+        serverConfig.headers.Authorization = `${tokenType} ${authConfig.oauthTokens.access_token}`
+      }
+    }
+  }
+
+  // If the URL contains authentication info, extract it (fallback)
+  try {
+    const url = new URL(mcpServerUrl)
+    if (url.username && url.password && (!authConfig || authConfig.type === 'none')) {
+      const auth = Buffer.from(`${url.username}:${url.password}`).toString('base64')
+      serverConfig.headers = serverConfig.headers || {}
+      serverConfig.headers.Authorization = `Basic ${auth}`
+      serverConfig.url = `${url.protocol}//${url.host}${url.pathname}${url.search}`
+    }
+  }
+  catch (error) {
+    console.warn('Failed to parse MCP server URL for auth:', error)
+  }
+
+  client.addServer(serverName, serverConfig)
+
+  // Create agent with user's LLM
+  const agent = new MCPAgent({
+    llm,
+    client,
+    maxSteps: 10,
+    memoryEnabled: true,
+    systemPrompt: 'You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.',
+  })
+
+  // Format messages - use only the last user message as the query
+  const lastUserMessage = messages.filter((msg: any) => msg.role === 'user').pop()
+
+  if (!lastUserMessage) {
+    throw new Error('No user message found')
+  }
+
+  try {
+    // Track current state
+    let currentContent = ''
+    const toolCalls: any[] = []
+    let currentToolCall: any = null
+
+    // Use streamEvents to get real-time updates
+    for await (const event of agent.streamEvents(lastUserMessage.content)) {
+      // Emit different types of events
+      if (event.event === 'on_chat_model_stream' && event.data?.chunk?.text) {
+        const text = event.data.chunk.text
+        if (typeof text === 'string' && text.length > 0) {
+          currentContent += text
+          yield JSON.stringify({ type: 'content', data: text }) + '\n'
+        }
+      }
+      else if (event.event === 'on_tool_start') {
+        // Tool invocation started
+        currentToolCall = {
+          toolName: event.name,
+          args: event.data?.input,
+        }
+        yield JSON.stringify({ type: 'tool_start', data: currentToolCall }) + '\n'
+      }
+      else if (event.event === 'on_tool_end') {
+        // Tool invocation completed
+        if (currentToolCall) {
+          currentToolCall.result = event.data?.output
+          toolCalls.push(currentToolCall)
+          yield JSON.stringify({ type: 'tool_result', data: currentToolCall }) + '\n'
+          currentToolCall = null
+        }
+      }
+    }
+
+    // Send final message with tool calls
+    yield JSON.stringify({
+      type: 'done',
+      data: {
+        content: currentContent,
+        toolCalls,
+      },
+    }) + '\n'
+  }
+  finally {
+    // Clean up
+    await client.closeAllSessions()
+  }
+}
+
+/**
+ * Handle chat API request with MCP agent (non-streaming, kept for backwards compatibility)
  */
 export async function handleChatRequest(requestBody: {
   mcpServerUrl: string

@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from 'express'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { checkClientFiles, getClientDistPath, getContentType, handleChatRequest } from './shared-utils.js'
+import { checkClientFiles, getClientDistPath, getContentType, handleChatRequest, handleChatRequestStream } from './shared-utils.js'
 
 /**
  * Mount the MCP Inspector UI at a specified path on an Express app
@@ -40,7 +40,30 @@ export function mountInspector(app: Express, path: string = '/inspector', mcpSer
     })
   })
 
-  // Chat API endpoint - handles MCP agent chat with custom LLM key
+  // Chat API endpoint - streaming version
+  app.post(`${basePath}/api/chat/stream`, async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/x-ndjson')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.setHeader('Connection', 'keep-alive')
+
+      for await (const chunk of handleChatRequestStream(req.body)) {
+        res.write(chunk)
+      }
+
+      res.end()
+    }
+    catch (error) {
+      console.error('Chat API streaming error:', error)
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: error instanceof Error ? error.message : 'Failed to process chat request',
+        })
+      }
+    }
+  })
+
+  // Chat API endpoint - handles MCP agent chat with custom LLM key (non-streaming)
   app.post(`${basePath}/api/chat`, async (req: Request, res: Response) => {
     try {
       const result = await handleChatRequest(req.body)

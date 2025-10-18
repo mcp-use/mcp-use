@@ -7,7 +7,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { MCPInspector } from './mcp-inspector.js'
-import { checkClientFiles, getClientDistPath, getContentType, handleChatRequest } from './shared-utils.js'
+import { checkClientFiles, getClientDistPath, getContentType, handleChatRequest, handleChatRequestStream } from './shared-utils.js'
 
 // Helper function to format error responses with context and timestamp
 function formatErrorResponse(error: unknown, context: string) {
@@ -148,7 +148,49 @@ app.delete('/api/servers/:id', async (c) => {
   }
 })
 
-// Chat API endpoint - handles MCP agent chat with custom LLM key
+// Chat API endpoint - handles MCP agent chat with custom LLM key (streaming)
+app.post('/inspector/api/chat/stream', async (c) => {
+  try {
+    const requestBody = await c.req.json()
+
+    // Create a readable stream from the async generator
+    const { readable, writable } = new TransformStream()
+    const writer = writable.getWriter()
+    const encoder = new TextEncoder()
+
+    // Start streaming in the background
+    ;(async () => {
+      try {
+        for await (const chunk of handleChatRequestStream(requestBody)) {
+          await writer.write(encoder.encode(chunk))
+        }
+      }
+      catch (error) {
+        const errorMsg = `${JSON.stringify({
+          type: 'error',
+          data: { message: error instanceof Error ? error.message : 'Unknown error' },
+        })}\n`
+        await writer.write(encoder.encode(errorMsg))
+      }
+      finally {
+        await writer.close()
+      }
+    })()
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    })
+  }
+  catch (error) {
+    return c.json(formatErrorResponse(error, 'handleChatRequestStream'), 500)
+  }
+})
+
+// Chat API endpoint - handles MCP agent chat with custom LLM key (non-streaming)
 app.post('/inspector/api/chat', async (c) => {
   try {
     const requestBody = await c.req.json()
