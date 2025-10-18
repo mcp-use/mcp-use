@@ -301,7 +301,7 @@ async function startServer() {
     // Auto-open browser
     try {
       await open(`http://localhost:${port}`)
-      console.log(`🌐 Browser opened automatically`)
+      console.log(`🌐 Browser opened`)
     } catch {
       console.log(`🌐 Please open http://localhost:${port} in your browser`)
     }
