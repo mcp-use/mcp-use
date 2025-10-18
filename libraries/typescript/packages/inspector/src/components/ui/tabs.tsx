@@ -1,8 +1,8 @@
 'use client'
 
-import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 import * as React from 'react'
+import { cn } from '@/lib/utils'
 
 interface TabsContextType {
   activeValue: string
@@ -24,11 +24,11 @@ interface TabsListContextType {
 }
 
 const TabsListContext = React.createContext<TabsListContextType | undefined>(
-  undefined
+  undefined,
 )
 
 function useTabsList() {
-  const context = React.useContext(TabsListContext)
+  const context = React.use(TabsListContext)
   return context
 }
 
@@ -59,7 +59,7 @@ function Tabs({
       }
       onValueChange?.(val)
     },
-    [isControlled, onValueChange]
+    [isControlled, onValueChange],
   )
 
   const currentValue = isControlled ? value : activeValue
@@ -106,15 +106,16 @@ function TabsList({
   const debounceTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   const childrenArray = React.Children.toArray(children)
   const activeIndex = childrenArray.findIndex(
-    (child) =>
-      React.isValidElement(child) &&
-      (child.props as { value: string }).value === activeValue
+    child =>
+      React.isValidElement(child)
+      && (child.props as { value: string }).value === activeValue,
   )
 
   // Debounced update function
   const updateIndicator = React.useCallback(() => {
     const container = containerRef.current
-    if (!container) return
+    if (!container)
+      return
 
     const triggers = container.querySelectorAll('button')
     const activeTrigger = triggers[activeIndex] as HTMLElement
@@ -148,7 +149,8 @@ function TabsList({
   // Set up ResizeObserver for the container
   React.useEffect(() => {
     const container = containerRef.current
-    if (!container) return
+    if (!container)
+      return
 
     // Create ResizeObserver to watch for container size changes
     resizeObserverRef.current = new ResizeObserver(() => {
@@ -188,7 +190,8 @@ function TabsList({
   // Apply dynamic styles using data attributes
   React.useEffect(() => {
     const container = containerRef.current
-    if (!container) return
+    if (!container)
+      return
 
     const glider = container.querySelector('[data-width]') as HTMLElement
     if (glider) {
@@ -203,11 +206,11 @@ function TabsList({
         ref={containerRef}
         className={cn(
           'relative flex bg-none',
-          variant === 'default' &&
-            'p-1 rounded-full border border-zinc-300 dark:border-zinc-600',
-          variant === 'underline' &&
-            'border-b border-zinc-200 dark:border-zinc-700',
-          className
+          variant === 'default'
+          && 'p-1 rounded-full border border-zinc-300 dark:border-zinc-600',
+          variant === 'underline'
+          && 'border-b border-zinc-200 dark:border-zinc-700',
+          className,
         )}
         {...props}
       >
@@ -215,9 +218,9 @@ function TabsList({
         <span
           className={cn(
             'absolute transition-all duration-200 ease-out z-0',
-            variant === 'default' &&
-              'bg-white dark:bg-zinc-700 rounded-full h-[calc(100%-8px)] top-1 border border-zinc-300 dark:border-zinc-600',
-            variant === 'underline' && 'bottom-0 h-0.5 bg-black dark:bg-white'
+            variant === 'default'
+            && 'bg-white dark:bg-zinc-700 rounded-full h-[calc(100%-8px)] top-1 border border-zinc-300 dark:border-zinc-600',
+            variant === 'underline' && 'bottom-0 h-0.5 bg-black dark:bg-white',
           )}
           data-width={indicatorStyle.width}
           data-left={indicatorStyle.left}
@@ -273,7 +276,7 @@ function TabsTrigger({
         variant === 'underline' && 'px-6 py-3 border-b-2 border-transparent',
         isActive && 'text-foreground',
         !isActive && 'text-muted-foreground hover:text-foreground',
-        className
+        className,
       )}
       {...props}
     >
@@ -300,7 +303,8 @@ function TabsContent({
   const { activeValue } = useTabs()
   const isActive = activeValue === value
 
-  if (!isActive) return null
+  if (!isActive)
+    return null
 
   return (
     <div
@@ -308,7 +312,7 @@ function TabsContent({
       role="tabpanel"
       className={cn(
         'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        className
+        className,
       )}
       {...props}
     >

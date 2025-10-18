@@ -54,7 +54,6 @@ export function mountInspector(app: Express, path: string = '/inspector', mcpSer
     }
   })
 
-
   // Serve static assets
   app.use(`${basePath}/assets`, (_req: Request, res: Response) => {
     const assetPath = join(clientDistPath, 'assets', _req.path)

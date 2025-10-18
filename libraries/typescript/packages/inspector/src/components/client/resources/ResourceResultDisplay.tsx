@@ -1,8 +1,8 @@
+import { Brush, Copy, Download, Maximize } from 'lucide-react'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { usePrismTheme } from '@/client/hooks/usePrismTheme'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Brush, Copy, Download, Maximize } from 'lucide-react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { isMcpUIResource, McpUIRenderer } from '../McpUIRenderer'
 
 export interface ResourceResult {
@@ -73,16 +73,16 @@ export function ResourceResultDisplay({
   }
 
   // Check if we have MCP UI resources
-  const hasMcpUIResources =
-    result.result.contents &&
-    Array.isArray(result.result.contents) &&
-    result.result.contents.some(
-      (item: any) => item.mimeType && isMcpUIResource(item)
-    )
+  const hasMcpUIResources
+    = result.result.contents
+      && Array.isArray(result.result.contents)
+      && result.result.contents.some(
+        (item: any) => item.mimeType && isMcpUIResource(item),
+      )
 
   const mcpUIResources = hasMcpUIResources
     ? result.result.contents.filter(
-        (item: any) => item.mimeType && isMcpUIResource(item)
+        (item: any) => item.mimeType && isMcpUIResource(item),
       )
     : []
 
@@ -137,8 +137,8 @@ export function ResourceResultDisplay({
                   {mcpUIResources.map((resource: any, _idx: number) => (
                     <div
                       key={`mcp-ui-${
-                        resource.uri ||
-                        `resource-${Date.now()}-${Math.random()}`
+                        resource.uri
+                        || `resource-${Date.now()}-${Math.random()}`
                       }`}
                       className="mx-0 size-full"
                     >
@@ -156,11 +156,11 @@ export function ResourceResultDisplay({
                   {/* Show JSON for non-UI content */}
                   {(() => {
                     if (
-                      result.result.contents &&
-                      Array.isArray(result.result.contents)
+                      result.result.contents
+                      && Array.isArray(result.result.contents)
                     ) {
                       const nonUIResources = result.result.contents.filter(
-                        (item: any) => !(item.mimeType && isMcpUIResource(item))
+                        (item: any) => !(item.mimeType && isMcpUIResource(item)),
                       )
                       if (nonUIResources.length > 0) {
                         return (
@@ -188,7 +188,8 @@ export function ResourceResultDisplay({
                   })()}
                 </div>
               )
-            } else {
+            }
+            else {
               // JSON mode for MCP UI resources
               return (
                 <div className="px-4 pt-4">

@@ -1,4 +1,3 @@
-import { cn } from '@/lib/utils'
 import type { Resource } from '@modelcontextprotocol/sdk/types.js'
 import {
   Database,
@@ -8,6 +7,7 @@ import {
   FileText,
   Globe,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface ResourcesListProps {
   resources: Resource[]
@@ -17,7 +17,8 @@ interface ResourcesListProps {
 }
 
 function getResourceIcon(mimeType?: string, uri?: string) {
-  if (!mimeType && !uri) return <File className="h-5 w-5" />
+  if (!mimeType && !uri)
+    return <File className="h-5 w-5" />
 
   const type = (mimeType || uri || '').toLowerCase()
 
@@ -25,9 +26,9 @@ function getResourceIcon(mimeType?: string, uri?: string) {
     return <FileImage className="h-5 w-5" />
   }
   if (
-    type.includes('json') ||
-    type.includes('javascript') ||
-    type.includes('typescript')
+    type.includes('json')
+    || type.includes('javascript')
+    || type.includes('typescript')
   ) {
     return <FileCode className="h-5 w-5" />
   }
@@ -58,9 +59,9 @@ function getResourceTypeColor(mimeType?: string, uri?: string) {
     }
   }
   if (
-    type.includes('json') ||
-    type.includes('javascript') ||
-    type.includes('typescript')
+    type.includes('json')
+    || type.includes('javascript')
+    || type.includes('typescript')
   ) {
     return {
       bgColor: 'bg-blue-100 dark:bg-blue-900/30',
@@ -111,10 +112,10 @@ export function ResourcesList({
             id={`resource-${resource.uri}`}
             className={cn(
               'cursor-pointer transition-all rounded-[20px] bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-2',
-              selectedResource?.uri === resource.uri &&
-                'border-2 border-zinc-200 dark:border-zinc-600',
-              focusedIndex === index &&
-                'border-2 border-blue-500 dark:border-blue-400'
+              selectedResource?.uri === resource.uri
+              && 'border-2 border-zinc-200 dark:border-zinc-600',
+              focusedIndex === index
+              && 'border-2 border-blue-500 dark:border-blue-400',
             )}
             onClick={() => onResourceSelect(resource)}
           >
@@ -122,7 +123,7 @@ export function ResourcesList({
               <div
                 className={cn(
                   'rounded-full p-3 flex items-center justify-center',
-                  typeInfo.bgColor
+                  typeInfo.bgColor,
                 )}
               >
                 <div className={typeInfo.iconColor}>

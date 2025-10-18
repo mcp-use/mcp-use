@@ -44,7 +44,7 @@ interface ToolCall {
 }
 
 // Type for LangChain LLM models - using any for flexibility with dynamic imports
- 
+
 type BaseLLM = any
 
 interface ServerConfig {
@@ -61,7 +61,7 @@ export async function handleChatRequest(requestBody: {
   llmConfig: LLMConfig
   authConfig?: AuthConfig
   messages: ChatMessage[]
-}): Promise<{ content: string; toolCalls: ToolCall[] }> {
+}): Promise<{ content: string, toolCalls: ToolCall[] }> {
   const { mcpServerUrl, llmConfig, authConfig, messages } = requestBody
 
   if (!mcpServerUrl || !llmConfig || !messages) {

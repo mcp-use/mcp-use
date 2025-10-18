@@ -78,7 +78,7 @@ export function CommandPalette({
       action: () =>
         window.open(
           'https://modelcontextprotocol.io/docs/getting-started/intro',
-          '_blank'
+          '_blank',
         ),
     },
     {
@@ -108,7 +108,7 @@ export function CommandPalette({
   ]
 
   // Create server selection items
-  const serverItems: CommandItem[] = connections.map((connection) => ({
+  const serverItems: CommandItem[] = connections.map(connection => ({
     id: `server-${connection.id}`,
     name: connection.name,
     description: `Connected server (${connection.state})`,
@@ -122,7 +122,7 @@ export function CommandPalette({
   const commandItems: CommandItem[] = [
     ...globalItems,
     ...serverItems,
-    ...tools.map((tool) => ({
+    ...tools.map(tool => ({
       id: `tool-${tool.name}`,
       name: tool.name,
       description: tool.description,
@@ -136,7 +136,7 @@ export function CommandPalette({
         serverName: (tool as any)._serverName,
       },
     })),
-    ...prompts.map((prompt) => ({
+    ...prompts.map(prompt => ({
       id: `prompt-${prompt.name}`,
       name: prompt.name,
       description: prompt.description,
@@ -150,7 +150,7 @@ export function CommandPalette({
         serverName: (prompt as any)._serverName,
       },
     })),
-    ...resources.map((resource) => ({
+    ...resources.map(resource => ({
       id: `resource-${resource.uri}`,
       name: resource.name,
       description: resource.description,
@@ -180,29 +180,31 @@ export function CommandPalette({
         console.warn('[CommandPalette] Executing action for global item')
         item.action()
         onOpenChange(false)
-      } else if (item.type === 'global') {
+      }
+      else if (item.type === 'global') {
         // Handle server selection
         if (item.metadata?.serverId) {
           console.warn(
             '[CommandPalette] Selecting server:',
-            item.metadata.serverId
+            item.metadata.serverId,
           )
           onServerSelect(item.metadata.serverId)
           onOpenChange(false)
         }
-      } else {
+      }
+      else {
         // Navigate to the item's tab and server in one atomic operation
         // For resources, use URI instead of name
-        const itemIdentifier =
-          item.type === 'resource' ? item.metadata?.uri : item.name
+        const itemIdentifier
+          = item.type === 'resource' ? item.metadata?.uri : item.name
 
         // Convert singular type to plural tab name
-        const tabName =
-          item.type === 'tool'
+        const tabName
+          = item.type === 'tool'
             ? 'tools'
             : item.type === 'prompt'
-            ? 'prompts'
-            : ('resources' as const)
+              ? 'prompts'
+              : ('resources' as const)
 
         console.warn('[CommandPalette] Navigating to item:', {
           tab: tabName,
@@ -213,7 +215,7 @@ export function CommandPalette({
         onOpenChange(false)
       }
     },
-    [onNavigate, onOpenChange, onServerSelect]
+    [onNavigate, onOpenChange, onServerSelect],
   )
 
   const getIcon = (type: string, category?: string, itemName?: string) => {
@@ -322,7 +324,7 @@ export function CommandPalette({
         <Command.Empty className="text-sm flex items-center justify-center h-12 whitespace-pre-wrap text-muted-foreground">
           No results found.
         </Command.Empty>
-        {commandItems.map((item) => (
+        {commandItems.map(item => (
           <Command.Item
             key={item.id}
             value={`${item.name} ${item.description || ''} ${item.category}`}
@@ -333,19 +335,19 @@ export function CommandPalette({
             <span className="font-medium truncate flex-1 min-w-0">
               {item.name}
             </span>
-            {(item.metadata?.serverName || item.metadata?.serverId) &&
-              item.category !== 'Connected Servers' && (
-                <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
-                  <ServerIcon
-                    serverUrl={item.metadata?.serverId}
-                    serverName={item.metadata?.serverName}
-                    size="sm"
-                  />
-                  <span className="text-xs font-base text-muted-foreground">
-                    {item.metadata?.serverName || item.metadata?.serverId}
-                  </span>
-                </div>
-              )}
+            {(item.metadata?.serverName || item.metadata?.serverId)
+              && item.category !== 'Connected Servers' && (
+              <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
+                <ServerIcon
+                  serverUrl={item.metadata?.serverId}
+                  serverName={item.metadata?.serverName}
+                  size="sm"
+                />
+                <span className="text-xs font-base text-muted-foreground">
+                  {item.metadata?.serverName || item.metadata?.serverId}
+                </span>
+              </div>
+            )}
           </Command.Item>
         ))}
       </Command.List>

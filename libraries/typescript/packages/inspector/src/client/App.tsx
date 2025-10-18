@@ -1,7 +1,7 @@
+import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import { InspectorDashboard } from '@/components/client/InspectorDashboard'
 import { Layout } from '@/components/client/Layout'
 import { Toaster } from '@/components/ui/sonner'
-import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import { InspectorProvider } from './context/InspectorContext'
 import { McpProvider } from './context/McpContext'
 import { ThemeProvider } from './context/ThemeContext'

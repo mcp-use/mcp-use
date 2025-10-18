@@ -1,4 +1,6 @@
-import { Button } from '@/components/ui/button';
+import { Check, Copy, Loader2, Wrench, X } from 'lucide-react'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Sheet,
   SheetContent,
@@ -6,16 +8,14 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
-import { Check, Copy, Loader2, Wrench, X } from 'lucide-react';
-import { useState } from 'react';
+} from '@/components/ui/sheet'
+import { cn } from '@/lib/utils'
 
 interface ToolCallDisplayProps {
-  toolName: string;
-  args: Record<string, unknown>;
-  result?: any;
-  state?: 'call' | 'result' | 'error';
+  toolName: string
+  args: Record<string, unknown>
+  result?: any
+  state?: 'call' | 'result' | 'error'
 }
 
 export function ToolCallDisplay({
@@ -24,46 +24,46 @@ export function ToolCallDisplay({
   result,
   state = 'result',
 }: ToolCallDisplayProps) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false)
 
   const getStatusIcon = () => {
     switch (state) {
       case 'call':
         return (
           <Loader2 className="h-4 w-4 animate-spin text-blue-500 dark:text-blue-400" />
-        );
+        )
       case 'result':
         return (
           <Check className="h-4 w-4 text-emerald-800 dark:text-emerald-400" />
-        );
+        )
       case 'error':
-        return <X className="h-4 w-4 text-red-500 dark:text-red-400" />;
+        return <X className="h-4 w-4 text-red-500 dark:text-red-400" />
     }
-  };
+  }
 
   const getStatusBg = () => {
     switch (state) {
       case 'call':
-        return 'border border-blue-200 dark:border-blue-800';
+        return 'border border-blue-200 dark:border-blue-800'
       case 'result':
-        return 'border border-emerald-200 dark:border-emerald-800';
+        return 'border border-emerald-200 dark:border-emerald-800'
       case 'error':
-        return 'border border-red-200 dark:border-red-800';
+        return 'border border-red-200 dark:border-red-800'
     }
-  };
+  }
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const formatContent = (content: any): string => {
     if (typeof content === 'object') {
-      return JSON.stringify(content, null, 2);
+      return JSON.stringify(content, null, 2)
     }
-    return String(content);
-  };
+    return String(content)
+  }
 
   return (
     <Sheet>
@@ -78,14 +78,19 @@ export function ToolCallDisplay({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium truncate">
-                {toolName}(
-                {Object.keys(args).length > 0 ? (
-                  <span className="bg-muted-foreground/20 rounded-full px-1.5 mx-1 py-0.5 text-xs">
-                    {Object.keys(args).length} args
-                  </span>
-                ) : (
-                  ''
-                )}
+                {toolName}
+                (
+                {Object.keys(args).length > 0
+                  ? (
+                      <span className="bg-muted-foreground/20 rounded-full px-1.5 mx-1 py-0.5 text-xs">
+                        {Object.keys(args).length}
+                        {' '}
+                        args
+                      </span>
+                    )
+                  : (
+                      ''
+                    )}
                 )
               </span>
             </div>
@@ -95,7 +100,7 @@ export function ToolCallDisplay({
           <div
             className={cn(
               'w-8 h-8 rounded-full flex items-center justify-center',
-              getStatusBg()
+              getStatusBg(),
             )}
           >
             {getStatusIcon()}
@@ -113,7 +118,10 @@ export function ToolCallDisplay({
             Tool Call Details
           </SheetTitle>
           <SheetDescription>
-            {toolName} - {state}
+            {toolName}
+            {' '}
+            -
+            {state}
           </SheetDescription>
         </SheetHeader>
 
@@ -147,29 +155,33 @@ export function ToolCallDisplay({
                     'p-3 rounded-lg border text-sm leading-relaxed max-h-48 overflow-x-auto whitespace-pre-wrap break-words max-w-full',
                     state === 'error'
                       ? 'bg-destructive/10 border-destructive/20 text-destructive-foreground'
-                      : 'bg-muted/30 border-border'
+                      : 'bg-muted/30 border-border',
                   )}
                 >
-                  {typeof result === 'string' ? (
-                    result.startsWith('Error') ? (
-                      <div className="font-mono">
-                        <div className="font-semibold text-destructive mb-1">
-                          Error:
-                        </div>
-                        <div className="whitespace-pre-wrap break-words">
-                          {result.replace(/^Error:\s*/, '')}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="whitespace-pre-wrap font-mono break-words">
-                        {result}
-                      </div>
-                    )
-                  ) : (
-                    <pre className="font-mono text-xs overflow-x-auto max-h-48 whitespace-pre-wrap break-words max-w-full">
-                      {JSON.stringify(result, null, 2)}
-                    </pre>
-                  )}
+                  {typeof result === 'string'
+                    ? (
+                        result.startsWith('Error')
+                          ? (
+                              <div className="font-mono">
+                                <div className="font-semibold text-destructive mb-1">
+                                  Error:
+                                </div>
+                                <div className="whitespace-pre-wrap break-words">
+                                  {result.replace(/^Error:\s*/, '')}
+                                </div>
+                              </div>
+                            )
+                          : (
+                              <div className="whitespace-pre-wrap font-mono break-words">
+                                {result}
+                              </div>
+                            )
+                      )
+                    : (
+                        <pre className="font-mono text-xs overflow-x-auto max-h-48 whitespace-pre-wrap break-words max-w-full">
+                          {JSON.stringify(result, null, 2)}
+                        </pre>
+                      )}
                 </div>
                 <Button
                   variant="ghost"
@@ -178,9 +190,8 @@ export function ToolCallDisplay({
                     copyToClipboard(
                       typeof result === 'string'
                         ? result
-                        : JSON.stringify(result, null, 2)
-                    )
-                  }
+                        : JSON.stringify(result, null, 2),
+                    )}
                   className="absolute top-2 right-2 h-6 w-6 p-0 opacity-70 hover:opacity-100"
                   title="Copy result"
                 >
@@ -192,6 +203,5 @@ export function ToolCallDisplay({
         </div>
       </SheetContent>
     </Sheet>
-  );
+  )
 }
-

@@ -29,10 +29,10 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check if any input, textarea, or contenteditable element is focused
       const target = event.target as HTMLElement
-      const isInputFocused =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.contentEditable === 'true'
+      const isInputFocused
+        = target.tagName === 'INPUT'
+          || target.tagName === 'TEXTAREA'
+          || target.contentEditable === 'true'
 
       // Cmd/Ctrl + K for command palette (works even with inputs focused)
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {

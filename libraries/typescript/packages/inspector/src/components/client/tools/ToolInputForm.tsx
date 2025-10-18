@@ -1,7 +1,7 @@
+import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 
 interface ToolInputFormProps {
   selectedTool: Tool
@@ -42,16 +42,17 @@ export function ToolInputForm({
         if (currentValue !== undefined && currentValue !== null) {
           if (typeof currentValue === 'string') {
             stringValue = currentValue
-          } else {
+          }
+          else {
             stringValue = JSON.stringify(currentValue, null, 2)
           }
         }
 
         // Use textarea for objects/arrays or complex types
         if (
-          typedProp.type === 'object' ||
-          typedProp.type === 'array' ||
-          (typeof currentValue === 'object' && currentValue !== null)
+          typedProp.type === 'object'
+          || typedProp.type === 'array'
+          || (typeof currentValue === 'object' && currentValue !== null)
         ) {
           return (
             <div key={key} className="space-y-2">
@@ -64,7 +65,7 @@ export function ToolInputForm({
               <Textarea
                 id={key}
                 value={stringValue}
-                onChange={(e) => onArgChange(key, e.target.value)}
+                onChange={e => onArgChange(key, e.target.value)}
                 placeholder={typedProp?.description || `Enter ${key}`}
                 className="min-h-[100px]"
               />
@@ -88,7 +89,7 @@ export function ToolInputForm({
             <Input
               id={key}
               value={stringValue}
-              onChange={(e) => onArgChange(key, e.target.value)}
+              onChange={e => onArgChange(key, e.target.value)}
               placeholder={typedProp?.description || `Enter ${key}`}
             />
             {typedProp?.description && (

@@ -1,7 +1,7 @@
+import { Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Save } from 'lucide-react'
 
 interface SaveRequestDialogProps {
   isOpen: boolean
@@ -20,7 +20,8 @@ export function SaveRequestDialog({
   onSave,
   onCancel,
 }: SaveRequestDialogProps) {
-  if (!isOpen) return null
+  if (!isOpen)
+    return null
 
   return (
     <div
@@ -29,7 +30,7 @@ export function SaveRequestDialog({
     >
       <div
         className="bg-white dark:bg-zinc-800 rounded-lg p-6 w-[400px] shadow-xl border border-gray-200 dark:border-zinc-700"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
           Save Request
@@ -40,7 +41,7 @@ export function SaveRequestDialog({
             <Input
               id="request-name"
               value={requestName}
-              onChange={(e) => onRequestNameChange(e.target.value)}
+              onChange={e => onRequestNameChange(e.target.value)}
               placeholder={defaultPlaceholder}
               className="mt-2"
               onKeyDown={(e) => {

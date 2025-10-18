@@ -1,3 +1,7 @@
+import type { CustomHeader } from './CustomHeadersEditor'
+import { Cog, Copy, FileText, Shield } from 'lucide-react'
+import { useState } from 'react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,10 +28,6 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import { Cog, Copy, FileText, Shield } from 'lucide-react'
-import { useState } from 'react'
-import { toast } from 'sonner'
-import type { CustomHeader } from './CustomHeadersEditor'
 import { CustomHeadersEditor } from './CustomHeadersEditor'
 
 interface ConnectionSettingsFormProps {
@@ -114,7 +114,7 @@ export function ConnectionSettingsForm({
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
 
   const enabledHeadersCount = customHeaders.filter(
-    (h) => h.name && h.value
+    h => h.name && h.value,
   ).length
 
   const handleExportServerEntry = async () => {
@@ -132,9 +132,10 @@ export function ConnectionSettingsForm({
     try {
       await navigator.clipboard.writeText(JSON.stringify(serverEntry, null, 2))
       toast.success(
-        'Streamable HTTP URL has been copied. Use this URL directly in your MCP Client.'
+        'Streamable HTTP URL has been copied. Use this URL directly in your MCP Client.',
       )
-    } catch {
+    }
+    catch {
       toast.error('Failed to copy server entry to clipboard')
     }
   }
@@ -158,9 +159,10 @@ export function ConnectionSettingsForm({
     try {
       await navigator.clipboard.writeText(JSON.stringify(serversFile, null, 2))
       toast.success(
-        "Servers configuration has been copied to clipboard. Add this to your mcp.json file. Current testing server will be added as 'default-server'"
+        'Servers configuration has been copied to clipboard. Add this to your mcp.json file. Current testing server will be added as \'default-server\'',
       )
-    } catch {
+    }
+    catch {
       toast.error('Failed to copy servers file to clipboard')
     }
   }
@@ -204,7 +206,7 @@ export function ConnectionSettingsForm({
                 isStyled
                   ? 'absolute top-0 right-0 text-white hover:bg-white/20 z-10 dark:hover:bg-white/20'
                   : 'w-full',
-                !isStyled && 'mb-2'
+                !isStyled && 'mb-2',
               )}
             >
               <Copy className="w-4 h-4 mr-2" />
@@ -268,7 +270,7 @@ export function ConnectionSettingsForm({
         <Input
           placeholder="http://localhost:3001/sse"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={e => setUrl(e.target.value)}
           className={inputClassName}
         />
       </div>
@@ -283,7 +285,7 @@ export function ConnectionSettingsForm({
                 htmlFor="auto-switch"
                 className={cn(
                   'text-xs cursor-pointer',
-                  isStyled ? 'text-white/70' : 'text-muted-foreground'
+                  isStyled ? 'text-white/70' : 'text-muted-foreground',
                 )}
               >
                 Auto-switch
@@ -295,7 +297,7 @@ export function ConnectionSettingsForm({
                   setAutoSwitch(value)
                   localStorage.setItem(
                     'mcp-inspector-auto-switch',
-                    String(value)
+                    String(value),
                   )
                 }}
                 className="scale-75"
@@ -345,7 +347,7 @@ export function ConnectionSettingsForm({
                 <Input
                   placeholder="Client ID"
                   value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
+                  onChange={e => setClientId(e.target.value)}
                 />
               </div>
 
@@ -354,7 +356,7 @@ export function ConnectionSettingsForm({
                 <Label className="text-sm">Redirect URL</Label>
                 <Input
                   value={redirectUrl}
-                  onChange={(e) => setRedirectUrl(e.target.value)}
+                  onChange={e => setRedirectUrl(e.target.value)}
                 />
               </div>
 
@@ -364,7 +366,7 @@ export function ConnectionSettingsForm({
                 <Input
                   placeholder="Scope (space-separated)"
                   value={scope}
-                  onChange={(e) => setScope(e.target.value)}
+                  onChange={e => setScope(e.target.value)}
                 />
               </div>
 
@@ -410,7 +412,7 @@ export function ConnectionSettingsForm({
               variant="outline"
               className={cn(
                 'flex-1 justify-center cursor-pointer',
-                buttonClassName
+                buttonClassName,
               )}
             >
               <Cog className="w-4 h-4 mr-2" />
@@ -431,7 +433,7 @@ export function ConnectionSettingsForm({
                 <Input
                   type="number"
                   value={requestTimeout}
-                  onChange={(e) => setRequestTimeout(e.target.value)}
+                  onChange={e => setRequestTimeout(e.target.value)}
                 />
               </div>
 
@@ -464,7 +466,7 @@ export function ConnectionSettingsForm({
                 <Input
                   type="number"
                   value={maxTotalTimeout}
-                  onChange={(e) => setMaxTotalTimeout(e.target.value)}
+                  onChange={e => setMaxTotalTimeout(e.target.value)}
                 />
               </div>
 
@@ -476,7 +478,7 @@ export function ConnectionSettingsForm({
                 </Label>
                 <Input
                   value={proxyAddress}
-                  onChange={(e) => setProxyAddress(e.target.value)}
+                  onChange={e => setProxyAddress(e.target.value)}
                   placeholder=""
                 />
               </div>
@@ -496,44 +498,46 @@ export function ConnectionSettingsForm({
           disabled={!url.trim() || isConnecting}
           className={cn(
             'w-full font-semibold mt-4',
-            isStyled ? 'bg-white text-black hover:bg-white/90' : ''
+            isStyled ? 'bg-white text-black hover:bg-white/90' : '',
           )}
         >
-          {isConnecting ? (
-            <>
-              <svg
-                className="w-4 h-4 mr-2 animate-spin"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Connecting...
-            </>
-          ) : (
-            <>
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              Connect
-            </>
-          )}
+          {isConnecting
+            ? (
+                <>
+                  <svg
+                    className="w-4 h-4 mr-2 animate-spin"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Connecting...
+                </>
+              )
+            : (
+                <>
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                  Connect
+                </>
+              )}
         </Button>
       )}
 

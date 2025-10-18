@@ -1,7 +1,7 @@
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { Wrench } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 interface ToolsListProps {
   tools: Tool[]
@@ -35,10 +35,10 @@ export function ToolsList({
           onClick={() => onToolSelect(tool)}
           className={cn(
             'w-full text-left cursor-pointer p-4 border-b dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors group',
-            selectedTool?.name === tool.name &&
-              'bg-blue-50 dark:bg-zinc-800 border-l-4 border-l-blue-500',
-            focusedIndex === index &&
-              'ring-2 ring-blue-500 dark:ring-blue-400 ring-inset'
+            selectedTool?.name === tool.name
+            && 'bg-blue-50 dark:bg-zinc-800 border-l-4 border-l-blue-500',
+            focusedIndex === index
+            && 'ring-2 ring-blue-500 dark:ring-blue-400 ring-inset',
           )}
         >
           <div className="flex items-start gap-3">
@@ -48,7 +48,7 @@ export function ToolsList({
                   'p-3 rounded-full transition-colors',
                   selectedTool?.name === tool.name
                     ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                    : 'bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-zinc-600'
+                    : 'bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-zinc-600',
                 )}
               >
                 <Wrench className="h-4 w-4" />
@@ -61,7 +61,7 @@ export function ToolsList({
                     'font-medium truncate',
                     selectedTool?.name === tool.name
                       ? 'text-blue-700 dark:text-blue-400'
-                      : 'text-gray-900 dark:text-gray-100'
+                      : 'text-gray-900 dark:text-gray-100',
                   )}
                 >
                   {tool.name}
@@ -71,7 +71,9 @@ export function ToolsList({
                     variant="outline"
                     className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
                   >
-                    {Object.keys(tool.inputSchema.properties).length} params
+                    {Object.keys(tool.inputSchema.properties).length}
+                    {' '}
+                    params
                   </Badge>
                 )}
               </div>

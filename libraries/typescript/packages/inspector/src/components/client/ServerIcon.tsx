@@ -1,8 +1,8 @@
+import { useEffect, useState } from 'react'
 import { BlurFade } from '@/components/ui/blur-fade'
 import { RandomGradientBackground } from '@/components/ui/random-gradient-background'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import { useEffect, useState } from 'react'
 
 interface ServerIconProps {
   serverUrl?: string
@@ -20,19 +20,20 @@ const FAVICON_CACHE_KEY = 'mcp-inspector-favicon-cache'
 const CACHE_TTL_MS = 10 * 24 * 60 * 60 * 1000 // 10 days in milliseconds
 
 // Helper functions for favicon cache
-const getFaviconCache = (): Record<string, FaviconCache> => {
+function getFaviconCache(): Record<string, FaviconCache> {
   try {
     const cached = localStorage.getItem(FAVICON_CACHE_KEY)
     if (cached) {
       return JSON.parse(cached)
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to load favicon cache:', error)
   }
   return {}
 }
 
-const setFaviconCache = (domain: string, base64: string) => {
+function setFaviconCache(domain: string, base64: string) {
   try {
     const cache = getFaviconCache()
     cache[domain] = {
@@ -40,12 +41,13 @@ const setFaviconCache = (domain: string, base64: string) => {
       timestamp: Date.now(),
     }
     localStorage.setItem(FAVICON_CACHE_KEY, JSON.stringify(cache))
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to save favicon cache:', error)
   }
 }
 
-const getCachedFavicon = (domain: string): string | null => {
+function getCachedFavicon(domain: string): string | null {
   try {
     const cache = getFaviconCache()
     const cached = cache[domain]
@@ -54,22 +56,21 @@ const getCachedFavicon = (domain: string): string | null => {
       const age = Date.now() - cached.timestamp
       if (age < CACHE_TTL_MS) {
         return cached.base64
-      } else {
+      }
+      else {
         // Cache expired, remove it
         delete cache[domain]
         localStorage.setItem(FAVICON_CACHE_KEY, JSON.stringify(cache))
       }
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to get cached favicon:', error)
   }
   return null
 }
 
-const fetchAndCacheImage = async (
-  url: string,
-  domain: string
-): Promise<string> => {
+async function fetchAndCacheImage(url: string, domain: string): Promise<string> {
   const response = await fetch(url)
   const blob = await response.blob()
 
@@ -104,7 +105,8 @@ export function ServerIcon({
   }
 
   useEffect(() => {
-    if (!serverUrl) return
+    if (!serverUrl)
+      return
 
     const fetchFavicon = async () => {
       setIsLoading(true)
@@ -114,24 +116,26 @@ export function ServerIcon({
         // Extract domain from serverUrl
         let domain = serverUrl
         if (
-          serverUrl.startsWith('http://') ||
-          serverUrl.startsWith('https://')
+          serverUrl.startsWith('http://')
+          || serverUrl.startsWith('https://')
         ) {
           domain = new URL(serverUrl).hostname
-        } else if (serverUrl.includes('://')) {
+        }
+        else if (serverUrl.includes('://')) {
           domain = serverUrl.split('://')[1].split('/')[0]
-        } else {
+        }
+        else {
           domain = serverUrl.split('/')[0]
         }
 
         // Check if this is a local server - skip remote favicon services
-        const isLocalServer =
-          domain === 'localhost' ||
-          domain === '127.0.0.1' ||
-          domain.startsWith('127.') ||
-          domain.startsWith('192.168.') ||
-          domain.startsWith('10.') ||
-          domain.startsWith('172.')
+        const isLocalServer
+          = domain === 'localhost'
+            || domain === '127.0.0.1'
+            || domain.startsWith('127.')
+            || domain.startsWith('192.168.')
+            || domain.startsWith('10.')
+            || domain.startsWith('172.')
 
         if (isLocalServer) {
           // For local servers, skip favicon fetching and go straight to fallback
@@ -150,8 +154,8 @@ export function ServerIcon({
 
         // Try full domain first, then base domain with 1s timeout
         const baseDomain = domain.split('.').slice(-2).join('.')
-        const domainsToTry =
-          domain !== baseDomain ? [domain, baseDomain] : [domain]
+        const domainsToTry
+          = domain !== baseDomain ? [domain, baseDomain] : [domain]
 
         const faviconServices = [
           // list of providers, google and duckduckgo are not working due to CORS
@@ -165,7 +169,7 @@ export function ServerIcon({
             try {
               const currentFaviconUrl = serviceTemplate.replace(
                 '{domain}',
-                currentDomain
+                currentDomain,
               )
 
               // Create a timeout promise
@@ -173,7 +177,7 @@ export function ServerIcon({
               const timeoutPromise = new Promise<never>((_, reject) => {
                 _timeoutId = setTimeout(
                   () => reject(new Error('Timeout')),
-                  1000
+                  1000,
                 )
               })
 
@@ -187,14 +191,15 @@ export function ServerIcon({
                 // Fetch and cache the image as base64
                 const base64Image = await fetchAndCacheImage(
                   currentFaviconUrl,
-                  domain
+                  domain,
                 )
                 setImageLoading(true)
                 setFaviconUrl(base64Image)
                 setIsLoading(false)
                 return
               }
-            } catch {
+            }
+            catch {
               // Continue to next service
               continue
             }
@@ -203,9 +208,11 @@ export function ServerIcon({
 
         // If all services fail
         setFaviconError(true)
-      } catch {
+      }
+      catch {
         setFaviconError(true)
-      } finally {
+      }
+      finally {
         setIsLoading(false)
       }
     }
@@ -232,49 +239,53 @@ export function ServerIcon({
       className={cn(
         'rounded-full overflow-hidden flex-shrink-0 relative',
         sizeClasses[size],
-        className
+        className,
       )}
     >
-      {isLoading ? (
-        <div className="w-full h-full flex items-center justify-center bg-gray-100/20 dark:bg-gray-800">
-          <Spinner className="text-gray-200" />
-        </div>
-      ) : faviconUrl && !faviconError ? (
-        <>
-          {imageLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100/20 dark:bg-gray-800 z-10">
+      {isLoading
+        ? (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100/20 dark:bg-gray-800">
               <Spinner className="text-gray-200" />
             </div>
-          )}
-          <BlurFade
-            duration={0.6}
-            delay={0.1}
-            blur="8px"
-            direction="up"
-            className="w-full h-full"
-          >
-            <img
-              src={faviconUrl}
-              alt={`${serverName || 'Server'} favicon`}
-              className="w-full h-full object-cover"
-              onLoad={() => setImageLoading(false)}
-              onError={() => {
-                setImageLoading(false)
-                setFaviconError(true)
-              }}
-            />
-          </BlurFade>
-        </>
-      ) : (
-        <RandomGradientBackground
-          className="w-full h-full"
-          color={getServerColor()}
-        >
-          <div className="w-full h-full flex items-center justify-center text-white font-semibold text-xs">
-            {serverName ? serverName.charAt(0).toUpperCase() : 'S'}
-          </div>
-        </RandomGradientBackground>
-      )}
+          )
+        : faviconUrl && !faviconError
+          ? (
+              <>
+                {imageLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100/20 dark:bg-gray-800 z-10">
+                    <Spinner className="text-gray-200" />
+                  </div>
+                )}
+                <BlurFade
+                  duration={0.6}
+                  delay={0.1}
+                  blur="8px"
+                  direction="up"
+                  className="w-full h-full"
+                >
+                  <img
+                    src={faviconUrl}
+                    alt={`${serverName || 'Server'} favicon`}
+                    className="w-full h-full object-cover"
+                    onLoad={() => setImageLoading(false)}
+                    onError={() => {
+                      setImageLoading(false)
+                      setFaviconError(true)
+                    }}
+                  />
+                </BlurFade>
+              </>
+            )
+          : (
+              <RandomGradientBackground
+                className="w-full h-full"
+                color={getServerColor()}
+              >
+                <div className="w-full h-full flex items-center justify-center text-white font-semibold text-xs">
+                  {serverName ? serverName.charAt(0).toUpperCase() : 'S'}
+                </div>
+              </RandomGradientBackground>
+            )}
     </div>
   )
 }

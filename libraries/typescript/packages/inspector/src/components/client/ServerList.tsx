@@ -1,5 +1,3 @@
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Activity,
   CheckCircle2,
@@ -10,6 +8,8 @@ import {
   Zap,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { useMcpContext } from '../../client/context/McpContext'
 import { ServerIcon } from './ServerIcon'
 
@@ -59,87 +59,99 @@ export function ServerList() {
         </p>
       </div>
 
-      {connections.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Server className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No servers found</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              You haven't connected to any MCP servers yet.
-            </p>
-            <Button asChild>
-              <Link to="/">Add your first server</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {connections.map((connection) => (
-            <Card key={connection.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <ServerIcon
-                      serverUrl={connection.url}
-                      serverName={connection.name}
-                      size="lg"
-                    />
-                    <div className="space-y-1">
-                      <h3 className="font-semibold text-lg">
-                        {connection.name}
-                      </h3>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium flex items-center ${getStatusColor(
-                            connection.state
-                          )}`}
-                        >
-                          {getStatusIcon(connection.state)}
-                          {connection.state}
-                        </span>
-                        {connection.state === 'ready' && (
-                          <>
-                            <div className="flex items-center space-x-1">
-                              <Zap className="w-4 h-4" />
-                              <span>{connection.tools.length} tools</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Database className="w-4 h-4" />
-                              <span>
-                                {connection.resources.length} resources
-                              </span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Activity className="w-4 h-4" />
-                              <span>{connection.prompts.length} prompts</span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button asChild variant="outline" size="sm">
-                      <Link
-                        to={`/?server=${encodeURIComponent(connection.id)}`}
-                      >
-                        Inspect
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteConnection(connection.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+      {connections.length === 0
+        ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Server className="h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No servers found</h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  You haven't connected to any MCP servers yet.
+                </p>
+                <Button asChild>
+                  <Link to="/">Add your first server</Link>
+                </Button>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          )
+        : (
+            <div className="grid gap-4">
+              {connections.map(connection => (
+                <Card key={connection.id}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <ServerIcon
+                          serverUrl={connection.url}
+                          serverName={connection.name}
+                          size="lg"
+                        />
+                        <div className="space-y-1">
+                          <h3 className="font-semibold text-lg">
+                            {connection.name}
+                          </h3>
+                          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium flex items-center ${getStatusColor(
+                                connection.state,
+                              )}`}
+                            >
+                              {getStatusIcon(connection.state)}
+                              {connection.state}
+                            </span>
+                            {connection.state === 'ready' && (
+                              <>
+                                <div className="flex items-center space-x-1">
+                                  <Zap className="w-4 h-4" />
+                                  <span>
+                                    {connection.tools.length}
+                                    {' '}
+                                    tools
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <Database className="w-4 h-4" />
+                                  <span>
+                                    {connection.resources.length}
+                                    {' '}
+                                    resources
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <Activity className="w-4 h-4" />
+                                  <span>
+                                    {connection.prompts.length}
+                                    {' '}
+                                    prompts
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button asChild variant="outline" size="sm">
+                          <Link
+                            to={`/?server=${encodeURIComponent(connection.id)}`}
+                          >
+                            Inspect
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteConnection(connection.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
     </div>
   )
 }

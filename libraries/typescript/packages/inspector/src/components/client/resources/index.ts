@@ -1,4 +1,3 @@
-export { ResourceResultDisplay, type ResourceResult } from './ResourceResultDisplay'
+export { type ResourceResult, ResourceResultDisplay } from './ResourceResultDisplay'
 export { ResourcesList } from './ResourcesList'
 export { ResourcesTabHeader } from './ResourcesTabHeader'
-

@@ -1,7 +1,7 @@
-import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { Play, Save } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { ToolInputForm } from './ToolInputForm'
 
 interface ToolExecutionPanelProps {
@@ -49,17 +49,19 @@ export function ToolExecutionPanel({
                 onClick={onExecute}
                 disabled={isExecuting || !isConnected}
               >
-                {isExecuting ? (
-                  <>
-                    <Spinner size="sm" className="mr-2" />
-                    Executing...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Execute
-                  </>
-                )}
+                {isExecuting
+                  ? (
+                      <>
+                        <Spinner className="mr-2" />
+                        Executing...
+                      </>
+                    )
+                  : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        Execute
+                      </>
+                    )}
               </Button>
               <Button
                 variant="outline"

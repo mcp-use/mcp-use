@@ -1,6 +1,6 @@
+import { Clock, Database, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Clock, Database, Trash2 } from 'lucide-react'
 
 export interface SavedRequest {
   id: string
@@ -45,8 +45,8 @@ export function SavedRequestsList({
           id={`saved-${request.id}`}
           className={cn(
             'p-4 border-b dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors group',
-            focusedIndex === index &&
-              'ring-2 ring-purple-500 dark:ring-purple-400 ring-inset'
+            focusedIndex === index
+            && 'ring-2 ring-purple-500 dark:ring-purple-400 ring-inset',
           )}
         >
           <div className="flex items-start justify-between gap-3">

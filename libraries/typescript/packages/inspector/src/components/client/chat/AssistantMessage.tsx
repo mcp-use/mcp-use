@@ -1,15 +1,15 @@
-import { AnimatedMarkdown } from 'flowtoken';
-import { Check, Copy } from 'lucide-react';
-import { useState } from 'react';
+import { AnimatedMarkdown } from 'flowtoken'
+import { Check, Copy } from 'lucide-react'
+import { useState } from 'react'
 
-const CopyButton = ({ text }: { text: string }) => {
-  const [isCopied, setIsCopied] = useState(false);
+function CopyButton({ text }: { text: string }) {
+  const [isCopied, setIsCopied] = useState(false)
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(text);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
+    await navigator.clipboard.writeText(text)
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 2000)
+  }
 
   return (
     <button
@@ -17,19 +17,21 @@ const CopyButton = ({ text }: { text: string }) => {
       onClick={handleCopy}
       title="Copy message content"
     >
-      {isCopied ? (
-        <Check className="h-3.5 w-3.5" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" />
-      )}
+      {isCopied
+        ? (
+            <Check className="h-3.5 w-3.5" />
+          )
+        : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
     </button>
-  );
-};
+  )
+}
 
 interface AssistantMessageProps {
-  content: string;
-  timestamp?: Date | number;
-  isStreaming?: boolean;
+  content: string
+  timestamp?: Date | number
+  isStreaming?: boolean
 }
 
 export function AssistantMessage({
@@ -38,7 +40,7 @@ export function AssistantMessage({
   isStreaming = false,
 }: AssistantMessageProps) {
   if (!content || content.length === 0) {
-    return null;
+    return null
   }
 
   return (
@@ -48,7 +50,7 @@ export function AssistantMessage({
           <div className="prose prose-sm max-w-none dark:prose-invert text-base leading-7 font-sans text-start break-words prose-pre:p-0 prose-pre:m-0 prose-pre:bg-transparent transition-all duration-300 ease-in-out">
             <AnimatedMarkdown
               content={content}
-              animation={"fadeIn"}
+              animation="fadeIn"
               animationDuration="0.5s"
             />
           </div>
@@ -65,6 +67,5 @@ export function AssistantMessage({
         )}
       </div>
     </div>
-  );
+  )
 }
-

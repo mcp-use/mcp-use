@@ -1,9 +1,9 @@
 'use client'
 
-import { cn } from '@/lib/utils'
 import { Monitor, Moon, SunDim } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
+import { cn } from '@/lib/utils'
 import { useTheme } from '../../client/context/ThemeContext'
 
 interface props {
@@ -22,25 +22,32 @@ export function AnimatedThemeToggler({ className }: props) {
 
   // Cycle through: system -> light -> dark -> system
   const getNextTheme = () => {
-    if (theme === 'system') return 'light'
-    if (theme === 'light') return 'dark'
+    if (theme === 'system')
+      return 'light'
+    if (theme === 'light')
+      return 'dark'
     return 'system'
   }
 
   const getThemeIcon = () => {
-    if (theme === 'system') return <Monitor className="size-4" />
-    if (theme === 'light') return <SunDim className="size-4" />
+    if (theme === 'system')
+      return <Monitor className="size-4" />
+    if (theme === 'light')
+      return <SunDim className="size-4" />
     return <Moon className="size-4" />
   }
 
   const getThemeLabel = () => {
-    if (theme === 'system') return 'Switch to light mode'
-    if (theme === 'light') return 'Switch to dark mode'
+    if (theme === 'system')
+      return 'Switch to light mode'
+    if (theme === 'light')
+      return 'Switch to dark mode'
     return 'Switch to system mode'
   }
 
   const changeTheme = async () => {
-    if (!buttonRef.current) return
+    if (!buttonRef.current)
+      return
 
     const nextTheme = getNextTheme()
 
@@ -52,8 +59,8 @@ export function AnimatedThemeToggler({ className }: props) {
         })
       }).ready
 
-      const { top, left, width, height } =
-        buttonRef.current.getBoundingClientRect()
+      const { top, left, width, height }
+        = buttonRef.current.getBoundingClientRect()
       const y = top + height / 2
       const x = left + width / 2
 
@@ -72,9 +79,10 @@ export function AnimatedThemeToggler({ className }: props) {
           duration: 700,
           easing: 'ease-in-out',
           pseudoElement: '::view-transition-new(root)',
-        }
+        },
       )
-    } else {
+    }
+    else {
       // Fallback for browsers that don't support view transitions
       setTheme(nextTheme)
     }

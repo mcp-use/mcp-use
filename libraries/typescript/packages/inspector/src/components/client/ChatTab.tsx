@@ -1,24 +1,49 @@
-import { ArrowUp, Check, Copy, Key, Loader2, MessageCircle, Send, Settings, Trash2, User } from 'lucide-react'
+import {
+  ArrowUp,
+  Key,
+  Loader2,
+  MessageCircle,
+  Send,
+  Settings,
+  Trash2,
+} from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
+import { extractMCPResources } from '@/client/utils/mcpResourceUtils'
 import { AuroraBackground } from '@/components/ui/aurora-background'
 import { Badge } from '@/components/ui/badge'
 import { BlurFade } from '@/components/ui/blur-fade'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
-import { UserMessage } from './chat/UserMessage'
-import { AssistantMessage } from './chat/AssistantMessage'
-import { ToolCallDisplay } from './chat/ToolCallDisplay'
-import { MCPUIResource } from './chat/MCPUIResource'
-import { extractMCPResources } from '@/client/utils/mcpResourceUtils'
 import { TextShimmer } from '@/components/ui/text-shimmer'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import { AssistantMessage } from './chat/AssistantMessage'
+import { MCPUIResource } from './chat/MCPUIResource'
+import { ToolCallDisplay } from './chat/ToolCallDisplay'
+import { UserMessage } from './chat/UserMessage'
 
 interface ChatTabProps {
   mcpServerUrl: string
@@ -75,7 +100,12 @@ function hashString(str: string): string {
   return Math.abs(hash).toString(16)
 }
 
-export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: ChatTabProps) {
+export function ChatTab({
+  mcpServerUrl,
+  isConnected,
+  oauthState,
+  oauthError,
+}: ChatTabProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -84,12 +114,16 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
 
   // LLM Config form state
-  const [tempProvider, setTempProvider] = useState<'openai' | 'anthropic' | 'google'>('openai')
+  const [tempProvider, setTempProvider] = useState<
+    'openai' | 'anthropic' | 'google'
+  >('openai')
   const [tempApiKey, setTempApiKey] = useState('')
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai)
 
   // Auth Config form state
-  const [tempAuthType, setTempAuthType] = useState<'none' | 'basic' | 'bearer' | 'oauth'>('none')
+  const [tempAuthType, setTempAuthType] = useState<
+    'none' | 'basic' | 'bearer' | 'oauth'
+  >('none')
   const [tempUsername, setTempUsername] = useState('')
   const [tempPassword, setTempPassword] = useState('')
   const [tempToken, setTempToken] = useState('')
@@ -194,10 +228,24 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
 
     setLLMConfig(newLlmConfig)
     setAuthConfig(newAuthConfig)
-    localStorage.setItem('mcp-inspector-llm-config', JSON.stringify(newLlmConfig))
-    localStorage.setItem('mcp-inspector-auth-config', JSON.stringify(newAuthConfig))
+    localStorage.setItem(
+      'mcp-inspector-llm-config',
+      JSON.stringify(newLlmConfig),
+    )
+    localStorage.setItem(
+      'mcp-inspector-auth-config',
+      JSON.stringify(newAuthConfig),
+    )
     setConfigDialogOpen(false)
-  }, [tempProvider, tempApiKey, tempModel, tempAuthType, tempUsername, tempPassword, tempToken])
+  }, [
+    tempProvider,
+    tempApiKey,
+    tempModel,
+    tempAuthType,
+    tempUsername,
+    tempPassword,
+    tempToken,
+  ])
 
   const clearConfig = useCallback(() => {
     setLLMConfig(null)
@@ -247,7 +295,10 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
             }
           }
           else {
-            console.warn('No OAuth tokens found in localStorage for key:', storageKey)
+            console.warn(
+              'No OAuth tokens found in localStorage for key:',
+              storageKey,
+            )
           }
         }
         catch (error) {
@@ -292,7 +343,9 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+        content: `Error: ${
+          error instanceof Error ? error.message : 'Unknown error occurred'
+        }`,
         timestamp: Date.now(),
       }
       setMessages(prev => [...prev, errorMessage])
@@ -302,12 +355,15 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
     }
   }, [inputValue, llmConfig, isConnected, mcpServerUrl, messages])
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }, [sendMessage])
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        sendMessage()
+      }
+    },
+    [sendMessage],
+  )
 
   const clearChat = useCallback(() => {
     setMessages([])
@@ -330,13 +386,17 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
               <DialogHeader>
                 <DialogTitle>LLM Provider Configuration</DialogTitle>
                 <DialogDescription>
-                  Configure your LLM provider and API key to start chatting with the MCP server
+                  Configure your LLM provider and API key to start chatting with
+                  the MCP server
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Provider</Label>
-                  <Select value={tempProvider} onValueChange={(v: any) => setTempProvider(v)}>
+                  <Select
+                    value={tempProvider}
+                    onValueChange={(v: any) => setTempProvider(v)}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -374,14 +434,21 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
 
                 <div className="space-y-2">
                   <Label>MCP Server Authentication (Optional)</Label>
-                  <Select value={tempAuthType} onValueChange={(v: any) => setTempAuthType(v)}>
+                  <Select
+                    value={tempAuthType}
+                    onValueChange={(v: any) => setTempAuthType(v)}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Authentication</SelectItem>
-                      <SelectItem value="oauth">OAuth (Use Inspector's OAuth)</SelectItem>
-                      <SelectItem value="basic">Basic Auth (Username/Password)</SelectItem>
+                      <SelectItem value="oauth">
+                        OAuth (Use Inspector's OAuth)
+                      </SelectItem>
+                      <SelectItem value="basic">
+                        Basic Auth (Username/Password)
+                      </SelectItem>
                       <SelectItem value="bearer">Bearer Token</SelectItem>
                     </SelectContent>
                   </Select>
@@ -415,8 +482,9 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
                     <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
                       <p className="font-medium">OAuth Authentication</p>
                       <p className="text-xs mt-1">
-                        This will use the same OAuth flow as the Inspector's main connection.
-                        If the MCP server requires OAuth, the Inspector will handle the authentication automatically.
+                        This will use the same OAuth flow as the Inspector's
+                        main connection. If the MCP server requires OAuth, the
+                        Inspector will handle the authentication automatically.
                       </p>
                       {oauthState === 'authenticating' && (
                         <div className="mt-2 flex items-center gap-2 text-blue-600">
@@ -436,10 +504,7 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
                 </div>
 
                 <div className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={clearConfig}
-                  >
+                  <Button variant="outline" onClick={clearConfig}>
                     Clear Config
                   </Button>
                   <Button
@@ -464,11 +529,9 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
                 Chat with MCP Agent
               </h1>
               <p className="text-sm text-zinc-600 dark:text-zinc-400 font-light">
-                {llmConfig.provider}
-                {' / '}
-                {llmConfig.model}
-                {' - '}
-                Ask questions or request actions
+                selected mcp server:
+                {' '}
+                {mcpServerUrl}
               </p>
             </div>
 
@@ -486,7 +549,11 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
                     value={inputValue}
                     onChange={e => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={isConnected ? 'Ask a question or request an action...' : 'Server not connected'}
+                    placeholder={
+                      isConnected
+                        ? 'Ask a question or request an action...'
+                        : 'Server not connected'
+                    }
                     className="p-4 min-h-[150px] rounded-xl bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800"
                     disabled={!isConnected || isLoading}
                   />
@@ -496,7 +563,7 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
                       size="sm"
                       className={cn(
                         'h-10 w-10 rounded-full',
-                        (isLoading) && 'animate-spin',
+                        isLoading && 'animate-spin',
                         !inputValue.trim() && 'bg-zinc-400',
                       )}
                       disabled={isLoading || !inputValue.trim() || !isConnected}
@@ -564,13 +631,17 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
               <DialogHeader>
                 <DialogTitle>LLM Provider Configuration</DialogTitle>
                 <DialogDescription>
-                  Configure your LLM provider and API key to start chatting with the MCP server
+                  Configure your LLM provider and API key to start chatting with
+                  the MCP server
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Provider</Label>
-                  <Select value={tempProvider} onValueChange={(v: any) => setTempProvider(v)}>
+                  <Select
+                    value={tempProvider}
+                    onValueChange={(v: any) => setTempProvider(v)}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -608,14 +679,21 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
 
                 <div className="space-y-2">
                   <Label>MCP Server Authentication (Optional)</Label>
-                  <Select value={tempAuthType} onValueChange={(v: any) => setTempAuthType(v)}>
+                  <Select
+                    value={tempAuthType}
+                    onValueChange={(v: any) => setTempAuthType(v)}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Authentication</SelectItem>
-                      <SelectItem value="oauth">OAuth (Use Inspector's OAuth)</SelectItem>
-                      <SelectItem value="basic">Basic Auth (Username/Password)</SelectItem>
+                      <SelectItem value="oauth">
+                        OAuth (Use Inspector's OAuth)
+                      </SelectItem>
+                      <SelectItem value="basic">
+                        Basic Auth (Username/Password)
+                      </SelectItem>
                       <SelectItem value="bearer">Bearer Token</SelectItem>
                     </SelectContent>
                   </Select>
@@ -649,8 +727,9 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
                     <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
                       <p className="font-medium">OAuth Authentication</p>
                       <p className="text-xs mt-1">
-                        This will use the same OAuth flow as the Inspector's main connection.
-                        If the MCP server requires OAuth, the Inspector will handle the authentication automatically.
+                        This will use the same OAuth flow as the Inspector's
+                        main connection. If the MCP server requires OAuth, the
+                        Inspector will handle the authentication automatically.
                       </p>
                       {oauthState === 'authenticating' && (
                         <div className="mt-2 flex items-center gap-2 text-blue-600">
@@ -671,10 +750,7 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
 
                 <div className="flex justify-between">
                   {llmConfig && (
-                    <Button
-                      variant="outline"
-                      onClick={clearConfig}
-                    >
+                    <Button variant="outline" onClick={clearConfig}>
                       Clear Config
                     </Button>
                   )}
@@ -700,10 +776,13 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
             ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Key className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Configure Your LLM Provider</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    Configure Your LLM Provider
+                  </h3>
                   <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                    To start chatting with the MCP server, you need to configure your LLM provider and API key.
-                    Your credentials are stored locally and used only for this chat.
+                    To start chatting with the MCP server, you need to configure
+                    your LLM provider and API key. Your credentials are stored
+                    locally and used only for this chat.
                   </p>
                   <Button onClick={() => setConfigDialogOpen(true)}>
                     <Settings className="h-4 w-4 mr-2" />
@@ -714,18 +793,22 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
             : (
                 <>
                   {messages.map((message, index) => {
-                    const contentStr = typeof message.content === 'string'
-                      ? message.content
-                      : Array.isArray(message.content)
-                        ? message.content.map(item =>
-                            typeof item === 'string'
-                              ? item
-                              : item.text || JSON.stringify(item),
-                          ).join('')
-                        : JSON.stringify(message.content)
+                    const contentStr
+                      = typeof message.content === 'string'
+                        ? message.content
+                        : Array.isArray(message.content)
+                          ? message.content
+                              .map(item =>
+                                typeof item === 'string'
+                                  ? item
+                                  : item.text || JSON.stringify(item),
+                              )
+                              .join('')
+                          : JSON.stringify(message.content)
 
                     const isLastMessage = index === messages.length - 1
-                    const isMessageStreaming = isLoading && isLastMessage && message.role === 'assistant'
+                    const isMessageStreaming
+                      = isLoading && isLastMessage && message.role === 'assistant'
 
                     if (message.role === 'user') {
                       return (
@@ -744,14 +827,14 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
                           timestamp={message.timestamp}
                           isStreaming={isMessageStreaming}
                         />
-                        
+
                         {/* Tool Calls */}
                         {message.toolCalls && message.toolCalls.length > 0 && (
                           <div className="space-y-2">
                             {message.toolCalls.map((toolCall, idx) => {
                               // Extract MCP-UI resources from tool result
                               const resources = extractMCPResources(toolCall.result)
-                              
+
                               return (
                                 <div key={`${toolCall.toolName}-${idx}`}>
                                   <ToolCallDisplay
@@ -777,7 +860,9 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
                   })}
 
                   {/* Thinking indicator - only show when loading and last message is from user */}
-                  {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
+                  {isLoading
+                    && messages.length > 0
+                    && messages[messages.length - 1].role === 'user' && (
                     <div className="flex items-start gap-3">
                       <div className="flex-1">
                         <div className="rounded-lg p-4 max-w-fit">
@@ -807,7 +892,11 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isConnected ? 'Ask a question or request an action...' : 'Server not connected'}
+              placeholder={
+                isConnected
+                  ? 'Ask a question or request an action...'
+                  : 'Server not connected'
+              }
               className="resize-none"
               rows={2}
               disabled={!isConnected || isLoading}
@@ -817,7 +906,13 @@ export function ChatTab({ mcpServerUrl, isConnected, oauthState, oauthError }: C
               disabled={!inputValue.trim() || !isConnected || isLoading}
               className="self-end"
             >
-              {isLoading ? <Spinner className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+              {isLoading
+                ? (
+                    <Spinner className="h-4 w-4" />
+                  )
+                : (
+                    <Send className="h-4 w-4" />
+                  )}
             </Button>
           </div>
         </div>

@@ -1,5 +1,5 @@
-import { useMcp } from 'mcp-use/react'
 import type { ReactNode } from 'react'
+import { useMcp } from 'mcp-use/react'
 import {
   createContext,
   use,
@@ -79,8 +79,8 @@ function McpConnectionWrapper({
 }) {
   // Configure OAuth callback URL
   // Use /inspector/oauth/callback for proper routing in the inspector
-  const callbackUrl =
-    typeof window !== 'undefined'
+  const callbackUrl
+    = typeof window !== 'undefined'
       ? new URL('/inspector/oauth/callback', window.location.origin).toString()
       : '/inspector/oauth/callback'
 
@@ -148,19 +148,20 @@ function McpConnectionWrapper({
         // Only update if something actually changed
         const prev = prevConnectionRef.current
         if (
-          !prev ||
-          prev.state !== connection.state ||
-          prev.error !== connection.error ||
-          prev.authUrl !== connection.authUrl ||
-          prev.tools.length !== connection.tools.length ||
-          prev.resources.length !== connection.resources.length ||
-          prev.prompts.length !== connection.prompts.length
+          !prev
+          || prev.state !== connection.state
+          || prev.error !== connection.error
+          || prev.authUrl !== connection.authUrl
+          || prev.tools.length !== connection.tools.length
+          || prev.resources.length !== connection.resources.length
+          || prev.prompts.length !== connection.prompts.length
         ) {
           prevConnectionRef.current = connection
           onUpdateRef.current(connection)
         }
       })
-    } else {
+    }
+    else {
       // Fallback for environments without queueMicrotask
       const connection: MCPConnection = {
         id: url,
@@ -182,13 +183,13 @@ function McpConnectionWrapper({
       // Only update if something actually changed
       const prev = prevConnectionRef.current
       if (
-        !prev ||
-        prev.state !== connection.state ||
-        prev.error !== connection.error ||
-        prev.authUrl !== connection.authUrl ||
-        prev.tools.length !== connection.tools.length ||
-        prev.resources.length !== connection.resources.length ||
-        prev.prompts.length !== connection.prompts.length
+        !prev
+        || prev.state !== connection.state
+        || prev.error !== connection.error
+        || prev.authUrl !== connection.authUrl
+        || prev.tools.length !== connection.tools.length
+        || prev.resources.length !== connection.resources.length
+        || prev.prompts.length !== connection.prompts.length
       ) {
         prevConnectionRef.current = connection
         onUpdateRef.current(connection)
@@ -210,7 +211,7 @@ function McpConnectionWrapper({
 
 export function McpProvider({ children }: { children: ReactNode }) {
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>(
-    []
+    [],
   )
   const [activeConnections, setActiveConnections] = useState<
     Map<string, MCPConnection>
@@ -218,7 +219,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
   const [connectionVersion, setConnectionVersion] = useState(0)
   const [autoConnect, setAutoConnectState] = useState<boolean>(true)
   const [manualConnections, setManualConnections] = useState<Set<string>>(
-    new Set()
+    new Set(),
   )
 
   // Load saved connections and auto-connect setting from localStorage on mount
@@ -233,11 +234,11 @@ export function McpProvider({ children }: { children: ReactNode }) {
               .filter((conn: any) => {
                 // Ensure connection has valid structure with string url and id
                 return (
-                  conn &&
-                  typeof conn === 'object' &&
-                  typeof conn.id === 'string' &&
-                  typeof conn.url === 'string' &&
-                  typeof conn.name === 'string'
+                  conn
+                  && typeof conn === 'object'
+                  && typeof conn.id === 'string'
+                  && typeof conn.url === 'string'
+                  && typeof conn.name === 'string'
                 )
               })
               .map((conn: any) => {
@@ -250,26 +251,27 @@ export function McpProvider({ children }: { children: ReactNode }) {
           : []
 
         // If we filtered out any invalid connections or migrated transport types, update localStorage
-        const hasChanges =
-          validConnections.length !== parsed.length ||
-          validConnections.some(
-            (conn: any) =>
-              conn.transportType === 'http' &&
-              !parsed.find((p: any) => p.id === conn.id && p.transportType)
-          )
+        const hasChanges
+          = validConnections.length !== parsed.length
+            || validConnections.some(
+              (conn: any) =>
+                conn.transportType === 'http'
+                && !parsed.find((p: any) => p.id === conn.id && p.transportType),
+            )
 
         if (hasChanges) {
           console.warn(
-            'Updated connections in localStorage with transport type migration'
+            'Updated connections in localStorage with transport type migration',
           )
           localStorage.setItem(
             'mcp-inspector-connections',
-            JSON.stringify(validConnections)
+            JSON.stringify(validConnections),
           )
         }
 
         setSavedConnections(validConnections)
-      } catch (error) {
+      }
+      catch (error) {
         console.error('Failed to parse saved connections:', error)
         // Clear corrupted localStorage
         localStorage.removeItem('mcp-inspector-connections')
@@ -278,7 +280,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
 
     // Load auto-connect setting
     const autoConnectSetting = localStorage.getItem(
-      'mcp-inspector-auto-connect'
+      'mcp-inspector-auto-connect',
     )
     if (autoConnectSetting !== null) {
       setAutoConnectState(autoConnectSetting === 'true')
@@ -286,8 +288,8 @@ export function McpProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateConnection = useCallback((connection: MCPConnection) => {
-    setActiveConnections((prev) => new Map(prev).set(connection.id, connection))
-    setConnectionVersion((v) => v + 1)
+    setActiveConnections(prev => new Map(prev).set(connection.id, connection))
+    setConnectionVersion(v => v + 1)
   }, [])
 
   const addConnection = useCallback(
@@ -299,7 +301,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
         proxyToken?: string
         customHeaders?: Record<string, string>
       },
-      transportType?: 'http' | 'sse'
+      transportType?: 'http' | 'sse',
     ) => {
       const connectionName = name || url
       const newConnection: SavedConnection = {
@@ -312,23 +314,23 @@ export function McpProvider({ children }: { children: ReactNode }) {
 
       setSavedConnections((prev) => {
         // Check if connection already exists
-        if (prev.some((c) => c.id === url)) {
+        if (prev.some(c => c.id === url)) {
           return prev
         }
         const updated = [...prev, newConnection]
         localStorage.setItem(
           'mcp-inspector-connections',
-          JSON.stringify(updated)
+          JSON.stringify(updated),
         )
         return updated
       })
     },
-    []
+    [],
   )
 
   const removeConnection = useCallback((id: string) => {
     setSavedConnections((prev) => {
-      const updated = prev.filter((c) => c.id !== id)
+      const updated = prev.filter(c => c.id !== id)
       localStorage.setItem('mcp-inspector-connections', JSON.stringify(updated))
       return updated
     })
@@ -340,7 +342,8 @@ export function McpProvider({ children }: { children: ReactNode }) {
         // Clear storage and remove connection
         try {
           connection.clearStorage()
-        } catch (error) {
+        }
+        catch (error) {
           console.error('Failed to clear storage:', error)
         }
         next.delete(id)
@@ -358,7 +361,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       }
 
       // If not active, check if it's a saved connection and return placeholder
-      const savedConn = savedConnections.find((conn) => conn.id === id)
+      const savedConn = savedConnections.find(conn => conn.id === id)
       if (savedConn) {
         return {
           id: savedConn.id,
@@ -384,7 +387,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
 
       return undefined
     },
-    [activeConnections, savedConnections]
+    [activeConnections, savedConnections],
   )
 
   const setAutoConnect = useCallback((value: boolean) => {
@@ -398,7 +401,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const connectServer = useCallback((id: string) => {
-    setManualConnections((prev) => new Set(prev).add(id))
+    setManualConnections(prev => new Set(prev).add(id))
   }, [])
 
   const disconnectServer = useCallback((id: string) => {
@@ -415,7 +418,8 @@ export function McpProvider({ children }: { children: ReactNode }) {
         // Clear storage and remove connection
         try {
           connection.clearStorage()
-        } catch (error) {
+        }
+        catch (error) {
           console.error('Failed to clear storage:', error)
         }
         next.delete(id)
@@ -464,7 +468,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       'count:',
       conns.length,
       'states:',
-      conns.map((c) => `${c.id}:${c.state}`)
+      conns.map(c => `${c.id}:${c.state}`),
     )
     return conns
   }, [activeConnections, savedConnections, connectionVersion])
@@ -490,14 +494,14 @@ export function McpProvider({ children }: { children: ReactNode }) {
       setAutoConnect,
       connectServer,
       disconnectServer,
-    ]
+    ],
   )
 
   return (
     <McpContext value={contextValue}>
       {savedConnections
-        .filter((saved) => autoConnect || manualConnections.has(saved.id))
-        .map((saved) => (
+        .filter(saved => autoConnect || manualConnections.has(saved.id))
+        .map(saved => (
           <McpConnectionWrapper
             key={saved.id}
             url={saved.url}

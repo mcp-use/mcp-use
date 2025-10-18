@@ -1,3 +1,9 @@
+import type { CustomHeader } from './CustomHeadersEditor'
+import { CircleMinus, Copy, Loader2, RotateCcw } from 'lucide-react'
+import { useMcp } from 'mcp-use/react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -9,14 +15,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { CircleMinus, Copy, Loader2, RotateCcw } from 'lucide-react'
-import { useMcp } from 'mcp-use/react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 import { useMcpContext } from '../../client/context/McpContext'
 import { ConnectionSettingsForm } from './ConnectionSettingsForm'
-import type { CustomHeader } from './CustomHeadersEditor'
 
 // Temporary connection tester component
 function ConnectionTester({
@@ -37,8 +37,8 @@ function ConnectionTester({
   onSuccess: () => void
   onFailure: (error: string) => void
 }) {
-  const callbackUrl =
-    typeof window !== 'undefined'
+  const callbackUrl
+    = typeof window !== 'undefined'
       ? new URL('/inspector/oauth/callback', window.location.origin).toString()
       : '/inspector/oauth/callback'
 
@@ -69,20 +69,23 @@ function ConnectionTester({
   const hasCalledRef = useRef(false)
 
   useEffect(() => {
-    if (hasCalledRef.current) return
+    if (hasCalledRef.current)
+      return
 
     if (mcpHook.state === 'ready') {
       hasCalledRef.current = true
       // Don't clear storage on success - we want to keep the connection alive
       // The real McpConnectionWrapper will take over
       onSuccess()
-    } else if (
-      mcpHook.state === 'authenticating' ||
-      mcpHook.state === 'pending_auth'
+    }
+    else if (
+      mcpHook.state === 'authenticating'
+      || mcpHook.state === 'pending_auth'
     ) {
       // Authentication is in progress - keep waiting for OAuth callback
-      return
-    } else if (mcpHook.state === 'failed' && mcpHook.error) {
+
+    }
+    else if (mcpHook.state === 'failed' && mcpHook.error) {
       // If there's an authUrl available, authentication is in progress - don't fail yet
       if (mcpHook.authUrl) {
         return
@@ -118,16 +121,16 @@ export function InspectorDashboard() {
   } = mcpContext
   const navigate = useNavigate()
   const [connectingServers, setConnectingServers] = useState<Set<string>>(
-    new Set()
+    new Set(),
   )
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
-    null
+    null,
   )
 
   // Log connections on every render to debug
   console.warn(
     '[InspectorDashboard] Render - connections:',
-    connections.map((c) => ({ id: c.id, state: c.state }))
+    connections.map(c => ({ id: c.id, state: c.state })),
   )
 
   // Form state
@@ -139,14 +142,14 @@ export function InspectorDashboard() {
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState('True')
   const [maxTotalTimeout, setMaxTotalTimeout] = useState('60000')
   const [proxyAddress, setProxyAddress] = useState(
-    `${window.location.origin}/inspector/api/proxy`
+    `${window.location.origin}/inspector/api/proxy`,
   )
   // OAuth fields
   const [clientId, setClientId] = useState('')
   const [redirectUrl, setRedirectUrl] = useState(
     typeof window !== 'undefined'
       ? new URL('/inspector/oauth/callback', window.location.origin).toString()
-      : '/inspector/oauth/callback'
+      : '/inspector/oauth/callback',
   )
   const [scope, setScope] = useState('')
 
@@ -154,8 +157,8 @@ export function InspectorDashboard() {
   const [isConnecting, setIsConnecting] = useState(false)
   const [autoSwitch, setAutoSwitch] = useState(true)
   const hasShownToastRef = useRef(false)
-  const [hasTriedBothConnectionTypes, setHasTriedBothConnectionTypes] =
-    useState(false)
+  const [hasTriedBothConnectionTypes, setHasTriedBothConnectionTypes]
+    = useState(false)
   const [pendingConnectionConfig, setPendingConnectionConfig] = useState<{
     url: string
     name: string
@@ -175,15 +178,16 @@ export function InspectorDashboard() {
   }, [])
 
   const handleAddConnection = useCallback(() => {
-    if (!url.trim()) return
+    if (!url.trim())
+      return
 
     setIsConnecting(true)
     hasShownToastRef.current = false
     setHasTriedBothConnectionTypes(false)
 
     // Prepare proxy configuration if "Via Proxy" is selected
-    const proxyConfig =
-      connectionType === 'Via Proxy' && proxyAddress.trim()
+    const proxyConfig
+      = connectionType === 'Via Proxy' && proxyAddress.trim()
         ? {
             proxyAddress: proxyAddress.trim(),
             customHeaders: customHeaders.reduce((acc, header) => {
@@ -218,7 +222,8 @@ export function InspectorDashboard() {
 
   // Handle successful connection
   const handleConnectionSuccess = useCallback(() => {
-    if (!pendingConnectionConfig) return
+    if (!pendingConnectionConfig)
+      return
 
     console.warn('[InspectorDashboard] Connection ready! Saving to list...')
     setIsConnecting(false)
@@ -228,7 +233,7 @@ export function InspectorDashboard() {
       pendingConnectionConfig.url,
       pendingConnectionConfig.name,
       pendingConnectionConfig.proxyConfig,
-      pendingConnectionConfig.transportType
+      pendingConnectionConfig.transportType,
     )
 
     setPendingConnectionConfig(null)
@@ -262,7 +267,8 @@ export function InspectorDashboard() {
             setIsConnecting(true)
             handleAddConnection()
           }, 1000) // Small delay to show the toast
-        } else if (shouldTryDirect) {
+        }
+        else if (shouldTryDirect) {
           toast.error('Proxy connection failed, trying direct...')
           setHasTriedBothConnectionTypes(true)
           // Clear pending config first to unmount the old ConnectionTester
@@ -274,7 +280,8 @@ export function InspectorDashboard() {
             handleAddConnection()
           }, 1000) // Small delay to show the toast
         }
-      } else {
+      }
+      else {
         toast.error(errorMessage)
         // Clear pending config on final failure
         setPendingConnectionConfig(null)
@@ -286,7 +293,7 @@ export function InspectorDashboard() {
       hasTriedBothConnectionTypes,
       connectionType,
       handleAddConnection,
-    ]
+    ],
   )
 
   const handleClearAllConnections = () => {
@@ -300,7 +307,8 @@ export function InspectorDashboard() {
     try {
       await navigator.clipboard.writeText(errorMessage)
       toast.success('Error message copied to clipboard')
-    } catch {
+    }
+    catch {
       toast.error('Failed to copy error message')
     }
   }
@@ -315,9 +323,9 @@ export function InspectorDashboard() {
     if (connection.state === 'disconnected') {
       console.warn(
         '[InspectorDashboard] Connecting server and setting pending navigation:',
-        connection.id
+        connection.id,
       )
-      setConnectingServers((prev) => new Set(prev).add(connection.id))
+      setConnectingServers(prev => new Set(prev).add(connection.id))
       setPendingNavigation(connection.id)
       connectServer(connection.id)
       return
@@ -333,10 +341,10 @@ export function InspectorDashboard() {
   // Monitor connecting servers and remove them from the set when they connect or fail
   useEffect(() => {
     connectingServers.forEach((serverId) => {
-      const connection = connections.find((c) => c.id === serverId)
+      const connection = connections.find(c => c.id === serverId)
       if (
-        connection &&
-        (connection.state === 'ready' || connection.state === 'failed')
+        connection
+        && (connection.state === 'ready' || connection.state === 'failed')
       ) {
         setConnectingServers((prev) => {
           const next = new Set(prev)
@@ -349,13 +357,14 @@ export function InspectorDashboard() {
 
   // Monitor pending navigation and navigate when server becomes ready
   useEffect(() => {
-    if (!pendingNavigation) return
+    if (!pendingNavigation)
+      return
 
-    const connection = connections.find((c) => c.id === pendingNavigation)
-    const hasData =
-      (connection?.tools?.length || 0) > 0 ||
-      (connection?.resources?.length || 0) > 0 ||
-      (connection?.prompts?.length || 0) > 0
+    const connection = connections.find(c => c.id === pendingNavigation)
+    const hasData
+      = (connection?.tools?.length || 0) > 0
+        || (connection?.resources?.length || 0) > 0
+        || (connection?.prompts?.length || 0) > 0
 
     console.warn('[InspectorDashboard] Pending navigation check:', {
       pendingNavigation,
@@ -366,9 +375,9 @@ export function InspectorDashboard() {
 
     // Navigate if connection is ready OR if it has loaded some data (partial success)
     if (
-      connection &&
-      (connection.state === 'ready' ||
-        (hasData && connection.state !== 'connecting'))
+      connection
+      && (connection.state === 'ready'
+        || (hasData && connection.state !== 'connecting'))
     ) {
       console.warn('[InspectorDashboard] Navigating to server:', connection.id)
       setPendingNavigation(null)
@@ -376,13 +385,13 @@ export function InspectorDashboard() {
     }
     // Only cancel navigation if connection truly failed with no data loaded
     else if (
-      connection &&
-      connection.state === 'failed' &&
-      !hasData &&
-      connection.error
+      connection
+      && connection.state === 'failed'
+      && !hasData
+      && connection.error
     ) {
       console.warn(
-        '[InspectorDashboard] Connection failed with no data, canceling navigation'
+        '[InspectorDashboard] Connection failed with no data, canceling navigation',
       )
       setPendingNavigation(null)
     }
@@ -406,9 +415,9 @@ export function InspectorDashboard() {
                   className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
                 >
                   v
-                  {(typeof window !== 'undefined' &&
-                    (window as any).__INSPECTOR_VERSION__) ||
-                    '1.0.0'}
+                  {(typeof window !== 'undefined'
+                    && (window as any).__INSPECTOR_VERSION__)
+                  || '1.0.0'}
                 </Badge>
               </a>
             </TooltipTrigger>
@@ -449,150 +458,155 @@ export function InspectorDashboard() {
               )}
             </div>
           </div>
-          {connections.length === 0 ? (
-            <NotFound message="No servers connected yet. Add a server above to get started." />
-          ) : (
-            <div className="grid gap-3">
-              {connections.map((connection) => (
-                <div
-                  key={connection.id}
-                  onClick={() => handleServerClick(connection)}
-                  className="group rounded-lg bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-4 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-semibold text-sm">
-                          {connection.name}
-                        </h4>
-                        <div className="flex items-center gap-2">
-                          {connectingServers.has(connection.id) ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                          ) : connection.error &&
-                            connection.state !== 'ready' ? (
+          {connections.length === 0
+            ? (
+                <NotFound message="No servers connected yet. Add a server above to get started." />
+              )
+            : (
+                <div className="grid gap-3">
+                  {connections.map(connection => (
+                    <div
+                      key={connection.id}
+                      onClick={() => handleServerClick(connection)}
+                      className="group rounded-lg bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-4 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h4 className="font-semibold text-sm">
+                              {connection.name}
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              {connectingServers.has(connection.id)
+                                ? (
+                                    <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                  )
+                                : connection.error
+                                  && connection.state !== 'ready'
+                                  ? (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleCopyError(connection.error!)
+                                            }}
+                                            className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
+                                            title="Click to copy error message"
+                                            aria-label="Copy error message to clipboard"
+                                          />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="max-w-xs">{connection.error}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )
+                                  : (
+                                      <div
+                                        className={`w-2 h-2 rounded-full ${
+                                          connection.state === 'disconnected'
+                                            ? 'bg-gray-400 dark:bg-gray-600'
+                                            : connection.state === 'ready'
+                                              ? 'bg-emerald-600 animate-status-pulse'
+                                              : connection.state === 'failed'
+                                                ? 'bg-rose-600 animate-status-pulse-red'
+                                                : 'bg-yellow-500 animate-status-pulse-yellow'
+                                        }`}
+                                      />
+                                    )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-muted-foreground dark:text-zinc-400 font-mono">
+                              {connection.url}
+                            </p>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleCopyError(connection.error!)
+                                    navigator.clipboard.writeText(connection.url)
+                                    toast.success('URL copied to clipboard')
                                   }}
-                                  className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
-                                  title="Click to copy error message"
-                                  aria-label="Copy error message to clipboard"
-                                />
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
+                                  title="Copy URL"
+                                >
+                                  <Copy className="w-3 h-3 text-muted-foreground" />
+                                </button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p className="max-w-xs">{connection.error}</p>
+                                <p>Copy URL</p>
                               </TooltipContent>
                             </Tooltip>
-                          ) : (
-                            <div
-                              className={`w-2 h-2 rounded-full ${
-                                connection.state === 'disconnected'
-                                  ? 'bg-gray-400 dark:bg-gray-600'
-                                  : connection.state === 'ready'
-                                  ? 'bg-emerald-600 animate-status-pulse'
-                                  : connection.state === 'failed'
-                                  ? 'bg-rose-600 animate-status-pulse-red'
-                                  : 'bg-yellow-500 animate-status-pulse-yellow'
-                              }`}
-                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={e =>
+                                  handleActionClick(e, () =>
+                                    removeConnection(connection.id))}
+                                className="h-8 w-8 p-0"
+                              >
+                                <CircleMinus className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Remove connection</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          {connection.state !== 'disconnected' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={e =>
+                                    handleActionClick(e, connection.retry)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Resync connection</p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-xs text-muted-foreground dark:text-zinc-400 font-mono">
-                          {connection.url}
-                        </p>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigator.clipboard.writeText(connection.url)
-                                toast.success('URL copied to clipboard')
-                              }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
-                              title="Copy URL"
-                            >
-                              <Copy className="w-3 h-3 text-muted-foreground" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Copy URL</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
+                      {connection.state === 'pending_auth'
+                        && connection.authUrl && (
+                        <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
                           <Button
-                            variant="secondary"
                             size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () =>
-                                removeConnection(connection.id)
-                              )
-                            }
-                            className="h-8 w-8 p-0"
+                            variant="outline"
+                            onClick={connection.authenticate}
                           >
-                            <CircleMinus className="w-4 h-4" />
+                            Authenticate
                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Remove connection</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      {connection.state !== 'disconnected' && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) =>
-                                handleActionClick(e, connection.retry)
-                              }
-                              className="h-8 w-8 p-0"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Resync connection</p>
-                          </TooltipContent>
-                        </Tooltip>
+                          {' '}
+                          or
+                          {' '}
+                          <a
+                            href={connection.authUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            open auth page
+                          </a>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  {connection.state === 'pending_auth' &&
-                    connection.authUrl && (
-                      <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={connection.authenticate}
-                        >
-                          Authenticate
-                        </Button>{' '}
-                        or{' '}
-                        <a
-                          href={connection.authUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline"
-                        >
-                          open auth page
-                        </a>
-                      </div>
-                    )}
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
         </div>
       </div>
 

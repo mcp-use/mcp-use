@@ -26,7 +26,7 @@ interface InspectorContextType extends InspectorState {
 }
 
 const InspectorContext = createContext<InspectorContextType | undefined>(
-  undefined
+  undefined,
 )
 
 export function InspectorProvider({ children }: { children: ReactNode }) {
@@ -39,23 +39,23 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
   })
 
   const setSelectedServerId = useCallback((serverId: string | null) => {
-    setState((prev) => ({ ...prev, selectedServerId: serverId }))
+    setState(prev => ({ ...prev, selectedServerId: serverId }))
   }, [])
 
   const setActiveTab = useCallback((tab: TabType) => {
-    setState((prev) => ({ ...prev, activeTab: tab }))
+    setState(prev => ({ ...prev, activeTab: tab }))
   }, [])
 
   const setSelectedToolName = useCallback((toolName: string | null) => {
-    setState((prev) => ({ ...prev, selectedToolName: toolName }))
+    setState(prev => ({ ...prev, selectedToolName: toolName }))
   }, [])
 
   const setSelectedPromptName = useCallback((promptName: string | null) => {
-    setState((prev) => ({ ...prev, selectedPromptName: promptName }))
+    setState(prev => ({ ...prev, selectedPromptName: promptName }))
   }, [])
 
   const setSelectedResourceUri = useCallback((resourceUri: string | null) => {
-    setState((prev) => ({ ...prev, selectedResourceUri: resourceUri }))
+    setState(prev => ({ ...prev, selectedResourceUri: resourceUri }))
   }, [])
 
   const navigateToItem = useCallback(
@@ -80,11 +80,11 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
       // Update all state atomically in a single setState call
       setState(newState)
     },
-    []
+    [],
   )
 
   const clearSelection = useCallback(() => {
-    setState((prev) => ({
+    setState(prev => ({
       ...prev,
       selectedToolName: null,
       selectedPromptName: null,
@@ -104,9 +104,9 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <InspectorContext.Provider value={value}>
+    <InspectorContext value={value}>
       {children}
-    </InspectorContext.Provider>
+    </InspectorContext>
   )
 }
 

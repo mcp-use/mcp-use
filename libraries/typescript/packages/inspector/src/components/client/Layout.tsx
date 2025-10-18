@@ -1,3 +1,16 @@
+import type { ReactNode } from 'react'
+import type { CustomHeader } from './CustomHeadersEditor'
+import {
+  Command,
+  FolderOpen,
+  MessageCircle,
+  MessageSquare,
+  Settings,
+  Wrench,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import LogoAnimated from '@/components/LogoAnimated'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,25 +31,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import {
-  Command,
-  FolderOpen,
-  MessageCircle,
-  MessageSquare,
-  Settings,
-  Wrench,
-} from 'lucide-react'
-import type { ReactNode } from 'react'
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 import { useInspector } from '../../client/context/InspectorContext'
 import { useMcpContext } from '../../client/context/McpContext'
 import { useKeyboardShortcuts } from '../../client/hooks/useKeyboardShortcuts'
 import { AnimatedThemeToggler } from './AnimatedThemeToggler'
 import { ChatTab } from './ChatTab'
 import { CommandPalette } from './CommandPalette'
-import type { CustomHeader } from './CustomHeadersEditor'
 import { PromptsTab } from './PromptsTab'
 import { ResourcesTab } from './ResourcesTab'
 import { ServerIcon } from './ServerIcon'
@@ -127,7 +127,7 @@ export function Layout({ children }: LayoutProps) {
   // Connection options dialog state
   const [connectionOptionsOpen, setConnectionOptionsOpen] = useState(false)
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
-    null
+    null,
   )
 
   // Refs for search inputs in tabs
@@ -150,7 +150,7 @@ export function Layout({ children }: LayoutProps) {
   const [redirectUrl, setRedirectUrl] = useState(
     typeof window !== 'undefined'
       ? new URL('/inspector/oauth/callback', window.location.origin).toString()
-      : 'http://localhost:3000/inspector/oauth/callback'
+      : 'http://localhost:3000/inspector/oauth/callback',
   )
   const [scope, setScope] = useState('')
 
@@ -162,7 +162,7 @@ export function Layout({ children }: LayoutProps) {
   ]
 
   const handleServerSelect = (serverId: string) => {
-    const server = connections.find((c) => c.id === serverId)
+    const server = connections.find(c => c.id === serverId)
     if (!server || server.state !== 'ready') {
       toast.error('Server is not connected and cannot be inspected')
       return
@@ -174,7 +174,7 @@ export function Layout({ children }: LayoutProps) {
   const handleCommandPaletteNavigate = (
     tab: 'tools' | 'prompts' | 'resources',
     itemName?: string,
-    serverId?: string
+    serverId?: string,
   ) => {
     console.warn('[Layout] handleCommandPaletteNavigate called:', {
       tab,
@@ -184,7 +184,7 @@ export function Layout({ children }: LayoutProps) {
 
     // If a serverId is provided, navigate to that server
     if (serverId) {
-      const server = connections.find((c) => c.id === serverId)
+      const server = connections.find(c => c.id === serverId)
       console.warn('[Layout] Server lookup:', {
         serverId,
         serverFound: !!server,
@@ -207,10 +207,11 @@ export function Layout({ children }: LayoutProps) {
       // Navigate using query params
       console.warn(
         '[Layout] Navigating to:',
-        `/?server=${encodeURIComponent(serverId)}`
+        `/?server=${encodeURIComponent(serverId)}`,
       )
       navigate(`/?server=${encodeURIComponent(serverId)}`)
-    } else {
+    }
+    else {
       console.warn('[Layout] No serverId, just updating tab to:', tab)
       // No serverId provided, just update the tab for the current server
       setActiveTab(tab)
@@ -223,13 +224,14 @@ export function Layout({ children }: LayoutProps) {
 
     // If editing an existing connection, populate the form with its data
     if (connectionId) {
-      const connection = connections.find((c) => c.id === connectionId)
+      const connection = connections.find(c => c.id === connectionId)
       if (connection) {
         setUrl(connection.url)
         // Set other fields based on connection data if available
         // For now, we'll use defaults since the connection object might not have all the config
       }
-    } else {
+    }
+    else {
       // Reset form for new connection
       setUrl('')
       setCustomHeaders([])
@@ -246,59 +248,60 @@ export function Layout({ children }: LayoutProps) {
     toast.success('Connection options saved')
   }
 
-  const selectedServer = connections.find((c) => c.id === selectedServerId)
+  const selectedServer = connections.find(c => c.id === selectedServerId)
 
   // Aggregate tools, prompts, and resources from all connected servers
   // When a server is selected, use only that server's items
   // When no server is selected, aggregate from all ready servers and add server metadata
   const aggregatedTools = selectedServer
-    ? selectedServer.tools.map((tool) => ({
+    ? selectedServer.tools.map(tool => ({
         ...tool,
         _serverId: selectedServer.id,
       }))
-    : connections.flatMap((conn) =>
+    : connections.flatMap(conn =>
         conn.state === 'ready'
-          ? conn.tools.map((tool) => ({
+          ? conn.tools.map(tool => ({
               ...tool,
               _serverId: conn.id,
               _serverName: conn.name,
             }))
-          : []
+          : [],
       )
 
   const aggregatedPrompts = selectedServer
-    ? selectedServer.prompts.map((prompt) => ({
+    ? selectedServer.prompts.map(prompt => ({
         ...prompt,
         _serverId: selectedServer.id,
       }))
-    : connections.flatMap((conn) =>
+    : connections.flatMap(conn =>
         conn.state === 'ready'
-          ? conn.prompts.map((prompt) => ({
+          ? conn.prompts.map(prompt => ({
               ...prompt,
               _serverId: conn.id,
               _serverName: conn.name,
             }))
-          : []
+          : [],
       )
 
   const aggregatedResources = selectedServer
-    ? selectedServer.resources.map((resource) => ({
+    ? selectedServer.resources.map(resource => ({
         ...resource,
         _serverId: selectedServer.id,
       }))
-    : connections.flatMap((conn) =>
+    : connections.flatMap(conn =>
         conn.state === 'ready'
-          ? conn.resources.map((resource) => ({
+          ? conn.resources.map(resource => ({
               ...resource,
               _serverId: conn.id,
               _serverName: conn.name,
             }))
-          : []
+          : [],
       )
 
   // Load config and auto-connect if URL is provided
   useEffect(() => {
-    if (configLoaded) return
+    if (configLoaded)
+      return
 
     // Check for autoConnect query parameter first
     const urlParams = new URLSearchParams(window.location.search)
@@ -306,7 +309,7 @@ export function Layout({ children }: LayoutProps) {
 
     if (autoConnectUrl) {
       // Auto-connect to the URL from query parameter
-      const existing = connections.find((c) => c.url === autoConnectUrl)
+      const existing = connections.find(c => c.url === autoConnectUrl)
       if (!existing) {
         setIsAutoConnecting(true)
         addConnection(autoConnectUrl, 'Local MCP Server', undefined, 'http')
@@ -322,13 +325,13 @@ export function Layout({ children }: LayoutProps) {
 
     // Fallback to config.json
     fetch('/inspector/config.json')
-      .then((res) => res.json())
+      .then(res => res.json())
       .then((config: { autoConnectUrl: string | null }) => {
         setConfigLoaded(true)
         if (config.autoConnectUrl) {
           // Check if we already have this server
           const existing = connections.find(
-            (c) => c.url === config.autoConnectUrl
+            c => c.url === config.autoConnectUrl,
           )
           if (!existing) {
             // Auto-connect to the local server
@@ -336,7 +339,7 @@ export function Layout({ children }: LayoutProps) {
               config.autoConnectUrl,
               'Local MCP Server',
               undefined,
-              'http'
+              'http',
             )
           }
         }
@@ -358,7 +361,8 @@ export function Layout({ children }: LayoutProps) {
       if (decodedServerId !== selectedServerId) {
         setSelectedServerId(decodedServerId)
       }
-    } else {
+    }
+    else {
       // No server param, clear the selected server
       if (selectedServerId !== null) {
         setSelectedServerId(null)
@@ -380,7 +384,7 @@ export function Layout({ children }: LayoutProps) {
 
     // Check if any connection exists for this server
     const serverConnection = connections.find(
-      (conn) => conn.id === decodedServerId
+      conn => conn.id === decodedServerId,
     )
 
     if (serverConnection) {
@@ -394,9 +398,9 @@ export function Layout({ children }: LayoutProps) {
       }
       // If server is connecting/loading/discovering, don't redirect yet
       if (
-        serverConnection.state === 'connecting' ||
-        serverConnection.state === 'loading' ||
-        serverConnection.state === 'discovering'
+        serverConnection.state === 'connecting'
+        || serverConnection.state === 'loading'
+        || serverConnection.state === 'discovering'
       ) {
         return
       }
@@ -443,9 +447,11 @@ export function Layout({ children }: LayoutProps) {
       // Focus the search bar based on the active tab
       if (activeTab === 'tools' && toolsSearchRef.current) {
         toolsSearchRef.current.focusSearch()
-      } else if (activeTab === 'prompts' && promptsSearchRef.current) {
+      }
+      else if (activeTab === 'prompts' && promptsSearchRef.current) {
         promptsSearchRef.current.focusSearch()
-      } else if (activeTab === 'resources' && resourcesSearchRef.current) {
+      }
+      else if (activeTab === 'resources' && resourcesSearchRef.current) {
         resourcesSearchRef.current.focusSearch()
       }
     },
@@ -453,9 +459,11 @@ export function Layout({ children }: LayoutProps) {
       // Blur the search bar based on the active tab
       if (activeTab === 'tools' && toolsSearchRef.current) {
         toolsSearchRef.current.blurSearch()
-      } else if (activeTab === 'prompts' && promptsSearchRef.current) {
+      }
+      else if (activeTab === 'prompts' && promptsSearchRef.current) {
         promptsSearchRef.current.blurSearch()
-      } else if (activeTab === 'resources' && resourcesSearchRef.current) {
+      }
+      else if (activeTab === 'resources' && resourcesSearchRef.current) {
         resourcesSearchRef.current.blurSearch()
       }
     },
@@ -491,7 +499,7 @@ export function Layout({ children }: LayoutProps) {
                       className={cn(
                         'min-w-[200px] p-0 px-1 text-sm h-11 justify-start bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200',
                         !selectedServer && 'pl-4',
-                        selectedServer && 'pr-4'
+                        selectedServer && 'pr-4',
                       )}
                     >
                       {selectedServer && (
@@ -510,37 +518,37 @@ export function Layout({ children }: LayoutProps) {
                         </span>
                         {selectedServer && (
                           <div className="flex items-center gap-2">
-                            {selectedServer.error &&
-                            selectedServer.state !== 'ready' ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      // Handle copy error functionality if needed
-                                    }}
-                                    className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
-                                    title="Click to copy error message"
-                                    aria-label="Copy error message to clipboard"
+                            {selectedServer.error
+                              && selectedServer.state !== 'ready' ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          // Handle copy error functionality if needed
+                                        }}
+                                        className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
+                                        title="Click to copy error message"
+                                        aria-label="Copy error message to clipboard"
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="max-w-xs">
+                                        {selectedServer.error}
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ) : (
+                                  <div
+                                    className={`w-2 h-2 rounded-full ${
+                                      selectedServer.state === 'ready'
+                                        ? 'bg-emerald-600 animate-status-pulse'
+                                        : selectedServer.state === 'failed'
+                                          ? 'bg-rose-600 animate-status-pulse-red'
+                                          : 'bg-yellow-500 animate-status-pulse-yellow'
+                                    }`}
                                   />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">
-                                    {selectedServer.error}
-                                  </p>
-                                </TooltipContent>
-                              </Tooltip>
-                            ) : (
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  selectedServer.state === 'ready'
-                                    ? 'bg-emerald-600 animate-status-pulse'
-                                    : selectedServer.state === 'failed'
-                                    ? 'bg-rose-600 animate-status-pulse-red'
-                                    : 'bg-yellow-500 animate-status-pulse-yellow'
-                                }`}
-                              />
-                            )}
+                                )}
                           </div>
                         )}
                       </div>
@@ -549,40 +557,42 @@ export function Layout({ children }: LayoutProps) {
                   <DropdownMenuContent className="w-[300px]" align="start">
                     <DropdownMenuLabel>MCP Servers</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {connections.length === 0 ? (
-                      <div className="px-2 py-4 text-sm text-muted-foreground dark:text-zinc-400 text-center">
-                        No servers connected. Go to the dashboard to add one.
-                      </div>
-                    ) : (
-                      connections.map((connection) => (
-                        <DropdownMenuItem
-                          key={connection.id}
-                          onClick={() => handleServerSelect(connection.id)}
-                          className="flex items-center gap-3"
-                        >
-                          <ServerIcon
-                            serverUrl={connection.url}
-                            serverName={connection.name}
-                            size="sm"
-                          />
-                          <div className="flex items-center gap-2 flex-1">
-                            <div className="font-medium">{connection.name}</div>
-                            <StatusDot status={connection.state} />
+                    {connections.length === 0
+                      ? (
+                          <div className="px-2 py-4 text-sm text-muted-foreground dark:text-zinc-400 text-center">
+                            No servers connected. Go to the dashboard to add one.
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleOpenConnectionOptions(connection.id)
-                            }}
-                          >
-                            <Settings className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuItem>
-                      ))
-                    )}
+                        )
+                      : (
+                          connections.map(connection => (
+                            <DropdownMenuItem
+                              key={connection.id}
+                              onClick={() => handleServerSelect(connection.id)}
+                              className="flex items-center gap-3"
+                            >
+                              <ServerIcon
+                                serverUrl={connection.url}
+                                serverName={connection.name}
+                                size="sm"
+                              />
+                              <div className="flex items-center gap-2 flex-1">
+                                <div className="font-medium">{connection.name}</div>
+                                <StatusDot status={connection.state} />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleOpenConnectionOptions(connection.id)
+                                }}
+                              >
+                                <Settings className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuItem>
+                          ))
+                        )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => navigate('/')}>
                       <span className="text-blue-600 dark:text-blue-400">
@@ -602,9 +612,11 @@ export function Layout({ children }: LayoutProps) {
                       let count = 0
                       if (tab.id === 'tools') {
                         count = selectedServer.tools.length
-                      } else if (tab.id === 'prompts') {
+                      }
+                      else if (tab.id === 'prompts') {
                         count = selectedServer.prompts.length
-                      } else if (tab.id === 'resources') {
+                      }
+                      else if (tab.id === 'resources') {
                         count = selectedServer.resources.length
                       }
 
@@ -682,23 +694,27 @@ export function Layout({ children }: LayoutProps) {
               callPrompt={selectedServer.callTool} // Using callTool for now, should be callPrompt when available
               isConnected={selectedServer.state === 'ready'}
             />
-          ) : selectedServer && activeTab === 'resources' ? (
-            <ResourcesTab
-              ref={resourcesSearchRef}
-              resources={selectedServer.resources}
-              readResource={selectedServer.readResource}
-              isConnected={selectedServer.state === 'ready'}
-            />
-          ) : selectedServer && activeTab === 'chat' ? (
-            <ChatTab
-              mcpServerUrl={selectedServer.url}
-              isConnected={selectedServer.state === 'ready'}
-              oauthState={selectedServer.state}
-              oauthError={selectedServer.error}
-            />
-          ) : (
-            children
-          )}
+          ) : selectedServer && activeTab === 'resources'
+            ? (
+                <ResourcesTab
+                  ref={resourcesSearchRef}
+                  resources={selectedServer.resources}
+                  readResource={selectedServer.readResource}
+                  isConnected={selectedServer.state === 'ready'}
+                />
+              )
+            : selectedServer && activeTab === 'chat'
+              ? (
+                  <ChatTab
+                    mcpServerUrl={selectedServer.url}
+                    isConnected={selectedServer.state === 'ready'}
+                    oauthState={selectedServer.state}
+                    oauthError={selectedServer.error}
+                  />
+                )
+              : (
+                  children
+                )}
         </main>
 
         {/* Command Palette */}
