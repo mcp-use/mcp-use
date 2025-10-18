@@ -60,7 +60,7 @@
             ]
           },
           {
-            "group": "Client Configuration",
+            "group": "MCP Client",
             "pages": [
               {
                 "group": "Overview",
@@ -96,7 +96,7 @@
             ]
           },
           {
-            "group": "Agent Configuration",
+            "group": "MCP Agent",
             "pages": [
               {
                 "group": "Overview",
