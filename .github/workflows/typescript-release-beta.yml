@@ -50,7 +50,7 @@ jobs:
           version: pnpm version
           commit: "chore(typescript): version packages (beta)"
           title: "chore(typescript): version packages (beta)"
-          cwd: libraries/typescript
+          cwd: ${{ github.workspace }}/libraries/typescript
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
