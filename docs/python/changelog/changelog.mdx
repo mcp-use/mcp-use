@@ -4,7 +4,15 @@ description: "New updates and improvements"
 icon:  "history"
 ---
 
-<Update label="v1.3.12 - 2025‑01‑02">
+<Update label="v1.3.13 - 2025‑10‑18">
+  ## Package Reorganization
+  - **Refactor**: Reorganized package structure into `client.*` and `agents.*` namespaces for better discoverability
+  - **Deprecation**: Old import paths (auth, middleware, managers, adapters, task_managers) are deprecated but still work with backward compatibility
+  - **Enhancement**: Clearer separation between client and agent concerns for improved maintainability
+  - **Fix**: Temporarily pinned to LangChain 0.3.27 to prevent breaking changes from 1.0.0 release (migration planned)
+</Update>
+
+<Update label="v1.3.12 - 2025‑10‑02">
   ## Middleware & Documentation
   - **New**: Comprehensive middleware system for request/response interception ([#269](https://github.com/mcp-use/mcp-use/pull/269))
   - **New**: Automatic API documentation generation ([#301](https://github.com/mcp-use/mcp-use/pull/301))
