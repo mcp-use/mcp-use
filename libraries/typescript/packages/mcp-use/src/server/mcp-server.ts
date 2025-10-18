@@ -87,7 +87,7 @@ export class McpServer {
    * @param resourceDefinition.description - Optional description of the resource
    * @param resourceDefinition.mimeType - MIME type of the resource content
    * @param resourceDefinition.annotations - Optional annotations (audience, priority, lastModified)
-   * @param resourceDefinition.fn - Async function that returns the resource content
+   * @param resourceDefinition.readCallback - Async callback function that returns the resource content
    * @returns The server instance for method chaining
    * 
    * @example
@@ -102,7 +102,7 @@ export class McpServer {
    *     audience: ['user'],
    *     priority: 0.8
    *   },
-   *   fn: async () => ({
+   *   readCallback: async () => ({
    *     contents: [{
    *       uri: 'config://app-settings',
    *       mimeType: 'application/json',
@@ -124,7 +124,7 @@ export class McpServer {
         annotations: resourceDefinition.annotations,
       },
       async () => {
-        return await resourceDefinition.fn()
+        return await resourceDefinition.readCallback()
       },
     )
     return this
@@ -140,7 +140,7 @@ export class McpServer {
    * @param resourceTemplateDefinition - Configuration object for the resource template
    * @param resourceTemplateDefinition.name - Unique identifier for the template
    * @param resourceTemplateDefinition.resourceTemplate - ResourceTemplate object with uriTemplate and metadata
-   * @param resourceTemplateDefinition.fn - Async function that generates resource content from URI and params
+   * @param resourceTemplateDefinition.readCallback - Async callback function that generates resource content from URI and params
    * @returns The server instance for method chaining
    * 
    * @example
@@ -152,7 +152,7 @@ export class McpServer {
    *     name: 'User Profile',
    *     mimeType: 'application/json'
    *   },
-   *   fn: async (uri, params) => ({
+   *   readCallback: async (uri, params) => ({
    *     contents: [{
    *       uri: uri.toString(),
    *       mimeType: 'application/json',
@@ -200,7 +200,7 @@ export class McpServer {
           resourceTemplateDefinition.resourceTemplate.uriTemplate,
           uri.toString()
         )
-        return await resourceTemplateDefinition.fn(uri, params)
+        return await resourceTemplateDefinition.readCallback(uri, params)
       },
     )
     return this
@@ -219,7 +219,7 @@ export class McpServer {
    * @param toolDefinition.name - Unique identifier for the tool
    * @param toolDefinition.description - Human-readable description of what the tool does
    * @param toolDefinition.inputs - Array of input parameter definitions with types and validation
-   * @param toolDefinition.fn - Async function that executes the tool logic with provided parameters
+   * @param toolDefinition.cb - Async callback function that executes the tool logic with provided parameters
    * @param toolDefinition._meta - Optional metadata for the tool (e.g. Apps SDK metadata)
    * @returns The server instance for method chaining
    * 
@@ -232,7 +232,7 @@ export class McpServer {
    *     { name: 'expression', type: 'string', required: true },
    *     { name: 'precision', type: 'number', required: false }
    *   ],
-   *   fn: async ({ expression, precision = 2 }) => {
+   *   cb: async ({ expression, precision = 2 }) => {
    *     const result = eval(expression)
    *     return { result: Number(result.toFixed(precision)) }
    *   },
@@ -254,10 +254,10 @@ export class McpServer {
         description: toolDefinition.description ?? "",
         inputSchema,
         annotations: toolDefinition.annotations,
-        _meta: toolDefinition.metadata
+        _meta: toolDefinition._meta
       },
       async (params: any) => {
-        return await toolDefinition.fn(params)
+        return await toolDefinition.cb(params)
       },
     )
     return this
@@ -274,7 +274,7 @@ export class McpServer {
    * @param promptDefinition.name - Unique identifier for the prompt template
    * @param promptDefinition.description - Human-readable description of the prompt's purpose
    * @param promptDefinition.args - Array of argument definitions with types and validation
-   * @param promptDefinition.fn - Async function that generates the prompt from provided arguments
+   * @param promptDefinition.cb - Async callback function that generates the prompt from provided arguments
    * @returns The server instance for method chaining
    * 
    * @example
@@ -286,7 +286,7 @@ export class McpServer {
    *     { name: 'language', type: 'string', required: true },
    *     { name: 'focus', type: 'string', required: false }
    *   ],
-   *   fn: async ({ language, focus = 'general' }) => {
+   *   cb: async ({ language, focus = 'general' }) => {
    *     return {
    *       messages: [{
    *         role: 'user',
@@ -307,7 +307,7 @@ export class McpServer {
         argsSchema,
       },
       async (params: any) => {
-        return await promptDefinition.fn(params)
+        return await promptDefinition.cb(params)
       },
     )
     return this
@@ -423,7 +423,7 @@ export class McpServer {
       description: definition.description,
       mimeType,
       annotations: definition.annotations,
-      fn: async () => {
+      readCallback: async () => {
         // For externalUrl type, use default props. For others, use empty params
         const params = definition.type === 'externalUrl'
           ? this.applyDefaultProps(definition.props)
@@ -468,8 +468,8 @@ export class McpServer {
         ? definition.title
         : (definition.description || `Display ${displayName}`),
       inputs: this.convertPropsToInputs(definition.props),
-      metadata: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
-      fn: async (params) => {
+      _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
+      cb: async (params) => {
         // Create the UIResource with user-provided params
         const uiResource = this.createWidgetUIResource(definition, params)
 

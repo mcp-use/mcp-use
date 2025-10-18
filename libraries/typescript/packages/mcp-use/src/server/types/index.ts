@@ -11,8 +11,8 @@ export {
 
 // Resource types including UIResource
 export {
-  ResourceHandler,
-  ResourceTemplateHandler,
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
   ResourceTemplateConfig,
   ResourceTemplateDefinition,
   ResourceDefinition,
@@ -36,12 +36,12 @@ export {
 
 // Tool types
 export {
-  ToolHandler,
+  ToolCallback,
   ToolDefinition
 } from './tool.js'
 
 // Prompt types
 export {
-  PromptHandler,
+  PromptCallback,
   PromptDefinition
 } from './prompt.js'
