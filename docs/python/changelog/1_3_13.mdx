@@ -1,0 +1,120 @@
+---
+title: "Version 1.3.13"
+description: "Package reorganization and improved module structure"
+icon: "box"
+---
+
+This release focuses on package reorganization to provide clearer module structure and better separation of concerns. The library has been restructured into logical namespaces for improved discoverability and maintainability.
+
+## Bug Fixes
+
+### LangChain Version Compatibility
+
+Fixed compatibility issues caused by LangChain's 1.0.0 release. The library is temporarily pinned to LangChain 0.3.27 to prevent breaking changes. Migration to LangChain 1.0.0 is planned for a future release.
+
+## Package Reorganization
+
+The package has been reorganized into clearer, more intuitive modules:
+
+- **`mcp_use.client.*`** - Client-related functionality
+  - `mcp_use.client.auth` - Authentication mechanisms (OAuth, Bearer)
+  - `mcp_use.client.connectors` - Connection transports (HTTP, WebSocket, Stdio, Sandbox)
+  - `mcp_use.client.middleware` - Request/response middleware
+  - `mcp_use.client.task_managers` - Connection task managers
+
+- **`mcp_use.agents.*`** - Agent-related functionality
+  - `mcp_use.agents.adapters` - LLM framework adapters (LangChain, etc.)
+  - `mcp_use.agents.managers` - Server management tools and utilities
+
+This reorganization provides:
+- Better code discoverability through logical namespacing
+- Clear separation between client and agent concerns
+- Improved maintainability and extensibility
+- More intuitive import paths
+
+## Deprecation Notices
+
+<Warning>
+The following import paths are now deprecated and will be removed in future versions:
+</Warning>
+
+### Authentication
+```python
+# Deprecated
+from mcp_use.auth import BearerAuth, OAuth
+from mcp_use.auth.oauth_callback import OAuthCallbackServer, CallbackResponse
+
+# Use instead
+from mcp_use.client.auth import BearerAuth, OAuth
+from mcp_use.client.auth.oauth_callback import OAuthCallbackServer, CallbackResponse
+```
+
+### Middleware
+```python
+# Deprecated
+from mcp_use.middleware import Middleware, MiddlewareManager, MiddlewareContext
+from mcp_use.middleware.metrics import MetricsMiddleware, PerformanceMetricsMiddleware, ErrorTrackingMiddleware, CombinedAnalyticsMiddleware
+
+# Use instead
+from mcp_use.client.middleware import Middleware, MiddlewareManager, MiddlewareContext
+from mcp_use.client.middleware.metrics import MetricsMiddleware, PerformanceMetricsMiddleware, ErrorTrackingMiddleware, CombinedAnalyticsMiddleware
+```
+
+### Task Managers
+```python
+# Deprecated
+from mcp_use.task_managers import ConnectionManager, SseConnectionManager, StdioConnectionManager, StreamableHttpConnectionManager, WebSocketConnectionManager
+
+# Use instead
+from mcp_use.client.task_managers import ConnectionManager, SseConnectionManager, StdioConnectionManager, StreamableHttpConnectionManager, WebSocketConnectionManager
+```
+
+### Adapters
+```python
+# Deprecated
+from mcp_use.adapters import BaseAdapter, LangChainAdapter
+
+# Use instead
+from mcp_use.agents.adapters import BaseAdapter, LangChainAdapter
+```
+
+### Server Managers
+```python
+# Deprecated
+from mcp_use.managers import ServerManager, MCPServerTool, ConnectServerTool, DisconnectServerTool, GetActiveServerTool, ListServersTool, SearchToolsTool
+
+# Use instead
+from mcp_use.agents.managers import ServerManager, MCPServerTool, ConnectServerTool, DisconnectServerTool, GetActiveServerTool, ListServersTool, SearchToolsTool
+```
+
+### Exceptions
+```python
+# Deprecated
+from mcp_use.exceptions import MCPError, OAuthDiscoveryError, OAuthAuthenticationError, ConnectionError, ConfigurationError
+
+# Use instead
+from mcp_use.client.exceptions import MCPError, OAuthDiscoveryError, OAuthAuthenticationError, ConnectionError, ConfigurationError
+```
+
+### Types
+```python
+# Deprecated
+from mcp_use.types.sandbox import SandboxOptions
+
+# Use instead
+from mcp_use.client.connectors.sandbox import SandboxOptions
+```
+
+**Backward Compatibility:** All deprecated import paths continue to work in version 1.3.13 but will emit deprecation warnings. Please migrate to the new import paths before the next major release.
+
+**Note:** Top-level imports like `from mcp_use import MCPAgent, MCPClient, MCPSession` remain supported and are NOT deprecated.
+
+## Migration Guide
+
+To migrate your code:
+
+1. Replace old import paths with new ones as shown above
+2. Run your tests to ensure everything works
+3. The functionality remains identical - only the import paths have changed
+
+The reorganization maintains full backward compatibility, so existing code will continue to work while you migrate to the new structure.
