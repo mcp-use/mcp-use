@@ -5,9 +5,9 @@ This module provides the abstract base class that all MCP tool adapters should i
 """
 
 from abc import ABC, abstractmethod
-from typing import TypeVar
+from typing import TypeVar, Any
 
-from mcp.types import Prompt, Resource, Tool
+from mcp.types import Prompt, Resource, Tool, CallToolResult
 
 from mcp_use.client.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
@@ -60,7 +60,7 @@ class BaseAdapter(ABC):
         elif hasattr(tool_result, "messages"):  # For Prompts (GetPromptResult)
             return "\n".join(str(s) for s in tool_result.messages)
         elif hasattr(tool_result, "content"):  # For Tools (CallToolResult)
-            return self._parse_mcp_tool_result(tool_result)
+            return str(tool_result.content)
         else:
             # Fallback for unexpected types
             return str(tool_result)
@@ -86,47 +86,6 @@ class BaseAdapter(ABC):
             for key, value in schema.items():
                 schema[key] = self.fix_schema(value)  # Apply recursively
         return schema
-
-    def _parse_mcp_tool_result(self, tool_result: CallToolResult) -> str:
-        """Parse the content of a CallToolResult into a string.
-
-        Args:
-            tool_result: The result object from calling an MCP tool.
-
-        Returns:
-            A string representation of the tool result content.
-
-        Raises:
-            RuntimeError: If the tool execution failed, returned no content,
-                        or contained unexpected content types.
-        """
-        if tool_result.isError:
-            raise Exception(f"Tool execution failed: {tool_result.content}")
-
-        decoded_result = ""
-        for item in tool_result.content or []:
-            match item.type:
-                case "text":
-                    item: TextContent
-                    decoded_result += item.text
-                case "image":
-                    item: ImageContent
-                    decoded_result += item.data  # Assuming data is string-like or base64
-                case "resource":
-                    resource: EmbeddedResource = item.resource
-                    if hasattr(resource, "text"):
-                        decoded_result += resource.text
-                    elif hasattr(resource, "blob"):
-                        # Assuming blob needs decoding or specific handling; adjust as needed
-                        decoded_result += (
-                            resource.blob.decode() if isinstance(resource.blob, bytes) else str(resource.blob)
-                        )
-                    else:
-                        raise RuntimeError(f"Unexpected resource type: {resource.type}")
-                case _:
-                    raise RuntimeError(f"Unexpected content type: {item.type}")
-
-        return decoded_result
 
     async def _get_connectors(self, client: MCPClient) -> list[BaseConnector]:
         """Get all connectors from the client, creating sessions if needed."""

@@ -4,8 +4,8 @@ from typing import Any
 
 from mcp.types import Prompt, Resource, Tool
 
-from ..connectors.base import BaseConnector
-from .base import BaseAdapter
+from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.agents.adapters.base import BaseAdapter
 
 
 def _sanitize_for_tool_name(name: str) -> str:
