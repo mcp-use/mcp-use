@@ -36,7 +36,7 @@ class GoogleMCPAdapter(BaseAdapter):
         self.prompts: list[types.FunctionDeclaration] = []
 
     def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> types.FunctionDeclaration:
-        """Convert an MCP tool to the Anthropic tool format."""
+        """Convert an MCP tool to the Google tool format."""
         if mcp_tool.name in self.disallowed_tools:
             return None
 
@@ -49,7 +49,7 @@ class GoogleMCPAdapter(BaseAdapter):
         return function_declaration
 
     def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> types.FunctionDeclaration:
-        """Convert an MCP resource to a readable tool in Anthropic format."""
+        """Convert an MCP resource to a readable tool in Google format."""
         tool_name = _sanitize_for_tool_name(f"resource_{mcp_resource.name}")
 
         if tool_name in self.disallowed_tools:
@@ -65,7 +65,7 @@ class GoogleMCPAdapter(BaseAdapter):
         return function_declaration
 
     def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> types.FunctionDeclaration:
-        """Convert an MCP prompt to a usable tool in Anthropic format."""
+        """Convert an MCP prompt to a usable tool in Google format."""
         if mcp_prompt.name in self.disallowed_tools:
             return None
 
