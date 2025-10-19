@@ -5,7 +5,7 @@ from google import genai
 from google.genai import types
 
 from mcp_use import MCPClient
-from mcp_use.adapters import GoogleMCPAdapter
+from mcp_use.agents.adapters import GoogleMCPAdapter
 
 # This example demonstrates how to use our integration
 # adapaters to use MCP tools and convert to the right format.
