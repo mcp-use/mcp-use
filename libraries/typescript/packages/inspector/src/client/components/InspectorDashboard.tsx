@@ -177,13 +177,15 @@ export function InspectorDashboard() {
     }
   }, [])
 
-  const handleAddConnection = useCallback(() => {
+  const handleAddConnection = useCallback((isRetry = false) => {
     if (!url.trim())
       return
 
     setIsConnecting(true)
     hasShownToastRef.current = false
-    setHasTriedBothConnectionTypes(false)
+    if (!isRetry) {
+      setHasTriedBothConnectionTypes(false)
+    }
 
     // Prepare proxy configuration if "Via Proxy" is selected
     const proxyConfig
@@ -265,7 +267,7 @@ export function InspectorDashboard() {
           setConnectionType('Via Proxy')
           setTimeout(() => {
             setIsConnecting(true)
-            handleAddConnection()
+            handleAddConnection(true)
           }, 1000) // Small delay to show the toast
         }
         else if (shouldTryDirect) {
@@ -277,7 +279,7 @@ export function InspectorDashboard() {
           setConnectionType('Direct')
           setTimeout(() => {
             setIsConnecting(true)
-            handleAddConnection()
+            handleAddConnection(true)
           }, 1000) // Small delay to show the toast
         }
       }
