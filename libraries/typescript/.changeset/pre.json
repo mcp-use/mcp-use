@@ -7,5 +7,8 @@
     "@mcp-use/inspector": "0.4.0",
     "mcp-use": "1.1.0"
   },
-  "changesets": []
+  "changesets": [
+    "jolly-symbols-remain",
+    "thin-glasses-grab"
+  ]
 }

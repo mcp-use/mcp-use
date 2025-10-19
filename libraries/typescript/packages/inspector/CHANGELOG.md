@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.4.1-beta.0
+
+### Patch Changes
+
+- a2b8fd8: refactor: clean up code formatting and improve readability across multiple components
+- Updated dependencies [a2b8fd8]
+  - mcp-use@1.1.1-beta.0
+
 ## 0.4.0
 
 ### Minor Changes

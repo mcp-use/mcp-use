@@ -1,5 +1,12 @@
 # create-mcp-use-app
 
+## 0.4.1-beta.0
+
+### Patch Changes
+
+- 65e3e86: Fix templates deps versions
+- a2b8fd8: refactor: clean up code formatting and improve readability across multiple components
+
 ## 0.4.0
 
 ### Minor Changes
