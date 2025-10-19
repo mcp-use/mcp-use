@@ -216,10 +216,10 @@ async def main():
     try:
         client = MCPClient(config=config)
 
-        # Creates the adapter for Anthropic's format
+        # Creates the adapter for Google's format
         adapter = GoogleMCPAdapter()
 
-        # Convert tools from active connectors to the Anthropic's format
+        # Convert tools from active connectors to Google's format
         await adapter.create_all(client)
 
         # List concatenation (if you loaded all tools)
