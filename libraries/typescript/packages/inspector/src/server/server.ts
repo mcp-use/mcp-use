@@ -154,28 +154,28 @@ app.post('/inspector/api/chat/stream', async (c) => {
     const requestBody = await c.req.json()
 
     // Create a readable stream from the async generator
-    const { readable, writable } = new TransformStream()
+    const { readable, writable } = new globalThis.TransformStream()
     const writer = writable.getWriter()
     const encoder = new TextEncoder()
 
-    // Start streaming in the background
-    ;(async () => {
-      try {
-        for await (const chunk of handleChatRequestStream(requestBody)) {
-          await writer.write(encoder.encode(chunk))
+      // Start streaming in the background
+      ; (async () => {
+        try {
+          for await (const chunk of handleChatRequestStream(requestBody)) {
+            await writer.write(encoder.encode(chunk))
+          }
         }
-      }
-      catch (error) {
-        const errorMsg = `${JSON.stringify({
-          type: 'error',
-          data: { message: error instanceof Error ? error.message : 'Unknown error' },
-        })}\n`
-        await writer.write(encoder.encode(errorMsg))
-      }
-      finally {
-        await writer.close()
-      }
-    })()
+        catch (error) {
+          const errorMsg = `${JSON.stringify({
+            type: 'error',
+            data: { message: error instanceof Error ? error.message : 'Unknown error' },
+          })}\n`
+          await writer.write(encoder.encode(errorMsg))
+        }
+        finally {
+          await writer.close()
+        }
+      })()
 
     return new Response(readable, {
       headers: {

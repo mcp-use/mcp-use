@@ -1,5 +1,4 @@
 import type { LLMConfig } from './types'
-import { MessageCircle } from 'lucide-react'
 
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -8,7 +7,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/client/components/ui/tooltip'
-import { Kbd } from '../ui/kbd'
 import { ConfigurationDialog } from './ConfigurationDialog'
 
 interface ChatHeaderProps {
@@ -55,10 +53,12 @@ export function ChatHeader({
                 className="ml-2 pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
                 onClick={() => onConfigDialogOpenChange(true)}
               >
-                <img src={`/inspector/providers/${llmConfig.provider}.png`} alt={llmConfig.provider} className="w-4 h-4 mr-0" />
-                {llmConfig.provider}
-                /
-                {llmConfig.model}
+                <img
+                  src={`/inspector/providers/${llmConfig.provider}.png`}
+                  alt={llmConfig.provider}
+                  className="w-4 h-4 mr-0"
+                />
+                {llmConfig.provider}/{llmConfig.model}
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
@@ -69,13 +69,11 @@ export function ChatHeader({
       </div>
       <div className="flex items-center gap-2 pr-3 pt-2">
         {hasMessages && (
-          <Button
-            size="default"
-            className="pr-1"
-            onClick={onClearChat}
-          >
+          <Button size="default" className="pr-1" onClick={onClearChat}>
             New Chat
-            <span className="text-[12px]  border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500">⌘O</span>
+            <span className="text-[12px]  border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500">
+              ⌘O
+            </span>
           </Button>
         )}
         <ConfigurationDialog
