@@ -15,13 +15,14 @@ _thread_local = threading.local()
 class MCPLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware that extracts MCP method information from JSON-RPC requests."""
 
-    def __init__(self, app, debug_level: int = 0):
+    def __init__(self, app, debug_level: int = 0, mcp_path: str = "/mcp"):
         super().__init__(app)
         self.debug_level = debug_level
+        self.mcp_path = mcp_path
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        # Only process POST requests to /mcp
-        if request.method != "POST" or not request.url.path.endswith("/mcp"):
+        # Only process POST requests to the MCP endpoint
+        if request.method != "POST" or not request.url.path.endswith(self.mcp_path):
             return await call_next(request)
 
         # Read request body

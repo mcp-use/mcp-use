@@ -52,7 +52,7 @@ class MCPAccessFormatter(AccessFormatter):
             # Pad HTTP method for alignment
             padded_method = f"{method:<4}"
 
-            if "/mcp" in path and method == "POST":
+            if "/mcp" in path and method == "POST":  # TODO: Make this configurable
                 # Get MCP method info from thread-local storage
                 from mcp_use.server.middleware import MCPLoggingMiddleware
 

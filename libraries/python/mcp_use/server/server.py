@@ -19,9 +19,10 @@ class MCPServer(FastMCP):
         version: str | None = None,
         instructions: str | None = None,
         debug: bool = False,
-        docs_url: str | None = "/docs",
-        inspector_url: str | None = "/inspector",
-        openmcp_url: str | None = "/openmcp.json",
+        mcp_path: str | None = "/mcp",
+        docs_path: str | None = "/docs",
+        inspector_path: str | None = "/inspector",
+        openmcp_path: str | None = "/openmcp.json",
     ):
         self._start_time = time.time()
         super().__init__(name=name or "mcp-use server", instructions=instructions)
@@ -38,10 +39,11 @@ class MCPServer(FastMCP):
             # Use debug parameter (0 or 1)
             self.debug_level = 1 if debug else 0
 
-        # Set dev route URLs
-        self.docs_url = docs_url
-        self.inspector_url = inspector_url
-        self.openmcp_url = openmcp_url
+        # Set route paths
+        self.mcp_path = mcp_path
+        self.docs_path = docs_path
+        self.inspector_path = inspector_path
+        self.openmcp_path = openmcp_path
 
         # Add dev routes only in DEBUG=1 and above
         if self.debug_level >= 1:
@@ -80,21 +82,23 @@ class MCPServer(FastMCP):
         async def openmcp_handler(request):
             return await openmcp_json(request, self)
 
-        self.custom_route(self.openmcp_url, methods=["GET"])(openmcp_handler)
+        self.custom_route(self.openmcp_path, methods=["GET"])(openmcp_handler)
 
         # Documentation UI
-        self.custom_route(self.docs_url, methods=["GET"])(docs_ui)
+        self.custom_route(self.docs_path, methods=["GET"])(docs_ui)
 
         # Inspector routes
-        self.custom_route(self.inspector_url, methods=["GET"])(_inspector_index)
-        self.custom_route(f"{self.inspector_url}/{{path:path}}", methods=["GET"])(_inspector_static)
+        self.custom_route(self.inspector_path, methods=["GET"])(
+            lambda request: _inspector_index(request, self.mcp_path)
+        )
+        self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""
         app = super().streamable_http_app()
 
         # Add MCP logging middleware
-        app.add_middleware(MCPLoggingMiddleware, debug_level=self.debug_level)
+        app.add_middleware(MCPLoggingMiddleware, debug_level=self.debug_level, mcp_path=self.mcp_path)
 
         return app
 

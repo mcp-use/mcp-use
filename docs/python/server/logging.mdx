@@ -134,12 +134,13 @@ server.run(transport="streamable-http")
 server = MCPServer("my-server", debug=True)
 server.run(transport="streamable-http")
 
-# Debug mode with custom URLs
+# Debug mode with custom paths
 server = MCPServer(
     name="my-server",
     debug=True,
-    docs_url="/custom-docs",
-    inspector_url="/custom-inspector"
+    mcp_path="/api/mcp",  # Custom MCP endpoint
+    docs_path="/custom-docs",
+    inspector_path="/custom-inspector"
 )
 server.run(transport="streamable-http")
 ```

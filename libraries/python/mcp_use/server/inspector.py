@@ -6,10 +6,10 @@ CDN_BASE_URL = "https://unpkg.com/@mcp-use/inspector/dist/client"
 INDEX_URL = f"{CDN_BASE_URL}/index.html"
 
 
-async def _inspector_index(request: Request):
+async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
     """Serve the inspector index.html file with autoconnect parameter."""
     # Get the server URL from the request
-    server_url = f"{request.url.scheme}://{request.url.netloc}/mcp"
+    server_url = f"{request.url.scheme}://{request.url.netloc}{mcp_path}"
 
     # Check if server parameter is already present
     server_param = request.query_params.get("server")

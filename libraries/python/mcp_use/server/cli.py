@@ -42,14 +42,15 @@ async def display_startup_info(server: "MCPServer", host: str, port: int, start_
     )
     click.echo()
     click.echo(f"- Local:        http://{host}:{port}")
+    click.echo(f"- MCP:          http://{host}:{port}{server.mcp_path}")
     if network_ip and network_ip != host and host == "0.0.0.0":
         click.echo(f"- Network:      http://{get_local_network_ip()}:{port}")
 
     # Show additional endpoints if in dev mode
     if server.debug_level >= 1:
-        click.echo(f"- Docs:         http://{host}:{port}{server.docs_url}")
-        click.echo(f"- Inspector:    http://{host}:{port}{server.inspector_url}")
-        click.echo(f"- OpenMCP:      http://{host}:{port}{server.openmcp_url}")
+        click.echo(f"- Docs:         http://{host}:{port}{server.docs_path}")
+        click.echo(f"- Inspector:    http://{host}:{port}{server.inspector_path}")
+        click.echo(f"- OpenMCP:      http://{host}:{port}{server.openmcp_path}")
 
     click.echo()
     click.echo(f"{click.style('✓', fg='green')} Starting...")

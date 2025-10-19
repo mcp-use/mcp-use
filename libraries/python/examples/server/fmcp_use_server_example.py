@@ -73,4 +73,16 @@ async def template_message(template_name: str) -> str:
 
 # 3. Run the server with TUI chat interface
 if __name__ == "__main__":
+    # Example with custom paths (optional)
+    # server = MCPServer(
+    #     name="Example Server",
+    #     version="0.1.0",
+    #     instructions="This is an example server with a simple echo tool.",
+    #     debug=True,  # Enable debug mode (adds dev routes)
+    #     mcp_path="/api/mcp",  # Custom MCP endpoint
+    #     docs_path="/custom-docs",
+    #     inspector_path="/custom-inspector",
+    #     openmcp_path="/custom-openmcp.json"
+    # )
+
     server.run(transport="streamable-http", port=8000, reload=True)
