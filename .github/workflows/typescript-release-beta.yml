@@ -74,7 +74,9 @@ jobs:
       - name: Publish packages
         if: steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
-        run: pnpm release
+        run: |
+          echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > .npmrc
+          pnpm release
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
