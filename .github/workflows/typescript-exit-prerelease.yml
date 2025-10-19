@@ -1,4 +1,4 @@
-name: TypeScript Exit Prerelease Mode
+name: TypeScript Exit Prerelease
 
 on:
   push:
@@ -58,22 +58,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create new branch
-          BRANCH_NAME="exit-prerelease-$(date +%s)"
+          BRANCH_NAME="release/exit-prerelease-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
 
           # Exit prerelease mode
           echo "Exiting prerelease mode..."
           pnpm changeset pre exit
 
-          # Version packages from canary to stable
-          echo "Versioning packages to stable versions..."
+          # Version packages
+          echo "Versioning packages..."
           pnpm changeset version
 
           # Commit changes
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "chore: exit prerelease mode and version packages to stable"
+          git commit -m "chore(release): exit prerelease mode and version packages"
 
           # Push branch
           git push origin "$BRANCH_NAME"
@@ -82,20 +82,22 @@ jobs:
           gh pr create \
             --base main \
             --head "$BRANCH_NAME" \
-            --title "chore: Exit prerelease mode and prepare stable release" \
-            --body "This PR exits prerelease mode after merging canary changes.
+            --title "release(typescript): Exit prerelease mode and version packages" \
+            --body "This PR exits prerelease mode and versions packages for stable release.
 
-          ## Changes in this PR:
+          ## Changes:
 
-          1. ✅ Exit prerelease mode (remove pre.json)
-          2. ✅ Version packages to stable (e.g., 1.0.0-canary.0 → 1.0.0)
-          3. ✅ Update CHANGELOGs
+          - ✅ Exited prerelease mode (removed \`pre.json\`)
+          - ✅ Versioned packages to stable versions
+          - ✅ Updated CHANGELOGs
 
-          ## What happens when this PR is merged:
+          ## After merging:
 
-          1. ✅ The TypeScript Release workflow will run
-          2. ✅ Stable versions will be published to npm
+          - ✅ Packages will be automatically published to npm with \`latest\` tag
+          - ✅ Git tags will be pushed
 
-          **This PR was automatically created because canary was merged to main while in prerelease mode.**"
+          ---
 
-          echo "✅ Created PR for exiting prerelease mode"
+          **This PR was automatically created after merging canary to main.**"
+
+          echo "✅ Created exit prerelease PR"

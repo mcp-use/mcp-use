@@ -45,82 +45,33 @@ jobs:
         working-directory: libraries/typescript
         run: pnpm build
 
-      - name: Check for work to do
-        working-directory: libraries/typescript
+      - name: Check if this is a release commit
         id: check
         run: |
-          # Check for changesets
-          if [ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ]; then
-            echo "has_changesets=true" >> $GITHUB_OUTPUT
-            echo "📦 Found changesets to process"
-          else
-            echo "has_changesets=false" >> $GITHUB_OUTPUT
-            echo "ℹ️  No changesets found"
-          fi
-
-          # Check if we should publish
-          HAS_CHANGESETS=$([ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ] && echo "true" || echo "false")
           COMMIT_MSG=$(git log -1 --pretty=%B)
 
-          # Publish only AFTER versions are committed (not while creating version PR)
-          if echo "$COMMIT_MSG" | grep -q "exit prerelease mode"; then
+          if echo "$COMMIT_MSG" | grep -q "chore(release): exit prerelease mode"; then
             echo "should_publish=true" >> $GITHUB_OUTPUT
-            echo "🚀 Detected exit prerelease mode - will publish updated versions"
-          elif echo "$COMMIT_MSG" | grep -q "chore(typescript): version packages"; then
-            echo "should_publish=true" >> $GITHUB_OUTPUT
-            echo "🚀 Detected version packages commit - will publish"
+            echo "🚀 Detected release commit - will publish packages"
           else
             echo "should_publish=false" >> $GITHUB_OUTPUT
-            if [ "$HAS_CHANGESETS" = "true" ]; then
-              echo "📦 Will create version PR (publish happens after PR merge)"
-            else
-              echo "ℹ️  Nothing to do"
-            fi
+            echo "ℹ️  Not a release commit - skipping publish"
           fi
-
-      - name: Version packages
-        if: steps.check.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
-        run: |
-          echo "Versioning packages based on changesets..."
-          pnpm changeset version
-
-      - name: Create Version PR
-        if: steps.check.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Create branch for version changes
-          BRANCH_NAME="version-packages-$(date +%s)"
-          git checkout -b "$BRANCH_NAME"
-
-          # Commit changes
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "chore(typescript): version packages" || echo "No changes to commit"
-
-          # Push branch
-          git push origin "$BRANCH_NAME"
-
-          # Create PR
-          gh pr create \
-            --base main \
-            --head "$BRANCH_NAME" \
-            --title "chore(typescript): version packages" \
-            --body "This PR updates package versions based on changesets.
-
-          ## After merging:
-          - Packages will be published to npm automatically"
 
       - name: Publish packages
         if: steps.check.outputs.should_publish == 'true'
         working-directory: libraries/typescript
         run: |
+          # Setup npm auth
           echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > .npmrc
+
+          # Publish to npm
           pnpm changeset publish
-          echo "✅ Published packages to npm"
+
+          # Push git tags
+          git push --follow-tags
+
+          echo "✅ Published packages to npm and pushed tags"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
