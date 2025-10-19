@@ -5,9 +5,9 @@ This module provides the abstract base class that all MCP tool adapters should i
 """
 
 from abc import ABC, abstractmethod
-from typing import TypeVar, Any
+from typing import Any, TypeVar
 
-from mcp.types import Prompt, Resource, Tool, CallToolResult
+from mcp.types import Prompt, Resource, Tool
 
 from mcp_use.client.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
@@ -209,7 +209,7 @@ class BaseAdapter(ABC):
             f"{[getattr(r, 'name', str(r)) for r in connector_resources]}"
         )
         return connector_resources
-    
+
     @telemetry("adapter_load_prompts")
     async def load_prompts_for_connector(self, connector: BaseConnector) -> list[T]:
         """Dynamically load prompts for a specific connector.

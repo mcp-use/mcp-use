@@ -5,8 +5,8 @@ from typing import Any
 from google.genai import types
 from mcp.types import Prompt, Resource, Tool
 
-from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.agents.adapters.base import BaseAdapter
+from mcp_use.client.connectors.base import BaseConnector
 
 
 def _sanitize_for_tool_name(name: str) -> str:
