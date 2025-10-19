@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.4.1
+
+### Patch Changes
+
+- 3670ed0: minor fixes
+- 3670ed0: minor
+- Updated dependencies [3670ed0]
+- Updated dependencies [3670ed0]
+  - mcp-use@1.1.1
+
 ## 0.4.1-canary.1
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-use/cli",
-  "version": "2.1.13-canary.1",
+  "version": "2.1.13",
   "description": "Build tool for MCP UI widgets - bundles React components into standalone HTML pages for Model Context Protocol servers",
   "author": "mcp-use, Inc.",
   "license": "MIT",
