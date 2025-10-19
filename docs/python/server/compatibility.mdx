@@ -23,82 +23,70 @@ mcp-use extends the official MCP Python SDK rather than replacing it, ensuring:
 
 ## Compatibility Matrix
 
-| Feature | Official SDK | mcp-use | Notes |
-|---------|--------------|---------|-------|
+| Feature | FastMCP | mcp-use | Notes |
+|---------|---------|---------|-------|
 | MCP Protocol | ✅ | ✅ | Full compliance |
-| Tools | ✅ | ✅ | Enhanced with decorators |
-| Resources | ✅ | ✅ | Enhanced with decorators |
-| Prompts | ✅ | ✅ | Enhanced with decorators |
-| Documentation | ❌ | ✅ | Built-in OpenAPI/Swagger |
+| Tools | ✅ | ✅ | Same decorator API |
+| Resources | ✅ | ✅ | Same decorator API |
+| Prompts | ✅ | ✅ | Same decorator API |
+| Documentation | ❌ | ✅ | Built-in docs UI |
 | Inspector UI | ❌ | ✅ | Real-time monitoring |
-| Enhanced Logging | ❌ | ✅ | Structured JSON logging |
-| Health Checks | ❌ | ✅ | Built-in endpoints |
-| Metrics | ❌ | ✅ | Prometheus compatible |
+| Enhanced Logging | ❌ | ✅ | MCP method logging |
+| Much more to come... | ❌ | ✅ | Continuous enhancements |
 
 ## Migration Guide
 
-### From Official SDK
+### From FastMCP
 
-If you have an existing MCP server built with the official SDK, you can easily migrate to mcp-use:
+If you have an existing MCP server built with FastMCP, migration is as simple as changing the import:
 
-#### Before (Official SDK)
+#### Before (FastMCP)
 
-```python
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
+```python highlight={1,5}
+from mcp.server import FastMCP
 
-server = Server("my-server")
+mcp = FastMCP()
 
-@server.list_tools()
-async def list_tools():
-    return [
-        {
-            "name": "greet",
-            "description": "Greet someone",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"}
-                }
-            }
-        }
-    ]
-
-@server.call_tool()
-async def call_tool(name: str, arguments: dict):
-    if name == "greet":
-        return f"Hello, {arguments['name']}!"
-    raise ValueError(f"Unknown tool: {name}")
+@mcp.tool()
+def add(a: int, b: int) -> int:
+    """Add two numbers"""
+    return a + b
 
 if __name__ == "__main__":
-    stdio_server(server)
+    mcp.run(transport="streamable-http", port=8000)
 ```
 
 #### After (mcp-use)
 
-```python
-from mcp_use.server import MCPServer
+```python highlight={1,5}
+from mcp_use.server import FastMCP
 
-server = MCPServer(
-    name="my-server",
-    version="1.0.0"
-)
+mcp = FastMCP()
 
-@server.tool()
-def greet(name: str) -> str:
-    """Greet someone."""
-    return f"Hello, {name}!"
+@mcp.tool()
+def add(a: int, b: int) -> int:
+    """Add two numbers"""
+    return a + b
 
 if __name__ == "__main__":
-    server.run(port=3001)
+    mcp.run(transport="streamable-http", port=8000)
 ```
+
+**That's it!** Just change the import and you get all the enhanced features:
+- Built-in inspector UI at `/inspector`
+- Enhanced logging with MCP method information
+- Documentation at `/docs`
+- OpenMCP configuration at `/openmcp.json`
+- Configurable paths for all endpoints
 
 ### Key Improvements
 
-1. **Simplified API**: Decorator-based approach instead of manual tool registration
-2. **Automatic Schema Generation**: Type hints automatically generate input/output schemas
-3. **Built-in Features**: Documentation, inspector, and logging come out of the box
-4. **HTTP Support**: Built-in HTTP server with uvicorn integration
+1. **Drop-in Replacement**: Same FastMCP API with enhanced features
+2. **Built-in Documentation**: Automatic OpenAPI/Swagger docs at `/docs`
+3. **Inspector UI**: Real-time monitoring and testing at `/inspector`
+4. **Enhanced Logging**: MCP method information in structured logs
+5. **Configurable Paths**: Customize all endpoint paths
+6. **Much More Coming**: Continuous feature additions
 
 ## Protocol Compliance
 
