@@ -65,6 +65,7 @@ class BaseAdapter(ABC):
             # Fallback for unexpected types
             return str(tool_result)
 
+    @telemetry("adapter_fix_schema")
     def fix_schema(self, schema: dict) -> dict:
         """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
 
