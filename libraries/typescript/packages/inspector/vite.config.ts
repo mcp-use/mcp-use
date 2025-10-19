@@ -43,16 +43,38 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       'mcp-use/react': path.resolve(__dirname, '../mcp-use/dist/src/react/index.js'),
+      'mcp-use/browser': path.resolve(__dirname, '../mcp-use/dist/src/browser.js'),
+      'posthog-node': path.resolve(__dirname, './src/client/stubs/posthog-node.js'),
+      '@scarf/scarf': path.resolve(__dirname, './src/client/stubs/@scarf/scarf.js'),
+      'dotenv': path.resolve(__dirname, './src/client/stubs/dotenv.js'),
+      'util': path.resolve(__dirname, './src/client/stubs/util.js'),
+      'path': path.resolve(__dirname, './src/client/stubs/path.js'),
     },
   },
   define: {
     // Define process.env for browser compatibility
-    'process.env': {},
+    'process.env': '{}',
+    'process.platform': '"browser"',
     // Inject version from package.json at build time
     '__INSPECTOR_VERSION__': JSON.stringify(packageJson.version),
+    // Ensure global is defined
+    'global': 'globalThis',
   },
   optimizeDeps: {
     include: ['mcp-use/react'],
+    exclude: ['posthog-node'], // Exclude Node.js-only packages
+  },
+  build: {
+    outDir: 'dist/client',
+    rollupOptions: {
+      external: [
+        // Exclude Node.js built-in modules from the bundle
+        /^node:/,
+      ],
+    },
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
   },
   server: {
     port: 3000,
@@ -64,8 +86,5 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-  },
-  build: {
-    outDir: 'dist/client',
   },
 })

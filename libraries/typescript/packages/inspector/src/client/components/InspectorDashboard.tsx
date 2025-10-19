@@ -177,17 +177,22 @@ export function InspectorDashboard() {
     }
   }, [])
 
-  const handleAddConnection = useCallback(() => {
+  const handleAddConnection = useCallback((isRetry = false, overrideConnectionType?: string) => {
     if (!url.trim())
       return
 
     setIsConnecting(true)
     hasShownToastRef.current = false
-    setHasTriedBothConnectionTypes(false)
+    if (!isRetry) {
+      setHasTriedBothConnectionTypes(false)
+    }
+
+    // Use overridden connection type if provided (for retry logic), otherwise use state
+    const effectiveConnectionType = overrideConnectionType || connectionType
 
     // Prepare proxy configuration if "Via Proxy" is selected
     const proxyConfig
-      = connectionType === 'Via Proxy' && proxyAddress.trim()
+      = effectiveConnectionType === 'Via Proxy' && proxyAddress.trim()
         ? {
             proxyAddress: proxyAddress.trim(),
             customHeaders: customHeaders.reduce((acc, header) => {
@@ -265,7 +270,8 @@ export function InspectorDashboard() {
           setConnectionType('Via Proxy')
           setTimeout(() => {
             setIsConnecting(true)
-            handleAddConnection()
+            // Pass 'Via Proxy' explicitly to override the memoized callback's connectionType
+            handleAddConnection(true, 'Via Proxy')
           }, 1000) // Small delay to show the toast
         }
         else if (shouldTryDirect) {
@@ -277,7 +283,8 @@ export function InspectorDashboard() {
           setConnectionType('Direct')
           setTimeout(() => {
             setIsConnecting(true)
-            handleAddConnection()
+            // Pass 'Direct' explicitly to override the memoized callback's connectionType
+            handleAddConnection(true, 'Direct')
           }, 1000) // Small delay to show the toast
         }
       }
