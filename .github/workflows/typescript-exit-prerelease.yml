@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "libraries/typescript/**"
+      - ".github/workflows/typescript-release.yml"
 
 jobs:
   create-exit-prerelease-pr:
