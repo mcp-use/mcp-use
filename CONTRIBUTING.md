@@ -32,7 +32,7 @@ Please read and follow our [Code of Conduct](./CODE_OF_CONDUCT.md) to ensure a w
 This is a monorepo containing both Python and TypeScript implementations:
 
 ```
-mcp-use-monorepo/
+mcp-use/
 ├── libraries/
 │   ├── python/        # Python implementation
 │   └── typescript/    # TypeScript implementation
@@ -47,7 +47,7 @@ mcp-use-monorepo/
 ```bash
 # Fork the repository on GitHub, then:
 git clone https://github.com/YOUR_USERNAME/mcp-use.git
-cd mcp-use-monorepo
+cd mcp-use
 ```
 
 ### 2. Install Dependencies
