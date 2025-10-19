@@ -38,6 +38,23 @@ export interface AuthConfig {
   }
 }
 
+export interface MCPServerConfig {
+  url?: string
+  transport?: 'http' | 'websocket' | 'sse'
+  headers?: Record<string, string>
+  authToken?: string
+  auth_token?: string
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  ws_url?: string
+  preferSse?: boolean
+}
+
+export interface MCPConfig {
+  mcpServers: Record<string, MCPServerConfig>
+}
+
 export const DEFAULT_MODELS = {
   openai: 'gpt-4o',
   anthropic: 'claude-3-5-sonnet-20241022',
