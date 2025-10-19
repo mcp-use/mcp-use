@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import type { CustomHeader } from './CustomHeadersEditor'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -7,6 +6,7 @@ import { Spinner } from '@/client/components/ui/spinner'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { useInspector } from '@/client/context/InspectorContext'
 import { useMcpContext } from '@/client/context/McpContext'
+import { useAutoConnect } from '@/client/hooks/useAutoConnect'
 import { useKeyboardShortcuts } from '@/client/hooks/useKeyboardShortcuts'
 import { CommandPalette } from './CommandPalette'
 import { LayoutContent } from './LayoutContent'
@@ -19,7 +19,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { connections, addConnection } = useMcpContext()
+  const { connections, addConnection, removeConnection } = useMcpContext()
   const {
     selectedServerId,
     setSelectedServerId,
@@ -27,38 +27,16 @@ export function Layout({ children }: LayoutProps) {
     setActiveTab,
     navigateToItem,
   } = useInspector()
-  const [configLoaded, setConfigLoaded] = useState(false)
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
-  const [isAutoConnecting, setIsAutoConnecting] = useState(false)
 
-  // Connection options dialog state
-  const [_connectionOptionsOpen, setConnectionOptionsOpen] = useState(false)
-  const [_editingConnectionId, setEditingConnectionId] = useState<string | null>(
-    null,
-  )
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
 
   // Refs for search inputs in tabs
   const toolsSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
   const promptsSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
   const resourcesSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
 
-  // Form state for connection options
-  const [_url, setUrl] = useState('')
-  const [_connectionType, _setConnectionType] = useState('Direct')
-  const [_customHeaders, setCustomHeaders] = useState<CustomHeader[]>([])
-  const [_requestTimeout, _setRequestTimeout] = useState('10000')
-  const [_resetTimeoutOnProgress, _setResetTimeoutOnProgress] = useState('True')
-  const [_maxTotalTimeout, _setMaxTotalTimeout] = useState('60000')
-  const [_proxyAddress, _setProxyAddress] = useState('')
-
-  // OAuth fields
-  const [_clientId, setClientId] = useState('')
-  const [_redirectUrl, _setRedirectUrl] = useState(
-    typeof window !== 'undefined'
-      ? new URL('/inspector/oauth/callback', window.location.origin).toString()
-      : 'http://localhost:3000/inspector/oauth/callback',
-  )
-  const [_scope, setScope] = useState('')
+  // Auto-connect handling extracted to custom hook
+  const { isAutoConnecting } = useAutoConnect({ connections, addConnection, removeConnection })
 
   const handleServerSelect = (serverId: string) => {
     const server = connections.find(c => c.id === serverId)
@@ -117,36 +95,6 @@ export function Layout({ children }: LayoutProps) {
     }
   }
 
-  const handleOpenConnectionOptions = (connectionId: string | null) => {
-    setEditingConnectionId(connectionId)
-    setConnectionOptionsOpen(true)
-
-    // If editing an existing connection, populate the form with its data
-    if (connectionId) {
-      const connection = connections.find(c => c.id === connectionId)
-      if (connection) {
-        setUrl(connection.url)
-        // Set other fields based on connection data if available
-        // For now, we'll use defaults since the connection object might not have all the config
-      }
-    }
-    else {
-      // Reset form for new connection
-      setUrl('')
-      setCustomHeaders([])
-      setClientId('')
-      setScope('')
-    }
-  }
-
-  const _handleSaveConnectionOptions = () => {
-    // Here you would implement the logic to save/update the connection options
-    // For now, we'll just close the dialog
-    setConnectionOptionsOpen(false)
-    setEditingConnectionId(null)
-    toast.success('Connection options saved')
-  }
-
   const selectedServer = connections.find(c => c.id === selectedServerId)
 
   // Aggregate tools, prompts, and resources from all connected servers
@@ -197,146 +145,41 @@ export function Layout({ children }: LayoutProps) {
           : [],
       )
 
-  // Load config and auto-connect if URL is provided
-  useEffect(() => {
-    if (configLoaded)
-      return
-
-    // Check for autoConnect query parameter first
-    const urlParams = new URLSearchParams(window.location.search)
-    const autoConnectUrl = urlParams.get('autoConnect')
-
-    if (autoConnectUrl) {
-      // Auto-connect to the URL from query parameter
-      const existing = connections.find(c => c.url === autoConnectUrl)
-      if (!existing) {
-        setIsAutoConnecting(true)
-        addConnection(autoConnectUrl, 'Local MCP Server', undefined, 'http')
-        // Navigate immediately but keep loading screen visible a bit longer to avoid flash
-        navigate(`/?server=${encodeURIComponent(autoConnectUrl)}`)
-        const timeoutId = setTimeout(() => {
-          setIsAutoConnecting(false)
-        }, 500)
-        // Cleanup timeout on unmount
-        return () => clearTimeout(timeoutId)
-      }
-      else {
-        // Connection already exists, make sure we're not in loading state
-        setIsAutoConnecting(false)
-      }
-      setConfigLoaded(true)
-      return
-    }
-
-    // Fallback to config.json
-    fetch('/inspector/config.json')
-      .then(res => res.json())
-      .then((config: { autoConnectUrl: string | null }) => {
-        setConfigLoaded(true)
-        if (config.autoConnectUrl) {
-          // Check if we already have this server
-          const existing = connections.find(
-            c => c.url === config.autoConnectUrl,
-          )
-          if (!existing) {
-            // Auto-connect to the local server
-            addConnection(
-              config.autoConnectUrl,
-              'Local MCP Server',
-              undefined,
-              'http',
-            )
-          }
-        }
-      })
-      .catch(() => {
-        setConfigLoaded(true)
-      })
-  }, [configLoaded, connections, addConnection, navigate])
-
-  // Clear auto-connecting state when connection is established
-  useEffect(() => {
-    if (isAutoConnecting && connections.length > 0) {
-      // Check if any connection has moved past the initial connecting state
-      const hasEstablishedConnection = connections.some(
-        conn => conn.state !== 'connecting' && conn.state !== 'loading',
-      )
-      if (hasEstablishedConnection) {
-        const timeoutId = setTimeout(() => {
-          setIsAutoConnecting(false)
-        }, 500)
-        return () => clearTimeout(timeoutId)
-      }
-    }
-  }, [isAutoConnecting, connections])
-
-  // Handle navigation logic based on query parameters
+  // Sync URL query params with selected server state
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search)
     const serverParam = searchParams.get('server')
+    const decodedServerId = serverParam ? decodeURIComponent(serverParam) : null
 
-    if (serverParam) {
-      // Decode the server ID from query param
-      const decodedServerId = decodeURIComponent(serverParam)
-      // Only update if different to avoid unnecessary re-renders
-      if (decodedServerId !== selectedServerId) {
-        setSelectedServerId(decodedServerId)
-      }
-    }
-    else {
-      // No server param, clear the selected server
-      if (selectedServerId !== null) {
-        setSelectedServerId(null)
-      }
+    // Update selected server if changed
+    if (decodedServerId !== selectedServerId) {
+      setSelectedServerId(decodedServerId)
     }
   }, [location.search, selectedServerId, setSelectedServerId])
 
-  // If server param exists but connection fails, navigate to root
-  // But only after we've given connections time to load and establish
+  // Handle failed server connections - redirect to home
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search)
     const serverParam = searchParams.get('server')
-
-    if (!serverParam || !configLoaded) {
+    if (!serverParam) {
       return
     }
 
     const decodedServerId = decodeURIComponent(serverParam)
+    const serverConnection = connections.find(conn => conn.id === decodedServerId)
 
-    // Check if any connection exists for this server
-    const serverConnection = connections.find(
-      conn => conn.id === decodedServerId,
-    )
-
-    if (serverConnection) {
-      // Server connection exists - check its state
-      if (serverConnection.state === 'failed') {
-        // Server failed to connect, redirect after a short delay
-        const timeoutId = setTimeout(() => {
-          navigate('/')
-        }, 2000)
-        return () => clearTimeout(timeoutId)
-      }
-      // If server is connecting/loading/discovering, don't redirect yet
-      if (
-        serverConnection.state === 'connecting'
-        || serverConnection.state === 'loading'
-        || serverConnection.state === 'discovering'
-      ) {
-        return
-      }
-      // If server is ready, we're good - no redirect needed
-      return
+    // No connection found - wait for auto-connect, then redirect
+    if (!serverConnection) {
+      const timeoutId = setTimeout(() => navigate('/'), 3000)
+      return () => clearTimeout(timeoutId)
     }
 
-    // No connection found for this server
-    // Wait a bit for auto-connection to potentially kick in, then redirect
-    const timeoutId = setTimeout(() => {
-      navigate('/')
-    }, 3000)
-
-    return () => clearTimeout(timeoutId)
-  }, [location.search, navigate, connections, configLoaded])
+    // Connection failed - redirect after short delay
+    if (serverConnection.state === 'failed') {
+      const timeoutId = setTimeout(() => navigate('/'), 2000)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [location.search, navigate, connections])
 
   // Centralized keyboard shortcuts
   useKeyboardShortcuts({
@@ -415,7 +258,7 @@ export function Layout({ children }: LayoutProps) {
           onServerSelect={handleServerSelect}
           onTabChange={setActiveTab}
           onCommandPaletteOpen={() => setIsCommandPaletteOpen(true)}
-          onOpenConnectionOptions={handleOpenConnectionOptions}
+          onOpenConnectionOptions={() => {}}
         />
 
         {/* Main Content */}
