@@ -48,6 +48,7 @@ async def display_startup_info(server: "MCPServer", host: str, port: int, start_
     # Show additional endpoints if in dev mode
     if server.debug:
         click.echo(f"- Docs:         http://{host}:{port}/docs")
+        click.echo(f"- Inspector:    http://{host}:{port}/inspector")
         click.echo(f"- OpenMCP:      http://{host}:{port}/openmcp.json")
 
     click.echo()
