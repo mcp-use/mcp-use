@@ -33,6 +33,7 @@ export function LayoutContent({
           ref={toolsSearchRef}
           tools={selectedServer.tools}
           callTool={selectedServer.callTool}
+          readResource={selectedServer.readResource}
           isConnected={selectedServer.state === 'ready'}
         />
       )
@@ -61,6 +62,7 @@ export function LayoutContent({
           isConnected={selectedServer.state === 'ready'}
           oauthState={selectedServer.state as 'pending_auth' | 'authenticating' | 'ready' | 'failed' | undefined}
           oauthError={selectedServer.error ?? undefined}
+          readResource={selectedServer.readResource}
         />
       )
     default:

@@ -3,6 +3,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { Button } from '@/client/components/ui/button'
 import { usePrismTheme } from '@/client/hooks/usePrismTheme'
 import { isMcpUIResource, McpUIRenderer } from '../McpUIRenderer'
+import { OpenAIComponentRenderer } from '../OpenAIComponentRenderer'
 
 export interface ToolResult {
   toolName: string
@@ -11,6 +12,15 @@ export interface ToolResult {
   error?: string
   timestamp: number
   duration?: number
+  // Tool metadata from definition (_meta field, includes openai/outputTemplate)
+  toolMeta?: Record<string, any>
+  // For Apps SDK UI resources
+  appsSdkResource?: {
+    uri: string
+    resourceData: any
+    isLoading?: boolean
+    error?: string
+  }
 }
 
 interface ToolResultDisplayProps {
@@ -39,6 +49,15 @@ export function ToolResultDisplay({
           ? (
               <div className="space-y-4 flex-1 h-full">
                 {results.map((result, index) => {
+                  // Check tool metadata for Apps SDK component (from tool definition)
+                  const openaiOutputTemplate = result.toolMeta?.['openai/outputTemplate']
+                  const hasAppsSdkResource = !!(
+                    openaiOutputTemplate
+                    && typeof openaiOutputTemplate === 'string'
+                    && result.appsSdkResource
+                  )
+                  const appsSdkUri = openaiOutputTemplate
+
                   // Check if result contains MCP UI resources
                   const content = result.result?.content || []
                   const mcpUIResources = content.filter(
@@ -48,10 +67,10 @@ export function ToolResultDisplay({
                   const hasMcpUIResources = mcpUIResources.length > 0
 
                   return (
-                    <div key={index} className="space-y-0 flex-1 h-full">
+                    <div key={index} className="space-y-0 flex-1 h-full flex flex-col">
                       <div
                         className={`flex items-center gap-2 px-4 pt-2 ${
-                          hasMcpUIResources
+                          hasMcpUIResources || hasAppsSdkResource
                             ? 'border-b border-gray-200 dark:border-zinc-600 pb-2'
                             : ''
                         }`}
@@ -72,7 +91,39 @@ export function ToolResultDisplay({
                             </span>
                           </div>
                         )}
-                        {hasMcpUIResources && (
+                        {hasAppsSdkResource && (
+                          <div className="flex items-center gap-4 ml-4">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              URI:
+                              {' '}
+                              {appsSdkUri || 'No URI'}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => onTogglePreview()}
+                                className={`text-xs font-medium ${
+                                  previewMode
+                                    ? 'text-black dark:text-white'
+                                    : 'text-zinc-500 dark:text-zinc-400'
+                                }`}
+                              >
+                                Component
+                              </button>
+                              <span className="text-xs text-zinc-400">|</span>
+                              <button
+                                onClick={() => onTogglePreview()}
+                                className={`text-xs font-medium ${
+                                  !previewMode
+                                    ? 'text-black dark:text-white'
+                                    : 'text-zinc-500 dark:text-zinc-400'
+                                }`}
+                              >
+                                Raw JSON
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {hasMcpUIResources && !hasAppsSdkResource && (
                           <div className="flex items-center gap-4 ml-4">
                             <span className="text-xs text-gray-500 dark:text-gray-400">
                               URI:
@@ -133,21 +184,87 @@ export function ToolResultDisplay({
                           )
                         : (
                             (() => {
+                              // Handle Apps SDK UI resources
+                              if (hasAppsSdkResource) {
+                                const appsSdk = result.appsSdkResource!
+
+                                if (appsSdk.isLoading) {
+                                  return (
+                                    <div className="flex items-center justify-center h-32">
+                                      <div className="flex flex-col items-center gap-3">
+                                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                          Loading resource...
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                if (appsSdk.error) {
+                                  return (
+                                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 mx-4">
+                                      <p className="text-red-800 dark:text-red-300 font-medium">
+                                        Resource Error:
+                                      </p>
+                                      <p className="text-red-700 dark:text-red-400 text-sm">
+                                        {appsSdk.error}
+                                      </p>
+                                    </div>
+                                  )
+                                }
+
+                                if (previewMode) {
+                                  // OpenAI Apps SDK Component mode
+                                  return (
+                                    <div className="flex-1">
+                                      <OpenAIComponentRenderer
+                                        componentUrl={appsSdkUri}
+                                        toolName={result.toolName}
+                                        toolArgs={result.args}
+                                        toolResult={appsSdk.resourceData}
+                                        className="w-full h-full relative flex p-4"
+                                      />
+                                    </div>
+                                  )
+                                }
+                                else {
+                                  // JSON mode for Apps SDK resources
+                                  return (
+                                    <div className="px-4 pt-4">
+                                      <SyntaxHighlighter
+                                        language="json"
+                                        style={prismStyle}
+                                        customStyle={{
+                                          margin: 0,
+                                          padding: 0,
+                                          border: 'none',
+                                          borderRadius: 0,
+                                          fontSize: '1rem',
+                                          background: 'transparent',
+                                        }}
+                                        className="text-gray-900 dark:text-gray-100"
+                                      >
+                                        {JSON.stringify(result.result, null, 2)}
+                                      </SyntaxHighlighter>
+                                    </div>
+                                  )
+                                }
+                              }
+
                               if (hasMcpUIResources) {
                                 if (previewMode) {
                                   return (
                                     <div className="space-y-0 h-full">
                                       {mcpUIResources.map((item: any, idx: number) => (
                                         <div key={idx} className="mx-0 size-full">
-                                          <div className="w-full h-full">
-                                            <McpUIRenderer
-                                              resource={item.resource}
-                                              onUIAction={(_action) => {
-                                                // Handle UI actions here if needed
-                                              }}
-                                              className="w-full h-full"
-                                            />
-                                          </div>
+                                          <McpUIRenderer
+                                            resource={item.resource}
+                                            onUIAction={(_action) => {
+                                              // Handle UI actions here if needed
+                                            }}
+                                            className="w-full h-full relative"
+                                          />
                                         </div>
                                       ))}
                                       {/* Show JSON for non-UI content */}
