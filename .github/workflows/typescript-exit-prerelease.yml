@@ -65,11 +65,15 @@ jobs:
           echo "Exiting prerelease mode..."
           pnpm changeset pre exit
 
+          # Version packages from canary to stable
+          echo "Versioning packages to stable versions..."
+          pnpm changeset version
+
           # Commit changes
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .changeset/pre.json
-          git commit -m "chore: exit prerelease mode"
+          git add .
+          git commit -m "chore: exit prerelease mode and version packages to stable"
 
           # Push branch
           git push origin "$BRANCH_NAME"
@@ -81,12 +85,16 @@ jobs:
             --title "chore: Exit prerelease mode and prepare stable release" \
             --body "This PR exits prerelease mode after merging canary changes.
 
+          ## Changes in this PR:
+
+          1. ✅ Exit prerelease mode (remove pre.json)
+          2. ✅ Version packages to stable (e.g., 1.0.0-canary.0 → 1.0.0)
+          3. ✅ Update CHANGELOGs
+
           ## What happens when this PR is merged:
 
-          1. ✅ Prerelease mode will be exited
-          2. ✅ The TypeScript Release workflow will run
-          3. ✅ Packages will be versioned to stable versions (removing canary tags)
-          4. ✅ Stable versions will be published to npm
+          1. ✅ The TypeScript Release workflow will run
+          2. ✅ Stable versions will be published to npm
 
           **This PR was automatically created because canary was merged to main while in prerelease mode.**"
 
