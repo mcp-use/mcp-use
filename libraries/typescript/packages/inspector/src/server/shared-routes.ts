@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import type { MCPInspector } from './mcp-inspector.js'
-import { handleChatRequest, handleChatRequestStream } from './shared-utils.js'
+import { handleChatRequest, handleChatRequestStream } from './shared-utils-browser.js'
 
 /**
  * Helper function to format error responses with context and timestamp
