@@ -52,6 +52,7 @@
         "groups": [
           {
             "group": "Getting Started",
+            "icon": "list-start",
             "pages": [
               "python/getting-started/index",
               "python/getting-started/quickstart",
@@ -93,6 +94,7 @@
           },
           {
             "group": "MCP Client",
+            "icon": "router",
             "pages": [
               {
                 "group": "Overview",
@@ -108,6 +110,7 @@
                 "group": "Core Features",
                 "icon": "list-plus",
                 "pages": [
+                  "python/client/multi-server-setup",
                   "python/client/tools",
                   "python/client/resources",
                   "python/client/prompts"
@@ -128,7 +131,8 @@
             ]
           },
           {
-            "group": "MCP Agent",
+            "group": "MCP Agents",
+            "icon": "brain",
             "pages": [
               {
                 "group": "Overview",
@@ -148,32 +152,19 @@
                   "python/agent/interactive-chat-patterns"
                 ]
               },
-              "python/agent/server-manager"
-            ]
-          },
-          {
-            "group": "Advanced Usage",
-            "pages": [
-              "python/advanced/building-custom-agents",
-              "python/advanced/logging",
-              "python/advanced/multi-server-setup",
-              "python/advanced/security"
+              "python/agent/server-manager",
+              "python/agent/building-custom-agents",
+              "python/agent/observability"
             ]
           },
           {
             "group": "Development",
+            "icon": "sparkle",
             "pages": [
-              "python/development",
-              "python/development/telemetry",
-              "python/development/observability"
-            ]
-          },
-          {
-            "group": "Troubleshooting",
-            "pages": [
-              "python/troubleshooting/common-issues",
-              "python/troubleshooting/performance",
-              "python/troubleshooting/connection-errors"
+              "python/development/development",
+              "python/development/logging",
+              "python/development/security",
+              "python/development/telemetry"
             ]
           }
         ]

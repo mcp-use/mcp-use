@@ -20,7 +20,7 @@ This guide will help you set up your development environment and contribute to m
 
 ```bash
 git clone https://github.com/mcp-use/mcp-use.git
-cd mcp-use
+cd mcp-use/libraries/python
 ```
 
 2. Install development dependencies:
@@ -75,9 +75,10 @@ Documentation is written in MDX format and uses Mintlify for rendering. To previ
 npm i -g mintlify
 ```
 
-2. Run the development server:
+2. Navigate to the docs directory and run the development server:
 
 ```bash
+cd ../../docs
 mintlify dev
 ```
 
@@ -106,10 +107,16 @@ git push origin feature/your-feature-name
 
 ```
 mcp-use/
-├── mcp_use/           # Main package code
-├── tests/             # Test files
-├── examples/          # Example usage
-├── docs/             # Documentation
-├── static/           # Static assets
-└── pyproject.toml    # Project configuration
+├── libraries/
+│   ├── python/
+│   │   ├── mcp_use/         # Main package code
+│   │   ├── tests/           # Test files
+│   │   ├── examples/        # Python examples
+│   │   └── pyproject.toml   # Python package configuration
+│   └── typescript/
+│       └── packages/
+│           └── mcp-use/     # TypeScript package
+├── docs/                    # Documentation
+├── examples/                # Additional examples
+└── static/                  # Static assets
 ```
