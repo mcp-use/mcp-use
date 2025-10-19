@@ -8,7 +8,7 @@ import anyio
 import uvicorn
 
 from mcp_use.server.cli import display_startup_info
-from mcp_use.server.logging import MCP_LOGGING_CONFIG
+from mcp_use.server.logging import get_logging_config
 from mcp_use.server.signals import setup_signal_handlers
 
 
@@ -31,7 +31,7 @@ class ServerRunner:
             port=port,
             log_level=self.server.settings.log_level.lower(),
             reload=reload,
-            log_config=MCP_LOGGING_CONFIG,
+            log_config=get_logging_config(debug_level=self.server.debug_level),
             timeout_graceful_shutdown=0,  # Disable graceful shutdown
         )
 

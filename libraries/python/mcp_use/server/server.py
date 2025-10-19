@@ -1,3 +1,4 @@
+import os
 import time
 
 from mcp.server.fastmcp import FastMCP
@@ -12,21 +13,65 @@ from mcp_use.server.signals import setup_signal_handlers
 class MCPServer(FastMCP):
     """Main MCP Server class with integrated inspector and development tools."""
 
-    def __init__(self, name: str, version: str | None = None, instructions: str | None = None, debug: bool = False):
+    def __init__(
+        self,
+        name: str,
+        version: str | None = None,
+        instructions: str | None = None,
+        debug: bool = False,
+        docs_url: str | None = "/docs",
+        inspector_url: str | None = "/inspector",
+        openmcp_url: str | None = "/openmcp.json",
+    ):
         self._start_time = time.time()
         super().__init__(name=name or "mcp-use server", instructions=instructions)
 
         if version:
             self._mcp_server.version = version
 
-        self.debug = debug
-        if self.debug:
+        # Set debug level: DEBUG env var takes precedence, then debug parameter
+        env_debug_level = self._parse_debug_level()
+        if env_debug_level > 0:
+            # Environment variable overrides parameter
+            self.debug_level = env_debug_level
+        else:
+            # Use debug parameter (0 or 1)
+            self.debug_level = 1 if debug else 0
+
+        # Set dev route URLs
+        self.docs_url = docs_url
+        self.inspector_url = inspector_url
+        self.openmcp_url = openmcp_url
+
+        # Add dev routes only in DEBUG=1 and above
+        if self.debug_level >= 1:
             self._add_dev_routes()
 
         self.app = self.streamable_http_app()
 
         # Set up signal handlers for immediate shutdown
         setup_signal_handlers()
+
+    def _parse_debug_level(self) -> int:
+        """Parse DEBUG environment variable to get debug level.
+
+        Returns:
+            0: Production mode (clean logs only)
+            1: Debug mode (clean logs + dev routes)
+            2: Full debug mode (clean logs + dev routes + JSON-RPC logging)
+        """
+        debug_env = os.environ.get("DEBUG", "0")
+        try:
+            level = int(debug_env)
+            return max(0, min(2, level))  # Clamp between 0-2
+        except ValueError:
+            # Handle string values
+            if debug_env.lower() in ("1", "true", "yes"):
+                return 1
+            elif debug_env.lower() in ("2", "full", "verbose"):
+                return 2
+            else:
+                return 0
 
     def _add_dev_routes(self):
         """Add development routes for debugging and inspection."""
@@ -35,21 +80,21 @@ class MCPServer(FastMCP):
         async def openmcp_handler(request):
             return await openmcp_json(request, self)
 
-        self.custom_route("/openmcp.json", methods=["GET"])(openmcp_handler)
+        self.custom_route(self.openmcp_url, methods=["GET"])(openmcp_handler)
 
         # Documentation UI
-        self.custom_route("/docs", methods=["GET"])(docs_ui)
+        self.custom_route(self.docs_url, methods=["GET"])(docs_ui)
 
         # Inspector routes
-        self.custom_route("/inspector", methods=["GET"])(_inspector_index)
-        self.custom_route("/inspector/{path:path}", methods=["GET"])(_inspector_static)
+        self.custom_route(self.inspector_url, methods=["GET"])(_inspector_index)
+        self.custom_route(f"{self.inspector_url}/{{path:path}}", methods=["GET"])(_inspector_static)
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""
         app = super().streamable_http_app()
 
-        # Add middleware for structured logging
-        app.add_middleware(MCPLoggingMiddleware)
+        # Add MCP logging middleware
+        app.add_middleware(MCPLoggingMiddleware, debug_level=self.debug_level)
 
         return app
 

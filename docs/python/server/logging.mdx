@@ -1,32 +1,60 @@
 ---
 title: "MCP Logging"
-description: "Enhanced logging system designed specifically for MCP servers"
+description: "Clean, configurable logging system designed specifically for MCP servers"
 icon: "activity"
 ---
 
 <Card title="" img="./images/Logging.jpg" horizontal="true"/>
 
 <Info>
-mcp-use provides informative logging about which MCP endpoints are hit, making it easy to understand server activity and debug issues.
+mcp-use provides clean, informative logging about MCP operations, making it easy to understand server activity and debug issues in both production and development.
 </Info>
 
-
-MCP-specific logging provides detailed information about which MCP endpoints are being accessed, including the specific endpoint name and request details.
+MCP-specific logging provides detailed information about which MCP methods are being called, including the specific method name, session IDs, and execution details.
 
 ## Why Use MCP-Specific Logging?
 
-This type of logging is super useful because:
-- **Clear visibility** into which MCP endpoints are being hit
+This type of logging is essential because:
+- **Clear visibility** into which MCP methods are being called
 - **Easy debugging** of MCP protocol interactions
-- **Request tracking** with session IDs, endpoint names and status codes
-- **Better understanding** of server usage patterns
-- **Token usage visibility** - approximate display of tokens your server occupies in the model's context window
+- **Request tracking** with session IDs and method names
+- **Production monitoring** of server usage patterns
+- **Error tracking** for tools, resources, and prompts
+- **Performance insights** with execution timing
 
-## Example Log Output
+## Log Levels
 
-<img src="./images/Logging.jpg" alt="MCP endpoint logging example" />
+mcp-use provides three logging modes controlled by the `debug` parameter and `DEBUG` environment variable:
 
-### Understanding the Log Format
+### Production Logs (Default: `debug=False`)
+Clean, readable logs showing MCP method calls:
+
+```
+INFO: 127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200 OK
+INFO: 127.0.0.1:58478 - "POST /mcp [resources/list] HTTP/1.1" 200 OK
+ERROR: 127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200 OK
+```
+
+### Debug Logs (`debug=True`)
+Same logs as production + development routes (inspector, docs):
+
+```
+INFO: 127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200 OK
+INFO: 127.0.0.1:58478 - "GET  /inspector HTTP/1.1" 302
+INFO: 127.0.0.1:58478 - "GET  /docs HTTP/1.1" 200
+```
+
+### Full Debug Logs (`DEBUG=2` environment variable)
+Same logs as debug mode + JSON-RPC request/response logging:
+
+```
+INFO: 127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200 OK
+DEBUG: JSON-RPC Request: {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "test"}}}
+DEBUG: JSON-RPC Response: {"jsonrpc": "2.0", "id": 1, "result": {"content": [...]}}
+DEBUG: Duration: 45.2ms
+```
+
+## Understanding the Log Format
 
 Each log line contains detailed information about the request:
 
@@ -72,16 +100,64 @@ Breaking down each component:
 
 ### Common MCP Methods
 
-As you can see, the logs clearly show which MCP endpoints are being accessed, such as:
-- `[6b3ce920...] [initialize]` - Server initialization with session ID
-- `[6b3ce920...] [tools/list]` - Listing available tools
-- `[6b3ce920...] [tools/call:echone]` - Calling a specific tool
-- `[6b3ce920...] [resources/list]` - Listing available resources
-- `[6b3ce920...] [ping]` - Health check requests
+The logs clearly show which MCP methods are being called, such as:
+- `[initialize]` - Server initialization
+- `[tools/list]` - Listing available tools
+- `[tools/call:search]` - Calling a specific tool
+- `[resources/list]` - Listing available resources
+- `[resources/read:config]` - Reading a specific resource
+- `[prompts/get:assistant]` - Getting a specific prompt
 
-The logs also display approximate token counts (e.g., "Tokens: 214") to give you visibility into how much context your server uses. This addresses a common criticism of MCP servers occupying too much of the model's context window.
+## Configuration
 
-This makes it much easier to understand what's happening with your MCP server and debug any issues.
+Logging is automatically configured based on the `DEBUG` environment variable:
+
+```bash
+# Production logging (default)
+python server.py
+
+# Debug mode with development routes (inspector, docs)
+DEBUG=1 python server.py
+
+# Full debug mode with JSON-RPC request/response logging
+DEBUG=2 python server.py
+```
+
+Or programmatically:
+
+```python
+# Production logging (default)
+server = MCPServer("my-server")
+server.run(transport="streamable-http")
+
+# Debug mode with dev routes
+server = MCPServer("my-server", debug=True)
+server.run(transport="streamable-http")
+
+# Debug mode with custom URLs
+server = MCPServer(
+    name="my-server",
+    debug=True,
+    docs_url="/custom-docs",
+    inspector_url="/custom-inspector"
+)
+server.run(transport="streamable-http")
+```
+
+## Customization
+
+You can customize the logging behavior by modifying the logging configuration:
+
+```python
+from mcp_use.server.logging import get_logging_config
+
+# Get custom logging config
+config = get_logging_config(debug=True)
+# Modify config as needed
+server.run(transport="streamable-http", log_config=config)
+```
+
+This makes it much easier to understand what's happening with your MCP server and debug any issues in both production and development environments.
 
 ## Next Steps
 
