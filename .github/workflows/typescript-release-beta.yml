@@ -29,7 +29,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 9.14.2
+          version: 10.6.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,15 +42,18 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Build Packages
+        run: pnpm build
+
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1
         with:
           publish: pnpm release
-          version: pnpm version
+          version: pnpm run version
           commit: "chore(typescript): version packages (beta)"
           title: "chore(typescript): version packages (beta)"
-          cwd: ${{ github.workspace }}/libraries/typescript
+          cwd: libraries/typescript
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
