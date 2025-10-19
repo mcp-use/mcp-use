@@ -45,14 +45,15 @@ jobs:
         run: pnpm build
 
       - name: Enter Prerelease Mode
-        working-directory: libraries/typescript
         run: |
+          cd libraries/typescript
           if [ ! -f .changeset/pre.json ]; then
             echo "Entering canary prerelease mode..."
             pnpm changeset pre enter canary
+            cd ../..
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add .changeset/pre.json
+            git add libraries/typescript/.changeset/pre.json
             git commit -m "chore: enter canary prerelease mode" || echo "No changes to commit"
             git push
           else
@@ -71,16 +72,12 @@ jobs:
 
       - name: Version packages
         if: steps.has-changesets.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
         run: |
+          cd libraries/typescript
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           pnpm changeset version
-
-      - name: Commit version changes
-        if: steps.has-changesets.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
-        run: |
+          cd ../..
           git add .
           git commit -m "chore(typescript): version packages (canary)" || echo "No changes to commit"
           git push
