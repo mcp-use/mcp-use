@@ -8,6 +8,7 @@
     "mcp-use": "1.1.0"
   },
   "changesets": [
-    "large-jokes-write"
+    "large-jokes-write",
+    "wicked-jobs-win"
   ]
 }

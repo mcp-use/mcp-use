@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.1-canary.1
+
+### Patch Changes
+
+- a571b5c: minor
+
 ## 0.4.1-canary.0
 
 ### Patch Changes
