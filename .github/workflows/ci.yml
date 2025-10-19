@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, beta]
+    branches: [main, canary]
   pull_request:
-    branches: [main, beta]
+    branches: [main, canary]
 
 jobs:
   detect-changes:

@@ -1,18 +1,11 @@
 # @mcp-use/inspector
 
-## 0.4.1-beta.0
-
-### Patch Changes
-
-- a2b8fd8: refactor: clean up code formatting and improve readability across multiple components
-- Updated dependencies [a2b8fd8]
-  - mcp-use@1.1.1-beta.0
-
 ## 0.4.0
 
 ### Minor Changes
 
 - 0f2b7f6: reafctor: Refactor Inpector to be aligned with mcp-use-ts
+
   - Migrated from CommonJS to ESM format
   - Added input validation for port and URL
   - Improved error handling and logging
@@ -34,6 +27,7 @@
   - Cleaned up obsolete TypeScript declaration files
 
   fix: CLI binary format and package configuration
+
   - Changed CLI build format from CommonJS to ESM for ESM-only dependency compatibility
   - Added prepublishOnly hook to ensure build before publishing
   - Updated documentation references from @mcp-use/inspect to @mcp-use/inspector

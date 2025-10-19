@@ -1,4 +1,4 @@
-# MCP-Use Server
+# mcp-use Server
 
 A developer-friendly wrapper around the official Model Context Protocol (MCP) SDK for creating MCP servers in TypeScript.
 
