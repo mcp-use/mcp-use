@@ -1,0 +1,11 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "@mcp-use/cli": "2.1.12",
+    "create-mcp-use-app": "0.4.0",
+    "@mcp-use/inspector": "0.4.0",
+    "mcp-use": "1.1.0"
+  },
+  "changesets": []
+}
