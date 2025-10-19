@@ -37,7 +37,7 @@ export function ChatInputArea({
               ? 'Ask a question'
               : 'Server not connected'
           }
-          className="p-4 min-h-[150px] rounded-xl bg-zinc-50 z-10 focus:bg-zinc-100 dark:text-white dark:bg-black border-gray-200 dark:border-zinc-800"
+          className="p-4 min-h-[150px] max-h-[300px] rounded-xl bg-zinc-50 z-10 focus:bg-zinc-100 dark:text-white dark:bg-black border-gray-200 dark:border-zinc-800"
           disabled={!isConnected || isLoading}
         />
         <div className="absolute left-0 p-3 bottom-0 w-full flex justify-end items-end">

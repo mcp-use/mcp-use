@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AuthConfig, LLMConfig, MCPConfig, MCPServerConfig, Message } from './types'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { hashString } from './utils'
 
 interface UseChatMessagesClientSideProps {
@@ -10,6 +10,8 @@ interface UseChatMessagesClientSideProps {
   mcpConfig?: MCPConfig
   llmConfig: LLMConfig | null
   isConnected: boolean
+  // Function to read resources from the MCP server
+  readResource?: (uri: string) => Promise<any>
 }
 
 export function useChatMessagesClientSide({
@@ -18,12 +20,14 @@ export function useChatMessagesClientSide({
   mcpConfig,
   llmConfig,
   isConnected,
+  readResource,
 }: UseChatMessagesClientSideProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const agentRef = useRef<any>(null)
   const clientRef = useRef<any>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const toolsMetadataRef = useRef<Map<string, any>>(new Map())
 
   // Cleanup agent and client on unmount or when config changes
   useEffect(() => {
@@ -124,11 +128,11 @@ export function useChatMessagesClientSide({
         else if (mcpServerUrl) {
           // Legacy single-server mode
           client = new MCPClient()
-          
+
           const authConfigResolved = await resolveOAuthTokens(mcpServerUrl, authConfig || undefined)
           const serverConfig: MCPServerConfig = { url: mcpServerUrl }
           const serverConfigWithAuth = addAuthHeaders(serverConfig, authConfigResolved)
-          
+
           const serverName = `inspector-${Date.now()}`
           client.addServer(serverName, serverConfigWithAuth)
         }
@@ -180,6 +184,55 @@ export function useChatMessagesClientSide({
 
         // Initialize agent (connects to server)
         await agent.initialize()
+
+        // Store tools metadata for later reference
+        try {
+          // Access the client's internal tool definitions
+          // The client should have the raw MCP tools stored
+          const clientInternal = client as any
+          
+          // Try to get tools from the client's sessions
+          if (clientInternal.sessions) {
+            const sessionIds = Object.keys(clientInternal.sessions)
+            if (sessionIds.length > 0) {
+              const session = clientInternal.sessions[sessionIds[0]]
+              if (session?.tools) {
+                const tools = Object.values(session.tools) as any[]
+                toolsMetadataRef.current = new Map(
+                  tools.map((tool: any) => [
+                    tool.name,
+                    tool._meta || tool.metadata || {},
+                  ]),
+                )
+                console.log('[useChatMessagesClientSide] Stored metadata for tools:', Array.from(toolsMetadataRef.current.keys()), 'sample:', tools[0])
+              }
+            }
+          }
+          
+          // Fallback: access from agent's tools
+          if (toolsMetadataRef.current.size === 0 && agent.client) {
+            const agentClient = agent.client as any
+            if (agentClient.sessions) {
+              const sessionIds = Object.keys(agentClient.sessions)
+              if (sessionIds.length > 0) {
+                const session = agentClient.sessions[sessionIds[0]]
+                if (session?.tools) {
+                  const tools = Object.values(session.tools) as any[]
+                  toolsMetadataRef.current = new Map(
+                    tools.map((tool: any) => [
+                      tool.name,
+                      tool._meta || tool.metadata || {},
+                    ]),
+                  )
+                  console.log('[useChatMessagesClientSide] Stored metadata from agent for tools:', Array.from(toolsMetadataRef.current.keys()))
+                }
+              }
+            }
+          }
+        }
+        catch (error) {
+          console.warn('[useChatMessagesClientSide] Failed to load tools metadata:', error)
+        }
 
         // Create assistant message that will be updated with streaming content
         const assistantMessageId = `assistant-${Date.now()}`
@@ -273,19 +326,71 @@ export function useChatMessagesClientSide({
                 && !p.toolInvocation?.result,
             )
 
+            console.log('[useChatMessagesClientSide] on_tool_end event:', {
+              toolName: event.name,
+              hasToolPart: !!toolPart,
+              output: event.data?.output,
+            })
+
             if (toolPart && toolPart.toolInvocation) {
               const result = event.data?.output
               toolPart.toolInvocation.result = result
               toolPart.toolInvocation.state = 'result'
 
-              // Check for Apps SDK UI resource
-              const appsSdkUri = result?._meta?.['openai/outputTemplate']
-              if (appsSdkUri && typeof appsSdkUri === 'string' && clientRef.current) {
+              // Parse result to check for Apps SDK component in the result's _meta field
+              let parsedResult = result
+              if (typeof result === 'string') {
+                try {
+                  parsedResult = JSON.parse(result)
+                }
+                catch (error) {
+                  console.warn('[useChatMessagesClientSide] Failed to parse result:', error)
+                }
+              }
+
+              // Check result's _meta field for Apps SDK component
+              const appsSdkUri = parsedResult?._meta?.['openai/outputTemplate']
+
+              console.log('[useChatMessagesClientSide] Apps SDK check:', {
+                toolName: event.name,
+                hasParsedResult: !!parsedResult,
+                hasMeta: !!parsedResult?._meta,
+                appsSdkUri,
+              })
+
+              if (appsSdkUri && typeof appsSdkUri === 'string' && readResource) {
                 // Fetch the resource in the background
+                console.log('[useChatMessagesClientSide] Detected Apps SDK component, fetching resource:', appsSdkUri)
                 ;(async () => {
                   try {
-                    const resourceData = await clientRef.current.readResource(appsSdkUri)
+                    // Use the readResource function passed from the inspector connection
+                    const resourceData = await readResource(appsSdkUri)
                     
+                    console.log('[useChatMessagesClientSide] Resource fetched:', resourceData)
+
+                    // Extract structured content from parsed result
+                    let structuredContent = null
+                    if (parsedResult?.structuredContent) {
+                      structuredContent = parsedResult.structuredContent
+                    }
+                    else if (Array.isArray(parsedResult) && parsedResult[0]) {
+                      const firstResult = parsedResult[0]
+                      if (firstResult.output?.value?.structuredContent) {
+                        structuredContent = firstResult.output.value.structuredContent
+                      }
+                      else if (firstResult.structuredContent) {
+                        structuredContent = firstResult.structuredContent
+                      }
+                      else if (firstResult.output?.value) {
+                        structuredContent = firstResult.output.value
+                      }
+                    }
+
+                    // Fallback to entire parsed result
+                    if (!structuredContent) {
+                      structuredContent = parsedResult
+                    }
+
                     // Add the fetched resource contents to the result's content array
                     if (resourceData?.contents && Array.isArray(resourceData.contents)) {
                       // Convert resource contents to MCP resource format
@@ -294,16 +399,22 @@ export function useChatMessagesClientSide({
                         resource: content,
                       }))
 
+                      console.log('[useChatMessagesClientSide] Created MCP resources:', mcpResources)
+
                       // Update the tool result with the fetched resources
                       if (toolPart.toolInvocation) {
                         const updatedResult = {
-                          ...result,
+                          ...parsedResult,
                           content: [
-                            ...(result.content || []),
+                            ...(parsedResult.content || []),
                             ...mcpResources,
                           ],
+                          structuredContent,
                         }
-                        toolPart.toolInvocation.result = updatedResult
+
+                        console.log('[useChatMessagesClientSide] Updated result:', updatedResult)
+                        // Store as JSON string to match the format
+                        toolPart.toolInvocation.result = JSON.stringify(updatedResult)
 
                         setMessages(prev =>
                           prev.map(msg =>
@@ -312,7 +423,12 @@ export function useChatMessagesClientSide({
                               : msg,
                           ),
                         )
+                        
+                        console.log('[useChatMessagesClientSide] Messages state updated with resource')
                       }
+                    }
+                    else {
+                      console.warn('[useChatMessagesClientSide] No contents in resourceData:', resourceData)
                     }
                   }
                   catch (error) {
@@ -377,7 +493,7 @@ export function useChatMessagesClientSide({
         abortControllerRef.current = null
       }
     },
-    [llmConfig, isConnected, mcpConfig, mcpServerUrl, authConfig],
+    [llmConfig, isConnected, mcpConfig, mcpServerUrl, authConfig, readResource],
   )
 
   const clearMessages = useCallback(() => {
@@ -391,4 +507,3 @@ export function useChatMessagesClientSide({
     clearMessages,
   }
 }
-

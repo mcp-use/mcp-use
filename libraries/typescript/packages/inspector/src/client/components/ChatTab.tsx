@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import type { MCPConfig } from './chat/types'
 
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { ChatHeader } from './chat/ChatHeader'
 import { ChatInputArea } from './chat/ChatInputArea'
@@ -7,7 +8,6 @@ import { ChatLandingForm } from './chat/ChatLandingForm'
 import { ConfigurationDialog } from './chat/ConfigurationDialog'
 import { ConfigureEmptyState } from './chat/ConfigureEmptyState'
 import { MessageList } from './chat/MessageList'
-import type { MCPConfig } from './chat/types'
 import { useChatMessages } from './chat/useChatMessages'
 import { useChatMessagesClientSide } from './chat/useChatMessagesClientSide'
 import { useConfig } from './chat/useConfig'
@@ -24,6 +24,8 @@ interface ChatTabProps {
   // If true, runs the agent client-side in the browser
   // If false, uses the server-side API endpoint
   useClientSide?: boolean
+  // Function to read resources from the MCP server
+  readResource?: (uri: string) => Promise<any>
 }
 
 export function ChatTab({
@@ -33,6 +35,7 @@ export function ChatTab({
   oauthState: _oauthState,
   oauthError: _oauthError,
   useClientSide = true, // Default to client-side execution
+  readResource,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -63,8 +66,9 @@ export function ChatTab({
     llmConfig,
     authConfig,
     isConnected,
+    readResource,
   }
-  
+
   const serverSideChat = useChatMessages({
     mcpServerUrl: mcpServerUrl || effectiveMcpServerUrl || '',
     llmConfig,
@@ -72,7 +76,7 @@ export function ChatTab({
     isConnected,
   })
   const clientSideChat = useChatMessagesClientSide(chatHookParams)
-  
+
   const { messages, isLoading, sendMessage, clearMessages } = useClientSide
     ? clientSideChat
     : serverSideChat
@@ -179,16 +183,6 @@ export function ChatTab({
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
       />
-
-      {/* Client-side indicator badge */}
-      {useClientSide && llmConfig && (
-        <div className="absolute top-16 left-4 z-10">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-xs text-green-600 dark:text-green-400">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="font-medium">Running Client-Side</span>
-          </div>
-        </div>
-      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 pt-[100px]">

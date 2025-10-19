@@ -1,9 +1,8 @@
 import { memo, useEffect, useRef } from 'react'
 import { TextShimmer } from '@/client/components/ui/text-shimmer'
-import { extractMCPResources } from '@/client/utils/mcpResourceUtils'
 import { AssistantMessage } from './AssistantMessage'
-import { MCPUIResource } from './MCPUIResource'
 import { ToolCallDisplay } from './ToolCallDisplay'
+import { ToolResultRenderer } from './ToolResultRenderer'
 import { UserMessage } from './UserMessage'
 
 interface Message {
@@ -140,9 +139,6 @@ export const MessageList = memo(({ messages, isLoading }: MessageListProps) => {
                       )
                     }
                     else if (part.type === 'tool-invocation' && part.toolInvocation) {
-                      // Extract MCP-UI resources from tool result
-                      const resources = extractMCPResources(part.toolInvocation.result)
-
                       return (
                         <div key={partKey}>
                           <ToolCallDisplay
@@ -151,16 +147,14 @@ export const MessageList = memo(({ messages, isLoading }: MessageListProps) => {
                             result={part.toolInvocation.result}
                             state={part.toolInvocation.result ? 'result' : 'call'}
                           />
-                          {/* Render extracted MCP-UI resources */}
-                          {resources.map((resource, resourceIdx) => {
-                            const resourceKey = `${partKey}-resource-${resourceIdx}-${resource.uri || resource.mimeType}`
-                            return (
-                              <MCPUIResource
-                                key={resourceKey}
-                                resource={resource}
-                              />
-                            )
-                          })}
+                          {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
+                          {part.toolInvocation.result && (
+                            <ToolResultRenderer
+                              toolName={part.toolInvocation.toolName}
+                              toolArgs={part.toolInvocation.args}
+                              result={part.toolInvocation.result}
+                            />
+                          )}
                         </div>
                       )
                     }
@@ -178,8 +172,6 @@ export const MessageList = memo(({ messages, isLoading }: MessageListProps) => {
                       {message.toolCalls && message.toolCalls.length > 0 && (
                         <div className="space-y-2">
                           {message.toolCalls.map((toolCall) => {
-                            // Extract MCP-UI resources from tool result
-                            const resources = extractMCPResources(toolCall.result)
                             const toolCallKey = `${message.id}-${toolCall.toolName}-${JSON.stringify(toolCall.args).slice(0, 50)}`
 
                             return (
@@ -190,16 +182,14 @@ export const MessageList = memo(({ messages, isLoading }: MessageListProps) => {
                                   result={toolCall.result}
                                   state={toolCall.result ? 'result' : 'call'}
                                 />
-                                {/* Render extracted MCP-UI resources */}
-                                {resources.map((resource, resourceIdx) => {
-                                  const resourceKey = `${toolCallKey}-resource-${resourceIdx}-${resource.uri || resource.mimeType}`
-                                  return (
-                                    <MCPUIResource
-                                      key={resourceKey}
-                                      resource={resource}
-                                    />
-                                  )
-                                })}
+                                {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
+                                {toolCall.result && (
+                                  <ToolResultRenderer
+                                    toolName={toolCall.toolName}
+                                    toolArgs={toolCall.args}
+                                    result={toolCall.result}
+                                  />
+                                )}
                               </div>
                             )
                           })}

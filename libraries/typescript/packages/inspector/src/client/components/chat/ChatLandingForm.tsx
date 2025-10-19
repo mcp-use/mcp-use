@@ -64,7 +64,7 @@ export function ChatLandingForm({
                     ? 'Ask a question or request an action...'
                     : 'Server not connected'
                 }
-                className="p-4 min-h-[150px] rounded-xl bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800"
+                className="p-4 min-h-[150px] max-h-[300px] rounded-xl bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800"
                 disabled={!isConnected || isLoading}
               />
               <div className="absolute left-0 p-3 bottom-0 w-full flex justify-end items-end">
