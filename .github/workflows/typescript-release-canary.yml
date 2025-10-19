@@ -1,22 +1,21 @@
-name: TypeScript Release
+name: TypeScript Release Canary
 
 on:
   push:
     branches:
-      - main
+      - canary
     paths:
       - "libraries/typescript/**"
-      - ".github/workflows/typescript-release.yml"
+      - ".github/workflows/typescript-release-canary.yml"
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   release:
-    name: Release
+    name: Release Canary
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
       id-token: write
     steps:
       - name: Checkout Repo
@@ -45,14 +44,14 @@ jobs:
         working-directory: libraries/typescript
         run: pnpm build
 
-      - name: Exit Prerelease Mode
+      - name: Enter Prerelease Mode
         working-directory: libraries/typescript
         run: |
-          if [ -f .changeset/pre.json ]; then
-            echo "Exiting prerelease mode..."
-            pnpm changeset pre exit
+          if [ ! -f .changeset/pre.json ]; then
+            echo "Entering canary prerelease mode..."
+            pnpm changeset pre enter canary
           else
-            echo "Not in prerelease mode"
+            echo "Already in prerelease mode"
           fi
 
       - name: Create Release Pull Request or Publish

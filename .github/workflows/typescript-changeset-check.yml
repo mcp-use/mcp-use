@@ -1,0 +1,53 @@
+name: TypeScript Changeset Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "libraries/typescript/**"
+
+jobs:
+  check:
+    name: Check for Changeset
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Check for changesets
+        working-directory: libraries/typescript
+        run: |
+          # Check if there are changesets
+          if [ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ]; then
+            echo "✅ Changeset found"
+            exit 0
+          else
+            # Check if any package files changed
+            if git diff --name-only origin/main...HEAD | grep -E "^libraries/typescript/packages/.+\.(ts|tsx|js|jsx|json)$" > /dev/null; then
+              echo "❌ No changeset found but package files were modified"
+              echo "Please add a changeset by running: pnpm changeset"
+              exit 1
+            else
+              echo "✅ No package changes detected, skipping changeset requirement"
+              exit 0
+            fi
+          fi

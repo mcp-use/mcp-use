@@ -539,34 +539,49 @@ npm run start
 
 ---
 
-## 📊 Publishing & Version Management
+## 📊 Version Management
 
-This monorepo uses modern tooling for package management:
+This monorepo uses [Changesets](https://github.com/changesets/changesets) for automated version management and publishing.
 
-### Using Changesets (Recommended)
+### For Contributors
+
+When making changes to TypeScript packages, create a changeset to describe your changes:
 
 ```bash
-# Create a changeset for your changes
+# Create a changeset
+cd libraries/typescript
 pnpm changeset
 
-# Version packages based on changesets
-pnpm changeset version
+# Follow the prompts to:
+# 1. Select which packages changed
+# 2. Choose the version bump type (major/minor/patch)
+# 3. Write a summary of changes
 
-# Publish all changed packages
-pnpm changeset publish
+# Commit the changeset with your code
+git add .
+git commit -m "feat: your feature description"
 ```
 
-### Manual Publishing
+### Release Channels
+
+#### Stable Releases (main branch)
+
+- Push changes with changesets to `main` branch
+- CI creates/updates a "Version Packages" PR automatically
+- Merge the Version PR to publish stable versions
+- Packages published with `latest` tag on npm
+
+#### Canary Prereleases (canary branch)
+
+- Push changes with changesets to `canary` branch
+- CI automatically publishes prerelease versions
+- Versions: `x.y.z-canary.0`, `x.y.z-canary.1`, etc.
+- Published with `canary` dist tag on npm
 
 ```bash
-# Publish individual packages
-pnpm --filter mcp-use publish --access public
-pnpm --filter @mcp-use/cli publish --access public
-pnpm --filter @mcp-use/inspector publish --access public
-pnpm --filter create-mcp-use-app publish --access public
-
-# Or publish all at once
-pnpm -r publish --access public
+# Install canary versions
+npm install mcp-use@canary
+npm install @mcp-use/cli@canary
 ```
 
 ---
