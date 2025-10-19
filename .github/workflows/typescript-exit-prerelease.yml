@@ -6,7 +6,9 @@ on:
       - main
     paths:
       - "libraries/typescript/**"
-      - ".github/workflows/typescript-release.yml"
+      - ".github/workflows/typescript-exit-prerelease.yml"
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   create-exit-prerelease-pr:
@@ -54,21 +56,24 @@ jobs:
 
       - name: Create exit prerelease branch and PR
         if: steps.check.outputs.in_prerelease == 'true'
-        working-directory: libraries/typescript
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create new branch
+          # Create new branch (from repo root)
           BRANCH_NAME="release/exit-prerelease-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
 
           # Exit prerelease mode
+          cd libraries/typescript
           echo "Exiting prerelease mode..."
           pnpm changeset pre exit
 
           # Version packages
           echo "Versioning packages..."
           pnpm changeset version
+
+          # Go back to repo root for git operations
+          cd ../..
 
           # Commit changes
           git config user.name "github-actions[bot]"
