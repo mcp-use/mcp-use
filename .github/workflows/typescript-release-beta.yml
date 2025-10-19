@@ -82,21 +82,23 @@ jobs:
         working-directory: libraries/typescript
         run: pnpm run version
 
+      - name: Commit version changes
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          git add .
+          git commit -m "chore: version packages for beta release [skip ci]" || echo "No changes to commit"
+          git push
+
       - name: Publish beta packages
         if: steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
-        run: pnpm build && pnpm changeset publish
+        run: pnpm build && pnpm changeset publish --tag beta
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Restore changesets for main branch
+      - name: Push tags
         if: steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
-        run: |
-          echo "Restoring changesets while keeping pre.json and updated CHANGELOGs..."
-          # Restore deleted changeset files
-          git checkout HEAD -- .changeset/*.md 2>/dev/null || echo "No changesets to restore"
-          # Reset package.json and CHANGELOG.md changes
-          git checkout HEAD -- packages/*/package.json packages/*/CHANGELOG.md package.json pnpm-lock.yaml 2>/dev/null || echo "No package files to reset"
-          echo "Changesets restored successfully"
+        run: git push --follow-tags
