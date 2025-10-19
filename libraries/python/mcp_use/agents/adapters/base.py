@@ -256,25 +256,6 @@ class BaseAdapter(ABC):
         pass
 
     async def _create_tools_from_connectors(self, connectors: list[BaseConnector]) -> list[T]:
-        """Create tools from MCP tools in all provided connectors.
-
-        Args:
-            connectors: list of MCP connectors to create tools from.
-
-        Returns:
-            A list of tools in the target framework's format.
-        """
-        tools = []
-        for connector in connectors:
-            # Create tools for this connector
-            connector_tools = await self.load_tools_for_connector(connector)
-            tools.extend(connector_tools)
-
-        # Log available tools for debugging
-        logger.debug(f"Available tools: {len(tools)}")
-        return tools
-
-    async def _create_tools_from_connectors(self, connectors: list[BaseConnector]) -> list[T]:
         """Create tools from MCP tools in all provided connectors."""
         tools = []
         for connector in connectors:

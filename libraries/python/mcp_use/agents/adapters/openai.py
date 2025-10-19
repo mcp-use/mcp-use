@@ -54,7 +54,7 @@ class OpenAIMCPAdapter(BaseAdapter):
     def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> dict[str, Any]:
         """Convert an MCP resource to a readable tool in OpenAI format."""
         # Sanitize the name to be a valid function name for OpenAI
-        tool_name = _sanitize_for_tool_name(f"resource_{mcp_resource.uri}")
+        tool_name = _sanitize_for_tool_name(f"resource_{mcp_resource.name}")
 
         if tool_name in self.disallowed_tools:
             return None
