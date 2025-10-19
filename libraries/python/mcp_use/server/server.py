@@ -88,9 +88,7 @@ class MCPServer(FastMCP):
         self.custom_route(self.docs_path, methods=["GET"])(docs_ui)
 
         # Inspector routes
-        self.custom_route(self.inspector_path, methods=["GET"])(
-            lambda request: _inspector_index(request, self.mcp_path)
-        )
+        self.custom_route(self.inspector_path, methods=["GET"])(_inspector_index)
         self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
 
     def streamable_http_app(self):
