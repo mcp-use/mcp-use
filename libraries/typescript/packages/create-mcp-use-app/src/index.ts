@@ -74,22 +74,16 @@ function getCurrentPackageVersions() {
     }
     
     // Read mcp-use version
-    const mcpUsePackage = JSON.parse(
-      readFileSync(join(workspaceRoot, 'packages/mcp-use/package.json'), 'utf-8')
-    )
-    versions['mcp-use'] = mcpUsePackage.version
+
+    versions['mcp-use'] = 'latest'
     
     // Read cli version
-    const cliPackage = JSON.parse(
-      readFileSync(join(workspaceRoot, 'packages/cli/package.json'), 'utf-8')
-    )
-    versions['@mcp-use/cli'] = cliPackage.version
+
+    versions['@mcp-use/cli'] = 'latest'
     
     // Read inspector version
-    const inspectorPackage = JSON.parse(
-      readFileSync(join(workspaceRoot, 'packages/inspector/package.json'), 'utf-8')
-    )
-    versions['@mcp-use/inspector'] = inspectorPackage.version
+
+    versions['@mcp-use/inspector'] = 'latest'
   } catch (error) {
     // Use defaults when not in workspace (normal for published package)
     // Log error details in development mode for debugging
