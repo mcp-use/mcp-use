@@ -1,17 +1,13 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import open from 'open'
 import { MCPInspector } from '../server/mcp-inspector.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+import { registerInspectorRoutes, registerMCPApiRoutes } from '../server/shared-routes.js'
+import { registerStaticRoutes } from '../server/shared-static.js'
 
 // Validate URL format
 function isValidUrl(urlString: string): boolean {
@@ -104,195 +100,15 @@ const app = new Hono()
 app.use('*', cors())
 app.use('*', logger())
 
-// Health check
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() })
-})
-
-// MCP Inspector routes
+// MCP Inspector instance
 const mcpInspector = new MCPInspector()
 
-// List available MCP servers
-app.get('/api/servers', async (c) => {
-  try {
-    const servers = await mcpInspector.listServers()
-    return c.json({ servers })
-  }
-  catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to list servers:', message, error)
-    return c.json({ error: 'Failed to list servers', details: message }, 500)
-  }
-})
+// Register all API routes
+registerMCPApiRoutes(app, mcpInspector)
+registerInspectorRoutes(app, { autoConnectUrl: mcpUrl })
 
-// Connect to an MCP server
-app.post('/api/servers/connect', async (c) => {
-  try {
-    const { url, command } = await c.req.json()
-    // Validate URL format for security
-    if (url && !isValidUrl(url)) {
-      return c.json({ error: 'Invalid URL format. Must start with http://, https://, ws://, or wss://' }, 400)
-    }
-
-    const server = await mcpInspector.connectToServer(url, command)
-    return c.json({ server })
-  }
-  catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to connect to server:', message, error)
-    return c.json({ error: 'Failed to connect to server', details: message }, 500)
-  }
-})
-
-// Get server details
-app.get('/api/servers/:id', async (c) => {
-  try {
-    const id = c.req.param('id')
-    const server = await mcpInspector.getServer(id)
-    if (!server) {
-      return c.json({ error: 'Server not found' }, 404)
-    }
-    return c.json({ server })
-  }
-  catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to get server details:', message, error)
-    return c.json({ error: 'Failed to get server details', details: message }, 500)
-  }
-})
-
-// Execute a tool on a server
-app.post('/api/servers/:id/tools/:toolName/execute', async (c) => {
-  try {
-    const id = c.req.param('id')
-    const toolName = c.req.param('toolName')
-    const input = await c.req.json()
-
-    const result = await mcpInspector.executeTool(id, toolName, input)
-    return c.json({ result })
-  }
-  catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to execute tool:', message, error)
-    return c.json({ error: 'Failed to execute tool', details: message }, 500)
-  }
-})
-
-// Get server tools
-app.get('/api/servers/:id/tools', async (c) => {
-  try {
-    const id = c.req.param('id')
-    const tools = await mcpInspector.getServerTools(id)
-    return c.json({ tools })
-  }
-  catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to get server tools:', message, error)
-    return c.json({ error: 'Failed to get server tools', details: message }, 500)
-  }
-})
-
-// Get server resources
-app.get('/api/servers/:id/resources', async (c) => {
-  try {
-    const id = c.req.param('id')
-    const resources = await mcpInspector.getServerResources(id)
-    return c.json({ resources })
-  }
-  catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to get server resources:', message, error)
-    return c.json({ error: 'Failed to get server resources', details: message }, 500)
-  }
-})
-
-// Disconnect from a server
-app.delete('/api/servers/:id', async (c) => {
-  try {
-    const id = c.req.param('id')
-    await mcpInspector.disconnectServer(id)
-    return c.json({ success: true })
-  }
-  catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to disconnect server:', message, error)
-    return c.json({ error: 'Failed to disconnect server', details: message }, 500)
-  }
-})
-
-// Serve static assets from the built client
-const clientDistPath = join(__dirname, '../../dist/client')
-
-if (existsSync(clientDistPath)) {
-  // Serve static assets from /inspector/assets/* (matching Vite's base path)
-  app.get('/inspector/assets/*', (c) => {
-    const path = c.req.path.replace('/inspector/assets/', 'assets/')
-    const fullPath = join(clientDistPath, path)
-    if (existsSync(fullPath)) {
-      const content = readFileSync(fullPath)
-      // Set appropriate content type based on file extension
-      if (path.endsWith('.js')) {
-        c.header('Content-Type', 'application/javascript')
-      }
-      else if (path.endsWith('.css')) {
-        c.header('Content-Type', 'text/css')
-      }
-      else if (path.endsWith('.svg')) {
-        c.header('Content-Type', 'image/svg+xml')
-      }
-      return c.body(content)
-    }
-    return c.notFound()
-  })
-
-  // Redirect root path to /inspector
-  app.get('/', (c) => {
-    return c.redirect('/inspector')
-  })
-
-  // Serve the main HTML file for /inspector and all other routes (SPA routing)
-  app.get('*', (c) => {
-    const indexPath = join(clientDistPath, 'index.html')
-    if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath, 'utf-8')
-      return c.html(content)
-    }
-    return c.html(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>MCP Inspector</title>
-        </head>
-        <body>
-          <h1>MCP Inspector</h1>
-          <p>Client files not found. Please run 'yarn build' to build the UI.</p>
-          <p>API is available at <a href="/api/servers">/api/servers</a></p>
-        </body>
-      </html>
-    `)
-  })
-}
-else {
-  console.warn(`⚠️  MCP Inspector client files not found at ${clientDistPath}`)
-  console.warn(`   Run 'yarn build' in the inspector package to build the UI`)
-
-  // Fallback for when client is not built
-  app.get('*', (c) => {
-    return c.html(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>MCP Inspector</title>
-        </head>
-        <body>
-          <h1>MCP Inspector</h1>
-          <p>Client files not found. Please run 'yarn build' to build the UI.</p>
-          <p>API is available at <a href="/api/servers">/api/servers</a></p>
-        </body>
-      </html>
-    `)
-  })
-}
+// Register static file serving (must be last as it includes catch-all route)
+registerStaticRoutes(app)
 
 // Start the server with automatic port selection
 async function startServer() {
