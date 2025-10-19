@@ -36,7 +36,45 @@ jobs:
       - name: Check for changesets
         working-directory: libraries/typescript
         run: |
-          # Check if there are changesets
+          # Get the source branch name
+          SOURCE_BRANCH="${{ github.head_ref }}"
+          echo "Source branch: $SOURCE_BRANCH"
+
+          # Special handling for canary -> main merges
+          if [ "$SOURCE_BRANCH" = "canary" ]; then
+            echo "🐤 Merging from canary branch - special checks apply"
+            
+            # Check if pre.json exists (should NOT exist - should be exited before PR)
+            if [ -f .changeset/pre.json ]; then
+              echo "❌ ERROR: pre.json still exists!"
+              echo ""
+              echo "Before merging canary → main, you must exit prerelease mode."
+              echo ""
+              echo "To exit prerelease mode:"
+              echo "1. Go to Actions tab"
+              echo "2. Run 'TypeScript Exit Prerelease Mode' workflow on canary branch"
+              echo "3. Type 'exit' to confirm"
+              echo "4. Wait for the workflow to complete"
+              echo "5. Then create/update this PR"
+              echo ""
+              exit 1
+            else
+              echo "✅ Prerelease mode already exited (pre.json not found)"
+            fi
+            
+            # Check if there are unconsumed changesets (there shouldn't be)
+            if [ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ]; then
+              echo "⚠️  Warning: Unconsumed changesets found when merging from canary"
+              echo "This might indicate that changesets weren't versioned/published on canary"
+            else
+              echo "✅ No unconsumed changesets (expected for canary merge)"
+            fi
+            
+            echo "✅ Canary merge check passed"
+            exit 0
+          fi
+
+          # Standard changeset check for other branches
           if [ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ]; then
             echo "✅ Changeset found"
             exit 0

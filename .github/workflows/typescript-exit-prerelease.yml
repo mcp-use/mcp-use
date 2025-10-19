@@ -1,0 +1,56 @@
+name: TypeScript Exit Prerelease Mode
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "exit" to confirm exiting prerelease mode'
+        required: true
+        type: string
+
+jobs:
+  exit-prerelease:
+    name: Exit Prerelease Mode
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/canary' && github.event.inputs.confirm == 'exit'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Exit Prerelease Mode
+        working-directory: libraries/typescript
+        run: |
+          if [ -f .changeset/pre.json ]; then
+            echo "Exiting prerelease mode..."
+            pnpm changeset pre exit
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .changeset/pre.json
+            git commit -m "chore: exit prerelease mode"
+            git push
+            echo "✅ Successfully exited prerelease mode"
+            echo "🔜 You can now create a PR to merge canary → main"
+          else
+            echo "❌ No pre.json found - not in prerelease mode"
+            exit 1
+          fi
