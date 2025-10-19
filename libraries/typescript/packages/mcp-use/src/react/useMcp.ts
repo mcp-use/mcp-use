@@ -268,7 +268,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             }
           }, delay)
         } else if (currentState !== 'failed' && currentState !== 'authenticating') {
-          failConnection('Connection closed unexpectedly.')
+          failConnection('Cannot connect to server')
         }
       }
 
