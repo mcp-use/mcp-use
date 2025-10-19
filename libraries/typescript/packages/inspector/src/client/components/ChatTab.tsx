@@ -7,25 +7,38 @@ import { ChatLandingForm } from './chat/ChatLandingForm'
 import { ConfigurationDialog } from './chat/ConfigurationDialog'
 import { ConfigureEmptyState } from './chat/ConfigureEmptyState'
 import { MessageList } from './chat/MessageList'
+import type { MCPConfig } from './chat/types'
 import { useChatMessages } from './chat/useChatMessages'
+import { useChatMessagesClientSide } from './chat/useChatMessagesClientSide'
 import { useConfig } from './chat/useConfig'
 
 interface ChatTabProps {
-  mcpServerUrl: string
+  // Legacy single-server support
+  mcpServerUrl?: string
+  // New multi-server support
+  mcpConfig?: MCPConfig
   isConnected: boolean
   // OAuth state from the main Inspector connection
   oauthState?: 'ready' | 'authenticating' | 'failed' | 'pending_auth'
   oauthError?: string
+  // If true, runs the agent client-side in the browser
+  // If false, uses the server-side API endpoint
+  useClientSide?: boolean
 }
 
 export function ChatTab({
   mcpServerUrl,
+  mcpConfig,
   isConnected,
   oauthState: _oauthState,
   oauthError: _oauthError,
+  useClientSide = true, // Default to client-side execution
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  // For backward compatibility, get the first server URL from config if not provided
+  const effectiveMcpServerUrl = mcpServerUrl || (mcpConfig ? Object.values(mcpConfig.mcpServers)[0]?.url : undefined)
 
   // Use custom hooks for configuration and chat messages
   const {
@@ -41,14 +54,28 @@ export function ChatTab({
     setTempModel,
     saveLLMConfig,
     clearConfig,
-  } = useConfig({ mcpServerUrl })
+  } = useConfig({ mcpServerUrl: effectiveMcpServerUrl || '' })
 
-  const { messages, isLoading, sendMessage, clearMessages } = useChatMessages({
+  // Use client-side or server-side chat implementation
+  const chatHookParams = {
     mcpServerUrl,
+    mcpConfig,
+    llmConfig,
+    authConfig,
+    isConnected,
+  }
+  
+  const serverSideChat = useChatMessages({
+    mcpServerUrl: mcpServerUrl || effectiveMcpServerUrl || '',
     llmConfig,
     authConfig,
     isConnected,
   })
+  const clientSideChat = useChatMessagesClientSide(chatHookParams)
+  
+  const { messages, isLoading, sendMessage, clearMessages } = useClientSide
+    ? clientSideChat
+    : serverSideChat
 
   // Register keyboard shortcuts (only active when ChatTab is mounted)
   useKeyboardShortcuts({
@@ -116,7 +143,7 @@ export function ChatTab({
 
         {/* Landing Form */}
         <ChatLandingForm
-          mcpServerUrl={mcpServerUrl}
+          mcpServerUrl={effectiveMcpServerUrl || ''}
           inputValue={inputValue}
           isConnected={isConnected}
           isLoading={isLoading}
@@ -152,6 +179,16 @@ export function ChatTab({
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
       />
+
+      {/* Client-side indicator badge */}
+      {useClientSide && llmConfig && (
+        <div className="absolute top-16 left-4 z-10">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-xs text-green-600 dark:text-green-400">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="font-medium">Running Client-Side</span>
+          </div>
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 pt-[100px]">

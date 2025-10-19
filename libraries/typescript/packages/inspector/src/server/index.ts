@@ -6,3 +6,6 @@
  */
 
 export { mountInspector } from './middleware.js'
+
+// Export browser-compatible chat utilities for client-side usage
+export { handleChatRequest, handleChatRequestStream } from './shared-utils-browser.js'
