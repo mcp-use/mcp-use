@@ -1,0 +1,42 @@
+{
+  "name": "mcp-apps-sdk-server",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server with OpenAI Apps SDK integration using mcp-use",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "apps-sdk",
+    "openai",
+    "chatgpt",
+    "widgets",
+    "pizzaz",
+    "ai",
+    "tools"
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "@mcp-ui/server": "^5.11.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.0",
+    "mcp-use": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@mcp-use/cli": "workspace:*",
+    "@mcp-use/inspector": "workspace:*",
+    "@types/cors": "^2.8.0",
+    "@types/express": "^4.17.0",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+

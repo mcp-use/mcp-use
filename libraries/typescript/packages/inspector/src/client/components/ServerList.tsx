@@ -1,8 +1,16 @@
-import { Activity, CheckCircle2, Database, Loader2, Server, Trash2, Zap } from 'lucide-react'
+import {
+  Activity,
+  CheckCircle2,
+  Database,
+  Loader2,
+  Server,
+  Trash2,
+  Zap,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { useMcpContext } from '../context/McpContext'
+import { Button } from '@/client/components/ui/button'
+import { Card, CardContent } from '@/client/components/ui/card'
+import { useMcpContext } from '../../client/context/McpContext'
 import { ServerIcon } from './ServerIcon'
 
 export function ServerList() {
@@ -73,8 +81,8 @@ export function ServerList() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <ServerIcon 
-                          serverUrl={connection.url} 
+                        <ServerIcon
+                          serverUrl={connection.url}
                           serverName={connection.name}
                           size="lg"
                         />
@@ -124,7 +132,11 @@ export function ServerList() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button asChild variant="outline" size="sm">
-                          <Link to={`/servers/${encodeURIComponent(connection.id)}`}>Inspect</Link>
+                          <Link
+                            to={`/?server=${encodeURIComponent(connection.id)}`}
+                          >
+                            Inspect
+                          </Link>
                         </Button>
                         <Button
                           variant="outline"

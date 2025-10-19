@@ -1,16 +1,16 @@
-import type { ConnectorInitOptions } from './base.js'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { logger } from '../logging.js'
 import { SseConnectionManager } from '../task_managers/sse.js'
 import { StreamableHttpConnectionManager } from '../task_managers/streamable_http.js'
+import type { ConnectorInitOptions } from './base.js'
 import { BaseConnector } from './base.js'
 
 export interface HttpConnectorOptions extends ConnectorInitOptions {
   authToken?: string
   headers?: Record<string, string>
-  timeout?: number // HTTP request timeout (s)
-  sseReadTimeout?: number // SSE read timeout (s)
+  timeout?: number // HTTP request timeout (ms)
+  sseReadTimeout?: number // SSE read timeout (ms)
   clientInfo?: { name: string, version: string }
   preferSse?: boolean // Force SSE transport instead of trying streamable HTTP first
 }
@@ -33,8 +33,8 @@ export class HttpConnector extends BaseConnector {
       this.headers.Authorization = `Bearer ${opts.authToken}`
     }
 
-    this.timeout = opts.timeout ?? 5
-    this.sseReadTimeout = opts.sseReadTimeout ?? 60 * 5
+    this.timeout = opts.timeout ?? 30000 // Default 30 seconds
+    this.sseReadTimeout = opts.sseReadTimeout ?? 300000 // Default 5 minutes
     this.clientInfo = opts.clientInfo ?? { name: 'http-connector', version: '1.0.0' }
     this.preferSse = opts.preferSse ?? false
   }
@@ -176,6 +176,8 @@ export class HttpConnector extends BaseConnector {
   private async connectWithSse(baseUrl: string): Promise<void> {
     try {
       // Create and start the SSE connection manager
+      // Note: The MCP SDK's SSEClientTransport doesn't expose timeout configuration directly
+      // Timeout handling is managed by the underlying EventSource and fetch implementations
       this.connectionManager = new SseConnectionManager(
         baseUrl,
         {

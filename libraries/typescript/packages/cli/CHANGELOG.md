@@ -1,5 +1,23 @@
 # @mcp-use/cli
 
+## 2.1.13-beta.0
+
+### Patch Changes
+
+- a2b8fd8: refactor: clean up code formatting and improve readability across multiple components
+- Updated dependencies [a2b8fd8]
+  - @mcp-use/inspector@0.4.1-beta.0
+  - mcp-use@1.1.1-beta.0
+
+## 2.1.12
+
+### Patch Changes
+
+- Updated dependencies [0f2b7f6]
+- Updated dependencies [0f2b7f6]
+  - mcp-use@1.1.0
+  - @mcp-use/inspector@0.4.0
+
 ## 2.1.11
 
 ### Patch Changes

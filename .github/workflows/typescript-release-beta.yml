@@ -6,6 +6,7 @@ on:
       - beta
     paths:
       - "libraries/typescript/**"
+      - ".github/workflows/typescript-release-beta.yml"
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -17,9 +18,6 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
-    defaults:
-      run:
-        working-directory: libraries/typescript
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -29,7 +27,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 9.14.2
+          version: 10.6.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,17 +38,67 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install Dependencies
+        working-directory: libraries/typescript
         run: pnpm install --no-frozen-lockfile
 
-      - name: Create Release Pull Request or Publish to npm
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          publish: pnpm release
-          version: pnpm version
-          commit: "chore(typescript): version packages (beta)"
-          title: "chore(typescript): version packages (beta)"
-          cwd: libraries/typescript
+      - name: Build Packages
+        working-directory: libraries/typescript
+        run: pnpm build
+
+      - name: Check for changesets
+        working-directory: libraries/typescript
+        id: has-changesets
+        run: |
+          if [ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ]; then
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Enter prerelease mode
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only enter prerelease mode if not already in it
+          if [ ! -f .changeset/pre.json ]; then
+            echo "Entering prerelease mode..."
+            pnpm changeset pre enter beta
+          else
+            echo "Already in prerelease mode"
+          fi
+
+      - name: Commit prerelease state
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          git add .changeset/pre.json
+          git commit -m "chore: enter beta prerelease mode" || echo "pre.json already committed"
+          git push
+
+      - name: Version packages for beta
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: pnpm run version
+
+      - name: Commit version changes
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          git add .
+          git commit -m "chore: version packages for beta release [skip ci]" || echo "No changes to commit"
+          git push
+
+      - name: Publish beta packages
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: pnpm build && pnpm changeset publish
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push tags
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: git push --follow-tags

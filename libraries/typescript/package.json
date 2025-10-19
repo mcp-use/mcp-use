@@ -28,7 +28,11 @@
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
     "release": "pnpm build && changeset publish",
-    "version:check": "changeset status"
+    "version:check": "changeset status",
+    "test_app": "pnpm test_app:uiresource",
+    "test_app:ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template ui && cd test_app && pnpm install && pnpm dev",
+    "test_app:uiresource": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template uiresource && cd test_app && pnpm install && pnpm dev",
+    "test_app:apps_sdk": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template apps_sdk && cd test_app && pnpm install && pnpm dev"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.7",

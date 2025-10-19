@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import open from 'open'
 import { MCPInspector } from '../server/mcp-inspector.js'
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
@@ -17,7 +18,8 @@ function isValidUrl(urlString: string): boolean {
   try {
     const url = new URL(urlString)
     return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'ws:' || url.protocol === 'wss:'
-  } catch {
+  }
+  catch {
     return false
   }
 }
@@ -25,7 +27,7 @@ function isValidUrl(urlString: string): boolean {
 // Find available port starting from 8080
 async function findAvailablePort(startPort = 8080, maxAttempts = 100): Promise<number> {
   const net = await import('node:net')
-  
+
   for (let port = startPort; port < startPort + maxAttempts; port++) {
     try {
       await new Promise<void>((resolve, reject) => {
@@ -33,10 +35,11 @@ async function findAvailablePort(startPort = 8080, maxAttempts = 100): Promise<n
         server.listen(port, () => {
           server.close(() => resolve())
         })
-        server.on('error', (err) => reject(err))
+        server.on('error', err => reject(err))
       })
       return port
-    } catch (error) {
+    }
+    catch {
       // Port is in use, try next one
       continue
     }
@@ -59,15 +62,17 @@ for (let i = 0; i < args.length; i++) {
     }
     mcpUrl = url
     i++
-  } else if (args[i] === '--port' && i + 1 < args.length) {
+  }
+  else if (args[i] === '--port' && i + 1 < args.length) {
     const parsedPort = Number.parseInt(args[i + 1], 10)
     if (Number.isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
       console.error(`Error: Port must be a number between 1 and 65535, got: ${args[i + 1]}`)
       process.exit(1)
     }
-    startPort = parsedPort;
+    startPort = parsedPort
     i++
-  } else if (args[i] === '--help' || args[i] === '-h') {
+  }
+  else if (args[i] === '--help' || args[i] === '-h') {
     console.log(`
 MCP Inspector - Inspect and debug MCP servers
 
@@ -128,7 +133,7 @@ app.post('/api/servers/connect', async (c) => {
     if (url && !isValidUrl(url)) {
       return c.json({ error: 'Invalid URL format. Must start with http://, https://, ws://, or wss://' }, 400)
     }
-    
+
     const server = await mcpInspector.connectToServer(url, command)
     return c.json({ server })
   }
@@ -225,19 +230,21 @@ if (existsSync(clientDistPath)) {
     const fullPath = join(clientDistPath, path)
     if (existsSync(fullPath)) {
       const content = readFileSync(fullPath)
-        // Set appropriate content type based on file extension
+      // Set appropriate content type based on file extension
       if (path.endsWith('.js')) {
         c.header('Content-Type', 'application/javascript')
-      } else if (path.endsWith('.css')) {
+      }
+      else if (path.endsWith('.css')) {
         c.header('Content-Type', 'text/css')
-      } else if (path.endsWith('.svg')) {
+      }
+      else if (path.endsWith('.svg')) {
         c.header('Content-Type', 'image/svg+xml')
       }
-        return c.body(content)
+      return c.body(content)
     }
     return c.notFound()
   })
-  
+
   // Redirect root path to /inspector
   app.get('/', (c) => {
     return c.redirect('/inspector')
@@ -264,10 +271,11 @@ if (existsSync(clientDistPath)) {
       </html>
     `)
   })
-} else {
+}
+else {
   console.warn(`⚠️  MCP Inspector client files not found at ${clientDistPath}`)
   console.warn(`   Run 'yarn build' in the inspector package to build the UI`)
-  
+
   // Fallback for when client is not built
   app.get('*', (c) => {
     return c.html(`
@@ -301,12 +309,14 @@ async function startServer() {
     // Auto-open browser
     try {
       await open(`http://localhost:${port}`)
-      console.log(`🌐 Browser opened automatically`)
-    } catch {
+      console.log(`🌐 Browser opened`)
+    }
+    catch {
       console.log(`🌐 Please open http://localhost:${port} in your browser`)
     }
     return { port, fetch: app.fetch }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to start server:', error)
     process.exit(1)
   }
@@ -314,4 +324,3 @@ async function startServer() {
 
 // Start the server
 startServer()
-

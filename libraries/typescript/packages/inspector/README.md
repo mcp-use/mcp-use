@@ -61,7 +61,7 @@ When you create an MCP server with `mcp-use`, the inspector is automatically ava
 import { createMCPServer } from 'mcp-use/server'
 
 const server = createMCPServer('my-server', {
-  version: '1.0.0',
+  version: '1.0.0'
 })
 
 // Add your tools, resources, prompts...
@@ -84,13 +84,13 @@ Use the inspector with any MCP server (local or remote):
 
 ```bash
 # Inspect a remote server
-npx @mcp-use/inspector --url https://mcp.linear.app/sse
+npx mcp-inspect --url https://mcp.linear.app/sse
 
 # Custom port
-npx @mcp-use/inspector --url http://localhost:3000/mcp --port 8080
+npx mcp-inspect --url http://localhost:3000/mcp --port 8080
 
 # Open inspector without auto-connect
-npx @mcp-use/inspector
+npx mcp-inspect
 ```
 
 ### Method 3: Custom Integration
@@ -296,18 +296,18 @@ import { createMCPServer } from 'mcp-use/server'
 
 const server = createMCPServer('dev-server', {
   version: '1.0.0',
-  description: 'Development MCP Server',
+  description: 'Development MCP Server'
 })
 
 server.tool('debug_tool', {
   description: 'Debug tool for testing',
   parameters: z.object({
-    message: z.string(),
+    message: z.string()
   }),
   execute: async ({ message }) => {
     console.log('Debug:', message)
     return { received: message, timestamp: Date.now() }
-  },
+  }
 })
 
 server.listen(3000)
@@ -323,8 +323,8 @@ const server = createMCPServer('production-server', {
     clientId: process.env.OAUTH_CLIENT_ID,
     clientSecret: process.env.OAUTH_CLIENT_SECRET,
     authorizationUrl: 'https://api.example.com/oauth/authorize',
-    tokenUrl: 'https://api.example.com/oauth/token',
-  },
+    tokenUrl: 'https://api.example.com/oauth/token'
+  }
 })
 
 // Inspector handles OAuth flow automatically
@@ -441,7 +441,7 @@ curl http://localhost:3000/inspector
 // Use pagination for many tools
 server.configurePagination({
   toolsPerPage: 50,
-  enableSearch: true,
+  enableSearch: true
 })
 ```
 
@@ -452,7 +452,7 @@ server.configurePagination({
 const inspector = {
   maxConnections: 5,
   connectionTimeout: 30000,
-  keepAlive: true,
+  keepAlive: true
 }
 ```
 
@@ -462,7 +462,7 @@ const inspector = {
 // Cache tool results
 server.enableCache({
   ttl: 300, // 5 minutes
-  maxSize: 100, // MB
+  maxSize: 100 // MB
 })
 ```
 
@@ -476,7 +476,7 @@ server.enableCache({
 // Configure CORS for inspector access
 server.configureCORS({
   origin: ['http://localhost:3000'],
-  credentials: true,
+  credentials: true
 })
 ```
 
@@ -493,7 +493,7 @@ server.use(authMiddleware)
 // Prevent abuse
 server.configureRateLimit({
   windowMs: 60000, // 1 minute
-  max: 100, // requests
+  max: 100 // requests
 })
 ```
 

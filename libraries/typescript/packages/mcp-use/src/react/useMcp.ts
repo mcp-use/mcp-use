@@ -1,30 +1,31 @@
 // useMcp.ts
 import type {
-  JSONRPCMessage,
-  Tool,
-  Resource,
-  ResourceTemplate,
-  Prompt} from '@modelcontextprotocol/sdk/types.js';
+    JSONRPCMessage,
+    Prompt,
+    Resource,
+    ResourceTemplate,
+    Tool
+} from '@modelcontextprotocol/sdk/types.js';
 import {
-  CallToolResultSchema,
-  ListToolsResultSchema,
-  ListResourcesResultSchema,
-  ReadResourceResultSchema,
-  ListPromptsResultSchema,
-  GetPromptResultSchema
-} from '@modelcontextprotocol/sdk/types.js'
-import { useCallback, useEffect, useRef, useState } from 'react'
+    CallToolResultSchema,
+    GetPromptResultSchema,
+    ListPromptsResultSchema,
+    ListResourcesResultSchema,
+    ListToolsResultSchema,
+    ReadResourceResultSchema
+} from '@modelcontextprotocol/sdk/types.js';
+import { useCallback, useEffect, useRef, useState } from 'react';
 // Import both transport types
+import { auth, UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { auth, UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
-import { sanitizeUrl } from 'strict-url-sanitise'
-import { BrowserOAuthClientProvider } from '../auth/browser-provider.js'
-import { assert } from '../utils/assert.js'
-import type { UseMcpOptions, UseMcpResult } from './types.js'
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { sanitizeUrl } from 'strict-url-sanitise';
+import { BrowserOAuthClientProvider } from '../auth/browser-provider.js';
+import { assert } from '../utils/assert.js';
+import type { UseMcpOptions, UseMcpResult } from './types.js';
 
 const DEFAULT_RECONNECT_DELAY = 3000
 const DEFAULT_RETRY_DELAY = 5000
@@ -51,6 +52,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     transportType = 'auto',
     preventAutoAuth = false,
     onPopupWindow,
+    timeout = 30000, // 30 seconds default for connection timeout
+    sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
   } = options
 
   const [state, setState] = useState<UseMcpResult['state']>('discovering')
@@ -211,6 +214,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               ...customHeaders,
             },
           },
+          // Note: The MCP SDK's SSEClientTransport doesn't expose timeout configuration directly
+          // Timeout handling is managed by the underlying EventSource and browser/Node.js fetch implementations
+          // The timeout and sseReadTimeout options are preserved for future use or custom implementations
         }
         const sanitizedUrl = sanitizeUrl(url)
         const targetUrl = new URL(sanitizedUrl)
@@ -442,6 +448,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     preventAutoAuth,
     onPopupWindow,
     enabled,
+    timeout,
+    sseReadTimeout,
   ])
 
   const callTool = useCallback(

@@ -289,7 +289,7 @@ root.appendChild(container);
 server.tool({
   name: 'get-widget-info',
   description: 'Get information about available UI widgets',
-  fn: async () => {
+  cb: async () => {
     const widgets = [
       {
         name: 'kanban-board',
@@ -321,10 +321,10 @@ server.tool({
           `  Resource: ${w.resource}\n` +
           (w.url ? `  Browser: ${w.url}\n` : '')
         ).join('\n')}\n` +
-        `\nTypes Explained:\n` +
-        `• externalUrl: Iframe widget from filesystem\n` +
-        `• rawHtml: Direct HTML rendering\n` +
-        `• remoteDom: React/Web Components scripting`
+          `\nTypes Explained:\n` +
+          `• externalUrl: Iframe widget from filesystem\n` +
+          `• rawHtml: Direct HTML rendering\n` +
+          `• remoteDom: React/Web Components scripting`
       }]
     }
   }
@@ -336,7 +336,7 @@ server.resource({
   title: 'Server Configuration',
   description: 'Current server configuration and status',
   mimeType: 'application/json',
-  fn: async () => ({
+  readCallback: async () => ({
     contents: [{
       uri: 'config://server',
       mimeType: 'application/json',

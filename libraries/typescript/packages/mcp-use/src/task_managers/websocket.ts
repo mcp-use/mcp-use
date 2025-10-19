@@ -28,14 +28,14 @@ export class WebSocketConnectionManager extends ConnectionManager<IWebSocket> {
       this._ws = ws
 
       const onOpen = () => {
-        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+         
         cleanup()
         logger.debug('WebSocket connected successfully')
         resolve(ws)
       }
 
       const onError = (err: Error) => {
-        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+         
         cleanup()
         logger.error(`Failed to connect to WebSocket: ${err}`)
         reject(err)
