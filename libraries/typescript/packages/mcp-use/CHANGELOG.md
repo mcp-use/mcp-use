@@ -1,11 +1,18 @@
 # mcp-use
 
+## 1.1.1-canary.0
+
+### Patch Changes
+
+- 4ad9c7f: minor fixes
+- Updated dependencies [4ad9c7f]
+  - @mcp-use/inspector@0.4.1-canary.0
+
 ## 1.1.0
 
 ### Minor Changes
 
 - 0f2b7f6: feat: Add OpenAI Apps SDK integration
-
   - Added new UI resource type for Apps SDK, allowing integration with OpenAI's platform
   - Enhanced MCP-UI adapter to handle Apps SDK metadata and structured content
   - Updated resource URI format to support `ui://widget/` scheme
@@ -15,7 +22,6 @@
   - Updated type definitions to reflect new resource capabilities
 
   refactor: Improve compatibility
-
   - Renamed `fn` to `cb` in tool and prompt definitions for consistency.
   - Updated resource definitions to use `readCallback` instead of `fn`.
   - Adjusted related documentation and type definitions to reflect these changes.
@@ -48,7 +54,6 @@
 - 55dfebf: Add MCP-UI Resource Integration
 
   Add uiResource() method to McpServer for unified widget registration with MCP-UI compatibility.
-
   - Support three resource types: externalUrl (iframe), rawHtml (direct), remoteDom (scripted)
   - Automatic tool and resource generation with ui\_ prefix and ui://widget/ URIs
   - Props-to-parameters conversion with type safety
@@ -178,7 +183,6 @@
   ```
 
   **This will:**
-
   1. Update `mcp-use/package.json` to `0.3.0`
   2. Update dependent packages (`@mcp-use/cli`, `@mcp-use/inspector`) with patch bumps
   3. Generate/update `CHANGELOG.md` in each package:
@@ -221,7 +225,6 @@
   ```
 
   **This will:**
-
   1. Build all packages with tsup
   2. Run `changeset publish`
   3. Publish `mcp-use@0.3.0` to npm
@@ -263,7 +266,6 @@
   ```
 
   ## 📊 Timeline Summary
-
   1. **Day 1**: Developer creates feature + changeset, pushes PR
   2. **Day 2-3**: Code review, changes, approval
   3. **Day 3**: PR merged to main
@@ -275,7 +277,6 @@
   ## 🤖 Automated Workflow (GitHub Actions)
 
   With the included GitHub Actions workflows:
-
   1. **Developer** creates PR with changeset
   2. **CI** validates build, tests, lint
   3. **Merge** to main triggers release workflow
@@ -285,14 +286,12 @@
   7. **Done!** No manual commands needed
 
   ## 🎓 Learning Resources
-
   - **Quick Reference**: See `CHANGESET_WORKFLOW.md`
   - **Detailed Guide**: See `VERSIONING.md`
   - **Changesets Docs**: https://github.com/changesets/changesets
   - **Semantic Versioning**: https://semver.org/
 
   ## 💡 Tips
-
   - **Batch related changes** - Create one changeset for related changes across packages
   - **Clear summaries** - Write what users need to know, not implementation details
   - **Link to PRs** - Reference PR numbers in changeset summaries

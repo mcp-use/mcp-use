@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.1-canary.0
+
+### Patch Changes
+
+- 4ad9c7f: minor fixes
+
 ## 0.4.0
 
 ### Minor Changes
@@ -26,7 +32,6 @@
 - 55dfebf: Add MCP-UI Resource Integration
 
   Add uiResource() method to McpServer for unified widget registration with MCP-UI compatibility.
-
   - Support three resource types: externalUrl (iframe), rawHtml (direct), remoteDom (scripted)
   - Automatic tool and resource generation with ui\_ prefix and ui://widget/ URIs
   - Props-to-parameters conversion with type safety
