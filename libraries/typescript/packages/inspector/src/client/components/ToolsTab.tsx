@@ -16,11 +16,9 @@ import {
 } from '@/client/components/ui/resizable'
 import { useInspector } from '@/client/context/InspectorContext'
 import {
-
   SavedRequestsList,
   SaveRequestDialog,
   ToolExecutionPanel,
-
   ToolResultDisplay,
   ToolsList,
   ToolsTabHeader,
@@ -39,7 +37,12 @@ interface ToolsTabProps {
 
 const SAVED_REQUESTS_KEY = 'mcp-inspector-saved-requests'
 
-export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
+export function ToolsTab({
+  ref,
+  tools,
+  callTool,
+  isConnected,
+}: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
   // State
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null)
   const { selectedToolName, setSelectedToolName } = useInspector()
@@ -83,8 +86,7 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
       if (saved) {
         setSavedRequests(JSON.parse(saved))
       }
-    }
-    catch (error) {
+    } catch (error) {
       console.error('[ToolsTab] Failed to load saved requests:', error)
     }
   }, [])
@@ -94,22 +96,20 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
     try {
       localStorage.setItem(SAVED_REQUESTS_KEY, JSON.stringify(requests))
       setSavedRequests(requests)
-    }
-    catch (error) {
+    } catch (error) {
       console.error('[ToolsTab] Failed to save requests:', error)
     }
   }, [])
 
   // Filter tools based on search query
   const filteredTools = useMemo(() => {
-    if (!searchQuery.trim())
-      return tools
+    if (!searchQuery.trim()) return tools
 
     const query = searchQuery.toLowerCase()
     return tools.filter(
-      tool =>
-        tool.name.toLowerCase().includes(query)
-        || tool.description?.toLowerCase().includes(query),
+      (tool) =>
+        tool.name.toLowerCase().includes(query) ||
+        tool.description?.toLowerCase().includes(query)
     )
   }, [tools, searchQuery])
 
@@ -122,20 +122,15 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
         const typedProp = prop as any
         if (typedProp.default !== undefined) {
           initialArgs[key] = typedProp.default
-        }
-        else if (typedProp.type === 'string') {
+        } else if (typedProp.type === 'string') {
           initialArgs[key] = ''
-        }
-        else if (typedProp.type === 'number') {
+        } else if (typedProp.type === 'number') {
           initialArgs[key] = 0
-        }
-        else if (typedProp.type === 'boolean') {
+        } else if (typedProp.type === 'boolean') {
           initialArgs[key] = false
-        }
-        else if (typedProp.type === 'array') {
+        } else if (typedProp.type === 'array') {
           initialArgs[key] = []
-        }
-        else if (typedProp.type === 'object') {
+        } else if (typedProp.type === 'object') {
           initialArgs[key] = {}
         }
       })
@@ -145,13 +140,13 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
 
   const loadSavedRequest = useCallback(
     (request: SavedRequest) => {
-      const tool = tools.find(t => t.name === request.toolName)
+      const tool = tools.find((t) => t.name === request.toolName)
       if (tool) {
         setSelectedTool(tool)
         setToolArgs(request.args)
       }
     },
-    [tools],
+    [tools]
   )
 
   // Auto-focus the search input when expanded
@@ -181,12 +176,12 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
 
   // Handle keyboard navigation
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       const target = e.target as HTMLElement
-      const isInputFocused
-        = target.tagName === 'INPUT'
-          || target.tagName === 'TEXTAREA'
-          || target.contentEditable === 'true'
+      const isInputFocused =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.contentEditable === 'true'
 
       if (isInputFocused || e.metaKey || e.ctrlKey || e.altKey) {
         return
@@ -200,23 +195,20 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
           const next = prev + 1
           return next >= items.length ? 0 : next
         })
-      }
-      else if (e.key === 'ArrowUp') {
+      } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setFocusedIndex((prev) => {
           const next = prev - 1
           return next < 0 ? items.length - 1 : next
         })
-      }
-      else if (e.key === 'Enter' && focusedIndex >= 0) {
+      } else if (e.key === 'Enter' && focusedIndex >= 0) {
         e.preventDefault()
         if (activeTab === 'tools') {
           const tool = filteredTools[focusedIndex]
           if (tool) {
             handleToolSelect(tool)
           }
-        }
-        else {
+        } else {
           const request = savedRequests[focusedIndex]
           if (request) {
             loadSavedRequest(request)
@@ -239,8 +231,8 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
   // Scroll focused item into view
   useEffect(() => {
     if (focusedIndex >= 0) {
-      const itemId
-        = activeTab === 'tools'
+      const itemId =
+        activeTab === 'tools'
           ? `tool-${filteredTools[focusedIndex]?.name}`
           : `saved-${savedRequests[focusedIndex]?.id}`
       const element = document.getElementById(itemId)
@@ -253,7 +245,7 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
   // Handle auto-selection from context
   useEffect(() => {
     if (selectedToolName && tools.length > 0) {
-      const tool = tools.find(t => t.name === selectedToolName)
+      const tool = tools.find((t) => t.name === selectedToolName)
 
       if (tool && selectedTool?.name !== tool.name) {
         setSelectedToolName(null)
@@ -288,21 +280,17 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
 
           if (expectedType === 'string') {
             newArgs[key] = value
-          }
-          else {
+          } else {
             try {
               newArgs[key] = JSON.parse(value)
-            }
-            catch {
+            } catch {
               newArgs[key] = value
             }
           }
-        }
-        else {
+        } else {
           try {
             newArgs[key] = JSON.parse(value)
-          }
-          catch {
+          } catch {
             newArgs[key] = value
           }
         }
@@ -310,12 +298,11 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
         return newArgs
       })
     },
-    [selectedTool],
+    [selectedTool]
   )
 
   const executeTool = useCallback(async () => {
-    if (!selectedTool || isExecuting)
-      return
+    if (!selectedTool || isExecuting) return
 
     setIsExecuting(true)
     const startTime = Date.now()
@@ -324,7 +311,7 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
       const result = await callTool(selectedTool.name, toolArgs)
       const duration = Date.now() - startTime
 
-      setResults(prev => [
+      setResults((prev) => [
         {
           toolName: selectedTool.name,
           args: toolArgs,
@@ -334,9 +321,8 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
         },
         ...prev,
       ])
-    }
-    catch (error) {
-      setResults(prev => [
+    } catch (error) {
+      setResults((prev) => [
         {
           toolName: selectedTool.name,
           args: toolArgs,
@@ -347,8 +333,7 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
         },
         ...prev,
       ])
-    }
-    finally {
+    } finally {
       setIsExecuting(false)
     }
   }, [selectedTool, toolArgs, isExecuting, callTool])
@@ -358,14 +343,13 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
       await navigator.clipboard.writeText(JSON.stringify(result, null, 2))
       setCopiedResult(index)
       setTimeout(() => setCopiedResult(null), 2000)
-    }
-    catch (error) {
+    } catch (error) {
       console.error('[ToolsTab] Failed to copy result:', error)
     }
   }, [])
 
   const handleDeleteResult = useCallback((index: number) => {
-    setResults(prev => prev.filter((_, i) => i !== index))
+    setResults((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
   const handleFullscreen = useCallback(
@@ -393,25 +377,23 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
         }
       }
     },
-    [results],
+    [results]
   )
 
   const openSaveDialog = useCallback(() => {
-    if (!selectedTool)
-      return
+    if (!selectedTool) return
     setRequestName('')
     setSaveDialogOpen(true)
   }, [selectedTool])
 
   const saveRequest = useCallback(() => {
-    if (!selectedTool)
-      return
+    if (!selectedTool) return
 
     const newRequest: SavedRequest = {
       id: `${Date.now()}-${Math.random()}`,
       name:
-          requestName.trim()
-          || `${selectedTool.name} - ${new Date().toLocaleString()}`,
+        requestName.trim() ||
+        `${selectedTool.name} - ${new Date().toLocaleString()}`,
       toolName: selectedTool.name,
       args: toolArgs,
       savedAt: Date.now(),
@@ -424,9 +406,9 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
 
   const deleteSavedRequest = useCallback(
     (id: string) => {
-      saveSavedRequests(savedRequests.filter(r => r.id !== id))
+      saveSavedRequests(savedRequests.filter((r) => r.id !== id))
     },
-    [savedRequests, saveSavedRequests],
+    [savedRequests, saveSavedRequests]
   )
 
   return (
@@ -445,27 +427,26 @@ export function ToolsTab({ ref, tools, callTool, isConnected }: ToolsTabProps & 
           onSearchChange={setSearchQuery}
           onSearchBlur={handleSearchBlur}
           onTabSwitch={() =>
-            setActiveTab(activeTab === 'tools' ? 'saved' : 'tools')}
+            setActiveTab(activeTab === 'tools' ? 'saved' : 'tools')
+          }
           searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
         />
 
-        {activeTab === 'tools'
-          ? (
-              <ToolsList
-                tools={filteredTools}
-                selectedTool={selectedTool}
-                onToolSelect={handleToolSelect}
-                focusedIndex={focusedIndex}
-              />
-            )
-          : (
-              <SavedRequestsList
-                savedRequests={savedRequests}
-                onLoadRequest={loadSavedRequest}
-                onDeleteRequest={deleteSavedRequest}
-                focusedIndex={focusedIndex}
-              />
-            )}
+        {activeTab === 'tools' ? (
+          <ToolsList
+            tools={filteredTools}
+            selectedTool={selectedTool}
+            onToolSelect={handleToolSelect}
+            focusedIndex={focusedIndex}
+          />
+        ) : (
+          <SavedRequestsList
+            savedRequests={savedRequests}
+            onLoadRequest={loadSavedRequest}
+            onDeleteRequest={deleteSavedRequest}
+            focusedIndex={focusedIndex}
+          />
+        )}
       </ResizablePanel>
 
       <ResizableHandle withHandle />

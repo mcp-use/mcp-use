@@ -38,6 +38,10 @@ export function ToolCallDisplay({
         )
       case 'error':
         return <X className="h-4 w-4 text-red-500 dark:text-red-400" />
+      default:
+        return (
+          <Check className="h-4 w-4 text-emerald-800 dark:text-emerald-400" />
+        )
     }
   }
 
@@ -49,6 +53,8 @@ export function ToolCallDisplay({
         return ' bg-emerald-500/20 dark:bg-emerald-500/20'
       case 'error':
         return ' bg-red-500/20 dark:bg-red-500/20'
+      default:
+        return ' bg-emerald-500/20 dark:bg-emerald-500/20'
     }
   }
 
@@ -78,19 +84,14 @@ export function ToolCallDisplay({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium truncate">
-                {toolName}
-                (
-                {Object.keys(args).length > 0
-                  ? (
-                      <span className="bg-muted-foreground/20 rounded-full px-1.5 mx-1 py-0.5 text-xs">
-                        {Object.keys(args).length}
-                        {' '}
-                        args
-                      </span>
-                    )
-                  : (
-                      ''
-                    )}
+                {toolName}(
+                {Object.keys(args).length > 0 ? (
+                  <span className="bg-muted-foreground/20 rounded-full px-1.5 mx-1 py-0.5 text-xs">
+                    {Object.keys(args).length} args
+                  </span>
+                ) : (
+                  ''
+                )}
                 )
               </span>
             </div>
@@ -100,7 +101,7 @@ export function ToolCallDisplay({
           <div
             className={cn(
               'w-8 h-8 rounded-full flex items-center justify-center',
-              getStatusBg(),
+              getStatusBg()
             )}
           >
             {getStatusIcon()}
@@ -118,10 +119,7 @@ export function ToolCallDisplay({
             Tool Call Details
           </SheetTitle>
           <SheetDescription>
-            {toolName}
-            {' '}
-            -
-            {state}
+            {toolName} -{state}
           </SheetDescription>
         </SheetHeader>
 
@@ -155,33 +153,29 @@ export function ToolCallDisplay({
                     'p-3 rounded-lg border text-sm leading-relaxed max-h-48 overflow-x-auto whitespace-pre-wrap break-words max-w-full',
                     state === 'error'
                       ? 'bg-destructive/10 border-destructive/20 text-destructive-foreground'
-                      : 'bg-muted/30 border-border',
+                      : 'bg-muted/30 border-border'
                   )}
                 >
-                  {typeof result === 'string'
-                    ? (
-                        result.startsWith('Error')
-                          ? (
-                              <div className="font-mono">
-                                <div className="font-semibold text-destructive mb-1">
-                                  Error:
-                                </div>
-                                <div className="whitespace-pre-wrap break-words">
-                                  {result.replace(/^Error:\s*/, '')}
-                                </div>
-                              </div>
-                            )
-                          : (
-                              <div className="whitespace-pre-wrap font-mono break-words">
-                                {result}
-                              </div>
-                            )
-                      )
-                    : (
-                        <pre className="font-mono text-xs overflow-x-auto max-h-48 whitespace-pre-wrap break-words max-w-full">
-                          {JSON.stringify(result, null, 2)}
-                        </pre>
-                      )}
+                  {typeof result === 'string' ? (
+                    result.startsWith('Error') ? (
+                      <div className="font-mono">
+                        <div className="font-semibold text-destructive mb-1">
+                          Error:
+                        </div>
+                        <div className="whitespace-pre-wrap break-words">
+                          {result.replace(/^Error:\s*/, '')}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-wrap font-mono break-words">
+                        {result}
+                      </div>
+                    )
+                  ) : (
+                    <pre className="font-mono text-xs overflow-x-auto max-h-48 whitespace-pre-wrap break-words max-w-full">
+                      {JSON.stringify(result, null, 2)}
+                    </pre>
+                  )}
                 </div>
                 <Button
                   variant="ghost"
@@ -190,8 +184,9 @@ export function ToolCallDisplay({
                     copyToClipboard(
                       typeof result === 'string'
                         ? result
-                        : JSON.stringify(result, null, 2),
-                    )}
+                        : JSON.stringify(result, null, 2)
+                    )
+                  }
                   className="absolute top-2 right-2 h-6 w-6 p-0 opacity-70 hover:opacity-100"
                   title="Copy result"
                 >

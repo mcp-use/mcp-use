@@ -154,7 +154,7 @@ export default [
       'no-self-assign': 'error',
       'no-self-compare': 'error',
       'no-sequences': 'error',
-      'no-shadow': 'warn',
+      'no-shadow': 'off',
       'no-shadow-restricted-names': 'error',
       'no-sparse-arrays': 'error',
       'no-template-curly-in-string': 'error',

@@ -28,13 +28,13 @@ export interface KeyboardShortcutHandlers {
  */
 export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       // Check if any input, textarea, or contenteditable element is focused
       const target = event.target as HTMLElement
       const isInputFocused
         = target.tagName === 'INPUT'
-          || target.tagName === 'TEXTAREA'
-          || target.contentEditable === 'true'
+        || target.tagName === 'TEXTAREA'
+        || target.contentEditable === 'true'
 
       // Cmd/Ctrl + K for command palette (works even with inputs focused)
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
@@ -97,6 +97,9 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
         case 'f':
           event.preventDefault()
           handlers.onFocusSearch?.()
+          break
+        default:
+          // No action for other keys
           break
       }
     }
