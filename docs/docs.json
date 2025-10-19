@@ -61,12 +61,31 @@
           },
           {
             "group": "MCP Server",
+            "icon": "server",
             "pages": [
               "python/server/index",
-              "python/server/installation",
-              "python/server/quickstart",
-              "python/server/running",
-              "python/server/compatibility",
+              {
+                "group": "Overview",
+                "icon": "globe",
+                "pages": [
+                  "python/server/compatibility",
+                  "python/server/running"
+                ]
+              },
+              {
+                "group": "Core Features",
+                "icon": "list-plus",
+                "pages": [
+                  "python/server/tools",
+                  "python/server/resources",
+                  "python/server/prompts"
+                ]
+              },
+              {
+                "group": "Advanced Features",
+                "icon": "sparkle",
+                "pages": []
+              },
               "python/server/inspector",
               "python/server/logging",
               "python/server/openmcp"
