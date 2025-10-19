@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, monorepo]
+    branches: [main, beta]
   pull_request:
-    branches: [main, monorepo]
+    branches: [main, beta]
 
 jobs:
   detect-changes:
