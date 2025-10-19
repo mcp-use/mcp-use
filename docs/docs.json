@@ -63,6 +63,7 @@
           {
             "group": "MCP Server",
             "icon": "server",
+            "tag": "Beta",
             "pages": [
               "python/server/index",
               {
