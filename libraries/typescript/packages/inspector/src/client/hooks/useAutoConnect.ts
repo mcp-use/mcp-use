@@ -117,21 +117,26 @@ export function useAutoConnect({ connections, addConnection, removeConnection }:
         })
       }
       else {
-        // Both modes failed
+        // Both modes failed - clear loading and reset state
         toast.error('Proxy connection also failed')
         setHasTriedBothModes(true)
         setIsAutoConnecting(false)
+        setAutoConnectUrl(null)
+        retryScheduledRef.current = false
       }
     }
     // Handle successful connection
     else if (connection?.state === 'ready') {
       console.warn('[useAutoConnect] Connection succeeded, navigating to server')
-      navigate(`/?server=${encodeURIComponent(autoConnectUrl)}`)
+      
+      // Navigate using the connection ID (which is the original URL)
+      navigate(`/?server=${encodeURIComponent(connection.id)}`)
 
       setTimeout(() => {
         setAutoConnectUrl(null)
         setHasTriedBothModes(false)
         setIsAutoConnecting(false)
+        retryScheduledRef.current = false
       }, 100)
     }
   }, [connections, autoConnectUrl, hasTriedBothModes, useDirectMode, autoSwitch, addConnection, removeConnection, navigate])
