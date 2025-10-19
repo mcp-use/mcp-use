@@ -1,11 +1,16 @@
 # create-mcp-use-app
 
-## 0.4.1-beta.0
+## 0.4.1-canary.1
 
 ### Patch Changes
 
-- 65e3e86: Fix templates deps versions
-- a2b8fd8: refactor: clean up code formatting and improve readability across multiple components
+- a571b5c: minor
+
+## 0.4.1-canary.0
+
+### Patch Changes
+
+- 4ad9c7f: minor fixes
 
 ## 0.4.0
 

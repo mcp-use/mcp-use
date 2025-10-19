@@ -5,4 +5,4 @@
 '@mcp-use/cli': patch
 ---
 
-refactor: clean up code formatting and improve readability across multiple components
+minor

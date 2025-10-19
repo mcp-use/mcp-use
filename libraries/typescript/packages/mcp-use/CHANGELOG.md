@@ -1,12 +1,20 @@
 # mcp-use
 
-## 1.1.1-beta.0
+## 1.1.1-canary.1
 
 ### Patch Changes
 
-- a2b8fd8: refactor: clean up code formatting and improve readability across multiple components
-- Updated dependencies [a2b8fd8]
-  - @mcp-use/inspector@0.4.1-beta.0
+- a571b5c: minor
+- Updated dependencies [a571b5c]
+  - @mcp-use/inspector@0.4.1-canary.1
+
+## 1.1.1-canary.0
+
+### Patch Changes
+
+- 4ad9c7f: minor fixes
+- Updated dependencies [4ad9c7f]
+  - @mcp-use/inspector@0.4.1-canary.0
 
 ## 1.1.0
 
