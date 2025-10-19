@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.1.12
+
+### Patch Changes
+
+- Updated dependencies [86d54fb]
+- Updated dependencies [86d54fb]
+  - mcp-use@1.1.0
+  - @mcp-use/inspector@0.4.0
+
 ## 2.1.11
 
 ### Patch Changes
