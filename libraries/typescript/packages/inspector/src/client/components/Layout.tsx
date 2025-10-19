@@ -216,9 +216,13 @@ export function Layout({ children }: LayoutProps) {
         navigate(`/?server=${encodeURIComponent(autoConnectUrl)}`)
         const timeoutId = setTimeout(() => {
           setIsAutoConnecting(false)
-        }, 1000)
+        }, 500)
         // Cleanup timeout on unmount
         return () => clearTimeout(timeoutId)
+      }
+      else {
+        // Connection already exists, make sure we're not in loading state
+        setIsAutoConnecting(false)
       }
       setConfigLoaded(true)
       return
@@ -249,6 +253,22 @@ export function Layout({ children }: LayoutProps) {
         setConfigLoaded(true)
       })
   }, [configLoaded, connections, addConnection, navigate])
+
+  // Clear auto-connecting state when connection is established
+  useEffect(() => {
+    if (isAutoConnecting && connections.length > 0) {
+      // Check if any connection has moved past the initial connecting state
+      const hasEstablishedConnection = connections.some(
+        conn => conn.state !== 'connecting' && conn.state !== 'loading',
+      )
+      if (hasEstablishedConnection) {
+        const timeoutId = setTimeout(() => {
+          setIsAutoConnecting(false)
+        }, 500)
+        return () => clearTimeout(timeoutId)
+      }
+    }
+  }, [isAutoConnecting, connections])
 
   // Handle navigation logic based on query parameters
   useEffect(() => {

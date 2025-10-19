@@ -590,6 +590,46 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
+  test_app:
+    dependencies:
+      '@mcp-ui/server':
+        specifier: ^5.11.0
+        version: 5.12.0
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
+      express:
+        specifier: ^4.18.0
+        version: 4.21.2
+      mcp-use:
+        specifier: workspace:*
+        version: link:../packages/mcp-use
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@mcp-use/cli':
+        specifier: workspace:*
+        version: link:../packages/cli
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../packages/inspector
+      '@types/cors':
+        specifier: ^2.8.0
+        version: 2.8.19
+      '@types/express':
+        specifier: ^4.17.0
+        version: 4.17.23
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.19
+      tsx:
+        specifier: ^4.0.0
+        version: 4.20.6
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
 packages:
 
   '@ai-sdk/provider-utils@2.2.8':
