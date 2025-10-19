@@ -55,6 +55,11 @@ jobs:
             echo "has_changesets=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Enter prerelease mode
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: pnpm changeset pre enter beta
+
       - name: Version packages
         if: steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
@@ -71,10 +76,10 @@ jobs:
           git commit -m "chore(typescript): version packages (beta)" || echo "No changes to commit"
           git push
 
-      - name: Publish packages
+      - name: Publish beta packages
         if: steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
-        run: pnpm release
+        run: pnpm release:beta
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

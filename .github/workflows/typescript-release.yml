@@ -55,6 +55,17 @@ jobs:
             echo "has_changesets=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Exit prerelease mode if needed
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          if [ -f .changeset/pre.json ]; then
+            echo "Exiting prerelease mode..."
+            pnpm changeset pre exit
+          else
+            echo "Not in prerelease mode, skipping..."
+          fi
+
       - name: Version packages
         if: steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
