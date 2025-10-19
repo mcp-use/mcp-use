@@ -85,7 +85,7 @@ jobs:
       - name: Publish beta packages
         if: steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
-        run: pnpm release:beta
+        run: pnpm build && pnpm changeset publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
