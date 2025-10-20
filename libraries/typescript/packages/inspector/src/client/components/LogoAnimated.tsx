@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 
 /**
  * HoverDrawLogo (timed sequence)

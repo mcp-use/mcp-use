@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/client/components/ui/select'
 import { Switch } from '@/client/components/ui/switch'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 import { CustomHeadersEditor } from './CustomHeadersEditor'
 
 interface ConnectionSettingsFormProps {

@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/client/components/ui/sheet'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 
 interface ToolCallDisplayProps {
   toolName: string
