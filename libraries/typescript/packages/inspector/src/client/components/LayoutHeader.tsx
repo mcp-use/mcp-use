@@ -74,8 +74,9 @@ export function LayoutHeader({
                       key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
+                      className="[&>svg]:mr-0 lg:[&>svg]:mr-2"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="items-center gap-2 hidden lg:flex">
                         {tab.label}
                         {count > 0 && (
                           <span className="bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium">
