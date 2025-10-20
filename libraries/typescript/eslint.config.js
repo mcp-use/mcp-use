@@ -67,6 +67,7 @@ export default [
         Response: 'readonly',
         Request: 'readonly',
         Headers: 'readonly',
+        HeadersInit: 'readonly',
         btoa: 'readonly',
         atob: 'readonly',
         // Browser globals
