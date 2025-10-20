@@ -9,6 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/client/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import { AnimatedThemeToggler } from './AnimatedThemeToggler'
 import LogoAnimated from './LogoAnimated'
 import { ServerDropdown } from './ServerDropdown'
@@ -79,7 +80,10 @@ export function LayoutHeader({
                       <div className="items-center gap-2 hidden lg:flex">
                         {tab.label}
                         {count > 0 && (
-                          <span className="bg-zinc-200 dark:bg-black text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium">
+                          <span className={
+                            cn(activeTab === tab.id ? ' dark:bg-black ' : 'dark:bg-zinc-700', 'bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium')
+                          }
+                          >
                             {count}
                           </span>
                         )}
