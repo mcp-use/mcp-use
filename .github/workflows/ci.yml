@@ -248,7 +248,7 @@ jobs:
 
   typescript-changeset-check:
     needs: detect-changes
-    if: needs.detect-changes.outputs.typescript == 'true' && github.event_name == 'pull_request'
+    if: needs.detect-changes.outputs.typescript == 'true' && github.event_name == 'pull_request' && github.base_ref != 'canary'
     runs-on: ubuntu-latest
     defaults:
       run:
