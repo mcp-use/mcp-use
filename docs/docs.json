@@ -354,28 +354,29 @@
               {
                 "group": "Getting Started",
                 "icon": "list-start",
-                "pages": []
+                "pages": ["typescript/index"]
               },
               {
                 "group": "MCP Server",
                 "icon": "server",
                 "tag": "Beta",
-                "pages": []
+                "pages": ["typescript/index"]
+
               },
               {
                 "group": "MCP Client",
                 "icon": "router",
-                "pages": []
+                "pages": ["typescript/index"]
               },
               {
                 "group": "MCP Agents",
                 "icon": "brain",
-                "pages": []
+                "pages": ["typescript/index"]
               },
               {
                 "group": "Development",
                 "icon": "sparkle",
-                "pages": []
+                "pages": ["typescript/index"]
               }
             ]
           },
