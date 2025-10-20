@@ -2,7 +2,6 @@ import type { CustomHeader } from './CustomHeadersEditor'
 import { Cog, Copy, FileText, Shield } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
 import {
   Dialog,
@@ -11,12 +10,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/client/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/client/components/ui/dropdown-menu'
 import { Input } from '@/client/components/ui/input'
 import { Label } from '@/client/components/ui/label'
 import {
@@ -27,7 +20,7 @@ import {
   SelectValue,
 } from '@/client/components/ui/select'
 import { Switch } from '@/client/components/ui/switch'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 import { CustomHeadersEditor } from './CustomHeadersEditor'
 
 interface ConnectionSettingsFormProps {
@@ -113,57 +106,54 @@ export function ConnectionSettingsForm({
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
 
-  const enabledHeadersCount = customHeaders.filter(
-    h => h.name && h.value,
-  ).length
+  // Note: we compute header enablement on-demand where needed to avoid unused vars
 
-  const handleExportServerEntry = async () => {
+  const handleCopyConfig = async () => {
     if (!url.trim()) {
       toast.error('Please enter a URL first')
       return
     }
 
-    const serverEntry = {
-      type: 'streamable-http',
+    // Create a comprehensive config object with all current settings
+    const config = {
       url,
-      note: 'For Streamable HTTP connections, add this URL directly in your MCP Client',
+      transportType: transportType === 'SSE' ? 'http' : 'sse',
+      connectionType,
+      proxyConfig: connectionType === 'Via Proxy' && proxyAddress.trim()
+        ? {
+            proxyAddress: proxyAddress.trim(),
+            customHeaders: customHeaders.reduce((acc, header) => {
+              if (header.name && header.value) {
+                acc[header.name] = header.value
+              }
+              return acc
+            }, {} as Record<string, string>),
+          }
+        : undefined,
+      customHeaders: customHeaders.reduce((acc, header) => {
+        if (header.name && header.value) {
+          acc[header.name] = header.value
+        }
+        return acc
+      }, {} as Record<string, string>),
+      requestTimeout: Number.parseInt(requestTimeout, 10),
+      resetTimeoutOnProgress: resetTimeoutOnProgress === 'True',
+      maxTotalTimeout: Number.parseInt(maxTotalTimeout, 10),
+      oauth: (clientId || scope)
+        ? {
+            clientId,
+            redirectUrl,
+            scope,
+          }
+        : undefined,
     }
 
     try {
-      await navigator.clipboard.writeText(JSON.stringify(serverEntry, null, 2))
-      toast.success(
-        'Streamable HTTP URL has been copied. Use this URL directly in your MCP Client.',
-      )
+      await navigator.clipboard.writeText(JSON.stringify(config, null, 2))
+      toast.success('Configuration copied to clipboard')
     }
     catch {
-      toast.error('Failed to copy server entry to clipboard')
-    }
-  }
-
-  const handleExportServersFile = async () => {
-    if (!url.trim()) {
-      toast.error('Please enter a URL first')
-      return
-    }
-
-    const serversFile = {
-      mcpServers: {
-        'default-server': {
-          type: 'streamable-http',
-          url,
-          note: 'For Streamable HTTP connections, add this URL directly in your MCP Client',
-        },
-      },
-    }
-
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(serversFile, null, 2))
-      toast.success(
-        'Servers configuration has been copied to clipboard. Add this to your mcp.json file. Current testing server will be added as \'default-server\'',
-      )
-    }
-    catch {
-      toast.error('Failed to copy servers file to clipboard')
+      toast.error('Failed to copy configuration to clipboard')
     }
   }
 
@@ -178,6 +168,68 @@ export function ConnectionSettingsForm({
   const buttonClassName = isStyled
     ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
     : ''
+
+  // Handle paste event to detect config JSON
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const pastedText = e.clipboardData.getData('text')
+
+    // Try to parse as JSON config
+    try {
+      const config = JSON.parse(pastedText)
+
+      // Check if it looks like a connection config
+      if (config.url && typeof config.url === 'string') {
+        e.preventDefault() // Prevent default paste behavior
+
+        // Populate form fields with config data
+        setUrl(config.url)
+
+        if (config.transportType) {
+          setTransportType(config.transportType === 'sse' ? 'WebSocket' : 'SSE')
+        }
+
+        if (config.connectionType) {
+          setConnectionType(config.connectionType)
+        }
+
+        if (config.proxyConfig?.proxyAddress) {
+          setProxyAddress(config.proxyConfig.proxyAddress)
+        }
+
+        if (config.customHeaders) {
+          const headers = Object.entries(config.customHeaders).map(([name, value], index) => ({
+            id: `header-${index}`,
+            name,
+            value: String(value),
+          }))
+          setCustomHeaders(headers)
+        }
+
+        if (config.requestTimeout) {
+          setRequestTimeout(String(config.requestTimeout))
+        }
+
+        if (config.resetTimeoutOnProgress !== undefined) {
+          setResetTimeoutOnProgress(config.resetTimeoutOnProgress ? 'True' : 'False')
+        }
+
+        if (config.maxTotalTimeout) {
+          setMaxTotalTimeout(String(config.maxTotalTimeout))
+        }
+
+        if (config.oauth) {
+          setClientId(config.oauth.clientId || '')
+          setRedirectUrl(config.oauth.redirectUrl || redirectUrl)
+          setScope(config.oauth.scope || '')
+        }
+
+        toast.success('Configuration pasted and form populated')
+      }
+    }
+    catch (error) {
+      // Not valid JSON or not a config object, let default paste behavior continue
+    }
+  }
 
   // Handle Enter key to trigger connection
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -196,58 +248,21 @@ export function ConnectionSettingsForm({
   return (
     <div className="space-y-4 relative" onKeyDown={handleKeyDown}>
       <h3 className="text-xl font-semibold text-white mb-4">Connect</h3>
-      {/* Export Dropdown - positioned absolutely on styled variant */}
+      {/* Copy Config Button - positioned absolutely on styled variant */}
       {showExportButton && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className={cn(
-                isStyled
-                  ? 'absolute top-0 right-0 text-white hover:bg-white/20 z-10 dark:hover:bg-white/20'
-                  : 'w-full',
-                !isStyled && 'mb-2',
-              )}
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={handleExportServerEntry}>
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Server Entry
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportServersFile}>
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Servers File
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="ghost"
+          onClick={handleCopyConfig}
+          className={cn(
+            isStyled
+              ? 'absolute top-0 right-0 text-white hover:bg-white/20 z-10 dark:hover:bg-white/20'
+              : 'w-full',
+            !isStyled && 'mb-2',
+          )}
+        >
+          <Copy className="w-4 h-4 mr-2" />
+          Copy Config
+        </Button>
       )}
 
       {/* Transport Type */}
@@ -271,8 +286,16 @@ export function ConnectionSettingsForm({
           placeholder="http://localhost:3001/sse"
           value={url}
           onChange={e => setUrl(e.target.value)}
+          onPaste={handlePaste}
           className={inputClassName}
         />
+        <p className={cn(
+          'text-xs text-muted-foreground',
+          isStyled ? 'text-white/60' : '',
+        )}
+        >
+          Tip: You can paste a copied connection config (JSON) to auto-populate the form
+        </p>
       </div>
 
       {/* Connection Type */}
@@ -321,18 +344,19 @@ export function ConnectionSettingsForm({
         {/* Authentication Button */}
         <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
           <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn('flex-1 justify-center', buttonClassName)}
-            >
-              <Shield className="w-4 h-4 mr-2" />
-              Authentication
-              {(clientId || scope) && (
-                <Badge variant="secondary" className="ml-2">
-                  OAuth 2.0
-                </Badge>
-              )}
-            </Button>
+            <div className="relative flex-1">
+              <Button
+                variant="outline"
+                className={cn(
+                  (clientId || scope) && 'border-2',
+                  'w-full justify-center hover:text-white cursor-pointer',
+                  buttonClassName,
+                )}
+              >
+                <Shield className="w-4 h-4 mr-0" />
+                Authentication
+              </Button>
+            </div>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
@@ -380,18 +404,15 @@ export function ConnectionSettingsForm({
         {/* Custom Headers Button */}
         <Dialog open={headersDialogOpen} onOpenChange={setHeadersDialogOpen}>
           <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn('flex-1 justify-center', buttonClassName)}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Custom Headers
-              {enabledHeadersCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {enabledHeadersCount}
-                </Badge>
-              )}
-            </Button>
+            <div className="relative flex-1">
+              <Button
+                variant="outline"
+                className={cn('w-full justify-center hover:text-white cursor-pointer', buttonClassName)}
+              >
+                <FileText className="w-4 h-4" />
+                Custom Headers
+              </Button>
+            </div>
           </DialogTrigger>
           <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
@@ -411,11 +432,11 @@ export function ConnectionSettingsForm({
             <Button
               variant="outline"
               className={cn(
-                'flex-1 justify-center cursor-pointer',
+                'flex-1 justify-center hover:text-white cursor-pointer',
                 buttonClassName,
               )}
             >
-              <Cog className="w-4 h-4 mr-2" />
+              <Cog className="w-4 h-4" />
               Configuration
             </Button>
           </DialogTrigger>
@@ -497,7 +518,7 @@ export function ConnectionSettingsForm({
           onClick={onConnect}
           disabled={!url.trim() || isConnecting}
           className={cn(
-            'w-full font-semibold mt-4',
+            'w-full font-semibold',
             isStyled ? 'bg-white text-black hover:bg-white/90' : '',
           )}
         >

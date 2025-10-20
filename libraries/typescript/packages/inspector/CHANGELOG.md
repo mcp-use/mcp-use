@@ -1,5 +1,22 @@
 # @mcp-use/inspector
 
+## 0.4.3-canary.1
+
+### Patch Changes
+
+- 0203a77: fix lint
+- ebf1814: fix server of inspector
+- Updated dependencies [cb60eef]
+  - mcp-use@1.1.3-canary.1
+
+## 0.4.3-canary.0
+
+### Patch Changes
+
+- d171bf7: feat/app-sdk
+- Updated dependencies [d171bf7]
+  - mcp-use@1.1.3-canary.0
+
 ## 0.4.2
 
 ### Patch Changes

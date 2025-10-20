@@ -4,7 +4,7 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronDown, Circle } from 'lucide-react'
 import { useState } from 'react'
 
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 import { RandomGradientBackground } from './random-gradient-background'
 
 interface ServerOption {

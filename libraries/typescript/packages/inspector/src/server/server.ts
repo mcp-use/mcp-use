@@ -4,24 +4,11 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { MCPInspector } from './mcp-inspector.js'
-import { registerInspectorRoutes, registerMCPApiRoutes } from './shared-routes.js'
+import { registerInspectorRoutes } from './shared-routes.js'
 import { registerStaticRoutesWithDevProxy } from './shared-static.js'
+import { isPortAvailable } from './utils.js'
 
 const execAsync = promisify(exec)
-
-// Check if a specific port is available
-async function isPortAvailable(port: number): Promise<boolean> {
-  const net = await import('node:net')
-
-  return new Promise((resolve) => {
-    const server = net.createServer()
-    server.listen(port, () => {
-      server.close(() => resolve(true))
-    })
-    server.on('error', () => resolve(false))
-  })
-}
 
 const app = new Hono()
 
@@ -29,11 +16,7 @@ const app = new Hono()
 app.use('*', cors())
 app.use('*', logger())
 
-// MCP Inspector instance
-const mcpInspector = new MCPInspector()
-
 // Register all API routes
-registerMCPApiRoutes(app, mcpInspector)
 registerInspectorRoutes(app)
 
 // Register static file serving with dev proxy support (must be last as it includes catch-all route)

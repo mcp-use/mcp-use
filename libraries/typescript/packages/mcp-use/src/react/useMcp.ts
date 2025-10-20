@@ -374,7 +374,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
           try {
             assert(url, 'Server URL is required for authentication')
-            const authResult = await auth(authProviderRef.current, { serverUrl: url })
+            // Extract base URL (origin) for OAuth discovery - OAuth metadata should be at the origin level
+            const baseUrl = new URL(url).origin
+            const authResult = await auth(authProviderRef.current, { serverUrl: baseUrl })
 
             if (!isMountedRef.current) return 'failed'
 
@@ -427,7 +429,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       }
     }
 
-    if (finalStatus === 'success' || finalStatus === 'failed') {
+    // Reset connecting flag for all terminal states and auth_redirect
+    // auth_redirect needs to reset the flag so the auth callback can reconnect
+    if (finalStatus === 'success' || finalStatus === 'failed' || finalStatus === 'auth_redirect') {
       connectingRef.current = false
     }
 
@@ -486,7 +490,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           try {
             assert(authProviderRef.current, 'Auth Provider not available for tool re-auth')
             assert(url, 'Server URL is required for authentication')
-            const authResult = await auth(authProviderRef.current, { serverUrl: url })
+            // Extract base URL (origin) for OAuth discovery - OAuth metadata should be at the origin level
+            const baseUrl = new URL(url).origin
+            const authResult = await auth(authProviderRef.current, { serverUrl: baseUrl })
 
             if (!isMountedRef.current) return
 
@@ -551,7 +557,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       try {
         assert(authProviderRef.current, 'Auth Provider not available for manual auth')
         assert(url, 'Server URL is required for authentication')
-        const authResult = await auth(authProviderRef.current, { serverUrl: url })
+        // Extract base URL (origin) for OAuth discovery - OAuth metadata should be at the origin level
+        const baseUrl = new URL(url).origin
+        const authResult = await auth(authProviderRef.current, { serverUrl: baseUrl })
 
         if (!isMountedRef.current) return
 
@@ -692,13 +700,22 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         if (event.data.success) {
           addLog('info', 'Authentication successful via popup. Reconnecting client...')
-          // Ensure we're not already in a connection attempt to prevent loops
-          if (!connectingRef.current) {
-            connectingRef.current = false // Reset flag before connecting
-            connectRef.current()
-          } else {
-            addLog('warn', 'Connection already in progress, skipping reconnection from auth callback')
+          
+          // Check if already connecting
+          if (connectingRef.current) {
+            addLog('debug', 'Connection attempt already in progress, resetting flag to allow reconnection.')
           }
+          
+          // Reset the connecting flag and reconnect since auth just succeeded
+          connectingRef.current = false
+          
+          // Small delay to ensure state is clean before reconnecting
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              addLog('debug', 'Initiating reconnection after successful auth callback.')
+              connectRef.current()
+            }
+          }, 100)
         } else {
           failConnectionRef.current(`Authentication failed in callback: ${event.data.error || 'Unknown reason.'}`)
         }

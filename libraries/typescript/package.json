@@ -25,6 +25,7 @@
     "lint:fix": "eslint . --fix",
     "lint:strict": "eslint . --max-warnings 0",
     "dev": "pnpm run -r --parallel dev",
+    "prepare": "husky",
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
     "release": "pnpm build && changeset publish",

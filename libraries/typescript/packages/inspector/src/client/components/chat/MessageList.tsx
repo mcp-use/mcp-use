@@ -30,9 +30,11 @@ interface Message {
 interface MessageListProps {
   messages: Message[]
   isLoading: boolean
+  serverId?: string
+  readResource?: (uri: string) => Promise<any>
 }
 
-export const MessageList = memo(({ messages, isLoading }: MessageListProps) => {
+export const MessageList = memo(({ messages, isLoading, serverId, readResource }: MessageListProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll to bottom when messages change or streaming status changes
@@ -153,6 +155,8 @@ export const MessageList = memo(({ messages, isLoading }: MessageListProps) => {
                               toolName={part.toolInvocation.toolName}
                               toolArgs={part.toolInvocation.args}
                               result={part.toolInvocation.result}
+                              serverId={serverId}
+                              readResource={readResource}
                             />
                           )}
                         </div>
@@ -188,6 +192,8 @@ export const MessageList = memo(({ messages, isLoading }: MessageListProps) => {
                                     toolName={toolCall.toolName}
                                     toolArgs={toolCall.args}
                                     result={toolCall.result}
+                                    serverId={serverId}
+                                    readResource={readResource}
                                   />
                                 )}
                               </div>

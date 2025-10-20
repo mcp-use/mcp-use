@@ -3,7 +3,7 @@
 import { Monitor, Moon, SunDim } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 import { useTheme } from '../../client/context/ThemeContext'
 
 interface props {
@@ -33,7 +33,7 @@ export function AnimatedThemeToggler({ className }: props) {
     if (theme === 'system')
       return <Monitor className="size-4" />
     if (theme === 'light')
-      return <SunDim className="size-4" />
+      return <SunDim className="size-5" />
     return <Moon className="size-4" />
   }
 

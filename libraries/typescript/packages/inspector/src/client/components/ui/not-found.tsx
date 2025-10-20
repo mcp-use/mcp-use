@@ -1,14 +1,17 @@
 import type React from 'react'
+import { cn } from '@/client/lib/utils'
 
 interface NotFoundProps {
   message: string
   className?: string
+  vertical?: boolean
+  noBorder?: boolean
 }
 
-export function NotFound({ message, className = '' }: NotFoundProps) {
+export function NotFound({ message, className = '', vertical, noBorder }: NotFoundProps) {
   return (
-    <div className={`mt-2 border rounded-md p-6 ${className}`}>
-      <p className="text-sm text-muted-foreground flex items-center gap-4">
+    <div className={cn(`mt-2  rounded-md p-6 ${className}`, !noBorder && 'border')}>
+      <p className={cn('text-sm text-muted-foreground flex items-center gap-4', vertical && 'flex-col')}>
         <svg
           width="40"
           height="40"

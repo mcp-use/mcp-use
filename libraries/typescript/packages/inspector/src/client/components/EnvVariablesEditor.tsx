@@ -5,7 +5,7 @@ import React, { useCallback, useRef, useState } from 'react'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Label } from '@/client/components/ui/label'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 
 export interface EnvVariable {
   key: string

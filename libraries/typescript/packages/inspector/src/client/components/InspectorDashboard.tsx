@@ -320,6 +320,29 @@ export function InspectorDashboard() {
     }
   }
 
+  const handleCopyConnectionConfig = async (connection: any) => {
+    try {
+      const config = {
+        url: connection.url,
+        name: connection.name,
+        transportType: connection.transportType || 'http',
+        connectionType: connection.proxyConfig ? 'Via Proxy' : 'Direct',
+        proxyConfig: connection.proxyConfig,
+        customHeaders: connection.customHeaders || {},
+        requestTimeout: connection.requestTimeout || 10000,
+        resetTimeoutOnProgress: connection.resetTimeoutOnProgress !== false,
+        maxTotalTimeout: connection.maxTotalTimeout || 60000,
+        oauth: connection.oauth,
+      }
+
+      await navigator.clipboard.writeText(JSON.stringify(config, null, 2))
+      toast.success('Connection configuration copied to clipboard')
+    }
+    catch {
+      toast.error('Failed to copy connection configuration')
+    }
+  }
+
   const handleActionClick = (e: React.MouseEvent, action: () => void) => {
     e.stopPropagation()
     action()
@@ -550,6 +573,23 @@ export function InspectorDashboard() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={e =>
+                                  handleActionClick(e, () =>
+                                    handleCopyConnectionConfig(connection))}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Copy connection config</p>
+                            </TooltipContent>
+                          </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button

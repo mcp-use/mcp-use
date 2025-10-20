@@ -1,143 +1,27 @@
 import type { Hono } from 'hono'
-import type { MCPInspector } from './mcp-inspector.js'
-import { handleChatRequest, handleChatRequestStream } from './shared-utils-browser.js'
+import {
+  generateWidgetContainerHtml,
+  generateWidgetContentHtml,
+  getWidgetData,
+  getWidgetSecurityHeaders,
+  handleChatRequest,
+  handleChatRequestStream,
+  storeWidgetData,
+} from './shared-utils-browser.js'
+import { formatErrorResponse } from './utils.js'
 
 /**
- * Helper function to format error responses with context and timestamp
- */
-function formatErrorResponse(error: unknown, context: string) {
-  const timestamp = new Date().toISOString()
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-  const errorStack = error instanceof Error ? error.stack : undefined
-
-  // Log detailed error server-side for debugging
-  console.error(`[${timestamp}] Error in ${context}:`, {
-    message: errorMessage,
-    stack: errorStack,
-  })
-
-  return {
-    error: errorMessage,
-    context,
-    timestamp,
-    // Only include stack in development mode
-    ...(process.env.NODE_ENV === 'development' && errorStack ? { stack: errorStack } : {}),
-  }
-}
-
-/**
- * Register all MCP API routes on a Hono app
- * These routes handle server connections, tools, resources, etc.
- */
-export function registerMCPApiRoutes(app: Hono, mcpInspector: MCPInspector) {
-  // Health check
-  app.get('/health', (c) => {
-    return c.json({ status: 'ok', timestamp: new Date().toISOString() })
-  })
-
-  // List available MCP servers
-  app.get('/api/servers', async (c) => {
-    try {
-      const servers = await mcpInspector.listServers()
-      return c.json({ servers })
-    }
-    catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Failed to list servers:', message, error)
-      return c.json({ error: 'Failed to list servers', details: message }, 500)
-    }
-  })
-
-  // Connect to an MCP server
-  app.post('/api/servers/connect', async (c) => {
-    try {
-      const { url, command } = await c.req.json()
-      const server = await mcpInspector.connectToServer(url, command)
-      return c.json({ server })
-    }
-    catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Failed to connect to server:', message, error)
-      return c.json({ error: 'Failed to connect to server', details: message }, 500)
-    }
-  })
-
-  // Get server details
-  app.get('/api/servers/:id', async (c) => {
-    try {
-      const id = c.req.param('id')
-      const server = await mcpInspector.getServer(id)
-      if (!server) {
-        return c.json({ error: 'Server not found' }, 404)
-      }
-      return c.json({ server })
-    }
-    catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Failed to get server details:', message, error)
-      return c.json({ error: 'Failed to get server details', details: message }, 500)
-    }
-  })
-
-  // Execute a tool on a server
-  app.post('/api/servers/:id/tools/:toolName/execute', async (c) => {
-    try {
-      const id = c.req.param('id')
-      const toolName = c.req.param('toolName')
-      const input = await c.req.json()
-
-      const result = await mcpInspector.executeTool(id, toolName, input)
-      return c.json({ result })
-    }
-    catch (error) {
-      return c.json(formatErrorResponse(error, `executeTool(${c.req.param('id')}, ${c.req.param('toolName')})`), 500)
-    }
-  })
-
-  // Get server tools
-  app.get('/api/servers/:id/tools', async (c) => {
-    try {
-      const id = c.req.param('id')
-      const tools = await mcpInspector.getServerTools(id)
-      return c.json({ tools })
-    }
-    catch (error) {
-      return c.json(formatErrorResponse(error, `getServerTools(${c.req.param('id')})`), 500)
-    }
-  })
-
-  // Get server resources
-  app.get('/api/servers/:id/resources', async (c) => {
-    try {
-      const id = c.req.param('id')
-      const resources = await mcpInspector.getServerResources(id)
-      return c.json({ resources })
-    }
-    catch (error) {
-      return c.json(formatErrorResponse(error, `getServerResources(${c.req.param('id')})`), 500)
-    }
-  })
-
-  // Disconnect from a server
-  app.delete('/api/servers/:id', async (c) => {
-    try {
-      const id = c.req.param('id')
-      await mcpInspector.disconnectServer(id)
-      return c.json({ success: true })
-    }
-    catch (error) {
-      return c.json(formatErrorResponse(error, `disconnectServer(${c.req.param('id')})`), 500)
-    }
-  })
-}
-
-/**
- * Register inspector-specific routes (proxy, chat, config)
+ * Register inspector-specific routes (proxy, chat, config, widget rendering)
  */
 export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: string | null }) {
   // MCP Proxy endpoint - proxies MCP requests to target servers
   // WARNING: This proxy endpoint does not implement authentication.
   // For production use, consider adding authentication or restricting access to localhost only.
+
+  app.get('/inspector/health', (c) => {
+    return c.json({ status: 'ok', timestamp: new Date().toISOString() })
+  })
+
   app.all('/inspector/api/proxy/*', async (c) => {
     try {
       const targetUrl = c.req.header('X-Target-URL')
@@ -247,6 +131,84 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
     }
     catch (error) {
       return c.json(formatErrorResponse(error, 'handleChatRequest'), 500)
+    }
+  })
+
+  // Widget storage endpoint - store widget data for rendering
+  app.post('/inspector/api/resources/widget/store', async (c) => {
+    try {
+      const body = await c.req.json()
+      const result = storeWidgetData(body)
+
+      if (!result.success) {
+        return c.json(result, 400)
+      }
+
+      return c.json(result)
+    }
+    catch (error) {
+      console.error('[Widget Store] Error:', error)
+      console.error('[Widget Store] Stack:', error instanceof Error ? error.stack : '')
+      return c.json(formatErrorResponse(error, 'storeWidgetData'), 500)
+    }
+  })
+
+  // Widget container endpoint - serves container page that loads widget
+  app.get('/inspector/api/resources/widget/:toolId', async (c) => {
+    const toolId = c.req.param('toolId')
+
+    // Check if data exists in storage
+    const widgetData = getWidgetData(toolId)
+    if (!widgetData) {
+      return c.html(
+        '<html><body>Error: Widget data not found or expired</body></html>',
+        404,
+      )
+    }
+
+    // Return a container page that will fetch and load the actual widget
+    return c.html(generateWidgetContainerHtml('/inspector', toolId))
+  })
+
+  // Widget content endpoint - serves pre-fetched resource with injected OpenAI API
+  app.get('/inspector/api/resources/widget-content/:toolId', async (c) => {
+    try {
+      const toolId = c.req.param('toolId')
+
+      // Retrieve widget data from storage
+      const widgetData = getWidgetData(toolId)
+      if (!widgetData) {
+        console.error('[Widget Content] Widget data not found for toolId:', toolId)
+        return c.html(
+          '<html><body>Error: Widget data not found or expired</body></html>',
+          404,
+        )
+      }
+
+      // Generate the widget HTML using shared function
+      const result = generateWidgetContentHtml(widgetData)
+
+      if (result.error) {
+        return c.html(`<html><body>Error: ${result.error}</body></html>`, 404)
+      }
+
+      // Set security headers
+      const headers = getWidgetSecurityHeaders()
+      Object.entries(headers).forEach(([key, value]) => {
+        c.header(key, value)
+      })
+
+      return c.html(result.html)
+    }
+    catch (error) {
+      console.error('[Widget Content] Error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorStack = error instanceof Error ? error.stack : ''
+      console.error('[Widget Content] Stack:', errorStack)
+      return c.html(
+        `<html><body>Error: ${errorMessage}</body></html>`,
+        500,
+      )
     }
   })
 

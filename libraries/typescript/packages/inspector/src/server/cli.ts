@@ -5,43 +5,9 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import open from 'open'
-import { MCPInspector } from '../server/mcp-inspector.js'
-import { registerInspectorRoutes, registerMCPApiRoutes } from '../server/shared-routes.js'
-import { registerStaticRoutes } from '../server/shared-static.js'
-
-// Validate URL format
-function isValidUrl(urlString: string): boolean {
-  try {
-    const url = new URL(urlString)
-    return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'ws:' || url.protocol === 'wss:'
-  }
-  catch {
-    return false
-  }
-}
-
-// Find available port starting from 8080
-async function findAvailablePort(startPort = 8080, maxAttempts = 100): Promise<number> {
-  const net = await import('node:net')
-
-  for (let port = startPort; port < startPort + maxAttempts; port++) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const server = net.createServer()
-        server.listen(port, () => {
-          server.close(() => resolve())
-        })
-        server.on('error', err => reject(err))
-      })
-      return port
-    }
-    catch {
-      // Port is in use, try next one
-      continue
-    }
-  }
-  throw new Error(`No available port found after trying ${maxAttempts} ports starting from ${startPort}`)
-}
+import { registerInspectorRoutes } from './shared-routes.js'
+import { registerStaticRoutes } from './shared-static.js'
+import { findAvailablePort, isValidUrl } from './utils.js'
 
 // Parse command line arguments
 const args = process.argv.slice(2)
@@ -100,11 +66,6 @@ const app = new Hono()
 app.use('*', cors())
 app.use('*', logger())
 
-// MCP Inspector instance
-const mcpInspector = new MCPInspector()
-
-// Register all API routes
-registerMCPApiRoutes(app, mcpInspector)
 registerInspectorRoutes(app, { autoConnectUrl: mcpUrl })
 
 // Register static file serving (must be last as it includes catch-all route)
@@ -124,11 +85,11 @@ async function startServer() {
     }
     // Auto-open browser
     try {
-      await open(`http://localhost:${port}`)
+      await open(`http://localhost:${port}/inspector`)
       console.log(`🌐 Browser opened`)
     }
     catch {
-      console.log(`🌐 Please open http://localhost:${port} in your browser`)
+      console.log(`🌐 Please open http://localhost:${port}/inspector in your browser`)
     }
     return { port, fetch: app.fetch }
   }

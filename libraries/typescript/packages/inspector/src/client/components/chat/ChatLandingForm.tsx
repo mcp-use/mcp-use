@@ -12,7 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/client/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 
 interface ChatLandingFormProps {
   mcpServerUrl: string
