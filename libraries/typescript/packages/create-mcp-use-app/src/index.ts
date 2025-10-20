@@ -49,7 +49,7 @@ const packageJson = JSON.parse(
 )
 
 // Read current package versions from workspace
-function getCurrentPackageVersions(isDevelopment: boolean = false) {
+function getCurrentPackageVersions(isDevelopment: boolean = false, useCanary: boolean = false) {
   const versions: Record<string, string> = {}
   
   try {
@@ -58,13 +58,20 @@ function getCurrentPackageVersions(isDevelopment: boolean = false) {
       versions['mcp-use'] = 'workspace:*'
       versions['@mcp-use/cli'] = 'workspace:*'
       versions['@mcp-use/inspector'] = 'workspace:*'
+    } else if (useCanary) {
+      // In canary mode, use canary versions for published packages
+      versions['mcp-use'] = 'canary'
+      // For unpublished packages, keep them as workspace dependencies
+      // These packages are not available on npm registry yet
+      versions['@mcp-use/cli'] = 'canary'
+      versions['@mcp-use/inspector'] = 'canary'
     } else {
       // In production mode, use latest for published packages
       versions['mcp-use'] = 'latest'
       // For unpublished packages, keep them as workspace dependencies
       // These packages are not available on npm registry yet
-      versions['@mcp-use/cli'] = 'workspace:*'
-      versions['@mcp-use/inspector'] = 'workspace:*'
+      versions['@mcp-use/cli'] = 'latest'
+      versions['@mcp-use/inspector'] = 'latest'
     }
   } catch (error) {
     // Use defaults when not in workspace (normal for published package)
@@ -82,7 +89,7 @@ function getCurrentPackageVersions(isDevelopment: boolean = false) {
 }
 
 // Process template files to replace version placeholders
-function processTemplateFile(filePath: string, versions: Record<string, string>, isDevelopment: boolean = false) {
+function processTemplateFile(filePath: string, versions: Record<string, string>, isDevelopment: boolean = false, useCanary: boolean = false) {
   const content = readFileSync(filePath, 'utf-8')
   let processedContent = content
   
@@ -98,6 +105,10 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
     processedContent = processedContent.replace(/"mcp-use": "\^[^"]+"/, '"mcp-use": "workspace:*"')
     processedContent = processedContent.replace(/"@mcp-use\/cli": "\^[^"]+"/, '"@mcp-use/cli": "workspace:*"')
     processedContent = processedContent.replace(/"@mcp-use\/inspector": "\^[^"]+"/, '"@mcp-use/inspector": "workspace:*"')
+  } else if (useCanary) {
+    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "canary"`)
+    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "canary"`)
+    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "canary"`)
   } else {
     processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "latest"`)
     processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "latest"`)
@@ -115,7 +126,8 @@ program
   .option('-t, --template <template>', 'Template to use', 'simple')
   .option('--no-install', 'Skip installing dependencies')
   .option('--dev', 'Use workspace dependencies for development')
-  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean }) => {
+  .option('--canary', 'Use canary versions of packages')
+  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean, canary: boolean }) => {
     try {
       let selectedTemplate = options.template
       
@@ -174,10 +186,10 @@ program
       const validatedTemplate = validateTemplateName(selectedTemplate)
       
       // Get current package versions
-      const versions = getCurrentPackageVersions(options.dev)
+      const versions = getCurrentPackageVersions(options.dev, options.canary)
       
       // Copy template files
-      await copyTemplate(projectPath, validatedTemplate, versions, options.dev)
+      await copyTemplate(projectPath, validatedTemplate, versions, options.dev, options.canary)
 
       // Update package.json with project name
       updatePackageJson(projectPath, sanitizedProjectName)
@@ -206,6 +218,8 @@ program
       console.log(chalk.green('✅ MCP server created successfully!'))
       if (options.dev) {
         console.log(chalk.yellow('🔧 Development mode: Using workspace dependencies'))
+      } else if (options.canary) {
+        console.log(chalk.blue('🚀 Canary mode: Using canary versions of packages'))
       }
       console.log('')
       console.log(chalk.bold('📁 Project structure:'))
@@ -266,7 +280,7 @@ function validateTemplateName(template: string): string {
   return sanitized
 }
 
-async function copyTemplate(projectPath: string, template: string, versions: Record<string, string>, isDevelopment: boolean = false) {
+async function copyTemplate(projectPath: string, template: string, versions: Record<string, string>, isDevelopment: boolean = false, useCanary: boolean = false) {
   const templatePath = join(__dirname, 'templates', template)
 
   if (!existsSync(templatePath)) {
@@ -290,10 +304,10 @@ async function copyTemplate(projectPath: string, template: string, versions: Rec
     process.exit(1)
   }
 
-  copyDirectoryWithProcessing(templatePath, projectPath, versions, isDevelopment)
+  copyDirectoryWithProcessing(templatePath, projectPath, versions, isDevelopment, useCanary)
 }
 
-function copyDirectoryWithProcessing(src: string, dest: string, versions: Record<string, string>, isDevelopment: boolean) {
+function copyDirectoryWithProcessing(src: string, dest: string, versions: Record<string, string>, isDevelopment: boolean, useCanary: boolean = false) {
   const entries = readdirSync(src, { withFileTypes: true })
 
   for (const entry of entries) {
@@ -302,12 +316,12 @@ function copyDirectoryWithProcessing(src: string, dest: string, versions: Record
 
     if (entry.isDirectory()) {
       mkdirSync(destPath, { recursive: true })
-      copyDirectoryWithProcessing(srcPath, destPath, versions, isDevelopment)
+      copyDirectoryWithProcessing(srcPath, destPath, versions, isDevelopment, useCanary)
     }
     else {
       // Process files that might contain version placeholders
       if (entry.name === 'package.json' || entry.name.endsWith('.json')) {
-        const processedContent = processTemplateFile(srcPath, versions, isDevelopment)
+        const processedContent = processTemplateFile(srcPath, versions, isDevelopment, useCanary)
         writeFileSync(destPath, processedContent)
       } else {
         copyFileSync(srcPath, destPath)
