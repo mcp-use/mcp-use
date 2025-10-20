@@ -53,26 +53,6 @@ function getCurrentPackageVersions() {
   const versions: Record<string, string> = {}
   
   try {
-    // Try multiple possible workspace root locations
-    const possibleRoots = [
-      resolve(__dirname, '../../../..'), // From dist/templates
-      resolve(__dirname, '../../../../..'), // From dist
-      resolve(process.cwd(), '.'), // Current working directory
-      resolve(process.cwd(), '..'), // Parent of current directory
-    ]
-    
-    let workspaceRoot = null
-    for (const root of possibleRoots) {
-      if (existsSync(join(root, 'packages/mcp-use/package.json'))) {
-        workspaceRoot = root
-        break
-      }
-    }
-    
-    if (!workspaceRoot) {
-      throw new Error('Workspace root not found')
-    }
-    
     // Read mcp-use version
 
     versions['mcp-use'] = 'latest'
@@ -105,9 +85,9 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
   let processedContent = content
   
   // Replace version placeholders with current versions
-  for (const [packageName, version] of Object.entries(versions)) {
+  for (const [packageName] of Object.entries(versions)) {
     const placeholder = `{{${packageName}_version}}`
-    const versionPrefix = isDevelopment ? 'workspace:*' : `^${version}`
+    const versionPrefix = isDevelopment ? 'workspace:*' : `latest`
     processedContent = processedContent.replace(new RegExp(placeholder, 'g'), versionPrefix)
   }
   
@@ -119,9 +99,9 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
     processedContent = processedContent.replace(/"@mcp-use\/inspector": "\^[^"]+"/, '"@mcp-use/inspector": "workspace:*"')
   } else {
     // Replace workspace dependencies with specific versions for production
-    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "^${versions['mcp-use'] || '1.0.0'}"`)
-    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "^${versions['@mcp-use/cli'] || '2.0.0'}"`)
-    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "^${versions['@mcp-use/inspector'] || '0.3.0'}"`)
+    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "^${versions['mcp-use'] || 'latest'}"`)
+    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "^${versions['@mcp-use/cli'] || 'latest'}"`)
+    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "^${versions['@mcp-use/inspector'] || 'latest'}"`)
   }
   
   return processedContent
