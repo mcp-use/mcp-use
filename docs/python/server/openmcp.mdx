@@ -1,0 +1,100 @@
+---
+title: "OpenMCP"
+description: "Automatic generation of openmcp.json endpoint for server discovery and metadata"
+icon: "code"
+---
+
+<Danger>
+Python Server is a work in progress.
+</Danger>
+
+# OpenMCP
+
+<Card title="" img="./images/OpenMCP.jpg" horizontal="true"/>
+
+<Info>
+The `openmcp.json` endpoint provides standardized metadata about your MCP server, allowing clients and tools to discover its capabilities. mcp-use automatically generates this endpoint based on your `ServerConfig`.
+</Info>
+
+## What is OpenMCP?
+
+OpenMCP is a standardized metadata format for MCP servers. It provides a JSON endpoint that describes what tools, resources, and capabilities your server offers.
+
+## Why Use OpenMCP?
+
+OpenMCP enables automatic discovery of MCP server capabilities:
+- **Client Integration**: MCP clients can automatically discover available tools and resources
+- **Schema Information**: Provides input/output schemas for tools
+- **Standardized Format**: Consistent format across all MCP servers
+- **Easy Discovery**: Clients can query `/openmcp.json` to understand server capabilities
+
+## Basic Configuration
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="my-server",
+    version="1.0.0",
+    description="My MCP server"
+)
+
+@server.tool()
+def greet(name: str) -> str:
+    """Greet someone with a personalized message."""
+    return f"Hello, {name}!"
+
+# The openmcp.json endpoint is automatically available at /openmcp.json
+```
+
+## Example Output
+
+```json
+{
+  "openmcp": "1.0",
+  "info": {
+    "title": "Example Server",
+    "version": "0.1.0",
+    "description": "This is an example server with a simple echo tool."
+  },
+  "capabilities": {
+    "experimental": {},
+    "logging": null,
+    "prompts": {"listChanged": false},
+    "resources": {"subscribe": false, "listChanged": false},
+    "tools": {"listChanged": false},
+    "completions": null
+  },
+  "tools": [
+    {
+      "name": "echo",
+      "title": "Echo",
+      "description": "Echoes back the message you provide.",
+      "inputSchema": {
+        "properties": {
+          "message": {"title": "Message", "type": "string"}
+        },
+        "required": ["message"],
+        "title": "echoArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "properties": {
+          "result": {"title": "Result", "type": "string"}
+        },
+        "required": ["result"],
+        "title": "echoOutput",
+        "type": "object"
+      }
+    }
+  ],
+  "resources": [],
+  "prompts": []
+}
+```
+
+## Next Steps
+
+- [Configuration Reference](/python/getting-started/configuration) - Complete configuration options
+- [Quickstart Guide](/python/getting-started/quickstart) - Build your first server
+- [Inspector UI](/python/server/inspector) - Monitor your server

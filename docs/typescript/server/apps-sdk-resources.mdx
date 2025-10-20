@@ -1,0 +1,806 @@
+---
+title: "Apps SDK Resources"
+description: "Build OpenAI Apps SDK compatible widgets for ChatGPT"
+icon: "openai"
+---
+
+# Apps SDK Resources
+
+Apps SDK Resources enable you to build widgets that are fully compatible with OpenAI's Apps SDK, allowing your MCP server to provide rich interactive experiences in ChatGPT and other OpenAI-powered applications.
+
+## Overview
+
+The Apps SDK is OpenAI's framework for creating interactive widgets that:
+- Render in ChatGPT conversations
+- Support structured data injection
+- Include security policies
+- Provide tool invocation feedback
+- Load external resources securely
+
+## Apps SDK Format
+
+Apps SDK widgets use the `text/html+skybridge` MIME type and include specific metadata:
+
+```typescript
+server.uiResource({
+  type: 'appsSdk',
+  name: 'weather_widget',
+  title: 'Weather Widget',
+  description: 'Current weather display',
+  htmlTemplate: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        /* Widget styles */
+      </style>
+    </head>
+    <body>
+      <div id="root"></div>
+      <script>
+        // Access tool output data
+        const data = window.openai?.toolOutput || {};
+
+        // Render widget
+        document.getElementById('root').innerHTML = \`
+          <h1>\${data.city}</h1>
+          <p>\${data.temperature}°F</p>
+        \`;
+      </script>
+    </body>
+    </html>
+  `,
+  appsSdkMetadata: {
+    'openai/widgetDescription': 'Displays current weather conditions',
+    'openai/widgetCSP': {
+      connect_domains: ['api.weather.com'],
+      resource_domains: ['cdn.weather.com']
+    },
+    'openai/toolInvocation/invoking': 'Fetching weather data...',
+    'openai/toolInvocation/invoked': 'Weather data loaded',
+    'openai/widgetAccessible': true,
+    'openai/resultCanProduceWidget': true
+  }
+})
+```
+
+## Metadata Configuration
+
+### Widget Description
+
+Describes what the widget does for accessibility and discovery:
+
+```typescript
+appsSdkMetadata: {
+  'openai/widgetDescription': 'Interactive data visualization showing real-time metrics'
+}
+```
+
+### Content Security Policy
+
+Define allowed external resources:
+
+```typescript
+appsSdkMetadata: {
+  'openai/widgetCSP': {
+    // API endpoints the widget can connect to
+    connect_domains: [
+      'https://api.example.com',
+      'wss://websocket.example.com'
+    ],
+
+    // External resources (scripts, styles, images)
+    resource_domains: [
+      'https://cdn.jsdelivr.net',
+      'https://unpkg.com',
+      'https://fonts.googleapis.com'
+    ]
+  }
+}
+```
+
+### Tool Invocation Status
+
+Provide feedback during tool execution:
+
+```typescript
+appsSdkMetadata: {
+  // Message shown while tool is executing
+  'openai/toolInvocation/invoking': 'Loading analytics data...',
+
+  // Message shown after completion
+  'openai/toolInvocation/invoked': 'Analytics dashboard ready'
+}
+```
+
+### Accessibility Options
+
+```typescript
+appsSdkMetadata: {
+  // Whether the widget is accessible
+  'openai/widgetAccessible': true,
+
+  // Whether the tool can produce a widget
+  'openai/resultCanProduceWidget': true
+}
+```
+
+## Data Injection
+
+Apps SDK widgets receive data through `window.openai.toolOutput`:
+
+```javascript
+// In your widget HTML
+<script>
+  // Tool output is automatically injected
+  const data = window.openai?.toolOutput || {
+    // Default values
+    title: 'Loading...',
+    items: []
+  };
+
+  // Use the data to render your widget
+  function renderWidget(data) {
+    const container = document.getElementById('root');
+    container.innerHTML = `
+      <h1>${data.title}</h1>
+      <ul>
+        ${data.items.map(item => `<li>${item}</li>`).join('')}
+      </ul>
+    `;
+  }
+
+  renderWidget(data);
+</script>
+```
+
+## Tool Integration
+
+Apps SDK widgets are registered as both tools and resources:
+
+```typescript
+// The tool returns structured data
+server.tool({
+  name: 'show_chart',
+  description: 'Display an interactive chart',
+  inputs: [
+    { name: 'data', type: 'array', required: true },
+    { name: 'chartType', type: 'string', required: false }
+  ],
+  _meta: {
+    'openai/outputTemplate': 'ui://widgets/chart.html',
+    'openai/toolInvocation/invoking': 'Generating chart...',
+    'openai/toolInvocation/invoked': 'Chart generated'
+  },
+  cb: async ({ data, chartType = 'bar' }) => {
+    return {
+      _meta: {
+        'openai/outputTemplate': 'ui://widgets/chart.html'
+      },
+      content: [{
+        type: 'text',
+        text: 'Chart displayed successfully'
+      }],
+      // This data becomes window.openai.toolOutput
+      structuredContent: {
+        data,
+        chartType,
+        timestamp: new Date().toISOString()
+      }
+    }
+  }
+})
+```
+
+## Pizzaz Reference Widgets
+
+The Apps SDK template includes 5 reference widgets from OpenAI's Pizzaz examples:
+
+### 1. Pizza Map Widget
+
+Interactive map visualization:
+
+```typescript
+{
+  name: 'pizza-map',
+  htmlTemplate: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    </head>
+    <body>
+      <div id="map" style="height: 400px;"></div>
+      <script>
+        const data = window.openai?.toolOutput || {
+          center: [40.7128, -74.0060],
+          zoom: 12
+        };
+
+        const map = L.map('map').setView(data.center, data.zoom);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // Add markers from data
+        data.locations?.forEach(loc => {
+          L.marker([loc.lat, loc.lng])
+            .addTo(map)
+            .bindPopup(loc.name);
+        });
+      </script>
+    </body>
+    </html>
+  `,
+  appsSdkMetadata: {
+    'openai/widgetDescription': 'Interactive map with location markers',
+    'openai/widgetCSP': {
+      connect_domains: ['https://*.tile.openstreetmap.org'],
+      resource_domains: ['https://unpkg.com']
+    }
+  }
+}
+```
+
+### 2. Pizza Carousel Widget
+
+Image carousel component:
+
+```typescript
+{
+  name: 'pizza-carousel',
+  htmlTemplate: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .carousel {
+          position: relative;
+          width: 100%;
+          max-width: 600px;
+          margin: auto;
+        }
+        .carousel-inner {
+          display: flex;
+          overflow-x: auto;
+          scroll-snap-type: x mandatory;
+        }
+        .carousel-item {
+          flex: 0 0 100%;
+          scroll-snap-align: start;
+        }
+        .carousel-item img {
+          width: 100%;
+          height: auto;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="carousel">
+        <div class="carousel-inner" id="carousel"></div>
+      </div>
+      <script>
+        const data = window.openai?.toolOutput || {
+          images: []
+        };
+
+        const carousel = document.getElementById('carousel');
+        data.images.forEach(image => {
+          const item = document.createElement('div');
+          item.className = 'carousel-item';
+          item.innerHTML = \`
+            <img src="\${image.url}" alt="\${image.alt}">
+            <p>\${image.caption}</p>
+          \`;
+          carousel.appendChild(item);
+        });
+      </script>
+    </body>
+    </html>
+  `
+}
+```
+
+### 3. Pizza Albums Widget
+
+Gallery grid layout:
+
+```typescript
+{
+  name: 'pizza-albums',
+  htmlTemplate: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .albums-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 20px;
+          padding: 20px;
+        }
+        .album {
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          overflow: hidden;
+          transition: transform 0.2s;
+        }
+        .album:hover {
+          transform: scale(1.05);
+        }
+        .album img {
+          width: 100%;
+          height: 200px;
+          object-fit: cover;
+        }
+        .album-info {
+          padding: 10px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="albums-grid" id="albums"></div>
+      <script>
+        const data = window.openai?.toolOutput || {
+          albums: []
+        };
+
+        const container = document.getElementById('albums');
+        data.albums.forEach(album => {
+          const albumEl = document.createElement('div');
+          albumEl.className = 'album';
+          albumEl.innerHTML = \`
+            <img src="\${album.cover}" alt="\${album.title}">
+            <div class="album-info">
+              <h3>\${album.title}</h3>
+              <p>\${album.artist}</p>
+              <small>\${album.year}</small>
+            </div>
+          \`;
+          container.appendChild(albumEl);
+        });
+      </script>
+    </body>
+    </html>
+  `
+}
+```
+
+### 4. Pizza List Widget
+
+Structured list display:
+
+```typescript
+{
+  name: 'pizza-list',
+  htmlTemplate: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .list-container {
+          max-width: 600px;
+          margin: 20px auto;
+        }
+        .list-item {
+          display: flex;
+          align-items: center;
+          padding: 15px;
+          border-bottom: 1px solid #e0e0e0;
+        }
+        .list-item:hover {
+          background: #f5f5f5;
+        }
+        .item-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          margin-right: 15px;
+        }
+        .item-content {
+          flex: 1;
+        }
+        .item-title {
+          font-weight: bold;
+          margin-bottom: 5px;
+        }
+        .item-description {
+          color: #666;
+          font-size: 14px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="list-container" id="list"></div>
+      <script>
+        const data = window.openai?.toolOutput || {
+          items: []
+        };
+
+        const container = document.getElementById('list');
+        data.items.forEach(item => {
+          const itemEl = document.createElement('div');
+          itemEl.className = 'list-item';
+          itemEl.innerHTML = \`
+            <div class="item-icon" style="background: \${item.color}"></div>
+            <div class="item-content">
+              <div class="item-title">\${item.title}</div>
+              <div class="item-description">\${item.description}</div>
+            </div>
+          \`;
+          container.appendChild(itemEl);
+        });
+      </script>
+    </body>
+    </html>
+  `
+}
+```
+
+### 5. Pizza Video Widget
+
+Video player component:
+
+```typescript
+{
+  name: 'pizza-video',
+  htmlTemplate: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .video-container {
+          position: relative;
+          width: 100%;
+          max-width: 800px;
+          margin: 20px auto;
+        }
+        video {
+          width: 100%;
+          height: auto;
+          border-radius: 8px;
+        }
+        .video-info {
+          padding: 15px;
+          background: #f5f5f5;
+          border-radius: 0 0 8px 8px;
+        }
+        .video-title {
+          font-size: 20px;
+          font-weight: bold;
+          margin-bottom: 10px;
+        }
+        .video-description {
+          color: #666;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="video-container">
+        <video id="player" controls></video>
+        <div class="video-info">
+          <div class="video-title" id="title"></div>
+          <div class="video-description" id="description"></div>
+        </div>
+      </div>
+      <script>
+        const data = window.openai?.toolOutput || {
+          url: '',
+          title: 'Video Player',
+          description: 'No video loaded'
+        };
+
+        const video = document.getElementById('player');
+        video.src = data.url;
+
+        document.getElementById('title').textContent = data.title;
+        document.getElementById('description').textContent = data.description;
+      </script>
+    </body>
+    </html>
+  `
+}
+```
+
+## External Resources
+
+Apps SDK widgets can load external libraries and resources:
+
+### Loading from CDNs
+
+```javascript
+// In your widget HTML
+<head>
+  <!-- CSS libraries -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+
+  <!-- JavaScript libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/d3@7"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+```
+
+### CDN Whitelist
+
+Remember to add CDN domains to your CSP:
+
+```typescript
+appsSdkMetadata: {
+  'openai/widgetCSP': {
+    resource_domains: [
+      'https://cdn.jsdelivr.net',
+      'https://unpkg.com',
+      'https://cdnjs.cloudflare.com',
+      'https://cdn.plot.ly'
+    ]
+  }
+}
+```
+
+## Creating Custom Apps SDK Widgets
+
+### Step 1: Define the Widget Structure
+
+```typescript
+interface WidgetDefinition {
+  name: string
+  htmlTemplate: string
+  appsSdkMetadata: Record<string, any>
+}
+
+const myWidget: WidgetDefinition = {
+  name: 'data-visualization',
+  htmlTemplate: `...`,
+  appsSdkMetadata: {
+    'openai/widgetDescription': 'Interactive data visualization',
+    'openai/widgetCSP': {
+      connect_domains: [],
+      resource_domains: ['https://cdn.jsdelivr.net']
+    }
+  }
+}
+```
+
+### Step 2: Register as UI Resource
+
+```typescript
+server.uiResource({
+  type: 'appsSdk',
+  name: myWidget.name,
+  title: 'Data Visualization',
+  description: 'Interactive charts and graphs',
+  htmlTemplate: myWidget.htmlTemplate,
+  appsSdkMetadata: myWidget.appsSdkMetadata
+})
+```
+
+### Step 3: Create Corresponding Tool
+
+```typescript
+server.tool({
+  name: `show_${myWidget.name}`,
+  description: 'Display data visualization',
+  inputs: [
+    { name: 'data', type: 'array', required: true },
+    { name: 'options', type: 'object', required: false }
+  ],
+  _meta: {
+    'openai/outputTemplate': `ui://widget/${myWidget.name}.html`
+  },
+  cb: async ({ data, options }) => {
+    return {
+      _meta: {
+        'openai/outputTemplate': `ui://widget/${myWidget.name}.html`
+      },
+      content: [{
+        type: 'text',
+        text: 'Visualization displayed'
+      }],
+      structuredContent: { data, options }
+    }
+  }
+})
+```
+
+## Best Practices
+
+### 1. Progressive Enhancement
+
+```javascript
+// Provide fallback for missing data
+const data = window.openai?.toolOutput || {
+  title: 'Loading...',
+  content: 'Please wait while data loads'
+};
+
+// Check for required fields
+if (!data.required_field) {
+  document.body.innerHTML = '<p>Required data missing</p>';
+  return;
+}
+```
+
+### 2. Error Handling
+
+```javascript
+try {
+  const data = window.openai?.toolOutput;
+  renderWidget(data);
+} catch (error) {
+  console.error('Widget error:', error);
+  document.body.innerHTML = `
+    <div class="error">
+      <h2>Unable to load widget</h2>
+      <p>${error.message}</p>
+    </div>
+  `;
+}
+```
+
+### 3. Responsive Design
+
+```css
+/* Mobile-first approach */
+.widget {
+  width: 100%;
+  padding: 10px;
+}
+
+@media (min-width: 768px) {
+  .widget {
+    max-width: 768px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+}
+```
+
+### 4. Accessibility
+
+```html
+<!-- Provide semantic HTML -->
+<main role="main">
+  <h1 id="widget-title">Widget Title</h1>
+  <nav aria-label="Widget navigation">
+    <!-- Navigation items -->
+  </nav>
+  <section aria-labelledby="widget-title">
+    <!-- Widget content -->
+  </section>
+</main>
+
+<!-- Include ARIA labels -->
+<button aria-label="Refresh data">
+  <span aria-hidden="true">🔄</span>
+  Refresh
+</button>
+```
+
+## Security Considerations
+
+### 1. Content Security Policy
+
+Always define appropriate CSP:
+
+```typescript
+appsSdkMetadata: {
+  'openai/widgetCSP': {
+    // Only connect to trusted APIs
+    connect_domains: [
+      'https://api.yourdomain.com'
+    ],
+    // Only load from trusted CDNs
+    resource_domains: [
+      'https://cdn.jsdelivr.net',
+      'https://unpkg.com'
+    ]
+  }
+}
+```
+
+### 2. Input Validation
+
+```javascript
+// Validate data structure
+function validateData(data) {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Invalid data format');
+  }
+
+  if (!Array.isArray(data.items)) {
+    throw new Error('Items must be an array');
+  }
+
+  // Additional validation...
+}
+
+try {
+  const data = window.openai?.toolOutput;
+  validateData(data);
+  renderWidget(data);
+} catch (error) {
+  renderError(error.message);
+}
+```
+
+### 3. Sanitize User Content
+
+```javascript
+// Escape HTML to prevent XSS
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Use when rendering user content
+element.innerHTML = escapeHtml(userContent);
+```
+
+## Testing Apps SDK Widgets
+
+### Local Testing
+
+1. Start your MCP server:
+```bash
+npm run dev
+```
+
+2. Test widget rendering:
+```bash
+# Call the tool to test widget
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "show_chart",
+      "arguments": {
+        "data": [1, 2, 3, 4, 5]
+      }
+    }
+  }'
+```
+
+3. View in Inspector:
+- Navigate to `http://localhost:3000/inspector`
+- Execute tools to see widget output
+
+### ChatGPT Testing
+
+1. Configure your MCP server URL in ChatGPT
+2. Invoke tools that return Apps SDK widgets
+3. Verify widget rendering in conversation
+
+## Troubleshooting
+
+### Widget Not Rendering
+
+1. Check MIME type is `text/html+skybridge`
+2. Verify metadata structure
+3. Check for JavaScript errors in widget
+4. Validate CSP configuration
+
+### Data Not Available
+
+1. Check `window.openai.toolOutput` exists
+2. Verify tool returns `structuredContent`
+3. Check data structure matches expectations
+
+### External Resources Blocked
+
+1. Add domains to CSP whitelist
+2. Use HTTPS for all resources
+3. Check CORS headers if applicable
+
+## Next Steps
+
+- [MCP-UI Resources](./mcp-ui-resources) - MCP-UI framework guide
+- [Templates](./templates) - Project templates
+- [UI Widgets](./ui-widgets) - General widget guide
+- [Examples](./examples) - Complete implementations

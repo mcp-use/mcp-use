@@ -1,0 +1,227 @@
+---
+title: "Prompts"
+description: "Building prompt templates for AI model interactions"
+icon: "message-square"
+---
+
+# Prompts
+
+Prompts in MCP provide a way to create reusable, parameterized templates for AI model interactions. They enable standardized prompt generation with dynamic content based on user-provided arguments.
+
+## Understanding Prompts
+
+Prompts in MCP are:
+- **Template-Based**: Reusable structures for consistent prompts
+- **Parameterized**: Accept arguments to customize content
+- **Discoverable**: Clients can list available prompts
+- **Typed**: Arguments have defined types and validation
+
+## Basic Prompt Structure
+
+Every prompt has three main components:
+
+```typescript
+server.prompt({
+  name: 'prompt_name',              // Unique identifier
+  description: 'What it generates',  // Clear description
+  args: [...],                       // Argument definitions
+  cb: async (args) => {...}          // Generator function
+})
+```
+
+## Defining Prompt Arguments
+
+### Argument Types
+
+Prompts support five argument types:
+
+```typescript
+// String argument
+{
+  name: 'topic',
+  type: 'string',
+  description: 'Topic to write about',
+  required: true
+}
+
+// Number argument
+{
+  name: 'maxLength',
+  type: 'number',
+  description: 'Maximum length in words',
+  required: false,
+  default: 500
+}
+
+// Boolean argument
+{
+  name: 'formal',
+  type: 'boolean',
+  description: 'Use formal tone',
+  required: false,
+  default: false
+}
+
+// Object argument
+{
+  name: 'context',
+  type: 'object',
+  description: 'Additional context',
+  required: false
+}
+
+// Array argument
+{
+  name: 'keywords',
+  type: 'array',
+  description: 'Keywords to include',
+  required: false
+}
+```
+
+### Optional Arguments and Defaults
+
+```typescript
+server.prompt({
+  name: 'blog_post',
+  description: 'Generate a blog post prompt',
+  args: [
+    {
+      name: 'topic',
+      type: 'string',
+      required: true  // Required argument
+    },
+    {
+      name: 'style',
+      type: 'string',
+      required: false,  // Optional
+      default: 'professional'  // Default value
+    },
+    {
+      name: 'length',
+      type: 'number',
+      required: false  // Optional with no default
+    }
+  ],
+  cb: async ({ topic, style = 'professional', length }) => {
+    return {
+      messages: [
+        {
+          role: 'system',
+          content: `You are a ${style} blog writer.`
+        },
+        {
+          role: 'user',
+          content: `Write a blog post about ${topic}` +
+                   (length ? ` in approximately ${length} words.` : '.')
+        }
+      ]
+    }
+  }
+})
+```
+
+## Prompt Callbacks
+
+### Basic Prompt Response
+
+The simplest prompt returns a conversation:
+
+```typescript
+cb: async ({ topic }) => {
+  return {
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a helpful assistant.'
+      },
+      {
+        role: 'user',
+        content: `Explain ${topic} in simple terms.`
+      }
+    ]
+  }
+}
+```
+
+### Multi-Turn Conversations
+
+Create prompts with multiple messages:
+
+```typescript
+cb: async ({ scenario, persona }) => {
+  return {
+    messages: [
+      {
+        role: 'system',
+        content: `You are ${persona}. Stay in character.`
+      },
+      {
+        role: 'user',
+        content: 'Hello! Can you help me?'
+      },
+      {
+        role: 'assistant',
+        content: 'Of course! What would you like to know?'
+      },
+      {
+        role: 'user',
+        content: scenario
+      }
+    ]
+  }
+}
+```
+
+### Dynamic System Instructions
+
+Customize system prompts based on arguments:
+
+```typescript
+server.prompt({
+  name: 'code_review',
+  description: 'Generate code review prompt',
+  args: [
+    { name: 'language', type: 'string', required: true },
+    { name: 'focus', type: 'string', required: false, default: 'general' },
+    { name: 'strictness', type: 'string', required: false, default: 'moderate' }
+  ],
+  cb: async ({ language, focus = 'general', strictness = 'moderate' }) => {
+    const strictnessLevels = {
+      lenient: 'Be encouraging and focus on major issues only.',
+      moderate: 'Balance between finding issues and being constructive.',
+      strict: 'Be thorough and point out all potential improvements.'
+    }
+
+    return {
+      messages: [
+        {
+          role: 'system',
+          content: `You are a ${language} code reviewer. ` +
+                   `Focus area: ${focus}. ` +
+                   strictnessLevels[strictness]
+        },
+        {
+          role: 'user',
+          content: `Please review this ${language} code focusing on ${focus}.`
+        }
+      ]
+    }
+  }
+})
+```
+
+## Best Practices
+
+1. **Clear Descriptions**: Explain what the prompt generates and when to use it
+2. **Consistent Structure**: Use similar patterns across related prompts
+3. **Argument Validation**: Validate all inputs before using them
+4. **Flexible Defaults**: Provide sensible defaults for optional arguments
+5. **Documentation**: Include examples in argument descriptions
+
+## Next Steps
+
+- [Tools Guide](./tools) - Building executable tools
+- [Resources Guide](./resources) - Managing content
+- [API Reference](./api-reference) - Complete API documentation
+- [Examples](./examples) - Real-world implementations

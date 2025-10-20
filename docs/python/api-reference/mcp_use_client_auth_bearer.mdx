@@ -38,19 +38,12 @@ from mcp_use.client.auth.bearer import BearerAuth
 <Card type="info">
 ### `method` __init__
 
-Create a new model by parsing and validating input data from keyword arguments.
-
-        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
-        validated to form a valid model.
-
-        `self` is explicitly positional-only to allow `self` as a field name.
-
 **Parameters**
-><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
+><ParamField body="data" required="True" >   Parameter value </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(data: Any):
+def __init__(data):
 ```
 
 </Card>

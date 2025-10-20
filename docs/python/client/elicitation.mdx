@@ -1,7 +1,7 @@
 ---
 title: "Elicitation"
 description: "Enable user input requests for MCP tools"
-icon: "circle-help"
+icon: "check"
 ---
 
 # Elicitation
@@ -50,42 +50,6 @@ client = MCPClient(
     config="config.json",
     elicitation_callback=elicitation_callback
 )
-```
-
-```typescript TypeScript
-// ⚠️ Elicitation callbacks are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use-ts
-
-// When supported, the API will look similar to:
-/*
-import { MCPClient } from 'mcp-use'
-
-async function elicitationCallback(context, params) {
-    // Display the message to the user and collect their input
-    console.log(`Server requests: ${params.message}`)
-
-    let userInput
-    if (params.requestedSchema) {
-        // Handle structured input based on the schema
-        userInput = await collectStructuredInput(params.requestedSchema)
-    } else {
-        // Handle simple text input
-        userInput = await getUserInput('Please provide your response: ')
-    }
-
-    // Return the result
-    return {
-        action: 'accept',  // or 'decline' or 'cancel'
-        content: userInput
-    }
-}
-
-const client = new MCPClient(
-    config,
-    { elicitationCallback }
-)
-*/
 ```
 </CodeGroup>
 

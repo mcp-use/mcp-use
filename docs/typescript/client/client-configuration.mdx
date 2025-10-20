@@ -1,0 +1,201 @@
+---
+title: "Client Configuration"
+description: "Configure MCPClient for connecting to MCP servers"
+icon: "server"
+---
+
+# Client Configuration
+
+<Info>
+This guide covers MCPClient configuration options for connecting to MCP servers. For agent configuration, see the [Agent Configuration](/typescript/agent/agent-configuration) guide.
+</Info>
+
+
+## MCP Server Configuration
+
+mcp_use supports any MCP server through a flexible configuration system. (For a list of awesome servers you can visit https://github.com/punkpeye/awesome-mcp-servers or https://github.com/appcypher/awesome-mcp-servers which have an amazing collection of them)
+
+The configuration is defined in a JSON file with the following structure:
+
+```json
+{
+  "mcpServers": {
+    "server_name": {
+      "command": "command_to_run",
+      "args": ["arg1", "arg2"],
+      "env": {
+        "ENV_VAR": "value"
+      }
+    }
+  }
+}
+```
+
+MCP servers can use different connection types (STDIO, HTTP). For details on these connection types and how to configure them, see the [Connection Types](./connection-types) guide.
+Each server entry in the `mcpServers` object has a `server_name` and then specific options depending on how `mcp-use` should connect to and/or manage the server.
+
+- `server_name`: (Required) A unique string identifier for this MCP server configuration. This name is used to select the server, for example, in `agent.run(..., server_name="your_server_name")`.
+
+**For STDIO-based servers (local):**
+These are servers that `mcp-use` will start and manage as local child processes, communicating via their standard input/output streams.
+
+- `command`: (Required) The executable command to start the server (e.g., `"npx"`, `"python"`).
+- `args`: (Optional) An array of string arguments to pass to the `command` (e.g., `["-y", "@playwright/mcp@latest"]`).
+- `env`: (Optional) An object defining environment variables to set for the server's process (e.g., `{"DISPLAY": ":1"}`).
+
+**For HTTP/HTTPS-based servers (SSE and Streamable HTTP)**
+
+These are servers that are typically already running and accessible via an HTTP(S) endpoint. `mcp-use` acts as an HTTP client to communicate with them.
+
+- `url`: (Required) The full URL where the MCP server is listening (e.g., `"http://localhost:7777/mcp"`, `"https://api.example.com/mcp"`).
+- `headers`: (Optional) An object containing custom HTTP headers to be sent with every request to this server (e.g., for authentication: `{"Authorization": "Bearer your_api_token"}`).
+
+Additional options might be available depending on the specific connection type or wrappers used. Always refer to the [Connection Types](./connection-types) documentation for the most detailed and up-to-date specifications for each type.
+
+### Example Configuration
+
+Here's a basic example of how to configure an MCP server:
+
+```json
+{
+  "mcpServers": {
+    "my_server": {
+      "command": "npx",
+      "args": ["@my-mcp/server"],
+      "env": {
+        "PORT": "3000"
+      }
+    }
+  }
+}
+```
+
+### Multiple Server Configuration
+
+You can configure multiple MCP servers in a single configuration file, allowing you to use different servers for different tasks or combine their capabilities (e.g.):
+
+```json
+{
+  "mcpServers": {
+    "airbnb": {
+      "command": "npx",
+      "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": { "DISPLAY": ":1" }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/pietro/projects/mcp-use/"
+      ]
+    }
+  }
+}
+```
+
+For a complete example of using multiple servers, see the [multi-server example](https://github.com/mcp-use/mcp-use/blob/main/examples/multi_server_example.py) in our repository.
+
+
+## Client Creation Methods
+
+There are several ways to create an MCPClient:
+
+### From Dictionary/Object
+
+Create configuration programmatically:
+
+<CodeGroup>
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
+
+const config = {
+    mcpServers: {
+        playwright: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            env: { DISPLAY: ':1' }
+        }
+    }
+}
+
+const client = new MCPClient(config)
+```
+
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
+
+const config = {
+    mcpServers: {
+        playwright: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            env: { DISPLAY: ':1' }
+        }
+    }
+}
+
+const client = new MCPClient(config)
+```
+</CodeGroup>
+
+### From Configuration File
+
+Load configuration from a JSON file:
+
+<CodeGroup>
+```typescript TypeScript
+import { MCPClient, loadConfigFile } from 'mcp-use'
+
+const config = await loadConfigFile('config.json')
+const client = new MCPClient(config)
+```
+
+```typescript TypeScript
+import { MCPClient, loadConfigFile } from 'mcp-use'
+
+const config = await loadConfigFile('config.json')
+const client = new MCPClient(config)
+```
+</CodeGroup>
+
+
+### With Sandbox Options
+
+Enable sandboxed execution:
+
+<CodeGroup>
+```typescript TypeScript
+// Note: Sandbox mode is not yet supported in the TypeScript library
+// This is a planned feature for a future release
+```
+
+```typescript TypeScript
+// Note: Sandbox mode is not yet supported in the TypeScript library
+// This is a planned feature for a future release
+```
+</CodeGroup>
+
+## Best Practices
+
+1. **API Keys**: Always use environment variables for sensitive information
+2. **Configuration Files**: Keep configuration files in version control (without sensitive data)
+3. **Server Naming**: Use descriptive names for your MCP servers
+4. **Environment Variables**: Set appropriate environment variables for each server
+5. **Testing**: Test server connections independently before using with agents
+6. **Monitoring**: Enable logging to monitor server connection health
+
+## Error Handling
+
+Common client configuration errors and solutions:
+
+1. **Server Not Found**: Check if the server command is installed and accessible
+2. **Connection Timeout**: Verify server is running and network connectivity
+3. **Permission Denied**: Ensure proper file permissions and environment setup
+4. **Invalid Configuration**: Validate JSON syntax and required fields
+
+For detailed troubleshooting, see the [Connection Errors](/python/troubleshooting/connection-errors) guide.

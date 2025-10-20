@@ -43,7 +43,7 @@ Initialize a new MCPAgent instance.
 **Parameters**
 ><ParamField body="llm" type="langchain_core.language_models.base.BaseLanguageModel | None" default="None" >   The LangChain LLM to use. Not required if agent_id is provided for remote execution. </ParamField>
 ><ParamField body="client" type="mcp_use.client.client.MCPClient | None" default="None" >   The MCPClient to use. If provided, connector is ignored. </ParamField>
-><ParamField body="connectors" type="list[mcp_use.connectors.base.BaseConnector] | None" default="None" >   A list of MCP connectors to use if client is not provided. </ParamField>
+><ParamField body="connectors" type="list[mcp_use.client.connectors.base.BaseConnector] | None" default="None" >   A list of MCP connectors to use if client is not provided. </ParamField>
 ><ParamField body="max_steps" type="int" default="5" >   The maximum number of steps to take. </ParamField>
 ><ParamField body="auto_initialize" type="bool" default="False" >   Whether to automatically initialize the agent when run is called. </ParamField>
 ><ParamField body="memory_enabled" type="bool" default="True" >   Whether to maintain conversation history for context. </ParamField>
@@ -53,7 +53,7 @@ Initialize a new MCPAgent instance.
 ><ParamField body="disallowed_tools" type="list[str] | None" default="None" >   List of tool names that should not be available to the agent. </ParamField>
 ><ParamField body="tools_used_names" type="list[str] | None" default="None" >   List of tools </ParamField>
 ><ParamField body="use_server_manager" type="bool" default="False" >   Whether to use server manager mode instead of exposing all tools. </ParamField>
-><ParamField body="server_manager" type="mcp_use.managers.base.BaseServerManager | None" default="None" >   Server name or configuration </ParamField>
+><ParamField body="server_manager" type="mcp_use.agents.managers.base.BaseServerManager | None" default="None" >   Server name or configuration </ParamField>
 ><ParamField body="verbose" type="bool" default="False" >   Enable debug/verbose mode </ParamField>
 ><ParamField body="agent_id" type="str | None" default="None" >   Remote agent ID for remote execution. If provided, creates a remote agent. </ParamField>
 ><ParamField body="api_key" type="str | None" default="None" >   API key for remote execution. If None, checks MCP_USE_API_KEY env var. </ParamField>
@@ -65,7 +65,7 @@ Initialize a new MCPAgent instance.
 
 **Signature**
 ```python wrap
-def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.client.MCPClient | None = None, connectors: list[mcp_use.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.managers.base.BaseServerManager | None = None, verbose: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True, max_retries_per_step: int = 2):
+def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.client.MCPClient | None = None, connectors: list[mcp_use.client.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.agents.managers.base.BaseServerManager | None = None, verbose: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True, max_retries_per_step: int = 2):
 ```
 
 </Card>

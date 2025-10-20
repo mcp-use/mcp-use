@@ -1,0 +1,91 @@
+---
+title: "Sampling"
+description: "Enable LLM sampling capabilities for MCP tools"
+icon: "pipette"
+---
+
+# Sampling
+
+<Info>
+Sampling allows MCP tools to request LLM completions during their execution.
+</Info>
+
+## Configuration
+
+To enable sampling, provide a `sampling_callback` function when initializing the MCPClient:
+
+<CodeGroup>
+```typescript TypeScript
+// ⚠️ Sampling callbacks are not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient } from 'mcp-use'
+
+async function samplingCallback(context, params) {
+    // Integrate with your LLM of choice
+    const response = await yourLlm.complete(params.messages.at(-1).content.text)
+
+    return {
+        content: { text: response, type: 'text' },
+        model: 'your-model-name',
+        role: 'assistant'
+    }
+}
+
+const client = new MCPClient(
+    config,
+    { samplingCallback }
+)
+*/
+```
+
+```typescript TypeScript
+// ⚠️ Sampling callbacks are not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient } from 'mcp-use'
+
+async function samplingCallback(context, params) {
+    // Integrate with your LLM of choice
+    const response = await yourLlm.complete(params.messages.at(-1).content.text)
+
+    return {
+        content: { text: response, type: 'text' },
+        model: 'your-model-name',
+        role: 'assistant'
+    }
+}
+
+const client = new MCPClient(
+    config,
+    { samplingCallback }
+)
+*/
+```
+</CodeGroup>
+
+## Creating Sampling-Enabled Tools
+
+When building MCP servers, tools can request sampling using the context parameter:
+
+## Error Handling
+
+If no sampling callback is provided but a tool requests sampling:
+
+<CodeGroup>
+```typescript TypeScript
+// ⚠️ Not yet supported - see above for details
+// When supported, similar error handling will apply
+```
+
+```typescript TypeScript
+// ⚠️ Not yet supported - see above for details
+// When supported, similar error handling will apply
+```
+</CodeGroup>

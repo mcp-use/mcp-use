@@ -71,32 +71,6 @@ agent = MCPAgent(
     use_server_manager=True  # This is the magic switch!
 )
 ```
-
-```typescript TypeScript
-import { MCPClient, MCPAgent } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-// Create client with multiple servers
-const client = new MCPClient({
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest']
-        },
-        filesystem: {
-            command: 'uvx',
-            args: ['mcp-server-filesystem', '/tmp']
-        }
-    }
-})
-
-// Enable Server Manager
-const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4' }),
-    client,
-    useServerManager: true  // This is the magic switch!
-})
-```
 </CodeGroup>
 
 
@@ -132,19 +106,6 @@ I need to:
 Start by searching for relevant tools.
 """)
 ```
-
-```typescript TypeScript
-// Agent automatically discovers and uses the right tools
-const result = await agent.run(`
-I need to:
-1. Find tools for web scraping
-2. Connect to the right server
-3. Scrape data from https://example.com
-4. Save it to a file
-
-Start by searching for relevant tools.
-`)
-```
 </CodeGroup>
 
 **Agent Process:**
@@ -170,18 +131,6 @@ Create a data pipeline that:
 Figure out which servers and tools you need.
 """)
 ```
-
-```typescript TypeScript
-const result = await agent.run(`
-Create a data pipeline that:
-1. Scrapes product data from an e-commerce site
-2. Processes and cleans the data
-3. Saves it to a CSV file
-4. Loads it into a SQLite database
-
-Figure out which servers and tools you need.
-`)
-```
 </CodeGroup>
 
 **Server Flow:**
@@ -204,18 +153,6 @@ I want to:
 
 What tools do I need for this?
 """)
-```
-
-```typescript TypeScript
-const result = await agent.run(`
-I want to:
-1. Search for trending topics online
-2. Generate an image based on the topic
-3. Write a blog post about it
-4. Save everything to files
-
-What tools do I need for this?
-`)
 ```
 </CodeGroup>
 
@@ -283,51 +220,6 @@ async def demo_server_manager():
 
 if __name__ == "__main__":
     asyncio.run(demo_server_manager())
-```
-
-```typescript TypeScript
-import { MCPClient, MCPAgent } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-async function demoServerManager() {
-    // Multi-server configuration
-    const client = new MCPClient({
-        mcpServers: {
-            web: { command: 'npx', args: ['@playwright/mcp@latest'] },
-            files: { command: 'uvx', args: ['mcp-server-filesystem', '/tmp'] },
-            database: { command: 'uvx', args: ['mcp-server-sqlite'] }
-        }
-    })
-
-    // Agent with Server Manager
-    const agent = new MCPAgent({
-        llm: new ChatOpenAI({ model: 'gpt-4' }),
-        client,
-        useServerManager: true,
-        verbose: true  // See the magic happen!
-    })
-
-    // Complex multi-server task
-    const result = await agent.run(`
-    I need to build a complete data collection system:
-
-    1. First, show me what servers and tools are available
-    2. Scrape product information from https://example-store.com
-    3. Clean and structure the data
-    4. Save it as both JSON and CSV files
-    5. Load the data into a SQLite database
-    6. Generate a summary report
-
-    Guide me through each step and show me how you discover and use the right tools.
-    `)
-
-    console.log('Task completed!')
-    console.log(result)
-
-    await client.closeAllSessions()
-}
-
-demoServerManager().catch(console.error)
 ```
 </CodeGroup>
 

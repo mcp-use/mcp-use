@@ -48,48 +48,6 @@ agent = MCPAgent(llm=llm, client=client)
 response = await agent.run("Your query here")
 print(response)
 ```
-
-```typescript TypeScript
-// ⚠️ OAuth authentication is not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use-ts
-
-// When supported, the API will look similar to:
-/*
-import { MCPClient, MCPAgent } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-// Dynamic Client Registration (automatic)
-const config = {
-    mcpServers: {
-        linear: {
-            url: 'https://mcp.linear.app/sse',
-            // It's not needed to specify auth section
-        }
-    }
-}
-
-// Or with pre-registered client
-const configWithAuth = {
-    mcpServers: {
-        my_server: {
-            url: 'https://api.example.com/mcp/',
-            auth: {
-                clientId: 'your-client-id',
-                clientSecret: 'your-client-secret',
-            }
-        }
-    }
-}
-
-const client = new MCPClient(config)
-const llm = new ChatOpenAI({ model: 'gpt-4o-mini', temperature: 0 })
-const agent = new MCPAgent({ llm, client })
-
-const response = await agent.run('Your query here')
-console.log(response)
-*/
-```
 </CodeGroup>
 
 ### Bearer Token Authentication
@@ -106,24 +64,6 @@ config = {
         }
     }
 }
-```
-
-```typescript TypeScript
-// ⚠️ Bearer token authentication is not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use-ts
-
-// When supported, the API will look similar to:
-/*
-const config = {
-    mcpServers: {
-        api: {
-            url: 'https://api.example.com/mcp/sse',
-            auth: 'sk-your-api-key-here'
-        }
-    }
-}
-*/
 ```
 </CodeGroup>
 
@@ -145,10 +85,6 @@ config = {
         }
     }
 }
-```
-
-```typescript TypeScript
-// ⚠️ Not yet supported - see OAuth authentication above
 ```
 </CodeGroup>
 
