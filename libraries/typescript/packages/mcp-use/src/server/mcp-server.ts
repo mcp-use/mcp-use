@@ -750,8 +750,7 @@ export class McpServer {
     import('@mcp-use/inspector')
       .then(({ mountInspector }) => {
         // Auto-connect to the local MCP server at /mcp
-        const mcpServerUrl = `http://localhost:${this.serverPort}/mcp`
-        mountInspector(this.app, '/inspector', mcpServerUrl)
+        mountInspector(this.app)
         this.inspectorMounted = true
         console.log(`[INSPECTOR] UI available at http://localhost:${this.serverPort}/inspector`)
       })
