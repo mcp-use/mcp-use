@@ -49,6 +49,7 @@ export default defineConfig({
       'dotenv': path.resolve(__dirname, './src/client/stubs/dotenv.js'),
       'util': path.resolve(__dirname, './src/client/stubs/util.js'),
       'path': path.resolve(__dirname, './src/client/stubs/path.js'),
+      'process': path.resolve(__dirname, './src/client/stubs/process.js'),
     },
   },
   define: {
