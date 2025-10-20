@@ -31,9 +31,10 @@
     "library": "lucide"
   },
   "navigation": {
-    "dropdowns": [
+    "products": [
       {
-        "dropdown": "Python",
+        "product": "Python SDK",
+        "description": "Python SDK description",
         "icon": "python",
         "tabs": [
           {
@@ -290,18 +291,6 @@
             ]
           },
           {
-            "tab": "Community",
-            "icon": "users",
-            "groups": [
-              {
-                "group": "Community",
-                "pages": [
-                  "python/community/showcase"
-                ]
-              }
-            ]
-          },
-          {
             "tab": "Changelog",
             "icon": "history",
             "groups": [
@@ -322,6 +311,18 @@
             ]
           },
           {
+            "tab": "Community",
+            "icon": "users",
+            "groups": [
+              {
+                "group": "Community",
+                "pages": [
+                  "python/community/showcase"
+                ]
+              }
+            ]
+          },
+          {
             "tab": "Blog",
             "icon": "book",
             "groups": [
@@ -334,17 +335,22 @@
             ]
           }
         ]
+
       },
       {
-        "dropdown": "TypeScript",
+        "product": "TypeScript SDK",
+        "description": "TypeScript SDK description",
         "icon": "discord",
-        "groups": [
-          {
-            "group": "Getting Started",
-            "pages": [
-              "typescript/index"
-            ]
-          }
+        "pages": [
+          "typescript/index"
+        ]
+      },
+      {
+        "product": "Inspector",
+        "icon": "search",
+        "description": "Inspector description",
+        "pages": [
+          "inspector/index"
         ]
       }
     ]
