@@ -43,37 +43,6 @@
   - Fixed linting issues across multiple components
   - Fixed server configuration for improved stability
 
-  ## MCP-Use Package
-
-  ### Authentication and Connection
-  - **Enhanced OAuth Handling**: Extracted base URL (origin) for OAuth discovery in `onMcpAuthorization` and `useMcp` functions to ensure proper metadata retrieval
-  - **Improved Connection Robustness**: Enhanced connection handling by resetting the connecting flag for all terminal states, including `auth_redirect`, to allow for reconnections after authentication
-  - Improved logging for connection attempts with better debugging information
-
-  ### Apps SDK Support
-  - Enhanced Apps SDK integration for better compatibility
-  - Fixed inspector route for improved routing consistency
-  - Updated server configuration for better Apps SDK support
-
-  ## Create-MCP-Use-App Package
-
-  ### Version Management
-  - **Enhanced Package Version Handling**: Added support for canary mode alongside development and production modes
-  - **Flexible Version Resolution**: Updated `getCurrentPackageVersions` to dynamically handle workspace dependencies in development mode and 'latest' versions in production
-  - **Canary Mode Support**: Added command options to allow users to specify canary versions for testing environments
-
-  ### Template Processing
-  - Improved template processing to dynamically replace version placeholders based on the current mode
-  - Enhanced `processTemplateFile` and `copyTemplate` functions to support canary mode
-  - Better error handling in template processing workflow
-
-  ### Bug Fixes
-  - Fixed mcp-use package version dependencies
-  - Simplified workspace root detection for improved clarity
-  - Updated version placeholders for better flexibility in production environments
-
-- Updated dependencies [4852465]
-  - mcp-use@1.1.3
 
 ## 0.4.3-canary.1
 
