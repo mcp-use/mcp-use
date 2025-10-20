@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.4.3-canary.0
+
+### Patch Changes
+
+- d171bf7: feat/app-sdk
+- Updated dependencies [d171bf7]
+  - mcp-use@1.1.3-canary.0
+
 ## 0.4.2
 
 ### Patch Changes
