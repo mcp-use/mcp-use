@@ -1,8 +1,10 @@
 import type { Prompt, Resource, Tool } from '@modelcontextprotocol/sdk/types.js'
+import type { SavedRequest } from './tools'
 import { Command } from 'cmdk'
 import {
   ExternalLink,
   FileText,
+  History,
   MessageSquare,
   Plus,
   Search,
@@ -37,6 +39,7 @@ interface CommandPaletteProps {
   tools: Tool[]
   prompts: Prompt[]
   resources: Resource[]
+  savedRequests: SavedRequest[]
   connections: any[]
   onNavigate: (
     tab: 'tools' | 'prompts' | 'resources',
@@ -50,7 +53,7 @@ interface CommandItem {
   id: string
   name: string
   description?: string
-  type: 'tool' | 'prompt' | 'resource' | 'global'
+  type: 'tool' | 'prompt' | 'resource' | 'saved-request' | 'global'
   category: string
   metadata?: any
   action?: () => void
@@ -62,6 +65,7 @@ export function CommandPalette({
   tools,
   prompts,
   resources,
+  savedRequests,
   connections,
   onNavigate,
   onServerSelect,
@@ -176,6 +180,20 @@ export function CommandPalette({
         serverName: (resource as any)._serverName,
       },
     })),
+    ...savedRequests.map(request => ({
+      id: `saved-${request.id}`,
+      name: request.name,
+      description: `Saved request for ${request.toolName}`,
+      type: 'saved-request' as const,
+      category: 'Saved Requests',
+      metadata: {
+        toolName: request.toolName,
+        args: request.args,
+        savedAt: request.savedAt,
+        serverId: request.serverId,
+        serverName: request.serverName,
+      },
+    })),
   ]
 
   const handleSelect = useCallback(
@@ -215,7 +233,9 @@ export function CommandPalette({
             ? 'tools'
             : item.type === 'prompt'
               ? 'prompts'
-              : ('resources' as const)
+              : item.type === 'saved-request'
+                ? 'tools' // Navigate to tools tab for saved requests
+                : ('resources' as const)
 
         console.warn('[CommandPalette] Navigating to item:', {
           tab: tabName,
@@ -247,6 +267,12 @@ export function CommandPalette({
         return (
           <div className="bg-green-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
             <FileText className="h-4 w-4 text-green-500" />
+          </div>
+        )
+      case 'saved-request':
+        return (
+          <div className="bg-orange-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+            <History className="h-4 w-4 text-orange-500" />
           </div>
         )
       case 'global':

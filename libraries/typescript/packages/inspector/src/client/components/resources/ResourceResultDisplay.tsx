@@ -1,4 +1,5 @@
 import { Brush, Code, Copy, Download, Maximize } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -20,6 +21,7 @@ interface ResourceResultDisplayProps {
   onCopy: () => void
   onDownload: () => void
   onFullscreen: () => void
+  onUIAction?: (action: any) => void
 }
 
 export function ResourceResultDisplay({
@@ -145,9 +147,7 @@ export function ResourceResultDisplay({
                       <div className="w-full h-full">
                         <McpUIRenderer
                           resource={resource}
-                          onUIAction={(_action) => {
-                            // Handle UI actions here if needed
-                          }}
+                          // onUIAction={handleUIAction}
                           className="w-full h-full"
                         />
                       </div>

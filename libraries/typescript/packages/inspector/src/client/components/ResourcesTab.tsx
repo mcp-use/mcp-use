@@ -40,15 +40,13 @@ export function ResourcesTab({
 }: ResourcesTabProps & { ref?: React.RefObject<ResourcesTabRef | null> }) {
   // State
   const [selectedResource, setSelectedResource] = useState<Resource | null>(
-    null
+    null,
   )
   const { selectedResourceUri, setSelectedResourceUri } = useInspector()
-  const [results, setResults] = useState<ResourceResult[]>([])
+  const [currentResult, setCurrentResult] = useState<ResourceResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<'resources' | 'history'>(
-    'resources'
-  )
+  const [activeTab] = useState<'resources'>('resources')
   const [previewMode, setPreviewMode] = useState(true)
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
@@ -88,13 +86,14 @@ export function ResourcesTab({
   }, [searchQuery])
 
   const filteredResources = useMemo(() => {
-    if (!searchQuery) return resources
+    if (!searchQuery)
+      return resources
     const query = searchQuery.toLowerCase()
     return resources.filter(
-      (resource) =>
-        resource.name.toLowerCase().includes(query) ||
-        resource.description?.toLowerCase().includes(query) ||
-        resource.uri.toLowerCase().includes(query)
+      resource =>
+        resource.name.toLowerCase().includes(query)
+        || resource.description?.toLowerCase().includes(query)
+        || resource.uri.toLowerCase().includes(query),
     )
   }, [resources, searchQuery])
 
@@ -109,28 +108,26 @@ export function ResourcesTab({
 
         try {
           const result = await readResource(resource.uri)
-          setResults([
-            {
-              uri: resource.uri,
-              result,
-              timestamp,
-            },
-          ])
-        } catch (error) {
-          setResults([
-            {
-              uri: resource.uri,
-              result: null,
-              error: error instanceof Error ? error.message : 'Unknown error',
-              timestamp,
-            },
-          ])
-        } finally {
+          setCurrentResult({
+            uri: resource.uri,
+            result,
+            timestamp,
+          })
+        }
+        catch (error) {
+          setCurrentResult({
+            uri: resource.uri,
+            result: null,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            timestamp,
+          })
+        }
+        finally {
           setIsLoading(false)
         }
       }
     },
-    [readResource, isConnected]
+    [readResource, isConnected],
   )
 
   // Reset focused index when filtered resources change
@@ -142,16 +139,16 @@ export function ResourcesTab({
   useEffect(() => {
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       const target = e.target as HTMLElement
-      const isInputFocused =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.contentEditable === 'true'
+      const isInputFocused
+        = target.tagName === 'INPUT'
+          || target.tagName === 'TEXTAREA'
+          || target.contentEditable === 'true'
 
       if (isInputFocused || e.metaKey || e.ctrlKey || e.altKey) {
         return
       }
 
-      const items = activeTab === 'resources' ? filteredResources : results
+      const items = filteredResources
 
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -159,19 +156,19 @@ export function ResourcesTab({
           const next = prev + 1
           return next >= items.length ? 0 : next
         })
-      } else if (e.key === 'ArrowUp') {
+      }
+      else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setFocusedIndex((prev) => {
           const next = prev - 1
           return next < 0 ? items.length - 1 : next
         })
-      } else if (e.key === 'Enter' && focusedIndex >= 0) {
+      }
+      else if (e.key === 'Enter' && focusedIndex >= 0) {
         e.preventDefault()
-        if (activeTab === 'resources') {
-          const resource = filteredResources[focusedIndex]
-          if (resource) {
-            handleResourceSelect(resource)
-          }
+        const resource = filteredResources[focusedIndex]
+        if (resource) {
+          handleResourceSelect(resource)
         }
       }
     }
@@ -181,29 +178,24 @@ export function ResourcesTab({
   }, [
     focusedIndex,
     filteredResources,
-    results,
-    activeTab,
     handleResourceSelect,
   ])
 
   // Scroll focused item into view
   useEffect(() => {
     if (focusedIndex >= 0) {
-      const itemId =
-        activeTab === 'resources'
-          ? `resource-${filteredResources[focusedIndex]?.uri}`
-          : `result-${results[focusedIndex]?.uri}`
+      const itemId = `resource-${filteredResources[focusedIndex]?.uri}`
       const element = document.getElementById(itemId)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
       }
     }
-  }, [focusedIndex, filteredResources, results, activeTab])
+  }, [focusedIndex, filteredResources])
 
   // Handle auto-selection from context
   useEffect(() => {
     if (selectedResourceUri && resources.length > 0) {
-      const resource = resources.find((r) => r.uri === selectedResourceUri)
+      const resource = resources.find(r => r.uri === selectedResourceUri)
 
       if (resource && selectedResource?.uri !== resource.uri) {
         setSelectedResourceUri(null)
@@ -227,27 +219,28 @@ export function ResourcesTab({
     setSelectedResourceUri,
   ])
 
-  const currentResult = results[0] || null
-
   const handleCopy = useCallback(async () => {
-    if (!currentResult) return
+    if (!currentResult)
+      return
     try {
       await navigator.clipboard.writeText(
-        JSON.stringify(currentResult.result, null, 2)
+        JSON.stringify(currentResult.result, null, 2),
       )
-    } catch (error) {
+    }
+    catch (error) {
       console.error('[ResourcesTab] Failed to copy result:', error)
     }
   }, [currentResult])
 
   const handleDownload = useCallback(() => {
-    if (!currentResult) return
+    if (!currentResult)
+      return
     try {
       const blob = new globalThis.Blob(
         [JSON.stringify(currentResult.result, null, 2)],
         {
           type: 'application/json',
-        }
+        },
       )
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -257,88 +250,57 @@ export function ResourcesTab({
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-    } catch (error) {
+    }
+    catch (error) {
       console.error('[ResourcesTab] Failed to download result:', error)
     }
   }, [currentResult])
 
   const handleFullscreen = useCallback(async () => {
-    if (!resourceDisplayRef.current) return
+    if (!resourceDisplayRef.current)
+      return
 
     try {
       if (!document.fullscreenElement) {
         await resourceDisplayRef.current.requestFullscreen()
-      } else {
+      }
+      else {
         await document.exitFullscreen()
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('[ResourcesTab] Failed to toggle fullscreen:', error)
     }
   }, [])
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
-      <ResizablePanel defaultSize={33}>
+      <ResizablePanel defaultSize={25}>
         <ResourcesTabHeader
           activeTab={activeTab}
           isSearchExpanded={isSearchExpanded}
           searchQuery={searchQuery}
           filteredResourcesCount={filteredResources.length}
-          historyCount={results.length}
           onSearchExpand={() => setIsSearchExpanded(true)}
           onSearchChange={setSearchQuery}
           onSearchBlur={handleSearchBlur}
-          onTabSwitch={() =>
-            setActiveTab(activeTab === 'resources' ? 'history' : 'resources')
-          }
+          onTabSwitch={() => {}}
           searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
         />
 
         <div className="flex flex-col h-full">
-          {activeTab === 'resources' ? (
-            <ResourcesList
-              resources={filteredResources}
-              selectedResource={selectedResource}
-              onResourceSelect={handleResourceSelect}
-              focusedIndex={focusedIndex}
-            />
-          ) : (
-            <div className="flex-1 overflow-y-auto border-r dark:border-zinc-700">
-              {results.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <p>No history yet</p>
-                  <p className="text-sm">Read a resource to see it here</p>
-                </div>
-              ) : (
-                <div className="space-y-2 p-4">
-                  {results.map((result) => (
-                    <div
-                      key={`${result.uri}-${result.timestamp}`}
-                      id={`result-${result.uri}`}
-                      className="p-3 bg-gray-100 dark:bg-zinc-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-zinc-700"
-                      onClick={() => {
-                        setResults([result])
-                        setActiveTab('resources')
-                      }}
-                    >
-                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                        {result.uri}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {new Date(result.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <ResourcesList
+            resources={filteredResources}
+            selectedResource={selectedResource}
+            onResourceSelect={handleResourceSelect}
+            focusedIndex={focusedIndex}
+          />
         </div>
       </ResizablePanel>
 
       <ResizableHandle />
 
-      <ResizablePanel defaultSize={67}>
+      <ResizablePanel defaultSize={50}>
         <div
           ref={resourceDisplayRef}
           className="h-full bg-white dark:bg-zinc-900"
@@ -354,6 +316,19 @@ export function ResourcesTab({
           />
         </div>
       </ResizablePanel>
+
+      {/* <ResizableHandle />
+
+      <ResizablePanel defaultSize={25}>
+        <div className="h-full bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700">
+          <div className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 text-xs text-zinc-500 font-medium">
+            UI Events
+          </div>
+          <div className="max-h-full overflow-auto p-3 text-xs">
+            <div className="text-zinc-500">No events yet</div>
+          </div>
+        </div>
+      </ResizablePanel> */}
     </ResizablePanelGroup>
   )
 }
