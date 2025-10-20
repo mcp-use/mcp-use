@@ -284,14 +284,8 @@
                   "python/api-reference/mcp_use_cli",
                   "python/api-reference/mcp_use_client",
                   "python/api-reference/mcp_use_logging",
+                  "python/api-reference/mcp_use_server",
                   "python/api-reference/mcp_use_utils"
-                ]
-              },
-              {
-                "group": "Server",
-                "icon": "server",
-                "pages": [
-                  "python/api-reference/mcp_use_server"
                 ]
               },
               {
@@ -361,29 +355,38 @@
               {
                 "group": "Getting Started",
                 "icon": "list-start",
-                "pages": ["typescript/index"]
+                "pages": [
+                  "typescript/index"
+                ]
               },
               {
                 "group": "MCP Server",
                 "icon": "server",
                 "tag": "Beta",
-                "pages": ["typescript/index"]
-
+                "pages": [
+                  "typescript/index"
+                ]
               },
               {
                 "group": "MCP Client",
                 "icon": "router",
-                "pages": ["typescript/index"]
+                "pages": [
+                  "typescript/index"
+                ]
               },
               {
                 "group": "MCP Agents",
                 "icon": "brain",
-                "pages": ["typescript/index"]
+                "pages": [
+                  "typescript/index"
+                ]
               },
               {
                 "group": "Development",
                 "icon": "sparkle",
-                "pages": ["typescript/index"]
+                "pages": [
+                  "typescript/index"
+                ]
               }
             ]
           },
@@ -403,8 +406,7 @@
               },
               {
                 "group": "Versions",
-                "pages": [
-                ]
+                "pages": []
               }
             ]
           },

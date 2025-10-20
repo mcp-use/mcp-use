@@ -1700,11 +1700,15 @@ def update_docs_json(docs_json_path: str, api_reference_dir: str) -> None:
     api_groups = generate_api_reference_groups(packages)
 
     # Update the navigation structure
-    # Handle both "API Reference" and "Python API Reference" tab names
-    for tab in docs_config["navigation"]["tabs"]:
-        if "API Reference" in tab["tab"]:
-            tab["groups"] = api_groups
-            break
+    # Find the Python SDK product and then the API Reference tab within it.
+    for product in docs_config["navigation"]["products"]:
+        if product.get("product") == "Python SDK":
+            if "tabs" in product:
+                for tab in product["tabs"]:
+                    if "API Reference" in tab.get("tab", ""):
+                        tab["groups"] = api_groups
+                        break  # Found the tab, stop searching tabs
+            break  # Found the product, stop searching products
 
     # Write updated docs.json
     with open(docs_json_path, "w", encoding="utf-8") as f:
