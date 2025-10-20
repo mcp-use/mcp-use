@@ -70,49 +70,8 @@ async def list_prompts():
                 print(f"  - {arg.name}: {arg.description}")
         print("---")
 
-
 # Run the example
 asyncio.run(list_prompts())
-```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-async function listPrompts() {
-    // Initialize client with server configuration
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
-    }
-    const client = new MCPClient(config)
-
-    // Connect to servers
-    await client.createAllSessions()
-
-    // Get a session for a specific server
-    const session = client.getSession('my_server')
-
-    // List all available prompts - always returns fresh data
-    const prompts = await session.listPrompts()
-
-    for (const prompt of prompts) {
-        console.log(`Prompt: ${prompt.name}`)
-        console.log(`Description: ${prompt.description}`)
-        if (prompt.arguments) {
-            console.log('Arguments:')
-            for (const arg of prompt.arguments) {
-                console.log(`  - ${arg.name}: ${arg.description}`)
-            }
-        }
-        console.log('---')
-    }
-
-    await client.closeAllSessions()
-}
-
-// Run the example
-listPrompts().catch(console.error)
 ```
 </CodeGroup>
 
@@ -145,14 +104,6 @@ prompts = await session.list_prompts()
 
 # ⚠️ Deprecated - may return stale data
 # prompts = session.prompts
-```
-
-```typescript TypeScript
-// ✅ Recommended - always returns fresh data
-const prompts = await session.listPrompts()
-
-// ⚠️ Deprecated - may return stale data
-// const prompts = session.prompts
 ```
 </CodeGroup>
 
@@ -193,46 +144,7 @@ async def use_prompt_example():
         print(f"Role: {message.role}")
         print(f"Content: {message.content.text}")
 
-
 asyncio.run(use_prompt_example())
-```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-async function usePromptExample() {
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
-    }
-    const client = new MCPClient(config)
-    await client.createAllSessions()
-
-    const session = client.getSession('planning_server')
-
-    // Get a prompt with arguments
-    const result = await session.getPrompt(
-        'plan_vacation',
-        {
-            destination: 'Japan',
-            duration: '2 weeks',
-            budget: '$5000',
-            interests: ['culture', 'food', 'nature']
-        }
-    )
-
-    // Use the prompt content
-    console.log(`Prompt description: ${result.description}`)
-    for (const message of result.messages) {
-        console.log(`Role: ${message.role}`)
-        console.log(`Content: ${message.content.text}`)
-    }
-
-    await client.closeAllSessions()
-}
-
-usePromptExample().catch(console.error)
 ```
 </CodeGroup>
 
@@ -260,34 +172,7 @@ async def simple_prompt_example():
     for message in result.messages:
         print(f"{message.role}: {message.content.text}")
 
-
 asyncio.run(simple_prompt_example())
-```
-
-```typescript TypeScript
-async function simplePromptExample() {
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
-    }
-    const client = new MCPClient(config)
-    await client.createAllSessions()
-
-    const session = client.getSession('content_server')
-
-    // Get a prompt without arguments
-    const result = await session.getPrompt('writing_tips')
-
-    // Display the prompt content
-    for (const message of result.messages) {
-        console.log(`${message.role}: ${message.content.text}`)
-    }
-
-    await client.closeAllSessions()
-}
-
-simplePromptExample().catch(console.error)
 ```
 </CodeGroup>
 
@@ -313,27 +198,6 @@ for message in result.messages:
     if hasattr(message.content, 'image'):
         print(f"{role}: [Image content]")
 ```
-
-```typescript TypeScript
-// Example of working with prompt results
-const result = await session.getPrompt('code_review', { language: 'python' })
-
-for (const message of result.messages) {
-    // Messages have roles (e.g., "user", "assistant", "system")
-    const role = message.role
-
-    // Content can be text or other formats
-    if ('text' in message.content) {
-        const textContent = message.content.text
-        console.log(`${role}: ${textContent}`)
-    }
-
-    // Handle other content types if needed
-    if ('image' in message.content) {
-        console.log(`${role}: [Image content]`)
-    }
-}
-```
 </CodeGroup>
 
 ## Parameter Completion
@@ -354,25 +218,6 @@ async def explore_prompt_parameters():
                 required = "required" if arg.required else "optional"
                 print(f"  - {arg.name} ({required}): {arg.description}")
         print()
-```
-
-```typescript TypeScript
-async function explorePromptParameters() {
-    const session = client.getSession('my_server')
-    const prompts = await session.listPrompts()
-
-    for (const prompt of prompts) {
-        console.log(`Prompt: ${prompt.name}`)
-        if (prompt.arguments) {
-            console.log('Required parameters:')
-            for (const arg of prompt.arguments) {
-                const required = arg.required ? 'required' : 'optional'
-                console.log(`  - ${arg.name} (${required}): ${arg.description}`)
-            }
-        }
-        console.log()
-    }
-}
 ```
 </CodeGroup>
 
@@ -406,37 +251,6 @@ async def dynamic_prompt_example():
             print(f"  {message.content.text[:100]}...")
         print()
 ```
-
-```typescript TypeScript
-async function dynamicPromptExample() {
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
-    }
-    const client = new MCPClient(config)
-    await client.createAllSessions()
-
-    const session = client.getSession('adaptive_server')
-
-    // Same prompt with different parameters
-    const contexts = [
-        { domain: 'healthcare', complexity: 'beginner' },
-        { domain: 'finance', complexity: 'expert' }
-    ]
-
-    for (const context of contexts) {
-        const result = await session.getPrompt('domain_analysis', context)
-        console.log(`Analysis for ${context.domain}:`)
-        for (const message of result.messages) {
-            console.log(`  ${message.content.text.substring(0, 100)}...`)
-        }
-        console.log()
-    }
-
-    await client.closeAllSessions()
-}
-```
 </CodeGroup>
 
 ## Error Handling
@@ -460,26 +274,5 @@ if "my_prompt" in prompt_names:
     result = await session.get_prompt("my_prompt")
 else:
     print("Prompt not available")
-```
-
-```typescript TypeScript
-try {
-    const result = await session.getPrompt('missing_prompt', { param: 'value' })
-    for (const message of result.messages) {
-        console.log(message.content.text)
-    }
-} catch (error) {
-    console.error(`Failed to get prompt: ${error}`)
-}
-
-// Check if prompt exists before using
-const availablePrompts = await session.listPrompts()
-const promptNames = availablePrompts.map(p => p.name)
-
-if (promptNames.includes('my_prompt')) {
-    const result = await session.getPrompt('my_prompt')
-} else {
-    console.log('Prompt not available')
-}
 ```
 </CodeGroup>

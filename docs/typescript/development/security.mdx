@@ -1,0 +1,415 @@
+---
+title: "Security Best Practices"
+description: "Secure your mcp_use implementations and protect sensitive data"
+icon: "shield"
+---
+
+Security is crucial when working with MCP servers and LLM agents. This guide covers best practices for protecting your applications, data, and infrastructure.
+
+<Warning>
+**Important**: MCP servers can have powerful capabilities including file system access, network requests, and code execution. Always follow security best practices to protect your systems.
+</Warning>
+
+## API Key Management
+
+### Environment Variables
+
+Never hardcode API keys in your source code. Use environment variables:
+
+<CodeGroup>
+```typescript TypeScript
+import { config } from 'dotenv'
+
+// Load environment variables from .env file
+config()
+
+// Access API keys securely
+const openaiKey = process.env.OPENAI_API_KEY
+const anthropicKey = process.env.ANTHROPIC_API_KEY
+
+if (!openaiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is required')
+}
+```
+
+```typescript TypeScript
+import { config } from 'dotenv'
+
+// Load environment variables from .env file
+config()
+
+// Access API keys securely
+const openaiKey = process.env.OPENAI_API_KEY
+const anthropicKey = process.env.ANTHROPIC_API_KEY
+
+if (!openaiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is required')
+}
+```
+</CodeGroup>
+
+### .env File Security
+
+Create a secure `.env` file:
+
+```bash .env
+# LLM Provider Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GROQ_API_KEY=gsk_...
+
+# MCP Server Configuration
+FILESYSTEM_ROOT=/safe/workspace
+DATABASE_URL=postgresql://user:pass@localhost/db
+
+# Optional: Security settings
+MCP_TIMEOUT=30
+MAX_TOOL_CALLS=10
+ALLOWED_DOMAINS=example.com,api.service.com
+```
+
+<Warning>
+**Never commit .env files**: Add `.env` to your `.gitignore` file to prevent accidentally committing API keys to version control.
+</Warning>
+
+### Secrets Management
+
+For production environments, use proper secrets management:
+
+<Tabs>
+  <Tab title="AWS Secrets Manager">
+    <CodeGroup>
+```typescript TypeScript
+    import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+
+    async function getSecret(secretName: string, regionName = 'us-east-1') {
+        const client = new SecretsManagerClient({ region: regionName })
+
+        try {
+            const response = await client.send(
+                new GetSecretValueCommand({ SecretId: secretName })
+            )
+            return response.SecretString
+        } catch (error) {
+            throw error
+        }
+    }
+
+    // Usage
+    const openaiKey = await getSecret('prod/mcp-use/openai-key')
+    ```
+
+```typescript TypeScript
+    import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+
+    async function getSecret(secretName: string, regionName = 'us-east-1') {
+        const client = new SecretsManagerClient({ region: regionName })
+
+        try {
+            const response = await client.send(
+                new GetSecretValueCommand({ SecretId: secretName })
+            )
+            return response.SecretString
+        } catch (error) {
+            throw error
+        }
+    }
+
+    // Usage
+    const openaiKey = await getSecret('prod/mcp-use/openai-key')
+    ```
+</CodeGroup>
+  </Tab>
+  <Tab title="Azure Key Vault">
+    <CodeGroup>
+```typescript TypeScript
+    import { SecretClient } from '@azure/keyvault-secrets'
+    import { DefaultAzureCredential } from '@azure/identity'
+
+    const credential = new DefaultAzureCredential()
+    const client = new SecretClient(
+        'https://vault-name.vault.azure.net/',
+        credential
+    )
+
+    // Usage
+    const secret = await client.getSecret('openai-api-key')
+    const openaiKey = secret.value
+    ```
+
+```typescript TypeScript
+    import { SecretClient } from '@azure/keyvault-secrets'
+    import { DefaultAzureCredential } from '@azure/identity'
+
+    const credential = new DefaultAzureCredential()
+    const client = new SecretClient(
+        'https://vault-name.vault.azure.net/',
+        credential
+    )
+
+    // Usage
+    const secret = await client.getSecret('openai-api-key')
+    const openaiKey = secret.value
+    ```
+</CodeGroup>
+  </Tab>
+  <Tab title="HashiCorp Vault">
+    <CodeGroup>
+```typescript TypeScript
+    import vault from 'node-vault'
+
+    const client = vault({
+        endpoint: 'https://vault.example.com',
+        token: process.env.VAULT_TOKEN
+    })
+
+    // Read secret
+    const response = await client.read('secret/data/mcp-use/api-keys')
+    const openaiKey = response.data.data.openai_key
+    ```
+
+```typescript TypeScript
+    import vault from 'node-vault'
+
+    const client = vault({
+        endpoint: 'https://vault.example.com',
+        token: process.env.VAULT_TOKEN
+    })
+
+    // Read secret
+    const response = await client.read('secret/data/mcp-use/api-keys')
+    const openaiKey = response.data.data.openai_key
+    ```
+</CodeGroup>
+  </Tab>
+</Tabs>
+
+## MCP Server Security
+
+### Filesystem Server Security
+
+When using filesystem servers, restrict access to safe directories:
+
+```json secure_filesystem_config.json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": [
+        "/workspace/safe-directory",
+        "--readonly",
+        "--max-file-size", "10MB",
+        "--allowed-extensions", ".txt,.md,.json,.py"
+      ],
+      "env": {
+        "FILESYSTEM_READONLY": "true",
+        "MAX_FILE_SIZE": "10485760"
+      }
+    }
+  }
+}
+```
+
+### Network Access Restrictions
+
+Limit network access for web-based MCP servers:
+
+```json secure_network_config.json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": {
+        "PLAYWRIGHT_HEADLESS": "true",
+        "ALLOWED_DOMAINS": "example.com,api.trusted-service.com",
+        "BLOCK_PRIVATE_IPS": "true",
+        "DISABLE_JAVASCRIPT": "false",
+        "TIMEOUT": "30000"
+      }
+    }
+  }
+}
+```
+
+### Database Security
+
+Secure database connections with proper credentials and restrictions:
+
+```json secure_database_config.json
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "mcp-server-postgres",
+      "env": {
+        "DATABASE_URL": "${DATABASE_URL}",
+        "CONNECTION_TIMEOUT": "30",
+        "MAX_CONNECTIONS": "5",
+        "READONLY_MODE": "true",
+        "ALLOWED_SCHEMAS": "public,reporting",
+        "BLOCKED_TABLES": "users,passwords,secrets"
+      }
+    }
+  }
+}
+```
+
+## Agent Security Configuration
+
+### Restrict Tool Access
+
+Limit which tools the agent can use:
+
+### Input Validation
+
+Validate user inputs before processing:
+
+### Rate Limiting
+
+Implement rate limiting to prevent abuse:
+
+## Logging and Monitoring
+
+### Security Logging
+
+Implement comprehensive security logging:
+
+### Monitoring Dashboard
+
+Create monitoring for security events:
+
+## Production Deployment Security
+
+### Container Security
+
+Use secure container configurations:
+
+```dockerfile Dockerfile
+FROM node:18-alpine
+
+# Create non-root user
+RUN addgroup -S mcpuser && adduser -S mcpuser -G mcpuser
+
+# Install security updates
+RUN apk update && apk upgrade && \
+    apk add --no-cache ca-certificates && \
+    rm -rf /var/cache/apk/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Set ownership and permissions
+RUN chown -R mcpuser:mcpuser /app
+USER mcpuser
+
+# Expose port
+EXPOSE 8000
+
+# Run application
+CMD ["node", "main.js"]
+```
+
+### Network Security
+
+Configure network policies and firewalls:
+
+```yaml kubernetes_network_policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mcp-use-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: mcp-use
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS only
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: database
+    ports:
+    - protocol: TCP
+      port: 5432
+```
+
+## Security Checklist
+
+<AccordionGroup>
+  <Accordion title="API Key Security">
+    - [ ] API keys stored in environment variables or secrets manager
+    - [ ] No hardcoded credentials in source code
+    - [ ] .env files added to .gitignore
+    - [ ] Regular API key rotation implemented
+    - [ ] Least privilege access for API keys
+  </Accordion>
+
+  <Accordion title="MCP Server Security">
+    - [ ] Filesystem access restricted to safe directories
+    - [ ] Network access limited to necessary domains
+    - [ ] Database connections use read-only accounts where possible
+    - [ ] Input validation on all server parameters
+    - [ ] Resource limits configured (timeouts, file sizes, etc.)
+  </Accordion>
+
+  <Accordion title="Agent Configuration">
+    - [ ] Tool access restricted using allowed/disallowed lists
+    - [ ] Maximum execution steps limited
+    - [ ] Timeouts configured for agent operations
+    - [ ] Input validation implemented
+    - [ ] Rate limiting in place
+  </Accordion>
+
+  <Accordion title="Monitoring & Logging">
+    - [ ] Security events logged
+    - [ ] Monitoring dashboard configured
+    - [ ] Alerting set up for security violations
+    - [ ] Log retention policies in place
+    - [ ] Regular security audits scheduled
+  </Accordion>
+</AccordionGroup>
+
+## Common Security Vulnerabilities
+
+### Path Traversal Prevention
+
+### Command Injection Prevention
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Configuration Guide" icon="gear" href="/typescript/getting-started/configuration">
+    Learn secure configuration practices for MCP servers
+  </Card>
+  <Card title="Deployment Guide" icon="rocket" href="/typescript/development">
+    Best practices for secure production deployment
+  </Card>
+  <Card title="Troubleshooting" icon="warning" href="/typescript/troubleshooting/common-issues">
+    Debug security-related issues and errors
+  </Card>
+</CardGroup>
+
+<Tip>
+Security is an ongoing process. Regularly review and update your security practices, monitor for new vulnerabilities, and keep all dependencies up to date.
+</Tip>

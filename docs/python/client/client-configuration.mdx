@@ -125,22 +125,6 @@ config = {
 
 client = MCPClient(config)
 ```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-const config = {
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: { DISPLAY: ':1' }
-        }
-    }
-}
-
-const client = new MCPClient(config)
-```
 </CodeGroup>
 
 ### From Configuration File
@@ -152,13 +136,6 @@ Load configuration from a JSON file:
 from mcp_use import MCPClient
 
 client = MCPClient.from_config_file("config.json")
-```
-
-```typescript TypeScript
-import { MCPClient, loadConfigFile } from 'mcp-use'
-
-const config = await loadConfigFile('config.json')
-const client = new MCPClient(config)
 ```
 </CodeGroup>
 
@@ -182,11 +159,6 @@ client = MCPClient.from_dict(
     sandbox=True,
     sandbox_options=sandbox_options
 )
-```
-
-```typescript TypeScript
-// Note: Sandbox mode is not yet supported in the TypeScript library
-// This is a planned feature for a future release
 ```
 </CodeGroup>
 

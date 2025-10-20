@@ -1,0 +1,153 @@
+---
+title: "Elicitation"
+description: "Enable user input requests for MCP tools"
+icon: "check"
+---
+
+# Elicitation
+
+<Info>
+Elicitation allows MCP tools to request additional information from users during their execution.
+</Info>
+
+## Configuration
+
+To enable elicitation, provide an `elicitation_callback` function when initializing the MCPClient:
+
+<CodeGroup>
+```typescript TypeScript
+// ⚠️ Elicitation callbacks are not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient } from 'mcp-use'
+
+async function elicitationCallback(context, params) {
+    // Display the message to the user and collect their input
+    console.log(`Server requests: ${params.message}`)
+
+    let userInput
+    if (params.requestedSchema) {
+        // Handle structured input based on the schema
+        userInput = await collectStructuredInput(params.requestedSchema)
+    } else {
+        // Handle simple text input
+        userInput = await getUserInput('Please provide your response: ')
+    }
+
+    // Return the result
+    return {
+        action: 'accept',  // or 'decline' or 'cancel'
+        content: userInput
+    }
+}
+
+const client = new MCPClient(
+    config,
+    { elicitationCallback }
+)
+*/
+```
+
+```typescript TypeScript
+// ⚠️ Elicitation callbacks are not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient } from 'mcp-use'
+
+async function elicitationCallback(context, params) {
+    // Display the message to the user and collect their input
+    console.log(`Server requests: ${params.message}`)
+
+    let userInput
+    if (params.requestedSchema) {
+        // Handle structured input based on the schema
+        userInput = await collectStructuredInput(params.requestedSchema)
+    } else {
+        // Handle simple text input
+        userInput = await getUserInput('Please provide your response: ')
+    }
+
+    // Return the result
+    return {
+        action: 'accept',  // or 'decline' or 'cancel'
+        content: userInput
+    }
+}
+
+const client = new MCPClient(
+    config,
+    { elicitationCallback }
+)
+*/
+```
+</CodeGroup>
+
+## Handler Parameters
+
+The elicitation handler receives two parameters:
+
+### Elicitation Handler Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| **context** | `RequestContext` | Request context containing metadata about the elicitation request |
+| **params** | `ElicitRequestParams` | The MCP elicitation request parameters containing the message and optional schema |
+
+#### ElicitRequestParams Structure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| **message** | `str` | The prompt message to display to the user |
+| **requestedSchema** | `dict \| None` | Optional JSON schema defining the expected response structure |
+
+### Response Structure
+
+The handler must return an `ElicitResult` object that specifies how the user responded:
+
+#### ElicitResult Structure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| **action** | `Literal['accept', 'decline', 'cancel']` | How the user responded to the elicitation request |
+| **content** | `dict \| str \| None` | The user's input data (required for "accept", omitted for "decline"/"cancel") |
+
+#### Action Types:
+
+- **accept**: User provided valid input - include their data in the `content` field
+- **decline**: User chose not to provide the requested information - omit `content`
+- **cancel**: User cancelled the entire operation - omit `content`
+
+### Example Parameter Usage
+
+## Response Actions
+
+Elicitation responses use a three-action model to clearly distinguish between different user intentions:
+
+### Accept
+User explicitly approved and submitted data:
+### Decline
+User explicitly declined the request:
+### Cancel
+User dismissed without making an explicit choice:
+## Structured Data Requests
+
+MCP tools can request structured data using JSON schemas. The schema defines the expected format and validation rules:
+
+## Creating Elicitation-Enabled Tools
+
+When building MCP servers, tools can request user input using the context parameter:
+
+## Integration with MCPAgent
+
+When using elicitation with MCPAgent, the elicitation callback is automatically used during tool execution:
+
+## Error Handling
+
+If no elicitation callback is provided but a tool requests user input:
+

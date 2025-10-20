@@ -1,0 +1,121 @@
+---
+title: "Connection Types"
+description: "Understanding the different connection types for MCP servers"
+icon: "cable"
+---
+
+# Connection Types for MCP Servers
+
+MCP servers can communicate with clients using different connection protocols, each with its own advantages and use cases. This guide explains the primary connection types supported by mcp_use:
+
+## Standard Input/Output (STDIO)
+
+STDIO connections run the MCP server as a child process and communicate through standard input and output streams.
+
+### Characteristics:
+
+- **Local Operation**: The server runs as a child process on the same machine
+- **Simplicity**: Easy to set up with minimal configuration
+- **Security**: No network exposure, ideal for sensitive operations
+- **Performance**: Low latency for local operations
+
+### Configuration Example:
+
+```json
+{
+  "mcpServers": {
+    "stdio_server": {
+      "command": "npx",
+      "args": ["@my-mcp/server"],
+      "env": {}
+    }
+  }
+}
+```
+
+## HTTP Connections
+
+HTTP connections communicate with MCP servers over standard HTTP/HTTPS protocols.
+
+### Configuration Example:
+
+```json
+{
+  "mcpServers": {
+    "http_server": {
+      "url": "http://localhost:3000",
+      "headers": {
+        "Authorization": "Bearer ${AUTH_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+## Sandboxed Execution
+
+Sandboxed execution runs STDIO-based MCP servers in a cloud sandbox environment using E2B, rather than locally on your machine.
+
+### Installation
+
+To use sandboxed execution, you need to install the E2B dependency:
+
+```bash
+# Install mcp-use with E2B support
+npm install mcp-use
+
+# Then install the E2B code interpreter
+npm install @e2b/code-interpreter
+```
+
+You'll also need an E2B API key. You can sign up at [e2b.dev](https://e2b.dev) to get your API key.
+
+### Characteristics:
+
+- **Cloud Execution**: The server runs in a secure cloud environment
+- **No Local Dependencies**: No need to install server dependencies locally
+- **Consistent Environment**: Same environment regardless of local setup
+- **Resource Isolation**: Server operations won't impact local system resources
+- **Secure Execution**: Sandbox provides isolation for security-sensitive operations
+
+### Configuration Example:
+
+<CodeGroup>
+```typescript TypeScript
+// ⚠️ Sandbox execution is not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+```
+
+```typescript TypeScript
+// ⚠️ Sandbox execution is not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+```
+</CodeGroup>
+
+## Choosing the Right Connection Type
+
+The choice of connection type depends on your specific use case:
+
+1. **STDIO**: Best for local development, testing, and enhanced security scenarios where network exposure is a concern
+
+2. **HTTP**: Ideal for stateless operations, simple integrations, and when working with existing HTTP infrastructure
+
+3. **Sandboxed**: Best when you need to run MCP servers without installing their dependencies locally, or when you want consistent execution environments across different systems
+
+When configuring your mcp_use environment, you can specify the connection type in your configuration file as shown in the examples above.
+
+## Using Connection Types
+
+Connection types are automatically inferred from your configuration file based on the parameters provided:
+
+For example:
+
+- If your configuration includes `command` and `args` and sandbox parameter is False` (default), a local STDIO connection will be used
+- If your configuration includes `command` and `args` and sandbox parameter is True`, a sandboxed execution connection will be used
+- If your configuration has a `url` starting with `http://` or `https://`, an HTTP connection will be used
+
+This automatic inference simplifies the configuration process and ensures the appropriate connection type is used without requiring explicit specification.
+
+For more details on connection configuration, see the [Configuration Guide](/typescript/getting-started/configuration).
