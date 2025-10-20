@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from mcp_use.server import MCPServer as FastMCP
+from mcp_use.server import FastMCP
 
 # Initialize FastMCP server
 mcp = FastMCP("weather", debug=False)
