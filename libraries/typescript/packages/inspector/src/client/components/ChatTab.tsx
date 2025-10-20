@@ -193,7 +193,12 @@ export function ChatTab({
               />
             )
           : (
-              <MessageList messages={messages} isLoading={isLoading} />
+              <MessageList 
+                messages={messages} 
+                isLoading={isLoading}
+                serverId={effectiveMcpServerUrl}
+                readResource={readResource}
+              />
             )}
       </div>
 

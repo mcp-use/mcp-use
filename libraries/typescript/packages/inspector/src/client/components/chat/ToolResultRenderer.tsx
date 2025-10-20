@@ -6,6 +6,8 @@ interface ToolResultRendererProps {
   toolName: string
   toolArgs: Record<string, unknown>
   result: any
+  serverId?: string
+  readResource?: (uri: string) => Promise<any>
 }
 
 /**
@@ -15,6 +17,8 @@ export function ToolResultRenderer({
   toolName,
   toolArgs,
   result,
+  serverId,
+  readResource,
 }: ToolResultRendererProps) {
   const [resourceData, setResourceData] = useState<any>(null)
 
@@ -68,13 +72,15 @@ export function ToolResultRenderer({
   }, [extractedResource])
 
   // Render OpenAI Apps SDK component
-  if (hasAppsSdkComponent && resourceData) {
+  if (hasAppsSdkComponent && resourceData && serverId && readResource) {
     return (
       <OpenAIComponentRenderer
         componentUrl={resourceData.uri}
         toolName={toolName}
         toolArgs={toolArgs}
         toolResult={resourceData}
+        serverId={serverId}
+        readResource={readResource}
         noWrapper={true}
         className="my-4"
       />
