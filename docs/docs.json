@@ -57,7 +57,7 @@
       {
         "product": "Python SDK",
         "description": "Python SDK description",
-        "icon": "python",
+        "icon": "/images/pythonlogo.svg",
         "tabs": [
           {
             "tab": "Docs",
@@ -354,7 +354,7 @@
       {
         "product": "TypeScript SDK",
         "description": "TypeScript SDK description",
-        "icon": "discord",
+        "icon": "/images/typescriptlogo.svg",
         "tabs": [
           {
             "tab": "Docs",
