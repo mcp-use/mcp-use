@@ -49,21 +49,23 @@ const packageJson = JSON.parse(
 )
 
 // Read current package versions from workspace
-function getCurrentPackageVersions() {
+function getCurrentPackageVersions(isDevelopment: boolean = false) {
   const versions: Record<string, string> = {}
   
   try {
-    // Read mcp-use version
-
-    versions['mcp-use'] = 'latest'
-    
-    // Read cli version
-
-    versions['@mcp-use/cli'] = 'latest'
-    
-    // Read inspector version
-
-    versions['@mcp-use/inspector'] = 'latest'
+    if (isDevelopment) {
+      // In development mode, use workspace dependencies for all packages
+      versions['mcp-use'] = 'workspace:*'
+      versions['@mcp-use/cli'] = 'workspace:*'
+      versions['@mcp-use/inspector'] = 'workspace:*'
+    } else {
+      // In production mode, use latest for published packages
+      versions['mcp-use'] = 'latest'
+      // For unpublished packages, keep them as workspace dependencies
+      // These packages are not available on npm registry yet
+      versions['@mcp-use/cli'] = 'workspace:*'
+      versions['@mcp-use/inspector'] = 'workspace:*'
+    }
   } catch (error) {
     // Use defaults when not in workspace (normal for published package)
     // Log error details in development mode for debugging
@@ -85,10 +87,9 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
   let processedContent = content
   
   // Replace version placeholders with current versions
-  for (const [packageName] of Object.entries(versions)) {
+  for (const [packageName, version] of Object.entries(versions)) {
     const placeholder = `{{${packageName}_version}}`
-    const versionPrefix = isDevelopment ? 'workspace:*' : `latest`
-    processedContent = processedContent.replace(new RegExp(placeholder, 'g'), versionPrefix)
+    processedContent = processedContent.replace(new RegExp(placeholder, 'g'), version)
   }
   
   // Handle workspace dependencies based on mode
@@ -98,10 +99,9 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
     processedContent = processedContent.replace(/"@mcp-use\/cli": "\^[^"]+"/, '"@mcp-use/cli": "workspace:*"')
     processedContent = processedContent.replace(/"@mcp-use\/inspector": "\^[^"]+"/, '"@mcp-use/inspector": "workspace:*"')
   } else {
-    // Replace workspace dependencies with specific versions for production
-    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "^${versions['mcp-use'] || 'latest'}"`)
-    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "^${versions['@mcp-use/cli'] || 'latest'}"`)
-    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "^${versions['@mcp-use/inspector'] || 'latest'}"`)
+    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "latest"`)
+    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "latest"`)
+    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "latest"`)
   }
   
   return processedContent
@@ -174,7 +174,7 @@ program
       const validatedTemplate = validateTemplateName(selectedTemplate)
       
       // Get current package versions
-      const versions = getCurrentPackageVersions()
+      const versions = getCurrentPackageVersions(options.dev)
       
       // Copy template files
       await copyTemplate(projectPath, validatedTemplate, versions, options.dev)
