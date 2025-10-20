@@ -381,7 +381,8 @@
                     "group": "Overview",
                     "icon": "globe",
                     "pages": [
-                      "typescript/server/getting-started"
+                      "typescript/server/getting-started",
+                      "typescript/server/templates"
                     ]
                   },
                   {
@@ -390,13 +391,26 @@
                     "pages": [
                       "typescript/server/tools",
                       "typescript/server/resources",
+                      "typescript/server/prompts",
                       "typescript/server/api-reference"
+                    ]
+                  },
+                  {
+                    "group": "UI Widgets",
+                    "icon": "palette",
+                    "pages": [
+                      "typescript/server/ui-widgets",
+                      "typescript/server/mcp-ui-resources",
+                      "typescript/server/apps-sdk-resources"
                     ]
                   },
                   {
                     "group": "Advanced Features",
                     "icon": "sparkle",
-                    "pages": []
+                    "pages": [
+                      "typescript/server/configuration",
+                      "typescript/server/examples"
+                    ]
                   }
                 ]
               },
@@ -459,7 +473,8 @@
                     ]
                   },
                   "typescript/agent/server-manager",
-                  "typescript/agent/building-custom-agents"
+                  "typescript/agent/building-custom-agents",
+                  "typescript/agent/observability"
                 ]
               },
               {
