@@ -39,9 +39,13 @@ export function OpenAIComponentRenderer({
   noWrapper = false,
 }: OpenAIComponentRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null)
+  const [iframeHeight, setIframeHeight] = useState<number>(400)
+  const lastMeasuredHeightRef = useRef<number>(0)
+  const [centerVertically, setCenterVertically] = useState<boolean>(false)
 
   // Generate unique tool ID
   const toolIdRef = useRef(`tool-${Date.now()}-${Math.random().toString(36).substring(7)}`)
@@ -177,6 +181,59 @@ export function OpenAIComponentRenderer({
     }
   }, [widgetUrl])
 
+  // Dynamically resize iframe height to its content, capped at 100vh
+  useEffect(() => {
+    if (!widgetUrl)
+      return
+
+    const measure = () => {
+      const iframe = iframeRef.current
+      const contentDoc = iframe?.contentWindow?.document
+      const body = contentDoc?.body
+      if (!iframe || !body)
+        return
+
+      const contentHeight = body.scrollHeight || 0
+      const maxHeight = typeof window !== 'undefined' ? window.innerHeight : contentHeight
+      const newHeight = Math.min(contentHeight, maxHeight)
+      if (newHeight > 0 && newHeight !== lastMeasuredHeightRef.current) {
+        lastMeasuredHeightRef.current = newHeight
+        setIframeHeight(newHeight)
+      }
+    }
+
+    let rafId: number
+    const tick = () => {
+      measure()
+      rafId = requestAnimationFrame(tick)
+    }
+    tick()
+
+    window.addEventListener('resize', measure)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', measure)
+    }
+  }, [widgetUrl])
+
+  // Determine if we should vertically center (only when container height > iframe height)
+  useEffect(() => {
+    const evaluateCentering = () => {
+      const container = containerRef.current
+      if (!container)
+        return
+      const containerHeight = container.clientHeight
+      setCenterVertically(containerHeight > iframeHeight)
+    }
+
+    evaluateCentering()
+    window.addEventListener('resize', evaluateCentering)
+    return () => {
+      window.removeEventListener('resize', evaluateCentering)
+    }
+  }, [iframeHeight])
+
   if (error) {
     return (
       <div className={className}>
@@ -209,19 +266,20 @@ export function OpenAIComponentRenderer({
         </div>
       )}
 
-      <iframe
-        ref={iframeRef}
-        src={widgetUrl}
-        className={cn('w-full border rounded-3xl bg-white', noWrapper && 'h-[400px]')}
-        style={{
-          minHeight: '400px',
-          height: '600px',
-          maxHeight: '80vh',
-        }}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-        title={`OpenAI Component: ${toolName}`}
-        allow="web-share"
-      />
+      <div
+        ref={containerRef}
+        className={cn('w-full flex justify-center', centerVertically && 'items-center')}
+      >
+        <iframe
+          ref={iframeRef}
+          src={widgetUrl}
+          className={cn('w-full shadow-lg shadow-black/70 max-w-[768px] border border-zinc-200 dark:border-zinc-600 rounded-3xl bg-white')}
+          style={{ height: `${iframeHeight}px` }}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+          title={`OpenAI Component: ${toolName}`}
+          allow="web-share"
+        />
+      </div>
     </Wrapper>
   )
 }

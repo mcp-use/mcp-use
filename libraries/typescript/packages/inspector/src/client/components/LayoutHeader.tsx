@@ -79,7 +79,7 @@ export function LayoutHeader({
                       <div className="items-center gap-2 hidden lg:flex">
                         {tab.label}
                         {count > 0 && (
-                          <span className="bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium">
+                          <span className="bg-zinc-200 dark:bg-black text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium">
                             {count}
                           </span>
                         )}

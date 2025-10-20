@@ -1,4 +1,4 @@
-import { Brush, Code, Copy, Download, Maximize } from 'lucide-react'
+import { Brush, Clock, Code, Copy, Download, Maximize, Zap } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -132,13 +132,32 @@ export function ResourceResultDisplay({
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs">
-            {new Date(result.timestamp).toLocaleTimeString()}
-          </Badge>
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3 text-gray-400" />
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {new Date(result.timestamp).toLocaleTimeString()}
+            </span>
+          </div>
+          {(() => {
+            const durationMs = (result as any)?.duration
+              ?? (result.result as any)?.duration
+              ?? (result.result as any)?.metrics?.durationMs
+            return durationMs !== undefined
+              ? (
+                  <div className="flex items-center gap-1">
+                    <Zap className="h-3 w-3 text-gray-400" />
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {durationMs}
+                      ms
+                    </span>
+                  </div>
+                )
+              : null
+          })()}
           {hasMcpUIResources && (
             <Badge
               variant="outline"
-              className="text-xs text-purple-600 dark:text-purple-400"
+              className="text-xs bg-purple-50 dark:bg-purple-900/20 border-none border-purple-200 dark:border-purple-800/50 text-purple-600 dark:text-purple-400"
             >
               MCP UI
             </Badge>
@@ -146,7 +165,7 @@ export function ResourceResultDisplay({
           {hasOpenAIComponent && (
             <Badge
               variant="outline"
-              className="text-xs text-blue-600 dark:text-blue-400"
+              className="text-xs bg-blue-50 dark:bg-blue-900/20 border-none border-blue-200 dark:border-blue-800/50 text-blue-600 dark:text-blue-400"
             >
               OpenAI Widget
             </Badge>
