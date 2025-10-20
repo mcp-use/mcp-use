@@ -365,7 +365,7 @@
                 "group": "Getting Started",
                 "icon": "list-start",
                 "pages": [
-                  "typescript/index",
+                  "typescript/getting-started/index",
                   "typescript/getting-started/quickstart",
                   "typescript/getting-started/installation",
                   "typescript/getting-started/configuration"
