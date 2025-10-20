@@ -1,3 +1,5 @@
+import type { TabType } from '@/client/context/InspectorContext'
+import type { MCPConnection } from '@/client/context/McpContext'
 import { Command, FolderOpen, MessageCircle, MessageSquare, Wrench } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
 import { DiscordIcon } from '@/client/components/ui/discord-icon'
@@ -7,8 +9,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/client/components/ui/tooltip'
-import type { MCPConnection } from '@/client/context/McpContext'
-import type { TabType } from '@/client/context/InspectorContext'
 import { AnimatedThemeToggler } from './AnimatedThemeToggler'
 import LogoAnimated from './LogoAnimated'
 import { ServerDropdown } from './ServerDropdown'
@@ -54,7 +54,7 @@ export function LayoutHeader({
 
           {/* Tabs */}
           {selectedServer && (
-            <Tabs value={activeTab} onValueChange={(tab) => onTabChange(tab as TabType)}>
+            <Tabs value={activeTab} onValueChange={tab => onTabChange(tab as TabType)}>
               <TabsList>
                 {tabs.map((tab) => {
                   // Get count for the current tab
@@ -93,13 +93,19 @@ export function LayoutHeader({
 
         {/* Right side: Theme Toggle + Command Palette + Discord Button + Logo */}
         <div className="flex items-center gap-4">
-          <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
+          <Tooltip>
+            <TooltipTrigger>
+              <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Toggle theme</p>
+            </TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md py-0 flex gap-1"
+                className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full px-1 -mx-3 flex gap-1"
                 onClick={onCommandPaletteOpen}
               >
                 <Command className="size-4" />
@@ -128,4 +134,3 @@ export function LayoutHeader({
     </header>
   )
 }
-

@@ -7,6 +7,7 @@ interface OpenAIComponentRendererProps {
   toolArgs: Record<string, unknown>
   toolResult: any
   className?: string
+  noWrapper?: boolean
 }
 
 function Wrapper({ children, className, noWrapper }: { children: React.ReactNode, className?: string, noWrapper?: boolean }) {
