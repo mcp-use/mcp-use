@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.1.3-canary.1
+
+### Patch Changes
+
+- cb60eef: fix inspector route
+- Updated dependencies [0203a77]
+- Updated dependencies [ebf1814]
+  - @mcp-use/inspector@0.4.3-canary.1
+
 ## 1.1.3-canary.0
 
 ### Patch Changes
