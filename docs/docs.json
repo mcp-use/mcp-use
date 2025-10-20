@@ -41,9 +41,17 @@
       {
         "product": "Home",
         "description": "Home description",
-        "icon": "house",
-        "pages": [
-          "index"
+        "icon": "/images/mcp_use.svg",
+        "tabs": [
+          {
+            "tab": "Home",
+            "icon": "house",
+            "pages": [
+              "home/index",
+              "home/redirects/python",
+              "home/redirects/typescript"
+            ]
+          }
         ]
       },
       {
