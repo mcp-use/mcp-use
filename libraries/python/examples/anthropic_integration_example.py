@@ -7,7 +7,7 @@ from mcp_use import MCPClient
 from mcp_use.agents.adapters import AnthropicMCPAdapter
 
 # This example demonstrates how to use our integration
-# adapaters to use MCP tools and convert to the right format.
+# adapters to use MCP tools and convert to the right format.
 # In particularly, this example uses the AnthropicMCPAdapter.
 
 load_dotenv()

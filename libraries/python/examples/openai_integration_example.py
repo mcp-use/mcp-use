@@ -7,7 +7,7 @@ from mcp_use import MCPClient
 from mcp_use.agents.adapters import OpenAIMCPAdapter
 
 # This example demonstrates how to use our integration
-# adapaters to use MCP tools and convert to the right format.
+# adapters to use MCP tools and convert to the right format.
 # In particularly, this example uses the OpenAIMCPAdapter.
 
 load_dotenv()
