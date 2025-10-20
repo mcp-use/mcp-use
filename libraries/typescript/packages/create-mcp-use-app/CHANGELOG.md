@@ -1,5 +1,24 @@
 # create-mcp-use-app
 
+## 0.4.3
+
+### Patch Changes
+
+  ### Version Management
+  - **Enhanced Package Version Handling**: Added support for canary mode alongside development and production modes
+  - **Flexible Version Resolution**: Updated `getCurrentPackageVersions` to dynamically handle workspace dependencies in development mode and 'latest' versions in production
+  - **Canary Mode Support**: Added command options to allow users to specify canary versions for testing environments
+
+  ### Template Processing
+  - Improved template processing to dynamically replace version placeholders based on the current mode
+  - Enhanced `processTemplateFile` and `copyTemplate` functions to support canary mode
+  - Better error handling in template processing workflow
+
+  ### Bug Fixes
+  - Fixed mcp-use package version dependencies
+  - Simplified workspace root detection for improved clarity
+  - Updated version placeholders for better flexibility in production environments
+
 ## 0.4.3-canary.1
 
 ### Patch Changes
