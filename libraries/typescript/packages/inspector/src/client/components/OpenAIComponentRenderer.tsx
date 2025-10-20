@@ -277,7 +277,7 @@ export function OpenAIComponentRenderer({
         <iframe
           ref={iframeRef}
           src={widgetUrl}
-          className={cn('w-full shadow-lg shadow-black/70 max-w-[768px] border border-zinc-200 dark:border-zinc-600 rounded-3xl bg-white')}
+          className={cn('w-full shadow-lg dark:shadow-black/70 max-w-[768px] border border-zinc-200 dark:border-zinc-600 rounded-3xl bg-white')}
           style={{ height: `${iframeHeight}px` }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
           title={`OpenAI Component: ${toolName}`}
