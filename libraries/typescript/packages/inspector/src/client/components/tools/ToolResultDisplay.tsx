@@ -4,6 +4,7 @@ import { Button } from '@/client/components/ui/button'
 import { usePrismTheme } from '@/client/hooks/usePrismTheme'
 import { isMcpUIResource, McpUIRenderer } from '../McpUIRenderer'
 import { OpenAIComponentRenderer } from '../OpenAIComponentRenderer'
+import { NotFound } from '../ui/not-found'
 
 export interface ToolResult {
   toolName: string
@@ -360,10 +361,8 @@ export function ToolResultDisplay({
           : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <p className="text-gray-500 dark:text-gray-400">No results yet</p>
-                  <p className="text-gray-400 dark:text-gray-500 text-sm">
-                    Execute a tool to see results here
-                  </p>
+                  <NotFound vertical noBorder message="No Results yet" />
+
                 </div>
               </div>
             )}
