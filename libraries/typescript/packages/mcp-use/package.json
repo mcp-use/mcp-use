@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.1.4-canary.0",
+  "version": "1.1.4",
   "packageManager": "pnpm@10.6.1",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents and Clients + MCP Servers with support for MCP-UI.",
   "author": "mcp-use, Inc.",
@@ -88,7 +88,7 @@
     "example:observability": "tsx examples/client/observability.ts"
   },
   "peerDependencies": {
-    "@mcp-use/inspector": "^0.4.4-canary.0",
+    "@mcp-use/inspector": "^0.4.4",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "langfuse": "^3.32.0",
