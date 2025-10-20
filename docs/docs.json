@@ -31,6 +31,12 @@
     "library": "lucide"
   },
   "navigation": {
+    "anchors": [
+      {
+        "anchor": "python/getting-started/quickstart",
+        "icon": "rocket"
+      }
+    ],
     "products": [
       {
         "product": "Python SDK",
@@ -39,7 +45,7 @@
         "tabs": [
           {
             "tab": "Docs",
-            "icon":"book",
+            "icon": "book",
             "groups": [
               {
                 "group": "Getting Started",
@@ -335,14 +341,89 @@
             ]
           }
         ]
-
       },
       {
         "product": "TypeScript SDK",
         "description": "TypeScript SDK description",
         "icon": "discord",
-        "pages": [
-          "typescript/index"
+        "tabs": [
+          {
+            "tab": "Docs",
+            "icon": "book",
+            "groups": [
+              {
+                "group": "Getting Started",
+                "icon": "list-start",
+                "pages": []
+              },
+              {
+                "group": "MCP Server",
+                "icon": "server",
+                "tag": "Beta",
+                "pages": []
+              },
+              {
+                "group": "MCP Client",
+                "icon": "router",
+                "pages": []
+              },
+              {
+                "group": "MCP Agents",
+                "icon": "brain",
+                "pages": []
+              },
+              {
+                "group": "Development",
+                "icon": "sparkle",
+                "pages": []
+              }
+            ]
+          },
+          {
+            "tab": "API Reference",
+            "icon": "terminal"
+          },
+          {
+            "tab": "Changelog",
+            "icon": "history",
+            "groups": [
+              {
+                "group": "Changelog",
+                "pages": [
+                  "typescript/changelog/changelog"
+                ]
+              },
+              {
+                "group": "Versions",
+                "pages": [
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Community",
+            "icon": "users",
+            "groups": [
+              {
+                "group": "Community",
+                "pages": [
+                  "python/community/showcase"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Blog",
+            "icon": "book",
+            "groups": [
+              {
+                "group": "Blog",
+                "pages": [
+                  "python/blog/middleware"
+                ]
+              }
+            ]
+          }
         ]
       },
       {
