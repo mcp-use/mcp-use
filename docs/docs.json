@@ -545,17 +545,18 @@
   "navbar": {
     "links": [
       {
-        "label": "Community",
-        "href": "https://github.com/mcp-use/mcp-use/discussions"
-      },
-      {
         "label": "Examples",
         "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
+      },
+      {
+        "label": "Discord",
+        "icon": "discord",
+        "href": "https://discord.gg/XkNkSkMz3V"
       }
     ],
     "primary": {
-      "type": "button",
-      "label": "Get Started",
+      "type": "github",
+      "label": "Github",
       "href": "https://github.com/mcp-use/mcp-use"
     }
   },
