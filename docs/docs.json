@@ -42,12 +42,17 @@
         "product": "Home",
         "description": "Home description",
         "icon": "/images/mcp_use.svg",
-        "tabs": [
+        "groups": [
           {
-            "tab": "Home",
-            "icon": "house",
+            "group": "Welcome",
             "pages": [
-              "home/index",
+              "home/index"
+            ]
+          },
+          {
+            "group": "Libraries",
+            "icon": "library",
+            "pages": [
               "home/redirects/python",
               "home/redirects/typescript"
             ]
@@ -365,7 +370,6 @@
                 "group": "Getting Started",
                 "icon": "list-start",
                 "pages": [
-                  "typescript/getting-started/index",
                   "typescript/getting-started/quickstart",
                   "typescript/getting-started/installation",
                   "typescript/getting-started/configuration"
@@ -530,14 +534,6 @@
               }
             ]
           }
-        ]
-      },
-      {
-        "product": "Inspector",
-        "icon": "search",
-        "description": "Inspector description",
-        "pages": [
-          "inspector/index"
         ]
       }
     ]
