@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.1.15
+
+### Patch Changes
+
+- Updated dependencies [4852465]
+  - @mcp-use/inspector@0.4.3
+  - mcp-use@1.1.3
+
 ## 2.1.15-canary.1
 
 ### Patch Changes
