@@ -1,0 +1,275 @@
+---
+title: "Observability"
+description: "Trace and monitor your MCP agents with Langfuse, Laminar, and LangSmith"
+icon: "eye"
+---
+
+## Overview
+
+MCP-use provides **optional observability integration** to help you debug, monitor, and optimize your AI agents. Observability gives you visibility into:
+
+- **Agent execution flow** with detailed step-by-step tracing
+- **Tool usage patterns** and performance metrics
+- **LLM calls** with token usage and costs
+- **Error tracking** and debugging information
+- **Conversation analytics** across sessions
+
+<Warning>
+**Completely Optional**: Observability is entirely opt-in and requires zero code changes to your existing workflows.
+</Warning>
+
+## Supported Platforms
+
+MCP-use integrates with two leading observability platforms:
+
+- **[Langfuse](https://langfuse.com)** - Open-source LLM observability with self-hosting options
+- **[Laminar](https://www.lmnr.ai)** - Comprehensive AI application monitoring platform
+- **[LangSmith](https://smith.langchain.com/)** - LangChain's observability platform
+
+Choose the platform that best fits your needs. Each platform automatically initializes when you import mcp_use if their environment variables are set.
+
+## What Gets Traced
+
+These platforms automatically capture:
+- **Agent conversations** - Full query/response pairs
+- **LLM calls** - Model usage, tokens, and costs
+- **Tool executions** - Which MCP tools were used and their outputs
+- **Performance metrics** - Execution times and step counts
+- **Error tracking** - Failed operations with full context
+
+### Example Trace View
+Your observability dashboard will show something like:
+
+```
+🔍 mcp_agent_run
+├── 💬 LLM Call (gpt-4)
+│   ├── Input: "Help me analyze the sales data"
+│   └── Output: "I'll help you analyze the sales data..."
+├── 🔧 Tool: read_file
+│   ├── Input: {"path": "sales_data.csv"}
+│   └── Output: "CSV content loaded..."
+├── 🔧 Tool: analyze_data
+│   ├── Input: {"data": "...", "analysis_type": "summary"}
+│   └── Output: "Analysis complete..."
+└── 💬 Final Response
+    └── "Based on the sales data analysis..."
+```
+
+# Langfuse Integration
+
+[Langfuse](https://langfuse.com) is an open-source LLM observability platform with both cloud and self-hosted options.
+
+## Setup Langfuse
+
+### 1. Install Langfuse
+```bash
+pip install langfuse
+```
+
+### 2. Get Your Keys
+- **Cloud**: Sign up at [cloud.langfuse.com](https://cloud.langfuse.com)
+- **Self-hosted**: Follow the [self-hosting guide](https://langfuse.com/docs/deployment/self-host)
+
+### 3. Set Environment Variables
+```bash
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+```
+
+### 4. Start Using
+```python
+# Langfuse automatically initializes when mcp_use is imported
+import mcp_use
+from mcp_use import MCPAgent
+
+agent = MCPAgent(llm=your_llm, ...)
+result = await agent.run("Your query")  # Automatically traced!
+```
+## Langfuse Dashboard Features
+- **Timeline view** - Step-by-step execution flow
+- **Performance metrics** - Response times and costs
+- **Error analysis** - Debug failed operations
+- **Usage analytics** - Tool and model usage patterns
+- **Session grouping** - Track conversations over time
+- **Self-hosting** - Full control over your data
+
+## Environment Variables
+```bash
+# Required
+LANGFUSE_PUBLIC_KEY="pk-lf-..."
+LANGFUSE_SECRET_KEY="sk-lf-..."
+
+# Optional - for self-hosted instances
+LANGFUSE_HOST="https://your-langfuse-instance.com"
+
+# Optional - disable Langfuse
+MCP_USE_LANGFUSE="false"
+```
+
+---
+
+# Laminar Integration
+
+[Laminar](https://www.lmnr.ai) provides comprehensive AI application monitoring with advanced analytics.
+
+## Setup Laminar
+
+### 1. Install Laminar
+```bash
+pip install lmnr
+```
+
+### 2. Get Your API Key
+- Sign up at [lmnr.ai](https://www.lmnr.ai)
+- Create a new project
+- Copy your project API key
+
+### 3. Set Environment Variable
+```bash
+export LAMINAR_PROJECT_API_KEY="your-api-key-here"
+```
+
+### 4. Start Using
+```python
+# Laminar automatically initializes when mcp_use is imported
+import mcp_use
+from mcp_use import MCPAgent
+
+agent = MCPAgent(llm=your_llm, ...)
+result = await agent.run("Your query")  # Automatically traced!
+```
+
+## Laminar Features
+- **Advanced tracing** - Detailed execution flow visualization
+- **Real-time monitoring** - Live performance metrics
+- **Cost tracking** - LLM usage and billing analytics
+- **Error analysis** - Comprehensive error tracking and debugging
+- **Team collaboration** - Shared dashboards and insights
+- **Production monitoring** - Built for scale
+
+## Environment Variables
+```bash
+# Required
+LAMINAR_PROJECT_API_KEY="your-api-key-here"
+
+# Optional - disable Laminar
+MCP_USE_LAMINAR="false"
+```
+
+# Additional Information
+
+## Privacy & Data Security
+
+### What's Collected
+- **Queries and responses** (for debugging context)
+- **Tool inputs/outputs** (to understand workflows)
+- **Model metadata** (provider, model name, tokens)
+- **Performance data** (execution times, success rates)
+
+### What's NOT Collected
+- **No personal information** beyond what you send to your LLM
+- **No API keys** or credentials
+- **No unauthorized data** - you control what gets traced
+
+### Security Features
+- **HTTPS encryption** for all data transmission
+- **Self-hosting options** available (Langfuse)
+- **Easy to disable** with environment variables
+- **Data ownership** - you control your observability data
+
+## Disabling Observability
+
+### Temporarily Disable
+```bash
+# Disable Langfuse
+export MCP_USE_LANGFUSE="false"
+
+# Disable Laminar
+export MCP_USE_LAMINAR="false"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**"Package not installed" errors**
+```bash
+# Install the required packages
+pip install langfuse  # For Langfuse
+pip install lmnr      # For Laminar
+```
+
+**"API keys not found" warnings**
+```bash
+# Check your environment variables
+echo $LANGFUSE_PUBLIC_KEY
+echo $LANGFUSE_SECRET_KEY
+echo $LAMINAR_PROJECT_API_KEY
+```
+
+**No traces appearing in dashboard**
+- Verify your API keys are correct
+- Check that observability isn't disabled (`MCP_USE_LANGFUSE` or `MCP_USE_LAMINAR` set to "false")
+- Check network connectivity to the platform
+- Enable debug logging: `logging.basicConfig(level=logging.DEBUG)`
+
+**Self-hosted Langfuse connection issues**
+For self-hosted Langfuse instances, set the `LANGFUSE_HOST` environment variable:
+```bash
+export LANGFUSE_HOST="https://your-langfuse-instance.com"
+```
+
+# LangSmith Integration
+
+<Info>
+**Advanced Debugging**: LangChain offers LangSmith, a powerful tool for debugging agent behavior that integrates seamlessly with mcp-use.
+</Info>
+
+<Steps>
+  <Step title="Sign Up">
+    Visit [smith.langchain.com](https://smith.langchain.com/) and create an account
+  </Step>
+
+  <Step title="Get API Keys">
+    After login, you'll receive environment variables to add to your `.env` file
+  </Step>
+
+  <Step title="Visualize">
+    You'll be able to visualize agent behavior, tool calls, and decision-making processes on their platform
+  </Step>
+</Steps>
+
+<Tip>
+LangSmith provides detailed traces of your agent's execution, making it easier to understand complex multi-step workflows.
+</Tip>
+
+
+## Benefits
+
+### For Development
+- **Faster debugging** - See exactly where workflows fail
+- **Performance optimization** - Identify slow operations
+- **Cost monitoring** - Track LLM usage and expenses
+
+### For Production
+- **Real-time monitoring** - Monitor agent performance
+- **Error tracking** - Get alerted to failures
+- **Usage analytics** - Understand user interaction patterns
+
+### For Teams
+- **Shared visibility** - Everyone can see agent behavior
+- **Knowledge sharing** - Learn from successful workflows
+- **Collaborative debugging** - Debug issues together
+
+## Getting Help
+
+Need help with observability setup?
+
+- **Langfuse Documentation**: [langfuse.com/docs](https://langfuse.com/docs)
+- **Laminar Documentation**: [lmnr.ai/docs](https://www.lmnr.ai/docs)
+- **LangSmith Documentation**: [smith.langchain.com](https://smith.langchain.com/)
+- **MCP-use Issues**: [GitHub Issues](https://github.com/mcp-use/mcp-use/issues)
+
+<Tip>
+**Pro Tip**: Start with one platform first to get familiar with observability, then add the second platform if you need different features or perspectives.
+</Tip>

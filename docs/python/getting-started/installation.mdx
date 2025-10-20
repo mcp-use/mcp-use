@@ -120,36 +120,31 @@ icon: "download"
 </Steps>
 
 ## Development Installation
-
+{/* TODO: Add instructions for development installation after monorepo */}
 If you want to contribute or use the latest features, install from source:
 
 <CodeGroup>
 
 ```bash Python (Git Clone)
 git clone https://github.com/mcp-use/mcp-use.git
-cd mcp-use
+cd mcp-use/libraries/python
 pip install -e .
+```
+
+
+```bash Python (Dev Mode)
+git clone https://github.com/mcp-use/mcp-use.git
+cd mcp-use/libraries/python
+pip install -e ".[dev]"
 ```
 
 ```bash TypeScript (Git Clone)
 git clone https://github.com/mcp-use/mcp-use.git
-cd mcp-use-ts
-npm install
-npm run build
+cd mcp-use/libraries/typescript
+pnpm install
+pnpm run build
 ```
 
-```bash Python (Dev Mode)
-git clone https://github.com/mcp-use/mcp-use.git
-cd mcp-use
-pip install -e ".[dev]"
-```
-
-```bash TypeScript (Dev Mode)
-git clone https://github.com/mcp-use/mcp-use.git
-cd mcp-use-ts
-npm install
-npm run dev
-```
 
 </CodeGroup>
 

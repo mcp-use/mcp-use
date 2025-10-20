@@ -1,0 +1,191 @@
+---
+title: "Introduction"
+description: "Build MCP servers with mcp-use's enhanced server framework"
+icon: "list-start"
+---
+
+<Card title="" img="./images/Server.jpg" horizontal="true"/>
+
+# Server Framework
+
+<Info>
+The mcp-use server framework extends the official MCP Python SDK with enhanced features for building production-ready MCP servers. It provides built-in documentation endpoints, inspector UI, improved logging, and seamless integration with the mcp-use ecosystem.
+</Info>
+
+## Why mcp-use Server Framework?
+
+While the [official MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) provides the core functionality for building MCP servers, mcp-use enhances it with:
+<Columns cols={2}>
+  <Card title="Official SDK Compatibility" icon="check" href="/python/server/compatibility" img="./images/MCP.jpg">
+    Fully compatible with the official MCP Python SDK. Extends existing functionality without breaking changes, ensuring seamless migration.
+  </Card>
+  <Card title="Inspector UI" icon="monitor" href="/python/server/inspector" img="./images/Inspector.jpg">
+    Built-in web interface for real-time server monitoring, tool exploration, and debugging. Accessible at /inspector endpoint.
+  </Card>
+  <Card title="openmcp.json" icon="file-text" href="/python/server/openmcp" img="./images/OpenMCP.jpg">
+    Automatic generation of openmcp.json endpoint for server discovery and metadata. Provides standardized server information for MCP clients and tools.
+  </Card>
+  <Card title="MCP-Specific Logging" icon="activity" href="/python/server/logging" img="./images/Logging.jpg">
+    Enhanced logging system designed specifically for MCP servers with structured output, request tracing, and performance metrics.
+  </Card>
+</Columns>
+
+## Compatibility
+
+### Official MCP SDK
+mcp-use server framework is **fully compatible** with the official MCP Python SDK. It extends the SDK rather than replacing it, ensuring:
+
+- All official MCP features work as expected
+- Existing MCP servers can be easily migrated
+- Full compliance with MCP protocol specifications
+
+### fastmcp2
+mcp-use complements fastmcp2 by providing:
+
+- **Different Focus**: fastmcp2 focuses on rapid prototyping, mcp-use focuses on production features
+- **Enhanced Observability**: Better logging, metrics, and debugging tools
+- **Ecosystem Integration**: Native compatibility with mcp-use clients and agents
+- **Documentation**: Built-in API documentation and inspector UI
+
+You can use both frameworks in the same project if needed.
+
+## Quick Start
+
+Build your first MCP server in minutes with this step-by-step guide:
+
+<Steps>
+  <Step title="Install mcp-use">
+    ```bash
+    pip install mcp-use
+    ```
+  </Step>
+
+  <Step title="Create your server file">
+    Create a new file called `my_server.py`:
+
+    ```python
+    from mcp_use.server import MCPServer
+
+    server = MCPServer(
+        name="My Server",
+        version="1.0.0",
+        instructions="A simple example server"
+    )
+    ```
+  </Step>
+
+  <Step title="Add your first tool">
+    Define a tool using the `@server.tool()` decorator:
+
+    ```python
+    @server.tool()
+    def echo(message: str) -> str:
+        """Echo back the provided message."""
+        return f"Echo: {message}"
+    ```
+  </Step>
+
+  <Step title="Add more tools (optional)">
+    Add additional tools to extend functionality:
+
+    ```python
+    @server.tool()
+    def calculate(a: int, b: int) -> int:
+        """Add two numbers."""
+        return a + b
+
+    @server.tool()
+    def get_time() -> str:
+        """Get current time."""
+        from datetime import datetime
+        return datetime.now().isoformat()
+    ```
+  </Step>
+
+  <Step title="Run the server">
+    Add the run command at the bottom of your file:
+
+    ```python
+    if __name__ == "__main__":
+        server.run(transport="streamable-http", debug=True)
+    ```
+
+    Then run it:
+
+    ```bash
+    python my_server.py
+    ```
+  </Step>
+
+  <Step title="Access your server">
+    Your server is now running at `http://localhost:8000`:
+    - **MCP endpoints**: `/mcp`
+    - **OpenMCP metadata**: `/openmcp.json` (debug mode only)
+    - **Documentation**: `/docs` (debug mode only)
+  </Step>
+</Steps>
+
+### Complete Example
+
+Here's the full code in one place:
+
+```python
+from mcp_use.server import MCPServer
+from datetime import datetime
+
+server = MCPServer(
+    name="Example Server",
+    version="1.0.0",
+    instructions="This is an example server with a simple echo tool."
+)
+
+@server.tool()
+def echo(message: str) -> str:
+    """Echo back the provided message."""
+    return f"Echo: {message}"
+
+@server.tool()
+def calculate(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+@server.tool()
+def get_time() -> str:
+    """Get current time."""
+    return datetime.now().isoformat()
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", debug=True)
+```
+
+### Transport Options
+
+Choose the right transport for your use case:
+
+```python
+# Standard input/output (for MCP clients like Claude Desktop)
+server.run(transport="stdio")
+
+# HTTP server (for web clients and testing)
+server.run(transport="streamable-http", host="0.0.0.0", port=8000)
+```
+
+### Debug Mode
+
+Enable debug mode for development features:
+
+```python
+server = MCPServer(name="My Server", debug=True)
+```
+
+Debug mode provides:
+- `/openmcp.json` endpoint for server discovery
+- `/docs` endpoint with interactive documentation
+- Enhanced logging with detailed request information
+
+## Next Steps
+
+- [Installation & Setup](/python/server/installation) - Detailed installation instructions
+- [Running Your Server](/python/server/running) - Production deployment options
+- [Inspector UI](/python/server/inspector) - Monitor and debug your server
+- [API Reference](/python/api-reference/mcp_use_server) - Complete API documentation
