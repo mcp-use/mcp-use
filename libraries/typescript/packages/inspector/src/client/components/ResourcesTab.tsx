@@ -29,6 +29,7 @@ export interface ResourcesTabRef {
 interface ResourcesTabProps {
   resources: Resource[]
   readResource: (uri: string) => Promise<any>
+  serverId: string
   isConnected: boolean
 }
 
@@ -36,6 +37,7 @@ export function ResourcesTab({
   ref,
   resources,
   readResource,
+  serverId,
   isConnected,
 }: ResourcesTabProps & { ref?: React.RefObject<ResourcesTabRef | null> }) {
   // State
@@ -112,6 +114,7 @@ export function ResourcesTab({
             uri: resource.uri,
             result,
             timestamp,
+            resourceAnnotations: resource.annotations as Record<string, any>,
           })
         }
         catch (error) {
@@ -120,6 +123,7 @@ export function ResourcesTab({
             result: null,
             error: error instanceof Error ? error.message : 'Unknown error',
             timestamp,
+            resourceAnnotations: resource.annotations as Record<string, any>,
           })
         }
         finally {
@@ -309,6 +313,8 @@ export function ResourcesTab({
             result={currentResult}
             isLoading={isLoading}
             previewMode={previewMode}
+            serverId={serverId}
+            readResource={readResource}
             onTogglePreview={() => setPreviewMode(!previewMode)}
             onCopy={handleCopy}
             onDownload={handleDownload}

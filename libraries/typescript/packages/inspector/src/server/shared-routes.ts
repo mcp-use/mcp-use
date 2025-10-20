@@ -283,8 +283,22 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
       const body = await c.req.json()
       const { serverId, uri, toolInput, toolOutput, resourceData, toolId } = body
 
+      console.log('[Widget Store] Received request for toolId:', toolId)
+      console.log('[Widget Store] Fields:', { serverId, uri, hasResourceData: !!resourceData, hasToolInput: !!toolInput, hasToolOutput: !!toolOutput })
+
       if (!serverId || !uri || !toolId || !resourceData) {
-        return c.json({ success: false, error: 'Missing required fields' }, 400)
+        const missingFields = []
+        if (!serverId)
+          missingFields.push('serverId')
+        if (!uri)
+          missingFields.push('uri')
+        if (!toolId)
+          missingFields.push('toolId')
+        if (!resourceData)
+          missingFields.push('resourceData')
+
+        console.error('[Widget Store] Missing required fields:', missingFields)
+        return c.json({ success: false, error: `Missing required fields: ${missingFields.join(', ')}` }, 400)
       }
 
       // Store widget data using toolId as key
@@ -298,10 +312,12 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
         timestamp: Date.now(),
       })
 
+      console.log('[Widget Store] Data stored successfully for toolId:', toolId)
       return c.json({ success: true })
     }
     catch (error) {
-      console.error('Error storing widget data:', error)
+      console.error('[Widget Store] Error:', error)
+      console.error('[Widget Store] Stack:', error instanceof Error ? error.stack : '')
       return c.json(formatErrorResponse(error, 'storeWidgetData'), 500)
     }
   })
@@ -330,17 +346,23 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
       <body>
         <script>
           (async function() {
-            // Change URL to "/" BEFORE loading widget (for React Router)
-            history.replaceState(null, '', '/');
+            try {
+              // Change URL to "/" BEFORE loading widget (for React Router)
+              history.replaceState(null, '', '/');
 
-            // Fetch the actual widget HTML using toolId
-            const response = await fetch('/inspector/api/resources/widget-content/${toolId}');
-            const html = await response.text();
+              // Fetch the actual widget HTML using toolId
+              const response = await fetch('/inspector/api/resources/widget-content/${toolId}');
+              const html = await response.text();
 
-            // Replace entire document with widget HTML
-            document.open();
-            document.write(html);
-            document.close();
+              // Replace entire document with widget HTML using proper method
+              document.open();
+              // Write the HTML content - the browser will parse it properly
+              document.write(html);
+              document.close();
+            } catch (error) {
+              console.error('Failed to load widget:', error);
+              document.body.innerHTML = '<div style="padding: 20px; color: red;">Failed to load widget: ' + error.message + '</div>';
+            }
           })();
         </script>
       </body>
@@ -406,15 +428,26 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
 
       const widgetStateKey = `openai-widget-state:${toolId}`
 
+      // Safely serialize data to avoid script injection issues
+      const safeToolInput = JSON.stringify(toolInput).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+      const safeToolOutput = JSON.stringify(toolOutput).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+      const safeToolId = JSON.stringify(toolId)
+      const safeWidgetStateKey = JSON.stringify(widgetStateKey)
+
       // Inject window.openai API script
       const apiScript = `
         <script>
           (function() {
             'use strict';
+            
+            // Change URL to "/" for React Router compatibility
+            if (window.location.pathname !== '/') {
+              history.replaceState(null, '', '/');
+            }
 
             const openaiAPI = {
-              toolInput: ${JSON.stringify(toolInput)},
-              toolOutput: ${JSON.stringify(toolOutput)},
+              toolInput: ${safeToolInput},
+              toolOutput: ${safeToolOutput},
               displayMode: 'inline',
               maxHeight: 600,
               theme: 'dark',
@@ -426,13 +459,13 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
               async setWidgetState(state) {
                 this.widgetState = state;
                 try {
-                  localStorage.setItem(${JSON.stringify(widgetStateKey)}, JSON.stringify(state));
+                  localStorage.setItem(${safeWidgetStateKey}, JSON.stringify(state));
                 } catch (err) {
                   console.error('[OpenAI Widget] Failed to save widget state:', err);
                 }
                 window.parent.postMessage({
                   type: 'openai:setWidgetState',
-                  toolId: ${JSON.stringify(toolId)},
+                  toolId: ${safeToolId},
                   state
                 }, '*');
               },
@@ -525,7 +558,7 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
 
             setTimeout(() => {
               try {
-                const stored = localStorage.getItem(${JSON.stringify(widgetStateKey)});
+                const stored = localStorage.getItem(${safeWidgetStateKey});
                 if (stored && window.openai) {
                   window.openai.widgetState = JSON.parse(stored);
                 }
@@ -538,12 +571,14 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
       // Inject script into HTML
       let modifiedHtml
       if (htmlContent.includes('<html>') && htmlContent.includes('<head>')) {
+        // If it's a full HTML document, inject at the beginning of head
         modifiedHtml = htmlContent.replace(
           '<head>',
           `<head><base href="/">${apiScript}`,
         )
       }
       else {
+        // Widget HTML is just fragments, wrap it properly
         modifiedHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -551,12 +586,15 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   ${apiScript}
+  <title>Widget</title>
 </head>
 <body>
   ${htmlContent}
 </body>
 </html>`
       }
+
+      console.log('[Widget Content] Generated HTML length:', modifiedHtml.length)
 
       // Set security headers
       const trustedCdns = [

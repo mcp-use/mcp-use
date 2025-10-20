@@ -78,7 +78,7 @@ export function OpenAIComponentRenderer({
         const resourceData = await readResource(componentUrl)
 
         // Store widget data on server (including the fetched HTML)
-        await fetch('/inspector/api/resources/widget/store', {
+        const storeResponse = await fetch('/inspector/api/resources/widget/store', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -93,8 +93,13 @@ export function OpenAIComponentRenderer({
           }),
         })
 
-        // Set widget URL
-        setWidgetUrl(`/inspector/api/resources/widget/${toolId}`)
+        if (!storeResponse.ok) {
+          const errorData = await storeResponse.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(`Failed to store widget data: ${errorData.error || storeResponse.statusText}`)
+        }
+
+        // Set widget URL directly to content endpoint (skip container page)
+        setWidgetUrl(`/inspector/api/resources/widget-content/${toolId}`)
       }
       catch (error) {
         console.error('Error storing widget data:', error)
