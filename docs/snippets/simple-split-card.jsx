@@ -44,12 +44,12 @@ export const SimpleSplitCard = ({
         <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
         <p className="text-zinc-600 dark:text-zinc-400 text-sm mt-1 flex-grow">{description}</p>
         <div className="mt-4 flex items-center justify-between text-sm">
-          <a href={leftHref} className="flex items-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white">
-            <img src={leftLogo} alt={leftLabel} className="h-5 w-5 mr-2 filter grayscale" />
+          <a href={leftHref} className="flex items-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white group">
+            <img src={leftLogo} alt={leftLabel} className="h-5 w-5 mr-2 filter grayscale group-hover:grayscale-0 transition-all duration-200" />
             <span>{leftLabel}</span>
           </a>
-          <a href={rightHref} className="flex items-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white">
-            <img src={rightLogo} alt={rightLabel} className="h-5 w-5 mr-2 filter grayscale" />
+          <a href={rightHref} className="flex items-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white group">
+            <img src={rightLogo} alt={rightLabel} className="h-5 w-5 mr-2 filter grayscale group-hover:grayscale-0 transition-all duration-200" />
             <span>{rightLabel}</span>
           </a>
         </div>
