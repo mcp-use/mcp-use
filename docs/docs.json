@@ -40,7 +40,7 @@
     "products": [
       {
         "product": "Home",
-        "description": "Home description",
+        "description": "Home",
         "icon": "/images/mcp_use.svg",
         "groups": [
           {
@@ -55,6 +55,13 @@
             "pages": [
               "home/redirects/python",
               "home/redirects/typescript"
+            ]
+          }, 
+          {
+            "group": "Guides",
+            "icon": "",
+            "pages": [
+              "home/mcp101"
             ]
           }
         ]
@@ -552,6 +559,11 @@
         "label": "Discord",
         "icon": "discord",
         "href": "https://discord.gg/XkNkSkMz3V"
+      },
+      {
+        "label": "",
+        "icon": "/images/xlogo.svg",
+        "href": "https://x.com/mcpuse"
       }
     ],
     "primary": {
