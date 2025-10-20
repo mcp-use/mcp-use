@@ -8,11 +8,6 @@
     "mcp-use": "1.1.2"
   },
   "changesets": [
-    "crisp-coats-work",
-    "crisp-flies-obey",
-    "eight-nights-fold",
-    "fast-wolves-teach",
-    "legal-eagles-smash",
-    "silver-guests-fall"
+    "consolidated-canary-changes"
   ]
 }
