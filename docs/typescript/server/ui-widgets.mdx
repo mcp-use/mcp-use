@@ -1,0 +1,743 @@
+---
+title: "UI Widgets"
+description: "Creating interactive UI components for MCP clients"
+icon: "palette"
+---
+
+# UI Widgets
+
+UI widgets allow you to create rich, interactive user interfaces that MCP clients can display. The framework supports multiple widget formats including MCP-UI legacy widgets and OpenAI Apps SDK components.
+
+## Overview
+
+UI widgets are:
+- **Interactive**: Full HTML/JavaScript applications
+- **Parameterized**: Accept inputs to customize behavior
+- **Dual-Purpose**: Accessible as both tools and resources
+- **Framework-Agnostic**: Use any JavaScript framework
+
+## Widget Types
+
+### External URL Widgets (MCP-UI)
+
+Iframe-based widgets served from your server:
+
+```typescript
+server.uiResource({
+  type: 'externalUrl',
+  name: 'dashboard',
+  widget: 'analytics-dashboard',
+  title: 'Analytics Dashboard',
+  description: 'Interactive analytics visualization',
+  props: {
+    timeRange: {
+      type: 'string',
+      description: 'Time range for data (e.g., 7d, 30d, 1y)',
+      required: false,
+      default: '7d'
+    },
+    metric: {
+      type: 'string',
+      description: 'Metric to display',
+      required: false,
+      default: 'revenue'
+    }
+  },
+  size: ['800px', '600px'],
+  annotations: {
+    audience: ['user'],
+    priority: 0.9
+  }
+})
+```
+
+### Raw HTML Widgets
+
+Inline HTML content:
+
+```typescript
+server.uiResource({
+  type: 'rawHtml',
+  name: 'simple_form',
+  title: 'Contact Form',
+  description: 'Simple contact form',
+  htmlString: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: sans-serif; padding: 20px; }
+        input, textarea { width: 100%; margin: 10px 0; }
+        button { background: #007bff; color: white; padding: 10px 20px; }
+      </style>
+    </head>
+    <body>
+      <h2>Contact Us</h2>
+      <form id="contactForm">
+        <input type="text" placeholder="Name" required>
+        <input type="email" placeholder="Email" required>
+        <textarea placeholder="Message" rows="5" required></textarea>
+        <button type="submit">Send</button>
+      </form>
+      <script>
+        document.getElementById('contactForm').onsubmit = (e) => {
+          e.preventDefault();
+          alert('Message sent!');
+        };
+      </script>
+    </body>
+    </html>
+  `,
+  size: ['400px', '500px']
+})
+```
+
+### Remote DOM Widgets
+
+JavaScript-driven dynamic interfaces:
+
+```typescript
+server.uiResource({
+  type: 'remoteDom',
+  name: 'todo_list',
+  title: 'Todo List',
+  description: 'Interactive todo list manager',
+  remoteDomFramework: 'react',
+  remoteDomCode: `
+    function TodoApp() {
+      const [todos, setTodos] = React.useState([]);
+      const [input, setInput] = React.useState('');
+
+      const addTodo = () => {
+        if (input.trim()) {
+          setTodos([...todos, { id: Date.now(), text: input, done: false }]);
+          setInput('');
+        }
+      };
+
+      const toggleTodo = (id) => {
+        setTodos(todos.map(todo =>
+          todo.id === id ? { ...todo, done: !todo.done } : todo
+        ));
+      };
+
+      return (
+        <div style={{ padding: '20px' }}>
+          <h2>Todo List</h2>
+          <div>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Add a todo..."
+            />
+            <button onClick={addTodo}>Add</button>
+          </div>
+          <ul>
+            {todos.map(todo => (
+              <li key={todo.id} onClick={() => toggleTodo(todo.id)}
+                  style={{ textDecoration: todo.done ? 'line-through' : 'none' }}>
+                {todo.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<TodoApp />, document.getElementById('root'));
+  `,
+  props: {
+    initialTodos: {
+      type: 'array',
+      description: 'Initial todo items',
+      required: false,
+      default: []
+    }
+  },
+  size: ['500px', '600px']
+})
+```
+
+### OpenAI Apps SDK Widgets
+
+ChatGPT-compatible widgets with Skybridge format:
+
+```typescript
+server.uiResource({
+  type: 'appsSdk',
+  name: 'weather_widget',
+  title: 'Weather Widget',
+  description: 'Current weather display',
+  htmlTemplate: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          padding: 20px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+        }
+        .weather-card {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 20px;
+          padding: 30px;
+          backdrop-filter: blur(10px);
+        }
+        .temp { font-size: 48px; font-weight: bold; }
+        .condition { font-size: 24px; margin-top: 10px; }
+        .details { margin-top: 20px; display: flex; gap: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="weather-card">
+        <h1 id="city">Loading...</h1>
+        <div class="temp" id="temperature">--°</div>
+        <div class="condition" id="condition">--</div>
+        <div class="details">
+          <span>Humidity: <span id="humidity">--%</span></span>
+          <span>Wind: <span id="wind">-- mph</span></span>
+        </div>
+      </div>
+      <script>
+        // Access tool output via window.openai.toolOutput
+        const data = window.openai?.toolOutput || {
+          city: 'New York',
+          temperature: 72,
+          condition: 'Partly Cloudy',
+          humidity: 65,
+          wind: 8
+        };
+
+        document.getElementById('city').textContent = data.city;
+        document.getElementById('temperature').textContent = data.temperature + '°F';
+        document.getElementById('condition').textContent = data.condition;
+        document.getElementById('humidity').textContent = data.humidity + '%';
+        document.getElementById('wind').textContent = data.wind + ' mph';
+      </script>
+    </body>
+    </html>
+  `,
+  appsSdkMetadata: {
+    'openai/widgetDescription': 'Displays current weather conditions',
+    'openai/widgetCSP': {
+      connect_domains: [],
+      resource_domains: []
+    },
+    'openai/toolInvocation/invoking': 'Fetching weather data...',
+    'openai/toolInvocation/invoked': 'Weather data loaded',
+    'openai/widgetAccessible': true
+  }
+})
+```
+
+## Creating Widget Files
+
+For external URL widgets, create HTML files in your project:
+
+### Directory Structure
+
+```
+your-server/
+├── src/
+│   └── index.ts
+├── dist/
+│   └── resources/
+│       └── mcp-use/
+│           └── widgets/
+│               ├── dashboard/
+│               │   ├── index.html
+│               │   └── assets/
+│               │       ├── script.js
+│               │       └── style.css
+│               └── chart/
+│                   └── index.html
+```
+
+### Widget HTML Example
+
+`dist/resources/mcp-use/widgets/dashboard/index.html`:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Analytics Dashboard</title>
+  <link rel="stylesheet" href="./assets/style.css">
+</head>
+<body>
+  <div id="app">
+    <h1>Analytics Dashboard</h1>
+    <div id="chart-container"></div>
+    <div id="stats"></div>
+  </div>
+
+  <script>
+    // Parse query parameters from URL
+    const params = new URLSearchParams(window.location.search);
+    const timeRange = params.get('timeRange') || '7d';
+    const metric = params.get('metric') || 'revenue';
+
+    // Parse complex parameters (JSON)
+    let filters = {};
+    try {
+      filters = JSON.parse(params.get('filters') || '{}');
+    } catch (e) {}
+
+    // Initialize dashboard with parameters
+    function initDashboard() {
+      document.getElementById('stats').innerHTML = `
+        <p>Time Range: ${timeRange}</p>
+        <p>Metric: ${metric}</p>
+      `;
+
+      // Load and render chart
+      renderChart(timeRange, metric, filters);
+    }
+
+    function renderChart(range, metric, filters) {
+      // Chart rendering logic here
+      const chart = document.getElementById('chart-container');
+      chart.innerHTML = `<canvas id="chart"></canvas>`;
+
+      // Use your preferred charting library
+      // Example with Chart.js, D3, etc.
+    }
+
+    // Initialize on load
+    initDashboard();
+  </script>
+  <script src="./assets/script.js"></script>
+</body>
+</html>
+```
+
+## Widget Properties
+
+Define typed properties for widgets:
+
+```typescript
+server.uiResource({
+  type: 'externalUrl',
+  name: 'data_table',
+  widget: 'data-table',
+  title: 'Data Table',
+  props: {
+    // String property
+    title: {
+      type: 'string',
+      description: 'Table title',
+      required: false,
+      default: 'Data Table'
+    },
+
+    // Number property
+    pageSize: {
+      type: 'number',
+      description: 'Rows per page',
+      required: false,
+      default: 10
+    },
+
+    // Boolean property
+    sortable: {
+      type: 'boolean',
+      description: 'Enable sorting',
+      required: false,
+      default: true
+    },
+
+    // Object property
+    columns: {
+      type: 'object',
+      description: 'Column configuration',
+      required: true
+    },
+
+    // Array property
+    data: {
+      type: 'array',
+      description: 'Table data',
+      required: true
+    }
+  }
+})
+```
+
+## Accessing Widget Parameters
+
+### In External URL Widgets
+
+Parameters are passed as URL query parameters:
+
+```javascript
+// In your widget HTML/JavaScript
+const params = new URLSearchParams(window.location.search);
+
+// Simple parameters
+const title = params.get('title');
+const pageSize = parseInt(params.get('pageSize') || '10');
+const sortable = params.get('sortable') === 'true';
+
+// Complex parameters (JSON-encoded)
+let columns = {};
+let data = [];
+
+try {
+  columns = JSON.parse(params.get('columns') || '{}');
+  data = JSON.parse(params.get('data') || '[]');
+} catch (e) {
+  console.error('Failed to parse parameters:', e);
+}
+```
+
+### In Apps SDK Widgets
+
+Parameters are available via `window.openai.toolOutput`:
+
+```javascript
+// In your Apps SDK widget
+const params = window.openai?.toolOutput || {};
+
+// Access parameters directly
+const { city, temperature, condition } = params;
+
+// Use with fallbacks
+const humidity = params.humidity || 50;
+const windSpeed = params.windSpeed || 0;
+```
+
+## Advanced Widget Patterns
+
+### Widget Communication
+
+Enable parent-child communication:
+
+```javascript
+// In widget (child)
+window.parent.postMessage({
+  type: 'widget-event',
+  event: 'data-updated',
+  data: { /* ... */ }
+}, '*');
+
+// In parent (if supported by client)
+window.addEventListener('message', (event) => {
+  if (event.data.type === 'widget-event') {
+    handleWidgetEvent(event.data);
+  }
+});
+```
+
+### Responsive Widgets
+
+Create responsive layouts:
+
+```html
+<style>
+  .container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 768px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  @media (min-width: 769px) {
+    .grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+```
+
+### Dark Mode Support
+
+Detect and support dark mode:
+
+```javascript
+// Detect system dark mode
+const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+// Apply theme
+document.body.classList.toggle('dark-mode', isDarkMode);
+
+// Listen for changes
+window.matchMedia('(prefers-color-scheme: dark)')
+  .addEventListener('change', (e) => {
+    document.body.classList.toggle('dark-mode', e.matches);
+  });
+```
+
+### Data Fetching in Widgets
+
+Fetch data from your server:
+
+```javascript
+async function loadData() {
+  try {
+    // Fetch from your server's API
+    const response = await fetch('/api/widget-data', {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    renderWidget(data);
+  } catch (error) {
+    console.error('Failed to load data:', error);
+    showError('Unable to load data');
+  }
+}
+```
+
+## Using Modern Frameworks
+
+### React Widget Example
+
+```typescript
+// Build your React app and serve the bundle
+server.uiResource({
+  type: 'externalUrl',
+  name: 'react_app',
+  widget: 'react-dashboard',
+  title: 'React Dashboard',
+  description: 'Dashboard built with React',
+  props: {
+    userId: { type: 'string', required: true }
+  },
+  size: ['1000px', '800px']
+})
+
+// In your React app (built separately)
+import React from 'react';
+import ReactDOM from 'react-dom';
+
+function App() {
+  const params = new URLSearchParams(window.location.search);
+  const userId = params.get('userId');
+
+  return (
+    <div>
+      <h1>Dashboard for User {userId}</h1>
+      {/* Your React components */}
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById('root'));
+```
+
+### Vue.js Widget Example
+
+```html
+<!-- In your widget HTML -->
+<div id="app">
+  <h1>{{ title }}</h1>
+  <data-table :data="tableData" :columns="columns"></data-table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@3"></script>
+<script>
+const { createApp } = Vue;
+
+createApp({
+  data() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      title: params.get('title') || 'Data View',
+      tableData: JSON.parse(params.get('data') || '[]'),
+      columns: JSON.parse(params.get('columns') || '[]')
+    }
+  },
+  components: {
+    'data-table': {
+      props: ['data', 'columns'],
+      template: `
+        <table>
+          <thead>
+            <tr>
+              <th v-for="col in columns">{{ col.label }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in data">
+              <td v-for="col in columns">{{ row[col.field] }}</td>
+            </tr>
+          </tbody>
+        </table>
+      `
+    }
+  }
+}).mount('#app');
+</script>
+```
+
+## Security Considerations
+
+### Content Security Policy
+
+For Apps SDK widgets, define CSP:
+
+```typescript
+appsSdkMetadata: {
+  'openai/widgetCSP': {
+    // Domains for API calls
+    connect_domains: [
+      'https://api.example.com',
+      'wss://websocket.example.com'
+    ],
+    // Domains for resources (images, scripts, styles)
+    resource_domains: [
+      'https://cdn.example.com',
+      'https://fonts.googleapis.com'
+    ]
+  }
+}
+```
+
+### Input Sanitization
+
+Always sanitize user inputs in widgets:
+
+```javascript
+function sanitizeHTML(str) {
+  const temp = document.createElement('div');
+  temp.textContent = str;
+  return temp.innerHTML;
+}
+
+// Use when displaying user content
+element.innerHTML = sanitizeHTML(userInput);
+```
+
+### Secure Communication
+
+Use secure methods for sensitive data:
+
+```javascript
+// Don't pass sensitive data in URL parameters
+// Instead, use server-side sessions or tokens
+
+const sessionId = params.get('session');
+const data = await fetch(`/api/secure-data/${sessionId}`, {
+  credentials: 'include'
+});
+```
+
+## Testing Widgets
+
+### Local Testing
+
+Test widgets during development:
+
+```typescript
+// Add test route for widgets
+server.get('/test/widget/:name', (req, res) => {
+  const { name } = req.params;
+  const testParams = {
+    timeRange: '7d',
+    metric: 'revenue'
+  };
+
+  const url = `http://localhost:3000/mcp-use/widgets/${name}?` +
+    new URLSearchParams(testParams).toString();
+
+  res.send(`
+    <html>
+      <body style="margin: 0;">
+        <iframe src="${url}" width="100%" height="100%"></iframe>
+      </body>
+    </html>
+  `);
+});
+```
+
+### Inspector Testing
+
+Use the MCP Inspector:
+
+1. Navigate to `http://localhost:3000/inspector`
+2. Go to the Tools section
+3. Find your UI widget tool (e.g., `ui_dashboard`)
+4. Enter parameter values
+5. Execute to see the widget
+
+## Best Practices
+
+1. **Performance**: Optimize widget load time and responsiveness
+2. **Accessibility**: Follow WCAG guidelines for accessibility
+3. **Error Handling**: Display user-friendly error messages
+4. **Responsive Design**: Support various screen sizes
+5. **Parameter Validation**: Validate all input parameters
+6. **Documentation**: Document widget parameters and behavior
+7. **Version Control**: Version your widgets for compatibility
+8. **Security**: Sanitize inputs and use secure communication
+
+## Common Widget Examples
+
+### Chart Widget
+
+```typescript
+server.uiResource({
+  type: 'externalUrl',
+  name: 'chart',
+  widget: 'chart-widget',
+  title: 'Data Chart',
+  description: 'Interactive data visualization',
+  props: {
+    chartType: {
+      type: 'string',
+      description: 'Type of chart (line, bar, pie)',
+      required: false,
+      default: 'line'
+    },
+    data: {
+      type: 'array',
+      description: 'Chart data points',
+      required: true
+    },
+    options: {
+      type: 'object',
+      description: 'Chart configuration options',
+      required: false
+    }
+  },
+  size: ['600px', '400px']
+})
+```
+
+### Form Widget
+
+```typescript
+server.uiResource({
+  type: 'rawHtml',
+  name: 'user_form',
+  title: 'User Form',
+  htmlString: `
+    <!-- Complete form HTML with validation -->
+  `,
+  props: {
+    fields: {
+      type: 'array',
+      description: 'Form field definitions',
+      required: true
+    },
+    submitUrl: {
+      type: 'string',
+      description: 'Form submission endpoint',
+      required: false
+    }
+  }
+})
+```
+
+## Next Steps
+
+- [Examples](./examples) - Complete widget implementations
+- [API Reference](./api-reference) - Widget API details
+- [Tools Guide](./tools) - Integrating widgets with tools
+- [Getting Started](./getting-started) - Basic server setup

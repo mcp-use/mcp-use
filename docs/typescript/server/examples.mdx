@@ -1,0 +1,939 @@
+---
+title: "Examples"
+description: "Real-world MCP server implementations"
+icon: "code"
+---
+
+# Examples
+
+This page provides complete, production-ready examples of MCP servers built with the `mcp-use/server` framework. Each example demonstrates different capabilities and best practices.
+
+## Weather Service Server
+
+A complete weather information server with tools, resources, and UI widgets.
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+import express from 'express'
+import axios from 'axios'
+
+// Types
+interface WeatherData {
+  temperature: number
+  condition: string
+  humidity: number
+  windSpeed: number
+  pressure: number
+}
+
+interface Forecast {
+  date: string
+  high: number
+  low: number
+  condition: string
+  precipitation: number
+}
+
+// Create server
+const server = createMCPServer('weather-service', {
+  version: '2.0.0',
+  description: 'Comprehensive weather information service'
+})
+
+// Mock weather service (replace with real API)
+class WeatherService {
+  private cache = new Map<string, { data: WeatherData; timestamp: number }>()
+  private CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+  async getCurrentWeather(city: string): Promise<WeatherData> {
+    // Check cache
+    const cached = this.cache.get(city)
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.data
+    }
+
+    // Simulate API call (replace with real API)
+    const data: WeatherData = {
+      temperature: Math.round(50 + Math.random() * 50),
+      condition: ['Sunny', 'Cloudy', 'Rainy', 'Partly Cloudy'][Math.floor(Math.random() * 4)],
+      humidity: Math.round(40 + Math.random() * 40),
+      windSpeed: Math.round(5 + Math.random() * 20),
+      pressure: Math.round(1000 + Math.random() * 30)
+    }
+
+    // Cache result
+    this.cache.set(city, { data, timestamp: Date.now() })
+    return data
+  }
+
+  async getForecast(city: string, days: number): Promise<Forecast[]> {
+    const forecast: Forecast[] = []
+    const today = new Date()
+
+    for (let i = 0; i < days; i++) {
+      const date = new Date(today)
+      date.setDate(date.getDate() + i)
+
+      forecast.push({
+        date: date.toISOString().split('T')[0],
+        high: Math.round(60 + Math.random() * 30),
+        low: Math.round(40 + Math.random() * 20),
+        condition: ['Sunny', 'Cloudy', 'Rainy', 'Partly Cloudy'][Math.floor(Math.random() * 4)],
+        precipitation: Math.round(Math.random() * 100)
+      })
+    }
+
+    return forecast
+  }
+}
+
+const weatherService = new WeatherService()
+
+// Tool: Get current weather
+server.tool({
+  name: 'get_weather',
+  title: 'Get Weather',
+  description: 'Get current weather for a city',
+  inputs: [
+    {
+      name: 'city',
+      type: 'string',
+      description: 'City name',
+      required: true
+    },
+    {
+      name: 'units',
+      type: 'string',
+      description: 'Temperature units (celsius or fahrenheit)',
+      required: false,
+      default: 'fahrenheit'
+    }
+  ],
+  cb: async ({ city, units = 'fahrenheit' }) => {
+    try {
+      const weather = await weatherService.getCurrentWeather(city)
+
+      let temp = weather.temperature
+      if (units === 'celsius') {
+        temp = Math.round((temp - 32) * 5 / 9)
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Weather in ${city}:\n` +
+                `Temperature: ${temp}°${units === 'celsius' ? 'C' : 'F'}\n` +
+                `Condition: ${weather.condition}\n` +
+                `Humidity: ${weather.humidity}%\n` +
+                `Wind Speed: ${weather.windSpeed} mph\n` +
+                `Pressure: ${weather.pressure} mb`
+        }]
+      }
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Error fetching weather for ${city}: ${error.message}`
+        }]
+      }
+    }
+  }
+})
+
+// Tool: Get forecast
+server.tool({
+  name: 'get_forecast',
+  title: 'Get Weather Forecast',
+  description: 'Get weather forecast for multiple days',
+  inputs: [
+    {
+      name: 'city',
+      type: 'string',
+      description: 'City name',
+      required: true
+    },
+    {
+      name: 'days',
+      type: 'number',
+      description: 'Number of days (1-7)',
+      required: false,
+      default: 3
+    }
+  ],
+  cb: async ({ city, days = 3 }) => {
+    if (days < 1 || days > 7) {
+      return {
+        content: [{
+          type: 'text',
+          text: 'Please specify days between 1 and 7'
+        }]
+      }
+    }
+
+    try {
+      const forecast = await weatherService.getForecast(city, days)
+
+      const forecastText = forecast.map(day =>
+        `${day.date}: ${day.condition}\n` +
+        `  High: ${day.high}°F, Low: ${day.low}°F\n` +
+        `  Precipitation: ${day.precipitation}%`
+      ).join('\n\n')
+
+      return {
+        content: [{
+          type: 'text',
+          text: `${days}-day forecast for ${city}:\n\n${forecastText}`
+        }]
+      }
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Error fetching forecast: ${error.message}`
+        }]
+      }
+    }
+  }
+})
+
+// Resource: Current conditions for all monitored cities
+server.resource({
+  name: 'monitored_cities',
+  uri: 'weather://monitored',
+  title: 'Monitored Cities Weather',
+  description: 'Current weather for all monitored cities',
+  mimeType: 'application/json',
+  annotations: {
+    audience: ['user', 'assistant'],
+    priority: 0.8
+  },
+  readCallback: async () => {
+    const cities = ['New York', 'London', 'Tokyo', 'Paris', 'Sydney']
+    const weatherData: Record<string, WeatherData> = {}
+
+    for (const city of cities) {
+      weatherData[city] = await weatherService.getCurrentWeather(city)
+    }
+
+    return {
+      contents: [{
+        uri: 'weather://monitored',
+        mimeType: 'application/json',
+        text: JSON.stringify(weatherData, null, 2)
+      }]
+    }
+  }
+})
+
+// Resource Template: City-specific weather
+server.resourceTemplate({
+  name: 'city_weather',
+  resourceTemplate: {
+    uriTemplate: 'weather://city/{cityName}',
+    name: 'City Weather',
+    description: 'Weather data for a specific city',
+    mimeType: 'application/json'
+  },
+  readCallback: async (uri, params) => {
+    try {
+      const weather = await weatherService.getCurrentWeather(params.cityName)
+      const forecast = await weatherService.getForecast(params.cityName, 3)
+
+      return {
+        contents: [{
+          uri: uri.toString(),
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            city: params.cityName,
+            current: weather,
+            forecast,
+            timestamp: new Date().toISOString()
+          }, null, 2)
+        }]
+      }
+    } catch (error) {
+      return {
+        contents: [{
+          uri: uri.toString(),
+          mimeType: 'text/plain',
+          text: `Error: Unable to fetch weather for ${params.cityName}`
+        }]
+      }
+    }
+  }
+})
+
+// Prompt: Weather report generation
+server.prompt({
+  name: 'weather_report',
+  title: 'Weather Report Prompt',
+  description: 'Generate a weather report prompt',
+  args: [
+    {
+      name: 'city',
+      type: 'string',
+      required: true
+    },
+    {
+      name: 'style',
+      type: 'string',
+      required: false
+    }
+  ],
+  cb: async ({ city, style = 'professional' }) => {
+    const weather = await weatherService.getCurrentWeather(city)
+    const forecast = await weatherService.getForecast(city, 3)
+
+    const styleInstructions = {
+      professional: 'Use a professional, meteorological tone',
+      casual: 'Use a friendly, conversational tone',
+      brief: 'Be concise and to the point'
+    }
+
+    return {
+      messages: [
+        {
+          role: 'system',
+          content: `You are a weather reporter. ${styleInstructions[style] || styleInstructions.professional}.`
+        },
+        {
+          role: 'user',
+          content: `Please provide a weather report for ${city}. Current conditions: ${JSON.stringify(weather)}. 3-day forecast: ${JSON.stringify(forecast)}. Include current conditions, forecast summary, and any weather advisories.`
+        }
+      ]
+    }
+  }
+})
+
+// UI Widget: Weather Dashboard
+server.uiResource({
+  type: 'externalUrl',
+  name: 'weather_dashboard',
+  widget: 'weather-dashboard',
+  title: 'Weather Dashboard',
+  description: 'Interactive weather visualization',
+  props: {
+    city: {
+      type: 'string',
+      description: 'City to display',
+      required: true
+    },
+    showForecast: {
+      type: 'boolean',
+      description: 'Show forecast section',
+      required: false,
+      default: true
+    },
+    theme: {
+      type: 'string',
+      description: 'Dashboard theme (light or dark)',
+      required: false,
+      default: 'light'
+    }
+  },
+  size: ['800px', '600px'],
+  annotations: {
+    audience: ['user'],
+    priority: 0.9
+  }
+})
+
+// API endpoints for widget data
+server.get('/api/weather/:city', async (req, res) => {
+  try {
+    const weather = await weatherService.getCurrentWeather(req.params.city)
+    res.json(weather)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+server.get('/api/forecast/:city', async (req, res) => {
+  const days = parseInt(req.query.days as string) || 3
+  try {
+    const forecast = await weatherService.getForecast(req.params.city, days)
+    res.json(forecast)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Health check
+server.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'weather-service',
+    version: '2.0.0',
+    timestamp: new Date().toISOString()
+  })
+})
+
+// Start server
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000
+
+server.listen(PORT).then(() => {
+  console.log(`Weather Service MCP Server running on port ${PORT}`)
+  console.log(`MCP endpoint: http://localhost:${PORT}/mcp`)
+  console.log(`Inspector: http://localhost:${PORT}/inspector`)
+})
+```
+
+## Database Management Server
+
+A server for database operations with schema inspection and query execution.
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+import { Pool } from 'pg' // PostgreSQL client
+import sqlFormatter from 'sql-formatter'
+
+// Create server
+const server = createMCPServer('database-manager', {
+  version: '1.0.0',
+  description: 'Database management and query execution'
+})
+
+// Database connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000
+})
+
+// Tool: Execute SQL query
+server.tool({
+  name: 'execute_query',
+  title: 'Execute SQL Query',
+  description: 'Execute a SQL query against the database',
+  inputs: [
+    {
+      name: 'query',
+      type: 'string',
+      description: 'SQL query to execute',
+      required: true
+    },
+    {
+      name: 'params',
+      type: 'array',
+      description: 'Query parameters for prepared statement',
+      required: false
+    },
+    {
+      name: 'limit',
+      type: 'number',
+      description: 'Maximum number of rows to return',
+      required: false,
+      default: 100
+    }
+  ],
+  cb: async ({ query, params = [], limit = 100 }) => {
+    // Security: Only allow SELECT queries in this example
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery.startsWith('select')) {
+      return {
+        content: [{
+          type: 'text',
+          text: 'Error: Only SELECT queries are allowed'
+        }]
+      }
+    }
+
+    try {
+      // Add LIMIT if not present
+      let finalQuery = query
+      if (!normalizedQuery.includes('limit')) {
+        finalQuery += ` LIMIT ${limit}`
+      }
+
+      const result = await pool.query(finalQuery, params)
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Query executed successfully.\nRows returned: ${result.rowCount}\n\n` +
+                `Results:\n${JSON.stringify(result.rows, null, 2)}`
+        }]
+      }
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Query error: ${error.message}`
+        }]
+      }
+    }
+  }
+})
+
+// Tool: Get table schema
+server.tool({
+  name: 'get_schema',
+  title: 'Get Table Schema',
+  description: 'Get the schema of a database table',
+  inputs: [
+    {
+      name: 'tableName',
+      type: 'string',
+      description: 'Name of the table',
+      required: true
+    }
+  ],
+  cb: async ({ tableName }) => {
+    try {
+      const query = `
+        SELECT
+          column_name,
+          data_type,
+          is_nullable,
+          column_default,
+          character_maximum_length
+        FROM information_schema.columns
+        WHERE table_name = $1
+        ORDER BY ordinal_position
+      `
+
+      const result = await pool.query(query, [tableName])
+
+      if (result.rows.length === 0) {
+        return {
+          content: [{
+            type: 'text',
+            text: `Table '${tableName}' not found`
+          }]
+        }
+      }
+
+      const schema = result.rows.map(col =>
+        `${col.column_name}: ${col.data_type}` +
+        `${col.character_maximum_length ? `(${col.character_maximum_length})` : ''}` +
+        `${col.is_nullable === 'NO' ? ' NOT NULL' : ''}` +
+        `${col.column_default ? ` DEFAULT ${col.column_default}` : ''}`
+      ).join('\n')
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Schema for table '${tableName}':\n\n${schema}`
+        }]
+      }
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Error fetching schema: ${error.message}`
+        }]
+      }
+    }
+  }
+})
+
+// Resource: Database statistics
+server.resource({
+  name: 'db_stats',
+  uri: 'db://statistics',
+  title: 'Database Statistics',
+  description: 'Current database statistics and metrics',
+  mimeType: 'application/json',
+  annotations: {
+    audience: ['assistant'],
+    priority: 0.7
+  },
+  readCallback: async () => {
+    try {
+      const stats = await pool.query(`
+        SELECT
+          (SELECT count(*) FROM pg_stat_activity) as connections,
+          (SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public') as tables,
+          (SELECT pg_database_size(current_database())) as database_size
+      `)
+
+      const tableStats = await pool.query(`
+        SELECT
+          tablename,
+          n_live_tup as row_count,
+          pg_size_pretty(pg_total_relation_size(tablename::regclass)) as size
+        FROM pg_stat_user_tables
+        ORDER BY n_live_tup DESC
+        LIMIT 10
+      `)
+
+      return {
+        contents: [{
+          uri: 'db://statistics',
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            overview: stats.rows[0],
+            topTables: tableStats.rows,
+            timestamp: new Date().toISOString()
+          }, null, 2)
+        }]
+      }
+    } catch (error) {
+      return {
+        contents: [{
+          uri: 'db://statistics',
+          mimeType: 'text/plain',
+          text: `Error fetching statistics: ${error.message}`
+        }]
+      }
+    }
+  }
+})
+
+// Prompt: Query generation
+server.prompt({
+  name: 'generate_query',
+  title: 'SQL Query Generation',
+  description: 'Generate SQL query from natural language',
+  args: [
+    {
+      name: 'description',
+      type: 'string',
+      required: true
+    },
+    {
+      name: 'tables',
+      type: 'array',
+      required: false
+    }
+  ],
+  cb: async ({ description, tables = [] }) => {
+    // Get available tables if not provided
+    if (tables.length === 0) {
+      const result = await pool.query(`
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+      `)
+      tables = result.rows.map(row => row.tablename)
+    }
+
+    return {
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a SQL expert. Generate efficient, safe SQL queries based on requirements.'
+        },
+        {
+          role: 'user',
+          content: `Generate a SQL query for the following requirement: "${description}"\n\n` +
+                   `Available tables: ${tables.join(', ')}\n\n` +
+                   `Requirements:\n` +
+                   `- Use proper JOIN syntax\n` +
+                   `- Include appropriate WHERE clauses\n` +
+                   `- Add LIMIT for large result sets\n` +
+                   `- Use parameterized queries for any user input`
+        }
+      ]
+    }
+  }
+})
+
+// UI Widget: Query Builder
+server.uiResource({
+  type: 'rawHtml',
+  name: 'query_builder',
+  title: 'SQL Query Builder',
+  description: 'Visual SQL query builder',
+  htmlString: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: monospace; padding: 20px; }
+        .query-area { width: 100%; height: 200px; font-family: monospace; }
+        .results { margin-top: 20px; padding: 10px; background: #f5f5f5; }
+        button { padding: 10px 20px; background: #007bff; color: white; }
+      </style>
+    </head>
+    <body>
+      <h2>SQL Query Builder</h2>
+      <textarea class="query-area" id="query" placeholder="Enter SQL query...">
+SELECT * FROM users LIMIT 10;
+      </textarea>
+      <br><br>
+      <button onclick="executeQuery()">Execute Query</button>
+      <div class="results" id="results"></div>
+
+      <script>
+        async function executeQuery() {
+          const query = document.getElementById('query').value;
+          const results = document.getElementById('results');
+
+          results.innerHTML = 'Executing...';
+
+          try {
+            const response = await fetch('/api/query', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query })
+            });
+
+            const data = await response.json();
+            results.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+          } catch (error) {
+            results.innerHTML = 'Error: ' + error.message;
+          }
+        }
+      </script>
+    </body>
+    </html>
+  `,
+  size: ['700px', '500px']
+})
+
+// API endpoint for query execution
+server.post('/api/query', async (req, res) => {
+  const { query } = req.body
+
+  // Security: Only allow SELECT
+  if (!query.trim().toLowerCase().startsWith('select')) {
+    return res.status(400).json({ error: 'Only SELECT queries allowed' })
+  }
+
+  try {
+    const result = await pool.query(query)
+    res.json({
+      rowCount: result.rowCount,
+      rows: result.rows
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Start server
+server.listen(3000)
+```
+
+## File System Manager
+
+A server for browsing and managing files with content preview.
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+import fs from 'fs/promises'
+import path from 'path'
+import mime from 'mime-types'
+
+const server = createMCPServer('file-manager', {
+  version: '1.0.0',
+  description: 'File system browsing and management'
+})
+
+// Configuration
+const BASE_DIR = process.env.BASE_DIR || process.cwd()
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
+// Helper: Validate path is within base directory
+function validatePath(filePath: string): string {
+  const resolved = path.resolve(BASE_DIR, filePath)
+  if (!resolved.startsWith(BASE_DIR)) {
+    throw new Error('Access denied: Path outside base directory')
+  }
+  return resolved
+}
+
+// Tool: List directory contents
+server.tool({
+  name: 'list_directory',
+  description: 'List contents of a directory',
+  inputs: [
+    {
+      name: 'path',
+      type: 'string',
+      description: 'Directory path relative to base',
+      required: false,
+      default: '.'
+    },
+    {
+      name: 'showHidden',
+      type: 'boolean',
+      description: 'Show hidden files',
+      required: false,
+      default: false
+    }
+  ],
+  cb: async ({ path: dirPath = '.', showHidden = false }) => {
+    try {
+      const fullPath = validatePath(dirPath)
+      const items = await fs.readdir(fullPath, { withFileTypes: true })
+
+      const entries = await Promise.all(
+        items
+          .filter(item => showHidden || !item.name.startsWith('.'))
+          .map(async item => {
+            const itemPath = path.join(fullPath, item.name)
+            const stats = await fs.stat(itemPath)
+
+            return {
+              name: item.name,
+              type: item.isDirectory() ? 'directory' : 'file',
+              size: stats.size,
+              modified: stats.mtime.toISOString()
+            }
+          })
+      )
+
+      const formatted = entries
+        .sort((a, b) => {
+          if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+          return a.name.localeCompare(b.name)
+        })
+        .map(entry =>
+          `${entry.type === 'directory' ? '📁' : '📄'} ${entry.name}` +
+          ` (${entry.type === 'file' ? `${entry.size} bytes` : 'directory'})`
+        )
+        .join('\n')
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Contents of ${dirPath}:\n\n${formatted}`
+        }]
+      }
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Error listing directory: ${error.message}`
+        }]
+      }
+    }
+  }
+})
+
+// Tool: Read file content
+server.tool({
+  name: 'read_file',
+  description: 'Read the contents of a file',
+  inputs: [
+    {
+      name: 'path',
+      type: 'string',
+      description: 'File path relative to base',
+      required: true
+    },
+    {
+      name: 'encoding',
+      type: 'string',
+      description: 'File encoding (utf8, base64, etc)',
+      required: false,
+      default: 'utf8'
+    }
+  ],
+  cb: async ({ path: filePath, encoding = 'utf8' }) => {
+    try {
+      const fullPath = validatePath(filePath)
+      const stats = await fs.stat(fullPath)
+
+      if (stats.size > MAX_FILE_SIZE) {
+        return {
+          content: [{
+            type: 'text',
+            text: `File too large (${stats.size} bytes). Maximum size: ${MAX_FILE_SIZE} bytes`
+          }]
+        }
+      }
+
+      const content = await fs.readFile(fullPath, encoding as any)
+      const mimeType = mime.lookup(fullPath) || 'text/plain'
+
+      return {
+        content: [{
+          type: 'text',
+          text: `File: ${filePath}\nType: ${mimeType}\nSize: ${stats.size} bytes\n\n---\n\n${content}`
+        }]
+      }
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Error reading file: ${error.message}`
+        }]
+      }
+    }
+  }
+})
+
+// Resource Template: File access
+server.resourceTemplate({
+  name: 'file',
+  resourceTemplate: {
+    uriTemplate: 'file://{path}',
+    name: 'File Content',
+    description: 'Access file contents'
+  },
+  readCallback: async (uri, params) => {
+    try {
+      const fullPath = validatePath(params.path)
+      const stats = await fs.stat(fullPath)
+      const mimeType = mime.lookup(fullPath) || 'application/octet-stream'
+
+      if (stats.size > MAX_FILE_SIZE) {
+        return {
+          contents: [{
+            uri: uri.toString(),
+            mimeType: 'text/plain',
+            text: `File too large: ${stats.size} bytes`
+          }]
+        }
+      }
+
+      // Determine how to read based on MIME type
+      if (mimeType.startsWith('text/') || mimeType === 'application/json') {
+        const content = await fs.readFile(fullPath, 'utf8')
+        return {
+          contents: [{
+            uri: uri.toString(),
+            mimeType,
+            text: content
+          }]
+        }
+      } else {
+        const content = await fs.readFile(fullPath)
+        return {
+          contents: [{
+            uri: uri.toString(),
+            mimeType,
+            blob: content.toString('base64')
+          }]
+        }
+      }
+    } catch (error) {
+      return {
+        contents: [{
+          uri: uri.toString(),
+          mimeType: 'text/plain',
+          text: `Error: ${error.message}`
+        }]
+      }
+    }
+  }
+})
+
+// Start server
+server.listen(3000)
+```
+
+## Best Practices Summary
+
+These examples demonstrate:
+
+1. **Proper Error Handling**: All operations include try-catch blocks
+2. **Input Validation**: Parameters are validated before use
+3. **Caching**: Weather service implements simple caching
+4. **Security**: Database server restricts queries, file manager validates paths
+5. **Resource Management**: Database uses connection pooling
+6. **Type Safety**: Full TypeScript types throughout
+7. **Documentation**: Clear descriptions for all tools and resources
+8. **Performance**: Limits on query results and file sizes
+9. **UI Integration**: Multiple widget types demonstrated
+10. **API Design**: RESTful endpoints for widget data
+
+## Next Steps
+
+- [Getting Started](./getting-started) - Set up your first server
+- [API Reference](./api-reference) - Complete API documentation
+- [Tools Guide](./tools) - Deep dive into tool development
+- [UI Widgets](./ui-widgets) - Building interactive widgets

@@ -4,3 +4,179 @@ description: "Build MCP servers with mcp-use's server framework"
 icon: "list-start"
 ---
 
+# MCP Server Framework
+
+The `mcp-use` package provides a powerful and intuitive framework for building Model Context Protocol (MCP) servers with TypeScript. It combines the official MCP SDK with Express.js to enable both MCP protocol communication and HTTP endpoints for UI widgets and custom routes.
+
+## Key Features
+
+- **Fluent API Design**: Chain methods to configure tools, resources, prompts, and UI widgets
+- **Express Integration**: Built-in Express server for HTTP endpoints, static file serving, and custom routes
+- **UI Widget Support**: Native support for MCP-UI widgets and OpenAI Apps SDK components
+- **Type Safety**: Full TypeScript support with comprehensive type definitions
+- **Resource Templates**: Dynamic resource generation with URI templates and parameters
+- **Inspector UI**: Optional development UI for testing and debugging your MCP server
+- **Flexible Architecture**: Modular design supporting tools, resources, prompts, and UI components
+
+## Installation
+
+Install the package via npm:
+
+```bash
+npm install mcp-use
+```
+
+For development and testing, you can also install the optional inspector UI:
+
+```bash
+npm install --save-dev @mcp-use/inspector
+```
+
+## Quick Start
+
+Here's a minimal example to get you started:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+
+// Create server instance
+const server = createMCPServer('my-mcp-server', {
+  version: '1.0.0',
+  description: 'My first MCP server'
+})
+
+// Define a simple tool
+server.tool({
+  name: 'greet',
+  description: 'Greet someone by name',
+  inputs: [
+    { name: 'name', type: 'string', required: true }
+  ],
+  cb: async ({ name }) => {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Hello, ${name}! Welcome to MCP.`
+        }
+      ]
+    }
+  }
+})
+
+// Define a resource
+server.resource({
+  name: 'config',
+  uri: 'config://settings',
+  mimeType: 'application/json',
+  description: 'Server configuration',
+  readCallback: async () => ({
+    contents: [{
+      uri: 'config://settings',
+      mimeType: 'application/json',
+      text: JSON.stringify({
+        theme: 'dark',
+        language: 'en'
+      })
+    }]
+  })
+})
+
+// Start the server
+server.listen(3000)
+```
+
+When you run this server, it will be available at:
+- **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
+- **Inspector UI**: `http://localhost:3000/inspector` - Development and testing interface (if @mcp-use/inspector is installed)
+
+## Architecture Overview
+
+The MCP server framework is built on several core concepts:
+
+### 1. **Server Instance**
+The main server object created via `createMCPServer()`. It manages all MCP functionality and HTTP endpoints.
+
+### 2. **Tools**
+Functions that MCP clients can invoke with parameters. Tools perform actions and return results.
+
+### 3. **Resources**
+Static or dynamic content that clients can read. Resources can be simple files or complex data structures.
+
+### 4. **Prompts**
+Template-based prompt generation for AI models, accepting parameters to create structured prompts.
+
+### 5. **UI Resources**
+Interactive widgets that can be embedded in web applications, supporting both MCP-UI and OpenAI Apps SDK formats.
+
+### 6. **Express Integration**
+Full access to Express.js functionality for adding custom routes, middleware, and static file serving.
+
+## Core Components
+
+### McpServer Class
+
+The main server class that orchestrates all functionality:
+
+```typescript
+class McpServer {
+  constructor(config: ServerConfig)
+
+  // MCP Protocol Methods
+  tool(definition: ToolDefinition): this
+  resource(definition: ResourceDefinition): this
+  resourceTemplate(definition: ResourceTemplateDefinition): this
+  prompt(definition: PromptDefinition): this
+  uiResource(definition: UIResourceDefinition): this
+
+  // Server Control
+  listen(port?: number): Promise<void>
+
+  // Express proxy - all Express methods available
+  // e.g., server.get(), server.post(), server.use()
+}
+```
+
+### Type System
+
+The framework provides comprehensive TypeScript types for all components:
+
+- `ServerConfig` - Server configuration
+- `ToolDefinition` - Tool configuration and callbacks
+- `ResourceDefinition` - Resource configuration and read callbacks
+- `PromptDefinition` - Prompt template configuration
+- `UIResourceDefinition` - UI widget configuration
+- `InputDefinition` - Parameter definitions for tools and prompts
+
+## MCP Protocol Support
+
+The server fully implements the MCP protocol specification:
+
+- **Transport**: HTTP with Server-Sent Events (SSE) for streaming
+- **Tools**: Function execution with typed parameters
+- **Resources**: Content serving with MIME types and annotations
+- **Prompts**: Template-based prompt generation
+- **Resource Templates**: Dynamic resource generation with URI parameters
+
+## UI Widget System
+
+The framework supports multiple UI widget formats:
+
+### MCP-UI Widgets
+- External URL widgets (iframe-based)
+- Raw HTML widgets
+- Remote DOM scripting
+
+### OpenAI Apps SDK
+- Text/HTML+Skybridge format
+- Widget CSP configuration
+- Tool output templates
+
+## Next Steps
+
+- [Getting Started Guide](./getting-started) - Detailed setup and first server
+- [API Reference](./api-reference) - Complete API documentation
+- [Tools Guide](./tools) - Building and configuring tools
+- [Resources Guide](./resources) - Static and dynamic resources
+- [UI Widgets](./ui-widgets) - Creating interactive widgets
+- [Examples](./examples) - Real-world implementation examples
