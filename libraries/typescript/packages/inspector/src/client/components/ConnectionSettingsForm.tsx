@@ -106,9 +106,7 @@ export function ConnectionSettingsForm({
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
 
-  const enabledHeadersCount = customHeaders.filter(
-    h => h.name && h.value,
-  ).length
+  // Note: we compute header enablement on-demand where needed to avoid unused vars
 
   const handleCopyConfig = async () => {
     if (!url.trim()) {

@@ -38,7 +38,9 @@ export function OpenAIComponentRenderer({
   className,
   noWrapper = false,
 }: OpenAIComponentRendererProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const iframeRef = useRef<InstanceType<typeof window.HTMLIFrameElement> | null>(
+    null,
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -121,7 +123,7 @@ export function OpenAIComponentRenderer({
     if (!widgetUrl)
       return
 
-    const handleMessage = async (event: MessageEvent) => {
+    const handleMessage = async (event: any) => {
       // Only accept messages from our iframe
       if (
         !iframeRef.current
@@ -155,6 +157,8 @@ export function OpenAIComponentRenderer({
 
         case 'openai:sendFollowup':
           // Followup messages not yet supported
+          break
+        default:
           break
       }
     }
@@ -205,14 +209,14 @@ export function OpenAIComponentRenderer({
     let rafId: number
     const tick = () => {
       measure()
-      rafId = requestAnimationFrame(tick)
+      rafId = window.requestAnimationFrame(tick)
     }
     tick()
 
     window.addEventListener('resize', measure)
 
     return () => {
-      cancelAnimationFrame(rafId)
+      window.cancelAnimationFrame(rafId)
       window.removeEventListener('resize', measure)
     }
   }, [widgetUrl])

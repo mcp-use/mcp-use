@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import type { SavedRequest } from '@/client/components/tools'
+import { useEffect, useState } from 'react'
 
 const SAVED_REQUESTS_KEY = 'mcp-inspector-saved-requests'
 
@@ -21,7 +21,7 @@ export function useSavedRequests() {
 
   // Listen for changes to saved requests from other components
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
+    const handleStorageChange = (e: any) => {
       if (e.key === SAVED_REQUESTS_KEY && e.newValue) {
         try {
           setSavedRequests(JSON.parse(e.newValue))
