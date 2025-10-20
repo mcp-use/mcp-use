@@ -365,7 +365,10 @@
                 "group": "Getting Started",
                 "icon": "list-start",
                 "pages": [
-                  "typescript/index"
+                  "typescript/index",
+                  "typescript/getting-started/quickstart",
+                  "typescript/getting-started/installation",
+                  "typescript/getting-started/configuration"
                 ]
               },
               {
@@ -373,35 +376,106 @@
                 "icon": "server",
                 "tag": "Beta",
                 "pages": [
-                  "typescript/index"
+                  "typescript/server/index",
+                  {
+                    "group": "Overview",
+                    "icon": "globe",
+                    "pages": [
+                      "typescript/server/getting-started"
+                    ]
+                  },
+                  {
+                    "group": "Core Features",
+                    "icon": "list-plus",
+                    "pages": [
+                      "typescript/server/tools",
+                      "typescript/server/resources",
+                      "typescript/server/api-reference"
+                    ]
+                  },
+                  {
+                    "group": "Advanced Features",
+                    "icon": "sparkle",
+                    "pages": []
+                  }
                 ]
               },
               {
                 "group": "MCP Client",
                 "icon": "router",
                 "pages": [
-                  "typescript/index"
+                  {
+                    "group": "Overview",
+                    "icon": "globe",
+                    "pages": [
+                      "typescript/client/client-configuration",
+                      "typescript/client/connection-types",
+                      "typescript/client/sandbox",
+                      "typescript/client/direct-tool-calls"
+                    ]
+                  },
+                  {
+                    "group": "Core Features",
+                    "icon": "list-plus",
+                    "pages": [
+                      "typescript/client/multi-server-setup",
+                      "typescript/client/tools",
+                      "typescript/client/resources",
+                      "typescript/client/prompts"
+                    ]
+                  },
+                  {
+                    "group": "Advanced Features",
+                    "icon": "sparkle",
+                    "pages": [
+                      "typescript/client/sampling",
+                      "typescript/client/elicitation",
+                      "typescript/client/notifications",
+                      "typescript/client/logging"
+                    ]
+                  },
+                  "typescript/client/authentication"
                 ]
               },
               {
                 "group": "MCP Agents",
                 "icon": "brain",
                 "pages": [
-                  "typescript/index"
+                  {
+                    "group": "Overview",
+                    "icon": "globe",
+                    "pages": [
+                      "typescript/agent/agent-configuration",
+                      "typescript/agent/llm-integration"
+                    ]
+                  },
+                  {
+                    "group": "Core Features",
+                    "icon": "list-plus",
+                    "pages": [
+                      "typescript/agent/structured-output",
+                      "typescript/agent/streaming",
+                      "typescript/agent/interactive-chat-patterns"
+                    ]
+                  },
+                  "typescript/agent/server-manager",
+                  "typescript/agent/building-custom-agents"
                 ]
               },
               {
                 "group": "Development",
                 "icon": "sparkle",
                 "pages": [
-                  "typescript/index"
+                  "typescript/development/logging",
+                  "typescript/development/security"
                 ]
               }
             ]
           },
           {
             "tab": "API Reference",
-            "icon": "terminal"
+            "icon": "terminal",
+            "groups": []
           },
           {
             "tab": "Changelog",
@@ -409,12 +483,11 @@
             "groups": [
               {
                 "group": "Changelog",
-                "pages": [
-                  "typescript/changelog/changelog"
-                ]
+                "pages": []
               },
               {
                 "group": "Versions",
+                "pages": []
                 "pages": []
               }
             ]
