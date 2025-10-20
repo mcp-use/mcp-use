@@ -8,6 +8,7 @@ import { useInspector } from '@/client/context/InspectorContext'
 import { useMcpContext } from '@/client/context/McpContext'
 import { useAutoConnect } from '@/client/hooks/useAutoConnect'
 import { useKeyboardShortcuts } from '@/client/hooks/useKeyboardShortcuts'
+import { useSavedRequests } from '@/client/hooks/useSavedRequests'
 import { CommandPalette } from './CommandPalette'
 import { LayoutContent } from './LayoutContent'
 import { LayoutHeader } from './LayoutHeader'
@@ -29,6 +30,7 @@ export function Layout({ children }: LayoutProps) {
   } = useInspector()
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+  const savedRequests = useSavedRequests()
 
   // Refs for search inputs in tabs
   const toolsSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
@@ -281,6 +283,7 @@ export function Layout({ children }: LayoutProps) {
           tools={aggregatedTools}
           prompts={aggregatedPrompts}
           resources={aggregatedResources}
+          savedRequests={savedRequests}
           connections={connections}
           onNavigate={handleCommandPaletteNavigate}
           onServerSelect={handleServerSelect}

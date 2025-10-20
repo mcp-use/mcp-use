@@ -4,6 +4,7 @@ import { Button } from '@/client/components/ui/button'
 import { usePrismTheme } from '@/client/hooks/usePrismTheme'
 import { isMcpUIResource, McpUIRenderer } from '../McpUIRenderer'
 import { OpenAIComponentRenderer } from '../OpenAIComponentRenderer'
+import { NotFound } from '../ui/not-found'
 
 export interface ToolResult {
   toolName: string
@@ -27,6 +28,8 @@ interface ToolResultDisplayProps {
   results: ToolResult[]
   copiedResult: number | null
   previewMode: boolean
+  serverId: string
+  readResource: (uri: string) => Promise<any>
   onCopy: (index: number, result: any) => void
   onDelete: (index: number) => void
   onFullscreen: (index: number) => void
@@ -37,6 +40,8 @@ export function ToolResultDisplay({
   results,
   copiedResult,
   previewMode,
+  serverId,
+  readResource,
   onCopy,
   onTogglePreview,
 }: ToolResultDisplayProps) {
@@ -190,14 +195,7 @@ export function ToolResultDisplay({
 
                                 if (appsSdk.isLoading) {
                                   return (
-                                    <div className="flex items-center justify-center h-32">
-                                      <div className="flex flex-col items-center gap-3">
-                                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                                          Loading resource...
-                                        </p>
-                                      </div>
-                                    </div>
+                                    <></>
                                   )
                                 }
 
@@ -223,6 +221,8 @@ export function ToolResultDisplay({
                                         toolName={result.toolName}
                                         toolArgs={result.args}
                                         toolResult={appsSdk.resourceData}
+                                        serverId={serverId}
+                                        readResource={readResource}
                                         className="w-full h-full relative flex p-4"
                                       />
                                     </div>
@@ -360,10 +360,8 @@ export function ToolResultDisplay({
           : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <p className="text-gray-500 dark:text-gray-400">No results yet</p>
-                  <p className="text-gray-400 dark:text-gray-500 text-sm">
-                    Execute a tool to see results here
-                  </p>
+                  <NotFound vertical noBorder message="No Results yet" />
+
                 </div>
               </div>
             )}

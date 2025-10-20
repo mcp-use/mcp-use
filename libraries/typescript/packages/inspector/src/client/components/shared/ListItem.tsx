@@ -41,9 +41,9 @@ export function ListItem({
       className={cn(
         'w-full text-left cursor-pointer p-4 border-b dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors group',
         isSelected
-        && 'bg-blue-50 dark:bg-zinc-800 border-l-4 border-l-blue-500',
+        && 'bg-zinc-50 dark:bg-zinc-800 border-l-4 border-l-zinc-500',
         isFocused
-        && 'ring-2 ring-blue-500 dark:ring-blue-400 ring-inset',
+        && 'ring-2 ring-zinc-500 dark:ring-zinc-400 ring-inset',
         className,
       )}
     >
@@ -51,9 +51,9 @@ export function ListItem({
         <div className="flex-shrink-0 mt-1">
           <div
             className={cn(
-              'p-3 rounded-full transition-colors',
+              'p-2.5 rounded-full transition-colors',
               isSelected
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                ? 'bg-zinc-500 dark:bg-zinc-100/80 text-zinc-100 dark:text-zinc-900'
                 : 'bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-zinc-600',
             )}
           >
@@ -64,15 +64,12 @@ export function ListItem({
           <div className="flex items-center gap-2 mb-1">
             <h3
               className={cn(
-                'font-medium truncate',
-                isSelected
-                  ? 'text-blue-700 dark:text-blue-400'
-                  : 'text-gray-900 dark:text-gray-100',
+                'font-medium truncate font-mono text-sm',
               )}
             >
               {title}
             </h3>
-            {metadata}
+            {/* {metadata} */}
           </div>
           {description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
@@ -84,4 +81,3 @@ export function ListItem({
     </button>
   )
 }
-

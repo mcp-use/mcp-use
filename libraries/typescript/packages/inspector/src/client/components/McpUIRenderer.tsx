@@ -1,5 +1,12 @@
 import type { Resource } from '@modelcontextprotocol/sdk/types.js'
-import { UIResourceRenderer } from '@mcp-ui/client'
+import {
+  basicComponentLibrary,
+  remoteButtonDefinition,
+  remoteImageDefinition,
+  remoteStackDefinition,
+  remoteTextDefinition,
+  UIResourceRenderer,
+} from '@mcp-ui/client'
 
 interface McpUIRendererProps {
   resource: Resource
@@ -56,6 +63,16 @@ export function McpUIRenderer({ resource, onUIAction, className }: McpUIRenderer
             width: '100%',
             minHeight: '200px',
           },
+          sandboxPermissions: 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox',
+        }}
+        remoteDomProps={{
+          remoteElements: [
+            remoteTextDefinition,
+            remoteButtonDefinition,
+            remoteStackDefinition,
+            remoteImageDefinition,
+          ],
+          library: basicComponentLibrary,
         }}
       />
     </div>

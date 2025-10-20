@@ -33,6 +33,7 @@ interface ToolsTabProps {
   tools: Tool[]
   callTool: (name: string, args?: Record<string, unknown>) => Promise<any>
   readResource: (uri: string) => Promise<any>
+  serverId: string
   isConnected: boolean
 }
 
@@ -43,10 +44,12 @@ export function ToolsTab({
   tools,
   callTool,
   readResource,
+  serverId,
   isConnected,
 }: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
   // State
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null)
+  const [selectedSavedRequest, setSelectedSavedRequest] = useState<SavedRequest | null>(null)
   const { selectedToolName, setSelectedToolName } = useInspector()
   const [toolArgs, setToolArgs] = useState<Record<string, unknown>>({})
   const [results, setResults] = useState<ToolResult[]>([])
@@ -154,6 +157,7 @@ export function ToolsTab({
       if (tool) {
         setSelectedTool(tool)
         setToolArgs(request.args)
+        setSelectedSavedRequest(request)
       }
     },
     [tools],
@@ -262,7 +266,7 @@ export function ToolsTab({
 
       if (tool && selectedTool?.name !== tool.name) {
         setSelectedToolName(null)
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           handleToolSelect(tool)
           const toolElement = document.getElementById(`tool-${tool.name}`)
           if (toolElement) {
@@ -272,6 +276,8 @@ export function ToolsTab({
             })
           }
         }, 100)
+
+        return () => clearTimeout(timeoutId)
       }
     }
   }, [
@@ -520,6 +526,8 @@ export function ToolsTab({
       toolName: selectedTool.name,
       args: toolArgs,
       savedAt: Date.now(),
+      serverId: (selectedTool as any)._serverId,
+      serverName: (selectedTool as any)._serverName,
     }
 
     saveSavedRequests([...savedRequests, newRequest])
@@ -530,8 +538,12 @@ export function ToolsTab({
   const deleteSavedRequest = useCallback(
     (id: string) => {
       saveSavedRequests(savedRequests.filter(r => r.id !== id))
+      // Clear selection if the deleted request was selected
+      if (selectedSavedRequest?.id === id) {
+        setSelectedSavedRequest(null)
+      }
     },
-    [savedRequests, saveSavedRequests],
+    [savedRequests, saveSavedRequests, selectedSavedRequest],
   )
 
   return (
@@ -566,6 +578,7 @@ export function ToolsTab({
           : (
               <SavedRequestsList
                 savedRequests={savedRequests}
+                selectedRequest={selectedSavedRequest}
                 onLoadRequest={loadSavedRequest}
                 onDeleteRequest={deleteSavedRequest}
                 focusedIndex={focusedIndex}
@@ -597,6 +610,8 @@ export function ToolsTab({
                 results={results}
                 copiedResult={copiedResult}
                 previewMode={previewMode}
+                serverId={serverId}
+                readResource={readResource}
                 onCopy={handleCopyResult}
                 onDelete={handleDeleteResult}
                 onFullscreen={handleFullscreen}
