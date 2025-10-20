@@ -8,6 +8,7 @@
     "mcp-use": "1.1.3"
   },
   "changesets": [
-    "loud-ducks-allow"
+    "loud-ducks-allow",
+    "major-bears-shop"
   ]
 }

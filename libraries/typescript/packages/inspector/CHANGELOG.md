@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 0.4.4-canary.1
+
+### Patch Changes
+
+- f88801a: fix inspector shadow
+
 ## 0.4.4-canary.0
 
 ### Patch Changes
