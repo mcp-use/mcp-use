@@ -1,13 +1,21 @@
 # mcp-use
 
+## 1.1.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f11f846]
+  - @mcp-use/inspector@0.4.4-canary.0
+
 ## 1.1.3
 
 ### Patch Changes
 
-  ### Authentication and Connection
-  - **Enhanced OAuth Handling**: Extracted base URL (origin) for OAuth discovery in `onMcpAuthorization` and `useMcp` functions to ensure proper metadata retrieval
-  - **Improved Connection Robustness**: Enhanced connection handling by resetting the connecting flag for all terminal states, including `auth_redirect`, to allow for reconnections after authentication
-  - Improved logging for connection attempts with better debugging information
+### Authentication and Connection
+
+- **Enhanced OAuth Handling**: Extracted base URL (origin) for OAuth discovery in `onMcpAuthorization` and `useMcp` functions to ensure proper metadata retrieval
+- **Improved Connection Robustness**: Enhanced connection handling by resetting the connecting flag for all terminal states, including `auth_redirect`, to allow for reconnections after authentication
+- Improved logging for connection attempts with better debugging information
 
 - Updated dependencies [4852465]
   - @mcp-use/inspector@0.4.3

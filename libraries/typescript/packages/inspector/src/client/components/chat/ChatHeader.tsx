@@ -54,11 +54,13 @@ export function ChatHeader({
                 onClick={() => onConfigDialogOpenChange(true)}
               >
                 <img
-                  src={`/inspector/providers/${llmConfig.provider}.png`}
+                  src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
                   alt={llmConfig.provider}
                   className="w-4 h-4 mr-0"
                 />
-                {llmConfig.provider}/{llmConfig.model}
+                {llmConfig.provider}
+                /
+                {llmConfig.model}
               </Badge>
             </TooltipTrigger>
             <TooltipContent>

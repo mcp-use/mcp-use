@@ -99,7 +99,7 @@ export function ChatLandingForm({
                     onClick={() => onConfigDialogOpenChange(true)}
                   >
                     <img
-                      src={`/inspector/providers/${llmConfig.provider}.png`}
+                      src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
                       alt={llmConfig.provider}
                       className="w-4 h-4 mr-0 rounded-full"
                     />
