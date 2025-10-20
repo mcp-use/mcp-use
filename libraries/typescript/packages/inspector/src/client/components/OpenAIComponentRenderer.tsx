@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { Spinner } from './ui/spinner'
 
 interface OpenAIComponentRendererProps {
   componentUrl: string
@@ -179,17 +180,15 @@ export function OpenAIComponentRenderer({
   return (
     <Wrapper className={className} noWrapper={noWrapper}>
       {!isReady && (
-        <div className="bg-blue-50/30 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/50 rounded-lg p-4 mb-2">
-          <p className="text-sm text-blue-600 dark:text-blue-400">
-            Loading component...
-          </p>
+        <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
+          <Spinner className="size-5" />
         </div>
       )}
 
       <iframe
         ref={iframeRef}
         srcDoc={htmlContent}
-        className={cn('w-full border rounded-3xl bg-white dark:bg-gray-900', noWrapper && 'h-[400px]')}
+        className={cn('w-full border rounded-3xl bg-white', noWrapper && 'h-[400px]')}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
         title={`OpenAI Component: ${toolName}`}
         allow="web-share"

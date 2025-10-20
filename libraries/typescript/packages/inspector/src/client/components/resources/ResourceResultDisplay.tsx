@@ -5,6 +5,7 @@ import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
 import { usePrismTheme } from '@/client/hooks/usePrismTheme'
 import { isMcpUIResource, McpUIRenderer } from '../McpUIRenderer'
+import { Spinner } from '../ui/spinner'
 
 export interface ResourceResult {
   uri: string
@@ -37,13 +38,8 @@ export function ResourceResultDisplay({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Loading resource...
-          </p>
-        </div>
+      <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
+        <Spinner className="size-5" />
       </div>
     )
   }

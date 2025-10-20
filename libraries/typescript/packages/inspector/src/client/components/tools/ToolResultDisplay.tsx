@@ -191,14 +191,7 @@ export function ToolResultDisplay({
 
                                 if (appsSdk.isLoading) {
                                   return (
-                                    <div className="flex items-center justify-center h-32">
-                                      <div className="flex flex-col items-center gap-3">
-                                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                                          Loading resource...
-                                        </p>
-                                      </div>
-                                    </div>
+                                    <></>
                                   )
                                 }
 
