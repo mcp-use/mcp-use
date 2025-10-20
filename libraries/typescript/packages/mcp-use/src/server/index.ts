@@ -18,12 +18,13 @@ export {
 export type {
   InputDefinition,
   PromptDefinition,
-  PromptHandler,
+  PromptCallback,
   ResourceDefinition,
-  ResourceHandler,
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
   ServerConfig,
   ToolDefinition,
-  ToolHandler,
+  ToolCallback,
   // UIResource specific types
   UIResourceDefinition,
   ExternalUrlUIResource,

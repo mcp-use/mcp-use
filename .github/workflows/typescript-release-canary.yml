@@ -1,0 +1,93 @@
+name: TypeScript Release Canary
+
+on:
+  push:
+    branches:
+      - canary
+    paths:
+      - "libraries/typescript/**"
+      - ".github/workflows/typescript-release-canary.yml"
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  release:
+    name: Release Canary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install Dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Packages
+        working-directory: libraries/typescript
+        run: pnpm build
+
+      - name: Enter Prerelease Mode
+        run: |
+          cd libraries/typescript
+          if [ ! -f .changeset/pre.json ]; then
+            echo "Entering canary prerelease mode..."
+            pnpm changeset pre enter canary
+            cd ../..
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add libraries/typescript/.changeset/pre.json
+            git commit -m "chore: enter canary prerelease mode" || echo "No changes to commit"
+            git push
+          else
+            echo "Already in prerelease mode"
+          fi
+
+      - name: Check for changesets
+        working-directory: libraries/typescript
+        id: has-changesets
+        run: |
+          if [ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ]; then
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Version packages
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        run: |
+          cd libraries/typescript
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pnpm changeset version
+          cd ../..
+          git add .
+          git commit -m "chore(typescript): version packages (canary)" || echo "No changes to commit"
+          git push
+
+      - name: Publish packages
+        if: steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > .npmrc
+          pnpm changeset publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

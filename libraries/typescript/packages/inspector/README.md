@@ -37,7 +37,7 @@
 
 | Feature                    | Description                                                     |
 | -------------------------- | --------------------------------------------------------------- |
-| **🚀 Auto-Mount**          | Automatically available at `/inspector` for all MCP-Use servers |
+| **🚀 Auto-Mount**          | Automatically available at `/inspector` for all mcp-use servers |
 | **🔌 Multi-Connection**    | Connect to and manage multiple MCP servers simultaneously       |
 | **🎯 Interactive Testing** | Test tools with live execution and real-time results            |
 | **📊 Real-time Status**    | Monitor connection states, errors, and server health            |
@@ -53,7 +53,7 @@
 
 ## 🚀 Quick Start
 
-### Method 1: Automatic with MCP-Use Server (Recommended)
+### Method 1: Automatic with mcp-use Server (Recommended)
 
 When you create an MCP server with `mcp-use`, the inspector is automatically available:
 
@@ -84,13 +84,13 @@ Use the inspector with any MCP server (local or remote):
 
 ```bash
 # Inspect a remote server
-npx @mcp-use/inspector --url https://mcp.linear.app/sse
+npx mcp-inspect --url https://mcp.linear.app/sse
 
 # Custom port
-npx @mcp-use/inspector --url http://localhost:3000/mcp --port 8080
+npx mcp-inspect --url http://localhost:3000/mcp --port 8080
 
 # Open inspector without auto-connect
-npx @mcp-use/inspector
+npx mcp-inspect
 ```
 
 ### Method 3: Custom Integration
@@ -544,7 +544,7 @@ See our [contributing guide](https://github.com/mcp-use/mcp-use-ts/blob/main/CON
 
 ## 📚 Learn More
 
-- [MCP-Use Documentation](https://github.com/mcp-use/mcp-use-ts)
+- [mcp-use Documentation](https://github.com/mcp-use/mcp-use-ts)
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [Creating MCP Servers](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/mcp-use#-mcp-server-framework)
 - [Building with React](https://react.dev)
@@ -554,4 +554,4 @@ See our [contributing guide](https://github.com/mcp-use/mcp-use-ts/blob/main/CON
 
 ## 📜 License
 
-MIT © [MCP-Use](https://github.com/mcp-use)
+MIT © [mcp-use](https://github.com/mcp-use)

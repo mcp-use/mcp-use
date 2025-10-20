@@ -2,10 +2,10 @@
 
 import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
+import { Button } from '@/client/components/ui/button'
+import { Input } from '@/client/components/ui/input'
+import { Label } from '@/client/components/ui/label'
+import { cn } from '@/client/lib/utils'
 
 export interface CustomHeader {
   name: string
@@ -97,18 +97,29 @@ export function CustomHeadersEditor({
                 <Input
                   placeholder="Authorization"
                   value=""
-                  onChange={() => {}}
+                  onChange={(e) => {
+                    // Create a new header when user starts typing
+                    if (e.target.value.trim()) {
+                      const newHeader: CustomHeader = {
+                        id: generateId(),
+                        name: e.target.value,
+                        value: '',
+                      }
+                      onChange([newHeader])
+                    }
+                  }}
                   className="text-sm"
                   autoComplete="off"
                 />
                 <div className="flex items-center gap-2">
                   <Input
-                    placeholder=""
+                    placeholder="Bearer token..."
                     value=""
                     onChange={() => {}}
                     type="password"
                     className="font-mono text-sm"
                     autoComplete="off"
+                    disabled
                   />
                   <Button
                     type="button"

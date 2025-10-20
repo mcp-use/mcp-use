@@ -48,33 +48,6 @@ client = MCPClient(
     sampling_callback=sampling_callback
 )
 ```
-
-```typescript TypeScript
-// ⚠️ Sampling callbacks are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use-ts
-
-// When supported, the API will look similar to:
-/*
-import { MCPClient } from 'mcp-use'
-
-async function samplingCallback(context, params) {
-    // Integrate with your LLM of choice
-    const response = await yourLlm.complete(params.messages.at(-1).content.text)
-
-    return {
-        content: { text: response, type: 'text' },
-        model: 'your-model-name',
-        role: 'assistant'
-    }
-}
-
-const client = new MCPClient(
-    config,
-    { samplingCallback }
-)
-*/
-```
 </CodeGroup>
 
 
@@ -113,10 +86,5 @@ client = MCPClient(config="config.json")  # No sampling_callback
 # Tool that requires sampling will return an error
 result = await session.call_tool("analyze_sentiment", {"text": "Hello"})
 # result.isError will be True
-```
-
-```typescript TypeScript
-// ⚠️ Not yet supported - see above for details
-// When supported, similar error handling will apply
 ```
 </CodeGroup>

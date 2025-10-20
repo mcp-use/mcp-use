@@ -1,19 +1,198 @@
 # @mcp-use/inspector
 
-## 0.3.11
+## 0.4.3
 
 ### Patch Changes
 
-- fix: update to monorepo
-- Updated dependencies
-  - mcp-use@1.0.7
+- 4852465: ## Inspector Package
 
-## 0.3.10
+  ### Major Refactoring and Improvements
+  - **Server Architecture**: Refactored server code with major improvements to routing and middleware
+    - Removed legacy `mcp-inspector.ts` file in favor of modular architecture
+    - Added new `cli.ts` for improved command-line interface handling
+    - Added `utils.ts` and `shared-utils-browser.ts` for better code organization
+    - Enhanced `shared-routes.ts` with improved route handling and error management
+    - Streamlined middleware for better performance
+
+  ### Apps SDK Support
+  - Enhanced widget data handling and state management
+  - Added `readResource` method in MCPInspector for fetching resources based on server ID
+  - Integrated widget data storage and retrieval in inspector routes
+  - Enhanced OpenAI component renderer to utilize serverId and readResource for improved functionality
+  - Added error handling for widget data storage with detailed logging
+  - Improved safe data serialization for widget state management
+
+  ### UI/UX Improvements
+  - Enhanced `ConnectionSettingsForm` with copy configuration feature and improved paste functionality for auto-populating form fields with JSON configuration
+  - Updated `OpenAIComponentRenderer` to dynamically adjust iframe height based on content
+  - Improved resource display with duration metrics and enhanced badge styling
+  - Added proper error handling and type safety across components
+  - Enhanced `LayoutHeader` with dynamic badge styling for better visual feedback
+  - Fixed scrollable tool parameters for better user experience
+  - Added mobile-responsive hiding features
+
+  ### Component Enhancements
+  - Updated `ResourceResultDisplay` to support OpenAI components with proper metadata handling
+  - Enhanced `MessageList` and `ToolResultRenderer` with serverId and readResource props
+  - Improved `ToolExecutionPanel` layout with better spacing and styling consistency
+  - Replaced static error messages with reusable `NotFound` component
+  - Added tooltip support for better user guidance
+
+  ### Bug Fixes
+  - Fixed inspector mounting logic by simplifying server URL handling
+  - Fixed linting issues across multiple components
+  - Fixed server configuration for improved stability
+
+
+## 0.4.3-canary.1
 
 ### Patch Changes
 
-- Updated dependencies [36722a4]
-  - mcp-use@1.0.6
+- 0203a77: fix lint
+- ebf1814: fix server of inspector
+- Updated dependencies [cb60eef]
+  - mcp-use@1.1.3-canary.1
+
+## 0.4.3-canary.0
+
+### Patch Changes
+
+- d171bf7: feat/app-sdk
+- Updated dependencies [d171bf7]
+  - mcp-use@1.1.3-canary.0
+
+## 0.4.2
+
+### Patch Changes
+
+- abb7f52: ## Enhanced MCP Inspector with Auto-Connection and Multi-Server Support
+
+  ### 🚀 New Features
+  - **Auto-connection functionality**: Inspector now automatically connects to MCP servers on startup
+  - **Multi-server support**: Enhanced support for connecting to multiple MCP servers simultaneously
+  - **Client-side chat functionality**: New client-side chat implementation with improved message handling
+  - **Resource handling**: Enhanced chat components with proper resource management
+  - **Browser integration**: Improved browser-based MCP client with better connection handling
+
+  ### 🔧 Improvements
+  - **Streamlined routing**: Refactored server and client routing for better performance
+  - **Enhanced connection handling**: Improved auto-connection logic and error handling
+  - **Better UI components**: Updated Layout, ChatTab, and ToolsTab components
+  - **Dependency updates**: Updated various dependencies for better compatibility
+
+  ### 🐛 Fixes
+  - Fixed connection handling in InspectorDashboard
+  - Improved error messages in useMcp hook
+  - Enhanced Layout component connection handling
+
+  ### 📦 Technical Changes
+  - Added new client-side chat hooks and components
+  - Implemented shared routing and static file handling
+  - Enhanced tool result rendering and display
+  - Added browser-specific utilities and stubs
+  - Updated Vite configuration for better development experience
+
+- Updated dependencies [abb7f52]
+  - mcp-use@1.1.2
+
+## 0.4.2-canary.0
+
+### Patch Changes
+
+- d52c050: ## Enhanced MCP Inspector with Auto-Connection and Multi-Server Support
+
+  ### 🚀 New Features
+  - **Auto-connection functionality**: Inspector now automatically connects to MCP servers on startup
+  - **Multi-server support**: Enhanced support for connecting to multiple MCP servers simultaneously
+  - **Client-side chat functionality**: New client-side chat implementation with improved message handling
+  - **Resource handling**: Enhanced chat components with proper resource management
+  - **Browser integration**: Improved browser-based MCP client with better connection handling
+
+  ### 🔧 Improvements
+  - **Streamlined routing**: Refactored server and client routing for better performance
+  - **Enhanced connection handling**: Improved auto-connection logic and error handling
+  - **Better UI components**: Updated Layout, ChatTab, and ToolsTab components
+  - **Dependency updates**: Updated various dependencies for better compatibility
+
+  ### 🐛 Fixes
+  - Fixed connection handling in InspectorDashboard
+  - Improved error messages in useMcp hook
+  - Enhanced Layout component connection handling
+
+  ### 📦 Technical Changes
+  - Added new client-side chat hooks and components
+  - Implemented shared routing and static file handling
+  - Enhanced tool result rendering and display
+  - Added browser-specific utilities and stubs
+  - Updated Vite configuration for better development experience
+
+- Updated dependencies [d52c050]
+  - mcp-use@1.1.2-canary.0
+
+## 0.4.1
+
+### Patch Changes
+
+- 3670ed0: minor fixes
+- 3670ed0: minor
+- Updated dependencies [3670ed0]
+- Updated dependencies [3670ed0]
+  - mcp-use@1.1.1
+
+## 0.4.1-canary.1
+
+### Patch Changes
+
+- a571b5c: minor
+- Updated dependencies [a571b5c]
+  - mcp-use@1.1.1-canary.1
+
+## 0.4.1-canary.0
+
+### Patch Changes
+
+- 4ad9c7f: minor fixes
+- Updated dependencies [4ad9c7f]
+  - mcp-use@1.1.1-canary.0
+
+## 0.4.0
+
+### Minor Changes
+
+- 0f2b7f6: reafctor: Refactor Inpector to be aligned with mcp-use-ts
+  - Migrated from CommonJS to ESM format
+  - Added input validation for port and URL
+  - Improved error handling and logging
+  - Added `open` package for cross-platform browser launching
+  - Chat components: `AssistantMessage`, `UserMessage`, `ToolCallDisplay`, `MCPUIResource`, `MessageList`
+  - UI components: `aurora-background`, `text-shimmer`, `sheet`, `switch`, `kbd`, `shimmer-button`, `status-dot`
+  - Form components: `ConnectionSettingsForm`, `ServerDropdown`
+  - Tool components: `ToolExecutionPanel`, `ToolResultDisplay`, `SaveRequestDialog`
+  - Resource components: `ResourceResultDisplay`, `ResourcesList`
+  - Reorganized component structure (moved to `src/client/components/`)
+  - Refactored `ChatTab` to use streaming API and custom hooks
+  - Enhanced `InspectorDashboard` with auto-connect functionality
+  - Improved `CommandPalette` with better item selection
+  - Updated routing to use query parameters
+  - Updated `@types/node` to 20.19.21
+  - Upgraded `@typescript-eslint` packages to 8.46.1
+  - Added `inquirer@9.3.8` and `ora@8.2.0` for better CLI experience
+  - Removed `AddServerDialog` and `ServerSelectionModal` to streamline UI
+  - Cleaned up obsolete TypeScript declaration files
+
+  fix: CLI binary format and package configuration
+  - Changed CLI build format from CommonJS to ESM for ESM-only dependency compatibility
+  - Added prepublishOnly hook to ensure build before publishing
+  - Updated documentation references from @mcp-use/inspect to @mcp-use/inspector
+  - Removed compiled artifacts from source directory
+  - Added input validation for port and URL arguments
+  - Improved error logging in API routes
+  - Fixed async/await bugs in static file serving
+
+### Patch Changes
+
+- Updated dependencies [0f2b7f6]
+  - mcp-use@1.1.0
 
 ## 0.3.9
 

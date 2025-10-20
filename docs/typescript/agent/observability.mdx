@@ -1,0 +1,587 @@
+---
+title: "Observability"
+description: "Trace and monitor your MCP agents with Langfuse integration"
+icon: "eye"
+---
+
+## Overview
+
+MCP-use provides **optional observability integration** to help you debug, monitor, and optimize your AI agents. Observability gives you visibility into:
+
+- **Agent execution flow** with detailed step-by-step tracing
+- **Tool usage patterns** and performance metrics
+- **LLM calls** with token usage and costs
+- **Error tracking** and debugging information
+- **Conversation analytics** across sessions
+
+<Warning>
+**Completely Optional**: Observability is entirely opt-in and requires zero code changes to your existing workflows.
+</Warning>
+
+## Supported Platforms
+
+MCP-use currently integrates with:
+
+- **[Langfuse](https://langfuse.com)** - Open-source LLM observability with self-hosting options
+
+The platform automatically initializes when you import `mcp-use` if the required environment variables are set.
+
+## What Gets Traced
+
+Langfuse automatically captures:
+- **Agent conversations** - Full query/response pairs
+- **LLM calls** - Model usage, tokens, and costs
+- **Tool executions** - Which MCP tools were used and their outputs
+- **Chain executions** - Step-by-step execution flow
+- **Performance metrics** - Execution times and step counts
+- **Error tracking** - Failed operations with full context
+
+### Example Trace View
+Your observability dashboard will show something like:
+
+```
+🔍 mcp_agent_run
+├── 💬 LLM Call (gpt-4)
+│   ├── Input: "Help me analyze the sales data"
+│   └── Output: "I'll help you analyze the sales data..."
+├── 🔧 Tool: read_file
+│   ├── Input: {"path": "sales_data.csv"}
+│   └── Output: "CSV content loaded..."
+├── 🔧 Tool: analyze_data
+│   ├── Input: {"data": "...", "analysis_type": "summary"}
+│   └── Output: "Analysis complete..."
+└── 💬 Final Response
+    └── "Based on the sales data analysis..."
+```
+
+# Langfuse Integration
+
+[Langfuse](https://langfuse.com) is an open-source LLM observability platform with both cloud and self-hosted options.
+
+## Setup Langfuse
+
+### 1. Install Langfuse Packages
+```bash
+npm install langfuse langfuse-langchain
+```
+
+### 2. Get Your Keys
+- **Cloud**: Sign up at [cloud.langfuse.com](https://cloud.langfuse.com)
+- **Self-hosted**: Follow the [self-hosting guide](https://langfuse.com/docs/deployment/self-host)
+
+### 3. Set Environment Variables
+```bash
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+```
+
+### 4. Start Using
+```typescript
+// Langfuse automatically initializes when mcp-use is imported
+import { MCPAgent, MCPClient } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+import { config } from 'dotenv'
+
+config() // Load environment variables
+
+const client = new MCPClient({
+  mcpServers: {
+    filesystem: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', '/path/to/allowed/files']
+    }
+  }
+})
+
+const llm = new ChatOpenAI({ model: 'gpt-4' })
+const agent = new MCPAgent({
+  llm,
+  client,
+  maxSteps: 30
+})
+
+// All agent runs are automatically traced!
+const result = await agent.run("Analyze the sales data")
+```
+
+## Langfuse Dashboard Features
+- **Timeline view** - Step-by-step execution flow
+- **Performance metrics** - Response times and costs
+- **Error analysis** - Debug failed operations
+- **Usage analytics** - Tool and model usage patterns
+- **Session grouping** - Track conversations over time
+- **Self-hosting** - Full control over your data
+
+## Environment Variables
+
+### Required
+```bash
+LANGFUSE_PUBLIC_KEY="pk-lf-..."
+LANGFUSE_SECRET_KEY="sk-lf-..."
+```
+
+### Optional
+```bash
+# For self-hosted instances
+LANGFUSE_HOST="https://your-langfuse-instance.com"
+# Alternative
+LANGFUSE_BASEURL="https://your-langfuse-instance.com"
+
+# Release/version identifier
+LANGFUSE_RELEASE="v1.0.0"
+
+# Batch size for flushing (default: 15)
+LANGFUSE_FLUSH_AT="15"
+
+# Flush interval in milliseconds (default: 10000)
+LANGFUSE_FLUSH_INTERVAL="10000"
+
+# Request timeout in milliseconds (default: 10000)
+LANGFUSE_REQUEST_TIMEOUT="10000"
+
+# Disable Langfuse globally
+LANGFUSE_ENABLED="false"
+
+# Disable Langfuse for mcp-use specifically
+MCP_USE_LANGFUSE="false"
+
+# Set environment tag (local, production, staging, hosted)
+MCP_USE_AGENT_ENV="production"
+```
+
+---
+
+# Advanced Configuration
+
+## Custom Metadata and Tags
+
+You can add custom metadata and tags to your traces for better organization and filtering:
+
+```typescript
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  maxSteps: 30
+})
+
+// Set metadata that will be attached to all traces
+agent.setMetadata({
+  agent_id: 'customer-support-agent-01',
+  version: 'v2.0.0',
+  environment: 'production',
+  customer_id: 'cust_12345'
+})
+
+// Set tags for filtering and grouping
+agent.setTags(['customer-support', 'high-priority', 'beta-feature'])
+
+// Run your agent - metadata and tags are automatically included
+const result = await agent.run("Process customer request")
+```
+
+## Environment Tagging
+
+MCP-use automatically adds environment tags to traces based on the `MCP_USE_AGENT_ENV` variable:
+
+```bash
+# Development/local environment
+export MCP_USE_AGENT_ENV="local"
+
+# Production environment
+export MCP_USE_AGENT_ENV="production"
+
+# Staging environment
+export MCP_USE_AGENT_ENV="staging"
+
+# Hosted/cloud environment
+export MCP_USE_AGENT_ENV="hosted"
+```
+
+Traces will be tagged with `env:local`, `env:production`, etc., making it easy to filter traces by environment in your Langfuse dashboard.
+
+## Custom Callbacks
+
+You can provide custom Langfuse callback handlers or other LangChain callbacks:
+
+```typescript
+import { CallbackHandler } from 'langfuse-langchain'
+import { MCPAgent } from 'mcp-use'
+
+// Create a custom Langfuse handler
+const customHandler = new CallbackHandler({
+  publicKey: 'pk-lf-custom',
+  secretKey: 'sk-lf-custom',
+  baseUrl: 'https://custom-langfuse.com'
+})
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  callbacks: [customHandler] // Use custom callbacks instead of auto-detected ones
+})
+```
+
+## Disabling Observability
+
+You can disable observability in several ways:
+
+### 1. Via Environment Variable
+```bash
+# Disable globally for Langfuse
+export LANGFUSE_ENABLED="false"
+
+# Disable for mcp-use specifically
+export MCP_USE_LANGFUSE="false"
+```
+
+### 2. Via Agent Configuration
+```typescript
+const agent = new MCPAgent({
+  llm,
+  client,
+  observe: false // Disable observability for this agent
+})
+```
+
+---
+
+# Advanced Usage
+
+## Direct ObservabilityManager Usage
+
+For advanced use cases, you can use the `ObservabilityManager` directly:
+
+```typescript
+import { ObservabilityManager } from 'mcp-use/observability'
+
+// Create a manager with custom configuration
+const manager = new ObservabilityManager({
+  verbose: true, // Enable verbose logging
+  observe: true, // Enable observability
+  agentId: 'custom-agent-123',
+  metadata: {
+    version: 'v1.0.0',
+    environment: 'production'
+  }
+})
+
+// Get available callbacks
+const callbacks = await manager.getCallbacks()
+
+// Check which handlers are available
+const handlerNames = await manager.getHandlerNames()
+console.log('Available handlers:', handlerNames) // ['Langfuse']
+
+// Check if any callbacks are available
+const hasCallbacks = await manager.hasCallbacks()
+
+// Add custom callback
+manager.addCallback(myCustomCallback)
+
+// Flush pending traces (important for serverless)
+await manager.flush()
+
+// Shutdown gracefully (important for serverless)
+await manager.shutdown()
+```
+
+## Using with Custom LangChain Chains
+
+You can use the observability manager with custom LangChain chains:
+
+```typescript
+import { ObservabilityManager } from 'mcp-use/observability'
+import { RunnableSequence } from '@langchain/core/runnables'
+
+const manager = new ObservabilityManager()
+const callbacks = await manager.getCallbacks()
+
+// Use callbacks with any LangChain runnable
+const chain = RunnableSequence.from([
+  promptTemplate,
+  llm,
+  outputParser
+])
+
+const result = await chain.invoke(
+  { input: "Your input" },
+  { callbacks } // Add observability callbacks
+)
+```
+
+---
+
+# Serverless Considerations
+
+For serverless environments (AWS Lambda, Vercel, Netlify, etc.), ensure proper shutdown to flush traces:
+
+## Basic Pattern
+
+```typescript
+import { MCPAgent, MCPClient } from 'mcp-use'
+
+export async function handler(event: any) {
+  const client = new MCPClient({ /* ... */ })
+  const agent = new MCPAgent({ llm, client })
+  
+  try {
+    const result = await agent.run(event.query)
+    return { statusCode: 200, body: JSON.stringify({ result }) }
+  }
+  finally {
+    // Critical: Flush traces before function terminates
+    await agent.close()
+  }
+}
+```
+
+## AWS Lambda Example
+
+```typescript
+import { MCPAgent, MCPClient } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+import type { Handler } from 'aws-lambda'
+
+export const handler: Handler = async (event, context) => {
+  const client = new MCPClient({
+    mcpServers: {
+      filesystem: {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp']
+      }
+    }
+  })
+  
+  const llm = new ChatOpenAI({ model: 'gpt-4' })
+  const agent = new MCPAgent({ llm, client })
+  
+  try {
+    const result = await agent.run(event.query)
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ result })
+    }
+  }
+  catch (error) {
+    console.error('Error:', error)
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: String(error) })
+    }
+  }
+  finally {
+    // Ensure traces are flushed before Lambda terminates
+    await agent.close()
+  }
+}
+```
+
+<Warning>
+**Critical for Serverless**: Always call `agent.close()` in a `finally` block to ensure traces are flushed before the serverless function terminates. Otherwise, traces may be lost.
+</Warning>
+
+---
+
+# Debugging
+
+## Enable Debug Logging
+
+Enable debug logging to see observability events:
+
+```typescript
+import { Logger } from 'mcp-use'
+
+// Enable debug logging
+Logger.setDebug(true)
+
+// Or set environment variable
+process.env.LOG_LEVEL = 'debug'
+```
+
+You'll see detailed observability logs like:
+```
+[DEBUG] Langfuse observability initialized successfully
+[DEBUG] Langfuse: Chain start intercepted
+[DEBUG] Langfuse: LLM start intercepted
+[DEBUG] Langfuse: Tool start intercepted
+```
+
+## Verify Langfuse Setup
+
+Create a simple test script to verify your Langfuse setup:
+
+```typescript
+import { MCPAgent, MCPClient, Logger } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+import { config } from 'dotenv'
+
+config()
+
+// Enable debug logging
+Logger.setDebug(true)
+
+async function testLangfuse() {
+  console.log('🚀 Testing Langfuse integration...')
+  console.log('📊 Environment variables:')
+  console.log(`   LANGFUSE_PUBLIC_KEY: ${process.env.LANGFUSE_PUBLIC_KEY ? '✅ Set' : '❌ Missing'}`)
+  console.log(`   LANGFUSE_SECRET_KEY: ${process.env.LANGFUSE_SECRET_KEY ? '✅ Set' : '❌ Missing'}`)
+  console.log(`   LANGFUSE_HOST: ${process.env.LANGFUSE_HOST || 'Using default (cloud.langfuse.com)'}`)
+  
+  const client = new MCPClient({
+    mcpServers: {
+      filesystem: {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp']
+      }
+    }
+  })
+  
+  const llm = new ChatOpenAI({ model: 'gpt-4', temperature: 0 })
+  const agent = new MCPAgent({ llm, client, maxSteps: 5 })
+  
+  // Set metadata for easy identification
+  agent.setMetadata({
+    test: true,
+    timestamp: new Date().toISOString()
+  })
+  
+  agent.setTags(['test', 'langfuse-setup'])
+  
+  try {
+    console.log('💬 Running test query...')
+    const result = await agent.run('Say hello!')
+    console.log(`✅ Result: ${result}`)
+    console.log('🎉 Check your Langfuse dashboard for the trace!')
+  }
+  finally {
+    await agent.close()
+  }
+}
+
+testLangfuse().catch(console.error)
+```
+
+---
+
+# Troubleshooting
+
+## Common Issues
+
+### "Package not installed" errors
+
+```bash
+# Install the required packages
+npm install langfuse langfuse-langchain
+```
+
+### "API keys not found" warnings
+
+```bash
+# Check your environment variables
+echo $LANGFUSE_PUBLIC_KEY
+echo $LANGFUSE_SECRET_KEY
+
+# Verify they're loaded in your application
+console.log(process.env.LANGFUSE_PUBLIC_KEY)
+```
+
+### No traces appearing in dashboard
+
+1. **Verify API keys are correct**: Check your Langfuse project settings
+2. **Check observability isn't disabled**: Ensure `MCP_USE_LANGFUSE` is not set to `"false"`
+3. **Verify network connectivity**: Make sure your application can reach Langfuse servers
+4. **Enable debug logging**: Use `Logger.setDebug(true)` to see detailed logs
+5. **Ensure proper shutdown**: Call `await agent.close()` to flush traces
+
+### Traces not appearing in serverless environments
+
+```typescript
+// ❌ Bad - traces may be lost
+const result = await agent.run(query)
+return result
+
+// ✅ Good - traces are flushed
+try {
+  const result = await agent.run(query)
+  return result
+}
+finally {
+  await agent.close() // Flushes traces before function terminates
+}
+```
+
+### Self-hosted Langfuse connection issues
+
+For self-hosted Langfuse instances, set the `LANGFUSE_HOST` or `LANGFUSE_BASEURL` environment variable:
+
+```bash
+export LANGFUSE_HOST="https://your-langfuse-instance.com"
+```
+
+Make sure your application can reach the self-hosted instance and that SSL certificates are properly configured.
+
+---
+
+# Privacy & Data Security
+
+## What's Collected
+
+- **Queries and responses** (for debugging context)
+- **Tool inputs/outputs** (to understand workflows)
+- **Model metadata** (provider, model name, tokens)
+- **Performance data** (execution times, success rates)
+- **Custom metadata and tags** (what you explicitly set)
+
+## What's NOT Collected
+
+- **No additional personal information** beyond what you send to your LLM
+- **No API keys** or credentials
+- **No unauthorized data** - you control what gets traced
+
+## Security Features
+
+- **HTTPS encryption** for all data transmission (cloud instances)
+- **Self-hosting options** available for full data control
+- **Easy to disable** with environment variables
+- **Data ownership** - you control your observability data
+- **Granular control** - disable per-agent or globally
+
+---
+
+# Benefits
+
+## For Development
+- **Faster debugging** - See exactly where workflows fail
+- **Performance optimization** - Identify slow operations
+- **Cost monitoring** - Track LLM usage and expenses
+- **Rapid iteration** - Understand agent behavior quickly
+
+## For Production
+- **Real-time monitoring** - Monitor agent performance in production
+- **Error tracking** - Get alerted to failures
+- **Usage analytics** - Understand user interaction patterns
+- **Cost management** - Track and optimize LLM costs
+
+## For Teams
+- **Shared visibility** - Everyone can see agent behavior
+- **Knowledge sharing** - Learn from successful workflows
+- **Collaborative debugging** - Debug issues together
+- **Best practices** - Identify and share effective patterns
+
+---
+
+# Getting Help
+
+Need help with observability setup?
+
+- **Langfuse Documentation**: [langfuse.com/docs](https://langfuse.com/docs)
+- **MCP-use Documentation**: [docs.mcp-use.com](https://docs.mcp-use.com)
+- **GitHub Issues**: [github.com/mcp-use/mcp-use/issues](https://github.com/mcp-use/mcp-use/issues)
+- **Example Code**: See [examples/typescript/client/observability.ts](https://github.com/mcp-use/mcp-use/tree/main/examples/typescript/client)
+
+<Tip>
+**Pro Tip**: Start with basic tracing first to understand your agent's behavior, then add custom metadata and tags for more sophisticated analysis and filtering in your dashboard.
+</Tip>
+

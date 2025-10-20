@@ -1,0 +1,101 @@
+---
+title: "Running the Server"
+description: "How to run your mcp-use server with different transport methods"
+icon: "play"
+---
+
+<Danger>
+Python Server is a work in progress.
+</Danger>
+
+# Running the Server
+
+<Info>
+Learn how to run your mcp-use server using different transport methods and configurations.
+</Info>
+
+## Basic Usage
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="My Server")
+
+# Run with stdio transport (for MCP clients)
+server.run(transport="stdio")
+
+# Run with HTTP transport (for web clients)
+server.run(transport="streamable-http", host="127.0.0.1", port=8000)
+```
+
+## Transport Methods
+
+### stdio Transport
+
+Standard input/output transport for MCP clients:
+
+```python
+server.run(transport="stdio")
+```
+
+### streamable-http Transport
+
+HTTP-based transport for web clients:
+
+```python
+server.run(
+    transport="streamable-http",
+    host="127.0.0.1",
+    port=8000,
+    reload=False,
+    debug=False
+)
+```
+
+## Debug Mode
+
+Enable debug mode for development features:
+
+```python
+server = MCPServer(name="My Server", debug=True)
+
+# Debug mode enables:
+# - /openmcp.json endpoint
+# - /docs endpoint
+# - Enhanced logging
+server.run(transport="streamable-http", debug=True)
+```
+
+## Auto-reload
+
+Enable auto-reload during development:
+
+```python
+server.run(transport="streamable-http", reload=True)
+```
+
+## Production Configuration
+
+```python
+server.run(
+    transport="streamable-http",
+    host="0.0.0.0",
+    port=8000,
+    reload=False,
+    debug=False
+)
+```
+
+## Command Line
+
+Run directly with Python:
+
+```bash
+python my_server.py
+```
+
+Or use uvicorn directly:
+
+```bash
+uvicorn my_server:app --host 0.0.0.0 --port 8000
+```

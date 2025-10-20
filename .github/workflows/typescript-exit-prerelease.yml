@@ -1,0 +1,109 @@
+name: TypeScript Exit Prerelease
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "libraries/typescript/**"
+      - ".github/workflows/typescript-exit-prerelease.yml"
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  create-exit-prerelease-pr:
+    name: Create Exit Prerelease PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if in prerelease mode
+        working-directory: libraries/typescript
+        id: check
+        run: |
+          if [ -f .changeset/pre.json ]; then
+            echo "in_prerelease=true" >> $GITHUB_OUTPUT
+            echo "🐤 Detected prerelease mode on main branch"
+          else
+            echo "in_prerelease=false" >> $GITHUB_OUTPUT
+            echo "ℹ️  Not in prerelease mode - skipping"
+          fi
+
+      - name: Setup pnpm
+        if: steps.check.outputs.in_prerelease == 'true'
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        if: steps.check.outputs.in_prerelease == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        if: steps.check.outputs.in_prerelease == 'true'
+        working-directory: libraries/typescript
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create exit prerelease branch and PR
+        if: steps.check.outputs.in_prerelease == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create new branch (from repo root)
+          BRANCH_NAME="release/exit-prerelease-$(date +%s)"
+          git checkout -b "$BRANCH_NAME"
+
+          # Exit prerelease mode
+          cd libraries/typescript
+          echo "Exiting prerelease mode..."
+          pnpm changeset pre exit
+
+          # Version packages
+          echo "Versioning packages..."
+          pnpm changeset version
+
+          # Go back to repo root for git operations
+          cd ../..
+
+          # Commit changes
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore(release): exit prerelease mode and version packages"
+
+          # Push branch
+          git push origin "$BRANCH_NAME"
+
+          # Create PR
+          gh pr create \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "release(typescript): Exit prerelease mode and version packages" \
+            --body "This PR exits prerelease mode and versions packages for stable release.
+
+          ## Changes:
+
+          - ✅ Exited prerelease mode (removed \`pre.json\`)
+          - ✅ Versioned packages to stable versions
+          - ✅ Updated CHANGELOGs
+
+          ## After merging:
+
+          - ✅ Packages will be automatically published to npm with \`latest\` tag
+          - ✅ Git tags will be pushed
+
+          ---
+
+          **This PR was automatically created after merging canary to main.**"
+
+          echo "✅ Created exit prerelease PR"

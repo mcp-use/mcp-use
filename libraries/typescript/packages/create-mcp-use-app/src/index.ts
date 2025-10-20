@@ -1,81 +1,102 @@
 #!/usr/bin/env node
 
-import { execSync } from 'node:child_process'
+import chalk from 'chalk'
+import { Command } from 'commander'
+import inquirer from 'inquirer'
+import { spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createInterface } from 'node:readline'
-import { Command } from 'commander'
+import ora from 'ora'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+// Helper function to run package manager commands securely using spawn
+function runPackageManager(packageManager: string, args: string[], cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(packageManager, args, {
+      cwd,
+      stdio: 'inherit',
+      shell: false // Disable shell to prevent command injection
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`Process exited with code ${code}`))
+      }
+    })
+
+    child.on('error', (err) => {
+      reject(err)
+    })
+  })
+}
+
 const program = new Command()
+
+// Render logo as ASCII art
+function renderLogo(): void {
+  console.log(chalk.cyan('▛▛▌▛▘▛▌▄▖▌▌▛▘█▌'))
+  console.log(chalk.cyan('▌▌▌▙▖▙▌  ▙▌▄▌▙▖'))
+  console.log(chalk.cyan('     ▌         '))
+}
 
 const packageJson = JSON.parse(
   readFileSync(join(__dirname, '../package.json'), 'utf-8')
 )
 
 // Read current package versions from workspace
-function getCurrentPackageVersions() {
+function getCurrentPackageVersions(isDevelopment: boolean = false, useCanary: boolean = false) {
   const versions: Record<string, string> = {}
   
   try {
-    // Try multiple possible workspace root locations
-    const possibleRoots = [
-      resolve(__dirname, '../../../..'), // From dist/templates
-      resolve(__dirname, '../../../../..'), // From dist
-      resolve(process.cwd(), '.'), // Current working directory
-      resolve(process.cwd(), '..'), // Parent of current directory
-    ]
-    
-    let workspaceRoot = null
-    for (const root of possibleRoots) {
-      if (existsSync(join(root, 'packages/mcp-use/package.json'))) {
-        workspaceRoot = root
-        break
+    if (isDevelopment) {
+      // In development mode, use workspace dependencies for all packages
+      versions['mcp-use'] = 'workspace:*'
+      versions['@mcp-use/cli'] = 'workspace:*'
+      versions['@mcp-use/inspector'] = 'workspace:*'
+    } else if (useCanary) {
+      // In canary mode, use canary versions for published packages
+      versions['mcp-use'] = 'canary'
+      // For unpublished packages, keep them as workspace dependencies
+      // These packages are not available on npm registry yet
+      versions['@mcp-use/cli'] = 'canary'
+      versions['@mcp-use/inspector'] = 'canary'
+    } else {
+      // In production mode, use latest for published packages
+      versions['mcp-use'] = 'latest'
+      // For unpublished packages, keep them as workspace dependencies
+      // These packages are not available on npm registry yet
+      versions['@mcp-use/cli'] = 'latest'
+      versions['@mcp-use/inspector'] = 'latest'
+    }
+  } catch (error) {
+    // Use defaults when not in workspace (normal for published package)
+    // Log error details in development mode for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️  Could not read workspace package versions, using defaults')
+      console.warn(`   Error: ${error instanceof Error ? error.message : String(error)}`)
+      if (error instanceof Error && error.stack) {
+        console.warn(`   Stack: ${error.stack}`)
       }
     }
-    
-    if (!workspaceRoot) {
-      throw new Error('Workspace root not found')
-    }
-    
-    // Read mcp-use version
-    const mcpUsePackage = JSON.parse(
-      readFileSync(join(workspaceRoot, 'packages/mcp-use/package.json'), 'utf-8')
-    )
-    versions['mcp-use'] = mcpUsePackage.version
-    
-    // Read cli version
-    const cliPackage = JSON.parse(
-      readFileSync(join(workspaceRoot, 'packages/cli/package.json'), 'utf-8')
-    )
-    versions['@mcp-use/cli'] = cliPackage.version
-    
-    // Read inspector version
-    const inspectorPackage = JSON.parse(
-      readFileSync(join(workspaceRoot, 'packages/inspector/package.json'), 'utf-8')
-    )
-    versions['@mcp-use/inspector'] = inspectorPackage.version
-  } catch (error) {
-    console.warn('⚠️  Could not read workspace package versions, using defaults')
-    console.warn(`   Error: ${error}`)
   }
   
   return versions
 }
 
 // Process template files to replace version placeholders
-function processTemplateFile(filePath: string, versions: Record<string, string>, isDevelopment: boolean = false) {
+function processTemplateFile(filePath: string, versions: Record<string, string>, isDevelopment: boolean = false, useCanary: boolean = false) {
   const content = readFileSync(filePath, 'utf-8')
   let processedContent = content
   
   // Replace version placeholders with current versions
   for (const [packageName, version] of Object.entries(versions)) {
     const placeholder = `{{${packageName}_version}}`
-    const versionPrefix = isDevelopment ? 'workspace:*' : `^${version}`
-    processedContent = processedContent.replace(new RegExp(placeholder, 'g'), versionPrefix)
+    processedContent = processedContent.replace(new RegExp(placeholder, 'g'), version)
   }
   
   // Handle workspace dependencies based on mode
@@ -84,11 +105,15 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
     processedContent = processedContent.replace(/"mcp-use": "\^[^"]+"/, '"mcp-use": "workspace:*"')
     processedContent = processedContent.replace(/"@mcp-use\/cli": "\^[^"]+"/, '"@mcp-use/cli": "workspace:*"')
     processedContent = processedContent.replace(/"@mcp-use\/inspector": "\^[^"]+"/, '"@mcp-use/inspector": "workspace:*"')
+  } else if (useCanary) {
+    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "canary"`)
+    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "canary"`)
+    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "canary"`)
   } else {
     // Replace workspace dependencies with specific versions for production
-    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "^${versions['mcp-use'] || '1.0.0'}"`)
-    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "^${versions['@mcp-use/cli'] || '2.0.0'}"`)
-    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "^${versions['@mcp-use/inspector'] || '0.3.0'}"`)
+    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "${versions['mcp-use'] || 'latest'}"`)
+    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "${versions['@mcp-use/cli'] || 'latest'}"`)
+    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "${versions['@mcp-use/inspector'] || 'latest'}"`)
   }
   
   return processedContent
@@ -99,103 +124,135 @@ program
   .description('Create a new MCP server project')
   .version(packageJson.version)
   .argument('[project-name]', 'Name of the MCP server project')
-  .option('-t, --template <template>', 'Template to use', 'ui')
+  .option('-t, --template <template>', 'Template to use', 'simple')
   .option('--no-install', 'Skip installing dependencies')
   .option('--dev', 'Use workspace dependencies for development')
-  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean }) => {
+  .option('--canary', 'Use canary versions of packages')
+  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean, canary: boolean }) => {
     try {
+      let selectedTemplate = options.template
+      
       // If no project name provided, prompt for it
       if (!projectName) {
-        console.log('🎯 Welcome to create-mcp-use-app!')
+        console.log('')
+        renderLogo()
+        console.log('')
+        console.log(chalk.bold('Welcome to create-mcp-use-app!'))
         console.log('')
         
-        const promptedName = await promptForProjectName()
+        projectName = await promptForProjectName()
+        console.log('')
         
-        if (!promptedName) {
-          console.log('❌ Project creation cancelled.')
-          process.exit(0)
-        }
-        
-        projectName = promptedName
+        // Prompt for template selection in interactive mode
+        selectedTemplate = await promptForTemplate()
       }
 
-      console.log(`🚀 Creating MCP server "${projectName}"...`)
+      // Validate project name
+      const sanitizedProjectName = projectName!.trim()
+      if (!sanitizedProjectName) {
+        console.error(chalk.red('❌ Project name cannot be empty'))
+        process.exit(1)
+      }
 
-      const projectPath = resolve(process.cwd(), projectName!)
+      // Security: Validate project name doesn't contain path traversal
+      if (sanitizedProjectName.includes('..') || sanitizedProjectName.includes('/') || sanitizedProjectName.includes('\\')) {
+        console.error(chalk.red('❌ Project name cannot contain path separators or ".."'))
+        console.error(chalk.yellow('   Use simple names like "my-mcp-server"'))
+        process.exit(1)
+      }
+
+      // Validate against common protected directory names
+      const protectedNames = ['node_modules', '.git', '.env', 'package.json', 'src', 'dist']
+      if (protectedNames.includes(sanitizedProjectName.toLowerCase())) {
+        console.error(chalk.red(`❌ Cannot use protected name "${sanitizedProjectName}"`))
+        console.error(chalk.yellow('   Please choose a different project name'))
+        process.exit(1)
+      }
+
+      console.log(chalk.cyan(`🚀 Creating MCP server "${sanitizedProjectName}"...`))
+
+      const projectPath = resolve(process.cwd(), sanitizedProjectName)
 
       // Check if directory already exists
       if (existsSync(projectPath)) {
-        console.error(`❌ Directory "${projectName}" already exists!`)
+        console.error(chalk.red(`❌ Directory "${sanitizedProjectName}" already exists!`))
+        console.error(chalk.yellow('   Please choose a different name or remove the existing directory'))
         process.exit(1)
       }
 
       // Create project directory
       mkdirSync(projectPath, { recursive: true })
 
+      // Validate template name
+      const validatedTemplate = validateTemplateName(selectedTemplate)
+      
       // Get current package versions
-      const versions = getCurrentPackageVersions()
+      const versions = getCurrentPackageVersions(options.dev, options.canary)
       
       // Copy template files
-      await copyTemplate(projectPath, options.template, versions, options.dev)
+      await copyTemplate(projectPath, validatedTemplate, versions, options.dev, options.canary)
 
       // Update package.json with project name
-      updatePackageJson(projectPath, projectName!)
+      updatePackageJson(projectPath, sanitizedProjectName)
 
       // Install dependencies if requested
       if (options.install) {
-        console.log('📦 Installing dependencies...')
+        const spinner = ora('Installing packages...').start()
         try {
-          execSync('pnpm install', { cwd: projectPath, stdio: 'inherit' })
+          await runPackageManager('pnpm', ['install'], projectPath)
+          spinner.succeed('Packages installed successfully')
         }
         catch {
-          console.log('⚠️  pnpm not found, trying npm...')
+          spinner.text = 'pnpm not found, trying npm...'
           try {
-            execSync('npm install', { cwd: projectPath, stdio: 'inherit' })
+            await runPackageManager('npm', ['install'], projectPath)
+            spinner.succeed('Packages installed successfully')
           }
-          catch {
-            console.log('⚠️  npm install failed, please run "npm install" manually')
+          catch (error) {
+            spinner.fail('Package installation failed')
+            console.log('⚠️  Please run "npm install" or "pnpm install" manually')
           }
         }
       }
 
-      console.log('✅ MCP server created successfully!')
+      console.log('')
+      console.log(chalk.green('✅ MCP server created successfully!'))
       if (options.dev) {
-        console.log('🔧 Development mode: Using workspace dependencies')
+        console.log(chalk.yellow('🔧 Development mode: Using workspace dependencies'))
+      } else if (options.canary) {
+        console.log(chalk.blue('🚀 Canary mode: Using canary versions of packages'))
       }
       console.log('')
-      console.log('📁 Project structure:')
-      console.log(`   ${projectName}/`)
-      if (options.template === 'ui') {
-        console.log('   ├── src/')
-        console.log('   │   └── server.ts')
+      console.log(chalk.bold('📁 Project structure:'))
+      console.log(`   ${sanitizedProjectName}/`)
+      console.log('   ├── src/')
+      console.log('   │   └── server.ts')
+      if (validatedTemplate === 'ui') {
         console.log('   ├── resources/')
         console.log('   │   ├── data-visualization.tsx')
         console.log('   │   ├── kanban-board.tsx')
         console.log('   │   └── todo-list.tsx')
-        console.log('   ├── index.ts')
-        console.log('   ├── package.json')
-        console.log('   ├── tsconfig.json')
-        console.log('   └── README.md')
-      } else {
-        console.log('   ├── src/')
-        console.log('   │   └── server.ts')
-        console.log('   ├── package.json')
-        console.log('   ├── tsconfig.json')
-        console.log('   └── README.md')
       }
+      console.log('   ├── index.ts')
+      console.log('   ├── package.json')
+      console.log('   ├── tsconfig.json')
+      console.log('   └── README.md')
       console.log('')
-      console.log('🚀 To get started:')
-      console.log(`   cd ${projectName!}`)
+      console.log(chalk.bold('🚀 To get started:'))
+      console.log(chalk.cyan(`   cd ${sanitizedProjectName}`))
       if (!options.install) {
-        console.log('   npm install')
+        console.log(chalk.cyan('   npm install'))
       }
-      console.log('   npm run dev')
+      console.log(chalk.cyan('   npm run dev'))
       console.log('')
       if (options.dev) {
-        console.log('💡 Development mode: Your project uses workspace dependencies')
-        console.log('   Make sure you\'re in the mcp-use workspace root for development')
+        console.log(chalk.yellow('💡 Development mode: Your project uses workspace dependencies'))
+        console.log(chalk.yellow('   Make sure you\'re in the mcp-use workspace root for development'))
+        console.log('')
       }
-      console.log('📚 Learn more: https://docs.mcp-use.io')
+      console.log(chalk.blue('📚 Learn more: https://docs.mcp-use.com'))
+      console.log(chalk.gray('💬 For feedback and bug reporting visit:'))
+      console.log(chalk.gray('   https://github.com/mcp-use/mcp-use or https://mcp-use.com'))
     }
     catch (error) {
       console.error('❌ Error creating MCP server:', error)
@@ -203,11 +260,32 @@ program
     }
   })
 
-async function copyTemplate(projectPath: string, template: string, versions: Record<string, string>, isDevelopment: boolean = false) {
+// Validate and sanitize template name to prevent path traversal
+function validateTemplateName(template: string): string {
+  const sanitized = template.trim()
+  
+  // Security: Prevent path traversal attacks
+  if (sanitized.includes('..') || sanitized.includes('/') || sanitized.includes('\\')) {
+    console.error(chalk.red('❌ Invalid template name'))
+    console.error(chalk.yellow('   Template name cannot contain path separators'))
+    process.exit(1)
+  }
+  
+  // Only allow alphanumeric characters, hyphens, and underscores
+  if (!/^[a-zA-Z0-9_-]+$/.test(sanitized)) {
+    console.error(chalk.red('❌ Invalid template name'))
+    console.error(chalk.yellow('   Template name can only contain letters, numbers, hyphens, and underscores'))
+    process.exit(1)
+  }
+  
+  return sanitized
+}
+
+async function copyTemplate(projectPath: string, template: string, versions: Record<string, string>, isDevelopment: boolean = false, useCanary: boolean = false) {
   const templatePath = join(__dirname, 'templates', template)
 
   if (!existsSync(templatePath)) {
-    console.error(`❌ Template "${template}" not found!`)
+    console.error(chalk.red(`❌ Template "${template}" not found!`))
     
     // Dynamically list available templates
     const templatesDir = join(__dirname, 'templates')
@@ -227,10 +305,10 @@ async function copyTemplate(projectPath: string, template: string, versions: Rec
     process.exit(1)
   }
 
-  copyDirectoryWithProcessing(templatePath, projectPath, versions, isDevelopment)
+  copyDirectoryWithProcessing(templatePath, projectPath, versions, isDevelopment, useCanary)
 }
 
-function copyDirectoryWithProcessing(src: string, dest: string, versions: Record<string, string>, isDevelopment: boolean) {
+function copyDirectoryWithProcessing(src: string, dest: string, versions: Record<string, string>, isDevelopment: boolean, useCanary: boolean = false) {
   const entries = readdirSync(src, { withFileTypes: true })
 
   for (const entry of entries) {
@@ -239,12 +317,12 @@ function copyDirectoryWithProcessing(src: string, dest: string, versions: Record
 
     if (entry.isDirectory()) {
       mkdirSync(destPath, { recursive: true })
-      copyDirectoryWithProcessing(srcPath, destPath, versions, isDevelopment)
+      copyDirectoryWithProcessing(srcPath, destPath, versions, isDevelopment, useCanary)
     }
     else {
       // Process files that might contain version placeholders
       if (entry.name === 'package.json' || entry.name.endsWith('.json')) {
-        const processedContent = processTemplateFile(srcPath, versions, isDevelopment)
+        const processedContent = processTemplateFile(srcPath, versions, isDevelopment, useCanary)
         writeFileSync(destPath, processedContent)
       } else {
         copyFileSync(srcPath, destPath)
@@ -264,42 +342,60 @@ function updatePackageJson(projectPath: string, projectName: string) {
   writeFileSync(packageJsonPath, JSON.stringify(packageJsonContent, null, 2))
 }
 
-function promptForProjectName(): Promise<string | null> {
-  return new Promise((resolvePromise) => {
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout
-    })
-
-    const askForName = () => {
-      rl.question('What is your project name? ', (answer) => {
-        const trimmed = answer.trim()
-        
+async function promptForProjectName(): Promise<string> {
+  const { projectName } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'projectName',
+      message: 'What is your project name?',
+      validate: (input: string) => {
+        const trimmed = input.trim()
         if (!trimmed) {
-          console.log('❌ Project name is required')
-          askForName()
-          return
+          return 'Project name is required'
         }
-        
         if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
-          console.log('❌ Project name can only contain letters, numbers, hyphens, and underscores')
-          askForName()
-          return
+          return 'Project name can only contain letters, numbers, hyphens, and underscores'
         }
-        
         if (existsSync(join(process.cwd(), trimmed))) {
-          console.log(`❌ Directory "${trimmed}" already exists! Please choose a different name.`)
-          askForName()
-          return
+          return `Directory "${trimmed}" already exists! Please choose a different name.`
         }
-        
-        rl.close()
-        resolvePromise(trimmed)
-      })
+        return true
+      }
     }
-    
-    askForName()
-  })
+  ])
+  return projectName
+}
+
+async function promptForTemplate(): Promise<string> {
+  // Get available templates
+  const templatesDir = join(__dirname, 'templates')
+  const availableTemplates = existsSync(templatesDir) 
+    ? readdirSync(templatesDir, { withFileTypes: true })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => dirent.name)
+        .sort()
+    : ['simple', 'ui', 'uiresource']
+
+  const templateDescriptions: Record<string, string> = {
+    'simple': 'Simple MCP server with a basic calculator tool (add numbers)',
+    'ui': 'MCP Server with mcp-ui resources returned from tools',
+    'uiresource': 'MCP Server with mcp-ui resources',
+  }
+
+  const { template } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'template',
+      message: 'Select a template:',
+      default: 'simple',
+      choices: availableTemplates.map(template => ({
+        name: `${template} - ${templateDescriptions[template] || 'MCP server template'}`,
+        value: template
+      }))
+    }
+  ])
+  
+  return template
 }
 
 program.parse()

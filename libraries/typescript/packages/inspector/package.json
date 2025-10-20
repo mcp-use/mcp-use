@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.3.11",
+  "version": "0.4.3",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -20,7 +20,7 @@
   "main": "./dist/server/index.js",
   "types": "./dist/server/index.d.ts",
   "bin": {
-    "mcp-inspect": "./dist/cli/inspect.js"
+    "mcp-inspect": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -33,7 +33,7 @@
     "build": "npm run build:client && npm run build:server && npm run build:cli",
     "build:client": "vite build",
     "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
-    "build:cli": "tsup src/cli/inspect.ts --format esm --out-dir dist/cli",
+    "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
     "prepublishOnly": "pnpm build",
     "start": "node dist/server/server.js",
     "preview": "vite preview",
@@ -55,6 +55,7 @@
     "express": "^4.21.2"
   },
   "dependencies": {
+    "@ai-sdk/react": "^1.0.20",
     "@hono/node-server": "^1.19.5",
     "@mcp-ui/client": "^5.12.1",
     "@modelcontextprotocol/sdk": "1.20.0",
@@ -63,6 +64,7 @@
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-switch": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/cli": "^4.1.14",
     "@tailwindcss/vite": "^4.1.14",
@@ -70,6 +72,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "flowtoken": "^1.0.40",
     "framer-motion": "^12.23.22",
     "hono": "^4.0.0",
     "lucide-react": "^0.545.0",

@@ -1,4 +1,4 @@
-import type { Tool, Resource, ResourceTemplate, Prompt } from '@modelcontextprotocol/sdk/types.js'
+import type { Prompt, Resource, ResourceTemplate, Tool } from '@modelcontextprotocol/sdk/types.js'
 
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
@@ -38,6 +38,10 @@ export type UseMcpOptions = {
    * @param features The features string for the popup window.
    */
   onPopupWindow?: (url: string, features: string, window: globalThis.Window | null) => void
+  /** Connection timeout in milliseconds for establishing initial connection (default: 30000 / 30 seconds) */
+  timeout?: number
+  /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */
+  sseReadTimeout?: number
 }
 
 export type UseMcpResult = {

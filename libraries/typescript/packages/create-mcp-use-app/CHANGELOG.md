@@ -1,5 +1,130 @@
 # create-mcp-use-app
 
+## 0.4.3
+
+### Patch Changes
+
+  ### Version Management
+  - **Enhanced Package Version Handling**: Added support for canary mode alongside development and production modes
+  - **Flexible Version Resolution**: Updated `getCurrentPackageVersions` to dynamically handle workspace dependencies in development mode and 'latest' versions in production
+  - **Canary Mode Support**: Added command options to allow users to specify canary versions for testing environments
+
+  ### Template Processing
+  - Improved template processing to dynamically replace version placeholders based on the current mode
+  - Enhanced `processTemplateFile` and `copyTemplate` functions to support canary mode
+  - Better error handling in template processing workflow
+
+  ### Bug Fixes
+  - Fixed mcp-use package version dependencies
+  - Simplified workspace root detection for improved clarity
+  - Updated version placeholders for better flexibility in production environments
+
+## 0.4.3-canary.1
+
+### Patch Changes
+
+- d305be6: fix mcp use deps
+
+## 0.4.3-canary.0
+
+### Patch Changes
+
+- 119afb7: fix mcp-use packages versions
+
+## 0.4.2
+
+### Patch Changes
+
+- abb7f52: ## Enhanced MCP Inspector with Auto-Connection and Multi-Server Support
+
+  ### 🚀 New Features
+  - **Auto-connection functionality**: Inspector now automatically connects to MCP servers on startup
+  - **Multi-server support**: Enhanced support for connecting to multiple MCP servers simultaneously
+  - **Client-side chat functionality**: New client-side chat implementation with improved message handling
+  - **Resource handling**: Enhanced chat components with proper resource management
+  - **Browser integration**: Improved browser-based MCP client with better connection handling
+
+  ### 🔧 Improvements
+  - **Streamlined routing**: Refactored server and client routing for better performance
+  - **Enhanced connection handling**: Improved auto-connection logic and error handling
+  - **Better UI components**: Updated Layout, ChatTab, and ToolsTab components
+  - **Dependency updates**: Updated various dependencies for better compatibility
+
+  ### 🐛 Fixes
+  - Fixed connection handling in InspectorDashboard
+  - Improved error messages in useMcp hook
+  - Enhanced Layout component connection handling
+
+  ### 📦 Technical Changes
+  - Added new client-side chat hooks and components
+  - Implemented shared routing and static file handling
+  - Enhanced tool result rendering and display
+  - Added browser-specific utilities and stubs
+  - Updated Vite configuration for better development experience
+
+## 0.4.2-canary.0
+
+### Patch Changes
+
+- d52c050: ## Enhanced MCP Inspector with Auto-Connection and Multi-Server Support
+
+  ### 🚀 New Features
+  - **Auto-connection functionality**: Inspector now automatically connects to MCP servers on startup
+  - **Multi-server support**: Enhanced support for connecting to multiple MCP servers simultaneously
+  - **Client-side chat functionality**: New client-side chat implementation with improved message handling
+  - **Resource handling**: Enhanced chat components with proper resource management
+  - **Browser integration**: Improved browser-based MCP client with better connection handling
+
+  ### 🔧 Improvements
+  - **Streamlined routing**: Refactored server and client routing for better performance
+  - **Enhanced connection handling**: Improved auto-connection logic and error handling
+  - **Better UI components**: Updated Layout, ChatTab, and ToolsTab components
+  - **Dependency updates**: Updated various dependencies for better compatibility
+
+  ### 🐛 Fixes
+  - Fixed connection handling in InspectorDashboard
+  - Improved error messages in useMcp hook
+  - Enhanced Layout component connection handling
+
+  ### 📦 Technical Changes
+  - Added new client-side chat hooks and components
+  - Implemented shared routing and static file handling
+  - Enhanced tool result rendering and display
+  - Added browser-specific utilities and stubs
+  - Updated Vite configuration for better development experience
+
+## 0.4.1
+
+### Patch Changes
+
+- 3670ed0: minor fixes
+- 3670ed0: minor
+
+## 0.4.1-canary.1
+
+### Patch Changes
+
+- a571b5c: minor
+
+## 0.4.1-canary.0
+
+### Patch Changes
+
+- 4ad9c7f: minor fixes
+
+## 0.4.0
+
+### Minor Changes
+
+- 0f2b7f6: feat: Add Apps SDK template for OpenAI platform integration
+  - Added new Apps SDK template for creating OpenAI Apps SDK-compatible MCP servers
+  - Included example server implementation with Kanban board widget
+  - Pre-configured Apps SDK metadata (widgetDescription, widgetPrefersBorder, widgetAccessible, widgetCSP)
+  - Example widgets demonstrating structured data handling and UI rendering
+  - Comprehensive README with setup instructions and best practices
+  - Support for CSP (Content Security Policy) configuration with connect_domains and resource_domains
+  - Tool invocation state management examples
+
 ## 0.3.5
 
 ### Patch Changes

@@ -1,5 +1,152 @@
 # mcp-use
 
+## 1.1.3
+
+### Patch Changes
+
+  ### Authentication and Connection
+  - **Enhanced OAuth Handling**: Extracted base URL (origin) for OAuth discovery in `onMcpAuthorization` and `useMcp` functions to ensure proper metadata retrieval
+  - **Improved Connection Robustness**: Enhanced connection handling by resetting the connecting flag for all terminal states, including `auth_redirect`, to allow for reconnections after authentication
+  - Improved logging for connection attempts with better debugging information
+
+- Updated dependencies [4852465]
+  - @mcp-use/inspector@0.4.3
+
+## 1.1.3-canary.1
+
+### Patch Changes
+
+- cb60eef: fix inspector route
+- Updated dependencies [0203a77]
+- Updated dependencies [ebf1814]
+  - @mcp-use/inspector@0.4.3-canary.1
+
+## 1.1.3-canary.0
+
+### Patch Changes
+
+- d171bf7: feat/app-sdk
+- Updated dependencies [d171bf7]
+  - @mcp-use/inspector@0.4.3-canary.0
+
+## 1.1.2
+
+### Patch Changes
+
+- abb7f52: ## Enhanced MCP Inspector with Auto-Connection and Multi-Server Support
+
+  ### 🚀 New Features
+  - **Auto-connection functionality**: Inspector now automatically connects to MCP servers on startup
+  - **Multi-server support**: Enhanced support for connecting to multiple MCP servers simultaneously
+  - **Client-side chat functionality**: New client-side chat implementation with improved message handling
+  - **Resource handling**: Enhanced chat components with proper resource management
+  - **Browser integration**: Improved browser-based MCP client with better connection handling
+
+  ### 🔧 Improvements
+  - **Streamlined routing**: Refactored server and client routing for better performance
+  - **Enhanced connection handling**: Improved auto-connection logic and error handling
+  - **Better UI components**: Updated Layout, ChatTab, and ToolsTab components
+  - **Dependency updates**: Updated various dependencies for better compatibility
+
+  ### 🐛 Fixes
+  - Fixed connection handling in InspectorDashboard
+  - Improved error messages in useMcp hook
+  - Enhanced Layout component connection handling
+
+  ### 📦 Technical Changes
+  - Added new client-side chat hooks and components
+  - Implemented shared routing and static file handling
+  - Enhanced tool result rendering and display
+  - Added browser-specific utilities and stubs
+  - Updated Vite configuration for better development experience
+
+- Updated dependencies [abb7f52]
+  - @mcp-use/inspector@0.4.2
+
+## 1.1.2-canary.0
+
+### Patch Changes
+
+- d52c050: ## Enhanced MCP Inspector with Auto-Connection and Multi-Server Support
+
+  ### 🚀 New Features
+  - **Auto-connection functionality**: Inspector now automatically connects to MCP servers on startup
+  - **Multi-server support**: Enhanced support for connecting to multiple MCP servers simultaneously
+  - **Client-side chat functionality**: New client-side chat implementation with improved message handling
+  - **Resource handling**: Enhanced chat components with proper resource management
+  - **Browser integration**: Improved browser-based MCP client with better connection handling
+
+  ### 🔧 Improvements
+  - **Streamlined routing**: Refactored server and client routing for better performance
+  - **Enhanced connection handling**: Improved auto-connection logic and error handling
+  - **Better UI components**: Updated Layout, ChatTab, and ToolsTab components
+  - **Dependency updates**: Updated various dependencies for better compatibility
+
+  ### 🐛 Fixes
+  - Fixed connection handling in InspectorDashboard
+  - Improved error messages in useMcp hook
+  - Enhanced Layout component connection handling
+
+  ### 📦 Technical Changes
+  - Added new client-side chat hooks and components
+  - Implemented shared routing and static file handling
+  - Enhanced tool result rendering and display
+  - Added browser-specific utilities and stubs
+  - Updated Vite configuration for better development experience
+
+- Updated dependencies [d52c050]
+  - @mcp-use/inspector@0.4.2-canary.0
+
+## 1.1.1
+
+### Patch Changes
+
+- 3670ed0: minor fixes
+- 3670ed0: minor
+- Updated dependencies [3670ed0]
+- Updated dependencies [3670ed0]
+  - @mcp-use/inspector@0.4.1
+
+## 1.1.1-canary.1
+
+### Patch Changes
+
+- a571b5c: minor
+- Updated dependencies [a571b5c]
+  - @mcp-use/inspector@0.4.1-canary.1
+
+## 1.1.1-canary.0
+
+### Patch Changes
+
+- 4ad9c7f: minor fixes
+- Updated dependencies [4ad9c7f]
+  - @mcp-use/inspector@0.4.1-canary.0
+
+## 1.1.0
+
+### Minor Changes
+
+- 0f2b7f6: feat: Add OpenAI Apps SDK integration
+  - Added new UI resource type for Apps SDK, allowing integration with OpenAI's platform
+  - Enhanced MCP-UI adapter to handle Apps SDK metadata and structured content
+  - Updated resource URI format to support `ui://widget/` scheme
+  - Enhanced tool definition with Apps SDK-specific metadata
+  - Ensure `_meta` field is at top level of resource object for Apps SDK compatibility
+  - Added comprehensive test suite for Apps SDK resource creation
+  - Updated type definitions to reflect new resource capabilities
+
+  refactor: Improve compatibility
+  - Renamed `fn` to `cb` in tool and prompt definitions for consistency.
+  - Updated resource definitions to use `readCallback` instead of `fn`.
+  - Adjusted related documentation and type definitions to reflect these changes.
+  - Enhanced clarity in the MCP server's API by standardizing callback naming conventions.
+
+### Patch Changes
+
+- Updated dependencies [0f2b7f6]
+  - @mcp-use/inspector@0.4.0
+
 ## 1.0.7
 
 ### Patch Changes

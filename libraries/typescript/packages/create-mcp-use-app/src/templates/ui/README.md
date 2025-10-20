@@ -56,9 +56,9 @@ Interactive Kanban board for task management.
 mcp.tool({
   name: 'show-kanban',
   inputs: [{ name: 'tasks', type: 'string', required: true }],
-  fn: async ({ tasks }) => {
+  cb: async ({ tasks }) => {
     // Display Kanban board with tasks
-  }
+  },
 })
 ```
 
@@ -80,9 +80,9 @@ Interactive todo list with filtering and sorting.
 mcp.tool({
   name: 'show-todo-list',
   inputs: [{ name: 'todos', type: 'string', required: true }],
-  fn: async ({ todos }) => {
+  cb: async ({ todos }) => {
     // Display todo list with todos
-  }
+  },
 })
 ```
 
@@ -105,11 +105,11 @@ mcp.tool({
   name: 'show-data-viz',
   inputs: [
     { name: 'data', type: 'string', required: true },
-    { name: 'chartType', type: 'string', required: false }
+    { name: 'chartType', type: 'string', required: false },
   ],
-  fn: async ({ data, chartType }) => {
+  cb: async ({ data, chartType }) => {
     // Display data visualization
-  }
+  },
 })
 ```
 
@@ -149,10 +149,10 @@ mcp.tool({
      uri: 'ui://widget/my-widget',
      name: 'My Widget',
      mimeType: 'text/html+skybridge',
-     fn: async () => {
+     readCallback: async () => {
        const widgetUrl = `http://localhost:${PORT}/mcp-use/widgets/my-widget`
        return `<div id="my-widget-root"></div><script type="module" src="${widgetUrl}"></script>`
-     }
+     },
    })
    ```
 
@@ -198,11 +198,7 @@ const MyWidget: React.FC<MyWidgetProps> = ({ initialData = [] }) => {
     }
   }, [])
 
-  return (
-    <div>
-      {/* Your widget content */}
-    </div>
-  )
+  return <div>{/* Your widget content */}</div>
 }
 
 // Render the component
@@ -235,7 +231,7 @@ npm run build
 
 # The built files will be in dist/
 # - dist/index.js (MCP server entry point)
-# - dist/src/server.js (MCP server implementation)  
+# - dist/src/server.js (MCP server implementation)
 # - dist/resources/ (Compiled TypeScript + UI widget bundles)
 ```
 
@@ -315,10 +311,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        'my-custom-widget': resolve(__dirname, 'resources/my-custom-widget.html')
-      }
-    }
-  }
+        'my-custom-widget': resolve(
+          __dirname,
+          'resources/my-custom-widget.html'
+        ),
+      },
+    },
+  },
 })
 ```
 
@@ -374,12 +373,8 @@ const Counter: React.FC = () => {
   return (
     <div style={{ padding: '20px', textAlign: 'center' }}>
       <h1>Counter: {count}</h1>
-      <button onClick={() => setCount(count + 1)}>
-        Increment
-      </button>
-      <button onClick={() => setCount(count - 1)}>
-        Decrement
-      </button>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+      <button onClick={() => setCount(count - 1)}>Decrement</button>
     </div>
   )
 }
@@ -432,7 +427,7 @@ const DataTable: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {data.map(row => (
+          {data.map((row) => (
             <tr key={row.id}>
               <td>{row.name}</td>
               <td>{row.value}</td>

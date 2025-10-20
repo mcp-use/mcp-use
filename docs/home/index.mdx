@@ -1,0 +1,143 @@
+---
+title: "Welcome"
+icon: "/images/mcp_use.svg"
+mode: "frame"
+---
+
+import { RandomGradientBackground } from '/snippets/gradient.jsx'
+import { SimpleSplitCard } from '/snippets/simple-split-card.jsx'
+
+<div className="px-4 py-8 mt-24 lg:pb-24 max-w-5xl mx-auto">
+<div className="text-center">
+<img
+  src="/logo/light.svg"
+  className="block dark:hidden mx-auto h-16 w-auto"
+  alt="mcp_use"
+/>
+<img
+  src="/logo/dark.svg"
+  className="hidden dark:block mx-auto h-16 w-auto"
+  alt="mcp_use"
+/>
+</div>
+
+
+<p className="max-w-xl mx-auto px-4 mt-4 text-center ">
+  <p className='text-xl'>
+  Full-Stack MCP Framework <br/>
+  </p>
+  <p className='mt-4'>
+  <b>mcp-use</b> provides everything you need to build with the <a href="https://modelcontextprotocol.io">Model Context Protocol</a>—from AI agents to servers, in both <b>Python</b> and <b>TypeScript</b>.
+  </p>
+</p>
+
+<div className="max-w-5xl mx-auto px-6 mt-12">
+</div>
+
+<div className="px-6 lg:px-0 mt-12 lg:mt-12 grid sm:grid-cols-3 gap-x-6 gap-y-6">
+  <SimpleSplitCard
+    imgDark="/images/agent.jpg"
+    imgLight="/images/agent_white.png"
+    title="Agent"
+    description="Build tool-using AI agents."
+    leftHref="/python/agent/agent-configuration"
+    rightHref="/typescript/agent/agent-configuration"
+    leftLogo="/images/pythonlogo.svg"
+    rightLogo="/images/typescriptlogo.svg"
+  />
+  <SimpleSplitCard
+    imgDark="/images/client.jpg"
+    imgLight="/images/client_white.png"
+    title="Client"
+    description="Connect to MCP servers programmatically."
+    leftHref="/python/client/client-configuration"
+    rightHref="/typescript/client/client-configuration"
+    leftLogo="/images/pythonlogo.svg"
+    rightLogo="/images/typescriptlogo.svg"
+  />
+  <SimpleSplitCard
+    imgDark="/images/server.jpg"
+    imgLight="/images/server_white.png"
+    title="Server"
+    description="Build and run powerful MCP servers."
+    leftHref="/python/server/"
+    rightHref="/typescript/server/"
+    leftLogo="/images/pythonlogo.svg"
+    rightLogo="/images/typescriptlogo.svg"
+  />
+</div>
+
+</div>
+
+<div className="max-w-5xl mx-auto px-6">
+
+<h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-6">What is mcp-use?</h2>
+
+mcp-use is a **full-stack open source framework** that enables developers to connect any Language Learning Model (LLM) to any MCP server. We refuse lock-in. We refuse walled gardens. We build with open standards, composable tools, and source you can read. mcp-use connects models to real capability—your data, your workflows, your servers—on your terms.
+
+<p className="mt-4">
+Our mission is to provide the best developer experience across the MCP stack. Please explore the individual modules to understand what makes us special.
+</p>
+
+<h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-16 mb-6">Features at a Glance</h2>
+
+<CardGroup cols={3}>
+  <Card title="Agent" icon="bot">
+    <ul className="mt-4 space-y-2 text-zinc-400 text-sm">
+      <li>Connect any LLM</li>
+      <li>Get started in 6 lines of code</li>
+      <li>Supports any MCP server</li>
+    </ul>
+  </Card>
+  <Card title="Client" icon="plug">
+    <ul className="mt-4 space-y-2 text-zinc-400 text-sm">
+      <li>Fully spec compliant</li>
+      <li>Supports all primitives: sampling, tools, resources, prompts, elicitation, logging, notifications</li>
+    </ul>
+  </Card>
+  <Card title="Server" icon="server">
+    <ul className="mt-4 space-y-2 text-zinc-400 text-sm">
+      <li>Fully spec compliant</li>
+      <li>Best-in-class developer experience</li>
+      <li>Built-in Inspector, openmcp.json, and docs</li>
+    </ul>
+  </Card>
+</CardGroup>
+
+<h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-16 mb-6">Supported MCP Servers</h2>
+
+<Info>
+mcp-use supports **any MCP server**, allowing you to connect to a wide range of server implementations for different use cases.
+</Info>
+
+<CardGroup cols={2}>
+  <Card title="Playwright" icon="globe" href="https://github.com/microsoft/playwright-python">
+    Web scraping and browser automation capabilities
+  </Card>
+  <Card title="Filesystem" icon="folder" href="https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem">
+    Safe file system operations and management
+  </Card>
+  <Card title="SQLite" icon="database" href="https://github.com/modelcontextprotocol/servers/tree/main/src/sqlite">
+    Database querying and management tools
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/modelcontextprotocol/servers/tree/main/src/github">
+    Repository management and GitHub API access
+  </Card>
+</CardGroup>
+
+<Card title="Awesome MCP Servers" icon="star" href="https://github.com/punkpeye/awesome-mcp-servers" horizontal>
+  Explore a comprehensive list of available MCP servers from the community - find servers for APIs, databases, cloud services, and more.
+</Card>
+
+<h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-16 mb-6">Community & Support</h2>
+
+<CardGroup cols={2}>
+ <Card title="Join our Discord" icon="discord" href="https://discord.gg/XkNkSkMz3V">
+    Chat with the community and get help from the team.
+  </Card>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/mcp-use/mcp-use/issues">
+    Report bugs, request features, or ask questions.
+  </Card>
+</CardGroup>
+
+</div>

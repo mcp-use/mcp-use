@@ -1,0 +1,83 @@
+---
+title: "Logging"
+description: "MCP provides a dedicated channel for servers to send log messages to the client, which is separate from the standard notification system. This allows for structured and level-specific logging without cluttering the main message stream."
+icon: "logs"
+---
+
+`mcp-use` supports this feature through a `logging_callback` function that can be passed to the `MCPClient`.
+
+## Client-Side: Handling Logs
+
+While you can catch `LoggingMessageNotification` events within the general `message_handler`, the recommended approach is to use the dedicated `logging_callback`. This keeps your code clean by separating logging concerns from other notification handling.
+
+The `logging_callback` receives the parameters of the log notification directly, which include the `level` and `message`.
+
+<CodeGroup>
+```typescript TypeScript
+// ⚠️ Logging callbacks are not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient, types } from 'mcp-use'
+
+// A dedicated handler for log messages
+async function handleLogs(logParams: types.LoggingMessageNotificationParams) {
+    console.log(`LOG [${logParams.level.toUpperCase()}]: ${logParams.message}`)
+}
+
+async function testLogging(primitiveServer: string) {
+    const config = { mcpServers: { PrimitiveServer: { url: `${primitiveServer}/mcp` } } }
+    // Pass the callback to the client
+    const client = new MCPClient(config, { loggingCallback: handleLogs })
+
+    try {
+        await client.createAllSessions()
+        const session = client.getSession('PrimitiveServer')
+
+        // This tool will trigger the loggingCallback
+        const result = await session.callTool('logging_tool', {})
+        console.assert(result.content[0].text === 'Logging tool completed')
+    } finally {
+        await client.closeAllSessions()
+    }
+}
+*/
+```
+
+```typescript TypeScript
+// ⚠️ Logging callbacks are not yet supported in the TypeScript library.
+// Support is coming soon! If you need this feature now, please open an issue:
+// https://github.com/mcp-use/mcp-use-ts
+
+// When supported, the API will look similar to:
+/*
+import { MCPClient, types } from 'mcp-use'
+
+// A dedicated handler for log messages
+async function handleLogs(logParams: types.LoggingMessageNotificationParams) {
+    console.log(`LOG [${logParams.level.toUpperCase()}]: ${logParams.message}`)
+}
+
+async function testLogging(primitiveServer: string) {
+    const config = { mcpServers: { PrimitiveServer: { url: `${primitiveServer}/mcp` } } }
+    // Pass the callback to the client
+    const client = new MCPClient(config, { loggingCallback: handleLogs })
+
+    try {
+        await client.createAllSessions()
+        const session = client.getSession('PrimitiveServer')
+
+        // This tool will trigger the loggingCallback
+        const result = await session.callTool('logging_tool', {})
+        console.assert(result.content[0].text === 'Logging tool completed')
+    } finally {
+        await client.closeAllSessions()
+    }
+}
+*/
+```
+</CodeGroup>
+
+By using the `logging_callback`, you can easily route server-side logs to your client's logging system, display them in a debug console, or handle them in any other way that suits your application's needs.

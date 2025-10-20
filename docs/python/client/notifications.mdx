@@ -106,31 +106,6 @@ async def test_notifications(primitive_server):
     finally:
         await client.close_all_sessions()
 ```
-
-```typescript TypeScript
-// ⚠️ Notification handlers are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use-ts
-
-// When supported, the API will look similar to:
-/*
-import { MCPClient, types } from 'mcp-use'
-
-// The message handler receives all server-sent messages
-async function handleMessages(message: any) {
-    // Check notification types and handle accordingly
-    // ...
-}
-
-const config = {
-    mcpServers: {
-        PrimitiveServer: { url: `${primitiveServer}/mcp` }
-    }
-}
-
-const client = new MCPClient(config, { messageHandler: handleMessages })
-*/
-```
 </CodeGroup>
 
 <Callout>

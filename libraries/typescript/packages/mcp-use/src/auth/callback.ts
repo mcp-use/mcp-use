@@ -67,7 +67,9 @@ export async function onMcpAuthorization() {
     // 2. Use provider.codeVerifier()
     // 3. Call exchangeAuthorization()
     // 4. Use provider.saveTokens() on success
-    const authResult = await auth(provider, { serverUrl, authorizationCode: code })
+    // Extract base URL (origin) for OAuth discovery - OAuth metadata should be at the origin level
+    const baseUrl = new URL(serverUrl).origin
+    const authResult = await auth(provider, { serverUrl: baseUrl, authorizationCode: code })
 
     if (authResult === 'AUTHORIZED') {
       console.log(`${logPrefix} Authorization successful via SDK auth(). Notifying opener...`)
