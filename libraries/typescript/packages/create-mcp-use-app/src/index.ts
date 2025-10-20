@@ -110,9 +110,10 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
     processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "canary"`)
     processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "canary"`)
   } else {
-    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "latest"`)
-    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "latest"`)
-    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "latest"`)
+    // Replace workspace dependencies with specific versions for production
+    processedContent = processedContent.replace(/"mcp-use": "workspace:\*"/, `"mcp-use": "${versions['mcp-use'] || 'latest'}"`)
+    processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "${versions['@mcp-use/cli'] || 'latest'}"`)
+    processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "${versions['@mcp-use/inspector'] || 'latest'}"`)
   }
   
   return processedContent
