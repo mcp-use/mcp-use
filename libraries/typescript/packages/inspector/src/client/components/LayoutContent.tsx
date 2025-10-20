@@ -34,6 +34,7 @@ export function LayoutContent({
           tools={selectedServer.tools}
           callTool={selectedServer.callTool}
           readResource={selectedServer.readResource}
+          serverId={selectedServer.id}
           isConnected={selectedServer.state === 'ready'}
         />
       )

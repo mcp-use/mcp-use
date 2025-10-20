@@ -139,6 +139,23 @@ export class MCPInspector {
     return server.resources
   }
 
+  async readResource(serverId: string, uri: string): Promise<any> {
+    const server = this.servers.get(serverId)
+    if (!server || !server.session) {
+      throw new Error('Server not found or not connected')
+    }
+
+    try {
+      const result = await server.session.connector.readResource(uri)
+      server.lastActivity = new Date()
+      return result
+    }
+    catch (error) {
+      server.status = 'error'
+      throw error
+    }
+  }
+
   async disconnectServer(serverId: string): Promise<void> {
     const server = this.servers.get(serverId)
     if (server && server.session) {

@@ -105,7 +105,7 @@ const mcpInspector = new MCPInspector()
 
 // Register all API routes
 registerMCPApiRoutes(app, mcpInspector)
-registerInspectorRoutes(app, { autoConnectUrl: mcpUrl })
+registerInspectorRoutes(app, { autoConnectUrl: mcpUrl, mcpInspector })
 
 // Register static file serving (must be last as it includes catch-all route)
 registerStaticRoutes(app)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Spinner } from './ui/spinner'
 
@@ -7,6 +7,8 @@ interface OpenAIComponentRendererProps {
   toolName: string
   toolArgs: Record<string, unknown>
   toolResult: any
+  serverId: string
+  readResource: (uri: string) => Promise<any>
   className?: string
   noWrapper?: boolean
 }
@@ -27,42 +29,87 @@ function Wrapper({ children, className, noWrapper }: { children: React.ReactNode
  * Provides window.openai API bridge for component interaction via iframe
  */
 export function OpenAIComponentRenderer({
-  componentUrl: _componentUrl,
+  componentUrl,
   toolName,
   toolArgs,
   toolResult,
+  serverId,
+  readResource,
   className,
   noWrapper = false,
 }: OpenAIComponentRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [isReady, setIsReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [widgetUrl, setWidgetUrl] = useState<string | null>(null)
 
-  // Store stable references to avoid re-renders
-  const toolArgsRef = useRef(toolArgs)
-  const toolResultRef = useRef(toolResult)
+  // Generate unique tool ID
+  const toolIdRef = useRef(`tool-${Date.now()}-${Math.random().toString(36).substring(7)}`)
+  const toolId = toolIdRef.current
 
-  // Update refs when props change
+  // Store widget data and set up iframe URL
   useEffect(() => {
-    toolArgsRef.current = toolArgs
-    toolResultRef.current = toolResult
-  }, [toolArgs, toolResult])
+    const storeAndSetUrl = async () => {
+      try {
+        // Extract structured content from tool result
+        let structuredContent = null
+        if (toolResult?.structuredContent) {
+          structuredContent = toolResult.structuredContent
+        }
+        else if (Array.isArray(toolResult) && toolResult[0]) {
+          const firstResult = toolResult[0]
+          if (firstResult.output?.value?.structuredContent) {
+            structuredContent = firstResult.output.value.structuredContent
+          }
+          else if (firstResult.structuredContent) {
+            structuredContent = firstResult.structuredContent
+          }
+          else if (firstResult.output?.value) {
+            structuredContent = firstResult.output.value
+          }
+        }
 
-  // Extract HTML content from the resource (using useMemo to avoid re-renders)
-  const htmlContent = useMemo(() => {
-    if (toolResult?.text && typeof toolResult.text === 'string') {
-      return toolResult.text
-    }
-    else if (toolResult?.contents?.[0]?.text) {
-      return toolResult.contents[0].text
-    }
-    return null
-  }, [toolResult])
+        // Fallback to entire result
+        if (!structuredContent) {
+          structuredContent = toolResult
+        }
 
-  const error = htmlContent ? null : 'No HTML content found in resource'
+        // Fetch the HTML resource client-side (where the connection exists)
+        const resourceData = await readResource(componentUrl)
+
+        // Store widget data on server (including the fetched HTML)
+        await fetch('/inspector/api/resources/widget/store', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            serverId,
+            uri: componentUrl,
+            toolInput: toolArgs,
+            toolOutput: structuredContent,
+            resourceData, // Pass the fetched HTML
+            toolId,
+          }),
+        })
+
+        // Set widget URL
+        setWidgetUrl(`/inspector/api/resources/widget/${toolId}`)
+      }
+      catch (error) {
+        console.error('Error storing widget data:', error)
+        setError(
+          error instanceof Error ? error.message : 'Failed to prepare widget',
+        )
+      }
+    }
+
+    storeAndSetUrl()
+  }, [componentUrl, serverId, toolArgs, toolResult, toolId, readResource])
 
   // Handle postMessage communication with iframe
   useEffect(() => {
-    if (!htmlContent)
+    if (!widgetUrl)
       return
 
     const handleMessage = async (event: MessageEvent) => {
@@ -77,12 +124,11 @@ export function OpenAIComponentRenderer({
       switch (event.data.type) {
         case 'openai:setWidgetState':
           try {
-            // Store widget state in localStorage
-            const stateKey = `openai-widget-state:${toolName}`
-            localStorage.setItem(stateKey, JSON.stringify(event.data.state))
+            // Widget state is already handled by the server-injected script
+            // This is just for parent-level awareness if needed
           }
           catch (err) {
-            console.error('[OpenAIComponentRenderer] Failed to save widget state:', err)
+            console.error('[OpenAIComponentRenderer] Failed to handle widget state:', err)
           }
           break
 
@@ -108,50 +154,25 @@ export function OpenAIComponentRenderer({
 
     const handleLoad = () => {
       setIsReady(true)
-
-      // Send initial data to the iframe
-      if (iframeRef.current?.contentWindow) {
-        // Get any saved widget state
-        const stateKey = `openai-widget-state:${toolName}`
-        const savedState = localStorage.getItem(stateKey)
-        const widgetState = savedState ? JSON.parse(savedState) : undefined
-
-        // Extract structured content from current refs
-        const currentToolResult = toolResultRef.current
-        let structuredContent = currentToolResult?.structuredContent
-        if (!structuredContent && currentToolResult?.contents) {
-          structuredContent = currentToolResult.structuredContent
-        }
-
-        // Send initialization message
-        iframeRef.current.contentWindow.postMessage(
-          {
-            type: 'openai:init',
-            toolInput: toolArgsRef.current,
-            toolOutput: structuredContent || {},
-            widgetState,
-          },
-          '*',
-        )
-      }
+      setError(null)
     }
 
     const handleError = () => {
-      console.error('[OpenAIComponentRenderer] Failed to load iframe')
+      setError('Failed to load component')
     }
 
     const iframe = iframeRef.current
     iframe?.addEventListener('load', handleLoad)
-    iframe?.addEventListener('error', handleError)
+    iframe?.addEventListener('error', handleError as any)
 
     return () => {
       window.removeEventListener('message', handleMessage)
       iframe?.removeEventListener('load', handleLoad)
-      iframe?.removeEventListener('error', handleError)
+      iframe?.removeEventListener('error', handleError as any)
     }
-  }, [htmlContent, toolName])
+  }, [widgetUrl])
 
-  if (error && !htmlContent) {
+  if (error) {
     return (
       <div className={className}>
         <div className="bg-red-50/30 dark:bg-red-950/20 border border-red-200/50 dark:border-red-800/50 rounded-lg p-4">
@@ -165,15 +186,13 @@ export function OpenAIComponentRenderer({
     )
   }
 
-  if (!htmlContent) {
+  if (!widgetUrl) {
     return (
-      <div className={className}>
-        <div className="bg-yellow-50/30 dark:bg-yellow-950/20 border border-yellow-200/50 dark:border-yellow-800/50 rounded-lg p-4">
-          <p className="text-sm text-yellow-600 dark:text-yellow-400">
-            Loading component...
-          </p>
+      <Wrapper className={className} noWrapper={noWrapper}>
+        <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
+          <Spinner className="size-5" />
         </div>
-      </div>
+      </Wrapper>
     )
   }
 
@@ -187,8 +206,13 @@ export function OpenAIComponentRenderer({
 
       <iframe
         ref={iframeRef}
-        srcDoc={htmlContent}
+        src={widgetUrl}
         className={cn('w-full border rounded-3xl bg-white', noWrapper && 'h-[400px]')}
+        style={{
+          minHeight: '400px',
+          height: '600px',
+          maxHeight: '80vh',
+        }}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
         title={`OpenAI Component: ${toolName}`}
         allow="web-share"

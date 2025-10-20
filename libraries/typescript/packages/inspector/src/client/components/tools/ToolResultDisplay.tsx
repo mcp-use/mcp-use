@@ -28,6 +28,8 @@ interface ToolResultDisplayProps {
   results: ToolResult[]
   copiedResult: number | null
   previewMode: boolean
+  serverId: string
+  readResource: (uri: string) => Promise<any>
   onCopy: (index: number, result: any) => void
   onDelete: (index: number) => void
   onFullscreen: (index: number) => void
@@ -38,6 +40,8 @@ export function ToolResultDisplay({
   results,
   copiedResult,
   previewMode,
+  serverId,
+  readResource,
   onCopy,
   onTogglePreview,
 }: ToolResultDisplayProps) {
@@ -217,6 +221,8 @@ export function ToolResultDisplay({
                                         toolName={result.toolName}
                                         toolArgs={result.args}
                                         toolResult={appsSdk.resourceData}
+                                        serverId={serverId}
+                                        readResource={readResource}
                                         className="w-full h-full relative flex p-4"
                                       />
                                     </div>

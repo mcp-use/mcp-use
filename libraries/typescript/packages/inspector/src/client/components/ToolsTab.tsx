@@ -33,6 +33,7 @@ interface ToolsTabProps {
   tools: Tool[]
   callTool: (name: string, args?: Record<string, unknown>) => Promise<any>
   readResource: (uri: string) => Promise<any>
+  serverId: string
   isConnected: boolean
 }
 
@@ -43,6 +44,7 @@ export function ToolsTab({
   tools,
   callTool,
   readResource,
+  serverId,
   isConnected,
 }: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
   // State
@@ -608,6 +610,8 @@ export function ToolsTab({
                 results={results}
                 copiedResult={copiedResult}
                 previewMode={previewMode}
+                serverId={serverId}
+                readResource={readResource}
                 onCopy={handleCopyResult}
                 onDelete={handleDeleteResult}
                 onFullscreen={handleFullscreen}

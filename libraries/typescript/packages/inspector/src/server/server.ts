@@ -34,7 +34,7 @@ const mcpInspector = new MCPInspector()
 
 // Register all API routes
 registerMCPApiRoutes(app, mcpInspector)
-registerInspectorRoutes(app)
+registerInspectorRoutes(app, { mcpInspector })
 
 // Register static file serving with dev proxy support (must be last as it includes catch-all route)
 registerStaticRoutesWithDevProxy(app)
