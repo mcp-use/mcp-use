@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "maple",
+  "theme": "almond",
   "name": "mcp_use",
   "colors": {
     "primary": "#0C0C0C",
@@ -39,6 +39,14 @@
     ],
     "products": [
       {
+        "product": "Home",
+        "description": "Home description",
+        "icon": "house",
+        "pages": [
+          "index"
+        ]
+      },
+      {
         "product": "Python SDK",
         "description": "Python SDK description",
         "icon": "python",
@@ -51,7 +59,6 @@
                 "group": "Getting Started",
                 "icon": "list-start",
                 "pages": [
-                  "python/getting-started/index",
                   "python/getting-started/quickstart",
                   "python/getting-started/installation",
                   "python/getting-started/configuration"
