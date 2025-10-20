@@ -8,6 +8,7 @@
     "mcp-use": "1.1.2"
   },
   "changesets": [
+    "crisp-flies-obey",
     "fast-wolves-teach",
     "legal-eagles-smash"
   ]

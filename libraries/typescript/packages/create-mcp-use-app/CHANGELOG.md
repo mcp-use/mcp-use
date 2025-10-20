@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.3-canary.1
+
+### Patch Changes
+
+- d305be6: fix mcp use deps
+
 ## 0.4.3-canary.0
 
 ### Patch Changes
