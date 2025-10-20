@@ -362,3 +362,364 @@ export async function handleChatRequest(requestBody: {
   }
 }
 
+/**
+ * Widget data storage
+ */
+export interface WidgetData {
+  serverId: string
+  uri: string
+  toolInput: Record<string, any>
+  toolOutput: any
+  resourceData: any
+  toolId: string
+  timestamp: number
+}
+
+const widgetDataStore = new Map<string, WidgetData>()
+
+// Cleanup expired widget data every 5 minutes
+setInterval(
+  () => {
+    const now = Date.now()
+    const ONE_HOUR = 60 * 60 * 1000
+    for (const [toolId, data] of widgetDataStore.entries()) {
+      if (now - data.timestamp > ONE_HOUR) {
+        widgetDataStore.delete(toolId)
+      }
+    }
+  },
+  5 * 60 * 1000,
+).unref()
+
+/**
+ * Store widget data for rendering
+ */
+export function storeWidgetData(data: Omit<WidgetData, 'timestamp'>): { success: boolean, error?: string } {
+  const { serverId, uri, toolInput, toolOutput, resourceData, toolId } = data
+
+  console.log('[Widget Store] Received request for toolId:', toolId)
+  console.log('[Widget Store] Fields:', { serverId, uri, hasResourceData: !!resourceData, hasToolInput: !!toolInput, hasToolOutput: !!toolOutput })
+
+  if (!serverId || !uri || !toolId || !resourceData) {
+    const missingFields = []
+    if (!serverId)
+      missingFields.push('serverId')
+    if (!uri)
+      missingFields.push('uri')
+    if (!toolId)
+      missingFields.push('toolId')
+    if (!resourceData)
+      missingFields.push('resourceData')
+
+    console.error('[Widget Store] Missing required fields:', missingFields)
+    return { success: false, error: `Missing required fields: ${missingFields.join(', ')}` }
+  }
+
+  // Store widget data using toolId as key
+  widgetDataStore.set(toolId, {
+    serverId,
+    uri,
+    toolInput,
+    toolOutput,
+    resourceData,
+    toolId,
+    timestamp: Date.now(),
+  })
+
+  console.log('[Widget Store] Data stored successfully for toolId:', toolId)
+  return { success: true }
+}
+
+/**
+ * Get widget data by toolId
+ */
+export function getWidgetData(toolId: string): WidgetData | undefined {
+  return widgetDataStore.get(toolId)
+}
+
+/**
+ * Generate widget container HTML
+ */
+export function generateWidgetContainerHtml(basePath: string, toolId: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Loading Widget...</title>
+    </head>
+    <body>
+      <script>
+        (async function() {
+          try {
+            // Change URL to "/" BEFORE loading widget (for React Router)
+            history.replaceState(null, '', '/');
+
+            // Fetch the actual widget HTML using toolId
+            const response = await fetch('${basePath}/api/resources/widget-content/${toolId}');
+            const html = await response.text();
+
+            // Replace entire document with widget HTML using proper method
+            document.open();
+            // Write the HTML content - the browser will parse it properly
+            document.write(html);
+            document.close();
+          } catch (error) {
+            console.error('Failed to load widget:', error);
+            document.body.innerHTML = '<div style="padding: 20px; color: red;">Failed to load widget: ' + error.message + '</div>';
+          }
+        })();
+      </script>
+    </body>
+    </html>
+  `
+}
+
+/**
+ * Generate widget content HTML with injected OpenAI API
+ */
+export function generateWidgetContentHtml(widgetData: WidgetData): { html: string, error?: string } {
+  const { serverId, uri, toolInput, toolOutput, resourceData, toolId } = widgetData
+
+  console.log('[Widget Content] Using pre-fetched resource for:', { serverId, uri })
+
+  // Extract HTML content from the pre-fetched resource data
+  let htmlContent = ''
+
+  // The resourceData was fetched client-side, extract HTML from it
+  const contentsArray = Array.isArray(resourceData?.contents)
+    ? resourceData.contents
+    : []
+
+  const firstContent = contentsArray[0]
+  if (firstContent) {
+    if (typeof (firstContent as { text?: unknown }).text === 'string') {
+      htmlContent = (firstContent as { text: string }).text
+    }
+    else if (
+      typeof (firstContent as { blob?: unknown }).blob === 'string'
+    ) {
+      htmlContent = (firstContent as { blob: string }).blob
+    }
+  }
+
+  if (!htmlContent && resourceData && typeof resourceData === 'object') {
+    const recordContent = resourceData as Record<string, unknown>
+    if (typeof recordContent.text === 'string') {
+      htmlContent = recordContent.text
+    }
+    else if (typeof recordContent.blob === 'string') {
+      htmlContent = recordContent.blob
+    }
+  }
+
+  if (!htmlContent) {
+    return { html: '', error: 'No HTML content found' }
+  }
+
+  const widgetStateKey = `openai-widget-state:${toolId}`
+
+  // Safely serialize data to avoid script injection issues
+  const safeToolInput = JSON.stringify(toolInput).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+  const safeToolOutput = JSON.stringify(toolOutput).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+  const safeToolId = JSON.stringify(toolId)
+  const safeWidgetStateKey = JSON.stringify(widgetStateKey)
+
+  // Inject window.openai API script
+  const apiScript = `
+    <script>
+      (function() {
+        'use strict';
+        
+        // Change URL to "/" for React Router compatibility
+        if (window.location.pathname !== '/') {
+          history.replaceState(null, '', '/');
+        }
+
+        const openaiAPI = {
+          toolInput: ${safeToolInput},
+          toolOutput: ${safeToolOutput},
+          displayMode: 'inline',
+          maxHeight: 600,
+          theme: 'dark',
+          locale: 'en-US',
+          safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
+          userAgent: {},
+          widgetState: null,
+
+          async setWidgetState(state) {
+            this.widgetState = state;
+            try {
+              localStorage.setItem(${safeWidgetStateKey}, JSON.stringify(state));
+            } catch (err) {
+              console.error('[OpenAI Widget] Failed to save widget state:', err);
+            }
+            window.parent.postMessage({
+              type: 'openai:setWidgetState',
+              toolId: ${safeToolId},
+              state
+            }, '*');
+          },
+
+          async callTool(toolName, params = {}) {
+            return new Promise((resolve, reject) => {
+              const requestId = \`tool_\${Date.now()}_\${Math.random()}\`;
+              const handler = (event) => {
+                if (event.data.type === 'openai:callTool:response' &&
+                    event.data.requestId === requestId) {
+                  window.removeEventListener('message', handler);
+                  if (event.data.error) {
+                    reject(new Error(event.data.error));
+                  } else {
+                    resolve(event.data.result);
+                  }
+                }
+              };
+              window.addEventListener('message', handler);
+              window.parent.postMessage({
+                type: 'openai:callTool',
+                requestId,
+                toolName,
+                params
+              }, '*');
+              setTimeout(() => {
+                window.removeEventListener('message', handler);
+                reject(new Error('Tool call timeout'));
+              }, 30000);
+            });
+          },
+
+          async sendFollowupTurn(message) {
+            const payload = typeof message === 'string'
+              ? { prompt: message }
+              : message;
+            window.parent.postMessage({
+              type: 'openai:sendFollowup',
+              message: payload.prompt || payload
+            }, '*');
+          },
+
+          async requestDisplayMode(options = {}) {
+            const mode = options.mode || 'inline';
+            this.displayMode = mode;
+            window.parent.postMessage({
+              type: 'openai:requestDisplayMode',
+              mode
+            }, '*');
+            return { mode };
+          },
+
+          async sendFollowUpMessage(args) {
+            const prompt = typeof args === 'string' ? args : (args?.prompt || '');
+            return this.sendFollowupTurn(prompt);
+          }
+        };
+
+        Object.defineProperty(window, 'openai', {
+          value: openaiAPI,
+          writable: false,
+          configurable: false,
+          enumerable: true
+        });
+
+        Object.defineProperty(window, 'webplus', {
+          value: openaiAPI,
+          writable: false,
+          configurable: false,
+          enumerable: true
+        });
+
+        setTimeout(() => {
+          try {
+            const globalsEvent = new CustomEvent('webplus:set_globals', {
+              detail: {
+                globals: {
+                  displayMode: openaiAPI.displayMode,
+                  maxHeight: openaiAPI.maxHeight,
+                  theme: openaiAPI.theme,
+                  locale: openaiAPI.locale,
+                  safeArea: openaiAPI.safeArea,
+                  userAgent: openaiAPI.userAgent
+                }
+              }
+            });
+            window.dispatchEvent(globalsEvent);
+          } catch (err) {}
+        }, 0);
+
+        setTimeout(() => {
+          try {
+            const stored = localStorage.getItem(${safeWidgetStateKey});
+            if (stored && window.openai) {
+              window.openai.widgetState = JSON.parse(stored);
+            }
+          } catch (err) {}
+        }, 0);
+      })();
+    </script>
+  `
+
+  // Inject script into HTML
+  let modifiedHtml
+  if (htmlContent.includes('<html>') && htmlContent.includes('<head>')) {
+    // If it's a full HTML document, inject at the beginning of head
+    modifiedHtml = htmlContent.replace(
+      '<head>',
+      `<head><base href="/">${apiScript}`,
+    )
+  }
+  else {
+    // Widget HTML is just fragments, wrap it properly
+    modifiedHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${apiScript}
+  <title>Widget</title>
+</head>
+<body>
+  ${htmlContent}
+</body>
+</html>`
+  }
+
+  console.log('[Widget Content] Generated HTML length:', modifiedHtml.length)
+
+  return { html: modifiedHtml }
+}
+
+/**
+ * Get security headers for widget content
+ */
+export function getWidgetSecurityHeaders(): Record<string, string> {
+  const trustedCdns = [
+    'https://persistent.oaistatic.com',
+    'https://*.oaistatic.com',
+    'https://unpkg.com',
+    'https://cdn.jsdelivr.net',
+    'https://cdnjs.cloudflare.com',
+    'https://cdn.skypack.dev',
+  ].join(' ')
+
+  return {
+    'Content-Security-Policy': [
+      'default-src \'self\'',
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${trustedCdns}`,
+      'worker-src \'self\' blob:',
+      'child-src \'self\' blob:',
+      `style-src 'self' 'unsafe-inline' ${trustedCdns}`,
+      'img-src \'self\' data: https: blob:',
+      'media-src \'self\' data: https: blob:',
+      `font-src 'self' data: ${trustedCdns}`,
+      'connect-src \'self\' https: wss: ws:',
+      'frame-ancestors \'self\'',
+    ].join('; '),
+    'X-Frame-Options': 'SAMEORIGIN',
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  }
+}

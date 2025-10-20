@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { BlurFade } from '@/client/components/ui/blur-fade'
 import { RandomGradientBackground } from '@/client/components/ui/random-gradient-background'
 import { Spinner } from '@/client/components/ui/spinner'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 
 interface ServerIconProps {
   serverUrl?: string

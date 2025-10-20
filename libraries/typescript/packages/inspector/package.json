@@ -20,7 +20,7 @@
   "main": "./dist/server/index.js",
   "types": "./dist/server/index.d.ts",
   "bin": {
-    "mcp-inspect": "./dist/cli/inspect.js"
+    "mcp-inspect": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -33,7 +33,7 @@
     "build": "npm run build:client && npm run build:server && npm run build:cli",
     "build:client": "vite build",
     "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
-    "build:cli": "tsup src/cli/inspect.ts --format esm --out-dir dist/cli",
+    "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
     "prepublishOnly": "pnpm build",
     "start": "node dist/server/server.js",
     "preview": "vite preview",

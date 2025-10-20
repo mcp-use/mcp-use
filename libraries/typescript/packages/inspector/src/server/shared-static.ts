@@ -1,6 +1,6 @@
+import type { Hono } from 'hono'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Hono } from 'hono'
 import { checkClientFiles, getClientDistPath, getContentType } from './shared-utils.js'
 
 /**
@@ -24,7 +24,6 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
         <body>
           <h1>MCP Inspector</h1>
           <p>Client files not found. Please run 'yarn build' to build the UI.</p>
-          <p>API is available at <a href="/api/servers">/api/servers</a></p>
         </body>
       </html>
     `)
@@ -67,7 +66,6 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
         <body>
           <h1>MCP Inspector</h1>
           <p>Client files not found. Please run 'yarn build' to build the UI.</p>
-          <p>API is available at <a href="/api/servers">/api/servers</a></p>
         </body>
       </html>
     `)
@@ -124,8 +122,7 @@ export function registerStaticRoutesWithDevProxy(app: Hono, clientDistPath?: str
             <h1>MCP Inspector - Development Mode</h1>
             <p>Vite dev server is not running. Please start it with:</p>
             <pre>yarn dev:client</pre>
-            <p>API is available at <a href="/api/servers">/api/servers</a></p>
-          </body>
+            </body>
         </html>
       `)
     })
@@ -135,4 +132,3 @@ export function registerStaticRoutesWithDevProxy(app: Hono, clientDistPath?: str
     registerStaticRoutes(app, distPath)
   }
 }
-

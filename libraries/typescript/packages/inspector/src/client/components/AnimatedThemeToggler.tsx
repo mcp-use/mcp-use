@@ -3,7 +3,7 @@
 import { Monitor, Moon, SunDim } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { cn } from '@/lib/utils'
+import { cn } from '@/client/lib/utils'
 import { useTheme } from '../../client/context/ThemeContext'
 
 interface props {
