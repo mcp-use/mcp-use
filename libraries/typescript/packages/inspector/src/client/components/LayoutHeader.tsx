@@ -2,7 +2,7 @@ import type { TabType } from '@/client/context/InspectorContext'
 import type { MCPConnection } from '@/client/context/McpContext'
 import { Command, FolderOpen, MessageCircle, MessageSquare, Wrench } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
-import { DiscordIcon } from '@/client/components/ui/discord-icon'
+import  {GithubIcon} from '@/client/components/ui/github-icon'
 import { Tabs, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
 import {
   Tooltip,
@@ -121,17 +121,24 @@ export function LayoutHeader({
               <p>Command Palette</p>
             </TooltipContent>
           </Tooltip>
-          <Button variant="ghost" size="sm" asChild>
-            <a
-              href="https://discord.gg/XkNkSkMz3V"
-              className="flex items-center gap-2"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <DiscordIcon className="h-4 w-4" />
-              Discord
-            </a>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="sm" asChild>
+                <a
+                  href="https://github.com/mcp-use/mcp-use"
+                  className="flex items-center gap-2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <GithubIcon className="h-4 w-4" />
+                  Github
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Give us a star ⭐</p>
+            </TooltipContent>
+          </Tooltip>
 
           <LogoAnimated state="expanded" />
         </div>

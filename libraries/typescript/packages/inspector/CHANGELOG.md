@@ -1,5 +1,26 @@
 # @mcp-use/inspector
 
+## 0.4.4
+
+### Patch Changes
+
+- 09d1e45: fix: inspector chat
+- 09d1e45: fix inspector shadow
+  - mcp-use@1.1.4
+
+## 0.4.4-canary.1
+
+### Patch Changes
+
+- f88801a: fix inspector shadow
+
+## 0.4.4-canary.0
+
+### Patch Changes
+
+- f11f846: fix: inspector chat
+  - mcp-use@1.1.4-canary.0
+
 ## 0.4.3
 
 ### Patch Changes
@@ -42,7 +63,6 @@
   - Fixed inspector mounting logic by simplifying server URL handling
   - Fixed linting issues across multiple components
   - Fixed server configuration for improved stability
-
 
 ## 0.4.3-canary.1
 
