@@ -179,11 +179,11 @@ server.prompt({
     { name: 'code', type: 'string', required: true }
   ],
   cb: async (params: Record<string, any>) => {
-    const code = params.code as string
+    const { code } = params
     return {
-      content: [{
-        type: 'text',
-        text: `Please review this code:\n\n${code}`
+      messages: [{
+        role: 'user',
+        content: {type: 'text', text: `Please review this code:\n\n${code}`}
       }]
     }
   }
