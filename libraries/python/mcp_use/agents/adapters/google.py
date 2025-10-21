@@ -40,7 +40,9 @@ class GoogleMCPAdapter(BaseAdapter):
         if mcp_tool.name in self.disallowed_tools:
             return None
 
-        self.tool_executors[mcp_tool.name] = lambda name=mcp_tool.name, **kwargs: connector.call_tool(name, kwargs)
+        self.tool_executors[mcp_tool.name] = (
+            lambda connector=connector, name=mcp_tool.name, **kwargs: connector.call_tool(name, kwargs)
+        )
 
         fixed_schema = self.fix_schema(mcp_tool.inputSchema)
         function_declaration = types.FunctionDeclaration(
@@ -55,7 +57,9 @@ class GoogleMCPAdapter(BaseAdapter):
         if tool_name in self.disallowed_tools:
             return None
 
-        self.tool_executors[tool_name] = lambda uri=mcp_resource.uri, **kwargs: connector.read_resource(uri)
+        self.tool_executors[tool_name] = (
+            lambda connector=connector, uri=mcp_resource.uri, **kwargs: connector.read_resource(uri)
+        )
 
         function_declaration = types.FunctionDeclaration(
             name=tool_name,
@@ -69,7 +73,9 @@ class GoogleMCPAdapter(BaseAdapter):
         if mcp_prompt.name in self.disallowed_tools:
             return None
 
-        self.tool_executors[mcp_prompt.name] = lambda name=mcp_prompt.name, **kwargs: connector.get_prompt(name, kwargs)
+        self.tool_executors[mcp_prompt.name] = (
+            lambda connector=connector, name=mcp_prompt.name, **kwargs: connector.get_prompt(name, kwargs)
+        )
 
         properties = {}
         required_args = []

@@ -70,7 +70,7 @@ async def main():
                 arguments = function_call.args
 
                 # Use the adapter's map to get the correct executor
-                executor = adapter.tool_executors[tool_name]
+                executor = adapter.tool_executors.get(tool_name)
 
                 if not executor:
                     print(f"Error: Unknown tool '{tool_name}' requested by model.")
