@@ -52,4 +52,3 @@ export function StatusDot({ status }: StatusDotProps) {
     </Tooltip>
   )
 }
-

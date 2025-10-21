@@ -42,8 +42,8 @@ export function ChatHeader({
   onClearConfig,
 }: ChatHeaderProps) {
   return (
-    <div className="flex absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2">
-      <div className="flex items-center gap-2 bg-background/70 backdrop-blur-sm rounded-full p-2 px-4">
+    <div className="flex absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 bg-background/40 backdrop-blur-sm ">
+      <div className="flex items-center gap-2 rounded-full p-2 px-4">
         <h3 className="text-3xl font-base">Chat</h3>
         {llmConfig && (
           <Tooltip>
@@ -71,7 +71,7 @@ export function ChatHeader({
       </div>
       <div className="flex items-center gap-2 pr-3 pt-2">
         {hasMessages && (
-          <Button size="default" className="pr-1 cursor-pointer" onClick={onClearChat}>
+          <Button size="default" className="pr-1 pl-3 cursor-pointer" onClick={onClearChat}>
             New Chat
             <span className="text-[12px]  border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500">
               ⌘O

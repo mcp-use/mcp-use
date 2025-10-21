@@ -4,4 +4,3 @@ export class PostHog {
   capture() {}
   shutdown() { return Promise.resolve() }
 }
-

@@ -190,7 +190,7 @@ export function useChatMessagesClientSide({
           // Access the client's internal tool definitions
           // The client should have the raw MCP tools stored
           const clientInternal = client as any
-          
+
           // Try to get tools from the client's sessions
           if (clientInternal.sessions) {
             const sessionIds = Object.keys(clientInternal.sessions)
@@ -208,7 +208,7 @@ export function useChatMessagesClientSide({
               }
             }
           }
-          
+
           // Fallback: access from agent's tools
           if (toolsMetadataRef.current.size === 0 && agent.client) {
             const agentClient = agent.client as any
@@ -365,7 +365,7 @@ export function useChatMessagesClientSide({
                   try {
                     // Use the readResource function passed from the inspector connection
                     const resourceData = await readResource(appsSdkUri)
-                    
+
                     console.log('[useChatMessagesClientSide] Resource fetched:', resourceData)
 
                     // Extract structured content from parsed result
@@ -423,7 +423,7 @@ export function useChatMessagesClientSide({
                               : msg,
                           ),
                         )
-                        
+
                         console.log('[useChatMessagesClientSide] Messages state updated with resource')
                       }
                     }
