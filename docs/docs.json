@@ -54,7 +54,8 @@
             "icon": "library",
             "pages": [
               "home/redirects/python",
-              "home/redirects/typescript"
+              "home/redirects/typescript",
+              "home/redirects/inspector"
             ]
           },
           {
