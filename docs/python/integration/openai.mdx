@@ -228,7 +228,7 @@ async def main():
             arguments = json.loads(tool_call.function.arguments)
 
             # Use the adapter's map to get the correct executor
-            executor = adapter.tool_executors[function_name]
+            executor = adapter.tool_executors.get(function_name)
 
             if not executor:
                 print(f"Error: Unknown tool '{function_name}' requested by model.")

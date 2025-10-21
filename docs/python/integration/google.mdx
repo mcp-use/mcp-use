@@ -126,7 +126,7 @@ Here's how to use the adapter to provide MCP tools, resources, and prompts to a 
                 arguments = function_call.args
 
                 # 1. Use the adapter's map to get the correct executor
-                executor = adapter.tool_executors[tool_name]
+                executor = adapter.tool_executors.get(tool_name)
 
                 if not executor:
                     function_response_content = types.Content(
@@ -266,7 +266,7 @@ async def main():
                 arguments = function_call.args
 
                 # Use the adapter's map to get the correct executor
-                executor = adapter.tool_executors[tool_name]
+                executor = adapter.tool_executors.get(tool_name)
 
                 if not executor:
                     print(f"Error: Unknown tool '{tool_name}' requested by model.")
