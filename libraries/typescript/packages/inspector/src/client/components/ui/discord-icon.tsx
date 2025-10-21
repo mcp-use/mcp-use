@@ -13,4 +13,3 @@ export function DiscordIcon({ className }: { className?: string }) {
     </svg>
   )
 }
-

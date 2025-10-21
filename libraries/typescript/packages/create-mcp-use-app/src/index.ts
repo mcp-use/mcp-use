@@ -35,6 +35,48 @@ function runPackageManager(packageManager: string, args: string[], cwd: string):
   })
 }
 
+// Detect which package manager was used to run this script
+function detectPackageManager(): string | null {
+  // Check npm_config_user_agent which contains info about the package manager
+  const userAgent = process.env.npm_config_user_agent || ''
+
+  if (userAgent.includes('yarn')) {
+    return 'yarn'
+  } else if (userAgent.includes('pnpm')) {
+    return 'pnpm'
+  } else if (userAgent.includes('npm')) {
+    return 'npm'
+  }
+
+  return null
+}
+
+// Get the dev command for a specific package manager
+function getDevCommand(packageManager: string): string {
+  switch (packageManager) {
+    case 'yarn':
+      return 'yarn dev'
+    case 'pnpm':
+      return 'pnpm dev'
+    case 'npm':
+    default:
+      return 'npm run dev'
+  }
+}
+
+// Get the install command for a specific package manager
+function getInstallCommand(packageManager: string): string {
+  switch (packageManager) {
+    case 'yarn':
+      return 'yarn'
+    case 'pnpm':
+      return 'pnpm install'
+    case 'npm':
+    default:
+      return 'npm install'
+  }
+}
+
 const program = new Command()
 
 // Render logo as ASCII art
@@ -51,7 +93,7 @@ const packageJson = JSON.parse(
 // Read current package versions from workspace
 function getCurrentPackageVersions(isDevelopment: boolean = false, useCanary: boolean = false) {
   const versions: Record<string, string> = {}
-  
+
   try {
     if (isDevelopment) {
       // In development mode, use workspace dependencies for all packages
@@ -84,7 +126,7 @@ function getCurrentPackageVersions(isDevelopment: boolean = false, useCanary: bo
       }
     }
   }
-  
+
   return versions
 }
 
@@ -92,13 +134,13 @@ function getCurrentPackageVersions(isDevelopment: boolean = false, useCanary: bo
 function processTemplateFile(filePath: string, versions: Record<string, string>, isDevelopment: boolean = false, useCanary: boolean = false) {
   const content = readFileSync(filePath, 'utf-8')
   let processedContent = content
-  
+
   // Replace version placeholders with current versions
   for (const [packageName, version] of Object.entries(versions)) {
     const placeholder = `{{${packageName}_version}}`
     processedContent = processedContent.replace(new RegExp(placeholder, 'g'), version)
   }
-  
+
   // Handle workspace dependencies based on mode
   if (isDevelopment) {
     // Keep workspace dependencies for development
@@ -115,7 +157,7 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
     processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "${versions['@mcp-use/cli'] || 'latest'}"`)
     processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "${versions['@mcp-use/inspector'] || 'latest'}"`)
   }
-  
+
   return processedContent
 }
 
@@ -128,10 +170,13 @@ program
   .option('--no-install', 'Skip installing dependencies')
   .option('--dev', 'Use workspace dependencies for development')
   .option('--canary', 'Use canary versions of packages')
-  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean, canary: boolean }) => {
+  .option('--yarn', 'Use yarn as package manager')
+  .option('--npm', 'Use npm as package manager')
+  .option('--pnpm', 'Use pnpm as package manager')
+  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean, canary: boolean, yarn?: boolean, npm?: boolean, pnpm?: boolean }) => {
     try {
       let selectedTemplate = options.template
-      
+
       // If no project name provided, prompt for it
       if (!projectName) {
         console.log('')
@@ -139,10 +184,10 @@ program
         console.log('')
         console.log(chalk.bold('Welcome to create-mcp-use-app!'))
         console.log('')
-        
+
         projectName = await promptForProjectName()
         console.log('')
-        
+
         // Prompt for template selection in interactive mode
         selectedTemplate = await promptForTemplate()
       }
@@ -185,33 +230,99 @@ program
 
       // Validate template name
       const validatedTemplate = validateTemplateName(selectedTemplate)
-      
+
       // Get current package versions
       const versions = getCurrentPackageVersions(options.dev, options.canary)
-      
+
       // Copy template files
       await copyTemplate(projectPath, validatedTemplate, versions, options.dev, options.canary)
 
       // Update package.json with project name
       updatePackageJson(projectPath, sanitizedProjectName)
 
+      // Determine which package manager to use
+      let usedPackageManager = 'npm'
+
+      // Check if a specific package manager was requested via flags
+      if (options.yarn) {
+        usedPackageManager = 'yarn'
+      } else if (options.npm) {
+        usedPackageManager = 'npm'
+      } else if (options.pnpm) {
+        usedPackageManager = 'pnpm'
+      } else {
+        // Try to detect which package manager was used to run this script
+        const detected = detectPackageManager()
+        if (detected) {
+          usedPackageManager = detected
+        } else {
+          // No flag and couldn't detect, try in order: yarn → npm → pnpm
+          const defaultOrder = ['yarn', 'npm', 'pnpm']
+          // We'll determine the working one during installation
+          usedPackageManager = defaultOrder[0]
+        }
+      }
+
       // Install dependencies if requested
       if (options.install) {
-        const spinner = ora('Installing packages...').start()
+        // Yarn and npm show their own progress, so we don't need a spinner for them
+        const showSpinner = usedPackageManager !== 'yarn' && usedPackageManager !== 'npm'
+        const spinner = showSpinner ? ora('Installing packages...').start() : null
+
         try {
-          await runPackageManager('pnpm', ['install'], projectPath)
-          spinner.succeed('Packages installed successfully')
+          if (options.yarn || options.npm || options.pnpm || detectPackageManager()) {
+            // Use the specific package manager
+            if (!showSpinner) {
+              console.log('')
+            }
+            await runPackageManager(usedPackageManager, ['install'], projectPath)
+            if (spinner) {
+              spinner.succeed(`Packages installed successfully with ${usedPackageManager}`)
+            } else {
+              console.log('')
+            }
+          } else {
+            // Try in order: yarn → npm → pnpm
+            if (spinner) spinner.text = 'Installing packages (trying yarn)...'
+            try {
+              if (!spinner) console.log('')
+              await runPackageManager('yarn', ['install'], projectPath)
+              usedPackageManager = 'yarn'
+              if (spinner) {
+                spinner.succeed('Packages installed successfully with yarn')
+              } else {
+                console.log('')
+              }
+            } catch {
+              if (spinner) spinner.text = 'yarn not found, trying npm...'
+              try {
+                await runPackageManager('npm', ['install'], projectPath)
+                usedPackageManager = 'npm'
+                if (spinner) {
+                  spinner.succeed('Packages installed successfully with npm')
+                } else {
+                  console.log('')
+                }
+              } catch {
+                if (spinner) spinner.text = 'npm not found, trying pnpm...'
+                await runPackageManager('pnpm', ['install'], projectPath)
+                usedPackageManager = 'pnpm'
+                if (spinner) {
+                  spinner.succeed('Packages installed successfully with pnpm')
+                } else {
+                  console.log('')
+                }
+              }
+            }
+          }
         }
-        catch {
-          spinner.text = 'pnpm not found, trying npm...'
-          try {
-            await runPackageManager('npm', ['install'], projectPath)
-            spinner.succeed('Packages installed successfully')
-          }
-          catch (error) {
+        catch (error) {
+          if (spinner) {
             spinner.fail('Package installation failed')
-            console.log('⚠️  Please run "npm install" or "pnpm install" manually')
+          } else {
+            console.log('❌ Package installation failed')
           }
+          console.log('⚠️  Please run "npm install", "yarn install", or "pnpm install" manually')
         }
       }
 
@@ -241,9 +352,9 @@ program
       console.log(chalk.bold('🚀 To get started:'))
       console.log(chalk.cyan(`   cd ${sanitizedProjectName}`))
       if (!options.install) {
-        console.log(chalk.cyan('   npm install'))
+        console.log(chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`))
       }
-      console.log(chalk.cyan('   npm run dev'))
+      console.log(chalk.cyan(`   ${getDevCommand(usedPackageManager)}`))
       console.log('')
       if (options.dev) {
         console.log(chalk.yellow('💡 Development mode: Your project uses workspace dependencies'))
@@ -263,21 +374,21 @@ program
 // Validate and sanitize template name to prevent path traversal
 function validateTemplateName(template: string): string {
   const sanitized = template.trim()
-  
+
   // Security: Prevent path traversal attacks
   if (sanitized.includes('..') || sanitized.includes('/') || sanitized.includes('\\')) {
     console.error(chalk.red('❌ Invalid template name'))
     console.error(chalk.yellow('   Template name cannot contain path separators'))
     process.exit(1)
   }
-  
+
   // Only allow alphanumeric characters, hyphens, and underscores
   if (!/^[a-zA-Z0-9_-]+$/.test(sanitized)) {
     console.error(chalk.red('❌ Invalid template name'))
     console.error(chalk.yellow('   Template name can only contain letters, numbers, hyphens, and underscores'))
     process.exit(1)
   }
-  
+
   return sanitized
 }
 
@@ -286,7 +397,7 @@ async function copyTemplate(projectPath: string, template: string, versions: Rec
 
   if (!existsSync(templatePath)) {
     console.error(chalk.red(`❌ Template "${template}" not found!`))
-    
+
     // Dynamically list available templates
     const templatesDir = join(__dirname, 'templates')
     if (existsSync(templatesDir)) {
@@ -294,14 +405,15 @@ async function copyTemplate(projectPath: string, template: string, versions: Rec
         .filter(dirent => dirent.isDirectory())
         .map(dirent => dirent.name)
         .sort()
-      
+
       console.log(`Available templates: ${availableTemplates.join(', ')}`)
     } else {
       console.log('No templates directory found')
     }
-    
-    console.log('💡 Tip: Use "ui" template for React components and modern UI features')
-    console.log('💡 Tip: Use "uiresource" template for UI resources and advanced server examples')
+
+    console.log('💡 Tip: Use "starter" template for a comprehensive MCP server with all features')
+    console.log('💡 Tip: Use "ui-resource" template for a MCP server with mcp-ui resources')
+    console.log('💡 Tip: Use "apps-sdk-demo" template for a MCP server with OpenAI Apps SDK integration')
     process.exit(1)
   }
 
@@ -369,17 +481,25 @@ async function promptForProjectName(): Promise<string> {
 async function promptForTemplate(): Promise<string> {
   // Get available templates
   const templatesDir = join(__dirname, 'templates')
-  const availableTemplates = existsSync(templatesDir) 
-    ? readdirSync(templatesDir, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name)
-        .sort()
-    : ['simple', 'ui', 'uiresource']
+  const availableTemplates =  readdirSync(templatesDir, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name)
+      .sort()
 
-  const templateDescriptions: Record<string, string> = {
-    'simple': 'Simple MCP server with a basic calculator tool (add numbers)',
-    'ui': 'MCP Server with mcp-ui resources returned from tools',
-    'uiresource': 'MCP Server with mcp-ui resources',
+  // Read template descriptions dynamically from package.json files
+  const templateDescriptions: Record<string, string> = {}
+  for (const template of availableTemplates) {
+    const packageJsonPath = join(templatesDir, template, 'package.json')
+    if (existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
+        templateDescriptions[template] = packageJson.description || 'MCP server template'
+      } catch (error) {
+        templateDescriptions[template] = 'MCP server template'
+      }
+    } else {
+      templateDescriptions[template] = 'MCP server template'
+    }
   }
 
   const { template } = await inquirer.prompt([
@@ -394,7 +514,7 @@ async function promptForTemplate(): Promise<string> {
       }))
     }
   ])
-  
+
   return template
 }
 

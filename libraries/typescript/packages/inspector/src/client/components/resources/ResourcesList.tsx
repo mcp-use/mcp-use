@@ -17,7 +17,8 @@ interface ResourcesListProps {
 }
 
 function getResourceIcon(mimeType?: string, uri?: string) {
-  if (!mimeType && !uri) return <File className="h-5 w-5" />
+  if (!mimeType && !uri)
+    return <File className="h-5 w-5" />
 
   const type = (mimeType || uri || '').toLowerCase()
 
@@ -25,9 +26,9 @@ function getResourceIcon(mimeType?: string, uri?: string) {
     return <FileImage className="h-5 w-5" />
   }
   if (
-    type.includes('json') ||
-    type.includes('javascript') ||
-    type.includes('typescript')
+    type.includes('json')
+    || type.includes('javascript')
+    || type.includes('typescript')
   ) {
     return <FileCode className="h-5 w-5" />
   }
@@ -80,16 +81,18 @@ export function ResourcesList({
             icon={icon}
             title={resource.name}
             description={
-              description.length > 0 ? (
-                <span className="flex flex-col gap-1">
-                  {resource.description && <span>{resource.description}</span>}
-                  {resource.mimeType && (
-                    <span className="text-xs text-gray-500 dark:text-gray-500 font-mono">
-                      {resource.mimeType}
+              description.length > 0
+                ? (
+                    <span className="flex flex-col gap-1">
+                      {resource.description && <span>{resource.description}</span>}
+                      {resource.mimeType && (
+                        <span className="text-xs text-gray-500 dark:text-gray-500 font-mono">
+                          {resource.mimeType}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-              ) : undefined
+                  )
+                : undefined
             }
             onClick={() => onResourceSelect(resource)}
           />

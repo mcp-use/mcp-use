@@ -363,7 +363,7 @@ console.log('Resource:', resource)
 ## 📂 Project Structure
 
 ```
-apps_sdk/
+apps-sdk/
 ├── index.ts                # Entry point
 ├── package.json            # Dependencies
 ├── tsconfig.json          # TypeScript config

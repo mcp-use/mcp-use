@@ -3,5 +3,6 @@ packages:
   - 'test_app'
   - 'packages/mcp-use/examples/client/react'
   - 'packages/mcp-use/examples/server/simple'
-  - 'packages/create-mcp-use-app/src/templates/ui'
-  - 'packages/create-mcp-use-app/src/templates/uiresource'
+  - 'packages/create-mcp-use-app/src/templates/starter'
+  - 'packages/create-mcp-use-app/src/templates/ui-resource'
+  - 'packages/create-mcp-use-app/src/templates/apps-sdk-demo'
