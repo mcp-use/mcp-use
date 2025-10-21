@@ -1,0 +1,199 @@
+---
+title: "Inspector"
+description: "Built-in web interface for real-time server monitoring and debugging"
+icon: "monitor"
+---
+[![See Live Inspector](/images/UseLiveSmall.svg)](https://inspector.mcp-use.com)
+
+<Card title="MCP Inspector" img="/images/inspector/inspector-dashboard.jpg">
+The MCP Inspector is a powerful web-based debugging and inspection tool for MCP (Model Context Protocol) servers. It provides a beautiful, intuitive interface for testing tools, exploring resources, managing prompts, and monitoring server connections - all from your browser.
+</Card>
+
+
+
+### Key Features
+
+- **Multi-Server Management**: Connect to and manage multiple MCP servers simultaneously
+- **Tool Testing**: Interactive tool execution with schema validation and real-time results
+- **Resource Browser**: Explore available resources and data sources
+- **Prompt Manager**: Test and manage prompts with argument templates
+- **Chat Interface**: Interactive chat with LLM integration for testing conversational flows
+- **OAuth Support**: Built-in OAuth flow handling with popup authentication
+- **Session Persistence**: Connections saved to localStorage with auto-reconnect
+
+# Getting Started
+
+## Dashboard
+
+The MCP Inspector dashboard is your central hub for managing MCP server connections.
+
+![Dashboard](/images/inspector/dashboard.png)
+
+What you see:
+- Connected Servers panel (left)
+- Connect panel with transport, URL, connection type, auth, headers (right)
+- Quick actions in the top bar
+
+Next: add the Linear MCP server to begin a live walkthrough.
+
+### Add MCP Server
+
+<Steps>
+<Step title="Open Connect Panel">
+Open the Connect panel on the right side of the dashboard.
+
+![Connect Form](/images/inspector/connect-form.png)
+</Step>
+
+<Step title="Configure Transport">
+Set Transport Type to "Streamable HTTP" for SSE connections.
+</Step>
+
+<Step title="Enter Server URL">
+Enter the MCP server URL (e.g., `https://mcp.linear.app/mcp`).
+</Step>
+
+<Step title="Connect">
+Click the Connect button to establish the connection.
+</Step>
+</Steps>
+
+### OAuth Authentication
+
+<Note>
+All authentication tokens and credentials are stored securely in your browser's local storage. Nothing is sent to our servers - everything stays on your device.
+</Note>
+
+<Steps>
+<Step title="Authorization Request">
+Servers like Linear require OAuth. After clicking Connect, you'll see the authorization page.
+
+![OAuth Linear](/images/inspector/oauth-linear.png)
+</Step>
+
+<Step title="Grant Access">
+Click "Approve" to grant access. The inspector handles the redirect automatically.
+</Step>
+</Steps>
+
+### Connected Server
+
+Once authenticated, the server appears in the Connected Servers list with a green indicator.
+
+![Server Connected](/images/inspector/server-connected.png)
+
+Click the icon buttons to Inspect, Disconnect, or Remove the server.
+
+# Server Detail View
+
+Clicking "Inspect" opens the detailed server view with tabs for Tools, Resources, Prompts, and Chat.
+
+![Server Detail](/images/inspector/server-detail.png)
+
+### Tools Tab
+
+The Tools tab displays all available tools from the MCP server. Each tool shows its name and description.
+
+<Frame caption="Tools list showing 23 available Linear tools">
+<img src="/images/inspector/tools-list.png" alt="Tools tab interface showing list of available tools" />
+</Frame>
+
+Select a tool to view its details and execute it. The right panel will show the tool's schema and an Execute button.
+
+### Resources Tab
+
+The Resources tab displays available resources from the MCP server. Resources are data sources the server can provide.
+
+<Frame caption="Resources tab showing no resources available">
+<img src="/images/inspector/resources-empty.png" alt="Resources tab interface showing empty state" />
+</Frame>
+
+Note: Linear MCP server doesn't expose any resources, so this tab shows "No resources available".
+
+### Prompts Tab
+
+The Prompts tab shows pre-configured prompts from the MCP server. You can select and execute prompts with parameters.
+
+<Frame caption="Prompts tab showing no prompts available">
+<img src="/images/inspector/prompts-empty.png" alt="Prompts tab interface showing empty state" />
+</Frame>
+
+Note: Linear MCP server doesn't provide any prompts, so this tab shows "No prompts available".
+
+# Chat Tab
+
+<Note>
+The Chat feature uses a BYOK (Bring Your Own Key) model. Your API key is stored locally in your browser and never sent to our servers. All requests are made directly from your device to your LLM provider.
+</Note>
+
+The Chat tab provides an interactive interface to test the MCP server with an LLM. Configure your API key to start chatting.
+
+
+### Chat Setup
+To use the chat:
+
+<Steps>
+<Step title="Configure API Key">
+Click "Configure API Key" to open the configuration modal.
+
+![Chat Configure](/images/inspector/chat-configure.png)
+
+![Chat API Modal](/images/inspector/chat-api-modal.png)
+
+
+- **Provider**: Select your LLM provider (OpenAI, Anthropic, etc.)
+- **Model**: Choose the model to use (gpt-4o, claude-3, etc.)
+- **API Key**: Enter your API key (stored locally in browser)
+- Click "Save Configuration" to activate the chat
+</Step>
+
+<Step title="Enter Credentials">
+Once configured, the chat interface becomes active.
+
+![Chat Active](/images/inspector/chat-active.png)
+</Step>
+
+<Step title="Start Chatting">
+Type natural language queries to test the MCP server.
+</Step>
+
+<Step title="View Results">
+See tool calls and responses in real-time with detailed JSON output.
+
+![Chat Interaction](/images/inspector/chat-interaction.png)
+
+When you send a message, the inspector shows real-time tool calls and responses.
+</Step>
+</Steps>
+
+Key features of the chat interface:
+- **Message Input**: Natural language queries to test MCP server functionality
+- **Tool Call Visualization**: Shows which tools are being called with indicators
+- **Tool Call Details**: Side panel displays arguments and results in JSON format
+- **Response Display**: Shows the assistant's response based on tool results
+- **Real-time Feedback**: See exactly how the MCP server processes requests
+
+## Keyboard Shortcuts
+
+The inspector includes powerful keyboard shortcuts for quick navigation:
+
+![Quick Search](/images/inspector/quick-search.png)
+
+**Cmd/Ctrl + K** opens the quick search modal where you can:
+- Quickly connect to a new server
+- Access documentation and tutorials
+- Jump to recently used servers
+- Search and execute tools directly
+- Navigate to different tabs (Tools, Prompts, Resources, Chat)
+
+Other shortcuts:
+- **Esc**: Close modals and overlays
+
+## Persistency
+
+The inspector automatically saves your server configurations to localStorage:
+- Server connections persist across page reloads
+- Credentials are stored securely in your browser
+- Clear all sessions with the "Clear All" button
+
+Visit [inspector.mcp-use.com](https://inspector.mcp-use.com) to start inspecting your MCP servers today!

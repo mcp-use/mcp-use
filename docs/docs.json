@@ -56,7 +56,7 @@
               "home/redirects/python",
               "home/redirects/typescript"
             ]
-          }, 
+          },
           {
             "group": "Guides",
             "icon": "",
@@ -541,6 +541,14 @@
               }
             ]
           }
+        ]
+      },{
+        "product": "Inspector",
+        "description": "Inspector",
+        "icon": "monitor",
+        "pages": [
+          "inspector/index",
+          "inspector/self-hosting"
         ]
       }
     ]

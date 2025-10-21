@@ -1,0 +1,89 @@
+---
+title: "Self-Hosting"
+description: "Deploy MCP Inspector to your own infrastructure"
+icon: "server"
+---
+
+<Card title="Live Preview" >
+You can preview the inspector at inspector.mcp-use.com
+
+[![See Live Inspector](/images/UseLiveSmall.svg)](https://inspector.mcp-use.com)
+</Card>
+# Self-Hosting MCP Inspector
+
+Deploy the MCP Inspector to your own infrastructure with a single Docker container. Perfect for enterprise environments, air-gapped networks, or when you need full control over your debugging environment.
+
+
+<Card title="Docker Image" icon="docker">
+The MCP Inspector provides an official Docker image via Docker Hub that can be used for deployments on any system that is running Docker. Here's a one-liner that will start a container running the Inspector.
+
+```bash
+docker run -d -p 8080:8080 --name mcp-inspector mcpuse/inspector:latest
+```
+
+[![Docker Hub](/images/dockerbutton.svg)](https://hub.docker.com/r/mcpuse/inspector)
+</Card>
+
+## Quick Deploy
+
+<Card title="Railway" icon="/images/railway.svg">
+Deploy instantly to Railway with automatic HTTPS and custom domains.
+
+[![Deploy on Railway](/images/railway-button.svg)](https://railway.app/template/mcp-inspector)
+</Card>
+
+## Docker Deployment
+
+### Using Docker Run
+
+Deploy locally or on any Docker-compatible infrastructure:
+
+```bash
+docker run -d \
+  --name mcp-inspector \
+  -p 8080:8080 \
+  -e NODE_ENV=production \
+  mcpuse/inspector:latest
+```
+
+### Using Docker Compose
+
+For more complex deployments with environment variables:
+
+```yaml
+version: '3.8'
+services:
+  mcp-inspector:
+    image: mcpuse/inspector:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+### Environment Variables
+
+<Note>
+All configuration is optional. The inspector works out of the box with sensible defaults.
+</Note>
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NODE_ENV` | `production` | Node.js environment |
+| `PORT` | `8080` | Port to run the inspector on |
+| `HOST` | `0.0.0.0` | Host to bind to |
+
+## Support
+
+For self-hosting support:
+- [GitHub Issues](https://github.com/mcp-use/mcp-use/issues)
+- [Discord Community](https://discord.gg/XkNkSkMz3V)
+
+Visit [inspector.mcp-use.com](https://inspector.mcp-use.com) to try the hosted version first!
