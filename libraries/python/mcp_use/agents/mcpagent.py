@@ -756,11 +756,16 @@ class MCPAgent:
                     if run_manager:
                         await run_manager.on_chain_error(e)
                     break
-                except Exception:
-                    if initialized_here and manage_connector:
-                        logger.info("🧹 Cleaning up resources after initialization error in stream")
-                        await self.close()
-                    raise
+                except Exception as e:
+                    logger.error(f"❌ Error during agent execution step {step_num + 1}: {e}")
+                    import traceback
+
+                    traceback.print_exc()
+                    # End the chain with error if we have a run manager
+                    if run_manager:
+                        await run_manager.on_chain_error(e)
+                    result = f"Agent stopped due to an error: {str(e)}"
+                    break
 
             # --- Loop finished ---
             if not result:
@@ -810,8 +815,7 @@ class MCPAgent:
             if not output_schema:
                 yield result
 
-        except Exception as e:
-            logger.error(f"❌ Error running query: {e}")
+        except Exception:
             if initialized_here and manage_connector:
                 logger.info("🧹 Cleaning up resources after initialization error in stream")
                 await self.close()
