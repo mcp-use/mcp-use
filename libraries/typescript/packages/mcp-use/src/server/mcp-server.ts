@@ -438,14 +438,14 @@ export class McpServer {
       : widgetNameOrDefinition
     
     // Determine tool name based on resource type
-    // For Apps SDK, use the name directly without ui_ prefix
+    // For Apps SDK, use the name directly without prefix
     let toolName: string
     if (definition.type === 'appsSdk') {
       toolName = definition.name
     } else if (definition.type === 'externalUrl') {
-      toolName = `ui_${definition.widget}`
+      toolName = `${definition.widget}`
     } else {
-      toolName = `ui_${definition.name}`
+      toolName = `${definition.name}`
     }
     const displayName = definition.title || definition.name
 

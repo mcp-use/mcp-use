@@ -145,7 +145,7 @@ export function getPizzazWidgetsSummary() {
     id: w.id,
     title: w.title,
     description: w.description,
-    tool: `ui_${w.id}`,
+    tool: `${w.id}`,
     resource: w.templateUri,
     responseText: w.responseText
   }))

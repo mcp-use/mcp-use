@@ -34,7 +34,7 @@ const PORT = process.env.PORT || 8000
  * Using mcp-use's uiResource method with AppsSdkUIResource type:
  * 
  * This automatically:
- * 1. Creates tools (ui_pizza-map, ui_pizza-carousel, etc.)
+ * 1. Creates tools (pizza-map, pizza-carousel, etc.)
  * 2. Creates resources (ui://widget/pizza-map.html, etc.)
  * 3. Sets MIME type to text/html+skybridge
  * 4. Injects Apps SDK metadata
@@ -73,7 +73,7 @@ server.tool({
           `   Description: ${w.description}\n`
         ).join('\n')}\n` +
           `\nUsage:\n` +
-          `await client.callTool('ui_${widgets[0].id}', { pizzaTopping: 'pepperoni' })\n` +
+          `await client.callTool('${widgets[0].id}', { pizzaTopping: 'pepperoni' })\n` +
           `await client.readResource('${widgets[0].resource}')`
       }]
     }
@@ -195,14 +195,14 @@ Server is running on port ${PORT}
 🍕 Available Pizzaz Widgets (${pizzazWidgets.length} total):
 
 ${pizzazWidgets.map((w, i) => `   ${i + 1}. ${w.name}
-      Tool:      ui_${w.name}
+      Tool:      ${w.name}
       Resource:  ${w.appsSdkMetadata?.['openai/outputTemplate'] || 'N/A'}
 `).join('\n')}
 
 📝 Usage Examples:
 
    // Call a widget tool with parameters
-   await client.callTool('ui_pizza-map', {
+   await client.callTool('pizza-map', {
      pizzaTopping: 'pepperoni'
    })
 

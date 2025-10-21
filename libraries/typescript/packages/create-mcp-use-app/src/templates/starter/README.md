@@ -177,34 +177,34 @@ await client.callTool('fetch-weather', { city: 'London' })
 // Returns: Weather information from wttr.in
 ```
 
-### `ui_kanban-board`
+### `kanban-board`
 
 Interactive Kanban board widget (External URL).
 
 ```typescript
-await client.callTool('ui_kanban-board', {
+await client.callTool('kanban-board', {
   initialTasks: [{ id: '1', title: 'Task 1' /* ... */ }],
   theme: 'dark',
 })
 ```
 
-### `ui_quick-poll`
+### `quick-poll`
 
 Quick polling widget (Remote DOM).
 
 ```typescript
-await client.callTool('ui_quick-poll', {
+await client.callTool('quick-poll', {
   question: 'Favorite framework?',
   options: ['React', 'Vue', 'Svelte'],
 })
 ```
 
-### `ui_pizzaz-map-apps-sdk`
+### `pizzaz-map-apps-sdk`
 
 Pizza location map (Apps SDK).
 
 ```typescript
-await client.callTool('ui_pizzaz-map-apps-sdk', {
+await client.callTool('pizzaz-map-apps-sdk', {
   pizzaTopping: 'pepperoni',
 })
 ```
@@ -535,7 +535,7 @@ server.uiResource({
 3. **Use**:
 
 ```typescript
-await client.callTool('ui_weather-widget', { city: 'Paris' })
+await client.callTool('weather-widget', { city: 'Paris' })
 ```
 
 ## Learn More

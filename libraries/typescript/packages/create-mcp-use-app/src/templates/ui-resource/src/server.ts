@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 3000
  * Best for: Complex interactive widgets with their own assets
  *
  * This automatically:
- * 1. Creates a tool (ui_kanban-board) that accepts parameters
+ * 1. Creates a tool (kanban-board) that accepts parameters
  * 2. Creates a resource (ui://widget/kanban-board) for static access
  * 3. Serves the widget from dist/resources/mcp-use/widgets/kanban-board/
  */
@@ -61,7 +61,7 @@ server.uiResource({
  * Best for: Simple visualizations, status displays, formatted text
  *
  * This creates:
- * - Tool: ui_welcome-card
+ * - Tool: welcome-card
  * - Resource: ui://widget/welcome-card
  */
 server.uiResource({
@@ -160,7 +160,7 @@ server.uiResource({
  * Best for: Lightweight interactive UIs using MCP-UI React components
  *
  * This creates:
- * - Tool: ui_quick-poll
+ * - Tool: quick-poll
  * - Resource: ui://widget/quick-poll
  */
 server.uiResource({
@@ -294,20 +294,20 @@ server.tool({
       {
         name: 'kanban-board',
         type: 'externalUrl',
-        tool: 'ui_kanban-board',
+        tool: 'kanban-board',
         resource: 'ui://widget/kanban-board',
         url: `http://localhost:${PORT}/mcp-use/widgets/kanban-board`
       },
       {
         name: 'welcome-card',
         type: 'rawHtml',
-        tool: 'ui_welcome-card',
+        tool: 'welcome-card',
         resource: 'ui://widget/welcome-card'
       },
       {
         name: 'quick-poll',
         type: 'remoteDom',
-        tool: 'ui_quick-poll',
+        tool: 'quick-poll',
         resource: 'ui://widget/quick-poll'
       }
     ]
@@ -382,24 +382,24 @@ Server is running on port ${PORT}
 
    1️⃣  External URL Widget (Iframe)
    • kanban-board
-     Tool:      ui_kanban-board
+     Tool:      kanban-board
      Resource:  ui://widget/kanban-board
      Browser:   http://localhost:${PORT}/mcp-use/widgets/kanban-board
 
    2️⃣  Raw HTML Widget (Direct Rendering)
    • welcome-card
-     Tool:      ui_welcome-card
+     Tool:      welcome-card
      Resource:  ui://widget/welcome-card
 
    3️⃣  Remote DOM Widget (React Components)
    • quick-poll
-     Tool:      ui_quick-poll
+     Tool:      quick-poll
      Resource:  ui://widget/quick-poll
 
 📝 Usage Examples:
 
    // External URL - Call with dynamic parameters
-   await client.callTool('ui_kanban-board', {
+   await client.callTool('kanban-board', {
      initialTasks: [{id: 1, title: 'Task 1'}],
      theme: 'dark'
    })
@@ -408,7 +408,7 @@ Server is running on port ${PORT}
    await client.readResource('ui://widget/welcome-card')
 
    // Remote DOM - Interactive component
-   await client.callTool('ui_quick-poll', {
+   await client.callTool('quick-poll', {
      question: 'Favorite color?',
      options: ['Red', 'Blue', 'Green']
    })

@@ -71,7 +71,7 @@ const client = createMCPClient({
 })
 
 // Call a pizzaz widget tool
-const result = await client.callTool('ui_pizza-map', {
+const result = await client.callTool('pizza-map', {
   pizzaTopping: 'pepperoni',
 })
 
@@ -148,7 +148,7 @@ server.uiResource(widget)
 
 This automatically:
 
-1. Creates a tool (`ui_pizza-map`)
+1. Creates a tool (`pizza-map`)
 2. Creates a resource (`ui://widget/pizza-map.html`)
 3. Sets MIME type to `text/html+skybridge`
 4. Injects Apps SDK metadata
@@ -293,16 +293,16 @@ The external scripts:
 
 Each pizzaz widget creates a tool:
 
-- `ui_pizza-map` - Display interactive map
-- `ui_pizza-carousel` - Browse in carousel format
-- `ui_pizza-albums` - Show album gallery
-- `ui_pizza-list` - Display list view
-- `ui_pizza-video` - Play video content
+- `pizza-map` - Display interactive map
+- `pizza-carousel` - Browse in carousel format
+- `pizza-albums` - Show album gallery
+- `pizza-list` - Display list view
+- `pizza-video` - Play video content
 
 All accept a `pizzaTopping` parameter:
 
 ```typescript
-await client.callTool('ui_pizza-map', {
+await client.callTool('pizza-map', {
   pizzaTopping: 'pepperoni',
 })
 ```
@@ -350,7 +350,7 @@ const tools = await client.listTools()
 console.log('Available tools:', tools)
 
 // Test calling a widget
-const result = await client.callTool('ui_pizza-map', {
+const result = await client.callTool('pizza-map', {
   pizzaTopping: 'mushroom',
 })
 console.log('Result:', result)

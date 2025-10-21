@@ -38,7 +38,7 @@ server.uiResource({
 
 This automatically creates:
 
-- **Tool**: `ui_kanban-board` - Accepts parameters and returns UIResource
+- **Tool**: `kanban-board` - Accepts parameters and returns UIResource
 - **Resource**: `ui://widget/kanban-board` - Static access with defaults
 
 ## Getting Started
@@ -205,7 +205,7 @@ server.uiResource({
 
 When you call `uiResource`, it automatically creates a tool:
 
-- Name: `ui_[widget-name]`
+- Name: `[widget-name]`
 - Accepts all props as parameters
 - Returns both text description and UIResource object
 
@@ -323,7 +323,7 @@ Visit: `http://localhost:3000/mcp-use/widgets/[widget-name]`
 
 ```typescript
 // Call as tool
-const result = await client.callTool('ui_kanban-board', {
+const result = await client.callTool('kanban-board', {
   initialTasks: [...],
   theme: 'dark'
 })

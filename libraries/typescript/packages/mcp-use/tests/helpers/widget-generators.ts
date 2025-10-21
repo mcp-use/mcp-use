@@ -121,7 +121,7 @@ button.addEventListener('press', () => {
   window.parent.postMessage({
     type: 'tool',
     payload: {
-      toolName: 'ui_${definition.name}',
+      toolName: '${definition.name}',
       params: props
     }
   }, '*');
