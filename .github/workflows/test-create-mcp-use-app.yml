@@ -221,7 +221,9 @@ jobs:
         if: matrix.pm == 'yarn' && runner.os == 'Windows'
         shell: pwsh
         run: |
-          yarn dlx -p ${{ steps.package-path.outputs.path }} create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+          # Convert Windows path to forward slashes for yarn dlx
+          $packagePath = ${{ steps.package-path.outputs.path }}.Replace('\', '/')
+          yarn dlx -p $packagePath create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
           
           if (-not (Test-Path "test-app")) {
             Write-Error "❌ Project directory not created"
@@ -256,7 +258,9 @@ jobs:
         if: matrix.pm == 'pnpm' && runner.os == 'Windows'
         shell: pwsh
         run: |
-          pnpm --package=${{ steps.package-path.outputs.path }} dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+          # Convert Windows path to forward slashes for pnpm dlx
+          $packagePath = ${{ steps.package-path.outputs.path }}.Replace('\', '/')
+          pnpm --package=$packagePath dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
           
           if (-not (Test-Path "test-app")) {
             Write-Error "❌ Project directory not created"
@@ -450,7 +454,13 @@ jobs:
         if: matrix.pm == 'yarn'
         timeout-minutes: 10
         run: |
-          yarn dlx -p ${{ steps.package-path.outputs.path }} create-mcp-use-app test-full-app --template ${{ matrix.template }} --yarn
+          # Convert Windows path to forward slashes for yarn dlx
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            PACKAGE_PATH=$(echo "${{ steps.package-path.outputs.path }}" | sed 's|\\|/|g')
+          else
+            PACKAGE_PATH="${{ steps.package-path.outputs.path }}"
+          fi
+          yarn dlx -p "$PACKAGE_PATH" create-mcp-use-app test-full-app --template ${{ matrix.template }} --yarn
           
           if [ ! -d "test-full-app/node_modules" ]; then
             echo "❌ Dependencies not installed"
