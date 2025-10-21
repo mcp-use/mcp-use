@@ -1,0 +1,95 @@
+---
+title: "Config"
+description: "Configuration for output formatting API Documentation"
+icon: "settings"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/config.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/config.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/config.py</a>
+</Callout>
+
+Configuration for output formatting.
+
+This module provides configuration options for output formatting.
+
+## OutputConfig
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> OutputConfig</div>
+
+Configuration for output formatting.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.output.config import OutputConfig
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="show_message" type="bool" required="True" >   Boolean flag </ParamField>
+<ParamField body="show_timing" type="bool" required="True" >   Boolean flag </ParamField>
+<ParamField body="show_steps" type="bool" required="True" >   Boolean flag </ParamField>
+<ParamField body="markdown" type="bool" required="True" >   Boolean flag </ParamField>
+<ParamField body="max_stream_preview_length" type="int" required="True" >   Integer value </ParamField>
+<ParamField body="max_step_display_length" type="int" required="True" >   Integer value </ParamField>
+<ParamField body="max_final_output_length" type="int | None" required="True" >   Integer value </ParamField>
+<ParamField body="message_border_style" type="str" required="True" >   String value </ParamField>
+<ParamField body="response_border_style" type="str" required="True" >   String value </ParamField>
+<ParamField body="step_border_style" type="str" required="True" >   String value </ParamField>
+<ParamField body="error_border_style" type="str" required="True" >   String value </ParamField>
+<ParamField body="message_box_style" type="str" required="True" >   String value </ParamField>
+<ParamField body="response_box_style" type="str" required="True" >   String value </ParamField>
+<ParamField body="step_box_style" type="str" required="True" >   String value </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="show_message" type="bool" default="True" >   Boolean flag </ParamField>
+><ParamField body="show_timing" type="bool" default="True" >   Boolean flag </ParamField>
+><ParamField body="show_steps" type="bool" default="False" >   Boolean flag </ParamField>
+><ParamField body="markdown" type="bool" default="False" >   Boolean flag </ParamField>
+><ParamField body="max_stream_preview_length" type="int" default="500" >   Integer value </ParamField>
+><ParamField body="max_step_display_length" type="int" default="200" >   Integer value </ParamField>
+><ParamField body="max_final_output_length" type="int | None" default="None" >   Integer value </ParamField>
+><ParamField body="message_border_style" type="str" default='cyan' >   String value </ParamField>
+><ParamField body="response_border_style" type="str" default='blue' >   String value </ParamField>
+><ParamField body="step_border_style" type="str" default='green' >   String value </ParamField>
+><ParamField body="error_border_style" type="str" default='red' >   String value </ParamField>
+><ParamField body="message_box_style" type="str" default='HEAVY' >   String value </ParamField>
+><ParamField body="response_box_style" type="str" default='ROUNDED' >   String value </ParamField>
+><ParamField body="step_box_style" type="str" default='ROUNDED' >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(show_message: bool = True, show_timing: bool = True, show_steps: bool = False, markdown: bool = False, max_stream_preview_length: int = 500, max_step_display_length: int = 200, max_final_output_length: int | None = None, message_border_style: str = "cyan", response_border_style: str = "blue", step_border_style: str = "green", error_border_style: str = "red", message_box_style: str = "HEAVY", response_box_style: str = "ROUNDED", step_box_style: str = "ROUNDED"):
+```
+
+</Card>
+<Card type="info">
+### `method` to_dict
+
+Convert config to dictionary.
+
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" >Dictionary representation of config.</ResponseField>
+
+**Signature**
+```python wrap
+def to_dict():
+```
+
+</Card>
+
+</div>

@@ -56,7 +56,7 @@
               "home/redirects/python",
               "home/redirects/typescript"
             ]
-          }, 
+          },
           {
             "group": "Guides",
             "icon": "",
@@ -174,6 +174,7 @@
                     "pages": [
                       "python/agent/memory-management",
                       "python/agent/structured-output",
+                      "python/agent/pretty-printing",
                       "python/agent/streaming",
                       "python/agent/interactive-chat-patterns"
                     ]
@@ -212,6 +213,17 @@
                     ]
                   },
                   "python/api-reference/mcp_use_agents_base",
+                  {
+                    "group": "Output",
+                    "icon": "file-text",
+                    "pages": [
+                      "python/api-reference/mcp_use_output_config",
+                      "python/api-reference/mcp_use_output_types",
+                      "python/api-reference/mcp_use_output_printer",
+                      "python/api-reference/mcp_use_output_formatter",
+                      "python/api-reference/mcp_use_output_integration"
+                    ]
+                  },
                   {
                     "group": "Managers",
                     "icon": "users",

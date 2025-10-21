@@ -1,0 +1,194 @@
+---
+title: "Types"
+description: "Output types for MCP agent responses API Documentation"
+icon: "list"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/types.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/types.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/types.py</a>
+</Callout>
+
+Output types for MCP agent responses.
+
+This module defines the data structures for agent outputs and events.
+
+## AgentOutput
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> AgentOutput</div>
+
+Represents the final output from an agent execution.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.output.types import AgentOutput
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="content" type="typing.Any | None" required="True" >   Parameter value </ParamField>
+<ParamField body="content_type" type="str" required="True" >   String value </ParamField>
+<ParamField body="metadata" type="dict[str, typing.Any] | None" required="True" >   Dictionary of key-value pairs </ParamField>
+<ParamField body="events" type="list[mcp_use.output.types.AgentOutputEvent] | None" required="True" >   List of items </ParamField>
+<ParamField body="execution_time_ms" type="int | None" required="True" >   Integer value </ParamField>
+<ParamField body="steps_taken" type="int | None" required="True" >   Integer value </ParamField>
+<ParamField body="tools_used" type="list[str] | None" required="True" >   List of tools </ParamField>
+<ParamField body="success" type="bool" required="True" >   Boolean flag </ParamField>
+<ParamField body="error" type="str | None" required="True" >   String value </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="content" type="typing.Any | None" default="None" >   Parameter value </ParamField>
+><ParamField body="content_type" type="str" default='str' >   String value </ParamField>
+><ParamField body="metadata" type="dict[str, typing.Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
+><ParamField body="events" type="list[mcp_use.output.types.AgentOutputEvent] | None" default="None" >   List of items </ParamField>
+><ParamField body="execution_time_ms" type="int | None" default="None" >   Integer value </ParamField>
+><ParamField body="steps_taken" type="int | None" default="None" >   Integer value </ParamField>
+><ParamField body="tools_used" type="list[str] | None" default="None" >   List of tools </ParamField>
+><ParamField body="success" type="bool" default="True" >   Boolean flag </ParamField>
+><ParamField body="error" type="str | None" default="None" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(content: typing.Any | None = None, content_type: str = "str", metadata: dict[str, typing.Any] | None = None, events: list[mcp_use.output.types.AgentOutputEvent] | None = None, execution_time_ms: int | None = None, steps_taken: int | None = None, tools_used: list[str] | None = None, success: bool = True, error: str | None = None):
+```
+
+</Card>
+<Card type="info">
+### `method` get_content_as_string
+
+Get content as formatted string.
+
+
+
+**Parameters**
+><ParamField body="kwargs" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str" >String representation of content.</ResponseField>
+
+**Signature**
+```python wrap
+def get_content_as_string(kwargs):
+```
+
+</Card>
+
+<Card type="info">
+### `method` to_dict
+
+Convert output to dictionary.
+
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" >Dictionary representation of output.</ResponseField>
+
+**Signature**
+```python wrap
+def to_dict():
+```
+
+</Card>
+
+</div>
+
+## AgentOutputEvent
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> AgentOutputEvent</div>
+
+Represents an event during agent execution.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.output.types import AgentOutputEvent
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="event_type" type="mcp_use.output.types.EventType" required="True" >   Parameter value </ParamField>
+<ParamField body="timestamp" type="int" required="True" >   Integer value </ParamField>
+<ParamField body="content" type="typing.Any | None" required="True" >   Parameter value </ParamField>
+<ParamField body="metadata" type="dict[str, typing.Any] | None" required="True" >   Dictionary of key-value pairs </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="event_type" type="mcp_use.output.types.EventType" required="True" >   Parameter value </ParamField>
+><ParamField body="timestamp" type="int" default="<factory>" >   Integer value </ParamField>
+><ParamField body="content" type="typing.Any | None" default="None" >   Parameter value </ParamField>
+><ParamField body="metadata" type="dict[str, typing.Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
+
+**Signature**
+```python wrap
+def __init__(event_type: mcp_use.output.types.EventType, timestamp: int = <factory>, content: typing.Any | None = None, metadata: dict[str, typing.Any] | None = None):
+```
+
+</Card>
+<Card type="info">
+### `method` to_dict
+
+Convert event to dictionary.
+
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" >Dictionary representation of event.</ResponseField>
+
+**Signature**
+```python wrap
+def to_dict():
+```
+
+</Card>
+
+</div>
+
+## EventType
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> EventType</div>
+
+Types of events that can occur during agent execution.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.output.types import EventType
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="args" required="True" >   Parameter value </ParamField>
+><ParamField body="kwds" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(args, kwds):
+```
+
+</Card>
+</div>
