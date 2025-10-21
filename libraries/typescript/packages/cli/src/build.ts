@@ -99,11 +99,31 @@ async function generateWidgetManifest(entries: string[], projectPath: string) {
           name: widgetName,
           description: schema.metadata?.description,
           props: schema.props.reduce((acc, prop) => {
+            // Build enhanced description with enum and validation info
+            let enhancedDescription = prop.description || prop.name
+            const constraints: string[] = []
+            
+            // Add enum values to description
+            if (prop.enum && prop.enum.length > 0) {
+              constraints.push(`one of: ${prop.enum.join(', ')}`)
+            }
+            
+            // Add validation rules to description
+            if (prop.validation) {
+              constraints.push(prop.validation)
+            }
+            
+            // Append constraints to description
+            if (constraints.length > 0) {
+              enhancedDescription += ` (${constraints.join('; ')})`
+            }
+            
             acc[prop.name] = {
               type: prop.type,
               required: prop.required,
-              description: prop.description,
+              description: enhancedDescription,
               enum: prop.enum,
+              validation: prop.validation,
             }
             return acc
           }, {} as Record<string, any>),

@@ -8,12 +8,14 @@ interface PropSchema {
   required: boolean
   description?: string
   enum?: string[]
+  validation?: string
 }
 
 interface ComponentSchema {
   props: PropSchema[]
   metadata?: {
     description?: string
+    inputs?: PropSchema[]
   }
 }
 
@@ -37,9 +39,28 @@ export function extractPropsFromComponent(filePath: string): ComponentSchema | n
 
   const checker = program.getTypeChecker()
   let propsTypeName: string | null = null
-  let metadata: { description?: string } | undefined
+  let metadata: { description?: string; inputs?: PropSchema[] } | undefined
+  
+  // Store variable declarations to resolve references
+  const variableDeclarations = new Map<string, ts.Expression>()
 
   // Find the default export component and extract its props type
+  ts.forEachChild(sourceFile, (node) => {
+    // Collect variable declarations (for Zod schema references)
+    if (ts.isVariableStatement(node)) {
+      node.declarationList.declarations.forEach((declaration) => {
+        if (
+          ts.isVariableDeclaration(declaration) &&
+          ts.isIdentifier(declaration.name) &&
+          declaration.initializer
+        ) {
+          variableDeclarations.set(declaration.name.text, declaration.initializer)
+        }
+      })
+    }
+  })
+
+  // Second pass to extract metadata and component info
   ts.forEachChild(sourceFile, (node) => {
     // Look for: export default ComponentName
     if (ts.isExportAssignment(node) && !node.isExportEquals) {
@@ -81,12 +102,39 @@ export function extractPropsFromComponent(filePath: string): ComponentSchema | n
             declaration.initializer.properties.forEach((prop) => {
               if (
                 ts.isPropertyAssignment(prop) &&
-                ts.isIdentifier(prop.name) &&
-                prop.name.text === 'description' &&
-                ts.isStringLiteral(prop.initializer)
+                ts.isIdentifier(prop.name)
               ) {
                 if (!metadata) metadata = {}
-                metadata.description = prop.initializer.text
+                
+                // Extract description
+                if (prop.name.text === 'description' && ts.isStringLiteral(prop.initializer)) {
+                  metadata.description = prop.initializer.text
+                }
+                
+                // Extract inputs - support array, object, and Zod schema formats
+                if (prop.name.text === 'inputs') {
+                  let initializer = prop.initializer
+                  
+                  // Resolve variable references
+                  if (ts.isIdentifier(initializer)) {
+                    const varName = initializer.text
+                    const resolvedExpr = variableDeclarations.get(varName)
+                    if (resolvedExpr) {
+                      initializer = resolvedExpr
+                    }
+                  }
+                  
+                  if (ts.isArrayLiteralExpression(initializer)) {
+                    // Array format: [{ name: 'x', type: 'string', ... }]
+                    metadata.inputs = extractInputsFromArrayMetadata(initializer)
+                  } else if (ts.isObjectLiteralExpression(initializer)) {
+                    // Object format: { x: { type: 'string', ... } }
+                    metadata.inputs = extractInputsFromObjectMetadata(initializer)
+                  } else if (ts.isCallExpression(initializer)) {
+                    // Zod schema format: z.object({ x: z.string(), ... })
+                    metadata.inputs = extractInputsFromZodSchema(initializer)
+                  }
+                }
               }
             })
           }
@@ -94,6 +142,14 @@ export function extractPropsFromComponent(filePath: string): ComponentSchema | n
       }
     }
   })
+
+  // If metadata has inputs defined, use those directly
+  if (metadata?.inputs && metadata.inputs.length > 0) {
+    return {
+      props: metadata.inputs,
+      metadata,
+    }
+  }
 
   if (!propsTypeName) {
     return null
@@ -151,6 +207,329 @@ function extractPropsTypeFromComponent(
   }
 
   return null
+}
+
+function extractInputsFromArrayMetadata(arrayLiteral: ts.ArrayLiteralExpression): PropSchema[] {
+  const inputs: PropSchema[] = []
+  
+  arrayLiteral.elements.forEach((element) => {
+    if (ts.isObjectLiteralExpression(element)) {
+      const input: Partial<PropSchema> = {}
+      
+      element.properties.forEach((prop) => {
+        if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+          const propName = prop.name.text
+          
+          if (propName === 'name' && ts.isStringLiteral(prop.initializer)) {
+            input.name = prop.initializer.text
+          } else if (propName === 'type' && ts.isStringLiteral(prop.initializer)) {
+            input.type = prop.initializer.text
+          } else if (propName === 'description' && ts.isStringLiteral(prop.initializer)) {
+            input.description = prop.initializer.text
+          } else if (propName === 'required') {
+            if (prop.initializer.kind === ts.SyntaxKind.TrueKeyword) {
+              input.required = true
+            } else if (prop.initializer.kind === ts.SyntaxKind.FalseKeyword) {
+              input.required = false
+            }
+          } else if (propName === 'enum' && ts.isArrayLiteralExpression(prop.initializer)) {
+            input.enum = prop.initializer.elements
+              .filter(ts.isStringLiteral)
+              .map(e => e.text)
+          }
+        }
+      })
+      
+      // Only add if required fields are present
+      if (input.name && input.type !== undefined) {
+        inputs.push({
+          name: input.name,
+          type: input.type,
+          required: input.required ?? false,
+          description: input.description,
+          enum: input.enum,
+        })
+      }
+    }
+  })
+  
+  return inputs
+}
+
+function extractInputsFromObjectMetadata(objectLiteral: ts.ObjectLiteralExpression): PropSchema[] {
+  const inputs: PropSchema[] = []
+  
+  objectLiteral.properties.forEach((property) => {
+    if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.name)) {
+      const propName = property.name.text
+      
+      if (ts.isObjectLiteralExpression(property.initializer)) {
+        const input: Partial<PropSchema> = {
+          name: propName,
+        }
+        
+        property.initializer.properties.forEach((prop) => {
+          if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+            const configKey = prop.name.text
+            
+            if (configKey === 'type' && ts.isStringLiteral(prop.initializer)) {
+              input.type = prop.initializer.text
+            } else if (configKey === 'description' && ts.isStringLiteral(prop.initializer)) {
+              input.description = prop.initializer.text
+            } else if (configKey === 'required') {
+              if (prop.initializer.kind === ts.SyntaxKind.TrueKeyword) {
+                input.required = true
+              } else if (prop.initializer.kind === ts.SyntaxKind.FalseKeyword) {
+                input.required = false
+              }
+            } else if (configKey === 'enum' && ts.isArrayLiteralExpression(prop.initializer)) {
+              input.enum = prop.initializer.elements
+                .filter(ts.isStringLiteral)
+                .map(e => e.text)
+            }
+          }
+        })
+        
+        // Only add if required fields are present
+        if (input.name && input.type !== undefined) {
+          inputs.push({
+            name: input.name,
+            type: input.type,
+            required: input.required ?? false,
+            description: input.description,
+            enum: input.enum,
+          })
+        }
+      }
+    }
+  })
+  
+  return inputs
+}
+
+function extractZodValidations(expression: ts.Expression): { validations: string[]; description?: string; isOptional: boolean; enumValues?: string[] } {
+  const validations: string[] = []
+  let description: string | undefined
+  let isOptional = false
+  let enumValues: string[] | undefined
+  
+  // Helper to parse Zod chain calls
+  const parseZodChain = (expr: ts.Expression): void => {
+    if (ts.isCallExpression(expr)) {
+      // Parse the method being called
+      if (ts.isPropertyAccessExpression(expr.expression)) {
+        const methodName = expr.expression.name.text
+        
+        // Check for .describe()
+        if (methodName === 'describe' && expr.arguments.length > 0) {
+          const arg = expr.arguments[0]
+          if (ts.isStringLiteral(arg)) {
+            description = arg.text
+          }
+        }
+        
+        // Check for .optional()
+        if (methodName === 'optional') {
+          isOptional = true
+        }
+        
+        // Check for validation methods
+        if (methodName === 'min' && expr.arguments.length > 0) {
+          const arg = expr.arguments[0]
+          if (ts.isNumericLiteral(arg)) {
+            validations.push(`min: ${arg.text}`)
+          }
+        }
+        
+        if (methodName === 'max' && expr.arguments.length > 0) {
+          const arg = expr.arguments[0]
+          if (ts.isNumericLiteral(arg)) {
+            validations.push(`max: ${arg.text}`)
+          }
+        }
+        
+        if (methodName === 'email') {
+          validations.push('email format')
+        }
+        
+        if (methodName === 'url') {
+          validations.push('URL format')
+        }
+        
+        if (methodName === 'uuid') {
+          validations.push('UUID format')
+        }
+        
+        if (methodName === 'regex' && expr.arguments.length > 0) {
+          validations.push('regex pattern')
+        }
+        
+        if (methodName === 'length' && expr.arguments.length > 0) {
+          const arg = expr.arguments[0]
+          if (ts.isNumericLiteral(arg)) {
+            validations.push(`length: ${arg.text}`)
+          }
+        }
+        
+        if (methodName === 'int') {
+          validations.push('integer')
+        }
+        
+        if (methodName === 'positive') {
+          validations.push('positive')
+        }
+        
+        if (methodName === 'negative') {
+          validations.push('negative')
+        }
+        
+        if (methodName === 'nonnegative') {
+          validations.push('non-negative')
+        }
+        
+        // Recursively parse the left side of the chain
+        parseZodChain(expr.expression.expression)
+      }
+    } else if (ts.isPropertyAccessExpression(expr)) {
+      // Continue parsing property access
+      parseZodChain(expr.expression)
+    }
+  }
+  
+  parseZodChain(expression)
+  
+  return { validations, description, isOptional, enumValues }
+}
+
+function extractInputsFromZodSchema(callExpression: ts.CallExpression): PropSchema[] {
+  const inputs: PropSchema[] = []
+  
+  // Look for z.object({ ... }) pattern
+  if (
+    ts.isPropertyAccessExpression(callExpression.expression) &&
+    callExpression.expression.name.text === 'object' &&
+    callExpression.arguments.length > 0
+  ) {
+    const schemaArg = callExpression.arguments[0]
+    
+    if (ts.isObjectLiteralExpression(schemaArg)) {
+      schemaArg.properties.forEach((property) => {
+        if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.name)) {
+          const propName = property.name.text
+          const zodType = parseZodType(property.initializer)
+          
+          if (zodType) {
+            inputs.push({
+              name: propName,
+              type: zodType.type,
+              required: zodType.required,
+              description: zodType.description,
+              enum: zodType.enum,
+              validation: zodType.validation,
+            })
+          }
+        }
+      })
+    }
+  }
+  
+  return inputs
+}
+
+function parseZodType(expression: ts.Expression): { type: string; required: boolean; description?: string; enum?: string[]; validation?: string } | null {
+  let type = 'string'
+  let required = true
+  let description: string | undefined
+  let enumValues: string[] | undefined
+  const validations: string[] = []
+  
+  // Helper to traverse the chain and find the base type
+  const findBaseType = (expr: ts.Expression): void => {
+    if (ts.isCallExpression(expr)) {
+      // Check if this is a Zod type constructor
+      if (ts.isPropertyAccessExpression(expr.expression)) {
+        const typeName = expr.expression.name.text
+        
+        // Map Zod types to basic types
+        if (typeName === 'string') {
+          type = 'string'
+        } else if (typeName === 'number') {
+          type = 'number'
+        } else if (typeName === 'boolean') {
+          type = 'boolean'
+        } else if (typeName === 'array') {
+          type = 'array'
+        } else if (typeName === 'object') {
+          type = 'object'
+        } else if (typeName === 'enum' && expr.arguments.length > 0) {
+          type = 'string'
+          const enumArg = expr.arguments[0]
+          // z.enum(['a', 'b', 'c']) - array literal directly
+          if (ts.isArrayLiteralExpression(enumArg)) {
+            enumValues = enumArg.elements
+              .filter(ts.isStringLiteral)
+              .map(e => e.text)
+          }
+          // z.enum(['a', 'b'] as const) - array with as const
+          else if (ts.isAsExpression(enumArg) && ts.isArrayLiteralExpression(enumArg.expression)) {
+            enumValues = enumArg.expression.elements
+              .filter(ts.isStringLiteral)
+              .map(e => e.text)
+          }
+        } else if (typeName === 'optional') {
+          required = false
+        } else if (typeName === 'describe' && expr.arguments.length > 0) {
+          const arg = expr.arguments[0]
+          if (ts.isStringLiteral(arg)) {
+            description = arg.text
+          }
+        } else if (typeName === 'min' && expr.arguments.length > 0) {
+          const arg = expr.arguments[0]
+          if (ts.isNumericLiteral(arg)) {
+            validations.push(`min: ${arg.text}`)
+          } else if (ts.isPrefixUnaryExpression(arg) && arg.operator === ts.SyntaxKind.MinusToken && ts.isNumericLiteral(arg.operand)) {
+            validations.push(`min: -${arg.operand.text}`)
+          }
+        } else if (typeName === 'max' && expr.arguments.length > 0) {
+          const arg = expr.arguments[0]
+          if (ts.isNumericLiteral(arg)) {
+            validations.push(`max: ${arg.text}`)
+          } else if (ts.isPrefixUnaryExpression(arg) && arg.operator === ts.SyntaxKind.MinusToken && ts.isNumericLiteral(arg.operand)) {
+            validations.push(`max: -${arg.operand.text}`)
+          }
+        } else if (typeName === 'email') {
+          validations.push('email format')
+        } else if (typeName === 'url') {
+          validations.push('URL format')
+        } else if (typeName === 'uuid') {
+          validations.push('UUID format')
+        } else if (typeName === 'int') {
+          validations.push('integer')
+        } else if (typeName === 'positive') {
+          validations.push('positive')
+        } else if (typeName === 'negative') {
+          validations.push('negative')
+        }
+        
+        // Recursively check the left side of the property access
+        findBaseType(expr.expression.expression)
+      }
+    } else if (ts.isPropertyAccessExpression(expr)) {
+      findBaseType(expr.expression)
+    }
+  }
+  
+  findBaseType(expression)
+  
+  const validation = validations.length > 0 ? validations.join(', ') : undefined
+  
+  return {
+    type,
+    required,
+    description,
+    enum: enumValues,
+    validation,
+  }
 }
 
 function extractPropsFromType(type: ts.Type, checker: ts.TypeChecker): PropSchema[] {
