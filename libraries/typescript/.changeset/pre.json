@@ -7,5 +7,8 @@
     "@mcp-use/inspector": "0.4.4",
     "mcp-use": "1.1.4"
   },
-  "changesets": []
+  "changesets": [
+    "fine-cougars-change",
+    "young-radios-sell"
+  ]
 }
