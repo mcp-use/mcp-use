@@ -4,13 +4,13 @@ on:
   push:
     branches: [main, canary]
     paths:
-      - 'libraries/typescript/packages/create-mcp-use-app/**'
-      - '.github/workflows/test-create-mcp-use-app.yml'
+      - "libraries/typescript/packages/create-mcp-use-app/**"
+      - ".github/workflows/test-create-mcp-use-app.yml"
   pull_request:
     branches: [main, canary]
     paths:
-      - 'libraries/typescript/packages/create-mcp-use-app/**'
-      - '.github/workflows/test-create-mcp-use-app.yml'
+      - "libraries/typescript/packages/create-mcp-use-app/**"
+      - ".github/workflows/test-create-mcp-use-app.yml"
 
 jobs:
   build-package:
@@ -60,46 +60,46 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         pm: [npm, yarn, pnpm]
-        template: [ui, uiresource, apps_sdk]
-        flag: ['', '--yarn', '--npm', '--pnpm', '--dev', '--canary']
+        template: [starter, ui-resource, apps-sdk-demo]
+        flag: ["", "--yarn", "--npm", "--pnpm", "--dev", "--canary"]
         exclude:
           # Don't test redundant flag combinations (e.g., yarn with --yarn flag)
           - pm: yarn
-            flag: '--yarn'
+            flag: "--yarn"
           - pm: npm
-            flag: '--npm'
+            flag: "--npm"
           - pm: pnpm
-            flag: '--pnpm'
+            flag: "--pnpm"
           # Reduce matrix size by only testing flags on ubuntu
           - os: macos-latest
-            flag: '--yarn'
+            flag: "--yarn"
           - os: macos-latest
-            flag: '--npm'
+            flag: "--npm"
           - os: macos-latest
-            flag: '--pnpm'
+            flag: "--pnpm"
           - os: windows-latest
-            flag: '--yarn'
+            flag: "--yarn"
           - os: windows-latest
-            flag: '--npm'
+            flag: "--npm"
           - os: windows-latest
-            flag: '--pnpm'
+            flag: "--pnpm"
           # Only test version flags on ubuntu with npm
           - os: macos-latest
-            flag: '--dev'
+            flag: "--dev"
           - os: macos-latest
-            flag: '--canary'
+            flag: "--canary"
           - os: windows-latest
-            flag: '--dev'
+            flag: "--dev"
           - os: windows-latest
-            flag: '--canary'
+            flag: "--canary"
           - pm: yarn
-            flag: '--dev'
+            flag: "--dev"
           - pm: yarn
-            flag: '--canary'
+            flag: "--canary"
           - pm: pnpm
-            flag: '--dev'
+            flag: "--dev"
           - pm: pnpm
-            flag: '--canary'
+            flag: "--canary"
 
     steps:
       - name: Checkout
@@ -158,23 +158,23 @@ jobs:
         if: matrix.pm == 'npm' && runner.os != 'Windows'
         run: |
           npx --yes --package=${{ steps.package-path.outputs.path }} create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
-          
+
           # Verify project was created
           if [ ! -d "test-app" ]; then
             echo "❌ Project directory not created"
             exit 1
           fi
-          
+
           if [ ! -f "test-app/package.json" ]; then
             echo "❌ package.json not found"
             exit 1
           fi
-          
+
           if [ ! -f "test-app/index.ts" ]; then
             echo "❌ index.ts not found"
             exit 1
           fi
-          
+
           echo "✅ Project created successfully"
 
       - name: Test with npx (Windows)
@@ -182,39 +182,39 @@ jobs:
         shell: pwsh
         run: |
           npx --yes --package="${{ steps.package-path.outputs.path }}" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
-          
+
           if (-not (Test-Path "test-app")) {
             Write-Error "❌ Project directory not created"
             exit 1
           }
-          
+
           if (-not (Test-Path "test-app/package.json")) {
             Write-Error "❌ package.json not found"
             exit 1
           }
-          
+
           if (-not (Test-Path "test-app/index.ts")) {
             Write-Error "❌ index.ts not found"
             exit 1
           }
-          
+
           Write-Output "✅ Project created successfully"
 
       - name: Test with yarn (Unix)
         if: matrix.pm == 'yarn' && runner.os != 'Windows'
         run: |
           yarn dlx -p "create-mcp-use-app@file:${{ steps.package-path.outputs.path }}" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
-          
+
           if [ ! -d "test-app" ]; then
             echo "❌ Project directory not created"
             exit 1
           fi
-          
+
           if [ ! -f "test-app/package.json" ]; then
             echo "❌ package.json not found"
             exit 1
           fi
-          
+
           echo "✅ Project created successfully"
 
       - name: Test with yarn (Windows)
@@ -224,34 +224,34 @@ jobs:
           # Convert Windows path to forward slashes for yarn dlx
           $packagePath = "${{ steps.package-path.outputs.path }}".Replace('\', '/')
           yarn dlx -p "create-mcp-use-app@file:$packagePath" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
-          
+
           if (-not (Test-Path "test-app")) {
             Write-Error "❌ Project directory not created"
             exit 1
           }
-          
+
           if (-not (Test-Path "test-app/package.json")) {
             Write-Error "❌ package.json not found"
             exit 1
           }
-          
+
           Write-Output "✅ Project created successfully"
 
       - name: Test with pnpm (Unix)
         if: matrix.pm == 'pnpm' && runner.os != 'Windows'
         run: |
           pnpm --package=${{ steps.package-path.outputs.path }} dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
-          
+
           if [ ! -d "test-app" ]; then
             echo "❌ Project directory not created"
             exit 1
           fi
-          
+
           if [ ! -f "test-app/package.json" ]; then
             echo "❌ package.json not found"
             exit 1
           fi
-          
+
           echo "✅ Project created successfully"
 
       - name: Test with pnpm (Windows)
@@ -261,17 +261,17 @@ jobs:
           # Convert Windows path to forward slashes for pnpm dlx
           $packagePath = "${{ steps.package-path.outputs.path }}".Replace('\', '/')
           pnpm --package=$packagePath dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
-          
+
           if (-not (Test-Path "test-app")) {
             Write-Error "❌ Project directory not created"
             exit 1
           }
-          
+
           if (-not (Test-Path "test-app/package.json")) {
             Write-Error "❌ package.json not found"
             exit 1
           }
-          
+
           Write-Output "✅ Project created successfully"
 
       - name: Verify Package Manager Command (Unix)
@@ -290,7 +290,7 @@ jobs:
             EXPECTED_DEV="pnpm dev"
             EXPECTED_INSTALL="pnpm install"
           fi
-          
+
           echo "Expected dev command: $EXPECTED_DEV"
           echo "Expected install command: $EXPECTED_INSTALL"
           echo "✅ Package manager detection test passed"
@@ -299,7 +299,7 @@ jobs:
         if: runner.os != 'Windows' && (matrix.flag == '--dev' || matrix.flag == '--canary' || matrix.flag == '')
         run: |
           cd test-app
-          
+
           # Install jq for JSON parsing
           if ! command -v jq &> /dev/null; then
             if [ "$(uname)" == "Linux" ]; then
@@ -308,13 +308,13 @@ jobs:
               brew install jq
             fi
           fi
-          
+
           MCP_USE_VERSION=$(jq -r '.dependencies."mcp-use"' package.json)
           MCP_CLI_VERSION=$(jq -r '.devDependencies."@mcp-use/cli"' package.json)
-          
+
           echo "mcp-use version: $MCP_USE_VERSION"
           echo "@mcp-use/cli version: $MCP_CLI_VERSION"
-          
+
           if [ "${{ matrix.flag }}" == "--dev" ]; then
             # Should use workspace:* versions
             if [[ "$MCP_USE_VERSION" != workspace:* ]]; then
@@ -355,14 +355,14 @@ jobs:
         shell: pwsh
         run: |
           cd test-app
-          
+
           $packageJson = Get-Content package.json | ConvertFrom-Json
           $mcpUseVersion = $packageJson.dependencies.'mcp-use'
           $mcpCliVersion = $packageJson.devDependencies.'@mcp-use/cli'
-          
+
           Write-Output "mcp-use version: $mcpUseVersion"
           Write-Output "@mcp-use/cli version: $mcpCliVersion"
-          
+
           if ("${{ matrix.flag }}" -eq "--dev") {
             if (-not $mcpUseVersion.StartsWith("workspace:")) {
               Write-Error "❌ Expected workspace:* version with --dev flag, got: $mcpUseVersion"
@@ -442,12 +442,12 @@ jobs:
         timeout-minutes: 10
         run: |
           npx --yes --package=${{ steps.package-path.outputs.path }} create-mcp-use-app test-full-app --template ${{ matrix.template }} --npm
-          
+
           if [ ! -d "test-full-app/node_modules" ]; then
             echo "❌ Dependencies not installed"
             exit 1
           fi
-          
+
           echo "✅ Full installation test passed"
 
       - name: Test Full Installation with yarn
@@ -461,12 +461,12 @@ jobs:
             PACKAGE_PATH="${{ steps.package-path.outputs.path }}"
           fi
           yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-full-app --template ${{ matrix.template }} --yarn
-          
+
           if [ ! -d "test-full-app/node_modules" ]; then
             echo "❌ Dependencies not installed"
             exit 1
           fi
-          
+
           echo "✅ Full installation test passed"
 
       - name: Verify Build
@@ -477,11 +477,10 @@ jobs:
           else
             npm run build
           fi
-          
+
           if [ ! -d "dist" ]; then
             echo "❌ Build failed - dist directory not found"
             exit 1
           fi
-          
-          echo "✅ Build test passed"
 
+          echo "✅ Build test passed"
