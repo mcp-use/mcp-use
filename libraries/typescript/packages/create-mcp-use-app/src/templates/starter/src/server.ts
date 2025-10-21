@@ -6,8 +6,6 @@ import type {
 } from 'mcp-use/server'
 import { quickPollRemoteDomScript } from './remoteDom'
 
-const PORT = process.env.PORT || 3000
-
 // Create server instance
 const server = createMCPServer('my-mcp-server', {
   version: '1.0.0',
@@ -143,7 +141,7 @@ server.uiResource({
       resource_domains: ['https://persistent.oaistatic.com']
     }
   }
-});
+} satisfies AppsSdkUIResource);
 
 
 //============================================
