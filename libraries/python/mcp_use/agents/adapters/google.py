@@ -11,7 +11,7 @@ try:
     from google.genai import types
 except ImportError as e:
     raise ImportError(
-        "google-genai is required for GoogleMCPAdapter. " "Install it with: uv pip install google-genai"
+        "google-genai is required for GoogleMCPAdapter. Install it with: uv pip install google-genai"
     ) from e
 
 
