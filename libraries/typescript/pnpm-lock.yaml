@@ -122,11 +122,51 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.19)(lightningcss@1.30.1)
 
-  packages/create-mcp-use-app/src/templates/ui:
+  packages/create-mcp-use-app/src/templates/apps-sdk-demo:
     dependencies:
       '@mcp-ui/server':
         specifier: ^5.11.0
-        version: 5.11.0
+        version: 5.12.0
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
+      express:
+        specifier: ^4.18.0
+        version: 4.21.2
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../../mcp-use
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@mcp-use/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../../../../inspector
+      '@types/cors':
+        specifier: ^2.8.0
+        version: 2.8.19
+      '@types/express':
+        specifier: ^4.17.0
+        version: 4.17.23
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.19
+      tsx:
+        specifier: ^4.0.0
+        version: 4.20.6
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
+  packages/create-mcp-use-app/src/templates/starter:
+    dependencies:
+      '@mcp-ui/server':
+        specifier: ^5.11.0
+        version: 5.12.0
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -180,7 +220,7 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
-  packages/create-mcp-use-app/src/templates/uiresource:
+  packages/create-mcp-use-app/src/templates/ui-resource:
     dependencies:
       '@mcp-ui/server':
         specifier: ^5.11.0
@@ -583,6 +623,64 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.19
+      tsx:
+        specifier: ^4.0.0
+        version: 4.20.6
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
+  test_app:
+    dependencies:
+      '@mcp-ui/server':
+        specifier: ^5.11.0
+        version: 5.12.0
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
+      express:
+        specifier: ^4.18.0
+        version: 4.21.2
+      mcp-use:
+        specifier: workspace:*
+        version: link:../packages/mcp-use
+    devDependencies:
+      '@mcp-use/cli':
+        specifier: workspace:*
+        version: link:../packages/cli
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../packages/inspector
+      '@types/cors':
+        specifier: ^2.8.0
+        version: 2.8.19
+      '@types/express':
+        specifier: ^4.17.0
+        version: 4.17.23
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.19
+      '@types/react':
+        specifier: ^18.0.0
+        version: 18.3.26
+      '@types/react-dom':
+        specifier: ^18.0.0
+        version: 18.3.7(@types/react@18.3.26)
+      concurrently:
+        specifier: ^8.0.0
+        version: 8.2.2
+      esbuild:
+        specifier: ^0.23.0
+        version: 0.23.1
+      globby:
+        specifier: ^14.0.2
+        version: 14.1.0
+      react:
+        specifier: ^19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.0(react@19.2.0)
       tsx:
         specifier: ^4.0.0
         version: 4.20.6
@@ -1864,15 +1962,8 @@ packages:
       react: ^19.2.0
       react-dom: ^19.2.0
 
-  '@mcp-ui/server@5.11.0':
-    resolution: {integrity: sha512-DLakzSNA17XsViC+YYQxy2ViVtdJu0SDxQeAIviguXFq58qACvDC5tMFTNn2c0vMB5qfXqz0HLZImE3hHd3C8g==}
-
   '@mcp-ui/server@5.12.0':
     resolution: {integrity: sha512-ZAAHsvzfrBgA0gkyIOjoKNTBTsD0VSJT4KXKHe+Fx/kBASctG6mrzK5gvxD/LLLliantN2UWLTKtEeI4DH4FRQ==}
-
-  '@modelcontextprotocol/sdk@1.12.1':
-    resolution: {integrity: sha512-KG1CZhZfWg+u8pxeM/mByJDScJSrjjxLc8fwQqbsS8xCjBmQfMNEBTotYdNanKekepnfRI85GtgQlctLFpcYPw==}
-    engines: {node: '>=18'}
 
   '@modelcontextprotocol/sdk@1.20.0':
     resolution: {integrity: sha512-kOQ4+fHuT4KbR2iq2IjeV32HiihueuOf1vJkq18z08CLZ1UQrTc8BXJpVfxZkq45+inLLD+D4xx4nBjUelJa4Q==}
@@ -8110,31 +8201,9 @@ snapshots:
       - preact
       - supports-color
 
-  '@mcp-ui/server@5.11.0':
-    dependencies:
-      '@modelcontextprotocol/sdk': 1.12.1
-    transitivePeerDependencies:
-      - supports-color
-
   '@mcp-ui/server@5.12.0':
     dependencies:
       '@modelcontextprotocol/sdk': 1.20.0
-    transitivePeerDependencies:
-      - supports-color
-
-  '@modelcontextprotocol/sdk@1.12.1':
-    dependencies:
-      ajv: 6.12.6
-      content-type: 1.0.5
-      cors: 2.8.5
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      express: 5.1.0
-      express-rate-limit: 7.5.1(express@5.1.0)
-      pkce-challenge: 5.0.0
-      raw-body: 3.0.1
-      zod: 3.25.76
-      zod-to-json-schema: 3.24.6(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
 
