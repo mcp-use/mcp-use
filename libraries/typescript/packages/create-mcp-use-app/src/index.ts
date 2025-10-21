@@ -481,17 +481,25 @@ async function promptForProjectName(): Promise<string> {
 async function promptForTemplate(): Promise<string> {
   // Get available templates
   const templatesDir = join(__dirname, 'templates')
-  const availableTemplates = existsSync(templatesDir)
-    ? readdirSync(templatesDir, { withFileTypes: true })
+  const availableTemplates =  readdirSync(templatesDir, { withFileTypes: true })
       .filter(dirent => dirent.isDirectory())
       .map(dirent => dirent.name)
       .sort()
-    : ['starter', 'ui-resource', 'apps-sdk-demo']
 
-  const templateDescriptions: Record<string, string> = {
-    'starter': 'Starter MCP server with all features',
-    'ui-resource': 'MCP Server with mcp-ui resources returned from tools',
-    'apps-sdk-demo': 'MCP Server with mcp-ui resources',
+  // Read template descriptions dynamically from package.json files
+  const templateDescriptions: Record<string, string> = {}
+  for (const template of availableTemplates) {
+    const packageJsonPath = join(templatesDir, template, 'package.json')
+    if (existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
+        templateDescriptions[template] = packageJson.description || 'MCP server template'
+      } catch (error) {
+        templateDescriptions[template] = 'MCP server template'
+      }
+    } else {
+      templateDescriptions[template] = 'MCP server template'
+    }
   }
 
   const { template } = await inquirer.prompt([

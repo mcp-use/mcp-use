@@ -16,6 +16,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { requestLogger } from './logging.js'
 import { createUIResourceFromDefinition, type UrlConfig } from './adapters/mcp-ui-adapter.js'
+import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
 
 export class McpServer {
   private server: OfficialMcpServer
@@ -306,7 +307,7 @@ export class McpServer {
         description: promptDefinition.description ?? "",
         argsSchema,
       },
-      async (params: any) => {
+      async (params: any): Promise<GetPromptResult> => {
         return await promptDefinition.cb(params)
       },
     )

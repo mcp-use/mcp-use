@@ -107,25 +107,25 @@ export function PromptsTab({
     // Initialize args with default values based on prompt input schema
     const initialArgs: Record<string, unknown> = {}
     if (prompt.arguments) {
-      Object.entries(prompt.arguments).forEach(([key, prop]) => {
-        const typedProp = prop as any
-        if (typedProp.default !== undefined) {
-          initialArgs[key] = typedProp.default
+      // Handle MCP SDK structure: arguments is an array of PromptArgument objects
+      prompt.arguments.forEach((arg) => {
+        if (arg.default !== undefined) {
+          initialArgs[arg.name] = arg.default
         }
-        else if (typedProp.type === 'string') {
-          initialArgs[key] = ''
+        else if (arg.type === 'string') {
+          initialArgs[arg.name] = ''
         }
-        else if (typedProp.type === 'number') {
-          initialArgs[key] = 0
+        else if (arg.type === 'number') {
+          initialArgs[arg.name] = 0
         }
-        else if (typedProp.type === 'boolean') {
-          initialArgs[key] = false
+        else if (arg.type === 'boolean') {
+          initialArgs[arg.name] = false
         }
-        else if (typedProp.type === 'array') {
-          initialArgs[key] = []
+        else if (arg.type === 'array') {
+          initialArgs[arg.name] = []
         }
-        else if (typedProp.type === 'object') {
-          initialArgs[key] = {}
+        else if (arg.type === 'object') {
+          initialArgs[arg.name] = {}
         }
       })
     }
@@ -313,17 +313,17 @@ export function PromptsTab({
     [results],
   )
 
-  const renderInputField = (key: string, prop: any) => {
+  const renderInputField = (key: string, arg: any) => {
     const value = promptArgs[key]
     const stringValue
       = typeof value === 'string' ? value : JSON.stringify(value)
 
-    if (prop.type === 'boolean') {
+    if (arg.type === 'boolean') {
       return (
         <div key={key} className="space-y-2">
           <Label htmlFor={key} className="text-sm font-medium">
             {key}
-            {prop.required && <span className="text-red-500 ml-1">*</span>}
+            {arg.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <div className="flex items-center space-x-2">
             <input
@@ -334,39 +334,39 @@ export function PromptsTab({
               className="rounded"
               aria-label={`Toggle ${key}`}
             />
-            <span className="text-sm text-gray-600">{prop.description}</span>
+            <span className="text-sm text-gray-600">{arg.description}</span>
           </div>
         </div>
       )
     }
 
-    if (prop.type === 'number') {
+    if (arg.type === 'number') {
       return (
         <div key={key} className="space-y-2">
           <Label htmlFor={key} className="text-sm font-medium">
             {key}
-            {prop.required && <span className="text-red-500 ml-1">*</span>}
+            {arg.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Input
             id={key}
             type="number"
             value={Number(value) || 0}
             onChange={e => handleArgChange(key, Number(e.target.value))}
-            placeholder={prop.description || `Enter ${key}`}
+            placeholder={arg.description || `Enter ${key}`}
           />
-          {prop.description && (
-            <p className="text-xs text-gray-500">{prop.description}</p>
+          {arg.description && (
+            <p className="text-xs text-gray-500">{arg.description}</p>
           )}
         </div>
       )
     }
 
-    if (prop.type === 'array' || prop.type === 'object') {
+    if (arg.type === 'array' || arg.type === 'object') {
       return (
         <div key={key} className="space-y-2">
           <Label htmlFor={key} className="text-sm font-medium">
             {key}
-            {prop.required && <span className="text-red-500 ml-1">*</span>}
+            {arg.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Textarea
             id={key}
@@ -380,12 +380,12 @@ export function PromptsTab({
                 handleArgChange(key, e.target.value)
               }
             }}
-            placeholder={prop.description || `Enter ${key} as JSON`}
+            placeholder={arg.description || `Enter ${key} as JSON`}
             className="font-mono text-sm"
             rows={4}
           />
-          {prop.description && (
-            <p className="text-xs text-gray-500">{prop.description}</p>
+          {arg.description && (
+            <p className="text-xs text-gray-500">{arg.description}</p>
           )}
         </div>
       )
@@ -395,16 +395,16 @@ export function PromptsTab({
       <div key={key} className="space-y-2">
         <Label htmlFor={key} className="text-sm font-medium">
           {key}
-          {prop.required && <span className="text-red-500 ml-1">*</span>}
+          {arg.required && <span className="text-red-500 ml-1">*</span>}
         </Label>
         <Input
           id={key}
           value={stringValue}
           onChange={e => handleArgChange(key, e.target.value)}
-          placeholder={prop.description || `Enter ${key}`}
+          placeholder={arg.description || `Enter ${key}`}
         />
-        {prop.description && (
-          <p className="text-xs text-gray-500">{prop.description}</p>
+        {arg.description && (
+          <p className="text-xs text-gray-500">{arg.description}</p>
         )}
       </div>
     )
@@ -521,14 +521,14 @@ export function PromptsTab({
                     </p>
 
                     {selectedPrompt.arguments
-                      && Object.keys(selectedPrompt.arguments).length > 0 && (
+                      && selectedPrompt.arguments.length > 0 && (
                       <div className="space-y-4 mb-6">
                         <h4 className="text-sm font-medium text-gray-700">
                           Arguments
                         </h4>
                         <div className="space-y-4">
-                          {Object.entries(selectedPrompt.arguments).map(
-                            ([key, prop]) => renderInputField(key, prop),
+                          {selectedPrompt.arguments.map(
+                            (arg) => renderInputField(arg.name, arg),
                           )}
                         </div>
                       </div>
