@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.4-canary.1
+
+### Patch Changes
+
+- d65eb3d: Add starter template + remove ui template
+
 ## 0.4.4-canary.0
 
 ### Patch Changes
