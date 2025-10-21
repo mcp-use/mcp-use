@@ -404,7 +404,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         pm: [npm, yarn]
-        template: [ui]
+        template: [starter, ui-resource, apps-sdk-demo]
 
     steps:
       - name: Checkout

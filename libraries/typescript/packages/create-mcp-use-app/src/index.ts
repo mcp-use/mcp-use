@@ -39,7 +39,7 @@ function runPackageManager(packageManager: string, args: string[], cwd: string):
 function detectPackageManager(): string | null {
   // Check npm_config_user_agent which contains info about the package manager
   const userAgent = process.env.npm_config_user_agent || ''
-  
+
   if (userAgent.includes('yarn')) {
     return 'yarn'
   } else if (userAgent.includes('pnpm')) {
@@ -47,7 +47,7 @@ function detectPackageManager(): string | null {
   } else if (userAgent.includes('npm')) {
     return 'npm'
   }
-  
+
   return null
 }
 
@@ -93,7 +93,7 @@ const packageJson = JSON.parse(
 // Read current package versions from workspace
 function getCurrentPackageVersions(isDevelopment: boolean = false, useCanary: boolean = false) {
   const versions: Record<string, string> = {}
-  
+
   try {
     if (isDevelopment) {
       // In development mode, use workspace dependencies for all packages
@@ -126,7 +126,7 @@ function getCurrentPackageVersions(isDevelopment: boolean = false, useCanary: bo
       }
     }
   }
-  
+
   return versions
 }
 
@@ -134,13 +134,13 @@ function getCurrentPackageVersions(isDevelopment: boolean = false, useCanary: bo
 function processTemplateFile(filePath: string, versions: Record<string, string>, isDevelopment: boolean = false, useCanary: boolean = false) {
   const content = readFileSync(filePath, 'utf-8')
   let processedContent = content
-  
+
   // Replace version placeholders with current versions
   for (const [packageName, version] of Object.entries(versions)) {
     const placeholder = `{{${packageName}_version}}`
     processedContent = processedContent.replace(new RegExp(placeholder, 'g'), version)
   }
-  
+
   // Handle workspace dependencies based on mode
   if (isDevelopment) {
     // Keep workspace dependencies for development
@@ -157,7 +157,7 @@ function processTemplateFile(filePath: string, versions: Record<string, string>,
     processedContent = processedContent.replace(/"@mcp-use\/cli": "workspace:\*"/, `"@mcp-use/cli": "${versions['@mcp-use/cli'] || 'latest'}"`)
     processedContent = processedContent.replace(/"@mcp-use\/inspector": "workspace:\*"/, `"@mcp-use/inspector": "${versions['@mcp-use/inspector'] || 'latest'}"`)
   }
-  
+
   return processedContent
 }
 
@@ -176,7 +176,7 @@ program
   .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean, canary: boolean, yarn?: boolean, npm?: boolean, pnpm?: boolean }) => {
     try {
       let selectedTemplate = options.template
-      
+
       // If no project name provided, prompt for it
       if (!projectName) {
         console.log('')
@@ -184,10 +184,10 @@ program
         console.log('')
         console.log(chalk.bold('Welcome to create-mcp-use-app!'))
         console.log('')
-        
+
         projectName = await promptForProjectName()
         console.log('')
-        
+
         // Prompt for template selection in interactive mode
         selectedTemplate = await promptForTemplate()
       }
@@ -230,10 +230,10 @@ program
 
       // Validate template name
       const validatedTemplate = validateTemplateName(selectedTemplate)
-      
+
       // Get current package versions
       const versions = getCurrentPackageVersions(options.dev, options.canary)
-      
+
       // Copy template files
       await copyTemplate(projectPath, validatedTemplate, versions, options.dev, options.canary)
 
@@ -242,7 +242,7 @@ program
 
       // Determine which package manager to use
       let usedPackageManager = 'npm'
-      
+
       // Check if a specific package manager was requested via flags
       if (options.yarn) {
         usedPackageManager = 'yarn'
@@ -268,7 +268,7 @@ program
         // Yarn and npm show their own progress, so we don't need a spinner for them
         const showSpinner = usedPackageManager !== 'yarn' && usedPackageManager !== 'npm'
         const spinner = showSpinner ? ora('Installing packages...').start() : null
-        
+
         try {
           if (options.yarn || options.npm || options.pnpm || detectPackageManager()) {
             // Use the specific package manager
@@ -374,21 +374,21 @@ program
 // Validate and sanitize template name to prevent path traversal
 function validateTemplateName(template: string): string {
   const sanitized = template.trim()
-  
+
   // Security: Prevent path traversal attacks
   if (sanitized.includes('..') || sanitized.includes('/') || sanitized.includes('\\')) {
     console.error(chalk.red('❌ Invalid template name'))
     console.error(chalk.yellow('   Template name cannot contain path separators'))
     process.exit(1)
   }
-  
+
   // Only allow alphanumeric characters, hyphens, and underscores
   if (!/^[a-zA-Z0-9_-]+$/.test(sanitized)) {
     console.error(chalk.red('❌ Invalid template name'))
     console.error(chalk.yellow('   Template name can only contain letters, numbers, hyphens, and underscores'))
     process.exit(1)
   }
-  
+
   return sanitized
 }
 
@@ -397,7 +397,7 @@ async function copyTemplate(projectPath: string, template: string, versions: Rec
 
   if (!existsSync(templatePath)) {
     console.error(chalk.red(`❌ Template "${template}" not found!`))
-    
+
     // Dynamically list available templates
     const templatesDir = join(__dirname, 'templates')
     if (existsSync(templatesDir)) {
@@ -405,14 +405,15 @@ async function copyTemplate(projectPath: string, template: string, versions: Rec
         .filter(dirent => dirent.isDirectory())
         .map(dirent => dirent.name)
         .sort()
-      
+
       console.log(`Available templates: ${availableTemplates.join(', ')}`)
     } else {
       console.log('No templates directory found')
     }
-    
-    console.log('💡 Tip: Use "ui" template for React components and modern UI features')
-    console.log('💡 Tip: Use "uiresource" template for UI resources and advanced server examples')
+
+    console.log('💡 Tip: Use "starter" template for a comprehensive MCP server with all features')
+    console.log('💡 Tip: Use "ui-resource" template for a MCP server with mcp-ui resources')
+    console.log('💡 Tip: Use "apps-sdk-demo" template for a MCP server with OpenAI Apps SDK integration')
     process.exit(1)
   }
 
@@ -480,17 +481,17 @@ async function promptForProjectName(): Promise<string> {
 async function promptForTemplate(): Promise<string> {
   // Get available templates
   const templatesDir = join(__dirname, 'templates')
-  const availableTemplates = existsSync(templatesDir) 
+  const availableTemplates = existsSync(templatesDir)
     ? readdirSync(templatesDir, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name)
-        .sort()
-    : ['simple', 'ui', 'uiresource']
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name)
+      .sort()
+    : ['starter', 'ui-resource', 'apps-sdk-demo']
 
   const templateDescriptions: Record<string, string> = {
-    'simple': 'Simple MCP server with a basic calculator tool (add numbers)',
-    'ui': 'MCP Server with mcp-ui resources returned from tools',
-    'uiresource': 'MCP Server with mcp-ui resources',
+    'starter': 'Starter MCP server with all features',
+    'ui-resource': 'MCP Server with mcp-ui resources returned from tools',
+    'apps-sdk-demo': 'MCP Server with mcp-ui resources',
   }
 
   const { template } = await inquirer.prompt([
@@ -505,7 +506,7 @@ async function promptForTemplate(): Promise<string> {
       }))
     }
   ])
-  
+
   return template
 }
 
