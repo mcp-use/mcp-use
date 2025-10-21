@@ -45,7 +45,10 @@ jobs:
         run: npm install -g mint
 
       - name: Generate Python API documentation
-        run: cd libraries/python && uv run python ../../docs/generate_docs.py mcp_use ../../docs/python/api-reference ../../docs/docs.json
+        run: |
+          source libraries/python/.venv/bin/activate
+          cd docs
+          python generate_docs.py ../libraries/python/mcp_use python/api-reference docs.json
 
       - name: Check for broken links
         run: |
