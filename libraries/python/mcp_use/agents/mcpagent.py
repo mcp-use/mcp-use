@@ -34,8 +34,8 @@ from mcp_use.agents.prompts.templates import DEFAULT_SYSTEM_PROMPT_TEMPLATE, SER
 from mcp_use.agents.remote import RemoteAgent
 from mcp_use.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
-from mcp_use.output import OutputConfig, format_and_print_result, format_error, format_stream_with_panels
 from mcp_use.logging import logger
+from mcp_use.output import OutputConfig, format_and_print_result, format_error, format_stream_with_panels
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
 from mcp_use.telemetry.utils import extract_model_info
 
