@@ -56,7 +56,7 @@
               "home/redirects/python",
               "home/redirects/typescript"
             ]
-          }, 
+          },
           {
             "group": "Guides",
             "icon": "",
@@ -157,14 +157,6 @@
                 ]
               },
               {
-                "group": "Integrations",
-                "pages": [
-                  "python/integration/openai",
-                  "python/integration/anthropic",
-                  "python/integration/google"
-                ]
-              },
-              {
                 "group": "MCP Agents",
                 "icon": "brain",
                 "pages": [
@@ -189,6 +181,15 @@
                   "python/agent/server-manager",
                   "python/agent/building-custom-agents",
                   "python/agent/observability"
+                ]
+              },
+              {
+                "group": "Integrations",
+                "icon": "plug-2",
+                "pages": [
+                  "python/integration/openai",
+                  "python/integration/anthropic",
+                  "python/integration/google"
                 ]
               },
               {

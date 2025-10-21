@@ -23,6 +23,13 @@ The adapter maintains a mapping of these generated functions to their actual exe
 
 Here's how to use the adapter to provide MCP tools, resources, and prompts to an OpenAI Chat Completion.
 
+<Note>
+Before starting, install the OpenAI SDK:
+```bash
+uv pip install openai
+```
+</Note>
+
 <Steps>
     <Step name="Initialize MCPClient">
         First, set up your `MCPClient` with the desired MCP servers. This part of the process is the same as any other `mcp-use` application.
@@ -53,7 +60,7 @@ Here's how to use the adapter to provide MCP tools, resources, and prompts to an
         You can pass a `disallowed_tools` list to the adapter's constructor to prevent specific tools, resources, or prompts from being exposed to the model.
         </Tip>
     </Step>
-    
+
     <Step name="Generate OpenAI-Compatible Tools">
         Use the `create_all` method on the adapter to inspect all connected MCP servers and generate a list of tools, resources and prompts in the OpenAI function-calling format.
 

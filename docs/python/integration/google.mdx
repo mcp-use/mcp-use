@@ -23,6 +23,13 @@ The adapter maintains a mapping of these generated functions to their actual exe
 
 Here's how to use the adapter to provide MCP tools, resources, and prompts to a Google Chat Completion.
 
+<Note>
+Before starting, install the Google GenAI SDK:
+```bash
+uv pip install google-genai
+```
+</Note>
+
 <Steps>
     <Step name="Initialize MCPClient">
         First, set up your `MCPClient` with the desired MCP servers. This part of the process is the same as any other `mcp-use` application.
