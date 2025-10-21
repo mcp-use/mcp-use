@@ -39,7 +39,7 @@ jobs:
         run: cd libraries/python && uv venv
 
       - name: Install Python dependencies
-        run: cd libraries/python && uv pip install -e .
+        run: cd libraries/python && uv pip install -e . && uv pip install google-genai
 
       - name: Install Mintlify CLI
         run: npm install -g mint
