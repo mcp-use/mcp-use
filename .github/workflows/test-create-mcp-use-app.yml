@@ -130,7 +130,7 @@ jobs:
         if: runner.os != 'Windows'
         id: package-path-unix
         run: |
-          PACKAGE_PATH=$(ls ./package/create-mcp-use-app-*.tgz)
+          PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
           echo "path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
           echo "Package path: $PACKAGE_PATH"
 
@@ -139,7 +139,8 @@ jobs:
         id: package-path-windows
         shell: pwsh
         run: |
-          $PACKAGE_PATH = Get-ChildItem -Path ./package/create-mcp-use-app-*.tgz | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          $PACKAGE_FILE = Get-ChildItem -Path ./package/create-mcp-use-app-*.tgz | Select-Object -First 1
+          $PACKAGE_PATH = $PACKAGE_FILE.FullName
           "path=$PACKAGE_PATH" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Output "Package path: $PACKAGE_PATH"
 
@@ -428,8 +429,9 @@ jobs:
       - name: Get Package Path
         id: package-path
         run: |
-          PACKAGE_PATH=$(ls ./package/create-mcp-use-app-*.tgz)
+          PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
           echo "path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+          echo "Package path: $PACKAGE_PATH"
 
       - name: Test Full Installation with npm
         if: matrix.pm == 'npm'
