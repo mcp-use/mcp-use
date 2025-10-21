@@ -57,6 +57,12 @@ export function OpenAIComponentRenderer({
   useEffect(() => {
     const storeAndSetUrl = async () => {
       try {
+        console.log('[OpenAIComponentRenderer] Starting storeAndSetUrl:', {
+          toolName,
+          toolArgs,
+          toolResult: JSON.stringify(toolResult).substring(0, 200),
+        })
+
         // Extract structured content from tool result
         let structuredContent = null
         if (toolResult?.structuredContent) {
@@ -80,8 +86,20 @@ export function OpenAIComponentRenderer({
           structuredContent = toolResult
         }
 
+        console.log('[OpenAIComponentRenderer] Extracted structuredContent:', structuredContent)
+
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await readResource(componentUrl)
+
+        // For Apps SDK widgets, use structuredContent as toolInput (the actual tool parameters)
+        // toolArgs might be empty or from the initial invocation, structuredContent has the real data
+        const widgetToolInput = structuredContent || toolArgs
+
+        console.log('[OpenAIComponentRenderer] Widget inputs:', {
+          toolArgs,
+          structuredContent,
+          widgetToolInput,
+        })
 
         // Store widget data on server (including the fetched HTML)
         const storeResponse = await fetch('/inspector/api/resources/widget/store', {
@@ -92,7 +110,7 @@ export function OpenAIComponentRenderer({
           body: JSON.stringify({
             serverId,
             uri: componentUrl,
-            toolInput: toolArgs,
+            toolInput: widgetToolInput,
             toolOutput: structuredContent,
             resourceData, // Pass the fetched HTML
             toolId,
@@ -272,12 +290,12 @@ export function OpenAIComponentRenderer({
 
       <div
         ref={containerRef}
-        className={cn('w-full flex justify-center', centerVertically && 'items-center')}
+        className={cn('w-full h-full flex justify-center', centerVertically && 'items-center')}
       >
         <iframe
           ref={iframeRef}
           src={widgetUrl}
-          className={cn('w-full shadow-lg dark:shadow-black/70 max-w-[768px] border border-zinc-200 dark:border-zinc-600 rounded-3xl bg-white')}
+          className={cn('w-full max-w-[768px]  rounded-3xl')}
           style={{ height: `${iframeHeight}px` }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
           title={`OpenAI Component: ${toolName}`}

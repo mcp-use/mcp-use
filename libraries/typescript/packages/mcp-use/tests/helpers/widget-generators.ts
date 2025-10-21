@@ -18,7 +18,6 @@ export function generateWidgetHtml(
   definition: Pick<UIResourceDefinition, 'name' | 'title' | 'description' | 'size'>,
   props?: Record<string, any>
 ): string {
-  const [width = '100%', height = '400px'] = definition.size || []
   const propsJson = props ? JSON.stringify(props) : '{}'
 
   return `<!DOCTYPE html>
@@ -26,31 +25,6 @@ export function generateWidgetHtml(
 <head>
   <meta charset="UTF-8">
   <title>${definition.title || definition.name}</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 20px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    .widget-container {
-      width: ${width};
-      height: ${height};
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      overflow: auto;
-      padding: 20px;
-      background: white;
-    }
-    .widget-title {
-      font-size: 1.5em;
-      font-weight: 600;
-      margin-bottom: 10px;
-    }
-    .widget-description {
-      color: #666;
-      margin-bottom: 20px;
-    }
-  </style>
 </head>
 <body>
   <div class="widget-container">

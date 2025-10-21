@@ -36,18 +36,6 @@ function htmlTemplate({ title, scriptPath, isDev = false }: { title: string, scr
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>${title} Widget</title>
-    <style>
-      body {
-        margin: 0;
-        padding: 20px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        background: #f5f5f5;
-      }
-      #widget-root {
-        max-width: 1200px;
-        margin: 0 auto;
-      }
-    </style>
   </head>
   <body>
     <div id="widget-root"></div>

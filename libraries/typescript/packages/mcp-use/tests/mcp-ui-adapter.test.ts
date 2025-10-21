@@ -983,10 +983,6 @@ describe('MCP-UI Adapter', () => {
 <html>
 <head>
   <meta charset="UTF-8">
-  <style>
-    body { margin: 0; padding: 20px; font-family: system-ui; }
-    .container { max-width: 1200px; }
-  </style>
 </head>
 <body>
   <div id="root"></div>

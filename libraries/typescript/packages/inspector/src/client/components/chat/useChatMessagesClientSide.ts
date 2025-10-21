@@ -300,11 +300,30 @@ export function useChatMessagesClientSide({
               currentTextPart = ''
             }
 
+            // Extract args from event data - check multiple possible locations
+            let args = {}
+            if (event.data?.input) {
+              args = event.data.input
+            }
+            else if (event.data?.tool_input) {
+              args = event.data.tool_input
+            }
+            else if (event.data) {
+              // Sometimes the args are directly in data
+              args = event.data
+            }
+
+            console.log('[useChatMessagesClientSide] on_tool_start:', {
+              toolName: event.name,
+              eventData: event.data,
+              extractedArgs: args,
+            })
+
             parts.push({
               type: 'tool-invocation',
               toolInvocation: {
                 toolName: event.name || 'unknown',
-                args: event.data?.input || {},
+                args,
                 state: 'pending',
               },
             })

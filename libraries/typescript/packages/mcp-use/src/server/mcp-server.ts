@@ -26,6 +26,8 @@ export class McpServer {
   private mcpMounted = false
   private inspectorMounted = false
   private serverPort?: number
+  private serverHost: string
+  private serverBaseUrl?: string
   private widgetManifest?: Record<string, any>
 
   /**
@@ -40,6 +42,8 @@ export class McpServer {
    */
   constructor(config: ServerConfig) {
     this.config = config
+    this.serverHost = config.host || 'localhost'
+    this.serverBaseUrl = config.baseUrl
     this.server = new OfficialMcpServer({
       name: config.name,
       version: config.version,
@@ -366,6 +370,271 @@ export class McpServer {
   }
 
   /**
+   * Register an Apps SDK compatible UI widget as both a tool and a resource
+   *
+   * This method automatically converts a widget from the resources directory into an
+   * Apps SDK compatible format by inlining all HTML, CSS, and JavaScript into a single
+   * htmlTemplate. It reads the built widget files and creates a text/html+skybridge
+   * resource that works with OpenAI's Apps SDK.
+   *
+   * @param widgetName - Widget name to load from the manifest
+   * @param options - Optional Apps SDK metadata configuration
+   * @param options.appsSdkMetadata - Apps SDK specific metadata (CSP, widget description, etc.)
+   * @param options.title - Override the auto-generated title
+   * @param options.description - Override the description from manifest
+   * @param options.size - Preferred widget size [width, height] (e.g., ['800px', '600px'])
+   * @returns The server instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // Simple usage - auto-loads from generated schema
+   * server.appsUiResource('display-weather')
+   * 
+   * // With custom metadata
+   * server.appsUiResource('display-weather', {
+   *   appsSdkMetadata: {
+   *     'openai/widgetDescription': 'Interactive weather display widget',
+   *     'openai/toolInvocation/invoking': 'Fetching weather data...',
+   *     'openai/toolInvocation/invoked': 'Weather displayed',
+   *     'openai/widgetAccessible': true,
+   *     'openai/resultCanProduceWidget': true,
+   *     'openai/widgetCSP': {
+   *       connect_domains: ['https://chatgpt.com'],
+   *       resource_domains: ['https://*.oaistatic.com']
+   *       // Note: If MCP_URL/baseUrl is set, it will be automatically added to resource_domains
+   *     }
+   *   }
+   * })
+   * ```
+   */
+  appsUiResource(
+    widgetName: string, 
+    options?: {
+      appsSdkMetadata?: Record<string, any>,
+      title?: string,
+      description?: string,
+      size?: [string, string]
+    }
+  ): this {
+    // Load widget schema from manifest
+    const schema = this.loadWidgetSchema(widgetName)
+    
+    // Read the built widget's HTML file to extract asset references
+    const widgetHtmlPath = join(process.cwd(), 'dist/resources/mcp-use/widgets', widgetName, 'index.html')
+    
+    try {
+      const htmlContent = readFileSync(widgetHtmlPath, 'utf8')
+      
+      // Extract the script src from the HTML
+      const scriptMatch = htmlContent.match(/<script type="module" src="\.\/assets\/([^"]+)"/)
+      if (!scriptMatch) {
+        throw new Error(`Could not find script tag in ${widgetName}/index.html`)
+      }
+      
+      const scriptFile = scriptMatch[1]
+      
+      // Extract the styles from the HTML
+      const styleMatch = htmlContent.match(/<style>([\s\S]*?)<\/style>/)
+      const styles = styleMatch ? styleMatch[1] : ''
+      
+      // Store the template data for runtime generation
+      const templateData = {
+        widgetName,
+        scriptFile,
+        styles,
+        title: schema.title || widgetName
+      }
+      
+      // Create a function that generates the HTML template at runtime with the correct port
+      const generateHtmlTemplate = () => {
+        // Use baseUrl if provided, otherwise construct from host:port
+        const baseUrl = this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort || 3001}`
+        const scriptUrl = `${baseUrl}/mcp-use/widgets/${widgetName}/assets/${scriptFile}`
+        
+        return `
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${templateData.title}</title>
+    <style>${styles}</style>
+  </head>
+  <body>
+    <div id="widget-root"></div>
+    <script type="module" src="${scriptUrl}"></script>
+  </body>
+</html>
+        `.trim()
+      }
+      
+      // For Apps SDK, we need to use rawHtml type with dynamic template generation
+      // We'll create a custom UIResourceDefinition that generates HTML at request time
+      
+      // Prepare Apps SDK metadata with automatic CSP configuration
+      const appsSdkMetadata = options?.appsSdkMetadata || {}
+      
+      // Automatically add the base URL domain to CSP resource_domains if baseUrl is set
+      if (this.serverBaseUrl) {
+        try {
+          const url = new URL(this.serverBaseUrl)
+          const domain = `${url.protocol}//${url.hostname}${url.port ? ':' + url.port : ''}`
+          
+          // Initialize CSP if not present
+          if (!appsSdkMetadata['openai/widgetCSP']) {
+            appsSdkMetadata['openai/widgetCSP'] = {
+              connect_domains: [],
+              resource_domains: []
+            }
+          }
+          
+          // Ensure resource_domains exists and add the domain if not already present
+          const csp = appsSdkMetadata['openai/widgetCSP'] as any
+          if (!csp.resource_domains) {
+            csp.resource_domains = []
+          }
+          if (!csp.resource_domains.includes(domain)) {
+            csp.resource_domains.push(domain)
+            console.log(`[Apps SDK] Added ${domain} to CSP resource_domains for widget "${widgetName}"`)
+          }
+        } catch (e) {
+          console.warn('Failed to parse baseUrl for CSP configuration', e)
+        }
+      }
+      
+      const definition: UIResourceDefinition = {
+        type: 'rawHtml',
+        name: widgetName,
+        title: options?.title || schema.title,
+        description: options?.description || schema.description,
+        props: schema.props,
+        htmlContent: '', // Placeholder, will be replaced
+        size: options?.size,
+        appsSdkMetadata
+      }
+      
+      // Override the resource registration to generate HTML at runtime
+      const resourceUri = `ui://widget/${widgetName}.html`
+      const mimeType = 'text/html+skybridge'
+      
+      // Register the resource with dynamic HTML generation
+      this.resource({
+        name: widgetName,
+        uri: resourceUri,
+        title: definition.title,
+        description: definition.description,
+        mimeType,
+        annotations: definition.annotations,
+        readCallback: async () => {
+          const htmlTemplate = generateHtmlTemplate()
+          const resource: any = {
+            uri: resourceUri,
+            mimeType,
+            text: htmlTemplate
+          }
+          
+          // Add metadata if provided
+          if (definition.appsSdkMetadata && Object.keys(definition.appsSdkMetadata).length > 0) {
+            resource._meta = definition.appsSdkMetadata
+          }
+          
+          return {
+            contents: [resource]
+          }
+        }
+      })
+      
+      // Register the resource template for dynamic URIs
+      this.resourceTemplate({
+        name: `${widgetName}-dynamic`,
+        resourceTemplate: {
+          uriTemplate: `ui://widget/${widgetName}-{id}.html`,
+          name: definition.title || widgetName,
+          description: definition.description,
+          mimeType
+        },
+        title: definition.title,
+        description: definition.description,
+        annotations: definition.annotations,
+        readCallback: async (uri, params) => {
+          const htmlTemplate = generateHtmlTemplate()
+          const resource: any = {
+            uri: uri.toString(),
+            mimeType,
+            text: htmlTemplate
+          }
+          
+          if (definition.appsSdkMetadata && Object.keys(definition.appsSdkMetadata).length > 0) {
+            resource._meta = definition.appsSdkMetadata
+          }
+          
+          return {
+            contents: [resource]
+          }
+        }
+      })
+      
+      // Register the tool
+      const toolName = widgetName
+      const displayName = definition.title || widgetName
+      const toolMetadata: Record<string, unknown> = {
+        'openai/outputTemplate': resourceUri
+      }
+      
+      // Copy over tool-relevant metadata fields from appsSdkMetadata
+      if (definition.appsSdkMetadata) {
+        const toolMetadataFields = [
+          'openai/toolInvocation/invoking',
+          'openai/toolInvocation/invoked',
+          'openai/widgetAccessible',
+          'openai/resultCanProduceWidget'
+        ] as const
+        
+        for (const field of toolMetadataFields) {
+          if (definition.appsSdkMetadata[field] !== undefined) {
+            toolMetadata[field] = definition.appsSdkMetadata[field]
+          }
+        }
+      }
+      
+      this.tool({
+        name: toolName,
+        title: definition.title,
+        description: definition.title || definition.description || `Display ${displayName}`,
+        inputs: this.convertPropsToInputs(definition.props),
+        _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
+        cb: async (params) => {
+          // Generate a unique URI with random ID for each invocation
+          const randomId = Math.random().toString(36).substring(2, 15)
+          const uniqueUri = `ui://widget/${widgetName}-${randomId}.html`
+          
+          // Update toolMetadata with the unique URI
+          const uniqueToolMetadata = { ...toolMetadata, 'openai/outputTemplate': uniqueUri }
+          
+          return {
+            _meta: uniqueToolMetadata,
+            content: [
+              {
+                type: 'text',
+                text: `Displaying ${displayName}`
+              }
+            ],
+            structuredContent: params
+          }
+        }
+      })
+      
+      return this
+    } catch (error) {
+      throw new Error(
+        `Failed to load widget files for "${widgetName}". ` +
+        `Make sure to run the build process to generate the widget files. ` +
+        `Error: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  }
+
+  /**
    * Register a UI widget as both a tool and a resource
    *
    * Creates a unified interface for MCP-UI compatible widgets that can be accessed
@@ -496,6 +765,30 @@ export class McpServer {
       }
     })
 
+    // For Apps SDK, also register a resource template to handle dynamic URIs with random IDs
+    if (definition.type === 'appsSdk') {
+      this.resourceTemplate({
+        name: `${definition.name}-dynamic`,
+        resourceTemplate: {
+          uriTemplate: `ui://widget/${definition.name}-{id}.html`,
+          name: definition.title || definition.name,
+          description: definition.description,
+          mimeType
+        },
+        title: definition.title,
+        description: definition.description,
+        annotations: definition.annotations,
+        readCallback: async (uri, params) => {
+          // Use empty params for Apps SDK since structuredContent is passed separately
+          const uiResource = this.createWidgetUIResource(definition, {})
+          
+          return {
+            contents: [uiResource.resource]
+          }
+        }
+      })
+    }
+
     // Register the tool - returns UIResource with parameters
     // For Apps SDK, include the outputTemplate metadata
     const toolMetadata: Record<string, unknown> = {}
@@ -534,8 +827,15 @@ export class McpServer {
 
         // For Apps SDK, return _meta at top level with only text in content
         if (definition.type === 'appsSdk') {
+          // Generate a unique URI with random ID for each invocation
+          const randomId = Math.random().toString(36).substring(2, 15)
+          const uniqueUri = `ui://widget/${definition.name}-${randomId}.html`
+          
+          // Update toolMetadata with the unique URI
+          const uniqueToolMetadata = { ...toolMetadata, 'openai/outputTemplate': uniqueUri }
+          
           return {
-            _meta: toolMetadata,
+            _meta: uniqueToolMetadata,
             content: [
               {
                 type: 'text',
@@ -580,9 +880,24 @@ export class McpServer {
     definition: UIResourceDefinition,
     params: Record<string, any>
   ): UIResourceContent {
+    // If baseUrl is set, parse it to extract protocol, host, and port
+    let configBaseUrl = `http://${this.serverHost}`
+    let configPort: number | string = this.serverPort || 3001
+    
+    if (this.serverBaseUrl) {
+      try {
+        const url = new URL(this.serverBaseUrl)
+        configBaseUrl = `${url.protocol}//${url.hostname}`
+        configPort = url.port || (url.protocol === 'https:' ? 443 : 80)
+      } catch (e) {
+        // Fall back to host:port if baseUrl parsing fails
+        console.warn('Failed to parse baseUrl, falling back to host:port', e)
+      }
+    }
+    
     const urlConfig: UrlConfig = {
-      baseUrl: 'http://localhost',
-      port: this.serverPort || 3001
+      baseUrl: configBaseUrl,
+      port: configPort
     }
 
     return createUIResourceFromDefinition(definition, params, urlConfig)
@@ -601,7 +916,7 @@ export class McpServer {
    * @returns Complete URL with encoded parameters
    */
   private buildWidgetUrl(widget: string, params: Record<string, any>): string {
-    const baseUrl = `http://localhost:${this.serverPort}/mcp-use/widgets/${widget}`
+    const baseUrl = `http://${this.serverHost}:${this.serverPort}/mcp-use/widgets/${widget}`
 
     if (Object.keys(params).length === 0) {
       return baseUrl
@@ -759,7 +1074,7 @@ export class McpServer {
    * @example
    * ```typescript
    * await server.listen(8080)
-   * // Server now running at http://localhost:8080
+   * // Server now running at http://localhost:8080 (or configured host)
    * // MCP endpoints: http://localhost:8080/mcp
    * // Inspector UI: http://localhost:8080/inspector
    * ```
@@ -772,8 +1087,8 @@ export class McpServer {
     this.mountInspector()
 
     this.app.listen(this.serverPort, () => {
-      console.log(`[SERVER] Listening on http://localhost:${this.serverPort}`)
-      console.log(`[MCP] Endpoints: http://localhost:${this.serverPort}/mcp`)
+      console.log(`[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`)
+      console.log(`[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp`)
     })
   }
 
@@ -811,7 +1126,7 @@ export class McpServer {
         // Auto-connect to the local MCP server at /mcp
         mountInspector(this.app)
         this.inspectorMounted = true
-        console.log(`[INSPECTOR] UI available at http://localhost:${this.serverPort}/inspector`)
+        console.log(`[INSPECTOR] UI available at http://${this.serverHost}:${this.serverPort}/inspector`)
       })
       .catch(() => {
         // Inspector package not installed, skip mounting silently
@@ -835,7 +1150,7 @@ export class McpServer {
    * @returns void
    * 
    * @example
-   * Widget routes:
+   * Widget routes (using configured host, defaults to localhost):
    * - http://localhost:3001/mcp-use/widgets/kanban-board
    * - http://localhost:3001/mcp-use/widgets/todo-list/assets/style.css
    * - http://localhost:3001/mcp-use/widgets/assets/script.js (auto-discovered)
@@ -1086,12 +1401,43 @@ export type McpServerInstance = Omit<McpServer, keyof Express> & Express
 
 /**
  * Create a new MCP server instance
+ * 
+ * @param name - Server name
+   * @param config - Optional server configuration
+   * @param config.version - Server version (defaults to '1.0.0')
+   * @param config.description - Server description
+   * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
+   * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
+   * @returns McpServerInstance with both MCP and Express methods
+   * 
+   * @example
+   * ```typescript
+   * // Basic usage
+   * const server = createMCPServer('my-server', {
+   *   version: '1.0.0',
+   *   description: 'My MCP server'
+   * })
+   * 
+   * // With custom host (e.g., for Docker or remote access)
+   * const server = createMCPServer('my-server', {
+   *   version: '1.0.0',
+   *   host: '0.0.0.0' // or 'myserver.com'
+   * })
+   * 
+   * // With full base URL (e.g., behind a proxy or custom domain)
+   * const server = createMCPServer('my-server', {
+   *   version: '1.0.0',
+   *   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
+   * })
+   * ```
  */
 export function createMCPServer(name: string, config: Partial<ServerConfig> = {}): McpServerInstance {
   const instance = new McpServer({
     name,
     version: config.version || '1.0.0',
     description: config.description,
+    host: config.host,
+    baseUrl: config.baseUrl,
   })
   return instance as unknown as McpServerInstance
 }
