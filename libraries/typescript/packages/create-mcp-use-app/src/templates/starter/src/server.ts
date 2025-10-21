@@ -21,7 +21,8 @@ server.tool({
   inputs: [
     { name: 'name', type: 'string', required: true }
   ],
-  cb: async ({ name }: { name: string }) => {
+  cb: async (params: Record<string, any>) => {
+    const name = params.name as string
     return {
       content: [
         {
@@ -41,7 +42,8 @@ server.tool({
   inputs: [
     { name: 'city', type: 'string', required: true }
   ],
-  cb: async ({ city }: { city: string }) => {
+  cb: async (params: Record<string, any>) => {
+    const city = params.city as string
     const response = await fetch(`https://wttr.in/${city}?format=j1`)
     const data: any = await response.json()
     const current = data.current_condition[0]
@@ -176,7 +178,8 @@ server.prompt({
   args: [
     { name: 'code', type: 'string', required: true }
   ],
-  cb: async ({ code }: { code: string }) => {
+  cb: async (params: Record<string, any>) => {
+    const code = params.code as string
     return {
       content: [{
         type: 'text',
