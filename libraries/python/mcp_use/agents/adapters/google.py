@@ -2,11 +2,17 @@ import re
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from google.genai import types
 from mcp.types import Prompt, Resource, Tool
 
 from mcp_use.agents.adapters.base import BaseAdapter
 from mcp_use.client.connectors.base import BaseConnector
+
+try:
+    from google.genai import types
+except ImportError as e:
+    raise ImportError(
+        "google-genai is required for GoogleMCPAdapter. " "Install it with: uv pip install google-genai"
+    ) from e
 
 
 def _sanitize_for_tool_name(name: str) -> str:
