@@ -2,7 +2,7 @@ import type { TabType } from '@/client/context/InspectorContext'
 import type { MCPConnection } from '@/client/context/McpContext'
 import { Command, FolderOpen, MessageCircle, MessageSquare, Wrench } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
-import  {GithubIcon} from '@/client/components/ui/github-icon'
+import { GithubIcon } from '@/client/components/ui/github-icon'
 import { Tabs, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
 import {
   Tooltip,

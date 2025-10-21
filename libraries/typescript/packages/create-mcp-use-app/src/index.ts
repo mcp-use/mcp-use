@@ -35,6 +35,48 @@ function runPackageManager(packageManager: string, args: string[], cwd: string):
   })
 }
 
+// Detect which package manager was used to run this script
+function detectPackageManager(): string | null {
+  // Check npm_config_user_agent which contains info about the package manager
+  const userAgent = process.env.npm_config_user_agent || ''
+  
+  if (userAgent.includes('yarn')) {
+    return 'yarn'
+  } else if (userAgent.includes('pnpm')) {
+    return 'pnpm'
+  } else if (userAgent.includes('npm')) {
+    return 'npm'
+  }
+  
+  return null
+}
+
+// Get the dev command for a specific package manager
+function getDevCommand(packageManager: string): string {
+  switch (packageManager) {
+    case 'yarn':
+      return 'yarn dev'
+    case 'pnpm':
+      return 'pnpm dev'
+    case 'npm':
+    default:
+      return 'npm run dev'
+  }
+}
+
+// Get the install command for a specific package manager
+function getInstallCommand(packageManager: string): string {
+  switch (packageManager) {
+    case 'yarn':
+      return 'yarn'
+    case 'pnpm':
+      return 'pnpm install'
+    case 'npm':
+    default:
+      return 'npm install'
+  }
+}
+
 const program = new Command()
 
 // Render logo as ASCII art
@@ -128,7 +170,10 @@ program
   .option('--no-install', 'Skip installing dependencies')
   .option('--dev', 'Use workspace dependencies for development')
   .option('--canary', 'Use canary versions of packages')
-  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean, canary: boolean }) => {
+  .option('--yarn', 'Use yarn as package manager')
+  .option('--npm', 'Use npm as package manager')
+  .option('--pnpm', 'Use pnpm as package manager')
+  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean, canary: boolean, yarn?: boolean, npm?: boolean, pnpm?: boolean }) => {
     try {
       let selectedTemplate = options.template
       
@@ -195,23 +240,89 @@ program
       // Update package.json with project name
       updatePackageJson(projectPath, sanitizedProjectName)
 
+      // Determine which package manager to use
+      let usedPackageManager = 'npm'
+      
+      // Check if a specific package manager was requested via flags
+      if (options.yarn) {
+        usedPackageManager = 'yarn'
+      } else if (options.npm) {
+        usedPackageManager = 'npm'
+      } else if (options.pnpm) {
+        usedPackageManager = 'pnpm'
+      } else {
+        // Try to detect which package manager was used to run this script
+        const detected = detectPackageManager()
+        if (detected) {
+          usedPackageManager = detected
+        } else {
+          // No flag and couldn't detect, try in order: yarn → npm → pnpm
+          const defaultOrder = ['yarn', 'npm', 'pnpm']
+          // We'll determine the working one during installation
+          usedPackageManager = defaultOrder[0]
+        }
+      }
+
       // Install dependencies if requested
       if (options.install) {
-        const spinner = ora('Installing packages...').start()
+        // Yarn and npm show their own progress, so we don't need a spinner for them
+        const showSpinner = usedPackageManager !== 'yarn' && usedPackageManager !== 'npm'
+        const spinner = showSpinner ? ora('Installing packages...').start() : null
+        
         try {
-          await runPackageManager('pnpm', ['install'], projectPath)
-          spinner.succeed('Packages installed successfully')
+          if (options.yarn || options.npm || options.pnpm || detectPackageManager()) {
+            // Use the specific package manager
+            if (!showSpinner) {
+              console.log('')
+            }
+            await runPackageManager(usedPackageManager, ['install'], projectPath)
+            if (spinner) {
+              spinner.succeed(`Packages installed successfully with ${usedPackageManager}`)
+            } else {
+              console.log('')
+            }
+          } else {
+            // Try in order: yarn → npm → pnpm
+            if (spinner) spinner.text = 'Installing packages (trying yarn)...'
+            try {
+              if (!spinner) console.log('')
+              await runPackageManager('yarn', ['install'], projectPath)
+              usedPackageManager = 'yarn'
+              if (spinner) {
+                spinner.succeed('Packages installed successfully with yarn')
+              } else {
+                console.log('')
+              }
+            } catch {
+              if (spinner) spinner.text = 'yarn not found, trying npm...'
+              try {
+                await runPackageManager('npm', ['install'], projectPath)
+                usedPackageManager = 'npm'
+                if (spinner) {
+                  spinner.succeed('Packages installed successfully with npm')
+                } else {
+                  console.log('')
+                }
+              } catch {
+                if (spinner) spinner.text = 'npm not found, trying pnpm...'
+                await runPackageManager('pnpm', ['install'], projectPath)
+                usedPackageManager = 'pnpm'
+                if (spinner) {
+                  spinner.succeed('Packages installed successfully with pnpm')
+                } else {
+                  console.log('')
+                }
+              }
+            }
+          }
         }
-        catch {
-          spinner.text = 'pnpm not found, trying npm...'
-          try {
-            await runPackageManager('npm', ['install'], projectPath)
-            spinner.succeed('Packages installed successfully')
-          }
-          catch (error) {
+        catch (error) {
+          if (spinner) {
             spinner.fail('Package installation failed')
-            console.log('⚠️  Please run "npm install" or "pnpm install" manually')
+          } else {
+            console.log('❌ Package installation failed')
           }
+          console.log('⚠️  Please run "npm install", "yarn install", or "pnpm install" manually')
         }
       }
 
@@ -241,9 +352,9 @@ program
       console.log(chalk.bold('🚀 To get started:'))
       console.log(chalk.cyan(`   cd ${sanitizedProjectName}`))
       if (!options.install) {
-        console.log(chalk.cyan('   npm install'))
+        console.log(chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`))
       }
-      console.log(chalk.cyan('   npm run dev'))
+      console.log(chalk.cyan(`   ${getDevCommand(usedPackageManager)}`))
       console.log('')
       if (options.dev) {
         console.log(chalk.yellow('💡 Development mode: Your project uses workspace dependencies'))

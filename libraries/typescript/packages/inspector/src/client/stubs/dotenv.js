@@ -16,9 +16,8 @@ export function parse(src) {
   return {}
 }
 
-export default { 
-  config, 
+export default {
+  config,
   configDotenv,
-  parse
+  parse,
 }
-

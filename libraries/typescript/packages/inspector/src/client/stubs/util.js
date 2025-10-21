@@ -11,4 +11,3 @@ export function inherits() {}
 export function format() {}
 
 export default { debuglog, inspect, inherits, format }
-

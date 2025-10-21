@@ -9,9 +9,9 @@ export function UserMessage({ content, timestamp }: UserMessageProps) {
   }
 
   return (
-    <div className="flex items-start gap-3 justify-end">
+    <div className="flex items-start gap-3 justify-end group/user-message">
       <div className="flex-1 min-w-0 flex flex-col items-end">
-        <div className="bg-zinc-200 dark:bg-zinc-800 text-primary rounded-full px-4 py-2 max-w-[80%] break-words">
+        <div className="bg-zinc-200 dark:bg-zinc-800 text-primary rounded-3xl px-4 py-2 max-w-[80%] break-words">
           <p className="text-base leading-7 font-sans text-start break-words">
             {content}
           </p>
