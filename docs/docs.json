@@ -216,8 +216,11 @@
                     "group": "Adapters",
                     "icon": "plug-2",
                     "pages": [
+                      "python/api-reference/mcp_use_agents_adapters_anthropic",
                       "python/api-reference/mcp_use_agents_adapters_base",
-                      "python/api-reference/mcp_use_agents_adapters_langchain_adapter"
+                      "python/api-reference/mcp_use_agents_adapters_google",
+                      "python/api-reference/mcp_use_agents_adapters_langchain_adapter",
+                      "python/api-reference/mcp_use_agents_adapters_openai"
                     ]
                   },
                   "python/api-reference/mcp_use_agents_base",
