@@ -54,9 +54,10 @@
             "icon": "library",
             "pages": [
               "home/redirects/python",
-              "home/redirects/typescript"
+              "home/redirects/typescript",
+              "home/redirects/inspector"
             ]
-          }, 
+          },
           {
             "group": "Guides",
             "icon": "",
@@ -541,6 +542,14 @@
               }
             ]
           }
+        ]
+      },{
+        "product": "Inspector",
+        "description": "Inspector",
+        "icon": "monitor",
+        "pages": [
+          "inspector/index",
+          "inspector/self-hosting"
         ]
       }
     ]
