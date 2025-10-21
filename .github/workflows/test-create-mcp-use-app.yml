@@ -222,7 +222,7 @@ jobs:
         shell: pwsh
         run: |
           # Convert Windows path to forward slashes for yarn dlx
-          $packagePath = ${{ steps.package-path.outputs.path }}.Replace('\', '/')
+          $packagePath = "${{ steps.package-path.outputs.path }}".Replace('\', '/')
           yarn dlx -p $packagePath create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
           
           if (-not (Test-Path "test-app")) {
@@ -259,7 +259,7 @@ jobs:
         shell: pwsh
         run: |
           # Convert Windows path to forward slashes for pnpm dlx
-          $packagePath = ${{ steps.package-path.outputs.path }}.Replace('\', '/')
+          $packagePath = "${{ steps.package-path.outputs.path }}".Replace('\', '/')
           pnpm --package=$packagePath dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
           
           if (-not (Test-Path "test-app")) {
