@@ -60,4 +60,3 @@ export const DEFAULT_MODELS = {
   anthropic: 'claude-3-5-sonnet-20241022',
   google: 'gemini-2.0-flash-exp',
 }
-

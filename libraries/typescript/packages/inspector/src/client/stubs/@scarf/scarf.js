@@ -2,4 +2,3 @@
 export class Scarf {
   static report() {}
 }
-

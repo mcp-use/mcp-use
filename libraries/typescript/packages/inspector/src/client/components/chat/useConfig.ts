@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
 import type { AuthConfig, LLMConfig } from './types'
+import { useCallback, useEffect, useState } from 'react'
 import { DEFAULT_MODELS } from './types'
 import { hashString } from './utils'
 
@@ -159,4 +159,3 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     clearConfig,
   }
 }
-
