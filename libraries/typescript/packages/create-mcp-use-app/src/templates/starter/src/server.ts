@@ -189,5 +189,7 @@ server.prompt({
   }
 })
 
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000
+console.log(`Server running on port ${PORT}`)
 // Start the server
-server.listen(3000)
+server.listen(PORT)

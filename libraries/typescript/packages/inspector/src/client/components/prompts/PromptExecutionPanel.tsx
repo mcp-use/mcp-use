@@ -1,36 +1,36 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js'
+import type { Prompt } from '@modelcontextprotocol/sdk/types.js'
 import { Play, Save } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
-import { ToolInputForm } from './ToolInputForm'
+import { PromptInputForm } from './PromptInputForm'
 
-interface ToolExecutionPanelProps {
-  selectedTool: Tool | null
-  toolArgs: Record<string, unknown>
+interface PromptExecutionPanelProps {
+  selectedPrompt: Prompt | null
+  promptArgs: Record<string, unknown>
   isExecuting: boolean
   isConnected: boolean
-  onArgChange: (key: string, value: string) => void
+  onArgChange: (key: string, value: any) => void
   onExecute: () => void
   onSave: () => void
 }
 
-export function ToolExecutionPanel({
-  selectedTool,
-  toolArgs,
+export function PromptExecutionPanel({
+  selectedPrompt,
+  promptArgs,
   isExecuting,
   isConnected,
   onArgChange,
   onExecute,
   onSave,
-}: ToolExecutionPanelProps) {
-  if (!selectedTool) {
+}: PromptExecutionPanelProps) {
+  if (!selectedPrompt) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
         <p className="text-gray-500 dark:text-gray-400 mb-2">
-          Select a tool to get started
+          Select a prompt to get started
         </p>
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Choose a tool from the list to view its details and execute it
+          Choose a prompt from the list to view its details and execute it
         </p>
       </div>
     )
@@ -41,7 +41,7 @@ export function ToolExecutionPanel({
       <div className="flex-shrink-0 p-6 pt-3 pb-4 pr-3">
         <div>
           <div className="flex items-center justify-between mb-0">
-            <h3 className="text-lg font-semibold mb-2">{selectedTool.name}</h3>
+            <h3 className="text-lg font-semibold mb-2">{selectedPrompt.name}</h3>
             <div className="flex gap-2">
               <Button
                 onClick={onExecute}
@@ -72,18 +72,18 @@ export function ToolExecutionPanel({
               </Button>
             </div>
           </div>
-          {selectedTool.description && (
+          {selectedPrompt.description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              {selectedTool.description}
+              {selectedPrompt.description}
             </p>
           )}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pb-4 pr-3">
-        <ToolInputForm
-          selectedTool={selectedTool}
-          toolArgs={toolArgs}
+        <PromptInputForm
+          selectedPrompt={selectedPrompt}
+          promptArgs={promptArgs}
           onArgChange={onArgChange}
         />
       </div>
