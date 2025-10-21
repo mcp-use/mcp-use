@@ -5,14 +5,14 @@
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
   "license": "MIT",
-  "homepage": "https://github.com/mcp-use/mcp-use-ts#readme",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcp-use/mcp-use-ts.git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
     "directory": "packages/create-mcp-use-app"
   },
   "bugs": {
-    "url": "https://github.com/mcp-use/mcp-use-ts/issues"
+    "url": "https://github.com/mcp-use/mcp-use/issues"
   },
   "keywords": [
     "mcp",

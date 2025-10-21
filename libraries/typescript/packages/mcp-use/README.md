@@ -17,11 +17,11 @@
         <img src="https://img.shields.io/badge/docs-mcp--use.io-blue" /></a>
     <a href="https://mcp-use.io" alt="Website">
         <img src="https://img.shields.io/badge/website-mcp--use.io-blue" /></a>
-    <a href="https://github.com/mcp-use/mcp-use-ts/blob/main/LICENSE" alt="License">
+    <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/mcp-use/mcp-use-ts" /></a>
     <a href="https://eslint.org" alt="Code style: ESLint">
         <img src="https://img.shields.io/badge/code%20style-eslint-4B32C3.svg" /></a>
-    <a href="https://github.com/mcp-use/mcp-use-ts/stargazers" alt="GitHub stars">
+    <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/mcp-use/mcp-use-ts?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
@@ -36,9 +36,9 @@
 | Package                                                                                           | Description                                 | Version                                                                                                         |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | **mcp-use**                                                                                       | Core framework for MCP clients and servers  | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [@mcp-use/cli](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/cli)                      | Build tool for MCP apps with UI widgets     | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
-| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/inspector)          | Web-based MCP server inspector and debugger | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
-| [create-mcp-use-app](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/create-mcp-use-app) | Create MCP apps with one command            | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| [@mcp-use/cli](https://github.com/mcp-use/mcp-use/tree/main/packages/cli)                      | Build tool for MCP apps with UI widgets     | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
+| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)          | Web-based MCP server inspector and debugger | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/packages/create-mcp-use-app) | Create MCP apps with one command            | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 

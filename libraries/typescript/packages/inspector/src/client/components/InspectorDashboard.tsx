@@ -435,7 +435,7 @@ export function InspectorDashboard() {
           <Tooltip>
             <TooltipTrigger asChild>
               <a
-                href="https://github.com/mcp-use/mcp-use-ts"
+                href="https://github.com/mcp-use/mcp-use"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block"

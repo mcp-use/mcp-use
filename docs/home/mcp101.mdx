@@ -10,7 +10,7 @@ icon: "brain"
 
 The **Model Context Protocol (MCP)** is a recently introduced open standard (late 2024 by Anthropic) for connecting AI models (especially Large Language Models, LLMs) to external tools, data sources, and environments.
 
-It addresses a key limitation of standalone AI models: their isolation from live data and services. 
+It addresses a key limitation of standalone AI models: their isolation from live data and services.
 
 Instead of requiring custom integrations for every new data source or API (a process that is difficult to scale and maintain), MCP provides a universal, standardized interface
 
@@ -25,7 +25,7 @@ Early products include general third-party tools like Claude Desktop or developm
 - **MCP Client**: Operating within the host, the client acts as a bridge between the host and MCP servers. It manages communication by sending requests and querying available services. This exchange of information is handled securely over the transport layer.
 - **MCP Server**: This acts as the access point for the MCP client to carry out operations.
 
-This architecture allows a model to **autonomously maintain and switch context between multiple tools and data sources**. 
+This architecture allows a model to **autonomously maintain and switch context between multiple tools and data sources**.
 
 The MCP client can query servers to discover available tools and resources, and then invoke them by sending structured requests.
 
@@ -45,7 +45,7 @@ Tools are operations or API calls that the server can execute on behalf of the m
 
 ### Resources
 
-Resources are data sources that the server can provide access to. 
+Resources are data sources that the server can provide access to.
 
 When the model needs specific data (say, customer logs or an internal knowledge base), the MCP server fetches or queries these resources and returns the information
 
@@ -75,7 +75,7 @@ The MCP protocol defines three core primitives that clients can implement:
 | **Primitive** | Flow | **Description** | **Example Use** |
 | --- | --- | --- | --- |
 | Elicitation | Server to user | Elicitation in MCP allows servers to implement interactive workflows by enabling user input requests to occur nested inside other MCP server features. | User in the loop. |
-| Sampling | Server to LLM | Sampling is a standardized way for servers to request LLM sampling ("completions" or "generations") from language models via clients.  | Tool requires an LLM to return the result. 
+| Sampling | Server to LLM | Sampling is a standardized way for servers to request LLM sampling ("completions" or "generations") from language models via clients.  | Tool requires an LLM to return the result.
 This way, MCP servers don't need to include an LLM. |
 | Roots | Server to filesystem | Roots in MCP are typically exposed through workspace or project configuration interfaces. For example, implementations could offer a workspace/project picker that allows users to select directories and files that the server should have access to. | Access files and directories. |
 
@@ -86,7 +86,7 @@ mcp-use is the easiest way to interact with MCP servers with custom agents.
 It supports **any MCP server**, allowing you to connect to a wide range of server implementations for different use cases.
 
 - Python library: [https://github.com/mcp-use/mcp-use](https://github.com/mcp-use/mcp-use)
-- TypeScript library: [https://github.com/mcp-use/mcp-use-ts](https://github.com/mcp-use/mcp-use-ts)
+- TypeScript library: [https://github.com/mcp-use/mcp-use](https://github.com/mcp-use/mcp-use)
 - SDK documentation: [https://docs.mcp-use.com](https://docs.mcp-use.com/)
 
 ### MCP Client
@@ -170,11 +170,11 @@ Therefore, we need the infrastructure for MCP.
 
 ### Problem
 
-As software becomes increasingly agent-driven, traditional infrastructure falls short. 
+As software becomes increasingly agent-driven, traditional infrastructure falls short.
 
 Dev teams are using MCP servers to build internal agents or make their products agentic.
 
-But they're spending their time on plumbing, not product. 
+But they're spending their time on plumbing, not product.
 
 Dev teams aren't excited about managing more infrastructure and tooling.
 
@@ -194,7 +194,7 @@ Think of us as the Vercel and Next.js, but built for MCP development.
 
 We found that teams building AI agents frequently faced major friction points: agents need modular, plug-and-play integrations with diverse services, but most teams were hand-coding these integrations. Without standardization, scaling agents became slow and error-prone.
 
-**Remote deployment and governance of MCP servers** in enterprise settings remain unsolved issues. 
+**Remote deployment and governance of MCP servers** in enterprise settings remain unsolved issues.
 
 Also, it's crucial to make MCP-enabled agents easily configurable, swappable, and loosely coupled.
 
@@ -212,9 +212,9 @@ Let's go through the main challenges that we found when talking with hundreds of
 
 ### Correctly build and deploy MCP servers
 
-Creating an MCP server might seem trivial especially by translating OpenAPI specs into MCP servers using automations, but this often leads to hallucination-prone agent behavior. 
+Creating an MCP server might seem trivial especially by translating OpenAPI specs into MCP servers using automations, but this often leads to hallucination-prone agent behavior.
 
-AI agents using them often misinterpret capabilities or fail to handle error states. 
+AI agents using them often misinterpret capabilities or fail to handle error states.
 
 Without rigorous testing these "shallow wrappers" encourage brittle integrations that break silently.
 
@@ -224,11 +224,11 @@ Additionally most MCP servers today lack formal versioning strategies, this can 
 
 The MCP ecosystem today looks like the early web: configs scattered across GitHub or registries.
 
-Organizations hardcode MCP server definitions into multiple internal systems or codebases, leading to duplicated logic and stale configs. 
+Organizations hardcode MCP server definitions into multiple internal systems or codebases, leading to duplicated logic and stale configs.
 
 Updating schemas or rotating credentials is rarely done.
 
-Configs in organizations are shared over Slack or copied and pasted into scripts. 
+Configs in organizations are shared over Slack or copied and pasted into scripts.
 This makes collaboration between teams painful since there's no shared source of truth.
 
 ### Handle auth, access control, and audit logging
@@ -245,16 +245,16 @@ Every tool invocation or data access via MCP should be continuously verified and
 
 ### Reduce the number of tools exposed
 
-Many MCP servers expose dozens of tools, assuming agents will pick the right one. This is a false assumption. 
+Many MCP servers expose dozens of tools, assuming agents will pick the right one. This is a false assumption.
 
-LLMs degrade rapidly when overwhelmed with too many options. 
-They hallucinate tool names, misuse similar interfaces, or generate ambiguous calls. 
+LLMs degrade rapidly when overwhelmed with too many options.
+They hallucinate tool names, misuse similar interfaces, or generate ambiguous calls.
 
-The advice is to add a ceiling of ~10/20 tools per context window. Beyond that, performance and reliability drop significantly. 
+The advice is to add a ceiling of ~10/20 tools per context window. Beyond that, performance and reliability drop significantly.
 
 ### Manage environments and governance
 
-MCP sits at the intersection of AI autonomy and infrastructure control, which creates governance headaches. 
+MCP sits at the intersection of AI autonomy and infrastructure control, which creates governance headaches.
 
 There's no easy way to manage different environments (prod, staging, dev) or permission scopes across teams.
 
@@ -272,7 +272,7 @@ Despite MCP's vision of scalable, agentic infrastructure, most AI agents today a
 
 For internal use-cases, these setups are hard to monitor and almost impossible to standardize across teams.
 
-Worse, local agents often have broad system access, which increases the blast radius of any misbehavior or compromised tool. 
+Worse, local agents often have broad system access, which increases the blast radius of any misbehavior or compromised tool.
 
 Until agents move to a secure, server-based runtime with auditable execution and policy enforcement, companies will struggle to scale safe, compliant AI workflows.
 
@@ -314,11 +314,11 @@ mcp-use provides a vertical solution for MCP development with the following offe
 
 ### Centralized Server Config Management
 
-Manage all MCP server configurations centrally within the **mcp-use Cloud Platform**. 
+Manage all MCP server configurations centrally within the **mcp-use Cloud Platform**.
 
 Developers no longer have to hardcode configurations or share them manually.
 
-This single source of truth reduces duplication and stale configurations. 
+This single source of truth reduces duplication and stale configurations.
 
 It ensures everyone always work with the latest, standardized configurations.
 
@@ -326,9 +326,9 @@ Configs are imported into software projects via our integrated SDK or via API in
 
 ### Automated MCP Server Deployment
 
-Use the **mcp-use GitHub app** to automatically build, deploy, and continuously update MCP servers directly from your repository commits. 
+Use the **mcp-use GitHub app** to automatically build, deploy, and continuously update MCP servers directly from your repository commits.
 
-The **mcp-use Cloud Platform** handles versioning, canary rules and rollbacks. 
+The **mcp-use Cloud Platform** handles versioning, canary rules and rollbacks.
 
 Schema validation and structured tool definitions helps you correctly design MCP servers and possibly reducing errors from auto-generated OpenAPI conversions and decreasing hallucination in agents.
 
@@ -336,19 +336,19 @@ Schema validation and structured tool definitions helps you correctly design MCP
 
 Leverage **Profile-Based Access** to granularly assign permissions through role-based profiles.
 
-Agents are treated as untrusted by default, with scoped privileges that restrict access to necessary resources. 
+Agents are treated as untrusted by default, with scoped privileges that restrict access to necessary resources.
 
-Every tool invocation or data access is continuously verified and logged. 
+Every tool invocation or data access is continuously verified and logged.
 
 Built-in **Audit Logging** provides clear observability and compliance reporting, simplifying security management and ensuring rigorous enforcement of access policies.
 
 ### Tool Restrictions
 
-Limit or disable specific MCP tools per MCP server through the **mcp-use Cloud Platform**. 
+Limit or disable specific MCP tools per MCP server through the **mcp-use Cloud Platform**.
 
-The SDK pull the config and hides blocked tools from the model, keeping the tool list lean. 
+The SDK pull the config and hides blocked tools from the model, keeping the tool list lean.
 
-It minimizes agent confusion and hallucinations, improving reliability and performance. 
+It minimizes agent confusion and hallucinations, improving reliability and performance.
 
 ### Environment and Governance Profiles
 
@@ -358,29 +358,29 @@ For compliance assign explicit ownership and governance rules, ensuring each MCP
 
 ### Observability and Metrics for MCP Servers and Agents
 
-The **mcp-use Cloud Platform** captures detailed metrics, logs, and traces for every MCP server interaction. 
+The **mcp-use Cloud Platform** captures detailed metrics, logs, and traces for every MCP server interaction.
 
-Easily track exactly what an agent requested, what a tool returned, and how decisions were made, allowing rapid debugging, and compliance transparency. 
+Easily track exactly what an agent requested, what a tool returned, and how decisions were made, allowing rapid debugging, and compliance transparency.
 
 Enhanced observability transforms opaque agent workflows into fully auditable processes,  improving reliability and trust.
 
 ### Agent Execution Runtime
 
-Agents are stateful and executed within sandboxed, isolated environments rather than local scripts or closed-source clients. 
+Agents are stateful and executed within sandboxed, isolated environments rather than local scripts or closed-source clients.
 
 In your product the agent result can be returned as structured output or streamed to a chat interface for your users.
 
 For internal agents the decoupled execution model ensures policy enforcement, scalable performance, and auditability across the entire organization.
 
-The **mcp-use Agent Execution Runtime** is available through managed cloud hosting or self-hosted infrastructure. 
+The **mcp-use Agent Execution Runtime** is available through managed cloud hosting or self-hosted infrastructure.
 
 ## Conclusions
 
-The mcp-use platform delivers a comprehensive vertical solution for MCP, empowering development teams to seamlessly build, deploy, and manage AI agents at scale. 
+The mcp-use platform delivers a comprehensive vertical solution for MCP, empowering development teams to seamlessly build, deploy, and manage AI agents at scale.
 
 With a robust SDK that simplifies integration into products and internal workflows, paired with a unified central control plane, mcp-use solves the most challenging aspects of MCP server management.
 
-Centralized configuration management, automated deployment, built-in versioning, and granular access control drastically reduce operational complexity and security risks. 
+Centralized configuration management, automated deployment, built-in versioning, and granular access control drastically reduce operational complexity and security risks.
 
 Advanced tool management and rich observability address agent reliability and auditability, overcoming traditional limitations inherent to MCP deployments. Additionally, moving agent execution from isolated, local environments to secure, managed runtimes ensures safe, compliant, and scalable workflows.
 

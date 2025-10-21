@@ -6,13 +6,13 @@
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents and Clients + MCP Servers with support for MCP-UI.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
-  "homepage": "https://github.com/mcp-use/mcp-use-ts#readme",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcp-use/mcp-use-ts.git"
+    "url": "git+https://github.com/mcp-use/mcp-use.git"
   },
   "bugs": {
-    "url": "https://github.com/mcp-use/mcp-use-ts/issues"
+    "url": "https://github.com/mcp-use/mcp-use/issues"
   },
   "keywords": [
     "MCP",

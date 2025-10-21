@@ -9,9 +9,9 @@
 <h1 align="center">mcp-use: The Complete TypeScript Framework for Model Context Protocol</h1>
 
 <p align="center">
-    <a href="https://github.com/mcp-use/mcp-use-ts/stargazers" alt="GitHub stars">
+    <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/mcp-use/mcp-use-ts?style=social" /></a>
-    <a href="https://github.com/mcp-use/mcp-use-ts/blob/main/LICENSE" alt="License">
+    <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/mcp-use/mcp-use-ts" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
@@ -534,8 +534,8 @@ npm run start
 ## 🤝 Community & Support
 
 - **Discord**: [Join our community](https://discord.gg/XkNkSkMz3V)
-- **GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use-ts/issues)
-- **Documentation**: [Full docs](https://github.com/mcp-use/mcp-use-ts)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use/issues)
+- **Documentation**: [Full docs](https://github.com/mcp-use/mcp-use)
 
 ---
 
@@ -594,7 +594,7 @@ We welcome contributions! Check out our [Contributing Guide](CONTRIBUTING.md) to
 
 ```bash
 # Clone the repository
-git clone https://github.com/mcp-use/mcp-use-ts.git
+git clone https://github.com/mcp-use/mcp-use.git
 cd mcp-use-ts
 
 # Install dependencies

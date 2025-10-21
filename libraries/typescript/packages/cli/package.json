@@ -4,14 +4,14 @@
   "description": "Build tool for MCP UI widgets - bundles React components into standalone HTML pages for Model Context Protocol servers",
   "author": "mcp-use, Inc.",
   "license": "MIT",
-  "homepage": "https://github.com/mcp-use/mcp-use-ts#readme",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcp-use/mcp-use-ts.git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
     "directory": "packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/mcp-use/mcp-use-ts/issues"
+    "url": "https://github.com/mcp-use/mcp-use/issues"
   },
   "keywords": [
     "mcp",
