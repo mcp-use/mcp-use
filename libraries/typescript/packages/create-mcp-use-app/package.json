@@ -35,6 +35,8 @@
     "copy-templates": "node scripts/copy-templates.js",
     "dev": "tsc --build --watch",
     "test": "vitest --run --passWithNoTests",
+    "test:cli": "./test-cli.sh",
+    "test:cli:full": "RUN_INSTALL_TESTS=yes ./test-cli.sh",
     "lint": "eslint ."
   },
   "files": [
