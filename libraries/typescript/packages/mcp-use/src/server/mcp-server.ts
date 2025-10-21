@@ -14,6 +14,7 @@ import { z } from 'zod'
 import express, { type Express } from 'express'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { requestLogger } from './logging.js'
 import { createUIResourceFromDefinition, type UrlConfig } from './adapters/mcp-ui-adapter.js'
 import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
@@ -25,6 +26,7 @@ export class McpServer {
   private mcpMounted = false
   private inspectorMounted = false
   private serverPort?: number
+  private widgetManifest?: Record<string, any>
 
   /**
    * Creates a new MCP server instance with Express integration
@@ -315,6 +317,55 @@ export class McpServer {
   }
 
   /**
+   * Load widget schema from manifest
+   * @private
+   */
+  private loadWidgetSchema(widgetName: string): UIResourceDefinition {
+    try {
+      // Lazy load manifest on first use
+      if (!this.widgetManifest) {
+        try {
+          // Try to load from dist/resources/manifest.json
+          const manifestPath = join(process.cwd(), 'dist/resources/manifest.json')
+          const manifestData = readFileSync(manifestPath, 'utf8')
+          this.widgetManifest = JSON.parse(manifestData)
+        } catch (error) {
+          throw new Error(
+            `Failed to load widget manifest. Make sure to run the build process first. ` +
+            `Error: ${error instanceof Error ? error.message : String(error)}`
+          )
+        }
+      }
+      
+      const widgetData = this.widgetManifest![widgetName]
+      if (!widgetData) {
+        throw new Error(
+          `Widget "${widgetName}" not found in manifest. Available widgets: ${Object.keys(this.widgetManifest!).join(', ')}`
+        )
+      }
+      
+      // Convert kebab-case to Title Case
+      const toTitleCase = (str: string) => 
+        str.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+      
+      return {
+        type: 'externalUrl',
+        name: widgetName,
+        widget: widgetName,
+        title: toTitleCase(widgetName),
+        description: widgetData.description,
+        props: widgetData.props,
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to load widget schema for "${widgetName}". ` +
+        `Make sure to run the build process to generate the widget manifest. ` +
+        `Error: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  }
+
+  /**
    * Register a UI widget as both a tool and a resource
    *
    * Creates a unified interface for MCP-UI compatible widgets that can be accessed
@@ -327,19 +378,22 @@ export class McpServer {
    * - remoteDom: Legacy MCP-UI Remote DOM scripting
    * - appsSdk: OpenAI Apps SDK compatible widgets (text/html+skybridge)
    *
-   * @param definition - Configuration for the UI widget
+   * @param widgetNameOrDefinition - Widget name (string) for auto-loading schema, or full configuration object
    * @param definition.name - Unique identifier for the resource
    * @param definition.type - Type of UI resource (externalUrl, rawHtml, remoteDom, appsSdk)
    * @param definition.title - Human-readable title for the widget
    * @param definition.description - Description of the widget's functionality
    * @param definition.props - Widget properties configuration with types and defaults
-   * @param definition.size - Preferred iframe size [width, height] (e.g., ['800px', '600px'])
+   * @param definition.size - Preferred iframe size [width, height] (e.g., ['900px', '600px'])
    * @param definition.annotations - Resource annotations for discovery
    * @param definition.appsSdkMetadata - Apps SDK specific metadata (CSP, widget description, etc.)
    * @returns The server instance for method chaining
    *
    * @example
    * ```typescript
+   * // Simple usage - auto-loads from generated schema
+   * server.uiResource('display-weather')
+   * 
    * // Legacy MCP-UI widget
    * server.uiResource({
    *   type: 'externalUrl',
@@ -378,7 +432,11 @@ export class McpServer {
    * })
    * ```
    */
-  uiResource(definition: UIResourceDefinition): this {
+  uiResource(widgetNameOrDefinition: string | UIResourceDefinition): this {
+    const definition = typeof widgetNameOrDefinition === 'string' 
+      ? this.loadWidgetSchema(widgetNameOrDefinition)
+      : widgetNameOrDefinition
+    
     // Determine tool name based on resource type
     // For Apps SDK, use the name directly without ui_ prefix
     let toolName: string

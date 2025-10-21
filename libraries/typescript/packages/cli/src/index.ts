@@ -85,13 +85,13 @@ program
       
       console.log(`\x1b[36m\x1b[1mmcp-use\x1b[0m \x1b[90mVersion: ${packageJson.version}\x1b[0m\n`);
       
-      // Run tsc first
+      // Build widgets first (this generates schemas)
+      await buildWidgets(projectPath, false);
+      
+      // Then run tsc (now schemas are available for import)
       console.log('Building TypeScript...');
       await runCommand('npx', ['tsc'], projectPath);
       console.log('\x1b[32m✓\x1b[0m TypeScript build complete!');
-      
-      // Then build widgets
-      await buildWidgets(projectPath, false);
     } catch (error) {
       console.error('Build failed:', error);
       process.exit(1);
@@ -136,12 +136,24 @@ program
         stdio: 'pipe',
         shell: false,
       });
+      
+      let tscReady = false;
       tscProc.stdout?.on('data', (data) => {
         const output = data.toString();
-        if (output.includes('Watching for file changes')) {
+        if (output.includes('Watching for file changes') && !tscReady) {
           console.log('\x1b[32m✓\x1b[0m TypeScript compiler watching...');
+          tscReady = true;
+        }
+        // Forward other TypeScript output
+        if (!output.includes('Watching for file changes') && output.trim()) {
+          process.stdout.write(output);
         }
       });
+      
+      tscProc.stderr?.on('data', (data) => {
+        process.stderr.write(data);
+      });
+      
       processes.push(tscProc);
 
       // 2. Widget builder watch - run in background
@@ -153,11 +165,25 @@ program
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // 3. Server with tsx
+      console.log(`\x1b[32m✓\x1b[0m Starting server with tsx watch ${serverFile}...`);
       const serverProc = spawn('npx', ['tsx', 'watch', serverFile], {
         cwd: projectPath,
         stdio: 'inherit',
         shell: false,
         env: { ...process.env, PORT: String(port) },
+      });
+      
+      serverProc.on('error', (err) => {
+        console.error('\x1b[31m✗\x1b[0m Server process error:', err);
+      });
+      
+      serverProc.on('exit', (code, signal) => {
+        if (code !== null && code !== 0) {
+          console.error(`\x1b[31m✗\x1b[0m Server process exited with code ${code}`);
+        }
+        if (signal) {
+          console.error(`\x1b[31m✗\x1b[0m Server process killed with signal ${signal}`);
+        }
       });
       
       processes.push(serverProc);
