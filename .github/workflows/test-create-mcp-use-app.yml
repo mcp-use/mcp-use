@@ -203,7 +203,7 @@ jobs:
       - name: Test with yarn (Unix)
         if: matrix.pm == 'yarn' && runner.os != 'Windows'
         run: |
-          yarn dlx -p ${{ steps.package-path.outputs.path }} create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+          yarn dlx -p "create-mcp-use-app@file:${{ steps.package-path.outputs.path }}" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
           
           if [ ! -d "test-app" ]; then
             echo "❌ Project directory not created"
@@ -223,7 +223,7 @@ jobs:
         run: |
           # Convert Windows path to forward slashes for yarn dlx
           $packagePath = "${{ steps.package-path.outputs.path }}".Replace('\', '/')
-          yarn dlx -p $packagePath create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+          yarn dlx -p "create-mcp-use-app@file:$packagePath" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
           
           if (-not (Test-Path "test-app")) {
             Write-Error "❌ Project directory not created"
@@ -460,7 +460,7 @@ jobs:
           else
             PACKAGE_PATH="${{ steps.package-path.outputs.path }}"
           fi
-          yarn dlx -p "$PACKAGE_PATH" create-mcp-use-app test-full-app --template ${{ matrix.template }} --yarn
+          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-full-app --template ${{ matrix.template }} --yarn
           
           if [ ! -d "test-full-app/node_modules" ]; then
             echo "❌ Dependencies not installed"
