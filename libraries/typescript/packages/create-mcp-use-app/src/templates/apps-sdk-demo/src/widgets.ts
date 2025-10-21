@@ -151,30 +151,3 @@ export function getPizzazWidgetsSummary() {
   }))
 }
 
-/**
- * Create widget metadata for a specific widget
- */
-export function widgetMeta(widget: PizzazWidgetDefinition) {
-  return {
-    'openai/outputTemplate': widget.templateUri,
-    'openai/toolInvocation/invoking': widget.invoking,
-    'openai/toolInvocation/invoked': widget.invoked,
-    'openai/widgetAccessible': true,
-    'openai/resultCanProduceWidget': true
-  } as const
-}
-
-/**
- * Get widget by ID
- */
-export function getWidgetById(id: string): PizzazWidgetDefinition | undefined {
-  return pizzazWidgets.find(w => w.id === id)
-}
-
-/**
- * Get widget by template URI
- */
-export function getWidgetByUri(uri: string): PizzazWidgetDefinition | undefined {
-  return pizzazWidgets.find(w => w.templateUri === uri)
-}
-
