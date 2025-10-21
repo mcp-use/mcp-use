@@ -2,7 +2,7 @@
 title: "Anthropic"
 description: "Use mcp-use tools, resources, and prompts directly with the Anthropic SDK"
 tag: "New"
-icon: "./logos/anthropic"
+icon: "/images/anthropic.svg"
 ---
 
 # Using mcp-use with Anthropic
@@ -93,8 +93,8 @@ messages = [
 ]
 
 response = anthropic.messages.create(
-    model="claude-3-opus-20240229", 
-    messages=messages, 
+    model="claude-3-opus-20240229",
+    messages=messages,
     tools=anthropic_tools,
     max_tokens=1024
 )

@@ -2,7 +2,7 @@
 title: "OpenAI"
 description: "Use mcp-use tools, resources, and prompts directly with the OpenAI SDK"
 tag: "New"
-icon: "./logos/openai"
+icon: "/images/openai.svg"
 ---
 
 # Using mcp-use with OpenAI
@@ -93,8 +93,8 @@ messages = [
 ]
 
 response = openai.chat.completions.create(
-    model="gpt-4o", 
-    messages=messages, 
+    model="gpt-4o",
+    messages=messages,
     tools=openai_tools
 )
 
@@ -135,9 +135,9 @@ for tool_call in response_message.tool_calls:
     # 4. Append the result for this specific tool call
     messages.append(
         {
-            "tool_call_id": tool_call.id, 
-            "role": "tool", 
-            "name": function_name, 
+            "tool_call_id": tool_call.id,
+            "role": "tool",
+            "name": function_name,
             "content": content
         }
     )
@@ -150,8 +150,8 @@ Finally, send the updated message history which now includes the tool call resul
 
 ```python
 second_response = openai.chat.completions.create(
-    model="gpt-4o", 
-    messages=messages, 
+    model="gpt-4o",
+    messages=messages,
     tools=openai_tools
 )
 
