@@ -3,8 +3,8 @@
 import chalk from 'chalk'
 import { Command } from 'commander'
 import inquirer from 'inquirer'
-import { spawn } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { execSync, spawn } from 'node:child_process'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ora from 'ora'
@@ -74,6 +74,59 @@ function getInstallCommand(packageManager: string): string {
     case 'npm':
     default:
       return 'npm install'
+  }
+}
+
+function isInGitRepository(): boolean {
+  try {
+    execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' })
+    return true
+  } catch (_) {
+    // Not in a git repository
+  }
+  return false
+}
+
+function isDefaultBranchSet(): boolean {
+  try {
+    execSync('git config init.defaultBranch', { stdio: 'ignore' })
+    return true
+  } catch (_) {
+    // Default branch is not set
+  }
+  return false
+}
+
+function tryGitInit(root: string): boolean {
+  let didInit = false
+  try {
+    execSync('git --version', { stdio: 'ignore' })
+    if (isInGitRepository()) {
+      return false
+    }
+
+    execSync('git init', { cwd: root, stdio: 'ignore' })
+    didInit = true
+
+    if (!isDefaultBranchSet()) {
+      execSync('git checkout -b main', { cwd: root, stdio: 'ignore' })
+    }
+
+    execSync('git add -A', { cwd: root, stdio: 'ignore' })
+    execSync('git commit -m "Initial commit from create-mcp-use-app"', {
+      cwd: root,
+      stdio: 'ignore',
+    })
+    return true
+  } catch (e) {
+    if (didInit) {
+      try {
+        rmSync(join(root, '.git'), { recursive: true, force: true })
+      } catch (_) {
+        // Failed to remove .git directory
+      }
+    }
+    return false
   }
 }
 
@@ -168,12 +221,13 @@ program
   .argument('[project-name]', 'Name of the MCP server project')
   .option('-t, --template <template>', 'Template to use', 'simple')
   .option('--no-install', 'Skip installing dependencies')
+  .option('--no-git', 'Skip initializing a git repository')
   .option('--dev', 'Use workspace dependencies for development')
   .option('--canary', 'Use canary versions of packages')
   .option('--yarn', 'Use yarn as package manager')
   .option('--npm', 'Use npm as package manager')
   .option('--pnpm', 'Use pnpm as package manager')
-  .action(async (projectName: string | undefined, options: { template: string, install: boolean, dev: boolean, canary: boolean, yarn?: boolean, npm?: boolean, pnpm?: boolean }) => {
+  .action(async (projectName: string | undefined, options: { template: string, install: boolean, git: boolean, dev: boolean, canary: boolean, yarn?: boolean, npm?: boolean, pnpm?: boolean }) => {
     try {
       let selectedTemplate = options.template
 
@@ -324,6 +378,11 @@ program
           }
           console.log('⚠️  Please run "npm install", "yarn install", or "pnpm install" manually')
         }
+      }
+
+      // Initialize git repository if requested
+      if (options.git) {
+        tryGitInit(projectPath)
       }
 
       console.log('')
@@ -481,10 +540,10 @@ async function promptForProjectName(): Promise<string> {
 async function promptForTemplate(): Promise<string> {
   // Get available templates
   const templatesDir = join(__dirname, 'templates')
-  const availableTemplates =  readdirSync(templatesDir, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => dirent.name)
-      .sort()
+  const availableTemplates = readdirSync(templatesDir, { withFileTypes: true })
+    .filter(dirent => dirent.isDirectory())
+    .map(dirent => dirent.name)
+    .sort()
 
   // Read template descriptions dynamically from package.json files
   const templateDescriptions: Record<string, string> = {}
@@ -519,4 +578,3 @@ async function promptForTemplate(): Promise<string> {
 }
 
 program.parse()
-

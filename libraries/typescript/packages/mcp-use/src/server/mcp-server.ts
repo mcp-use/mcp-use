@@ -13,6 +13,7 @@ import { McpServer as OfficialMcpServer, ResourceTemplate } from '@modelcontextp
 import { z } from 'zod'
 import express, { type Express } from 'express'
 import cors from 'cors'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { requestLogger } from './logging.js'
@@ -1253,10 +1254,11 @@ if (container && Component) {
    * the inspector UI (if available), and starting the Express server to listen
    * for incoming connections. This is the main entry point for running the server.
    *
+   *
    * The server will be accessible at the specified port with MCP endpoints at /mcp
    * and inspector UI at /inspector (if the inspector package is installed).
    *
-   * @param port - Port number to listen on (defaults to PORT env var or 3001 if not specified)
+   * @param port - Port number to listen on (defaults to 3001 if not specified)
    * @returns Promise that resolves when the server is successfully listening
    *
    * @example
@@ -1334,16 +1336,100 @@ if (container && Component) {
       })
   }
 
+  /**
+   * Setup default widget serving routes
+   *
+   * Configures Express routes to serve MCP UI widgets and their static assets.
+   * Widgets are served from the dist/resources/mcp-use/widgets directory and can
+   * be accessed via HTTP endpoints for embedding in web applications.
+   *
+   * Routes created:
+   * - GET /mcp-use/widgets/:widget - Serves widget's index.html
+   * - GET /mcp-use/widgets/:widget/assets/* - Serves widget-specific assets
+   * - GET /mcp-use/widgets/assets/* - Fallback asset serving with auto-discovery
+   *
+   * @private
+   * @returns void
+   *
+   * @example
+   * Widget routes:
+   * - http://localhost:3001/mcp-use/widgets/kanban-board
+   * - http://localhost:3001/mcp-use/widgets/todo-list/assets/style.css
+   * - http://localhost:3001/mcp-use/widgets/assets/script.js (auto-discovered)
+   */
+  private setupWidgetRoutes(): void {
+    // Serve static assets (JS, CSS) from the assets directory
+    this.app.get('/mcp-use/widgets/:widget/assets/*', (req, res, next) => {
+      const widget = req.params.widget
+      const assetFile = (req.params as any)[0]
+      const assetPath = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets', widget, 'assets', assetFile)
+      res.sendFile(assetPath, err => (err ? next() : undefined))
+    })
 
+    // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
+    this.app.get('/mcp-use/widgets/assets/*', (req, res, next) => {
+      const assetFile = (req.params as any)[0]
+      // Try to find which widget this asset belongs to by checking all widget directories
+      const widgetsDir = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets')
+
+      try {
+        const widgets = readdirSync(widgetsDir)
+        for (const widget of widgets) {
+          const assetPath = join(widgetsDir, widget, 'assets', assetFile)
+          if (existsSync(assetPath)) {
+            return res.sendFile(assetPath)
+          }
+        }
+        next()
+      }
+      catch {
+        next()
+      }
+    })
+
+    // Serve each widget's index.html at its route
+    // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/mcp-use/widgets/kanban-board/index.html
+    this.app.get('/mcp-use/widgets/:widget', (req, res, next) => {
+      const filePath = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets', req.params.widget, 'index.html')
+      res.sendFile(filePath, err => (err ? next() : undefined))
+    })
+  }
 
   /**
-   * Create schema for tool inputs or prompt arguments
+   * Create input schema for resource templates
    *
-   * Converts input/argument definitions into Zod validation schemas for runtime validation.
-   * Supports common data types (string, number, boolean, object, array), optional
-   * parameters, and descriptions. Used internally when registering tools and prompts with the MCP server.
+   * Parses a URI template string to extract parameter names and generates a Zod
+   * validation schema for those parameters. Used internally for validating resource
+   * template parameters before processing requests.
    *
-   * @param inputs - Array of input parameter definitions with name, type, optional flag, and description
+   * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
+   * @returns Object mapping parameter names to Zod string schemas
+   *
+   * @example
+   * ```typescript
+   * const schema = this.createInputSchema("/users/{id}/posts/{postId}")
+   * // Returns: { id: z.string(), postId: z.string() }
+   * ```
+   */
+  private createInputSchema(uriTemplate: string): Record<string, z.ZodSchema> {
+    const params = this.extractTemplateParams(uriTemplate)
+    const schema: Record<string, z.ZodSchema> = {}
+
+    params.forEach((param) => {
+      schema[param] = z.string()
+    })
+
+    return schema
+  }
+
+  /**
+   * Create input schema for tools
+   *
+   * Converts tool input definitions into Zod validation schemas for runtime validation.
+   * Supports common data types (string, number, boolean, object, array) and optional
+   * parameters. Used internally when registering tools with the MCP server.
+   *
+   * @param inputs - Array of input parameter definitions with name, type, and optional flag
    * @returns Object mapping parameter names to Zod validation schemas
    *
    * @example
@@ -1395,6 +1481,80 @@ if (container && Component) {
     return schema
   }
 
+  /**
+   * Create arguments schema for prompts
+   *
+   * Converts prompt argument definitions into Zod validation schemas for runtime validation.
+   * Supports common data types (string, number, boolean, object, array) and optional
+   * parameters. Used internally when registering prompt templates with the MCP server.
+   *
+   * @param inputs - Array of argument definitions with name, type, and optional flag
+   * @returns Object mapping argument names to Zod validation schemas
+   *
+   * @example
+   * ```typescript
+   * const schema = this.createPromptArgsSchema([
+   *   { name: 'topic', type: 'string', required: true },
+   *   { name: 'style', type: 'string', required: false }
+   * ])
+   * // Returns: { topic: z.string(), style: z.string().optional() }
+   * ```
+   */
+  private createPromptArgsSchema(inputs: Array<{ name: string, type: string, required?: boolean }>): Record<string, z.ZodSchema> {
+    const schema: Record<string, z.ZodSchema> = {}
+
+    inputs.forEach((input) => {
+      let zodType: z.ZodSchema
+      switch (input.type) {
+        case 'string':
+          zodType = z.string()
+          break
+        case 'number':
+          zodType = z.number()
+          break
+        case 'boolean':
+          zodType = z.boolean()
+          break
+        case 'object':
+          zodType = z.object({})
+          break
+        case 'array':
+          zodType = z.array(z.any())
+          break
+        default:
+          zodType = z.any()
+      }
+
+      if (!input.required) {
+        zodType = zodType.optional()
+      }
+
+      schema[input.name] = zodType
+    })
+
+    return schema
+  }
+
+  /**
+   * Extract parameter names from URI template
+   *
+   * Parses a URI template string to extract parameter names enclosed in curly braces.
+   * Used internally to identify dynamic parameters in resource templates and generate
+   * appropriate validation schemas.
+   *
+   * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
+   * @returns Array of parameter names found in the template
+   *
+   * @example
+   * ```typescript
+   * const params = this.extractTemplateParams("/users/{id}/posts/{postId}")
+   * // Returns: ["id", "postId"]
+   * ```
+   */
+  private extractTemplateParams(uriTemplate: string): string[] {
+    const matches = uriTemplate.match(/\{([^}]+)\}/g)
+    return matches ? matches.map(match => match.slice(1, -1)) : []
+  }
 
   /**
    * Parse parameter values from a URI based on a template
