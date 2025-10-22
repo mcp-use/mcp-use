@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Spinner } from '@/client/components/ui/spinner'
@@ -9,6 +9,7 @@ import { useMcpContext } from '@/client/context/McpContext'
 import { useAutoConnect } from '@/client/hooks/useAutoConnect'
 import { useKeyboardShortcuts } from '@/client/hooks/useKeyboardShortcuts'
 import { useSavedRequests } from '@/client/hooks/useSavedRequests'
+import { MCPCommandPaletteOpenEvent, Telemetry } from '@/client/telemetry'
 import { CommandPalette } from './CommandPalette'
 import { LayoutContent } from './LayoutContent'
 import { LayoutHeader } from './LayoutHeader'
@@ -33,12 +34,43 @@ export function Layout({ children }: LayoutProps) {
   const savedRequests = useSavedRequests()
 
   // Refs for search inputs in tabs
-  const toolsSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
-  const promptsSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
-  const resourcesSearchRef = useRef<{ focusSearch: () => void, blurSearch: () => void } | null>(null)
+  const toolsSearchRef = useRef<{
+    focusSearch: () => void
+    blurSearch: () => void
+  } | null>(null)
+  const promptsSearchRef = useRef<{
+    focusSearch: () => void
+    blurSearch: () => void
+  } | null>(null)
+  const resourcesSearchRef = useRef<{
+    focusSearch: () => void
+    blurSearch: () => void
+  } | null>(null)
 
   // Auto-connect handling extracted to custom hook
-  const { isAutoConnecting } = useAutoConnect({ connections, addConnection, removeConnection })
+  const { isAutoConnecting } = useAutoConnect({
+    connections,
+    addConnection,
+    removeConnection,
+  })
+
+  // Track command palette open
+  const handleCommandPaletteOpen = useCallback(
+    (trigger: 'keyboard' | 'button') => {
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPCommandPaletteOpenEvent({
+            trigger,
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+      setIsCommandPaletteOpen(true)
+    },
+    [],
+  )
 
   const handleServerSelect = (serverId: string) => {
     const server = connections.find(c => c.id === serverId)
@@ -168,7 +200,9 @@ export function Layout({ children }: LayoutProps) {
     }
 
     const decodedServerId = decodeURIComponent(serverParam)
-    const serverConnection = connections.find(conn => conn.id === decodedServerId)
+    const serverConnection = connections.find(
+      conn => conn.id === decodedServerId,
+    )
 
     // No connection found - wait for auto-connect, then redirect
     if (!serverConnection) {
@@ -185,7 +219,7 @@ export function Layout({ children }: LayoutProps) {
 
   // Centralized keyboard shortcuts
   useKeyboardShortcuts({
-    onCommandPalette: () => setIsCommandPaletteOpen(true),
+    onCommandPalette: () => handleCommandPaletteOpen('keyboard'),
     onToolsTab: () => {
       if (selectedServer) {
         setActiveTab('tools')
@@ -259,7 +293,7 @@ export function Layout({ children }: LayoutProps) {
           activeTab={activeTab}
           onServerSelect={handleServerSelect}
           onTabChange={setActiveTab}
-          onCommandPaletteOpen={() => setIsCommandPaletteOpen(true)}
+          onCommandPaletteOpen={() => handleCommandPaletteOpen('button')}
           onOpenConnectionOptions={() => {}}
         />
 

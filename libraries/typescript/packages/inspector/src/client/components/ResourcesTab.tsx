@@ -15,6 +15,7 @@ import {
   ResizablePanelGroup,
 } from '@/client/components/ui/resizable'
 import { useInspector } from '@/client/context/InspectorContext'
+import { MCPResourceReadEvent, Telemetry } from '@/client/telemetry'
 import {
   ResourceResultDisplay,
   ResourcesList,
@@ -45,7 +46,9 @@ export function ResourcesTab({
     null,
   )
   const { selectedResourceUri, setSelectedResourceUri } = useInspector()
-  const [currentResult, setCurrentResult] = useState<ResourceResult | null>(null)
+  const [currentResult, setCurrentResult] = useState<ResourceResult | null>(
+    null,
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab] = useState<'resources'>('resources')
@@ -110,6 +113,21 @@ export function ResourcesTab({
 
         try {
           const result = await readResource(resource.uri)
+
+          // Track successful resource read
+          const telemetry = Telemetry.getInstance()
+          telemetry
+            .capture(
+              new MCPResourceReadEvent({
+                resourceUri: resource.uri,
+                serverId,
+                success: true,
+              }),
+            )
+            .catch(() => {
+              // Silently fail - telemetry should not break the application
+            })
+
           setCurrentResult({
             uri: resource.uri,
             result,
@@ -118,6 +136,21 @@ export function ResourcesTab({
           })
         }
         catch (error) {
+          // Track failed resource read
+          const telemetry = Telemetry.getInstance()
+          telemetry
+            .capture(
+              new MCPResourceReadEvent({
+                resourceUri: resource.uri,
+                serverId,
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              }),
+            )
+            .catch(() => {
+              // Silently fail - telemetry should not break the application
+            })
+
           setCurrentResult({
             uri: resource.uri,
             result: null,
@@ -131,7 +164,7 @@ export function ResourcesTab({
         }
       }
     },
-    [readResource, isConnected],
+    [readResource, serverId, isConnected],
   )
 
   // Reset focused index when filtered resources change
@@ -179,11 +212,7 @@ export function ResourcesTab({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [
-    focusedIndex,
-    filteredResources,
-    handleResourceSelect,
-  ])
+  }, [focusedIndex, filteredResources, handleResourceSelect])
 
   // Scroll focused item into view
   useEffect(() => {

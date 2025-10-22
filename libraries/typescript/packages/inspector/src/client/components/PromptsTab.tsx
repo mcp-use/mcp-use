@@ -21,6 +21,7 @@ import {
 import { Textarea } from '@/client/components/ui/textarea'
 import { useInspector } from '@/client/context/InspectorContext'
 import { usePrismTheme } from '@/client/hooks/usePrismTheme'
+import { MCPPromptCallEvent, Telemetry } from '@/client/telemetry'
 
 export interface PromptsTabRef {
   focusSearch: () => void
@@ -30,6 +31,7 @@ export interface PromptsTabRef {
 interface PromptsTabProps {
   prompts: Prompt[]
   callPrompt: (name: string, args?: Record<string, unknown>) => Promise<any>
+  serverId: string
   isConnected: boolean
 }
 
@@ -45,6 +47,7 @@ export function PromptsTab({
   ref,
   prompts,
   callPrompt,
+  serverId,
   isConnected,
 }: PromptsTabProps & { ref?: React.RefObject<PromptsTabRef | null> }) {
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null)
@@ -93,11 +96,12 @@ export function PromptsTab({
   }, [searchQuery])
 
   const filteredPrompts = useMemo(() => {
-    if (!searchQuery) return prompts
+    if (!searchQuery)
+      return prompts
     return prompts.filter(
-      (prompt) =>
-        prompt.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        prompt.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      prompt =>
+        prompt.name.toLowerCase().includes(searchQuery.toLowerCase())
+        || prompt.description?.toLowerCase().includes(searchQuery.toLowerCase()),
     )
   }, [prompts, searchQuery])
 
@@ -110,15 +114,20 @@ export function PromptsTab({
         const typedProp = prop as any
         if (typedProp.default !== undefined) {
           initialArgs[key] = typedProp.default
-        } else if (typedProp.type === 'string') {
+        }
+        else if (typedProp.type === 'string') {
           initialArgs[key] = ''
-        } else if (typedProp.type === 'number') {
+        }
+        else if (typedProp.type === 'number') {
           initialArgs[key] = 0
-        } else if (typedProp.type === 'boolean') {
+        }
+        else if (typedProp.type === 'boolean') {
           initialArgs[key] = false
-        } else if (typedProp.type === 'array') {
+        }
+        else if (typedProp.type === 'array') {
           initialArgs[key] = []
-        } else if (typedProp.type === 'object') {
+        }
+        else if (typedProp.type === 'object') {
           initialArgs[key] = {}
         }
       })
@@ -136,10 +145,10 @@ export function PromptsTab({
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       // Check if any input is focused
       const target = e.target as HTMLElement
-      const isInputFocused =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.contentEditable === 'true'
+      const isInputFocused
+        = target.tagName === 'INPUT'
+          || target.tagName === 'TEXTAREA'
+          || target.contentEditable === 'true'
 
       // Don't handle if input is focused or if modifiers are pressed
       if (isInputFocused || e.metaKey || e.ctrlKey || e.altKey) {
@@ -154,23 +163,26 @@ export function PromptsTab({
           const next = prev + 1
           return next >= items.length ? 0 : next
         })
-      } else if (e.key === 'ArrowUp') {
+      }
+      else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setFocusedIndex((prev) => {
           const next = prev - 1
           return next < 0 ? items.length - 1 : next
         })
-      } else if (e.key === 'Enter' && focusedIndex >= 0) {
+      }
+      else if (e.key === 'Enter' && focusedIndex >= 0) {
         e.preventDefault()
         if (activeTab === 'prompts') {
           const prompt = filteredPrompts[focusedIndex]
           if (prompt) {
             handlePromptSelect(prompt)
           }
-        } else {
+        }
+        else {
           const result = results[focusedIndex]
           if (result) {
-            const prompt = prompts.find((p) => p.name === result.promptName)
+            const prompt = prompts.find(p => p.name === result.promptName)
             if (prompt) {
               handlePromptSelect(prompt)
               setPromptArgs(result.args)
@@ -196,8 +208,8 @@ export function PromptsTab({
   // Scroll focused item into view
   useEffect(() => {
     if (focusedIndex >= 0) {
-      const itemId =
-        activeTab === 'prompts'
+      const itemId
+        = activeTab === 'prompts'
           ? `prompt-${filteredPrompts[focusedIndex]?.name}`
           : `prompt-result-${focusedIndex}`
       const element = document.getElementById(itemId)
@@ -216,7 +228,7 @@ export function PromptsTab({
     })
 
     if (selectedPromptName && prompts.length > 0) {
-      const prompt = prompts.find((p) => p.name === selectedPromptName)
+      const prompt = prompts.find(p => p.name === selectedPromptName)
       console.warn('[PromptsTab] Prompt lookup result:', {
         selectedPromptName,
         promptFound: !!prompt,
@@ -252,18 +264,34 @@ export function PromptsTab({
   ])
 
   const handleArgChange = useCallback((key: string, value: any) => {
-    setPromptArgs((prev) => ({ ...prev, [key]: value }))
+    setPromptArgs(prev => ({ ...prev, [key]: value }))
   }, [])
 
   const handleExecutePrompt = useCallback(async () => {
-    if (!selectedPrompt || !isConnected) return
+    if (!selectedPrompt || !isConnected)
+      return
 
     setIsExecuting(true)
     const timestamp = Date.now()
 
     try {
       const result = await callPrompt(selectedPrompt.name, promptArgs)
-      setResults((prev) => [
+
+      // Track successful prompt call
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPPromptCallEvent({
+            promptName: selectedPrompt.name,
+            serverId,
+            success: true,
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+
+      setResults(prev => [
         {
           promptName: selectedPrompt.name,
           args: promptArgs,
@@ -272,8 +300,24 @@ export function PromptsTab({
         },
         ...prev,
       ])
-    } catch (error) {
-      setResults((prev) => [
+    }
+    catch (error) {
+      // Track failed prompt call
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPPromptCallEvent({
+            promptName: selectedPrompt.name,
+            serverId,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+
+      setResults(prev => [
         {
           promptName: selectedPrompt.name,
           args: promptArgs,
@@ -283,10 +327,11 @@ export function PromptsTab({
         },
         ...prev,
       ])
-    } finally {
+    }
+    finally {
       setIsExecuting(false)
     }
-  }, [selectedPrompt, promptArgs, callPrompt, isConnected])
+  }, [selectedPrompt, promptArgs, callPrompt, serverId, isConnected])
 
   const handleCopyResult = useCallback(
     (index: number) => {
@@ -298,13 +343,13 @@ export function PromptsTab({
       setCopiedResult(index)
       setTimeout(() => setCopiedResult(null), 2000)
     },
-    [results]
+    [results],
   )
 
   const renderInputField = (key: string, prop: any) => {
     const value = promptArgs[key]
-    const stringValue =
-      typeof value === 'string' ? value : JSON.stringify(value)
+    const stringValue
+      = typeof value === 'string' ? value : JSON.stringify(value)
 
     if (prop.type === 'boolean') {
       return (
@@ -318,7 +363,7 @@ export function PromptsTab({
               id={key}
               type="checkbox"
               checked={Boolean(value)}
-              onChange={(e) => handleArgChange(key, e.target.checked)}
+              onChange={e => handleArgChange(key, e.target.checked)}
               className="rounded"
               aria-label={`Toggle ${key}`}
             />
@@ -339,7 +384,7 @@ export function PromptsTab({
             id={key}
             type="number"
             value={Number(value) || 0}
-            onChange={(e) => handleArgChange(key, Number(e.target.value))}
+            onChange={e => handleArgChange(key, Number(e.target.value))}
             placeholder={prop.description || `Enter ${key}`}
           />
           {prop.description && (
@@ -363,7 +408,8 @@ export function PromptsTab({
               try {
                 const parsed = JSON.parse(e.target.value)
                 handleArgChange(key, parsed)
-              } catch {
+              }
+              catch {
                 handleArgChange(key, e.target.value)
               }
             }}
@@ -387,7 +433,7 @@ export function PromptsTab({
         <Input
           id={key}
           value={stringValue}
-          onChange={(e) => handleArgChange(key, e.target.value)}
+          onChange={e => handleArgChange(key, e.target.value)}
           placeholder={prop.description || `Enter ${key}`}
         />
         {prop.description && (
@@ -417,35 +463,36 @@ export function PromptsTab({
           onSearchChange={setSearchQuery}
           onSearchBlur={handleSearchBlur}
           onTabSwitch={() =>
-            setActiveTab(activeTab === 'prompts' ? 'saved' : 'prompts')
-          }
+            setActiveTab(activeTab === 'prompts' ? 'saved' : 'prompts')}
           searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
         />
         {/* Left pane: Prompts list */}
         <div className="flex flex-col h-full">
           {activeTab === 'prompts' ? (
             <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
-              {filteredPrompts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                  <MessageSquare className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
-                  <p className="text-gray-500 dark:text-gray-400">
-                    No prompts available
-                  </p>
-                </div>
-              ) : (
-                filteredPrompts.map((prompt, index) => (
-                  <ListItem
-                    key={prompt.name}
-                    id={`prompt-${prompt.name}`}
-                    isSelected={selectedPrompt?.name === prompt.name}
-                    isFocused={focusedIndex === index}
-                    icon={<MessageSquare className="h-4 w-4" />}
-                    title={prompt.name}
-                    description={prompt.description}
-                    onClick={() => handlePromptSelect(prompt)}
-                  />
-                ))
-              )}
+              {filteredPrompts.length === 0
+                ? (
+                    <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                      <MessageSquare className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
+                      <p className="text-gray-500 dark:text-gray-400">
+                        No prompts available
+                      </p>
+                    </div>
+                  )
+                : (
+                    filteredPrompts.map((prompt, index) => (
+                      <ListItem
+                        key={prompt.name}
+                        id={`prompt-${prompt.name}`}
+                        isSelected={selectedPrompt?.name === prompt.name}
+                        isFocused={focusedIndex === index}
+                        icon={<MessageSquare className="h-4 w-4" />}
+                        title={prompt.name}
+                        description={prompt.description}
+                        onClick={() => handlePromptSelect(prompt)}
+                      />
+                    ))
+                  )}
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto border-r dark:border-zinc-700">
@@ -465,7 +512,7 @@ export function PromptsTab({
                       className="p-3 bg-gray-100 dark:bg-zinc-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-zinc-700"
                       onClick={() => {
                         const prompt = prompts.find(
-                          (p) => p.name === result.promptName
+                          p => p.name === result.promptName,
                         )
                         if (prompt) {
                           handlePromptSelect(prompt)
@@ -495,114 +542,122 @@ export function PromptsTab({
       <ResizablePanel defaultSize={67}>
         {/* Right pane: Prompt details and execution */}
         <div className="flex flex-col h-full bg-white dark:bg-black p-6">
-          {selectedPrompt ? (
-            <>
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">
-                  {selectedPrompt.name}
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  {selectedPrompt.description || 'No description available'}
-                </p>
+          {selectedPrompt
+            ? (
+                <>
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-2">
+                      {selectedPrompt.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      {selectedPrompt.description || 'No description available'}
+                    </p>
 
-                {selectedPrompt.arguments &&
-                  Object.keys(selectedPrompt.arguments).length > 0 && (
-                    <div className="space-y-4 mb-6">
-                      <h4 className="text-sm font-medium text-gray-700">
-                        Arguments
+                    {selectedPrompt.arguments
+                      && Object.keys(selectedPrompt.arguments).length > 0 && (
+                      <div className="space-y-4 mb-6">
+                        <h4 className="text-sm font-medium text-gray-700">
+                          Arguments
+                        </h4>
+                        <div className="space-y-4">
+                          {Object.entries(selectedPrompt.arguments).map(
+                            ([key, prop]) => renderInputField(key, prop),
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleExecutePrompt}
+                      disabled={!isConnected || isExecuting}
+                      className="w-full"
+                    >
+                      {isExecuting
+                        ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                              Executing...
+                            </>
+                          )
+                        : (
+                            <>
+                              <Play className="h-4 w-4 mr-2" />
+                              Execute Prompt
+                            </>
+                          )}
+                    </Button>
+                  </div>
+
+                  {results.length > 0 && (
+                    <div className="flex-1 overflow-hidden">
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">
+                        Results
                       </h4>
-                      <div className="space-y-4">
-                        {Object.entries(selectedPrompt.arguments).map(
-                          ([key, prop]) => renderInputField(key, prop)
-                        )}
+                      <div className="space-y-3 overflow-y-auto max-h-96">
+                        {results.map((result, index) => (
+                          <div
+                            key={index}
+                            className="border dark:border-zinc-700 rounded-lg p-3 bg-gray-50 dark:bg-zinc-700"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-700">
+                                {result.promptName}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleCopyResult(index)}
+                                className="h-6 w-6 p-0"
+                              >
+                                {copiedResult === index
+                                  ? (
+                                      <Check className="h-3 w-3 text-green-600" />
+                                    )
+                                  : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                              </Button>
+                            </div>
+                            <div className="text-xs text-gray-500 mb-2">
+                              {new Date(result.timestamp).toLocaleString()}
+                            </div>
+                            {result.error
+                              ? (
+                                  <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                                    {result.error}
+                                  </div>
+                                )
+                              : (
+                                  <SyntaxHighlighter
+                                    language="json"
+                                    style={prismStyle}
+                                    className="text-xs rounded"
+                                    customStyle={{
+                                      margin: 0,
+                                      background: 'transparent',
+                                    }}
+                                  >
+                                    {JSON.stringify(result.result, null, 2)}
+                                  </SyntaxHighlighter>
+                                )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
-
-                <Button
-                  onClick={handleExecutePrompt}
-                  disabled={!isConnected || isExecuting}
-                  className="w-full"
-                >
-                  {isExecuting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      Executing...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Execute Prompt
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {results.length > 0 && (
-                <div className="flex-1 overflow-hidden">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">
-                    Results
-                  </h4>
-                  <div className="space-y-3 overflow-y-auto max-h-96">
-                    {results.map((result, index) => (
-                      <div
-                        key={index}
-                        className="border dark:border-zinc-700 rounded-lg p-3 bg-gray-50 dark:bg-zinc-700"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-700">
-                            {result.promptName}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleCopyResult(index)}
-                            className="h-6 w-6 p-0"
-                          >
-                            {copiedResult === index ? (
-                              <Check className="h-3 w-3 text-green-600" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </div>
-                        <div className="text-xs text-gray-500 mb-2">
-                          {new Date(result.timestamp).toLocaleString()}
-                        </div>
-                        {result.error ? (
-                          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
-                            {result.error}
-                          </div>
-                        ) : (
-                          <SyntaxHighlighter
-                            language="json"
-                            style={prismStyle}
-                            className="text-xs rounded"
-                            customStyle={{
-                              margin: 0,
-                              background: 'transparent',
-                            }}
-                          >
-                            {JSON.stringify(result.result, null, 2)}
-                          </SyntaxHighlighter>
-                        )}
-                      </div>
-                    ))}
+                </>
+              )
+            : (
+                <div className="flex-1 flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">Select a prompt</p>
+                    <p className="text-sm">
+                      Choose a prompt from the list to see details and execute it
+                    </p>
                   </div>
                 </div>
               )}
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium">Select a prompt</p>
-                <p className="text-sm">
-                  Choose a prompt from the list to see details and execute it
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>

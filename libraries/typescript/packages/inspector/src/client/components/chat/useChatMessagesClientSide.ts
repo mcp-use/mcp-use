@@ -1,5 +1,6 @@
 import type { AuthConfig, LLMConfig, MCPConfig, MCPServerConfig, Message } from './types'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { MCPChatMessageEvent, Telemetry } from '@/client/telemetry'
 import { hashString } from './utils'
 
 interface UseChatMessagesClientSideProps {
@@ -56,6 +57,10 @@ export function useChatMessagesClientSide({
 
       // Create abort controller for cancellation
       abortControllerRef.current = new AbortController()
+
+      // Track telemetry
+      const startTime = Date.now()
+      let toolCallsCount = 0
 
       try {
         // Dynamically import mcp-use browser bundle
@@ -190,7 +195,7 @@ export function useChatMessagesClientSide({
           // Access the client's internal tool definitions
           // The client should have the raw MCP tools stored
           const clientInternal = client as any
-          
+
           // Try to get tools from the client's sessions
           if (clientInternal.sessions) {
             const sessionIds = Object.keys(clientInternal.sessions)
@@ -208,7 +213,7 @@ export function useChatMessagesClientSide({
               }
             }
           }
-          
+
           // Fallback: access from agent's tools
           if (toolsMetadataRef.current.size === 0 && agent.client) {
             const agentClient = agent.client as any
@@ -300,6 +305,9 @@ export function useChatMessagesClientSide({
               currentTextPart = ''
             }
 
+            // Count tool calls for telemetry
+            toolCallsCount++
+
             parts.push({
               type: 'tool-invocation',
               toolInvocation: {
@@ -361,11 +369,11 @@ export function useChatMessagesClientSide({
               if (appsSdkUri && typeof appsSdkUri === 'string' && readResource) {
                 // Fetch the resource in the background
                 console.log('[useChatMessagesClientSide] Detected Apps SDK component, fetching resource:', appsSdkUri)
-                ;(async () => {
+                ; (async () => {
                   try {
                     // Use the readResource function passed from the inspector connection
                     const resourceData = await readResource(appsSdkUri)
-                    
+
                     console.log('[useChatMessagesClientSide] Resource fetched:', resourceData)
 
                     // Extract structured content from parsed result
@@ -423,7 +431,7 @@ export function useChatMessagesClientSide({
                               : msg,
                           ),
                         )
-                        
+
                         console.log('[useChatMessagesClientSide] Messages state updated with resource')
                       }
                     }
@@ -461,16 +469,59 @@ export function useChatMessagesClientSide({
           ),
         )
 
+        // Track successful chat message
+        if (llmConfig) {
+          const telemetry = Telemetry.getInstance()
+          telemetry
+            .capture(
+              new MCPChatMessageEvent({
+                serverId: mcpServerUrl,
+                provider: llmConfig.provider,
+                model: llmConfig.model,
+                messageCount: messages.length + 1,
+                toolCallsCount,
+                success: true,
+                executionMode: 'client-side',
+                duration: Date.now() - startTime,
+              }),
+            )
+            .catch(() => {
+              // Silently fail - telemetry should not break the application
+            })
+        }
+
         // Cleanup
         await client.closeAllSessions()
       }
       catch (error) {
         console.error('Client-side agent error:', error)
+
+        // Track failed chat message
+        if (llmConfig) {
+          const telemetry = Telemetry.getInstance()
+          telemetry
+            .capture(
+              new MCPChatMessageEvent({
+                serverId: mcpServerUrl,
+                provider: llmConfig.provider,
+                model: llmConfig.model,
+                messageCount: messages.length + 1,
+                toolCallsCount,
+                success: false,
+                executionMode: 'client-side',
+                duration: Date.now() - startTime,
+                error: error instanceof Error ? error.message : 'Unknown error occurred',
+              }),
+            )
+            .catch(() => {
+              // Silently fail - telemetry should not break the application
+            })
+        }
+
         const errorMessage: Message = {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: `Error: ${
-            error instanceof Error ? error.message : 'Unknown error occurred'
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'
           }`,
           timestamp: Date.now(),
         }
