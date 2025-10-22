@@ -15,6 +15,7 @@ function isBrowserEnvironment(): boolean {
 }
 
 // Simple Scarf event logger implementation
+// Uses a proxy endpoint to avoid CORS issues when sending to Scarf gateway
 class ScarfEventLogger {
   private endpoint: string
   private timeout: number
@@ -29,6 +30,7 @@ class ScarfEventLogger {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
+      // Use local proxy endpoint to forward to Scarf (avoids CORS)
       const response = await fetch(this.endpoint, {
         method: 'POST',
         headers: {
@@ -60,7 +62,7 @@ export class Telemetry {
 
   private readonly PROJECT_API_KEY = 'phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI'
   private readonly HOST = 'https://eu.i.posthog.com'
-  private readonly SCARF_GATEWAY_URL = 'https://mcpuse.gateway.scarf.sh/events-inspector'
+  private readonly SCARF_PROXY_URL = '/inspector/api/tel/scarf'
   private readonly UNKNOWN_USER_ID = 'UNKNOWN_USER_ID'
 
   private _currUserId: string | null = null
@@ -68,6 +70,7 @@ export class Telemetry {
   private _scarfClient: ScarfEventLogger | null = null
   private _source: string = 'inspector'
   private _initialized: boolean = false
+  private _initializationPromise: Promise<void> | null = null
 
   private constructor() {
     // Check if we're in a browser environment first
@@ -92,12 +95,12 @@ export class Telemetry {
     else {
       logger.info('Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable.')
 
-      // Initialize PostHog asynchronously
-      this.initializePostHog()
+      // Initialize PostHog asynchronously and store the promise
+      this._initializationPromise = this.initializePostHog()
 
-      // Initialize Scarf
+      // Initialize Scarf with proxy endpoint (avoids CORS)
       try {
-        this._scarfClient = new ScarfEventLogger(this.SCARF_GATEWAY_URL, 3000)
+        this._scarfClient = new ScarfEventLogger(this.SCARF_PROXY_URL, 3000)
       }
       catch (e) {
         logger.warn(`Failed to initialize Scarf telemetry: ${e}`)
@@ -112,25 +115,30 @@ export class Telemetry {
       const posthogModule = await import('posthog-js')
       const posthogInstance = posthogModule.default
 
-      // Initialize PostHog
-      posthogInstance.init(this.PROJECT_API_KEY, {
-        api_host: this.HOST,
-        autocapture: false,
-        capture_pageview: false,
-        disable_session_recording: true,
-        persistence: 'localStorage',
-        loaded: (ph) => {
-          logger.debug('PostHog initialized successfully')
-          this._posthogClient = ph
-          this._initialized = true
-        },
-      })
+      // Create a promise that resolves when PostHog is fully loaded
+      await new Promise<void>((resolve) => {
+        // Initialize PostHog
+        posthogInstance.init(this.PROJECT_API_KEY, {
+          api_host: this.HOST,
+          autocapture: false,
+          capture_pageview: false,
+          disable_session_recording: true,
+          persistence: 'localStorage',
+          loaded: (ph) => {
+            logger.debug('PostHog initialized successfully')
+            this._posthogClient = ph
+            this._initialized = true
+            resolve()
+          },
+        })
 
-      this._posthogClient = posthogInstance
+        this._posthogClient = posthogInstance
+      })
     }
     catch (e) {
       logger.warn(`Failed to initialize PostHog telemetry: ${e}`)
       this._posthogClient = null
+      this._initialized = false
     }
   }
 
@@ -235,13 +243,22 @@ export class Telemetry {
       return
     }
 
-    // Wait for PostHog to be initialized
-    if (this._posthogClient && !this._initialized) {
-      await new Promise(resolve => setTimeout(resolve, 100))
+    // Wait for PostHog to be fully initialized before capturing events
+    if (this._initializationPromise && !this._initialized) {
+      try {
+        // Wait for initialization to complete (with timeout)
+        await Promise.race([
+          this._initializationPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Initialization timeout')), 5000)),
+        ])
+      }
+      catch (e) {
+        logger.debug(`PostHog initialization timed out or failed: ${e}`)
+      }
     }
 
     // Send to PostHog
-    if (this._posthogClient) {
+    if (this._posthogClient && this._initialized) {
       try {
         // Add package version, language flag, and source to all events
         const properties = { ...event.properties }
