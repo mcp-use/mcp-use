@@ -33,7 +33,8 @@ export function AnimatedThemeToggler({
   }, [])
 
   const toggleTheme = useCallback(async () => {
-    if (!buttonRef.current) return
+    if (!buttonRef.current)
+      return
 
     await document.startViewTransition(() => {
       const newTheme = !isDark
@@ -42,13 +43,13 @@ export function AnimatedThemeToggler({
       localStorage.setItem('theme', newTheme ? 'dark' : 'light')
     }).ready
 
-    const { top, left, width, height } =
-      buttonRef.current.getBoundingClientRect()
+    const { top, left, width, height }
+      = buttonRef.current.getBoundingClientRect()
     const x = left + width / 2
     const y = top + height / 2
     const maxRadius = Math.hypot(
       Math.max(left, window.innerWidth - left),
-      Math.max(top, window.innerHeight - top)
+      Math.max(top, window.innerHeight - top),
     )
 
     document.documentElement.animate(
@@ -62,7 +63,7 @@ export function AnimatedThemeToggler({
         duration,
         easing: 'ease-in-out',
         pseudoElement: '::view-transition-new(root)',
-      }
+      },
     )
   }, [isDark, duration])
 

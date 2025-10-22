@@ -52,7 +52,7 @@ export function LayoutContent({
         <PromptsTab
           ref={promptsSearchRef}
           prompts={selectedServer.prompts}
-          callPrompt={selectedServer.callTool} // Using callTool for now, should be callPrompt when available
+          callPrompt={selectedServer.getPrompt}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === 'ready'}
         />

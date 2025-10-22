@@ -1,7 +1,7 @@
-import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
+import type { GetPromptResult, GetPromptRequest } from '@modelcontextprotocol/sdk/types.js'
 import type { InputDefinition } from './common.js'
 
-export type PromptCallback = (params: Record<string, any>) => Promise<GetPromptResult>
+export type PromptCallback = (params: GetPromptRequest) => Promise<GetPromptResult>
 
 export interface PromptDefinition {
   /** Unique identifier for the prompt */

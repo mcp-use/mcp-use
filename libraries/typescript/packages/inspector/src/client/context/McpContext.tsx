@@ -23,6 +23,8 @@ export interface MCPConnection {
   authUrl: string | null
   callTool: (toolName: string, args: any) => Promise<any>
   readResource: (uri: string) => Promise<any>
+  listPrompts: (serverName?: string) => Promise<void>
+  getPrompt: (name: string, args: any) => Promise<any>
   authenticate: () => void
   retry: () => void
   clearStorage: () => void
@@ -141,6 +143,8 @@ function McpConnectionWrapper({
           authUrl: mcpHook.authUrl ?? null,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
+          listPrompts: mcpHook.listPrompts,
+          getPrompt: mcpHook.getPrompt,
           authenticate: mcpHook.authenticate,
           retry: mcpHook.retry,
           clearStorage: mcpHook.clearStorage,
@@ -176,6 +180,8 @@ function McpConnectionWrapper({
         authUrl: mcpHook.authUrl ?? null,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
+        listPrompts: mcpHook.listPrompts,
+        getPrompt: mcpHook.getPrompt,
         authenticate: mcpHook.authenticate,
         retry: mcpHook.retry,
         clearStorage: mcpHook.clearStorage,
@@ -386,6 +392,12 @@ export function McpProvider({ children }: { children: ReactNode }) {
           prompts: [],
           error: null,
           authUrl: null,
+          listPrompts: async (_serverName?: string) => {
+            throw new Error('Not connected')
+          },
+          getPrompt: async () => {
+            throw new Error('Not connected')
+          },
           callTool: async () => {
             throw new Error('Not connected')
           },
@@ -467,6 +479,12 @@ export function McpProvider({ children }: { children: ReactNode }) {
           throw new Error('Not connected')
         },
         readResource: async () => {
+          throw new Error('Not connected')
+        },
+        listPrompts: async (_serverName?: string) => {
+          throw new Error('Not connected')
+        },
+        getPrompt: async () => {
           throw new Error('Not connected')
         },
         authenticate: () => {},

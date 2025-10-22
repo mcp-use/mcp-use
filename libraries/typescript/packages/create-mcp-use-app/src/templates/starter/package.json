@@ -1,18 +1,23 @@
 {
-  "name": "mcp-use-server-with-mcp-ui",
+  "name": "mcp-use-starter-server",
   "type": "module",
   "version": "1.0.0",
-  "description": "MCP server: mcp-use-server-with-mcp-ui",
+  "description": "MCP server with starter tools and resources",
   "author": "",
   "license": "MIT",
   "keywords": [
     "mcp",
     "server",
+    "starter",
+    "tools",
+    "resources",
+    "prompts",
+    "uiresource",
     "ui",
     "react",
     "widgets",
-    "ai",
-    "tools"
+    "mcp-ui",
+    "apps-sdk"
   ],
   "main": "dist/index.js",
   "scripts": {
