@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -39,13 +41,16 @@ jobs:
         run: cd libraries/python && uv venv
 
       - name: Install Python dependencies
-        run: cd libraries/python && uv pip install -e .
+        run: cd libraries/python && uv pip install -e . && uv pip install google-genai
 
       - name: Install Mintlify CLI
         run: npm install -g mint
 
       - name: Generate Python API documentation
-        run: cd docs && uv run python generate_docs.py ../libraries/python/mcp_use python/api-reference docs.json
+        run: |
+          source libraries/python/.venv/bin/activate
+          cd docs
+          python generate_docs.py ../libraries/python/mcp_use python/api-reference docs.json
 
       - name: Check for broken links
         run: |
@@ -62,6 +67,9 @@ jobs:
             echo "The following files have been modified:"
             MODIFIED=$(git status --porcelain docs/)
             echo "$MODIFIED"
+            echo ""
+            echo "Diff (working tree vs HEAD):"
+            git diff docs/
             echo "modified_files<<EOF" >> $GITHUB_OUTPUT
             echo "$MODIFIED" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
