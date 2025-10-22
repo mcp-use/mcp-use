@@ -1,5 +1,19 @@
 # mcp-use
 
+## 1.1.6
+
+### Patch Changes
+
+- 696b2e1: Fix Server cors issue
+- 696b2e1: Test canary
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+  - @mcp-use/inspector@0.4.6
+
 ## 1.1.6-canary.1
 
 ### Patch Changes
