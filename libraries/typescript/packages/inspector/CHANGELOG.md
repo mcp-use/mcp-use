@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 0.4.6-canary.6
+
+### Patch Changes
+
+- c0d9b0b: chore: cleanup logging
+
 ## 0.4.6-canary.5
 
 ### Patch Changes
