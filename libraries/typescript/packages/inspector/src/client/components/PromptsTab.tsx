@@ -14,6 +14,7 @@ import {
   ResizablePanelGroup,
 } from '@/client/components/ui/resizable'
 import { useInspector } from '@/client/context/InspectorContext'
+import { MCPPromptCallEvent, Telemetry } from '@/client/telemetry'
 import {
   PromptExecutionPanel,
   PromptResultDisplay,
@@ -30,6 +31,7 @@ export interface PromptsTabRef {
 interface PromptsTabProps {
   prompts: Prompt[]
   callPrompt: (name: string, args?: Record<string, unknown>) => Promise<any>
+  serverId: string
   isConnected: boolean
 }
 
@@ -39,6 +41,7 @@ export function PromptsTab({
   ref,
   prompts,
   callPrompt,
+  serverId,
   isConnected,
 }: PromptsTabProps & { ref?: React.RefObject<PromptsTabRef | null> }) {
   // State
@@ -308,6 +311,20 @@ export function PromptsTab({
       const result = await callPrompt(selectedPrompt.name, promptArgs)
       const duration = Date.now() - startTime
 
+      // Track successful prompt call
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPPromptCallEvent({
+            promptName: selectedPrompt.name,
+            serverId,
+            success: true,
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+
       setResults(prev => [
         {
           promptName: selectedPrompt.name,
@@ -320,6 +337,21 @@ export function PromptsTab({
       ])
     }
     catch (error) {
+      // Track failed prompt call
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPPromptCallEvent({
+            promptName: selectedPrompt.name,
+            serverId,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+
       const errorResult = {
         promptName: selectedPrompt.name,
         args: promptArgs,
@@ -334,7 +366,7 @@ export function PromptsTab({
     finally {
       setIsExecuting(false)
     }
-  }, [selectedPrompt, promptArgs, isExecuting, callPrompt])
+  }, [selectedPrompt, promptArgs, isExecuting, callPrompt, serverId])
 
   const handleCopyResult = useCallback(async (index: number, result: any) => {
     try {

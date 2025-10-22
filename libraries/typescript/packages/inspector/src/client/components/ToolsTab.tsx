@@ -16,6 +16,11 @@ import {
 } from '@/client/components/ui/resizable'
 import { useInspector } from '@/client/context/InspectorContext'
 import {
+  MCPToolExecutionEvent,
+  MCPToolSavedEvent,
+  Telemetry,
+} from '@/client/telemetry'
+import {
   SavedRequestsList,
   SaveRequestDialog,
   ToolExecutionPanel,
@@ -49,7 +54,8 @@ export function ToolsTab({
 }: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
   // State
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null)
-  const [selectedSavedRequest, setSelectedSavedRequest] = useState<SavedRequest | null>(null)
+  const [selectedSavedRequest, setSelectedSavedRequest]
+    = useState<SavedRequest | null>(null)
   const { selectedToolName, setSelectedToolName } = useInspector()
   const [toolArgs, setToolArgs] = useState<Record<string, unknown>>({})
   const [results, setResults] = useState<ToolResult[]>([])
@@ -335,8 +341,24 @@ export function ToolsTab({
       const result = await callTool(selectedTool.name, toolArgs)
       const duration = Date.now() - startTime
 
+      // Track successful tool execution
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPToolExecutionEvent({
+            toolName: selectedTool.name,
+            serverId,
+            success: true,
+            duration,
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+
       // Extract tool metadata from tool definition
-      const toolMeta = (selectedTool as any)?._meta || (selectedTool as any)?.metadata
+      const toolMeta
+        = (selectedTool as any)?._meta || (selectedTool as any)?.metadata
 
       // Check tool metadata for Apps SDK component
       const openaiOutputTemplate = toolMeta?.['openai/outputTemplate']
@@ -415,11 +437,7 @@ export function ToolsTab({
 
         // Update the result with the fetched resource
         setResults(prev =>
-          prev.map((r, idx) =>
-            idx === 0
-              ? { ...r, appsSdkResource }
-              : r,
-          ),
+          prev.map((r, idx) => (idx === 0 ? { ...r, appsSdkResource } : r)),
         )
       }
       else {
@@ -438,7 +456,26 @@ export function ToolsTab({
       }
     }
     catch (error) {
-      const toolMeta = (selectedTool as any)?._meta || (selectedTool as any)?.metadata
+      const duration = Date.now() - startTime
+
+      // Track failed tool execution
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPToolExecutionEvent({
+            toolName: selectedTool.name,
+            serverId,
+            success: false,
+            duration,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+
+      const toolMeta
+        = (selectedTool as any)?._meta || (selectedTool as any)?.metadata
 
       // For Apps SDK tools, replace results; otherwise append
       const errorResult = {
@@ -447,7 +484,7 @@ export function ToolsTab({
         result: null,
         error: error instanceof Error ? error.message : String(error),
         timestamp: startTime,
-        duration: Date.now() - startTime,
+        duration,
         toolMeta,
       }
 
@@ -462,7 +499,7 @@ export function ToolsTab({
     finally {
       setIsExecuting(false)
     }
-  }, [selectedTool, toolArgs, isExecuting, callTool, readResource])
+  }, [selectedTool, toolArgs, isExecuting, callTool, readResource, serverId])
 
   const handleCopyResult = useCallback(async (index: number, result: any) => {
     try {
@@ -531,9 +568,30 @@ export function ToolsTab({
     }
 
     saveSavedRequests([...savedRequests, newRequest])
+
+    // Track tool saved
+    const telemetry = Telemetry.getInstance()
+    telemetry
+      .capture(
+        new MCPToolSavedEvent({
+          toolName: selectedTool.name,
+          serverId,
+        }),
+      )
+      .catch(() => {
+        // Silently fail - telemetry should not break the application
+      })
+
     setSaveDialogOpen(false)
     setRequestName('')
-  }, [selectedTool, requestName, toolArgs, savedRequests, saveSavedRequests])
+  }, [
+    selectedTool,
+    requestName,
+    toolArgs,
+    savedRequests,
+    saveSavedRequests,
+    serverId,
+  ])
 
   const deleteSavedRequest = useCallback(
     (id: string) => {
