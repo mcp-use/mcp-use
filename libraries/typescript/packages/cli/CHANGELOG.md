@@ -1,5 +1,38 @@
 # @mcp-use/cli
 
+## 2.1.18-canary.2
+
+### Patch Changes
+
+- Updated dependencies [60f20cb]
+  - mcp-use@1.1.6-canary.1
+  - @mcp-use/inspector@0.4.6-canary.2
+
+## 2.1.18-canary.1
+
+### Patch Changes
+
+- Updated dependencies [3d759e9]
+  - @mcp-use/inspector@0.4.6-canary.1
+
+## 2.1.18-canary.0
+
+### Patch Changes
+
+- Updated dependencies [6960f7f]
+  - mcp-use@1.1.6-canary.0
+  - @mcp-use/inspector@0.4.6-canary.0
+
+## 2.1.17
+
+### Patch Changes
+
+- 6dcee78: fix inspector chat formatting
+- Updated dependencies [6dcee78]
+- Updated dependencies [6dcee78]
+  - @mcp-use/inspector@0.4.5
+  - mcp-use@1.1.5
+
 ## 2.1.17-canary.0
 
 ### Patch Changes

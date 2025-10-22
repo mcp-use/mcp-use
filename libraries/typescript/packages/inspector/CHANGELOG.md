@@ -1,5 +1,33 @@
 # @mcp-use/inspector
 
+## 0.4.6-canary.2
+
+### Patch Changes
+
+- Updated dependencies [60f20cb]
+  - mcp-use@1.1.6-canary.1
+
+## 0.4.6-canary.1
+
+### Patch Changes
+
+- 3d759e9: add ph
+
+## 0.4.6-canary.0
+
+### Patch Changes
+
+- Updated dependencies [6960f7f]
+  - mcp-use@1.1.6-canary.0
+
+## 0.4.5
+
+### Patch Changes
+
+- 6dcee78: fix inspector chat formatting
+- Updated dependencies [6dcee78]
+  - mcp-use@1.1.5
+
 ## 0.4.5-canary.0
 
 ### Patch Changes

@@ -185,7 +185,8 @@ class MCPAgent:
                     logger.info(f"✅ Created {len(self._sessions)} new sessions")
 
                 # Create LangChain tools directly from the client using the adapter
-                self._tools = await self.adapter.create_tools(self.client)
+                await self.adapter.create_all(self.client)
+                self._tools = self.adapter.tools + self.adapter.resources + self.adapter.prompts
                 logger.info(f"🛠️ Created {len(self._tools)} LangChain tools from client")
             else:
                 # Using direct connector - only establish connection
@@ -197,7 +198,10 @@ class MCPAgent:
                         await connector.connect()
 
                 # Create LangChain tools using the adapter with connectors
-                self._tools = await self.adapter._create_tools_from_connectors(connectors_to_use)
+                await self.adapter._create_tools_from_connectors(connectors_to_use)
+                await self.adapter._create_resources_from_connectors(connectors_to_use)
+                await self.adapter._create_prompts_from_connectors(connectors_to_use)
+                self._tools = self.adapter.tools + self.adapter.resources + self.adapter.prompts
                 logger.info(f"🛠️ Created {len(self._tools)} LangChain tools from connectors")
 
             # Get all tools for system message generation

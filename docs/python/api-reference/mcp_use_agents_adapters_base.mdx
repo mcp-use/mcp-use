@@ -49,32 +49,143 @@ def __init__(disallowed_tools: list[str] | None = None):
 
 </Card>
 <Card type="info">
-### `method` create_tools
+### `method` create_all
 
-Create tools from an MCPClient instance.
-
-        This is the recommended way to create tools from an MCPClient, as it handles
-        session creation and connector extraction automatically.
-
-        Example:
-            ```python
-            from mcp_use.client import MCPClient
-            from mcp_use.adapters import YourAdapter
-
-            client = MCPClient.from_config_file("config.json")
-            tools = await YourAdapter.create_tools(client)
-            ```
+Create tools, resources, and prompts from an MCPClient instance.
 
 
 **Parameters**
-><ParamField body="client" type="MCPClient" required="True" >   The MCPClient to extract tools from. </ParamField>
+><ParamField body="client" type="mcp_use.client.client.MCPClient" required="True" >   MCP client instance </ParamField>
+
+**Signature**
+```python wrap
+def create_all(client: mcp_use.client.client.MCPClient):
+```
+
+</Card>
+
+<Card type="info">
+### `method` create_prompts
+
+Create prompts from the MCPClient instance.
+
+        This handles session creation and connector extraction automatically.
+        The created prompts are stored in `self.prompts`.
+
+
+
+**Parameters**
+><ParamField body="client" type="mcp_use.client.client.MCPClient" required="True" >   MCP client instance </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="list[mcp_use.agents.adapters.base.T]" >A list of prompts in the target framework's format.</ResponseField>
+
+**Signature**
+```python wrap
+def create_prompts(client: mcp_use.client.client.MCPClient):
+```
+
+</Card>
+
+<Card type="info">
+### `method` create_resources
+
+Create resources from the MCPClient instance.
+
+        This handles session creation and connector extraction automatically.
+        The created resources are stored in `self.resources`.
+
+
+
+**Parameters**
+><ParamField body="client" type="mcp_use.client.client.MCPClient" required="True" >   MCP client instance </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="list[mcp_use.agents.adapters.base.T]" >A list of resources in the target framework's format.</ResponseField>
+
+**Signature**
+```python wrap
+def create_resources(client: mcp_use.client.client.MCPClient):
+```
+
+</Card>
+
+<Card type="info">
+### `method` create_tools
+
+Create tools from the MCPClient instance.
+
+        This handles session creation and connector extraction automatically.
+        The created tools are stored in `self.tools`.
+
+
+
+**Parameters**
+><ParamField body="client" type="mcp_use.client.client.MCPClient" required="True" >   MCP client instance </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="list[mcp_use.agents.adapters.base.T]" >A list of tools in the target framework's format.</ResponseField>
 
 **Signature**
 ```python wrap
-def create_tools(client: MCPClient):
+def create_tools(client: mcp_use.client.client.MCPClient):
+```
+
+</Card>
+
+<Card type="info">
+### `method` fix_schema
+
+Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
+
+
+
+**Parameters**
+><ParamField body="schema" type="dict" required="True" >   The JSON schema to fix. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="dict" >The fixed JSON schema.</ResponseField>
+
+**Signature**
+```python wrap
+def fix_schema(schema: dict):
+```
+
+</Card>
+
+<Card type="info">
+### `method` load_prompts_for_connector
+
+Dynamically load prompts for a specific connector.
+
+
+
+**Parameters**
+><ParamField body="connector" type="mcp_use.client.connectors.base.BaseConnector" required="True" >   The connector to load prompts for. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="list[mcp_use.agents.adapters.base.T]" >The list of prompts that were loaded in the target framework's format.</ResponseField>
+
+**Signature**
+```python wrap
+def load_prompts_for_connector(connector: mcp_use.client.connectors.base.BaseConnector):
+```
+
+</Card>
+
+<Card type="info">
+### `method` load_resources_for_connector
+
+Dynamically load resources for a specific connector.
+
+
+
+**Parameters**
+><ParamField body="connector" type="mcp_use.client.connectors.base.BaseConnector" required="True" >   The connector to load resources for. </ParamField>
+
+**Signature**
+```python wrap
+def load_resources_for_connector(connector: mcp_use.client.connectors.base.BaseConnector):
 ```
 
 </Card>
@@ -95,6 +206,26 @@ Dynamically load tools for a specific connector.
 **Signature**
 ```python wrap
 def load_tools_for_connector(connector: mcp_use.client.connectors.base.BaseConnector):
+```
+
+</Card>
+
+<Card type="info">
+### `method` parse_result
+
+Parse the result from any MCP operation (tool, resource, or prompt) into a string.
+
+
+
+**Parameters**
+><ParamField body="tool_result" type="Any" required="True" >   The result object from an MCP operation. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str" >A string representation of the result content.</ResponseField>
+
+**Signature**
+```python wrap
+def parse_result(tool_result: Any):
 ```
 
 </Card>

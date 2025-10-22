@@ -76,3 +76,101 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.should_publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Fetch all tags
+          git fetch --tags
+
+          # Get tags from the last commit (the publish commit creates tags)
+          TAGS=$(git tag --points-at HEAD)
+
+          if [ -z "$TAGS" ]; then
+            echo "ℹ️  No tags found on current commit"
+            exit 0
+          fi
+
+          # Get the date for the release title
+          RELEASE_DATE=$(date +"%Y-%m-%d")
+          
+          # Generate release notes combining all packages
+          RELEASE_NOTES="# TypeScript Packages Release - $RELEASE_DATE"$'\n\n'
+          RELEASE_NOTES+="## 📦 Published Packages"$'\n\n'
+          
+          # Track the first/main tag for the release name
+          MAIN_TAG=""
+          
+          # Loop through all tags to build combined release notes
+          for TAG in $TAGS; do
+            if [ -z "$MAIN_TAG" ]; then
+              MAIN_TAG="$TAG"
+            fi
+            
+            echo "Processing $TAG..."
+            
+            # Extract package name and version
+            PACKAGE_NAME=$(echo "$TAG" | sed 's/@[0-9].*//')
+            VERSION=$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+.*')
+            
+            # Add package header
+            RELEASE_NOTES+="### \`$TAG\`"$'\n\n'
+            
+            # Try to extract changelog for this version
+            CHANGELOG_FILE="libraries/typescript/packages/${PACKAGE_NAME##*\/}/CHANGELOG.md"
+            
+            if [ -f "$CHANGELOG_FILE" ]; then
+              # Extract the changelog for this specific version
+              PACKAGE_CHANGELOG=$(awk -v ver="$VERSION" '
+                /^## / {
+                  if (found) exit;
+                  if ($0 ~ ver) found=1;
+                  next;
+                }
+                found {print}
+              ' "$CHANGELOG_FILE")
+              
+              if [ -n "$PACKAGE_CHANGELOG" ]; then
+                RELEASE_NOTES+="$PACKAGE_CHANGELOG"$'\n\n'
+              else
+                RELEASE_NOTES+="_No changelog entry found for this version._"$'\n\n'
+              fi
+            else
+              RELEASE_NOTES+="_No CHANGELOG.md found._"$'\n\n'
+            fi
+            
+            RELEASE_NOTES+="---"$'\n\n'
+          done
+
+          # Create a single consolidated release using the first tag
+          RELEASE_TITLE="TypeScript Release - $RELEASE_DATE"
+          
+          gh release create "$MAIN_TAG" \
+            --title "$RELEASE_TITLE" \
+            --notes "$RELEASE_NOTES" \
+            --latest || echo "⚠️  Failed to create release (may already exist)"
+          
+          echo "✅ Created consolidated GitHub release: $RELEASE_TITLE"
+
+      - name: Sync main to canary
+        if: steps.check.outputs.should_publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Fetch latest changes
+          git fetch origin
+
+          # Checkout canary and merge main
+          git checkout canary
+          git merge origin/main --no-edit -m "chore: sync version updates from main"
+
+          # Push canary
+          git push origin canary
+
+          echo "✅ Synced main version updates to canary branch"

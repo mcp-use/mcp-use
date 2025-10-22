@@ -2,14 +2,14 @@
   "mode": "pre",
   "tag": "canary",
   "initialVersions": {
-    "@mcp-use/cli": "2.1.16",
-    "create-mcp-use-app": "0.4.3",
-    "@mcp-use/inspector": "0.4.4",
-    "mcp-use": "1.1.4"
+    "@mcp-use/cli": "2.1.17",
+    "create-mcp-use-app": "0.4.4",
+    "@mcp-use/inspector": "0.4.5",
+    "mcp-use": "1.1.5"
   },
   "changesets": [
-    "fine-cougars-change",
-    "khaki-baths-follow",
-    "young-radios-sell"
+    "eight-cycles-smoke",
+    "nine-bars-sort",
+    "polite-carrots-clap"
   ]
 }
