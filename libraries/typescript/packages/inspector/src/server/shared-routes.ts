@@ -34,15 +34,20 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
       const method = c.req.method
       const headers: Record<string, string> = {}
 
-      // Copy relevant headers, excluding proxy-specific ones
+      // Copy relevant headers, excluding proxy-specific ones and encoding preferences
       const requestHeaders = c.req.header()
       for (const [key, value] of Object.entries(requestHeaders)) {
-        if (!key.toLowerCase().startsWith('x-proxy-')
-          && !key.toLowerCase().startsWith('x-target-')
-          && key.toLowerCase() !== 'host') {
+        const lowerKey = key.toLowerCase()
+        if (!lowerKey.startsWith('x-proxy-')
+          && !lowerKey.startsWith('x-target-')
+          && lowerKey !== 'host'
+          && lowerKey !== 'accept-encoding') { // Don't forward accept-encoding to prevent compression
           headers[key] = value
         }
       }
+
+      // Explicitly request uncompressed response
+      headers['Accept-Encoding'] = 'identity'
 
       // Set the target URL as the host
       try {
@@ -61,10 +66,17 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
         body: body ? new Uint8Array(body) : undefined,
       })
 
-      // Forward the response
+      // Forward response headers, excluding problematic encoding headers
+      // Node.js fetch() auto-decompresses the body but preserves these headers
       const responseHeaders: Record<string, string> = {}
       response.headers.forEach((value, key) => {
-        responseHeaders[key] = value
+        const lowerKey = key.toLowerCase()
+        // Skip compression-related headers that don't match the actual body state
+        if (lowerKey !== 'content-encoding' &&
+          lowerKey !== 'transfer-encoding' &&
+          lowerKey !== 'content-length') {
+          responseHeaders[key] = value
+        }
       })
 
       return new Response(response.body, {
@@ -92,22 +104,22 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
 
         // Start streaming in the background
         ; (async () => {
-        try {
-          for await (const chunk of handleChatRequestStream(requestBody)) {
-            await writer.write(encoder.encode(chunk))
+          try {
+            for await (const chunk of handleChatRequestStream(requestBody)) {
+              await writer.write(encoder.encode(chunk))
+            }
           }
-        }
-        catch (error) {
-          const errorMsg = `${JSON.stringify({
-            type: 'error',
-            data: { message: error instanceof Error ? error.message : 'Unknown error' },
-          })}\n`
-          await writer.write(encoder.encode(errorMsg))
-        }
-        finally {
-          await writer.close()
-        }
-      })()
+          catch (error) {
+            const errorMsg = `${JSON.stringify({
+              type: 'error',
+              data: { message: error instanceof Error ? error.message : 'Unknown error' },
+            })}\n`
+            await writer.write(encoder.encode(errorMsg))
+          }
+          finally {
+            await writer.close()
+          }
+        })()
 
       return new Response(readable, {
         headers: {
