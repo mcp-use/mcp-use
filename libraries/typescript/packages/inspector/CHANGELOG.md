@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 0.4.6-canary.5
+
+### Patch Changes
+
+- 1f18132: fix ph use ph-node
+
 ## 0.4.6-canary.4
 
 ### Patch Changes

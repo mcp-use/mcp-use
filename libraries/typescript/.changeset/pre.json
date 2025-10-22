@@ -8,6 +8,7 @@
     "mcp-use": "1.1.5"
   },
   "changesets": [
+    "cyan-apples-count",
     "eight-cycles-smoke",
     "grumpy-suits-take",
     "heavy-schools-accept",
