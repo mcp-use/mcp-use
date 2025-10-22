@@ -1,5 +1,19 @@
 # @mcp-use/inspector
 
+## 0.4.6
+
+### Patch Changes
+
+- 696b2e1: fix ph use ph-node
+- 696b2e1: fix scarf
+- 696b2e1: The main changes ensure that the proxy does not request or forward compressed responses and that problematic headers are filtered out when forwarding responses.
+- 696b2e1: fix logging
+- 696b2e1: add ph
+- 696b2e1: chore: cleanup logging
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+  - mcp-use@1.1.6
+
 ## 0.4.6-canary.7
 
 ### Patch Changes

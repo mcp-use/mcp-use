@@ -1,5 +1,20 @@
 # @mcp-use/cli
 
+## 2.1.18
+
+### Patch Changes
+
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+  - @mcp-use/inspector@0.4.6
+  - mcp-use@1.1.6
+
 ## 2.1.18-canary.7
 
 ### Patch Changes
