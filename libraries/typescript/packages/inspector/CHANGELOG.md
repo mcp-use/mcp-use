@@ -1,5 +1,18 @@
 # @mcp-use/inspector
 
+## 0.4.6-canary.3
+
+### Patch Changes
+
+- 6010d08: fix scarf
+
+## 0.4.6-canary.2
+
+### Patch Changes
+
+- Updated dependencies [60f20cb]
+  - mcp-use@1.1.6-canary.1
+
 ## 0.4.6-canary.1
 
 ### Patch Changes

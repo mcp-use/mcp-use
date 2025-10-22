@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.4.6-canary.1",
+  "version": "0.4.6-canary.3",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -66,6 +66,7 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-switch": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@scarf/scarf": "^1.4.0",
     "@tailwindcss/cli": "^4.1.14",
     "@tailwindcss/vite": "^4.1.14",
     "@types/react-syntax-highlighter": "^15.5.13",
