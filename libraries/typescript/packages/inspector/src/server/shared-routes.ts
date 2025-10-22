@@ -69,7 +69,7 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
       // Forward response headers, excluding problematic encoding headers
       // Node.js fetch() auto-decompresses the body but preserves these headers
       const responseHeaders: Record<string, string> = {}
-      response.headers.forEach((value: string, key: string) => {
+      response.headers.forEach((value, key) => {
         const lowerKey = key.toLowerCase()
         // Skip compression-related headers that don't match the actual body state
         if (lowerKey !== 'content-encoding' &&
