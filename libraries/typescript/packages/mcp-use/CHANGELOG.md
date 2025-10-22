@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.1.5
+
+### Patch Changes
+
+- 6dcee78: Add starter template + remove ui template
+- Updated dependencies [6dcee78]
+  - @mcp-use/inspector@0.4.5
+
 ## 1.1.5-canary.0
 
 ### Patch Changes

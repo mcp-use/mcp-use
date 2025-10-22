@@ -1,5 +1,15 @@
 # @mcp-use/cli
 
+## 2.1.17
+
+### Patch Changes
+
+- 6dcee78: fix inspector chat formatting
+- Updated dependencies [6dcee78]
+- Updated dependencies [6dcee78]
+  - @mcp-use/inspector@0.4.5
+  - mcp-use@1.1.5
+
 ## 2.1.17-canary.0
 
 ### Patch Changes
