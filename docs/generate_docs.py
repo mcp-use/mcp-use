@@ -1776,6 +1776,25 @@ def main():
     modules = find_python_modules(package_dir, exclude_patterns)
     print(f"Found {len(modules)} modules (excluding: {', '.join(exclude_patterns)})")
 
+    # Step 1a: Remove stale documentation files
+    print("🔄 Checking for stale documentation files...")
+    existing_mdx_files = (
+        list(Path(output_dir).glob("*.mdx")) if os.path.exists(output_dir) else []
+    )
+    existing_module_names = {f.stem for f in existing_mdx_files}
+    expected_module_names = {module.replace(".", "_") for module in modules}
+
+    stale_files = existing_module_names - expected_module_names
+    if stale_files:
+        print(f"🗑️  Found {len(stale_files)} stale documentation file(s) to remove:")
+        for stale_name in sorted(stale_files):
+            stale_path = Path(output_dir) / f"{stale_name}.mdx"
+            if stale_path.exists():
+                stale_path.unlink()
+                print(f"   - Removed {stale_path}")
+    else:
+        print("✅ No stale documentation files found")
+
     # Generate docs for each module
     success_count = 0
     for module in modules:
