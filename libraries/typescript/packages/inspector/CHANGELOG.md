@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 0.4.6-canary.1
+
+### Patch Changes
+
+- 3d759e9: add ph
+
 ## 0.4.6-canary.0
 
 ### Patch Changes

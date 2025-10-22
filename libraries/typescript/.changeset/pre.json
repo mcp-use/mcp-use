@@ -8,6 +8,7 @@
     "mcp-use": "1.1.5"
   },
   "changesets": [
-    "eight-cycles-smoke"
+    "eight-cycles-smoke",
+    "nine-bars-sort"
   ]
 }
