@@ -91,6 +91,7 @@
     "example:observability": "tsx examples/client/observability.ts"
   },
   "peerDependencies": {
+    "@mcp-use/inspector": "^0.4.5",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "langfuse": "^3.32.0",

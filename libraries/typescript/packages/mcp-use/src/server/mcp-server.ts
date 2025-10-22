@@ -1147,8 +1147,7 @@ if (container && Component) {
    * Initiates the server startup process by mounting MCP endpoints, configuring
    * the inspector UI (if available), and starting the Express server to listen
    * for incoming connections. This is the main entry point for running the server.
-   *
-   *
+   * 
    * The server will be accessible at the specified port with MCP endpoints at /mcp
    * and inspector UI at /inspector (if the inspector package is installed).
    *
@@ -1194,10 +1193,10 @@ if (container && Component) {
    * Dynamically loads and mounts the MCP Inspector UI package if available, providing
    * a web-based interface for testing and debugging MCP servers. The inspector
    * automatically connects to the local MCP server endpoints.
-   *
-   * In production mode, only mounts if the build manifest indicates inspector was included
-   * (built with --with-inspector flag).
-   *
+   * 
+   * This method gracefully handles cases where the inspector package is not installed,
+   * allowing the server to function without the inspector in production environments.
+   * 
    * @private
    * @returns void
    *
