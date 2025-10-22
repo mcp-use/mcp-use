@@ -1,6 +1,4 @@
-import type posthog from 'posthog-js'
 import type { BaseTelemetryEvent } from './events.js'
-import { logger } from '../utils/logger.js'
 import { MCPInspectorOpenEvent } from './events.js'
 import { getPackageVersion } from './utils.js'
 
@@ -14,9 +12,7 @@ function isBrowserEnvironment(): boolean {
   }
 }
 
-// Simple Scarf event logger implementation
-// Uses a proxy endpoint to avoid CORS issues when sending to Scarf gateway
-class ScarfEventLogger {
+class TelemetryEventLogger {
   private endpoint: string
   private timeout: number
 
@@ -30,7 +26,6 @@ class ScarfEventLogger {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
-      // Use local proxy endpoint to forward to Scarf (avoids CORS)
       const response = await fetch(this.endpoint, {
         method: 'POST',
         headers: {
@@ -46,9 +41,8 @@ class ScarfEventLogger {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
     }
-    catch (error) {
+    catch {
       // Silently fail - telemetry should not break the application
-      logger.debug(`Failed to send Scarf event: ${error}`)
     }
   }
 }
@@ -60,17 +54,14 @@ function getCacheKey(key: string): string {
 export class Telemetry {
   private static instance: Telemetry | null = null
 
-  private readonly PROJECT_API_KEY = 'phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI'
-  private readonly HOST = 'https://eu.i.posthog.com'
+  private readonly POSTHOG_PROXY_URL = '/inspector/api/tel/posthog'
   private readonly SCARF_PROXY_URL = '/inspector/api/tel/scarf'
   private readonly UNKNOWN_USER_ID = 'UNKNOWN_USER_ID'
 
   private _currUserId: string | null = null
-  private _posthogClient: typeof posthog | null = null
-  private _scarfClient: ScarfEventLogger | null = null
+  private _posthogClient: TelemetryEventLogger | null = null
+  private _scarfClient: TelemetryEventLogger | null = null
   private _source: string = 'inspector'
-  private _initialized: boolean = false
-  private _initializationPromise: Promise<void> | null = null
 
   private constructor() {
     // Check if we're in a browser environment first
@@ -85,60 +76,29 @@ export class Telemetry {
     if (telemetryDisabled) {
       this._posthogClient = null
       this._scarfClient = null
-      logger.debug('Telemetry disabled via environment variable or localStorage')
     }
     else if (!isBrowser) {
       this._posthogClient = null
       this._scarfClient = null
-      logger.debug('Telemetry disabled - non-browser environment detected')
     }
     else {
-      logger.info('Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable.')
-
-      // Initialize PostHog asynchronously and store the promise
-      this._initializationPromise = this.initializePostHog()
-
-      // Initialize Scarf with proxy endpoint (avoids CORS)
+      // Initialize PostHog proxy client (sends to server)
       try {
-        this._scarfClient = new ScarfEventLogger(this.SCARF_PROXY_URL, 3000)
+        this._posthogClient = new TelemetryEventLogger(this.POSTHOG_PROXY_URL, 3000)
       }
-      catch (e) {
-        logger.warn(`Failed to initialize Scarf telemetry: ${e}`)
+      catch {
+        // Silently fail - telemetry should not break the application
+        this._posthogClient = null
+      }
+
+      // Initialize Scarf proxy client (sends to server)
+      try {
+        this._scarfClient = new TelemetryEventLogger(this.SCARF_PROXY_URL, 3000)
+      }
+      catch {
+        // Silently fail - telemetry should not break the application
         this._scarfClient = null
       }
-    }
-  }
-
-  private async initializePostHog(): Promise<void> {
-    try {
-      // Dynamically import posthog-js only in browser environment
-      const posthogModule = await import('posthog-js')
-      const posthogInstance = posthogModule.default
-
-      // Create a promise that resolves when PostHog is fully loaded
-      await new Promise<void>((resolve) => {
-        // Initialize PostHog
-        posthogInstance.init(this.PROJECT_API_KEY, {
-          api_host: this.HOST,
-          autocapture: false,
-          capture_pageview: false,
-          disable_session_recording: true,
-          persistence: 'localStorage',
-          loaded: (ph) => {
-            logger.debug('PostHog initialized successfully')
-            this._posthogClient = ph
-            this._initialized = true
-            resolve()
-          },
-        })
-
-        this._posthogClient = posthogInstance
-      })
-    }
-    catch (e) {
-      logger.warn(`Failed to initialize PostHog telemetry: ${e}`)
-      this._posthogClient = null
-      this._initialized = false
     }
   }
 
@@ -180,7 +140,6 @@ export class Telemetry {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(getCacheKey('source'), source)
     }
-    logger.debug(`Telemetry source set to: ${source}`)
   }
 
   /**
@@ -213,16 +172,17 @@ export class Telemetry {
         const newUserId = this.generateUserId()
         localStorage.setItem(getCacheKey('user_id'), newUserId)
         this._currUserId = newUserId
-        logger.debug(`New user ID created: ${newUserId}`)
       }
 
       // Track package download on first access
       this.trackPackageDownload({
         triggered_by: 'user_id_property',
-      }).catch(e => logger.debug(`Failed to track package download: ${e}`))
+      }).catch(() => {
+        // Silently fail - telemetry should not break the application
+      })
     }
-    catch (e) {
-      logger.debug(`Failed to get/create user ID: ${e}`)
+    catch {
+      // Silently fail - telemetry should not break the application
       this._currUserId = this.UNKNOWN_USER_ID
     }
 
@@ -243,38 +203,30 @@ export class Telemetry {
       return
     }
 
-    // Wait for PostHog to be fully initialized before capturing events
-    if (this._initializationPromise && !this._initialized) {
+    // Send to PostHog proxy
+    if (this._posthogClient) {
       try {
-        // Wait for initialization to complete (with timeout)
-        await Promise.race([
-          this._initializationPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Initialization timeout')), 5000)),
-        ])
+        // Add package version, language flag, source, and user_id to all events
+        const properties: Record<string, any> = {
+          event: event.name,
+          user_id: this.userId, // Include user_id for distinct_id
+          properties: {
+            ...event.properties,
+            mcp_use_version: getPackageVersion(),
+            language: 'typescript',
+            source: this._source,
+            package: 'inspector',
+          },
+        }
+
+        await this._posthogClient.logEvent(properties)
       }
-      catch (e) {
-        logger.debug(`PostHog initialization timed out or failed: ${e}`)
+      catch {
+        // Silently fail - telemetry should not break the application
       }
     }
 
-    // Send to PostHog
-    if (this._posthogClient && this._initialized) {
-      try {
-        // Add package version, language flag, and source to all events
-        const properties = { ...event.properties }
-        properties.mcp_use_version = getPackageVersion()
-        properties.language = 'typescript'
-        properties.source = this._source
-        properties.package = 'inspector'
-
-        this._posthogClient.capture(event.name, properties)
-      }
-      catch (e) {
-        logger.debug(`Failed to track PostHog event ${event.name}: ${e}`)
-      }
-    }
-
-    // Send to Scarf
+    // Send to Scarf proxy
     if (this._scarfClient) {
       try {
         // Add package version, user_id, language flag, and source to all events
@@ -288,14 +240,13 @@ export class Telemetry {
 
         await this._scarfClient.logEvent(properties)
       }
-      catch (e) {
-        logger.debug(`Failed to track Scarf event ${event.name}: ${e}`)
+      catch {
+        // Silently fail - telemetry should not break the application
       }
     }
   }
 
   async trackPackageDownload(properties?: Record<string, any>): Promise<void> {
-    logger.debug('Tracking package download')
     if (!this._scarfClient) {
       return
     }
@@ -327,7 +278,6 @@ export class Telemetry {
       }
 
       if (shouldTrack) {
-        logger.debug(`Tracking package download event with properties: ${JSON.stringify(properties)}`)
         // Add package version, user_id, language flag, and source to event
         const eventProperties = { ...(properties || {}) }
         eventProperties.mcp_use_version = currentVersion
@@ -341,36 +291,13 @@ export class Telemetry {
         await this._scarfClient.logEvent(eventProperties)
       }
     }
-    catch (e) {
-      logger.debug(`Failed to track Scarf package_download event: ${e}`)
+    catch {
+      // Silently fail - telemetry should not break the application
     }
   }
 
   async trackInspectorOpen(data: { serverUrl?: string, connectionCount?: number }): Promise<void> {
     const event = new MCPInspectorOpenEvent(data)
     await this.capture(event)
-  }
-
-  // PostHog specific methods
-  identify(userId: string, properties?: Record<string, any>): void {
-    if (this._posthogClient) {
-      try {
-        this._posthogClient.identify(userId, properties)
-      }
-      catch (e) {
-        logger.debug(`Failed to identify user: ${e}`)
-      }
-    }
-  }
-
-  reset(): void {
-    if (this._posthogClient) {
-      try {
-        this._posthogClient.reset()
-      }
-      catch (e) {
-        logger.debug(`Failed to reset PostHog: ${e}`)
-      }
-    }
   }
 }

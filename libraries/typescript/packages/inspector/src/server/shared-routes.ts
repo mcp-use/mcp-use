@@ -231,6 +231,44 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
     })
   })
 
+  // Telemetry proxy endpoint - forwards telemetry events to PostHog from server-side
+  app.post('/inspector/api/tel/posthog', async (c) => {
+    try {
+      const body = await c.req.json()
+      const { event, user_id, properties } = body
+
+      if (!event) {
+        return c.json({ success: false, error: 'Missing event name' }, 400)
+      }
+
+      // Initialize PostHog lazily (only when needed)
+      const { PostHog } = await import('posthog-node')
+      const posthog = new PostHog('phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI', {
+        host: 'https://eu.i.posthog.com',
+      })
+
+      // Use the user_id from the request, or fallback to 'anonymous'
+      const distinctId = user_id || 'anonymous'
+
+      // Capture the event
+      posthog.capture({
+        distinctId,
+        event,
+        properties: properties || {},
+      })
+
+      // Flush to ensure event is sent
+      await posthog.shutdown()
+
+      return c.json({ success: true })
+    }
+    catch (error) {
+      console.error('[Telemetry] Error forwarding to PostHog:', error)
+      // Don't fail - telemetry should be silent
+      return c.json({ success: false })
+    }
+  })
+
   // Telemetry proxy endpoint - forwards telemetry events to Scarf from server-side
   app.post('/inspector/api/tel/scarf', async (c) => {
     try {
