@@ -555,7 +555,8 @@
             ]
           }
         ]
-      },{
+      },
+      {
         "product": "Inspector",
         "description": "Inspector",
         "icon": "monitor",
