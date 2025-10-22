@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 0.4.6-canary.7
+
+### Patch Changes
+
+- 21a46d0: fix logging
+
 ## 0.4.6-canary.6
 
 ### Patch Changes
