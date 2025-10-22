@@ -76,3 +76,24 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync main to canary
+        if: steps.check.outputs.should_publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Fetch latest changes
+          git fetch origin
+
+          # Checkout canary and merge main
+          git checkout canary
+          git merge origin/main --no-edit -m "chore: sync version updates from main"
+
+          # Push canary
+          git push origin canary
+
+          echo "✅ Synced main version updates to canary branch"
