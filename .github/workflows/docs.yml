@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -66,7 +68,7 @@ jobs:
             MODIFIED=$(git status --porcelain docs/)
             echo "$MODIFIED"
             echo ""
-            echo "Diff:"
+            echo "Diff (working tree vs HEAD):"
             git diff docs/
             echo "modified_files<<EOF" >> $GITHUB_OUTPUT
             echo "$MODIFIED" >> $GITHUB_OUTPUT
