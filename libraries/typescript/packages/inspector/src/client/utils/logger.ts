@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 export const logger = {
   debug: (...args: any[]) => {
     if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
