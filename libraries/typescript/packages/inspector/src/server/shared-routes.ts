@@ -1,4 +1,5 @@
 import type { Hono } from 'hono'
+import { logger } from 'hono/logger'
 import {
   generateWidgetContainerHtml,
   generateWidgetContentHtml,
@@ -21,6 +22,9 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
   app.get('/inspector/health', (c) => {
     return c.json({ status: 'ok', timestamp: new Date().toISOString() })
   })
+
+  // Apply logger middleware only to proxy routes
+  app.use('/inspector/api/proxy/*', logger())
 
   app.all('/inspector/api/proxy/*', async (c) => {
     try {
@@ -72,9 +76,9 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
       response.headers.forEach((value, key) => {
         const lowerKey = key.toLowerCase()
         // Skip compression-related headers that don't match the actual body state
-        if (lowerKey !== 'content-encoding' &&
-          lowerKey !== 'transfer-encoding' &&
-          lowerKey !== 'content-length') {
+        if (lowerKey !== 'content-encoding'
+          && lowerKey !== 'transfer-encoding'
+          && lowerKey !== 'content-length') {
           responseHeaders[key] = value
         }
       })
@@ -104,22 +108,22 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
 
         // Start streaming in the background
         ; (async () => {
-          try {
-            for await (const chunk of handleChatRequestStream(requestBody)) {
-              await writer.write(encoder.encode(chunk))
-            }
+        try {
+          for await (const chunk of handleChatRequestStream(requestBody)) {
+            await writer.write(encoder.encode(chunk))
           }
-          catch (error) {
-            const errorMsg = `${JSON.stringify({
-              type: 'error',
-              data: { message: error instanceof Error ? error.message : 'Unknown error' },
-            })}\n`
-            await writer.write(encoder.encode(errorMsg))
-          }
-          finally {
-            await writer.close()
-          }
-        })()
+        }
+        catch (error) {
+          const errorMsg = `${JSON.stringify({
+            type: 'error',
+            data: { message: error instanceof Error ? error.message : 'Unknown error' },
+          })}\n`
+          await writer.write(encoder.encode(errorMsg))
+        }
+        finally {
+          await writer.close()
+        }
+      })()
 
       return new Response(readable, {
         headers: {
