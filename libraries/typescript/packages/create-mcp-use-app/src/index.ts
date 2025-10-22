@@ -81,7 +81,9 @@ function isInGitRepository(): boolean {
   try {
     execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' })
     return true
-  } catch (_) { }
+  } catch (_) {
+    // Not in a git repository
+  }
   return false
 }
 
@@ -89,7 +91,9 @@ function isDefaultBranchSet(): boolean {
   try {
     execSync('git config init.defaultBranch', { stdio: 'ignore' })
     return true
-  } catch (_) { }
+  } catch (_) {
+    // Default branch is not set
+  }
   return false
 }
 
@@ -118,7 +122,9 @@ function tryGitInit(root: string): boolean {
     if (didInit) {
       try {
         rmSync(join(root, '.git'), { recursive: true, force: true })
-      } catch (_) { }
+      } catch (_) {
+        // Failed to remove .git directory
+      }
     }
     return false
   }
