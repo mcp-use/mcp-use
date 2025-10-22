@@ -70,6 +70,7 @@ export class Telemetry {
   private _scarfClient: ScarfEventLogger | null = null
   private _source: string = 'inspector'
   private _initialized: boolean = false
+  private _initializationPromise: Promise<void> | null = null
 
   private constructor() {
     // Check if we're in a browser environment first
@@ -94,8 +95,8 @@ export class Telemetry {
     else {
       logger.info('Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable.')
 
-      // Initialize PostHog asynchronously
-      this.initializePostHog()
+      // Initialize PostHog asynchronously and store the promise
+      this._initializationPromise = this.initializePostHog()
 
       // Initialize Scarf with proxy endpoint (avoids CORS)
       try {
@@ -114,25 +115,30 @@ export class Telemetry {
       const posthogModule = await import('posthog-js')
       const posthogInstance = posthogModule.default
 
-      // Initialize PostHog
-      posthogInstance.init(this.PROJECT_API_KEY, {
-        api_host: this.HOST,
-        autocapture: false,
-        capture_pageview: false,
-        disable_session_recording: true,
-        persistence: 'localStorage',
-        loaded: (ph) => {
-          logger.debug('PostHog initialized successfully')
-          this._posthogClient = ph
-          this._initialized = true
-        },
-      })
+      // Create a promise that resolves when PostHog is fully loaded
+      await new Promise<void>((resolve) => {
+        // Initialize PostHog
+        posthogInstance.init(this.PROJECT_API_KEY, {
+          api_host: this.HOST,
+          autocapture: false,
+          capture_pageview: false,
+          disable_session_recording: true,
+          persistence: 'localStorage',
+          loaded: (ph) => {
+            logger.debug('PostHog initialized successfully')
+            this._posthogClient = ph
+            this._initialized = true
+            resolve()
+          },
+        })
 
-      this._posthogClient = posthogInstance
+        this._posthogClient = posthogInstance
+      })
     }
     catch (e) {
       logger.warn(`Failed to initialize PostHog telemetry: ${e}`)
       this._posthogClient = null
+      this._initialized = false
     }
   }
 
@@ -237,13 +243,22 @@ export class Telemetry {
       return
     }
 
-    // Wait for PostHog to be initialized
-    if (this._posthogClient && !this._initialized) {
-      await new Promise(resolve => setTimeout(resolve, 100))
+    // Wait for PostHog to be fully initialized before capturing events
+    if (this._initializationPromise && !this._initialized) {
+      try {
+        // Wait for initialization to complete (with timeout)
+        await Promise.race([
+          this._initializationPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Initialization timeout')), 5000)),
+        ])
+      }
+      catch (e) {
+        logger.debug(`PostHog initialization timed out or failed: ${e}`)
+      }
     }
 
     // Send to PostHog
-    if (this._posthogClient) {
+    if (this._posthogClient && this._initialized) {
       try {
         // Add package version, language flag, and source to all events
         const properties = { ...event.properties }
