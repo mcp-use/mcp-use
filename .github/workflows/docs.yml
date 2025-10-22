@@ -65,6 +65,9 @@ jobs:
             echo "The following files have been modified:"
             MODIFIED=$(git status --porcelain docs/)
             echo "$MODIFIED"
+            echo ""
+            echo "Diff:"
+            git diff docs/
             echo "modified_files<<EOF" >> $GITHUB_OUTPUT
             echo "$MODIFIED" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
