@@ -15,6 +15,7 @@ function isBrowserEnvironment(): boolean {
 }
 
 // Simple Scarf event logger implementation
+// Uses a proxy endpoint to avoid CORS issues when sending to Scarf gateway
 class ScarfEventLogger {
   private endpoint: string
   private timeout: number
@@ -29,6 +30,7 @@ class ScarfEventLogger {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
+      // Use local proxy endpoint to forward to Scarf (avoids CORS)
       const response = await fetch(this.endpoint, {
         method: 'POST',
         headers: {
@@ -60,7 +62,7 @@ export class Telemetry {
 
   private readonly PROJECT_API_KEY = 'phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI'
   private readonly HOST = 'https://eu.i.posthog.com'
-  private readonly SCARF_GATEWAY_URL = 'https://mcpuse.gateway.scarf.sh/events-inspector'
+  private readonly SCARF_PROXY_URL = '/inspector/api/tel/scarf'
   private readonly UNKNOWN_USER_ID = 'UNKNOWN_USER_ID'
 
   private _currUserId: string | null = null
@@ -95,9 +97,9 @@ export class Telemetry {
       // Initialize PostHog asynchronously
       this.initializePostHog()
 
-      // Initialize Scarf
+      // Initialize Scarf with proxy endpoint (avoids CORS)
       try {
-        this._scarfClient = new ScarfEventLogger(this.SCARF_GATEWAY_URL, 3000)
+        this._scarfClient = new ScarfEventLogger(this.SCARF_PROXY_URL, 3000)
       }
       catch (e) {
         logger.warn(`Failed to initialize Scarf telemetry: ${e}`)

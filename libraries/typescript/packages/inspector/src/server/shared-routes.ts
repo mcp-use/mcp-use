@@ -218,4 +218,33 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
       autoConnectUrl: config?.autoConnectUrl || null,
     })
   })
+
+  // Telemetry proxy endpoint - forwards telemetry events to Scarf from server-side
+  app.post('/inspector/api/tel/scarf', async (c) => {
+    try {
+      const body = await c.req.json()
+
+      // Forward to Scarf gateway from server (no CORS issues)
+      const response = await fetch('https://mcpuse.gateway.scarf.sh/events-inspector', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        console.error('[Telemetry] Scarf request failed:', response.status)
+
+        return c.json({ success: false, status: response.status, error: response.statusText })
+      }
+
+      return c.json({ success: true })
+    }
+    catch (error) {
+      console.error('[Telemetry] Error forwarding to Scarf:', error)
+      // Don't fail - telemetry should be silent
+      return c.json({ success: false })
+    }
+  })
 }
