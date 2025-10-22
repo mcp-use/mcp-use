@@ -1,9 +1,12 @@
 packages:
-  - 'packages/*'
-  - 'test_app'
-  - 'packages/mcp-use/examples/client/react'
-  - 'packages/mcp-use/examples/server/simple'
-  - 'packages/create-mcp-use-app/src/templates/starter'
-  - 'packages/create-mcp-use-app/src/templates/ui-resource'
-  - 'packages/create-mcp-use-app/src/templates/apps-sdk-demo'
-  - 'packages/create-mcp-use-app/src/templates/weather'
+  - packages/*
+  - test_app
+  - packages/mcp-use/examples/client/react
+  - packages/mcp-use/examples/server/simple
+  - packages/create-mcp-use-app/src/templates/starter
+  - packages/create-mcp-use-app/src/templates/ui-resource
+  - packages/create-mcp-use-app/src/templates/apps-sdk-demo
+  - packages/create-mcp-use-app/src/templates/weather
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - esbuild
