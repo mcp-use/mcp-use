@@ -72,6 +72,7 @@ class MCPAgent:
         base_url: str = "https://cloud.mcp-use.com",
         callbacks: list | None = None,
         chat_id: str | None = None,
+        message_id : str | None = None,
         retry_on_error: bool = True,
         max_retries_per_step: int = 2,
     ):
@@ -133,6 +134,7 @@ class MCPAgent:
         # Set up observability callbacks using the ObservabilityManager
         self.observability_manager = ObservabilityManager(custom_callbacks=callbacks)
         self.callbacks = self.observability_manager.get_callbacks()
+        self.message_id = message_id if message_id else None
 
         # Either client or connector must be provided
         if not client and len(self.connectors) == 0:
@@ -636,7 +638,9 @@ class MCPAgent:
 
                                 # Add the final response to conversation history if memory is enabled
                                 if self.memory_enabled:
-                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                                    self.add_to_history(
+                                        AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                                    )
 
                                 logger.info("✅ Structured output successful")
                                 success = True
@@ -661,7 +665,7 @@ class MCPAgent:
                                 # Add this as feedback and continue the loop
                                 inputs["input"] = missing_info_prompt
                                 if self.memory_enabled:
-                                    self.add_to_history(HumanMessage(content=missing_info_prompt))
+                                    self.add_to_history(HumanMessage(content=missing_info_prompt, id=self.message_id))
 
                                 logger.info("🔄 Continuing execution to gather missing information...")
                                 continue
@@ -747,7 +751,9 @@ class MCPAgent:
 
                     # Add the final response to conversation history if memory is enabled
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                        self.add_to_history(
+                            AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                        )
 
                     logger.info("✅ Final structured output successful")
                     success = True
@@ -759,10 +765,10 @@ class MCPAgent:
                     raise RuntimeError(f"Failed to generate structured output after {steps} steps: {str(e)}") from e
 
             if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
+                self.add_to_history(HumanMessage(content=query, id=self.message_id))
 
             if self.memory_enabled and not output_schema:
-                self.add_to_history(AIMessage(content=self._normalize_output(result)))
+                self.add_to_history(AIMessage(content=self._normalize_output(result), id=self.message_id))
 
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
             if not success:
@@ -1029,11 +1035,13 @@ class MCPAgent:
                 if isinstance(output, list):
                     for message in output:
                         if not isinstance(message, ToolAgentAction):
+                            if self.message_id:
+                                message["id"] = self.message_id
                             self.add_to_history(message)
             yield event
 
         if self.memory_enabled:
-            self.add_to_history(HumanMessage(content=query))
+            self.add_to_history(HumanMessage(content=query, id=self.message_id))
 
         # 5. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
