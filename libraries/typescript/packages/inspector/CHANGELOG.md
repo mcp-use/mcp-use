@@ -1,5 +1,55 @@
 # @mcp-use/inspector
 
+## 0.4.6-canary.7
+
+### Patch Changes
+
+- 21a46d0: fix logging
+
+## 0.4.6-canary.6
+
+### Patch Changes
+
+- c0d9b0b: chore: cleanup logging
+
+## 0.4.6-canary.5
+
+### Patch Changes
+
+- 1f18132: fix ph use ph-node
+
+## 0.4.6-canary.4
+
+### Patch Changes
+
+- f958d73: The main changes ensure that the proxy does not request or forward compressed responses and that problematic headers are filtered out when forwarding responses.
+
+## 0.4.6-canary.3
+
+### Patch Changes
+
+- 6010d08: fix scarf
+
+## 0.4.6-canary.2
+
+### Patch Changes
+
+- Updated dependencies [60f20cb]
+  - mcp-use@1.1.6-canary.1
+
+## 0.4.6-canary.1
+
+### Patch Changes
+
+- 3d759e9: add ph
+
+## 0.4.6-canary.0
+
+### Patch Changes
+
+- Updated dependencies [6960f7f]
+  - mcp-use@1.1.6-canary.0
+
 ## 0.4.5
 
 ### Patch Changes

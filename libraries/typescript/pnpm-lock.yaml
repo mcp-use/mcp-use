@@ -313,6 +313,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.1(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@scarf/scarf':
+        specifier: ^1.4.0
+        version: 1.4.0
       '@tailwindcss/cli':
         specifier: ^4.1.14
         version: 4.1.14
@@ -355,6 +358,9 @@ importers:
       open:
         specifier: ^10.0.0
         version: 10.2.0
+      posthog-node:
+        specifier: ^5.1.1
+        version: 5.9.5
       react:
         specifier: ^19.2.0
         version: 19.2.0

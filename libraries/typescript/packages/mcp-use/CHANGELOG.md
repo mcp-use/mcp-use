@@ -1,5 +1,19 @@
 # mcp-use
 
+## 1.1.6-canary.1
+
+### Patch Changes
+
+- 60f20cb: Test canary
+  - @mcp-use/inspector@0.4.6-canary.2
+
+## 1.1.6-canary.0
+
+### Patch Changes
+
+- 6960f7f: Fix Server cors issue
+  - @mcp-use/inspector@0.4.6-canary.0
+
 ## 1.1.5
 
 ### Patch Changes

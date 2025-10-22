@@ -3,7 +3,6 @@ import { promisify } from 'node:util'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
 import { registerInspectorRoutes } from './shared-routes.js'
 import { registerStaticRoutesWithDevProxy } from './shared-static.js'
 import { isPortAvailable } from './utils.js'
@@ -14,7 +13,6 @@ const app = new Hono()
 
 // Middleware
 app.use('*', cors())
-app.use('*', logger())
 
 // Register all API routes
 registerInspectorRoutes(app)

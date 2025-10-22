@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.5-canary.0
+
+### Patch Changes
+
+- b76bf22: create-mcp-use app inits a git repository
+
 ## 0.4.4
 
 ### Patch Changes

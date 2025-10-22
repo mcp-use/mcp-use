@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { MCPServerRemovedEvent, Telemetry } from '@/client/telemetry'
 
 export interface MCPConnection {
   id: string
@@ -335,6 +336,18 @@ export function McpProvider({ children }: { children: ReactNode }) {
   )
 
   const removeConnection = useCallback((id: string) => {
+    // Track server removed
+    const telemetry = Telemetry.getInstance()
+    telemetry
+      .capture(
+        new MCPServerRemovedEvent({
+          serverId: id,
+        }),
+      )
+      .catch(() => {
+        // Silently fail - telemetry should not break the application
+      })
+
     setSavedConnections((prev) => {
       const updated = prev.filter(c => c.id !== id)
       localStorage.setItem('mcp-inspector-connections', JSON.stringify(updated))
