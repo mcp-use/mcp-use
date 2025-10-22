@@ -12,6 +12,7 @@ import type {
 import { McpServer as OfficialMcpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import express, { type Express } from 'express'
+import cors from 'cors'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { requestLogger } from './logging.js'
@@ -28,11 +29,11 @@ export class McpServer {
 
   /**
    * Creates a new MCP server instance with Express integration
-   * 
+   *
    * Initializes the server with the provided configuration, sets up CORS headers,
    * configures widget serving routes, and creates a proxy that allows direct
    * access to Express methods while preserving MCP server functionality.
-   * 
+   *
    * @param config - Server configuration including name, version, and description
    * @returns A proxied McpServer instance that supports both MCP and Express methods
    */
@@ -47,14 +48,12 @@ export class McpServer {
     // Parse JSON bodies
     this.app.use(express.json())
 
-    // TODO enable override
     // Enable CORS by default
-    this.app.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*')
-      res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, mcp-protocol-version, mcp-session-id, X-Proxy-Token, X-Target-URL')
-      next()
-    })
+    this.app.use(cors({
+      origin: '*',
+      methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'mcp-protocol-version', 'mcp-session-id', 'X-Proxy-Token', 'X-Target-URL'],
+    }))
 
     // Request logging middleware
     this.app.use(requestLogger)
@@ -76,11 +75,11 @@ export class McpServer {
 
   /**
    * Define a static resource that can be accessed by clients
-   * 
+   *
    * Registers a resource with the MCP server that clients can access via HTTP.
    * Resources are static content like files, data, or pre-computed results that
    * can be retrieved by clients without requiring parameters.
-   * 
+   *
    * @param resourceDefinition - Configuration object containing resource metadata and handler function
    * @param resourceDefinition.name - Unique identifier for the resource
    * @param resourceDefinition.uri - URI pattern for accessing the resource
@@ -90,7 +89,7 @@ export class McpServer {
    * @param resourceDefinition.annotations - Optional annotations (audience, priority, lastModified)
    * @param resourceDefinition.readCallback - Async callback function that returns the resource content
    * @returns The server instance for method chaining
-   * 
+   *
    * @example
    * ```typescript
    * server.resource({
@@ -133,17 +132,17 @@ export class McpServer {
 
   /**
    * Define a dynamic resource template with parameters
-   * 
+   *
    * Registers a parameterized resource template with the MCP server. Templates use URI
    * patterns with placeholders that can be filled in at request time, allowing dynamic
    * resource generation based on parameters.
-   * 
+   *
    * @param resourceTemplateDefinition - Configuration object for the resource template
    * @param resourceTemplateDefinition.name - Unique identifier for the template
    * @param resourceTemplateDefinition.resourceTemplate - ResourceTemplate object with uriTemplate and metadata
    * @param resourceTemplateDefinition.readCallback - Async callback function that generates resource content from URI and params
    * @returns The server instance for method chaining
-   * 
+   *
    * @example
    * ```typescript
    * server.resourceTemplate({
@@ -209,13 +208,13 @@ export class McpServer {
 
   /**
    * Define a tool that can be called by clients
-   * 
+   *
    * Registers a tool with the MCP server that clients can invoke with parameters.
    * Tools are functions that perform actions, computations, or operations and
    * return results. They accept structured input parameters and return structured output.
-   * 
+   *
    * Supports Apps SDK metadata for ChatGPT integration via the _meta field.
-   * 
+   *
    * @param toolDefinition - Configuration object containing tool metadata and handler function
    * @param toolDefinition.name - Unique identifier for the tool
    * @param toolDefinition.description - Human-readable description of what the tool does
@@ -223,7 +222,7 @@ export class McpServer {
    * @param toolDefinition.cb - Async callback function that executes the tool logic with provided parameters
    * @param toolDefinition._meta - Optional metadata for the tool (e.g. Apps SDK metadata)
    * @returns The server instance for method chaining
-   * 
+   *
    * @example
    * ```typescript
    * server.tool({
@@ -266,18 +265,18 @@ export class McpServer {
 
   /**
    * Define a prompt template
-   * 
+   *
    * Registers a prompt template with the MCP server that clients can use to generate
    * structured prompts for AI models. Prompt templates accept parameters and return
    * formatted text that can be used as input to language models or other AI systems.
-   * 
+   *
    * @param promptDefinition - Configuration object containing prompt metadata and handler function
    * @param promptDefinition.name - Unique identifier for the prompt template
    * @param promptDefinition.description - Human-readable description of the prompt's purpose
    * @param promptDefinition.args - Array of argument definitions with types and validation
    * @param promptDefinition.cb - Async callback function that generates the prompt from provided arguments
    * @returns The server instance for method chaining
-   * 
+   *
    * @example
    * ```typescript
    * server.prompt({
@@ -356,7 +355,7 @@ export class McpServer {
    *   },
    *   size: ['900px', '600px']
    * })
-   * 
+   *
    * // Apps SDK widget
    * server.uiResource({
    *   type: 'appsSdk',
@@ -610,18 +609,18 @@ export class McpServer {
 
   /**
    * Mount MCP server endpoints at /mcp
-   * 
+   *
    * Sets up the HTTP transport layer for the MCP server, creating endpoints for
    * Server-Sent Events (SSE) streaming, POST message handling, and DELETE session cleanup.
    * Each request gets its own transport instance to prevent state conflicts between
    * concurrent client connections.
-   * 
+   *
    * This method is called automatically when the server starts listening and ensures
    * that MCP clients can communicate with the server over HTTP.
-   * 
+   *
    * @private
    * @returns Promise that resolves when MCP endpoints are successfully mounted
-   * 
+   *
    * @example
    * Endpoints created:
    * - GET /mcp - SSE streaming endpoint for real-time communication
@@ -687,17 +686,17 @@ export class McpServer {
 
   /**
    * Start the Express server with MCP endpoints
-   * 
+   *
    * Initiates the server startup process by mounting MCP endpoints, configuring
    * the inspector UI (if available), and starting the Express server to listen
    * for incoming connections. This is the main entry point for running the server.
-   * 
+   *
    * The server will be accessible at the specified port with MCP endpoints at /mcp
    * and inspector UI at /inspector (if the inspector package is installed).
-   * 
+   *
    * @param port - Port number to listen on (defaults to 3001 if not specified)
    * @returns Promise that resolves when the server is successfully listening
-   * 
+   *
    * @example
    * ```typescript
    * await server.listen(8080)
@@ -721,22 +720,22 @@ export class McpServer {
 
   /**
    * Mount MCP Inspector UI at /inspector
-   * 
+   *
    * Dynamically loads and mounts the MCP Inspector UI package if available, providing
    * a web-based interface for testing and debugging MCP servers. The inspector
    * automatically connects to the local MCP server endpoints.
-   * 
+   *
    * This method gracefully handles cases where the inspector package is not installed,
    * allowing the server to function without the inspector in production environments.
-   * 
+   *
    * @private
    * @returns void
-   * 
+   *
    * @example
    * If @mcp-use/inspector is installed:
    * - Inspector UI available at http://localhost:PORT/inspector
    * - Automatically connects to http://localhost:PORT/mcp
-   * 
+   *
    * If not installed:
    * - Server continues to function normally
    * - No inspector UI available
@@ -763,19 +762,19 @@ export class McpServer {
 
   /**
    * Setup default widget serving routes
-   * 
+   *
    * Configures Express routes to serve MCP UI widgets and their static assets.
    * Widgets are served from the dist/resources/mcp-use/widgets directory and can
    * be accessed via HTTP endpoints for embedding in web applications.
-   * 
+   *
    * Routes created:
    * - GET /mcp-use/widgets/:widget - Serves widget's index.html
    * - GET /mcp-use/widgets/:widget/assets/* - Serves widget-specific assets
    * - GET /mcp-use/widgets/assets/* - Fallback asset serving with auto-discovery
-   * 
+   *
    * @private
    * @returns void
-   * 
+   *
    * @example
    * Widget routes:
    * - http://localhost:3001/mcp-use/widgets/kanban-board
@@ -822,14 +821,14 @@ export class McpServer {
 
   /**
    * Create input schema for resource templates
-   * 
+   *
    * Parses a URI template string to extract parameter names and generates a Zod
    * validation schema for those parameters. Used internally for validating resource
    * template parameters before processing requests.
-   * 
+   *
    * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
    * @returns Object mapping parameter names to Zod string schemas
-   * 
+   *
    * @example
    * ```typescript
    * const schema = this.createInputSchema("/users/{id}/posts/{postId}")
@@ -849,14 +848,14 @@ export class McpServer {
 
   /**
    * Create input schema for tools
-   * 
+   *
    * Converts tool input definitions into Zod validation schemas for runtime validation.
    * Supports common data types (string, number, boolean, object, array) and optional
    * parameters. Used internally when registering tools with the MCP server.
-   * 
+   *
    * @param inputs - Array of input parameter definitions with name, type, and optional flag
    * @returns Object mapping parameter names to Zod validation schemas
-   * 
+   *
    * @example
    * ```typescript
    * const schema = this.createToolInputSchema([
@@ -908,14 +907,14 @@ export class McpServer {
 
   /**
    * Create arguments schema for prompts
-   * 
+   *
    * Converts prompt argument definitions into Zod validation schemas for runtime validation.
    * Supports common data types (string, number, boolean, object, array) and optional
    * parameters. Used internally when registering prompt templates with the MCP server.
-   * 
+   *
    * @param inputs - Array of argument definitions with name, type, and optional flag
    * @returns Object mapping argument names to Zod validation schemas
-   * 
+   *
    * @example
    * ```typescript
    * const schema = this.createPromptArgsSchema([
@@ -962,14 +961,14 @@ export class McpServer {
 
   /**
    * Extract parameter names from URI template
-   * 
+   *
    * Parses a URI template string to extract parameter names enclosed in curly braces.
    * Used internally to identify dynamic parameters in resource templates and generate
    * appropriate validation schemas.
-   * 
+   *
    * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
    * @returns Array of parameter names found in the template
-   * 
+   *
    * @example
    * ```typescript
    * const params = this.extractTemplateParams("/users/{id}/posts/{postId}")
@@ -983,14 +982,14 @@ export class McpServer {
 
   /**
    * Parse parameter values from a URI based on a template
-   * 
+   *
    * Extracts parameter values from an actual URI by matching it against a URI template.
    * The template contains placeholders like {param} which are extracted as key-value pairs.
-   * 
+   *
    * @param template - URI template with placeholders (e.g., "user://{userId}/posts/{postId}")
    * @param uri - Actual URI to parse (e.g., "user://123/posts/456")
    * @returns Object mapping parameter names to their values
-   * 
+   *
    * @example
    * ```typescript
    * const params = this.parseTemplateUri("user://{userId}/posts/{postId}", "user://123/posts/456")
