@@ -315,10 +315,8 @@
                 "group": "Core",
                 "icon": "package",
                 "pages": [
-                  "python/api-reference/mcp_use_cli",
                   "python/api-reference/mcp_use_client",
                   "python/api-reference/mcp_use_logging",
-                  "python/api-reference/mcp_use_server",
                   "python/api-reference/mcp_use_utils"
                 ]
               },
