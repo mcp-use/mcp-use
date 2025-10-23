@@ -1,6 +1,5 @@
 import { createMCPServer } from 'mcp-use/server'
 import type {
-  ExternalUrlUIResource,
   RawHtmlUIResource,
   RemoteDomUIResource
 } from 'mcp-use/server'
