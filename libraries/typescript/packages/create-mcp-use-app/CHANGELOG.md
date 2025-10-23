@@ -1,5 +1,43 @@
 # create-mcp-use-app
 
+## 0.4.6-canary.2
+
+### Patch Changes
+
+- 66cc1d9: fix dev deps
+
+## 0.4.6-canary.1
+
+### Patch Changes
+
+- 113d2a3: update package.json files to include @mcp-use/cli and @mcp-use/inspector as devDependencies in apps-sdk, mcp-ui, and starter templates
+
+## 0.4.6-canary.0
+
+### Patch Changes
+
+- 6b8fdf2: ## Apps SDK widgets & Automatic Widget Registration
+
+  ### Key Features Added
+
+  #### Automatic UI Widget Registration
+  - **Major Enhancement**: React components in `resources/` folder now auto-register as MCP tools and resources
+  - No boilerplate needed, just export `widgetMetadata` with Zod schema
+  - Automatically creates both MCP tool and `ui://widget/{name}` resource endpoints
+  - Integration with existing manual registration patterns
+
+  #### Template System Restructuring
+  - Renamed `ui-resource` → `mcp-ui` for clarity
+  - Consolidated `apps-sdk-demo` into streamlined `apps-sdk` template
+  - Enhanced `starter` template as default with both MCP-UI and Apps SDK examples
+  - Added comprehensive weather examples to all templates
+
+  #### 📚 Documentation Enhancements
+  - Complete rewrite of template documentation with feature comparison matrices
+  - New "Automatic Widget Registration" section in ui-widgets.mdx
+  - Updated quick start guides for all package managers (npm, pnpm, yarn)
+  - Added practical weather widget implementation examples
+
 ## 0.4.5
 
 ### Patch Changes

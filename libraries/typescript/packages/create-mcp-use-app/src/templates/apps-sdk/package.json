@@ -1,8 +1,8 @@
 {
-  "name": "mcp-use-starter-server",
+  "name": "Weather App",
   "type": "module",
   "version": "1.0.0",
-  "description": "MCP server with starter tools and resources",
+  "description": "MCP server with apps sdk integration",
   "author": "",
   "license": "MIT",
   "keywords": [

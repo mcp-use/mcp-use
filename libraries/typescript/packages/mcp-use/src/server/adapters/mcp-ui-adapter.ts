@@ -30,7 +30,7 @@ export interface UrlConfig {
  * Build the full URL for a widget including query parameters
  *
  * @param widget - Widget identifier
- * @param props - Parameters to pass as query params
+ * @param props - Parameters to pass as a single JSON-encoded props param
  * @param config - URL configuration (baseUrl and port)
  * @returns Complete widget URL with encoded parameters
  */
@@ -44,15 +44,9 @@ export function buildWidgetUrl(
     `${config.baseUrl}:${config.port}`
   )
 
-  if (props) {
-    Object.entries(props).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        const stringValue = typeof value === 'object'
-          ? JSON.stringify(value)
-          : String(value)
-        url.searchParams.set(key, stringValue)
-      }
-    })
+  // Pass all props as a single JSON-encoded parameter
+  if (props && Object.keys(props).length > 0) {
+    url.searchParams.set('props', JSON.stringify(props))
   }
 
   return url.toString()

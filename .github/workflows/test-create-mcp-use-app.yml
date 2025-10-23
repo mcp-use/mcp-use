@@ -60,7 +60,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         pm: [npm, yarn, pnpm]
-        template: [starter, ui-resource, apps-sdk-demo]
+        template: [starter, mcp-ui, apps-sdk]
         flag: ["", "--yarn", "--npm", "--pnpm", "--dev", "--canary"]
         exclude:
           # Don't test redundant flag combinations (e.g., yarn with --yarn flag)
@@ -404,7 +404,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         pm: [npm, yarn]
-        template: [starter, ui-resource, apps-sdk-demo]
+        template: [starter, mcp-ui, apps-sdk]
 
     steps:
       - name: Checkout

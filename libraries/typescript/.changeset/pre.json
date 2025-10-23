@@ -1,0 +1,15 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.1.18",
+    "create-mcp-use-app": "0.4.5",
+    "@mcp-use/inspector": "0.4.6",
+    "mcp-use": "1.1.6"
+  },
+  "changesets": [
+    "easy-wings-learn",
+    "green-wolves-check",
+    "solid-places-marry"
+  ]
+}

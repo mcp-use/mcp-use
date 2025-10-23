@@ -284,7 +284,7 @@ describe('MCP-UI Adapter', () => {
       expect(script).toContain('An interactive remote DOM widget')
       expect(script).toContain('"enabled":true')
       expect(script).toContain('"count":5')
-      expect(script).toContain('ui_interactive-widget')
+      expect(script).toContain('interactive-widget')
       expect(script).toContain('ui-button')
     })
 
@@ -983,10 +983,6 @@ describe('MCP-UI Adapter', () => {
 <html>
 <head>
   <meta charset="UTF-8">
-  <style>
-    body { margin: 0; padding: 20px; font-family: system-ui; }
-    .container { max-width: 1200px; }
-  </style>
 </head>
 <body>
   <div id="root"></div>

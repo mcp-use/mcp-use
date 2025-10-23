@@ -220,10 +220,11 @@ export function ToolResultDisplay({
                                         componentUrl={appsSdkUri}
                                         toolName={result.toolName}
                                         toolArgs={result.args}
-                                        toolResult={appsSdk.resourceData}
+                                        toolResult={result.result}
+                                        resource={appsSdk.resourceData}
                                         serverId={serverId}
                                         readResource={readResource}
-                                        className="w-full h-full relative flex p-4"
+                                        className="w-full h-full relative p-4"
                                       />
                                     </div>
                                   )

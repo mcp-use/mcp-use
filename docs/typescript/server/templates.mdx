@@ -8,26 +8,52 @@ icon: "layout-template"
 
 The `create-mcp-use-app` tool provides several project templates to help you get started quickly with different types of MCP servers. Each template is optimized for specific use cases and includes pre-configured examples.
 
-**Quick Start:**
-```bash
-npx create-mcp-use-app my-server
-cd my-server
+<CodeGroup>
+```bash npm
+npx create-mcp-use-app@latest my-mcp-server
+cd my-mcp-server
 npm run dev
 ```
+
+```bash pnpm
+pnpm create mcp-use-app@latest my-mcp-server
+cd my-mcp-server
+pnpm run dev
+```
+
+```bash yarn
+yarn create mcp-use-app@latest my-mcp-server
+cd my-mcp-server
+yarn dev
+```
+</CodeGroup>
+
+<Tip>
+To explore available templates and options, run:
+```bash
+npx create-mcp-use-app --help
+```
+</Tip>
 
 
 ## Available Templates
 
-# Starter Template (Default)
- 
-The starter template is a comprehensive template that includes all the features of the UI Resource template, as well as the Apps SDK template.
+### 🚀 Starter Template (Default)
+
+The **starter** template is the most comprehensive option, showcasing all MCP features including tools, resources, prompts, and automatic UI widget registration for MCP-UI and OpenAI Apps SDK.
 
 **What's Included:**
-- Full MCP server setup with tools, resources, and prompts
-- React-based UI widgets with hot reload
-- Kanban board example widget
-- Development tools with auto-inspector
+- Full MCP server setup with all primitive types:
+  - **Tools**: `fetch-weather` - fetches weather data for any city
+  - **Resources**: `config://settings` - server configuration example
+  - **Prompts**: `review-code` - code review prompt template
+- **Automatic UI Widget Registration** from `resources/` folder:
+  - `display-weather` - Weather visualization widget (OpenAI Apps SDK)
+  - `kanban-board` - Task management board (MCP-UI)
+- Hot reload development environment
 - Production build configuration
+
+**Best For:** Learning all MCP features, full-featured applications, production-ready servers
 
 **Quick Start:**
 ```bash
@@ -36,249 +62,122 @@ cd my-server
 npm run dev
 ```
 
-### 🎯 UI Resource Template
+**Example Usage:**
+```typescript
+// Fetch weather data
+const weather = await client.callTool('fetch-weather', { city: 'London' })
 
-The most comprehensive template for building MCP servers with interactive UI widgets.
+// Display it in a beautiful widget
+const widget = await client.callTool('display-weather', { 
+  city: 'London',
+  temperature: '15',
+  condition: 'Partly Cloudy'
+})
+```
+
+---
+
+### ⚡ Apps SDK Template
+
+The **apps-sdk** template demonstrates how to build OpenAI Apps SDK compatible widgets for ChatGPT.
 
 **What's Included:**
-- Full MCP server setup with tools, resources, and prompts
-- React-based UI widgets with hot reload
-- Kanban board example widget
-- Development tools with auto-inspector
-- Production build configuration
+- Lightweight MCP server setup
+- **Automatic UI Widget Registration** from `resources/` folder:
+  - `display-weather` - Weather visualization widget
+- Simple tool example: `get-my-city`
+- Minimal configuration for fast development
 
-**Use When:**
-- Building interactive MCP applications
-- Need UI components alongside MCP tools
-- Want the full development experience
+**Best For:** Quick prototypes, widget-focused apps, minimal overhead projects
 
 **Quick Start:**
 ```bash
-npx create-mcp-use-app my-server --template ui-resource
+npx create-mcp-use-app my-server --template apps-sdk
 cd my-server
 npm run dev
 ```
 
+**Example Usage:**
+```typescript
+// All React components in resources/ folder are automatically registered!
+// Just export widgetMetadata and mcp-use handles the rest
 
-### 🍕 Apps SDK Template (Pizzaz)
+const widget = await client.callTool('display-weather', { 
+  city: 'San Francisco',
+  temperature: '22',
+  condition: 'Sunny'
+})
+```
 
-OpenAI Apps SDK integration with reference implementations.
+---
+
+### 🎨 MCP-UI Template
+
+The **mcp-ui** template demonstrates all three MCP-UI UIResource types with examples of each approach.
 
 **What's Included:**
-- 5 Pizzaz reference widgets from OpenAI
-- Full Apps SDK metadata configuration
-- Content Security Policy setup
-- External resource loading from CDN
-- Tool invocation status messages
+- **External URL (Iframe Widgets)**: 
+  - `kanban-board` - Complex interactive board served from filesystem
+  - Automatic static file serving
+  - Full asset support
+- **Raw HTML (Direct Rendering)**:
+  - `welcome-card` - Beautiful glass-morphic welcome card
+  - No iframe overhead
+  - Perfect for simple visualizations
+- **Remote DOM (React Components)**:
+  - `quick-poll` - Interactive polling widget
+  - Uses MCP-UI React components (`ui-stack`, `ui-button`, `ui-text`)
+  - Lightweight scripting approach
+- Traditional MCP tools and resources examples
 
-**Widgets:**
-- `pizza-map` - Interactive map widget
-- `pizza-carousel` - Carousel browsing widget
-- `pizza-albums` - Album gallery widget
-- `pizza-list` - List view widget
-- `pizza-video` - Video player widget
-
-**Use When:**
-- Building for ChatGPT or OpenAI platforms
-- Need Apps SDK compatibility
-- Want reference implementations
+**Best For:** Understanding all UIResource types, complex UI requirements, MCP-UI specification compliance
 
 **Quick Start:**
 ```bash
-npx create-mcp-use-app my-apps-server --template apps-sdk-demo
-cd my-apps-server
+npx create-mcp-use-app my-server --template mcp-ui
+cd my-server
 npm run dev
 ```
 
-## Development Workflow
-
-### 1. Create Your Project
-
-Choose the template that best fits your needs:
-
-```bash
-# Interactive mode - choose template via prompts
-npx create-mcp-use-app
-
-# Direct mode with template
-npx create-mcp-use-app my-project --template starter
-```
-
-### 2. Install Dependencies
-
-```bash
-cd my-project
-npm install
-```
-
-### 3. Start Development
-
-All templates support hot reload development:
-
-```bash
-npm run dev
-```
-
-This starts:
-- MCP server (default port 3000)
-- Inspector UI (auto-opens in browser)
-- Widget development server (if applicable)
-
-### 4. Build for Production
-
-```bash
-npm run build
-npm start
-```
-
-## Customizing Templates
-
-### Adding New Widgets
-
-For UI Resource and MCP-UI templates:
-
-1. Create a new React component in `resources/`:
-
-```tsx
-// resources/my-widget.tsx
-import React from 'react'
-
-export default function MyWidget() {
-  return (
-    <div>
-      <h1>My Custom Widget</h1>
-      {/* Your widget code */}
-    </div>
-  )
-}
-```
-
-2. Register it in your server:
-
+**Example Usage:**
 ```typescript
-server.uiResource({
-  type: 'externalUrl',
-  name: 'my-widget',
-  widget: 'my-widget',
-  title: 'My Custom Widget',
-  description: 'A custom widget'
+// External URL - Served via iframe with full interactivity
+await client.callTool('kanban-board', {
+  initialTasks: [{id: 1, title: 'Task 1'}],
+  theme: 'dark'
+})
+
+// Raw HTML - Direct rendering, no iframe
+await client.readResource('ui://widget/welcome-card')
+
+// Remote DOM - Interactive React components
+await client.callTool('quick-poll', {
+  question: 'Favorite color?',
+  options: ['Red', 'Blue', 'Green']
 })
 ```
 
-### Adding MCP Tools
+---
 
-All templates support adding MCP tools:
+## Template Comparison
 
-```typescript
-server.tool({
-  name: 'my_tool',
-  description: 'My custom tool',
-  inputs: [
-    { name: 'input', type: 'string', required: true }
-  ],
-  cb: async ({ input }) => {
-    return {
-      content: [{
-        type: 'text',
-        text: `Processed: ${input}`
-      }]
-    }
-  }
-})
-```
+| Feature | Starter | Apps SDK | MCP-UI |
+|---------|---------|----------|--------|
+| **MCP Tools** | ✅ Examples | ✅ Minimal | ✅ Examples |
+| **MCP Resources** | ✅ Examples | ❌ | ✅ Examples |
+| **MCP Prompts** | ✅ Examples | ❌ | ❌ |
+| **Auto Widget Registration** | ✅ | ✅ | ❌ |
+| **External URL Widgets** | ✅ | ✅ | ✅ Manual |
+| **Raw HTML Widgets** | ❌ | ❌ | ✅ |
+| **Remote DOM Widgets** | ❌ | ❌ | ✅ |
+| **Complexity** | Medium | Low | High |
+| **Best Use Case** | Production apps | Quick start | Learning MCP-UI |
 
-### Environment Configuration
-
-Use the `.env` file for configuration:
-
-```env
-# Server Configuration
-PORT=3000
-NODE_ENV=development
-
-# API Keys (if needed)
-OPENAI_API_KEY=your-key-here
-
-# Database (if needed)
-DATABASE_URL=postgresql://localhost:5432/mydb
-```
-
-## Template Scripts
-
-All templates include these npm scripts:
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start development server with hot reload |
-| `npm run build` | Build for production |
-| `npm start` | Run production build |
-| `npm run clean` | Remove build artifacts |
-| `npm run typecheck` | Check TypeScript types |
-
-## Choosing the Right Template
-
-### Use UI Resource Template When:
-- Building a full-featured MCP application
-- Need both tools and interactive UI
-- Want the complete development experience
-- Planning to deploy to production
-
-### Use MCP-UI Template When:
-- Focusing primarily on UI widgets
-- Building MCP-UI compatible interfaces
-- Need React with hot module replacement
-- Want a lighter setup
-
-### Use Apps SDK Template When:
-- Building for ChatGPT/OpenAI platforms
-- Need Apps SDK metadata support
-- Want reference implementations
-- Integrating with OpenAI tools
-
-## Migration Between Templates
-
-You can manually add features from one template to another:
-
-### Adding Apps SDK to UI Resource:
-
-```typescript
-// Add Apps SDK metadata to your widgets
-server.uiResource({
-  type: 'appsSdk',
-  name: 'my-widget',
-  htmlTemplate: widgetHTML,
-  appsSdkMetadata: {
-    'openai/widgetDescription': 'My widget description',
-    'openai/widgetCSP': {
-      connect_domains: [],
-      resource_domains: ['https://cdn.example.com']
-    }
-  }
-})
-```
-
-### Adding React Widgets to Apps SDK:
-
-1. Install React dependencies:
-```bash
-npm install react react-dom @vitejs/plugin-react vite
-```
-
-2. Add resources directory and create React components
-
-3. Configure Vite for widget building
-
-## Best Practices
-
-1. **Start Simple**: Begin with the default template and add features as needed
-2. **Use TypeScript**: All templates include TypeScript for better development experience
-3. **Environment Variables**: Keep secrets in `.env` files (never commit them)
-4. **Test with Inspector**: Use the auto-opening inspector for development
-5. **Build for Production**: Always test production builds before deployment
+---
 
 ## Next Steps
 
-- [MCP-UI Resources Guide](./mcp-ui-resources) - Deep dive into MCP-UI widgets
-- [Apps SDK Resources Guide](./apps-sdk-resources) - OpenAI Apps SDK integration
-- [UI Widgets](./ui-widgets) - General widget development guide
-- [Getting Started](./getting-started) - Basic server setup
+- [UI Widgets](./ui-widgets) - Deep dive into automatic UI widget registration
+- [Tools](./tools) - Learn about MCP tools
+- [Resources](./resources) - Understand MCP resources
+- [Prompts](./prompts) - Work with prompt templates
