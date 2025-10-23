@@ -1,6 +1,7 @@
 import React from 'react';
 import { z } from 'zod';
-
+import { useWidget } from 'mcp-use/react';
+import '../styles.css';
 
 const propSchema = z.object({
   city: z.string().describe('The city to display weather for'),
@@ -13,7 +14,15 @@ export const widgetMetadata = {
   inputs: propSchema,
 }
 
-const WeatherWidget: React.FC<z.infer<typeof propSchema>> = ({ city, weather, temperature }) => {
+type WeatherProps = z.infer<typeof propSchema>;
+
+const WeatherWidget: React.FC = () => {
+  // Use the useWidget hook to get props from OpenAI Apps SDK
+  const { props, theme, sendFollowUpMessage, callTool, requestDisplayMode } = useWidget<WeatherProps>();
+  
+  console.log(props)
+
+  const { city, weather, temperature } = props;
   const getWeatherIcon = (weatherType: string) => {
     switch (weatherType?.toLowerCase()) {
       case 'sunny':
@@ -44,20 +53,25 @@ const WeatherWidget: React.FC<z.infer<typeof propSchema>> = ({ city, weather, te
     }
   };
 
+  // Theme-aware styling
+  const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
+  const textColor = theme === 'dark' ? 'text-gray-100' : 'text-gray-800';
+  const subtextColor = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
+
   return (
-    <div className="max-w-sm mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+    <div className={`max-w-sm mx-auto ${bgColor} rounded-xl shadow-lg overflow-hidden`}>
       <div className={`h-32 bg-gradient-to-br ${getWeatherColor(weather)} flex items-center justify-center`}>
         <div className="text-6xl">{getWeatherIcon(weather)}</div>
       </div>
       
       <div className="p-6">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">{city}</h2>
+          <h2 className={`text-2xl font-bold ${textColor} mb-2`}>{city}</h2>
           <div className="flex items-center justify-center space-x-4">
-            <span className="text-4xl font-light text-gray-700">{temperature}°</span>
+            <span className={`text-4xl font-light ${textColor}`}>{temperature}°</span>
             <div className="text-right">
-              <p className="text-lg font-medium text-gray-600 capitalize">{weather}</p>
-              <p className="text-sm text-gray-500">Current</p>
+              <p className={`text-lg font-medium ${subtextColor} capitalize`}>{weather}</p>
+              <p className={`text-sm ${subtextColor}`}>Current</p>
             </div>
           </div>
         </div>
