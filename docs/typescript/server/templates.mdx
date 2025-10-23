@@ -38,16 +38,22 @@ npx create-mcp-use-app --help
 
 ## Available Templates
 
-# Starter Template (Default)
- 
-The starter template is a comprehensive template that includes all the features of the UI Resource template, as well as the Apps SDK template.
+### 🚀 Starter Template (Default)
+
+The **starter** template is the most comprehensive option, showcasing all MCP features including tools, resources, prompts, and automatic UI widget registration for MCP-UI and OpenAI Apps SDK.
 
 **What's Included:**
-- Full MCP server setup with tools, resources, and prompts
-- React-based UI widgets with hot reload
-- Kanban board example widget
-- Development tools with auto-inspector
+- Full MCP server setup with all primitive types:
+  - **Tools**: `fetch-weather` - fetches weather data for any city
+  - **Resources**: `config://settings` - server configuration example
+  - **Prompts**: `review-code` - code review prompt template
+- **Automatic UI Widget Registration** from `resources/` folder:
+  - `display-weather` - Weather visualization widget (OpenAI Apps SDK)
+  - `kanban-board` - Task management board (MCP-UI)
+- Hot reload development environment
 - Production build configuration
+
+**Best For:** Learning all MCP features, full-featured applications, production-ready servers
 
 **Quick Start:**
 ```bash
@@ -56,18 +62,122 @@ cd my-server
 npm run dev
 ```
 
-### 🎯 UI Resource Template
+**Example Usage:**
+```typescript
+// Fetch weather data
+const weather = await client.callTool('fetch-weather', { city: 'London' })
 
-The most comprehensive template for building MCP servers with interactive UI widgets.
+// Display it in a beautiful widget
+const widget = await client.callTool('display-weather', { 
+  city: 'London',
+  temperature: '15',
+  condition: 'Partly Cloudy'
+})
+```
+
+---
+
+### ⚡ Apps SDK Template
+
+The **apps-sdk** template demonstrates how to build OpenAI Apps SDK compatible widgets for ChatGPT.
 
 **What's Included:**
-- Full MCP server setup with tools, resources, and prompts
-- React-based UI widgets with hot reload
-- Kanban board example widget
-- Development tools with auto-inspector
-- Production build configuration
+- Lightweight MCP server setup
+- **Automatic UI Widget Registration** from `resources/` folder:
+  - `display-weather` - Weather visualization widget
+- Simple tool example: `get-my-city`
+- Minimal configuration for fast development
 
+**Best For:** Quick prototypes, widget-focused apps, minimal overhead projects
+
+**Quick Start:**
+```bash
+npx create-mcp-use-app my-server --template apps-sdk
+cd my-server
+npm run dev
+```
+
+**Example Usage:**
+```typescript
+// All React components in resources/ folder are automatically registered!
+// Just export widgetMetadata and mcp-use handles the rest
+
+const widget = await client.callTool('display-weather', { 
+  city: 'San Francisco',
+  temperature: '22',
+  condition: 'Sunny'
+})
+```
+
+---
+
+### 🎨 MCP-UI Template
+
+The **mcp-ui** template demonstrates all three MCP-UI UIResource types with examples of each approach.
+
+**What's Included:**
+- **External URL (Iframe Widgets)**: 
+  - `kanban-board` - Complex interactive board served from filesystem
+  - Automatic static file serving
+  - Full asset support
+- **Raw HTML (Direct Rendering)**:
+  - `welcome-card` - Beautiful glass-morphic welcome card
+  - No iframe overhead
+  - Perfect for simple visualizations
+- **Remote DOM (React Components)**:
+  - `quick-poll` - Interactive polling widget
+  - Uses MCP-UI React components (`ui-stack`, `ui-button`, `ui-text`)
+  - Lightweight scripting approach
+- Traditional MCP tools and resources examples
+
+**Best For:** Understanding all UIResource types, complex UI requirements, MCP-UI specification compliance
+
+**Quick Start:**
+```bash
+npx create-mcp-use-app my-server --template mcp-ui
+cd my-server
+npm run dev
+```
+
+**Example Usage:**
+```typescript
+// External URL - Served via iframe with full interactivity
+await client.callTool('kanban-board', {
+  initialTasks: [{id: 1, title: 'Task 1'}],
+  theme: 'dark'
+})
+
+// Raw HTML - Direct rendering, no iframe
+await client.readResource('ui://widget/welcome-card')
+
+// Remote DOM - Interactive React components
+await client.callTool('quick-poll', {
+  question: 'Favorite color?',
+  options: ['Red', 'Blue', 'Green']
+})
+```
+
+---
+
+## Template Comparison
+
+| Feature | Starter | Apps SDK | MCP-UI |
+|---------|---------|----------|--------|
+| **MCP Tools** | ✅ Examples | ✅ Minimal | ✅ Examples |
+| **MCP Resources** | ✅ Examples | ❌ | ✅ Examples |
+| **MCP Prompts** | ✅ Examples | ❌ | ❌ |
+| **Auto Widget Registration** | ✅ | ✅ | ❌ |
+| **External URL Widgets** | ✅ | ✅ | ✅ Manual |
+| **Raw HTML Widgets** | ❌ | ❌ | ✅ |
+| **Remote DOM Widgets** | ❌ | ❌ | ✅ |
+| **Complexity** | Medium | Low | High |
+| **Best Use Case** | Production apps | Quick start | Learning MCP-UI |
+
+---
 
 ## Next Steps
 
-- [UI Widgets](./ui-widgets) - Deep dive into UI widgets
+- [UI Widgets](./ui-widgets) - Deep dive into automatic UI widget registration
+- [Tools](./tools) - Learn about MCP tools
+- [Resources](./resources) - Understand MCP resources
+- [Prompts](./prompts) - Work with prompt templates
