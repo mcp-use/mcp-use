@@ -96,6 +96,7 @@ class MCPAgent:
             callbacks: List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler.
             retry_on_error: Whether to retry tool calls that fail due to validation errors.
             max_retries_per_step: Maximum number of retries for validation errors per step.
+            message_id: The Id sent by user for each message.
         """
         # Handle remote execution
         if agent_id is not None:
