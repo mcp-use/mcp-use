@@ -35,8 +35,6 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@mcp-use/cli": "workspace:*",
-    "@mcp-use/inspector": "workspace:*",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2"
   }
