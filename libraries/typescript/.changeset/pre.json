@@ -8,6 +8,7 @@
     "mcp-use": "1.1.6"
   },
   "changesets": [
-    "easy-wings-learn"
+    "easy-wings-learn",
+    "green-wolves-check"
   ]
 }

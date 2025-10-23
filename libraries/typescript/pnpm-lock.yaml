@@ -174,6 +174,12 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@mcp-use/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../../../../inspector
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.2
@@ -205,6 +211,12 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@mcp-use/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../../../../inspector
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.2
@@ -236,6 +248,12 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@mcp-use/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../../../../inspector
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.2

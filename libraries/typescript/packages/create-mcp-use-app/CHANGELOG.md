@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.6-canary.1
+
+### Patch Changes
+
+- 113d2a3: update package.json files to include @mcp-use/cli and @mcp-use/inspector as devDependencies in apps-sdk, mcp-ui, and starter templates
+
 ## 0.4.6-canary.0
 
 ### Patch Changes
