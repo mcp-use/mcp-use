@@ -56,12 +56,13 @@ async function waitForServer(port: number, host: string = 'localhost', maxAttemp
 }
 
 // Helper to run a command
-function runCommand(command: string, args: string[], cwd: string): Promise<void> {
+function runCommand(command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, {
       cwd,
       stdio: 'inherit',
       shell: false,
+      env: env ? { ...process.env, ...env } : process.env,
     });
 
     proc.on('error', reject);
@@ -141,50 +142,11 @@ program
       // Start all processes concurrently
       const processes: any[] = [];
       
-      // 1. TypeScript watch
-      // const tscProc = await runCommand('npx', ['tsc', '--watch'], projectPath);
-      // processes.push(tscProc);
-
-      // // 2. Build widgets once (manifest generation)
-      // console.log(chalk.gray('Building widgets...'));
-      // await buildWidgets(projectPath);
-
-      // // Wait a bit for initial builds
-      // await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // // 3. Server with tsx - Vite HMR will be handled by server.enableDevMode()
-      // console.log(`\x1b[32m✓\x1b[0m Starting server with tsx watch ${serverFile}...`);
-
-
-      const serverProc = runCommand('npx', ['tsx', 'watch', serverFile], projectPath);
+      const serverProc = runCommand('npx', ['tsx', 'watch', serverFile], projectPath, {
+        PORT: String(port),
+        HOST: host,
+      });
       processes.push(serverProc);
-
-      // const serverProc = spawn('npx', ['tsx', 'watch', serverFile], {
-      //   cwd: projectPath,
-      //   stdio: 'inherit',
-      //   shell: false,
-      //   env: { 
-      //     ...process.env, 
-      //     PORT: String(port),
-      //     DEV: 'true',
-      //     NODE_ENV: 'development'
-      //   },
-      // });
-      
-      // serverProc.on('error', (err) => {
-      //   console.error('\x1b[31m✗\x1b[0m Server process error:', err);
-      // });
-      
-      // serverProc.on('exit', (code, signal) => {
-      //   if (code !== null && code !== 0) {
-      //     console.error(`\x1b[31m✗\x1b[0m Server process exited with code ${code}`);
-      //   }
-      //   if (signal) {
-      //     console.error(`\x1b[31m✗\x1b[0m Server process killed with signal ${signal}`);
-      //   }
-      // });
-      
-      // processes.push(serverProc);
 
       // Auto-open inspector if enabled
       if (options.open !== false) {
@@ -195,10 +157,10 @@ program
           const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpUrl)}`;
           const readyTime = Date.now() - startTime;
           console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
-          console.log(chalk.blue(`Local:    http://${host}:${port}`));
-          console.log(chalk.blue(`Network:  http://${host}:${port}`));
-          console.log(chalk.blue(`MCP:      ${mcpUrl}`));
-          console.log(chalk.blue(`Inspector: ${inspectorUrl}\n`));
+          console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+          console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
+          console.log(chalk.whiteBright(`MCP:      ${mcpUrl}`));
+          console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
           await open(inspectorUrl);
         }
       }

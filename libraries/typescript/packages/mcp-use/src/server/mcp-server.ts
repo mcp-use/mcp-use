@@ -13,13 +13,15 @@ import { McpServer as OfficialMcpServer, ResourceTemplate } from '@modelcontextp
 import { z } from 'zod'
 import express, { type Express } from 'express'
 import cors from 'cors'
-import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { requestLogger } from './logging.js'
 import { createUIResourceFromDefinition, type UrlConfig } from './adapters/mcp-ui-adapter.js'
 import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
 import {createServer} from "vite"
+
+
+const TMP_MCP_USE_DIR = join(process.cwd(), '.mcp-use')
 
 
 export class McpServer {
@@ -31,7 +33,6 @@ export class McpServer {
   private serverPort?: number
   private serverHost: string
   private serverBaseUrl?: string
-  private widgetManifest?: Record<string, any>
 
   /**
    * Creates a new MCP server instance with Express integration
@@ -46,7 +47,7 @@ export class McpServer {
   constructor(config: ServerConfig) {
     this.config = config
     this.serverHost = config.host || 'localhost'
-    this.serverBaseUrl = config.baseUrl
+    this.serverBaseUrl = config.baseUrl;
     this.server = new OfficialMcpServer({
       name: config.name,
       version: config.version,
@@ -65,14 +66,6 @@ export class McpServer {
 
     // Request logging middleware
     this.app.use(requestLogger)
-
-    // Setup default widget serving routes
-    // this.setupWidgetRoutes()
-
-
-    
-
-   
 
     // Proxy all Express methods to the underlying app
     return new Proxy(this, {
@@ -135,6 +128,7 @@ export class McpServer {
         description: resourceDefinition.description,
         mimeType: resourceDefinition.mimeType,
         annotations: resourceDefinition.annotations,
+        _meta: resourceDefinition._meta,
       },
       async () => {
         return await resourceDefinition.readCallback()
@@ -258,7 +252,7 @@ export class McpServer {
    * ```
    */
   tool(toolDefinition: ToolDefinition): this {
-    const inputSchema = this.createToolInputSchema(toolDefinition.inputs || [])
+    const inputSchema = this.createParamsSchema(toolDefinition.inputs || [])
 
     this.server.registerTool(
       toolDefinition.name,
@@ -311,7 +305,7 @@ export class McpServer {
    * ```
    */
   prompt(promptDefinition: PromptDefinition): this {
-    const argsSchema = this.createPromptArgsSchema(promptDefinition.args || [])
+    const argsSchema = this.createParamsSchema(promptDefinition.args || [])
     this.server.registerPrompt(
       promptDefinition.name,
       {
@@ -324,55 +318,6 @@ export class McpServer {
       },
     )
     return this
-  }
-
-  /**
-   * Load widget schema from manifest
-   * @private
-   */
-  private loadWidgetSchema(widgetName: string): UIResourceDefinition {
-    try {
-      // Lazy load manifest on first use
-      if (!this.widgetManifest) {
-        try {
-          // Try to load from dist/resources/manifest.json
-          const manifestPath = join(process.cwd(), 'dist/resources/manifest.json')
-          const manifestData = readFileSync(manifestPath, 'utf8')
-          this.widgetManifest = JSON.parse(manifestData)
-        } catch (error) {
-          throw new Error(
-            `Failed to load widget manifest. Make sure to run the build process first. ` +
-            `Error: ${error instanceof Error ? error.message : String(error)}`
-          )
-        }
-      }
-      
-      const widgetData = this.widgetManifest![widgetName]
-      if (!widgetData) {
-        throw new Error(
-          `Widget "${widgetName}" not found in manifest. Available widgets: ${Object.keys(this.widgetManifest!).join(', ')}`
-        )
-      }
-      
-      // Convert kebab-case to Title Case
-      const toTitleCase = (str: string) => 
-        str.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-      
-      return {
-        type: 'externalUrl',
-        name: widgetName,
-        widget: widgetName,
-        title: toTitleCase(widgetName),
-        description: widgetData.description,
-        props: widgetData.props,
-      }
-    } catch (error) {
-      throw new Error(
-        `Failed to load widget schema for "${widgetName}". ` +
-        `Make sure to run the build process to generate the widget manifest. ` +
-        `Error: ${error instanceof Error ? error.message : String(error)}`
-      )
-    }
   }
 
   /**
@@ -531,6 +476,7 @@ export class McpServer {
         description: definition.description,
         mimeType,
         annotations: definition.annotations,
+        _meta: definition._meta,
         readCallback: async () => {
           const htmlTemplate = generateHtmlTemplate()
           const resource: any = {
@@ -559,6 +505,7 @@ export class McpServer {
           description: definition.description,
           mimeType
         },
+        _meta: definition._meta,
         title: definition.title,
         description: definition.description,
         annotations: definition.annotations,
@@ -707,21 +654,7 @@ export class McpServer {
    * })
    * ```
    */
-  uiResource(widgetNameOrDefinition: string | UIResourceDefinition): this {
-    const definition:any = typeof widgetNameOrDefinition === 'string' 
-      ? {}
-      : widgetNameOrDefinition
-    
-    // Determine tool name based on resource type
-    // For Apps SDK, use the name directly without prefix
-    let toolName: string
-    if (definition.type === 'appsSdk') {
-      toolName = definition.name
-    } else if (definition.type === 'externalUrl') {
-      toolName = `${definition.widget}`
-    } else {
-      toolName = `${definition.name}`
-    }
+  uiResource(definition: UIResourceDefinition): this {
     const displayName = definition.title || definition.name
 
     // Determine resource URI and mimeType based on type
@@ -756,6 +689,7 @@ export class McpServer {
       title: definition.title,
       description: definition.description,
       mimeType,
+      _meta: definition._meta,
       annotations: definition.annotations,
       readCallback: async () => {
         // For externalUrl type, use default props. For others, use empty params
@@ -781,6 +715,7 @@ export class McpServer {
           description: definition.description,
           mimeType
         },
+        _meta: definition._meta,
         title: definition.title,
         description: definition.description,
         annotations: definition.annotations,
@@ -797,7 +732,7 @@ export class McpServer {
 
     // Register the tool - returns UIResource with parameters
     // For Apps SDK, include the outputTemplate metadata
-    const toolMetadata: Record<string, unknown> = {}
+    const toolMetadata: Record<string, unknown> = definition._meta || {}
 
     if (definition.type === 'appsSdk' && definition.appsSdkMetadata) {
       // Add Apps SDK tool metadata
@@ -819,12 +754,9 @@ export class McpServer {
     }
 
     this.tool({
-      name: toolName,
+      name: definition.name,
       title: definition.title,
-      // For Apps SDK, use title as description to match OpenAI's pizzaz reference implementation
-      description: definition.type === 'appsSdk' && definition.title
-        ? definition.title
-        : (definition.description || `Display ${displayName}`),
+      description: definition.description,
       inputs: this.convertPropsToInputs(definition.props),
       _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
       cb: async (params) => {
@@ -987,77 +919,6 @@ export class McpServer {
     return defaults
   }
 
-  /**
-   * Mount a React app with Vite HMR at a custom route
-   *
-   * Serves a React application with hot module replacement (HMR) in development mode
-   * and built static assets in production. Perfect for serving widget galleries or
-   * admin interfaces alongside your MCP server.
-   *
-   * @param options - Configuration options for the React app
-   * @param options.route - Base route to mount the app at (e.g., '/app', '/widgets')
-   * @param options.root - Root directory containing index.html and src/ (defaults to process.cwd())
-   * @param options.base - Base URL for assets (defaults to route with trailing slash)
-   * @returns Promise that resolves when the app is mounted
-   *
-   * @example
-   * ```typescript
-   * // In development, serves with HMR at /mcp-use/widgets
-   * await server.mountReactApp({
-   *   route: '/mcp-use/widgets',
-   *   root: process.cwd()
-   * })
-   * ```
-   */
-  async mountReactApp(options: {
-    route: string
-    root?: string
-    base?: string
-  }): Promise<void> {
-    const isProd = process.env.NODE_ENV === 'production'
-    const route = options.route.replace(/\/$/, '') // Remove trailing slash
-    const base = options.base || (route.endsWith('/') ? route : route + '/')
-    const root = options.root || process.cwd()
-
-    if (!isProd) {
-      // Dev mode: Vite in middleware mode with HMR
-      const vite = await createServer({
-        appType: 'custom',
-        root,
-        server: { middlewareMode: true },
-        base,
-      })
-
-      // Mount the Vite dev middlewares under the route
-      this.app.use(route, vite.middlewares)
-
-      // Serve transformed index.html for any sub-route under the route
-      this.app.get(new RegExp(`^${route}($|/.*)`), async (req, res, next) => {
-        try {
-          const { readFileSync } = await import('node:fs')
-          const indexPath = join(root, 'index.html')
-          let html = readFileSync(indexPath, 'utf-8')
-          html = await vite.transformIndexHtml(req.originalUrl, html)
-          res.setHeader('Content-Type', 'text/html')
-          res.status(200).send(html)
-        } catch (e) {
-          vite.ssrFixStacktrace(e as Error)
-          next(e)
-        }
-      })
-
-      console.log(`[REACT APP] Dev server with HMR mounted at ${route}`)
-    } else {
-      // Prod mode: Serve built assets from /dist
-      const clientDir = join(root, 'dist/client')
-      this.app.use(route, express.static(clientDir, { index: false }))
-      this.app.get(`${route}*`, (_req, res) => {
-        res.sendFile(join(clientDir, 'index.html'))
-      })
-
-      console.log(`[REACT APP] Production build served at ${route}`)
-    }
-  }
 
   /**
    * Mount individual widget files from resources/ directory
@@ -1119,20 +980,28 @@ export class McpServer {
     }
     
     // Create a temp directory for widget entry files
-    const tempDir = join(process.cwd(), '.mcp-use-temp')
+    const tempDir = join(process.cwd(), TMP_MCP_USE_DIR)
     await fs.mkdir(tempDir, { recursive: true }).catch(() => {})
     
     const react = (await import('@vitejs/plugin-react')).default
     const tailwindcss = (await import('@tailwindcss/vite')).default
     console.log(react, tailwindcss)
-    
-    // Create entry files and Vite servers for each widget
-    for (const entry of entries) {
+
+
+    const widgets = entries.map(entry => {
       const baseName = entry.split('/').pop()?.replace(/\.tsx?$/, '') || 'widget'
       const widgetName = baseName
-      
+      return {
+        name: widgetName,
+        description: `Widget: ${widgetName}`,
+        entry: entry
+      }
+    })
+    
+    // Create entry files and Vite servers for each widget
+    for (const widget of widgets) {
       // Create temp entry and HTML files for this widget
-      const widgetTempDir = join(tempDir, widgetName)
+      const widgetTempDir = join(tempDir, widget.name)
       await fs.mkdir(widgetTempDir, { recursive: true })
       
       // Create a CSS file with Tailwind and @source directives to scan resources
@@ -1149,7 +1018,7 @@ export class McpServer {
       const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import Component from '${entry}'
+import Component from '${widget.entry}'
 
 const container = document.getElementById('widget-root')
 if (container && Component) {
@@ -1163,11 +1032,11 @@ if (container && Component) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widgetName} Widget</title>
+    <title>${widget.name} Widget</title>
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="/entry.tsx"></script>
+    <script type="module" src="${baseRoute}/${widget.name}/entry.tsx"></script>
   </body>
 </html>`
       
@@ -1178,7 +1047,7 @@ if (container && Component) {
 
       const viteServer = await createServer({
         root: widgetTempDir,
-        base: `${baseRoute}/${widgetName}/`,
+        base: `${baseRoute}/${widget.name}/`,
         plugins: [tailwindcss(), react()],
         resolve: {
           alias: {
@@ -1187,19 +1056,73 @@ if (container && Component) {
         },
         server: {
           middlewareMode: true,
-          hmr: {
-            port: 24678, // Fixed HMR port
-          },
+          // hmr: {
+          //   port: 24678, // Fixed HMR port
+          // },
         },
       })
       
       // Mount this widget's Vite server at its route
-      this.app.use(`${baseRoute}/${widgetName}`, viteServer.middlewares)
+      this.app.use(`${baseRoute}/${widget.name}`, viteServer.middlewares)
       
-      console.log(`[WIDGET] ${widgetName} mounted at ${baseRoute}/${widgetName}`)
+      console.log(`[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`)
     }
     
     console.log(`[WIDGETS] Serving ${entries.length} widget(s) with HMR`)
+
+
+
+    // register a tool and resource for each widget
+    for (const widget of widgets) {
+
+      // for now expose all widgets as appsSdk
+      const type = 'appsSdk'
+      
+      const props = {}
+
+      let html = '';
+      try {
+        html = await readFileSync(join(tempDir, widget.name, 'index.html'), 'utf8')
+      } catch (error) {
+        console.error(`Failed to read html template for widget ${widget.name}`, error)
+      }
+
+      // // html template is the content of the vite built html
+      // const html = await fetch(`${this.serverBaseUrl}/mcp-use/widgets/${widget.name}/index.html`).then(res => res.text())
+      // if (!html) {
+      //   throw new Error(`Failed to fetch html template for widget ${widget.name}`)
+      // }
+
+      this.uiResource({
+        name: widget.name,
+        title: widget.name,
+        description: widget.description,
+        type: type,
+        props: props,
+        _meta: {
+          'mcp-use/widget': {
+            name: widget.name,
+            description: widget.description,
+            type: type,
+            props: props,
+            html: html
+          }
+        },
+        htmlTemplate: html,
+        appsSdkMetadata: {
+          'openai/widgetDescription': widget.description,
+          'openai/toolInvocation/invoking': 'Hand-tossing a map',
+          'openai/toolInvocation/invoked': 'Served a fresh map',
+          'openai/widgetAccessible': true,
+          'openai/resultCanProduceWidget': true,
+          'openai/widgetCSP': {
+            connect_domains: [],
+            resource_domains: ['https://persistent.oaistatic.com']
+          }
+        }
+      })
+    }
+
   }
 
   /**
@@ -1289,7 +1212,7 @@ if (container && Component) {
    * The server will be accessible at the specified port with MCP endpoints at /mcp
    * and inspector UI at /inspector (if the inspector package is installed).
    *
-   * @param port - Port number to listen on (defaults to 3001 if not specified)
+   * @param port - Port number to listen on (defaults to PORT env var or 3001 if not specified)
    * @returns Promise that resolves when the server is successfully listening
    *
    * @example
@@ -1301,15 +1224,23 @@ if (container && Component) {
    * ```
    */
   async listen(port?: number): Promise<void> {
+    // Priority: parameter > PORT env var > default (3001)
+    this.serverPort = port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3001)
+    
+    // Update host from HOST env var if set
+    if (process.env.HOST) {
+      this.serverHost = process.env.HOST
+    }
+
+    await this.mountWidgets({
+      baseRoute: '/mcp-use/widgets',
+      resourcesDir: 'resources'
+    })
     await this.mountMcp()
     
-    this.serverPort = port || 3001
 
     // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
     this.mountInspector()
-
-    // Setup widget serving with Vite dev servers
-    await this.setupWidgetServers()
 
     this.app.listen(this.serverPort, () => {
       console.log(`[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`)
@@ -1359,269 +1290,28 @@ if (container && Component) {
       })
   }
 
-  /**
-   * Setup widget serving with Vite dev servers
-   * 
-   * Creates Vite dev servers for each widget in the resources directory,
-   * enabling HMR and proper React component serving in development mode.
-   *
-   * @private
-   * @returns Promise that resolves when widget servers are set up
-   */
-  private async setupWidgetServers(): Promise<void> {
-    const { promises: fs } = await import('node:fs')
-    
-    const srcDir = join(process.cwd(), 'resources')
-    
-    // Check if resources directory exists
-    try {
-      await fs.access(srcDir)
-    } catch (error) {
-      console.log('[WIDGETS] No resources/ directory found - skipping widget serving')
-      return
-    }
-    
-    // Find all TSX widget files using Node's fs
-    let entries: string[] = []
-    try {
-      const files = await fs.readdir(srcDir)
-      entries = files
-        .filter(f => f.endsWith('.tsx') || f.endsWith('.ts'))
-        .map(f => join(srcDir, f))
-    } catch (error) {
-      console.log('[WIDGETS] No widgets found in resources/ directory')
-      return
-    }
-    
-    if (entries.length === 0) {
-      console.log('[WIDGETS] No widgets found in resources/ directory')
-      return
-    }
-    
-    // Generate widget manifest
-    await this.generateWidgetManifest(entries)
-    
-    // Create a temp directory for widget entry files
-    const tempDir = join(process.cwd(), '.mcp-use-temp')
-    await fs.mkdir(tempDir, { recursive: true }).catch(() => {})
-    
-      // @ts-ignore - Optional peer dependency
-    const react = (await import('@vitejs/plugin-react')).default
-    const tailwindcss = (await import('@tailwindcss/vite')).default 
-    
-    // Create entry files and Vite servers for each widget
-    for (const entry of entries) {
-      const baseName = entry.split('/').pop()?.replace(/\.tsx?$/, '') || 'widget'
-      const widgetName = baseName
-      
-      // Create temp entry and HTML files for this widget
-      const widgetTempDir = join(tempDir, widgetName)
-      await fs.mkdir(widgetTempDir, { recursive: true })
-      
-      // Create a CSS file with Tailwind and @source directives to scan resources
-      const resourcesPath = join(process.cwd(), 'resources')
-      const { relative } = await import('node:path')
-      const relativeResourcesPath = relative(widgetTempDir, resourcesPath).replace(/\\/g, '/')
-      const cssContent = `@import "tailwindcss";
 
-/* Configure Tailwind to scan the resources directory */
-@source "${relativeResourcesPath}";
-`
-      await fs.writeFile(join(widgetTempDir, 'styles.css'), cssContent, 'utf8')
-      
-      const entryContent = `import React from 'react'
-import { createRoot } from 'react-dom/client'
-import './styles.css'
-import Component from '${entry}'
-
-const container = document.getElementById('widget-root')
-if (container && Component) {
-  const root = createRoot(container)
-  root.render(<Component />)
-}
-`
-      
-      const htmlContent = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widgetName} Widget</title>
-  </head>
-  <body>
-    <div id="widget-root"></div>
-    <script type="module" src="/entry.tsx"></script>
-  </body>
-</html>`
-      
-      await fs.writeFile(join(widgetTempDir, 'entry.tsx'), entryContent, 'utf8')
-      await fs.writeFile(join(widgetTempDir, 'index.html'), htmlContent, 'utf8')
-      
-      // Create a Vite dev server for this widget
-      const viteServer = await createServer({
-        root: widgetTempDir,
-        base: "/mcp-use/widgets",
-        plugins: [react(), tailwindcss()],
-        resolve: {
-          alias: {
-            '@': join(process.cwd(), 'resources'),
-          },
-        },
-        server: {
-          middlewareMode: true,
-          hmr: {
-            port: 24678, // Fixed HMR port
-          },
-        },
-      })
-      
-      // Mount this widget's Vite server at its route
-      this.app.use(`/mcp-use/widgets/${widgetName}`, viteServer.middlewares)
-    }
-    
-    console.log(`[WIDGETS] Serving ${entries.length} widget(s) with HMR`)
-  }
 
   /**
-   * Generate widget manifest from TSX files
-   * 
-   * @private
-   */
-  private async generateWidgetManifest(entries: string[]): Promise<void> {
-    const { promises: fs } = await import('node:fs')
-    const outDir = join(process.cwd(), 'dist/resources')
-    const manifest: Record<string, any> = {}
-    
-    for (const entry of entries) {
-      try {
-        // Try to extract schema - this would need the schema-generator utility
-        // For now, create a basic manifest entry
-        const widgetName = entry.split('/').pop()?.replace(/\.tsx?$/, '') || 'widget'
-        manifest[widgetName] = {
-          name: widgetName,
-          description: `Widget: ${widgetName}`,
-          props: {}
-        }
-      } catch (error) {
-        console.warn(`Failed to generate manifest for ${entry}:`, error)
-      }
-    }
-    
-    // Write manifest
-    await fs.mkdir(outDir, { recursive: true }).catch(() => {})
-    await fs.writeFile(
-      join(outDir, 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-      'utf8'
-    )
-  }
-
-  /**
-   * Setup default widget serving routes
+   * Create schema for tool inputs or prompt arguments
    *
-   * Configures Express routes to serve MCP UI widgets and their static assets.
-   * Widgets are served from the dist/resources/mcp-use/widgets directory and can
-   * be accessed via HTTP endpoints for embedding in web applications.
+   * Converts input/argument definitions into Zod validation schemas for runtime validation.
+   * Supports common data types (string, number, boolean, object, array), optional
+   * parameters, and descriptions. Used internally when registering tools and prompts with the MCP server.
    *
-   * Routes created:
-   * - GET /mcp-use/widgets/:widget - Serves widget's index.html
-   * - GET /mcp-use/widgets/:widget/assets/* - Serves widget-specific assets
-   * - GET /mcp-use/widgets/assets/* - Fallback asset serving with auto-discovery
-   *
-   * @private
-   * @returns void
-   *
-   * @example
-   * Widget routes (using configured host, defaults to localhost):
-   * - http://localhost:3001/mcp-use/widgets/kanban-board
-   * - http://localhost:3001/mcp-use/widgets/todo-list/assets/style.css
-   * - http://localhost:3001/mcp-use/widgets/assets/script.js (auto-discovered)
-   */
-  private setupWidgetRoutes(): void {
-    // Serve static assets (JS, CSS) from the assets directory
-    this.app.get('/mcp-use/widgets/:widget/assets/*', (req, res, next) => {
-      const widget = req.params.widget
-      const assetFile = (req.params as any)[0]
-      const assetPath = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets', widget, 'assets', assetFile)
-      res.sendFile(assetPath, err => (err ? next() : undefined))
-    })
-
-    // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
-    this.app.get('/mcp-use/widgets/assets/*', (req, res, next) => {
-      const assetFile = (req.params as any)[0]
-      // Try to find which widget this asset belongs to by checking all widget directories
-      const widgetsDir = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets')
-
-      try {
-        const widgets = readdirSync(widgetsDir)
-        for (const widget of widgets) {
-          const assetPath = join(widgetsDir, widget, 'assets', assetFile)
-          if (existsSync(assetPath)) {
-            return res.sendFile(assetPath)
-          }
-        }
-        next()
-      }
-      catch {
-        next()
-      }
-    })
-
-    // Serve each widget's index.html at its route
-    // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/mcp-use/widgets/kanban-board/index.html
-    this.app.get('/mcp-use/widgets/:widget', (req, res, next) => {
-      const filePath = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets', req.params.widget, 'index.html')
-      res.sendFile(filePath, err => (err ? next() : undefined))
-    })
-  }
-
-  /**
-   * Create input schema for resource templates
-   *
-   * Parses a URI template string to extract parameter names and generates a Zod
-   * validation schema for those parameters. Used internally for validating resource
-   * template parameters before processing requests.
-   *
-   * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
-   * @returns Object mapping parameter names to Zod string schemas
-   *
-   * @example
-   * ```typescript
-   * const schema = this.createInputSchema("/users/{id}/posts/{postId}")
-   * // Returns: { id: z.string(), postId: z.string() }
-   * ```
-   */
-  private createInputSchema(uriTemplate: string): Record<string, z.ZodSchema> {
-    const params = this.extractTemplateParams(uriTemplate)
-    const schema: Record<string, z.ZodSchema> = {}
-
-    params.forEach((param) => {
-      schema[param] = z.string()
-    })
-
-    return schema
-  }
-
-  /**
-   * Create input schema for tools
-   *
-   * Converts tool input definitions into Zod validation schemas for runtime validation.
-   * Supports common data types (string, number, boolean, object, array) and optional
-   * parameters. Used internally when registering tools with the MCP server.
-   *
-   * @param inputs - Array of input parameter definitions with name, type, and optional flag
+   * @param inputs - Array of input parameter definitions with name, type, optional flag, and description
    * @returns Object mapping parameter names to Zod validation schemas
    *
    * @example
    * ```typescript
-   * const schema = this.createToolInputSchema([
-   *   { name: 'query', type: 'string', required: true },
+   * const schema = this.createParamsSchema([
+   *   { name: 'query', type: 'string', required: true, description: 'Search query' },
    *   { name: 'limit', type: 'number', required: false }
    * ])
-   * // Returns: { query: z.string(), limit: z.number().optional() }
+   * // Returns: { query: z.string().describe('Search query'), limit: z.number().optional() }
    * ```
    */
-  private createToolInputSchema(inputs: Array<{ name: string, type: string, required?: boolean, description?: string }>): Record<string, z.ZodSchema> {
+  private createParamsSchema(inputs: Array<{ name: string, type: string, required?: boolean, description?: string }>): Record<string, z.ZodSchema> {
     const schema: Record<string, z.ZodSchema> = {}
 
     inputs.forEach((input) => {
@@ -1661,80 +1351,6 @@ if (container && Component) {
     return schema
   }
 
-  /**
-   * Create arguments schema for prompts
-   *
-   * Converts prompt argument definitions into Zod validation schemas for runtime validation.
-   * Supports common data types (string, number, boolean, object, array) and optional
-   * parameters. Used internally when registering prompt templates with the MCP server.
-   *
-   * @param inputs - Array of argument definitions with name, type, and optional flag
-   * @returns Object mapping argument names to Zod validation schemas
-   *
-   * @example
-   * ```typescript
-   * const schema = this.createPromptArgsSchema([
-   *   { name: 'topic', type: 'string', required: true },
-   *   { name: 'style', type: 'string', required: false }
-   * ])
-   * // Returns: { topic: z.string(), style: z.string().optional() }
-   * ```
-   */
-  private createPromptArgsSchema(inputs: Array<{ name: string, type: string, required?: boolean }>): Record<string, z.ZodSchema> {
-    const schema: Record<string, z.ZodSchema> = {}
-
-    inputs.forEach((input) => {
-      let zodType: z.ZodSchema
-      switch (input.type) {
-        case 'string':
-          zodType = z.string()
-          break
-        case 'number':
-          zodType = z.number()
-          break
-        case 'boolean':
-          zodType = z.boolean()
-          break
-        case 'object':
-          zodType = z.object({})
-          break
-        case 'array':
-          zodType = z.array(z.any())
-          break
-        default:
-          zodType = z.any()
-      }
-
-      if (!input.required) {
-        zodType = zodType.optional()
-      }
-
-      schema[input.name] = zodType
-    })
-
-    return schema
-  }
-
-  /**
-   * Extract parameter names from URI template
-   *
-   * Parses a URI template string to extract parameter names enclosed in curly braces.
-   * Used internally to identify dynamic parameters in resource templates and generate
-   * appropriate validation schemas.
-   *
-   * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
-   * @returns Array of parameter names found in the template
-   *
-   * @example
-   * ```typescript
-   * const params = this.extractTemplateParams("/users/{id}/posts/{postId}")
-   * // Returns: ["id", "postId"]
-   * ```
-   */
-  private extractTemplateParams(uriTemplate: string): string[] {
-    const matches = uriTemplate.match(/\{([^}]+)\}/g)
-    return matches ? matches.map(match => match.slice(1, -1)) : []
-  }
 
   /**
    * Parse parameter values from a URI based on a template

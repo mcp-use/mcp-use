@@ -8,35 +8,6 @@ import { extractPropsFromComponent } from './schema-generator'
 const SRC_DIR = 'resources'
 const OUT_DIR = 'dist/resources'
 
-function htmlTemplate(title: string, scriptPath: string) {
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${title} Widget</title>
-  </head>
-  <body>
-    <div id="widget-root"></div>
-    <script type="module" src="${scriptPath}"></script>
-  </body>
-</html>`
-}
-
-// Create entry file content that mounts the widget
-function createEntryContent(componentPath: string): string {
-  return `import React from 'react'
-import { createRoot } from 'react-dom/client'
-import Component from '${componentPath}'
-
-// Mount the component
-const container = document.getElementById('widget-root')
-if (container && Component) {
-  const root = createRoot(container)
-  root.render(<Component />)
-}
-`
-}
 
 async function generateWidgetManifest(entries: string[], projectPath: string) {
   const outDir = path.join(projectPath, OUT_DIR)
