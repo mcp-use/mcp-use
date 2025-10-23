@@ -135,13 +135,20 @@ export function OpenAIComponentRenderer({
         // to enable hrm show vite instead
         // use the mcp server base url
 
-        console.log(toolResult)
+        // pass props as url params (toolInpu, toolOutput)
+        const urlParams = new URLSearchParams()
+        const params = {
+          toolInput: toolArgs,
+          toolOutput: structuredContent,
+          toolId,
+        }
+        urlParams.set('mcpUseParams', JSON.stringify(params))
 
         if (toolResult?._meta?.['mcp-use/widget']?.html) {
-          setWidgetUrl(`${new URL(serverBaseUrl || '').origin}/mcp-use/widgets/${toolResult?._meta?.['mcp-use/widget']?.name}`)
+          setWidgetUrl(`${new URL(serverBaseUrl || '').origin}/mcp-use/widgets/${toolResult?._meta?.['mcp-use/widget']?.name}?${urlParams.toString()}`)
         }
         else {
-          setWidgetUrl(`/inspector/api/resources/widget-content/${toolId}`)
+          setWidgetUrl(`/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`)
         }
       }
       catch (error) {

@@ -1063,20 +1063,20 @@ if (container && Component) {
     // Custom middleware to route to the correct widget
     this.app.use(baseRoute, (req, res, next) => {
       const urlPath = req.url || ''
-      const widgetMatch = urlPath.match(/^\/([^/]+)/)
+      // Split pathname and query string
+      const [pathname, queryString] = urlPath.split('?')
+      const widgetMatch = pathname.match(/^\/([^/]+)/)
       
       if (widgetMatch) {
         const widgetName = widgetMatch[1]
         const widget = widgets.find(w => w.name === widgetName)
         
         if (widget) {
-          // Rewrite the URL to point to the widget's directory
-          req.url = urlPath.replace(`/${widgetName}`, `/${widgetName}`)
-          
           // If requesting the root of a widget, serve its index.html
-          if (urlPath === `/${widgetName}` || urlPath === `/${widgetName}/`) {
-            req.url = `/${widgetName}/index.html`
+          if (pathname === `/${widgetName}` || pathname === `/${widgetName}/`) {
+            req.url = `/${widgetName}/index.html${queryString ? '?' + queryString : ''}`
           }
+          // Otherwise keep the original URL (including query string)
         }
       }
       

@@ -3,7 +3,7 @@
  * Wraps window.openai API and adapts MCP UI props to toolInput
  */
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type {
   CallToolResponse,
   DisplayMode,
@@ -83,12 +83,40 @@ export function useWidget<
   TMetadata extends UnknownObject = UnknownObject,
   TState extends UnknownObject = UnknownObject,
 >(defaultProps?: TProps): UseWidgetResult<TProps, TOutput, TMetadata, TState> {
-  // Check if window.openai is available
-  const [isAvailable] = useState(() => typeof window !== 'undefined' && !!window.openai)
 
+
+  console.log(window?.location?.search, window.openai)
+  // Check if window.openai is available
+  const isOpenAiAvailable = useMemo(() => typeof window !== 'undefined' && !!window.openai, [])
+
+  const provider = useMemo(() => {
+    return isOpenAiAvailable ? 'openai' : 'mcp-ui'
+  }, [isOpenAiAvailable])
+
+
+  const urlParams = useMemo(() => { 
+    // check if it has mcpUseParams 
+    const urlParams = new URLSearchParams(window?.location?.search)
+    if (urlParams.has('mcpUseParams')) {
+      return JSON.parse(urlParams.get('mcpUseParams') as string) as {
+        toolInput: TProps,
+        toolOutput: TOutput,
+        toolId: string,
+      }
+    }
+    return {
+      toolInput: {} as TProps,
+      toolOutput: {} as TOutput,
+      toolId: '',
+    }
+  }, [window?.location?.search])
+
+  console.log(urlParams)
+  
+  
   // Subscribe to globals
-  const toolInput = useOpenAiGlobal('toolInput') as TProps | undefined
-  const toolOutput = useOpenAiGlobal('toolOutput') as TOutput | null | undefined
+  const toolInput = provider === 'openai' ? useOpenAiGlobal('toolInput') as TProps | undefined : urlParams.toolInput as TProps | undefined
+  const toolOutput = provider === 'openai' ? useOpenAiGlobal('toolOutput') as TOutput | null | undefined : urlParams.toolOutput as TOutput | null | undefined
   const toolResponseMetadata = useOpenAiGlobal('toolResponseMetadata') as TMetadata | null | undefined
   const widgetState = useOpenAiGlobal('widgetState') as TState | null | undefined
   const theme = useOpenAiGlobal('theme') as Theme | undefined
@@ -183,7 +211,7 @@ export function useWidget<
     requestDisplayMode,
 
     // Availability
-    isAvailable,
+    isAvailable: isOpenAiAvailable,
   }
 }
 

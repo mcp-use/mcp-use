@@ -453,7 +453,7 @@ export function generateWidgetContainerHtml(basePath: string, toolId: string): s
         (async function() {
           try {
             // Change URL to "/" BEFORE loading widget (for React Router)
-            history.replaceState(null, '', '/');
+            //history.replaceState(null, '', '/');
 
             // Fetch the actual widget HTML using toolId
             const response = await fetch('${basePath}/api/resources/widget-content/${toolId}');
