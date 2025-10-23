@@ -22,7 +22,7 @@ import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
 import {createServer} from "vite"
 
 
-const TMP_MCP_USE_DIR = join(process.cwd(), '.mcp-use')
+const TMP_MCP_USE_DIR = '.mcp-use'
 
 
 export class McpServer {

@@ -46,6 +46,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "mcp-use": "./node_modules/@mcp-use/cli/dist/index.js"
+  },
   "files": [
     "dist"
   ],
@@ -88,7 +91,6 @@
     "example:observability": "tsx examples/client/observability.ts"
   },
   "peerDependencies": {
-    "@mcp-use/inspector": "^0.4.6",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "langfuse": "^3.32.0",
@@ -96,9 +98,6 @@
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
-    "@mcp-use/inspector": {
-      "optional": true
-    },
     "cors": {
       "optional": true
     },
@@ -118,6 +117,8 @@
     "@langchain/core": "^0.3.72",
     "@langchain/openai": "^0.6.9",
     "@mcp-ui/server": "^5.12.0",
+    "@mcp-use/cli": "workspace:*",
+    "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/sdk": "1.20.0",
     "@scarf/scarf": "^1.4.0",
     "@tailwindcss/vite": "^4.1.15",
