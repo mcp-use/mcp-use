@@ -106,6 +106,7 @@ export interface ResourceTemplateDefinition {
   description?: string
   annotations?: ResourceAnnotations
   readCallback: ReadResourceTemplateCallback
+  _meta?: Record<string, unknown>
 }
 
 export interface ResourceDefinition {
@@ -123,6 +124,7 @@ export interface ResourceDefinition {
   annotations?: ResourceAnnotations
   /** Async callback function that returns the resource content */
   readCallback: ReadResourceCallback
+  _meta?: Record<string, unknown>
 }
 
 /**
@@ -165,6 +167,8 @@ interface BaseUIResourceDefinition {
   annotations?: ResourceAnnotations
   /** Encoding for the resource content (defaults to 'text') */
   encoding?: UIEncoding
+
+  _meta?: Record<string, unknown>
 }
 
 /**

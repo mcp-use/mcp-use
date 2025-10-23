@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { createRoot } from 'react-dom/client'
 
 interface Task {
   id: string
@@ -298,9 +297,4 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ initialTasks = [] }) => {
   )
 }
 
-// Mount the component
-const container = document.getElementById('widget-root')
-if (container) {
-  const root = createRoot(container)
-  root.render(<KanbanBoard />)
-}
+export default KanbanBoard

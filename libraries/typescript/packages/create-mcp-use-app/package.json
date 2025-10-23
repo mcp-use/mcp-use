@@ -15,6 +15,7 @@
     "url": "https://github.com/mcp-use/mcp-use/issues"
   },
   "keywords": [
+    "mcp-use",
     "mcp",
     "model-context-protocol",
     "create",
@@ -22,9 +23,7 @@
     "cli",
     "init",
     "starter",
-    "template",
-    "typescript",
-    "react"
+    "template"
   ],
   "bin": {
     "create-mcp-use-app": "./dist/index.js"

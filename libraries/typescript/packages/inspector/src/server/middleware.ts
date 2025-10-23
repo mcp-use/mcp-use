@@ -1,7 +1,7 @@
 import type { Express, NextFunction, Request, Response } from 'express'
 import { Hono } from 'hono'
 import { registerInspectorRoutes } from './shared-routes.js'
-import { registerStaticRoutesWithDevProxy } from './shared-static.js'
+import { registerStaticRoutes } from './shared-static.js'
 import {
   checkClientFiles,
   getClientDistPath,
@@ -34,7 +34,7 @@ export function mountInspector(app: Express | Hono): void {
   // If it's already a Hono app, register routes directly
   if (app instanceof Hono) {
     registerInspectorRoutes(app)
-    registerStaticRoutesWithDevProxy(app)
+    registerStaticRoutes(app, clientDistPath)
     return
   }
 
@@ -43,7 +43,7 @@ export function mountInspector(app: Express | Hono): void {
 
   // Register routes on Hono app
   registerInspectorRoutes(honoApp)
-  registerStaticRoutesWithDevProxy(honoApp)
+  registerStaticRoutes(honoApp, clientDistPath)
 
   // Convert all Hono routes to Express middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
