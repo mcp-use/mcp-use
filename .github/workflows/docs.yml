@@ -25,9 +25,19 @@ jobs:
 
     steps:
       - name: Checkout code
+        if: ${{ github.event_name == 'pull_request' }}
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Checkout (push)
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
