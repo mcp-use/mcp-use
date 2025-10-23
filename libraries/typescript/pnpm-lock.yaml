@@ -577,6 +577,9 @@ importers:
       dotenv:
         specifier: ^16.5.0
         version: 16.6.1
+      esbuild:
+        specifier: '>=0.25.0'
+        version: 0.25.10
       langchain:
         specifier: ^0.3.27
         version: 0.3.35(@langchain/anthropic@0.3.30(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(openai@5.12.2(ws@8.18.3)(zod@3.25.76)))(zod@3.25.76))(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(openai@5.12.2(ws@8.18.3)(zod@3.25.76)))(@langchain/google-genai@0.2.18(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(openai@5.12.2(ws@8.18.3)(zod@3.25.76))))(@opentelemetry/api@1.9.0)(openai@5.12.2(ws@8.18.3)(zod@3.25.76))(ws@8.18.3)

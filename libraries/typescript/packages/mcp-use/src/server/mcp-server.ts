@@ -998,7 +998,7 @@ export class McpServer {
       }
     })
     
-    // Create entry files and Vite servers for each widget
+    // Create entry files for each widget
     for (const widget of widgets) {
       // Create temp entry and HTML files for this widget
       const widgetTempDir = join(tempDir, widget.name)
@@ -1042,33 +1042,53 @@ if (container && Component) {
       
       await fs.writeFile(join(widgetTempDir, 'entry.tsx'), entryContent, 'utf8')
       await fs.writeFile(join(widgetTempDir, 'index.html'), htmlContent, 'utf8')
-      
-      // Create a Vite dev server for this widget
-
-      const viteServer = await createServer({
-        root: widgetTempDir,
-        base: `${baseRoute}/${widget.name}/`,
-        plugins: [tailwindcss(), react()],
-        resolve: {
-          alias: {
-            '@': join(process.cwd(), resourcesDir),
-          },
-        },
-        server: {
-          middlewareMode: true,
-          // hmr: {
-          //   port: 24678, // Fixed HMR port
-          // },
-        },
-      })
-      
-      // Mount this widget's Vite server at its route
-      this.app.use(`${baseRoute}/${widget.name}`, viteServer.middlewares)
-      
-      console.log(`[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`)
     }
     
-    console.log(`[WIDGETS] Serving ${entries.length} widget(s) with HMR`)
+    // Create a single Vite dev server for all widgets
+    const viteServer = await createServer({
+      root: tempDir,
+      base: baseRoute + '/',
+      plugins: [tailwindcss(), react()],
+      resolve: {
+        alias: {
+          '@': join(process.cwd(), resourcesDir),
+        },
+      },
+      server: {
+        middlewareMode: true,
+      },
+    })
+    
+    // Custom middleware to route to the correct widget
+    this.app.use(baseRoute, (req, res, next) => {
+      const urlPath = req.url || ''
+      const widgetMatch = urlPath.match(/^\/([^/]+)/)
+      
+      if (widgetMatch) {
+        const widgetName = widgetMatch[1]
+        const widget = widgets.find(w => w.name === widgetName)
+        
+        if (widget) {
+          // Rewrite the URL to point to the widget's directory
+          req.url = urlPath.replace(`/${widgetName}`, `/${widgetName}`)
+          
+          // If requesting the root of a widget, serve its index.html
+          if (urlPath === `/${widgetName}` || urlPath === `/${widgetName}/`) {
+            req.url = `/${widgetName}/index.html`
+          }
+        }
+      }
+      
+      next()
+    })
+    
+    // Mount the single Vite server for all widgets
+    this.app.use(baseRoute, viteServer.middlewares)
+    
+    console.log(`[WIDGETS] Serving ${entries.length} widget(s) with shared Vite server and HMR`)
+    widgets.forEach(widget => {
+      console.log(`[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`)
+    })
 
 
 
