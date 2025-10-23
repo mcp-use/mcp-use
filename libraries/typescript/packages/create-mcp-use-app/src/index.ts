@@ -471,8 +471,8 @@ async function copyTemplate(projectPath: string, template: string, versions: Rec
     }
 
     console.log('💡 Tip: Use "starter" template for a comprehensive MCP server with all features')
-    console.log('💡 Tip: Use "ui-resource" template for a MCP server with mcp-ui resources')
-    console.log('💡 Tip: Use "apps-sdk-demo" template for a MCP server with OpenAI Apps SDK integration')
+    console.log('💡 Tip: Use "mcp-ui" template for a MCP server with mcp-ui resources')
+    console.log('💡 Tip: Use "apps-sdk" template for a MCP server with OpenAI Apps SDK integration')
     process.exit(1)
   }
 
