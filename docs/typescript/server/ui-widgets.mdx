@@ -1,743 +1,830 @@
 ---
-title: "UI Widgets"
-description: "Creating interactive UI components for MCP clients"
+title: "Overview"
+description: "Auto-register widgets from the resources folder with zero boilerplate"
 icon: "palette"
 ---
 
 # UI Widgets
 
-UI widgets allow you to create rich, interactive user interfaces that MCP clients can display. The framework supports multiple widget formats including MCP-UI legacy widgets and OpenAI Apps SDK components.
+UI widgets allow you to create rich, interactive user interfaces that MCP clients can display. 
+The framework supports multiple widget formats including **MCP-UI** and **OpenAI Apps SDK** components.
+
+
+<img src="./images/apps-sdk-widget.png" alt="Apps SDK UI Widget Example" style={{maxWidth: '600px', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.08)'}} />
+
+
+# Automatic Widget Registration
+
+The `mcp-use` framework automatically registers all React components in your `resources/` folder as MCP tools and resources, eliminating the need for manual configuration and boilerplate code. This powerful feature allows you to focus on building UI components while the framework handles the MCP integration.
 
 ## Overview
 
-UI widgets are:
-- **Interactive**: Full HTML/JavaScript applications
-- **Parameterized**: Accept inputs to customize behavior
-- **Dual-Purpose**: Accessible as both tools and resources
-- **Framework-Agnostic**: Use any JavaScript framework
+When you create a React component in the `resources/` folder with proper metadata, `mcp-use` automatically:
 
-## Widget Types
+- **Registers an MCP Tool** - LLMs can invoke it with parameters
+- **Registers an MCP Resource** - Clients can discover and access it
+- **Extracts Input Schema** - Tool parameters are derived from component props
+- **Serves with HMR** - Hot Module Replacement for rapid development
+- **Builds for Production** - Optimized Apps SDK widgets
+- **Handles Props Mapping** - From LLM → Tool arguments → Apps SDK → React component
 
-### External URL Widgets (MCP-UI)
+**No manual registration required!** Just create a widget file, export metadata, and the mcp-use SDK does the rest.
 
-Iframe-based widgets served from your server:
+## Quick Start
 
-```typescript
-server.uiResource({
-  type: 'externalUrl',
-  name: 'dashboard',
-  widget: 'analytics-dashboard',
-  title: 'Analytics Dashboard',
-  description: 'Interactive analytics visualization',
-  props: {
-    timeRange: {
-      type: 'string',
-      description: 'Time range for data (e.g., 7d, 30d, 1y)',
-      required: false,
-      default: '7d'
-    },
-    metric: {
-      type: 'string',
-      description: 'Metric to display',
-      required: false,
-      default: 'revenue'
-    }
-  },
-  size: ['800px', '600px'],
-  annotations: {
-    audience: ['user'],
-    priority: 0.9
-  }
-})
+### 1. Create a Project
+
+Start with the Apps SDK template which includes automatic widget registration:
+
+```bash
+npx create-mcp-use-app my-mcp-server --template apps-sdk
+cd my-mcp-server
+npm run dev
 ```
 
-### Raw HTML Widgets
-
-Inline HTML content:
-
-```typescript
-server.uiResource({
-  type: 'rawHtml',
-  name: 'simple_form',
-  title: 'Contact Form',
-  description: 'Simple contact form',
-  htmlString: `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: sans-serif; padding: 20px; }
-        input, textarea { width: 100%; margin: 10px 0; }
-        button { background: #007bff; color: white; padding: 10px 20px; }
-      </style>
-    </head>
-    <body>
-      <h2>Contact Us</h2>
-      <form id="contactForm">
-        <input type="text" placeholder="Name" required>
-        <input type="email" placeholder="Email" required>
-        <textarea placeholder="Message" rows="5" required></textarea>
-        <button type="submit">Send</button>
-      </form>
-      <script>
-        document.getElementById('contactForm').onsubmit = (e) => {
-          e.preventDefault();
-          alert('Message sent!');
-        };
-      </script>
-    </body>
-    </html>
-  `,
-  size: ['400px', '500px']
-})
+This creates a project with:
+```
+my-mcp-server/
+├── resources/              # 👈 Put your UI widgets here
+│   └── display-weather.tsx # Example widget
+├── index.ts               # Server entry point
+└── package.json
 ```
 
-### Remote DOM Widgets
+### 2. Create a Widget
 
-JavaScript-driven dynamic interfaces:
+Add a new file in `resources/`, for example `resources/user-card.tsx`:
 
-```typescript
-server.uiResource({
-  type: 'remoteDom',
-  name: 'todo_list',
-  title: 'Todo List',
-  description: 'Interactive todo list manager',
-  remoteDomFramework: 'react',
-  remoteDomCode: `
-    function TodoApp() {
-      const [todos, setTodos] = React.useState([]);
-      const [input, setInput] = React.useState('');
-
-      const addTodo = () => {
-        if (input.trim()) {
-          setTodos([...todos, { id: Date.now(), text: input, done: false }]);
-          setInput('');
-        }
-      };
-
-      const toggleTodo = (id) => {
-        setTodos(todos.map(todo =>
-          todo.id === id ? { ...todo, done: !todo.done } : todo
-        ));
-      };
-
-      return (
-        <div style={{ padding: '20px' }}>
-          <h2>Todo List</h2>
-          <div>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Add a todo..."
-            />
-            <button onClick={addTodo}>Add</button>
-          </div>
-          <ul>
-            {todos.map(todo => (
-              <li key={todo.id} onClick={() => toggleTodo(todo.id)}
-                  style={{ textDecoration: todo.done ? 'line-through' : 'none' }}>
-                {todo.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
-    }
-
-    ReactDOM.render(<TodoApp />, document.getElementById('root'));
-  `,
-  props: {
-    initialTodos: {
-      type: 'array',
-      description: 'Initial todo items',
-      required: false,
-      default: []
-    }
-  },
-  size: ['500px', '600px']
-})
-```
-
-### OpenAI Apps SDK Widgets
-
-ChatGPT-compatible widgets with Skybridge format:
-
-```typescript
-server.uiResource({
-  type: 'appsSdk',
-  name: 'weather_widget',
-  title: 'Weather Widget',
-  description: 'Current weather display',
-  htmlTemplate: `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          padding: 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-        }
-        .weather-card {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 20px;
-          padding: 30px;
-          backdrop-filter: blur(10px);
-        }
-        .temp { font-size: 48px; font-weight: bold; }
-        .condition { font-size: 24px; margin-top: 10px; }
-        .details { margin-top: 20px; display: flex; gap: 20px; }
-      </style>
-    </head>
-    <body>
-      <div class="weather-card">
-        <h1 id="city">Loading...</h1>
-        <div class="temp" id="temperature">--°</div>
-        <div class="condition" id="condition">--</div>
-        <div class="details">
-          <span>Humidity: <span id="humidity">--%</span></span>
-          <span>Wind: <span id="wind">-- mph</span></span>
-        </div>
-      </div>
-      <script>
-        // Access tool output via window.openai.toolOutput
-        const data = window.openai?.toolOutput || {
-          city: 'New York',
-          temperature: 72,
-          condition: 'Partly Cloudy',
-          humidity: 65,
-          wind: 8
-        };
-
-        document.getElementById('city').textContent = data.city;
-        document.getElementById('temperature').textContent = data.temperature + '°F';
-        document.getElementById('condition').textContent = data.condition;
-        document.getElementById('humidity').textContent = data.humidity + '%';
-        document.getElementById('wind').textContent = data.wind + ' mph';
-      </script>
-    </body>
-    </html>
-  `,
-  appsSdkMetadata: {
-    'openai/widgetDescription': 'Displays current weather conditions',
-    'openai/widgetCSP': {
-      connect_domains: [],
-      resource_domains: []
-    },
-    'openai/toolInvocation/invoking': 'Fetching weather data...',
-    'openai/toolInvocation/invoked': 'Weather data loaded',
-    'openai/widgetAccessible': true
-  }
-})
-```
-
-## Creating Widget Files
-
-For external URL widgets, create HTML files in your project:
-
-### Directory Structure
-
-```
-your-server/
-├── src/
-│   └── index.ts
-├── dist/
-│   └── resources/
-│       └── mcp-use/
-│           └── widgets/
-│               ├── dashboard/
-│               │   ├── index.html
-│               │   └── assets/
-│               │       ├── script.js
-│               │       └── style.css
-│               └── chart/
-│                   └── index.html
-```
-
-### Widget HTML Example
-
-`dist/resources/mcp-use/widgets/dashboard/index.html`:
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Analytics Dashboard</title>
-  <link rel="stylesheet" href="./assets/style.css">
-</head>
-<body>
-  <div id="app">
-    <h1>Analytics Dashboard</h1>
-    <div id="chart-container"></div>
-    <div id="stats"></div>
-  </div>
-
-  <script>
-    // Parse query parameters from URL
-    const params = new URLSearchParams(window.location.search);
-    const timeRange = params.get('timeRange') || '7d';
-    const metric = params.get('metric') || 'revenue';
-
-    // Parse complex parameters (JSON)
-    let filters = {};
-    try {
-      filters = JSON.parse(params.get('filters') || '{}');
-    } catch (e) {}
-
-    // Initialize dashboard with parameters
-    function initDashboard() {
-      document.getElementById('stats').innerHTML = `
-        <p>Time Range: ${timeRange}</p>
-        <p>Metric: ${metric}</p>
-      `;
-
-      // Load and render chart
-      renderChart(timeRange, metric, filters);
-    }
-
-    function renderChart(range, metric, filters) {
-      // Chart rendering logic here
-      const chart = document.getElementById('chart-container');
-      chart.innerHTML = `<canvas id="chart"></canvas>`;
-
-      // Use your preferred charting library
-      // Example with Chart.js, D3, etc.
-    }
-
-    // Initialize on load
-    initDashboard();
-  </script>
-  <script src="./assets/script.js"></script>
-</body>
-</html>
-```
-
-## Widget Properties
-
-Define typed properties for widgets:
-
-```typescript
-server.uiResource({
-  type: 'externalUrl',
-  name: 'data_table',
-  widget: 'data-table',
-  title: 'Data Table',
-  props: {
-    // String property
-    title: {
-      type: 'string',
-      description: 'Table title',
-      required: false,
-      default: 'Data Table'
-    },
-
-    // Number property
-    pageSize: {
-      type: 'number',
-      description: 'Rows per page',
-      required: false,
-      default: 10
-    },
-
-    // Boolean property
-    sortable: {
-      type: 'boolean',
-      description: 'Enable sorting',
-      required: false,
-      default: true
-    },
-
-    // Object property
-    columns: {
-      type: 'object',
-      description: 'Column configuration',
-      required: true
-    },
-
-    // Array property
-    data: {
-      type: 'array',
-      description: 'Table data',
-      required: true
-    }
-  }
-})
-```
-
-## Accessing Widget Parameters
-
-### In External URL Widgets
-
-Parameters are passed as URL query parameters:
-
-```javascript
-// In your widget HTML/JavaScript
-const params = new URLSearchParams(window.location.search);
-
-// Simple parameters
-const title = params.get('title');
-const pageSize = parseInt(params.get('pageSize') || '10');
-const sortable = params.get('sortable') === 'true';
-
-// Complex parameters (JSON-encoded)
-let columns = {};
-let data = [];
-
-try {
-  columns = JSON.parse(params.get('columns') || '{}');
-  data = JSON.parse(params.get('data') || '[]');
-} catch (e) {
-  console.error('Failed to parse parameters:', e);
-}
-```
-
-### In Apps SDK Widgets
-
-Parameters are available via `window.openai.toolOutput`:
-
-```javascript
-// In your Apps SDK widget
-const params = window.openai?.toolOutput || {};
-
-// Access parameters directly
-const { city, temperature, condition } = params;
-
-// Use with fallbacks
-const humidity = params.humidity || 50;
-const windSpeed = params.windSpeed || 0;
-```
-
-## Advanced Widget Patterns
-
-### Widget Communication
-
-Enable parent-child communication:
-
-```javascript
-// In widget (child)
-window.parent.postMessage({
-  type: 'widget-event',
-  event: 'data-updated',
-  data: { /* ... */ }
-}, '*');
-
-// In parent (if supported by client)
-window.addEventListener('message', (event) => {
-  if (event.data.type === 'widget-event') {
-    handleWidgetEvent(event.data);
-  }
-});
-```
-
-### Responsive Widgets
-
-Create responsive layouts:
-
-```html
-<style>
-  .container {
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-
-  @media (max-width: 768px) {
-    .grid { grid-template-columns: 1fr; }
-  }
-
-  @media (min-width: 769px) {
-    .grid { grid-template-columns: repeat(3, 1fr); }
-  }
-</style>
-```
-
-### Dark Mode Support
-
-Detect and support dark mode:
-
-```javascript
-// Detect system dark mode
-const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-// Apply theme
-document.body.classList.toggle('dark-mode', isDarkMode);
-
-// Listen for changes
-window.matchMedia('(prefers-color-scheme: dark)')
-  .addEventListener('change', (e) => {
-    document.body.classList.toggle('dark-mode', e.matches);
-  });
-```
-
-### Data Fetching in Widgets
-
-Fetch data from your server:
-
-```javascript
-async function loadData() {
-  try {
-    // Fetch from your server's API
-    const response = await fetch('/api/widget-data', {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const data = await response.json();
-    renderWidget(data);
-  } catch (error) {
-    console.error('Failed to load data:', error);
-    showError('Unable to load data');
-  }
-}
-```
-
-## Using Modern Frameworks
-
-### React Widget Example
-
-```typescript
-// Build your React app and serve the bundle
-server.uiResource({
-  type: 'externalUrl',
-  name: 'react_app',
-  widget: 'react-dashboard',
-  title: 'React Dashboard',
-  description: 'Dashboard built with React',
-  props: {
-    userId: { type: 'string', required: true }
-  },
-  size: ['1000px', '800px']
-})
-
-// In your React app (built separately)
+```tsx
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { z } from 'zod';
+import { useWidget } from 'mcp-use/react';
 
-function App() {
-  const params = new URLSearchParams(window.location.search);
-  const userId = params.get('userId');
+// Define the props schema
+const propSchema = z.object({
+  name: z.string().describe('User full name'),
+  email: z.string().email().describe('User email address'),
+  avatar: z.string().url().optional().describe('Avatar image URL'),
+  role: z.enum(['admin', 'user', 'guest']).describe('User role'),
+});
 
+// Export metadata for automatic registration
+export const widgetMetadata = {
+  description: 'Display a user profile card',
+  inputs: propSchema,
+};
+
+type UserCardProps = z.infer<typeof propSchema>;
+
+const UserCard: React.FC = () => {
+  // useWidget hook provides props from Apps SDK or MCP-UI
+  const { props, theme } = useWidget<UserCardProps>();
+  
+  const { name, email, avatar, role } = props;
+  
   return (
-    <div>
-      <h1>Dashboard for User {userId}</h1>
-      {/* Your React components */}
+    <div className={`p-6 rounded-lg shadow-lg ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}>
+      {avatar && (
+        <img 
+          src={avatar} 
+          alt={name}
+          className="w-24 h-24 rounded-full mx-auto mb-4"
+        />
+      )}
+      <h2 className="text-2xl font-bold text-center mb-2">{name}</h2>
+      <p className="text-center text-gray-500 mb-2">{email}</p>
+      <span className="inline-block px-3 py-1 rounded-full text-sm bg-blue-500 text-white">
+        {role}
+      </span>
     </div>
   );
-}
+};
 
-ReactDOM.render(<App />, document.getElementById('root'));
+export default UserCard;
 ```
 
-### Vue.js Widget Example
+### 3. That's It!
 
-```html
-<!-- In your widget HTML -->
-<div id="app">
-  <h1>{{ title }}</h1>
-  <data-table :data="tableData" :columns="columns"></data-table>
-</div>
+The widget is automatically:
+- **Registered as tool**: `user-card`
+- **Available as resource**: `ui://widget/user-card.html`
+- **Ready in ChatGPT**: LLM can call it with name, email, avatar, role
 
-<script src="https://cdn.jsdelivr.net/npm/vue@3"></script>
-<script>
-const { createApp } = Vue;
+No manual `server.tool()` or `server.uiResource()` calls needed!
 
-createApp({
-  data() {
-    const params = new URLSearchParams(window.location.search);
-    return {
-      title: params.get('title') || 'Data View',
-      tableData: JSON.parse(params.get('data') || '[]'),
-      columns: JSON.parse(params.get('columns') || '[]')
-    }
-  },
-  components: {
-    'data-table': {
-      props: ['data', 'columns'],
-      template: `
-        <table>
-          <thead>
-            <tr>
-              <th v-for="col in columns">{{ col.label }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in data">
-              <td v-for="col in columns">{{ row[col.field] }}</td>
-            </tr>
-          </tbody>
-        </table>
-      `
-    }
-  }
-}).mount('#app');
-</script>
+## How It Works
+
+### The Flow
+
+```mermaid
+graph LR
+    A[Widget in resources/] --> B[mountWidgets]
+    B --> C[Vite Dev Server]
+    B --> D[Extract Metadata]
+    D --> E[Register Tool]
+    D --> F[Register Resource]
+    E --> G[LLM Calls Tool]
+    F --> H[Widget Renders]
+    G --> H
 ```
 
-## Security Considerations
+### 1. Widget Discovery
 
-### Content Security Policy
+When you call `server.listen()`, the framework automatically calls `mountWidgets()` which:
 
-For Apps SDK widgets, define CSP:
+- Scans the `resources/` directory for `.tsx` and `.ts` files
+- Creates a Vite dev server for each widget with HMR support
+- Loads widget metadata using Vite SSR
+
+### 2. Metadata Extraction
+
+The framework looks for the `widgetMetadata` export in each widget file:
 
 ```typescript
-appsSdkMetadata: {
-  'openai/widgetCSP': {
-    // Domains for API calls
-    connect_domains: [
-      'https://api.example.com',
-      'wss://websocket.example.com'
-    ],
-    // Domains for resources (images, scripts, styles)
-    resource_domains: [
-      'https://cdn.example.com',
-      'https://fonts.googleapis.com'
-    ]
-  }
+export const widgetMetadata = {
+  description: 'Display weather for a city',
+  inputs: propSchema,  // Zod schema for props
 }
 ```
 
-### Input Sanitization
+The `inputs` Zod schema defines:
+- **What props the component needs**
+- **What parameters the tool accepts**
+- **Type validation and descriptions for the LLM**
 
-Always sanitize user inputs in widgets:
+### 3. Tool Registration
 
-```javascript
-function sanitizeHTML(str) {
-  const temp = document.createElement('div');
-  temp.textContent = str;
-  return temp.innerHTML;
+The framework automatically registers a tool with:
+- **Name**: Derived from filename (e.g., `display-weather.tsx` → `display-weather`)
+- **Description**: From `widgetMetadata.description`
+- **Inputs**: Converted from Zod schema to MCP input definitions
+- **Callback**: Returns the widget resource with a unique URI
+
+### 4. Resource Registration
+
+The framework registers both:
+- **Static Resource**: `ui://widget/{name}.html` - Base resource
+- **Dynamic Template**: `ui://widget/{name}-{id}.html` - Unique per invocation
+
+Each resource includes:
+- **HTML Template**: With proper script tags and styles
+- **Apps SDK Metadata**: CSP configuration, widget description, etc.
+- **MIME Type**: `text/html+skybridge` for Apps SDK compatibility
+
+### 5. Props Flow
+
+When an LLM invokes the tool:
+
+1. **LLM** fills tool parameters based on context and inputs schema
+2. **MCP Server** returns widget resource URI + `structuredContent` with params
+3. **Apps SDK** (ChatGPT) loads the widget HTML
+4. **Apps SDK** injects params as `window.openai.toolInput`
+5. **useWidget Hook** reads from `window.openai` and provides props to React component
+6. **React Component** renders with the props
+
+
+## Widget Metadata 
+
+### widgetMetadata Object
+Contains the information that the MCP resource (and the tool that exposes it) will use when are automatically built by mcp-use.
+```typescript
+export const widgetMetadata = {
+  // Required: Human-readable description
+  description: string,
+  
+  // Required: Zod schema defining component props
+  inputs: z.ZodObject<...>,
 }
-
-// Use when displaying user content
-element.innerHTML = sanitizeHTML(userInput);
 ```
 
-### Secure Communication
+### Props Schema with Zod
 
-Use secure methods for sensitive data:
+The `inputs` field uses Zod for:
+- **Type Safety**: TypeScript inference for props
+- **Runtime Validation**: Ensure correct data types
+- **LLM Context**: `.describe()` helps LLM understand what to fill
 
-```javascript
-// Don't pass sensitive data in URL parameters
-// Instead, use server-side sessions or tokens
-
-const sessionId = params.get('session');
-const data = await fetch(`/api/secure-data/${sessionId}`, {
-  credentials: 'include'
+```typescript
+const propSchema = z.object({
+  // Basic types
+  name: z.string().describe('User name'),
+  age: z.number().min(0).max(150).describe('User age'),
+  active: z.boolean().describe('Is user active'),
+  
+  // Enums for specific choices
+  status: z.enum(['pending', 'approved', 'rejected']).describe('Request status'),
+  
+  // Optional fields
+  email: z.string().email().optional().describe('Optional email address'),
+  
+  // Arrays
+  tags: z.array(z.string()).describe('List of tags'),
+  
+  // Nested objects
+  address: z.object({
+    street: z.string(),
+    city: z.string(),
+    zip: z.string(),
+  }).describe('User address'),
 });
 ```
 
-## Testing Widgets
+## The useWidget Hook
 
-### Local Testing
-
-Test widgets during development:
+The `useWidget` hook is the bridge between Apps SDK and React:
 
 ```typescript
-// Add test route for widgets
-server.get('/test/widget/:name', (req, res) => {
-  const { name } = req.params;
-  const testParams = {
-    timeRange: '7d',
-    metric: 'revenue'
+import { useWidget } from 'mcp-use/react';
+
+const MyWidget: React.FC = () => {
+  const {
+    // Props from LLM/tool invocation
+    props,              // Typed props based on your schema
+    output,             // Tool output data (if any)
+    metadata,           // Response metadata
+    state,              // Persistent widget state
+    setState,           // Update widget state
+    
+    // Layout & theme
+    theme,              // 'light' | 'dark'
+    displayMode,        // 'inline' | 'fullscreen' | 'popup'
+    safeArea,           // Safe area insets
+    maxHeight,          // Max widget height
+    userAgent,          // Device capabilities
+    locale,             // User locale
+    
+    // Actions
+    callTool,           // Call other MCP tools
+    sendFollowUpMessage,// Send message to chat
+    openExternal,       // Open external URLs
+    requestDisplayMode, // Request display mode change
+    
+    // Availability
+    isAvailable,        // Is Apps SDK available
+  } = useWidget<MyPropsType>();
+  
+  return <div>...</div>;
+};
+```
+
+### Key Features
+
+**1. Props Without Props**
+
+Components don't accept props via React props. Instead, props come from the hook:
+
+```typescript
+// ❌ Don't do this
+const MyWidget: React.FC<MyProps> = ({ city, temperature }) => { ... }
+
+// Do this
+const MyWidget: React.FC = () => {
+  const { props } = useWidget<MyProps>();
+  const { city, temperature } = props;
+  // ...
+}
+```
+
+**2. Automatic Provider Detection**
+
+The hook automatically detects whether it's running in:
+- **Apps SDK** (ChatGPT): Reads from `window.openai`
+- **MCP-UI**: Reads from URL parameters
+- **Standalone**: Uses default props
+
+**3. Theme Awareness**
+
+```typescript
+const { theme } = useWidget();
+const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
+```
+
+**4. Interactive Capabilities**
+
+```typescript
+const { callTool, sendFollowUpMessage } = useWidget();
+
+// Call another tool
+const result = await callTool('search', { query: 'weather' });
+
+// Send message to chat
+await sendFollowUpMessage('Show me weather for New York');
+```
+
+## Complete Example: Weather Widget
+
+Here's the complete `display-weather.tsx` from the template:
+
+```tsx
+import React from 'react';
+import { z } from 'zod';
+import { useWidget } from 'mcp-use/react';
+
+// Define props schema
+const propSchema = z.object({
+  city: z.string().describe('The city to display weather for'),
+  weather: z.enum(['sunny', 'rain', 'snow', 'cloudy']).describe('The weather condition'),
+  temperature: z.number().min(-20).max(50).describe('The temperature in Celsius'),
+});
+
+// Export metadata for auto-registration
+export const widgetMetadata = {
+  description: 'Display weather for a city',
+  inputs: propSchema,
+}
+
+type WeatherProps = z.infer<typeof propSchema>;
+
+const WeatherWidget: React.FC = () => {
+  const { props, theme } = useWidget<WeatherProps>();
+  const { city, weather, temperature } = props;
+
+  const getWeatherIcon = (weatherType: string) => {
+    switch (weatherType?.toLowerCase()) {
+      case 'sunny': return '☀️';
+      case 'rain': return '🌧️';
+      case 'snow': return '❄️';
+      case 'cloudy': return '☁️';
+      default: return '🌤️';
+    }
   };
 
-  const url = `http://localhost:3000/mcp-use/widgets/${name}?` +
-    new URLSearchParams(testParams).toString();
+  const getWeatherColor = (weatherType: string) => {
+    switch (weatherType?.toLowerCase()) {
+      case 'sunny': return 'from-yellow-400 to-orange-500';
+      case 'rain': return 'from-blue-400 to-blue-600';
+      case 'snow': return 'from-blue-100 to-blue-300';
+      case 'cloudy': return 'from-gray-400 to-gray-600';
+      default: return 'from-gray-300 to-gray-500';
+    }
+  };
 
-  res.send(`
-    <html>
-      <body style="margin: 0;">
-        <iframe src="${url}" width="100%" height="100%"></iframe>
-      </body>
-    </html>
-  `);
+  const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
+  const textColor = theme === 'dark' ? 'text-gray-100' : 'text-gray-800';
+
+  return (
+    <div className={`max-w-sm mx-auto ${bgColor} rounded-xl shadow-lg overflow-hidden`}>
+      <div className={`h-32 bg-gradient-to-br ${getWeatherColor(weather)} flex items-center justify-center`}>
+        <div className="text-6xl">{getWeatherIcon(weather)}</div>
+      </div>
+      
+      <div className="p-6">
+        <div className="text-center">
+          <h2 className={`text-2xl font-bold ${textColor} mb-2`}>{city}</h2>
+          <div className="flex items-center justify-center space-x-4">
+            <span className={`text-4xl font-light ${textColor}`}>{temperature}°</span>
+            <div className="text-right">
+              <p className="text-lg font-medium capitalize">{weather}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default WeatherWidget;
+```
+
+### Testing in ChatGPT
+
+Once your server is running, you can test in ChatGPT:
+
+**User**: "Show me the weather in Paris. It's 22 degrees and sunny."
+
+**ChatGPT** (behind the scenes):
+1. Recognizes it should use `display-weather` tool
+2. Fills parameters: `{ city: "Paris", weather: "sunny", temperature: 22 }`
+3. Calls the tool
+4. Receives widget resource URI
+5. Loads and displays the widget
+
+## Advanced Features
+
+### Accessing Tool Output
+
+Widgets can access the output of their own tool execution:
+
+```typescript
+const { props, output } = useWidget<MyProps, MyOutput>();
+
+// props = tool input parameters
+// output = what the tool returned (if any additional data)
+```
+
+### Persistent Widget State
+
+Widgets can maintain state across interactions:
+
+```typescript
+const { state, setState } = useWidget<MyProps, any, any, MyState>();
+
+// Save state
+await setState({ favoriteCity: 'Tokyo' });
+
+// State persists across widget re-renders
+console.log(state?.favoriteCity);
+```
+
+### Calling Other Tools
+
+Widgets can call other MCP tools:
+
+```typescript
+const { callTool } = useWidget();
+
+const handleSearch = async () => {
+  const result = await callTool('search_cities', { 
+    query: 'tokyo' 
+  });
+  console.log(result);
+};
+```
+
+### Display Mode Control
+
+Request fullscreen or popup display:
+
+```typescript
+const { requestDisplayMode } = useWidget();
+
+const handleExpand = async () => {
+  await requestDisplayMode('fullscreen');
+};
+```
+
+## Development Workflow
+
+### 1. Start Dev Server
+
+```bash
+npm run dev
+```
+
+This starts:
+- MCP server with auto-widget registration
+- Vite dev server with HMR for each widget
+- Inspector UI for testing
+
+### 2. Create Widget
+
+Add a new file in `resources/`:
+
+```tsx
+// resources/my-new-widget.tsx
+import React from 'react';
+import { z } from 'zod';
+import { useWidget } from 'mcp-use/react';
+
+const propSchema = z.object({
+  title: z.string(),
+});
+
+export const widgetMetadata = {
+  description: 'My new widget',
+  inputs: propSchema,
+};
+
+const MyNewWidget: React.FC = () => {
+  const { props } = useWidget<{ title: string }>();
+  return <h1>{props.title}</h1>;
+};
+
+export default MyNewWidget;
+```
+
+### 3. Test in Inspector
+
+1. Open `http://localhost:3000/inspector`
+2. Navigate to Tools
+3. Find `my-new-widget` tool (automatically registered!)
+4. Test with parameters: `{ "title": "Hello" }`
+5. See the widget render
+
+### 4. Edit with Hot Reload
+
+Edit your widget file and save. Changes appear instantly thanks to HMR!
+
+### 5. Build for Production
+
+```bash
+npm run build
+npm start
+```
+
+Builds optimized widget bundles for production deployment.
+
+## Under the Hood
+
+### Server Initialization
+
+In your `index.ts`:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server';
+
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  baseUrl: process.env.MCP_URL, // For Apps SDK CSP
+});
+
+// ... define manual tools/resources if needed ...
+
+// This automatically calls mountWidgets() internally
+await server.listen(3000);
+```
+
+### mountWidgets() Implementation
+
+The `mountWidgets()` method (called automatically by `listen()`):
+
+```typescript
+async mountWidgets(options?: {
+  baseRoute?: string;      // Default: '/mcp-use/widgets'
+  resourcesDir?: string;   // Default: 'resources'
+}): Promise<void>
+```
+
+**What it does:**
+
+1. **Scans** the `resources/` directory for `.tsx` and `.ts` files
+2. **Creates** Vite dev server with React and Tailwind plugins
+3. **Generates** entry files for each widget in `.mcp-use/` temp directory
+4. **Serves** widgets at `/mcp-use/widgets/{name}` with HMR
+5. **Extracts** metadata using Vite SSR module loading
+6. **Registers** both tool and resource for each widget
+
+### Widget URL Structure
+
+**Development**:
+- Widget: `http://localhost:3000/mcp-use/widgets/display-weather`
+- Assets: `http://localhost:3000/mcp-use/widgets/display-weather/assets/...`
+
+**Production** (with baseUrl):
+- Widget: `https://myserver.com/mcp-use/widgets/display-weather`
+- Assets: `https://myserver.com/mcp-use/widgets/display-weather/assets/...`
+
+### Apps SDK CSP Configuration
+
+The framework automatically configures Content Security Policy for Apps SDK:
+
+```typescript
+// Automatic CSP when baseUrl is set
+if (baseUrl) {
+  appsSdkMetadata['openai/widgetCSP'] = {
+    connect_domains: [],
+    resource_domains: [baseUrl]  // Your server is whitelisted
+  }
+}
+```
+
+## Configuration
+
+### Custom Resources Directory
+
+```typescript
+await server.listen(3000);
+// Automatically uses 'resources/' directory
+
+// Or customize:
+await server.mountWidgets({
+  resourcesDir: 'widgets',  // Use 'widgets/' instead
+  baseRoute: '/ui'          // Serve at '/ui/{name}'
 });
 ```
 
-### Inspector Testing
+### Base URL for Production
 
-Use the MCP Inspector:
+Set the `MCP_URL` environment variable or pass `baseUrl`:
 
-1. Navigate to `http://localhost:3000/inspector`
-2. Go to the Tools section
-3. Find your UI widget tool (e.g., `dashboard`)
-4. Enter parameter values
-5. Execute to see the widget
+```typescript
+const server = createMCPServer('my-server', {
+  baseUrl: process.env.MCP_URL || 'https://myserver.com'
+});
+```
+
+This ensures:
+- Widget URLs use the correct domain
+- Apps SDK CSP automatically includes your server
+- Works behind proxies and custom domains
+
+### Environment Variables
+
+```env
+# Server Configuration
+PORT=3000
+HOST=localhost
+MCP_URL=https://myserver.com
+
+# For Production
+NODE_ENV=production
+```
 
 ## Best Practices
 
-1. **Performance**: Optimize widget load time and responsiveness
-2. **Accessibility**: Follow WCAG guidelines for accessibility
-3. **Error Handling**: Display user-friendly error messages
-4. **Responsive Design**: Support various screen sizes
-5. **Parameter Validation**: Validate all input parameters
-6. **Documentation**: Document widget parameters and behavior
-7. **Version Control**: Version your widgets for compatibility
-8. **Security**: Sanitize inputs and use secure communication
+### 1. Use Descriptive Schemas
 
-## Common Widget Examples
-
-### Chart Widget
+Help the LLM understand your inputs:
 
 ```typescript
-server.uiResource({
-  type: 'externalUrl',
-  name: 'chart',
-  widget: 'chart-widget',
-  title: 'Data Chart',
-  description: 'Interactive data visualization',
-  props: {
-    chartType: {
-      type: 'string',
-      description: 'Type of chart (line, bar, pie)',
-      required: false,
-      default: 'line'
-    },
-    data: {
-      type: 'array',
-      description: 'Chart data points',
-      required: true
-    },
-    options: {
-      type: 'object',
-      description: 'Chart configuration options',
-      required: false
-    }
-  },
-  size: ['600px', '400px']
-})
+const propSchema = z.object({
+  // Good: Clear description
+  city: z.string().describe('The city name (e.g., "New York", "Tokyo")'),
+  
+  // ❌ Bad: No description
+  city: z.string(),
+});
 ```
 
-### Form Widget
+### 2. Provide Defaults
+
+Make optional fields with sensible defaults:
+
+```typescript
+const propSchema = z.object({
+  theme: z.enum(['light', 'dark']).default('light'),
+  maxResults: z.number().min(1).max(100).default(10),
+});
+```
+
+### 3. Keep Widgets Focused
+
+Each widget should do one thing well:
+
+```typescript
+// Good: Focused widget
+export const widgetMetadata = {
+  description: 'Display weather for a single city',
+  inputs: z.object({ city: z.string() }),
+};
+
+// ❌ Bad: Too many responsibilities
+export const widgetMetadata = {
+  description: 'Display weather, forecast, map, and news for cities',
+  inputs: z.object({ /* too many fields */ }),
+};
+```
+
+### 4. Theme Support
+
+Always support both themes:
+
+```typescript
+const { theme } = useWidget();
+const bg = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
+const text = theme === 'dark' ? 'text-white' : 'text-black';
+```
+
+### 5. Error Handling
+
+Handle missing or invalid props gracefully:
+
+```typescript
+const { props } = useWidget<MyProps>();
+
+if (!props.city) {
+  return <div>No city provided</div>;
+}
+
+return <WeatherDisplay city={props.city} />;
+```
+
+### 6. Performance
+
+Keep widgets lightweight:
+- Minimize dependencies
+- Lazy load heavy components
+- Use React.memo for expensive renders
+
+```typescript
+import { lazy, Suspense } from 'react';
+
+const HeavyChart = lazy(() => import('./HeavyChart'));
+
+const MyWidget: React.FC = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HeavyChart />
+    </Suspense>
+  );
+};
+```
+
+## Troubleshooting
+
+### Widget Not Registered
+
+**Problem**: Widget file exists but tool doesn't appear
+
+**Solutions**:
+- Ensure file has `.tsx` or `.ts` extension
+- Export `widgetMetadata` object
+- Export default React component
+- Check server logs for errors during widget loading
+
+### Props Not Passed
+
+**Problem**: Component receives empty props
+
+**Solutions**:
+- Use `useWidget()` hook instead of React props
+- Ensure `widgetMetadata.inputs` is a valid Zod schema
+- Check Apps SDK is injecting `window.openai.toolInput`
+- Verify tool parameters match schema
+
+### HMR Not Working
+
+**Problem**: Changes don't reflect without restart
+
+**Solutions**:
+- Check Vite dev server is running
+- Ensure you're editing the source file in `resources/`
+- Clear browser cache
+- Check console for Vite errors
+
+### CSP Errors
+
+**Problem**: Widget loads but assets fail with CSP errors
+
+**Solutions**:
+- Set `baseUrl` in server config
+- Add external domains to `appsSdkMetadata['openai/widgetCSP']`
+- Check browser console for blocked domains
 
 ```typescript
 server.uiResource({
-  type: 'rawHtml',
-  name: 'user_form',
-  title: 'User Form',
-  htmlString: `
-    <!-- Complete form HTML with validation -->
-  `,
-  props: {
-    fields: {
-      type: 'array',
-      description: 'Form field definitions',
-      required: true
-    },
-    submitUrl: {
-      type: 'string',
-      description: 'Form submission endpoint',
-      required: false
+  // ... other config ...
+  appsSdkMetadata: {
+    'openai/widgetCSP': {
+      connect_domains: ['https://api.example.com'],
+      resource_domains: ['https://cdn.example.com'],
     }
   }
-})
+});
 ```
+
+## Comparison: Auto vs Manual
+
+### Auto Registration (Recommended)
+
+```tsx
+// resources/weather.tsx
+const propSchema = z.object({
+  city: z.string(),
+});
+
+export const widgetMetadata = {
+  description: 'Show weather',
+  inputs: propSchema,
+};
+
+export default WeatherWidget;
+```
+
+**Pros**:
+- Zero boilerplate
+- Type-safe props
+- Automatic tool/resource registration
+- Hot module replacement
+- Standardized structure
+
+**Cons**:
+- ⚠️ Less control over registration details
+- ⚠️ Must follow naming conventions
+
+### Manual Registration
+
+```typescript
+// index.ts
+server.uiResource({
+  type: 'appsSdk',
+  name: 'weather',
+  htmlTemplate: htmlString,
+  props: { city: { type: 'string', required: true } },
+  appsSdkMetadata: { /* ... */ }
+});
+
+server.tool({
+  name: 'weather',
+  inputs: [{ name: 'city', type: 'string' }],
+  cb: async (params) => { /* ... */ }
+});
+```
+
+**Pros**:
+- Full control over configuration
+- Custom tool behavior
+- Can use raw HTML strings
+
+**Cons**:
+- ❌ More boilerplate
+- ❌ Manual schema duplication
+- ❌ Prop mapping is manual
+- ❌ No HMR out of the box
 
 ## Next Steps
 
-- [Examples](./examples) - Complete widget implementations
-- [API Reference](./api-reference) - Widget API details
-- [Tools Guide](./tools) - Integrating widgets with tools
-- [Getting Started](./getting-started) - Basic server setup
+- [UI Widgets Guide](./ui-widgets) - General widget development
+- [Project Templates](./templates) - Explore available templates
+- [Examples](./examples) - Real-world widget examples
+

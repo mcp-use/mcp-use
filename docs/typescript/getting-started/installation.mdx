@@ -4,18 +4,7 @@ description: "Install mcp_use and get your development environment ready"
 icon: "download"
 ---
 
-<img
-  className="block dark:hidden my-0 pointer-events-none"
-  src="/images/hero-light.png"
-  alt="mcp_use Installation"
-/>
-<img
-  className="hidden dark:block my-0 pointer-events-none"
-  src="/images/hero-dark.png"
-  alt="mcp_use Installation"
-/>
-
-## Installing mcp_use
+## Installing mcp-use
 
 <Info>
   **Prerequisites**:
@@ -23,7 +12,42 @@ icon: "download"
   - npm, pnpm, or yarn package manager
 </Info>
 
-### Option 1: Install as a Library (for MCP Agents)
+### Option 1: Create an MCP Server (for Building Servers)
+
+The fastest way to scaffold a new MCP server project is to use `create-mcp-use-app`:
+
+<CodeGroup>
+```bash npm
+npx create-mcp-use-app my-mcp-server
+cd my-mcp-server
+npm run dev
+```
+
+```bash pnpm
+pnpm create mcp-use-app my-mcp-server
+cd my-mcp-server
+pnpm run dev
+```
+
+```bash yarn
+yarn create mcp-use-app my-mcp-server
+cd my-mcp-server
+yarn dev
+```
+</CodeGroup>
+
+This command will:
+- Create a new directory with your project name
+- Initialize a TypeScript project with mcp-use configured
+- Set up a basic MCP server template with example tools
+- Install all dependencies automatically
+
+<Tip>
+Check out [UI Widgets](./ui-widgets) with support to MCP-UI and OpenAI Apps SDK for ChatGPT.
+
+</Tip>
+
+### Option 2: Install as a Library (for MCP Agents)
 
 Install mcp_use using your preferred package manager:
 
@@ -57,42 +81,6 @@ yarn add @langchain/openai dotenv
 ```
 </CodeGroup>
 
-### Option 2: Create an MCP Server (for Building Servers)
-
-The fastest way to scaffold a new MCP server project is to use `create-mcp-use-app`:
-
-<CodeGroup>
-```bash npm
-npx create-mcp-use-app my-mcp-server
-cd my-mcp-server
-npm run dev
-```
-
-```bash pnpm
-pnpm create mcp-use-app my-mcp-server
-cd my-mcp-server
-pnpm run dev
-```
-
-```bash yarn
-yarn create mcp-use-app my-mcp-server
-cd my-mcp-server
-yarn dev
-```
-</CodeGroup>
-
-This command will:
-- Create a new directory with your project name
-- Initialize a TypeScript project with mcp-use configured
-- Set up a basic MCP server template with example tools
-- Install all dependencies automatically
-
-<Tip>
-To see all available options and templates, run:
-```bash
-npx create-mcp-use-app --help
-```
-</Tip>
 
 ## Setting Up Your First Project
 
@@ -126,7 +114,6 @@ console.log('mcp-use installed successfully!')
 </Steps>
 
 ## Development Installation
-{/* TODO: Add instructions for development installation after monorepo */}
 If you want to contribute or use the latest features, install from source:
 
 <CodeGroup>
@@ -140,31 +127,12 @@ pnpm run build
 
 ## Installing MCP Servers
 
-mcp_use connects to MCP servers that provide the actual tools. Here are some popular ones:
-
-### Playwright (Web Scraping)
-
-
-
-### Filesystem Server
-
-
-
-### SQLite Server
-
-
-
+mcp-use connects to MCP servers that provide the actual tools.
 <Tip>
   Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) repository for a comprehensive list of available servers.
 </Tip>
 
 ## Environment Setup
-
-### Using Virtual Environments
-
-It's recommended to use virtual environments to avoid dependency conflicts:
-
-
 
 ### Environment Variables
 
