@@ -1,35 +1,14 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { build, type InlineConfig } from 'vite'
+import { build, createServer, type InlineConfig, type ViteDevServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { globby } from 'globby'
 import { extractPropsFromComponent } from './schema-generator'
 
-const ROUTE_PREFIX = '/mcp-use/widgets'
 const SRC_DIR = 'resources'
 const OUT_DIR = 'dist/resources'
 
-function toRoute(file: string) {
-  const rel = file.replace(new RegExp(`^${SRC_DIR}/`), '').replace(/\.tsx?$/, '')
-  return `${ROUTE_PREFIX}/${rel}`
-}
-
-function outDirForRoute(route: string) {
-  return path.join(OUT_DIR, route.replace(/^\//, ''))
-}
-
-function htmlTemplate({ title, scriptPath, isDev = false }: { title: string, scriptPath: string, isDev?: boolean }) {
-  const liveReloadScript = isDev ? `
-    <script type="module">
-      // Simple live reload for development
-      const connect = () => {
-        const ws = new WebSocket('ws://localhost:3001/__live_reload')
-        ws.onmessage = () => window.location.reload()
-        ws.onclose = () => setTimeout(connect, 1000)
-      }
-      connect()
-    </script>` : ''
-  
+function htmlTemplate(title: string, scriptPath: string) {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -39,35 +18,22 @@ function htmlTemplate({ title, scriptPath, isDev = false }: { title: string, scr
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="${scriptPath}"></script>${liveReloadScript}
+    <script type="module" src="${scriptPath}"></script>
   </body>
 </html>`
 }
 
-// Create a virtual entry file content
+// Create entry file content that mounts the widget
 function createEntryContent(componentPath: string): string {
-  return `import '@tailwindcss/browser'
-import React from 'react'
+  return `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import Component from '${componentPath}'
-
-// Parse props from URL params
-const urlParams = new URLSearchParams(window.location.search)
-const propsParam = urlParams.get('props')
-let props = {}
-if (propsParam) {
-  try {
-    props = JSON.parse(decodeURIComponent(propsParam))
-  } catch (error) {
-    console.error('Error parsing props from URL:', error)
-  }
-}
 
 // Mount the component
 const container = document.getElementById('widget-root')
 if (container && Component) {
   const root = createRoot(container)
-  root.render(<Component {...props} />)
+  root.render(<Component />)
 }
 `
 }
@@ -131,193 +97,81 @@ async function generateWidgetManifest(entries: string[], projectPath: string) {
   )
 }
 
-function createViteConfig(
-  entry: string, 
-  projectPath: string, 
-  outDir: string, 
-  baseName: string,
-  minify: boolean,
-  watch: boolean = false
-): InlineConfig {
-  return {
-    root: projectPath,
-    plugins: [react()],
-    build: {
-      outDir,
-      emptyOutDir: false,
-      minify,
-      sourcemap: !minify,
-      watch: watch ? {} : null,
-      rollupOptions: {
-        input: entry,
-        output: {
-          entryFileNames: 'assets/[name].js',
-          chunkFileNames: 'assets/chunk-[hash].js',
-          assetFileNames: 'assets/asset-[hash].[ext]',
-        },
-      },
-    },
-    resolve: {
-      alias: {
-        '@': path.join(projectPath, SRC_DIR),
-      },
-    },
-  }
-}
 
-async function buildWidget(entry: string, projectPath: string, minify = true, isDev = false, useWatch = false) {
-  const relativePath = path.relative(projectPath, entry)
-  const route = toRoute(relativePath)
-  const pageOutDir = path.join(projectPath, outDirForRoute(route))
-  const baseName = path.parse(entry).name
+// export async function buildWidgets(projectPath: string) {
+//   const srcDir = path.join(projectPath, SRC_DIR)
+//   const outDir = path.join(projectPath, OUT_DIR)
 
-  // Create a temporary entry file
-  const tempDir = path.join(projectPath, '.mcp-use-temp')
-  await fs.mkdir(tempDir, { recursive: true })
-  const tempEntry = path.join(tempDir, `${baseName}-entry.tsx`)
+//   // Clean dist
+//   await fs.rm(outDir, { recursive: true, force: true })
+
+//   // Find all TSX entries
+//   const entries = await globby([`${srcDir}/**/*.tsx`])
   
-  // Write the entry file
-  const entryContent = createEntryContent(path.resolve(entry))
-  await fs.writeFile(tempEntry, entryContent, 'utf8')
-
-  const mainJs = `${baseName}-entry.js`
-
-  try {
-    // Build with Vite
-    await build(createViteConfig(tempEntry, projectPath, pageOutDir, baseName, minify, useWatch))
-
-    // Write index.html
-    await fs.writeFile(
-      path.join(pageOutDir, 'index.html'),
-      htmlTemplate({
-        title: baseName,
-        scriptPath: `./assets/${mainJs}`,
-        isDev,
-      }),
-      'utf8',
-    )
-
-    return { baseName, route }
-  } finally {
-    // Don't cleanup in watch mode, we'll reuse the temp files
-    if (!isDev) {
-      await fs.rm(tempEntry, { force: true }).catch(() => {})
-    }
-  }
-}
-
-// Live reload server
-const liveReloadClients: Set<any> = new Set()
-
-export async function createLiveReloadServer() {
-  const { WebSocketServer } = await import('ws')
-  const wss = new WebSocketServer({ port: 3001 })
+//   // Generate widget manifest
+//   console.log(`Generating widget manifest for ${entries.length} component(s)...`)
+//   await generateWidgetManifest(entries, projectPath)
   
-  wss.on('connection', (ws: any) => {
-    liveReloadClients.add(ws)
-    ws.on('close', () => liveReloadClients.delete(ws))
-  })
+//   // Build widgets
+//   console.log(`Building ${entries.length} widget(s)...`)
   
-  return {
-    reload: () => {
-      liveReloadClients.forEach(client => {
-        if (client.readyState === 1) { // OPEN
-          client.send('reload')
-        }
-      })
-    },
-    close: () => wss.close(),
-  }
-}
-
-export async function buildWidgets(projectPath: string, watch = false) {
-  const srcDir = path.join(projectPath, SRC_DIR)
-  const outDir = path.join(projectPath, OUT_DIR)
-
-  // Clean dist
-  await fs.rm(outDir, { recursive: true, force: true })
-
-  // Find all TSX entries
-  const entries = await globby([`${srcDir}/**/*.tsx`])
+//   for (const entry of entries) {
+//     const { baseName, widgetName } = await buildWidget(entry, projectPath, true)
+//     console.log(`\x1b[32m✓\x1b[0m Built ${baseName} -> /mcp-use/widgets/${widgetName}`)
+//   }
   
-  // Generate widget manifest
-  if (!watch) {
-    console.log(`Generating widget manifest for ${entries.length} component(s)...`)
-  }
-  await generateWidgetManifest(entries, projectPath)
+//   // Cleanup temp directory
+//   const tempDir = path.join(projectPath, '.mcp-use-temp')
+//   await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {})
+
+//   console.log('Build complete!')
+// }
+
+// // Create Vite dev servers for widgets (for HMR during development)
+// export async function startWidgetDevServers(projectPath: string): Promise<Map<string, ViteDevServer>> {
+//   const srcDir = path.join(projectPath, SRC_DIR)
+//   const entries = await globby([`${srcDir}/**/*.tsx`])
   
-  if (watch) {
-    // Watch mode - use Vite's build watch with live reload
-    console.log(`\x1b[32m✓\x1b[0m Widget builder watching ${entries.length} file(s)...`)
+//   // Generate manifest
+//   await generateWidgetManifest(entries, projectPath)
+  
+//   const servers = new Map<string, ViteDevServer>()
+  
+//   for (const entry of entries) {
+//     const baseName = path.parse(entry).name
+//     const widgetName = path.relative(path.join(projectPath, SRC_DIR), entry).replace(/\.tsx?$/, '')
     
-    // Start live reload server
-    const liveReload = await createLiveReloadServer()
-    console.log(`\x1b[32m✓\x1b[0m Live reload server running on port 3001`)
+//     // Create temp directory for this widget
+//     const tempDir = path.join(projectPath, '.mcp-use-temp', widgetName)
+//     await fs.mkdir(tempDir, { recursive: true })
+//     const tempEntry = path.join(tempDir, 'entry.tsx')
+//     const tempHtml = path.join(tempDir, 'index.html')
     
-    const tempDir = path.join(projectPath, '.mcp-use-temp')
-    await fs.mkdir(tempDir, { recursive: true })
+//     // Write entry and HTML (for dev mode, use /entry.tsx path)
+//     await fs.writeFile(tempEntry, createEntryContent(path.resolve(entry)), 'utf8')
+//     await fs.writeFile(tempHtml, htmlTemplate(baseName, '/entry.tsx'), 'utf8')
     
-    // Start Vite watch builds for each entry
-    const buildPromises = entries.map(async (entry) => {
-      const relativePath = path.relative(projectPath, entry)
-      const route = toRoute(relativePath)
-      const pageOutDir = path.join(projectPath, outDirForRoute(route))
-      const baseName = path.parse(entry).name
-
-      // Create a temporary entry file
-      const tempEntry = path.join(tempDir, `${baseName}-entry.tsx`)
-      const entryContent = createEntryContent(path.resolve(entry))
-      await fs.writeFile(tempEntry, entryContent, 'utf8')
-
-      const mainJs = `${baseName}-entry.js`
-
-      // Write initial index.html
-      await fs.mkdir(pageOutDir, { recursive: true })
-      await fs.writeFile(
-        path.join(pageOutDir, 'index.html'),
-        htmlTemplate({
-          title: baseName,
-          scriptPath: `./assets/${mainJs}`,
-          isDev: true,
-        }),
-        'utf8',
-      )
-
-      // Start Vite build in watch mode
-      const viteConfig = createViteConfig(tempEntry, projectPath, pageOutDir, baseName, false, true)
-      
-      // Add a plugin to trigger live reload on rebuild
-      if (!viteConfig.plugins) viteConfig.plugins = []
-      viteConfig.plugins.push({
-        name: 'live-reload-trigger',
-        closeBundle() {
-          console.log(`\x1b[32m✓\x1b[0m Rebuilt ${baseName}`)
-          liveReload.reload()
-        },
-      })
-
-      return build(viteConfig)
-    })
-
-    await Promise.all(buildPromises)
-
-    // Keep the process running
-    return () => {
-      liveReload.close()
-    }
-  } else {
-    // Build once
-    console.log(`Building ${entries.length} widget files...`)
+//     // Create Vite dev server for this widget
+//     const server = await createServer({
+//       root: tempDir,
+//       plugins: [react()],
+//       resolve: {
+//         alias: {
+//           '@': path.join(projectPath, SRC_DIR),
+//         },
+//       },
+//       server: {
+//         middlewareMode: true,
+//         hmr: {
+//           port: 24678, // Use a fixed port for HMR WebSocket
+//         },
+//       },
+//     })
     
-    for (const entry of entries) {
-      const { baseName, route } = await buildWidget(entry, projectPath, true, false)
-      console.log(`\x1b[32m✓\x1b[0m Built ${baseName} -> ${route}`)
-    }
-    
-    // Cleanup temp directory
-    const tempDir = path.join(projectPath, '.mcp-use-temp')
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {})
-
-    console.log('Build complete!')
-  }
-}
+//     servers.set(widgetName, server)
+//   }
+  
+//   console.log(`\x1b[32m✓\x1b[0m Started dev servers for ${servers.size} widget(s) with HMR`)
+  
+//   return servers
+// }

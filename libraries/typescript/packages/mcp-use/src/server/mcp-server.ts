@@ -19,6 +19,8 @@ import { readFileSync } from 'node:fs'
 import { requestLogger } from './logging.js'
 import { createUIResourceFromDefinition, type UrlConfig } from './adapters/mcp-ui-adapter.js'
 import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
+import {createServer} from "vite"
+
 
 export class McpServer {
   private server: OfficialMcpServer
@@ -65,7 +67,12 @@ export class McpServer {
     this.app.use(requestLogger)
 
     // Setup default widget serving routes
-    this.setupWidgetRoutes()
+    // this.setupWidgetRoutes()
+
+
+    
+
+   
 
     // Proxy all Express methods to the underlying app
     return new Proxy(this, {
@@ -416,7 +423,7 @@ export class McpServer {
     }
   ): this {
     // Load widget schema from manifest
-    const schema = this.loadWidgetSchema(widgetName)
+    const schema :any= {}
     
     // Read the built widget's HTML file to extract asset references
     const widgetHtmlPath = join(process.cwd(), 'dist/resources/mcp-use/widgets', widgetName, 'index.html')
@@ -701,8 +708,8 @@ export class McpServer {
    * ```
    */
   uiResource(widgetNameOrDefinition: string | UIResourceDefinition): this {
-    const definition = typeof widgetNameOrDefinition === 'string' 
-      ? this.loadWidgetSchema(widgetNameOrDefinition)
+    const definition:any = typeof widgetNameOrDefinition === 'string' 
+      ? {}
       : widgetNameOrDefinition
     
     // Determine tool name based on resource type
@@ -981,6 +988,221 @@ export class McpServer {
   }
 
   /**
+   * Mount a React app with Vite HMR at a custom route
+   *
+   * Serves a React application with hot module replacement (HMR) in development mode
+   * and built static assets in production. Perfect for serving widget galleries or
+   * admin interfaces alongside your MCP server.
+   *
+   * @param options - Configuration options for the React app
+   * @param options.route - Base route to mount the app at (e.g., '/app', '/widgets')
+   * @param options.root - Root directory containing index.html and src/ (defaults to process.cwd())
+   * @param options.base - Base URL for assets (defaults to route with trailing slash)
+   * @returns Promise that resolves when the app is mounted
+   *
+   * @example
+   * ```typescript
+   * // In development, serves with HMR at /mcp-use/widgets
+   * await server.mountReactApp({
+   *   route: '/mcp-use/widgets',
+   *   root: process.cwd()
+   * })
+   * ```
+   */
+  async mountReactApp(options: {
+    route: string
+    root?: string
+    base?: string
+  }): Promise<void> {
+    const isProd = process.env.NODE_ENV === 'production'
+    const route = options.route.replace(/\/$/, '') // Remove trailing slash
+    const base = options.base || (route.endsWith('/') ? route : route + '/')
+    const root = options.root || process.cwd()
+
+    if (!isProd) {
+      // Dev mode: Vite in middleware mode with HMR
+      const vite = await createServer({
+        appType: 'custom',
+        root,
+        server: { middlewareMode: true },
+        base,
+      })
+
+      // Mount the Vite dev middlewares under the route
+      this.app.use(route, vite.middlewares)
+
+      // Serve transformed index.html for any sub-route under the route
+      this.app.get(new RegExp(`^${route}($|/.*)`), async (req, res, next) => {
+        try {
+          const { readFileSync } = await import('node:fs')
+          const indexPath = join(root, 'index.html')
+          let html = readFileSync(indexPath, 'utf-8')
+          html = await vite.transformIndexHtml(req.originalUrl, html)
+          res.setHeader('Content-Type', 'text/html')
+          res.status(200).send(html)
+        } catch (e) {
+          vite.ssrFixStacktrace(e as Error)
+          next(e)
+        }
+      })
+
+      console.log(`[REACT APP] Dev server with HMR mounted at ${route}`)
+    } else {
+      // Prod mode: Serve built assets from /dist
+      const clientDir = join(root, 'dist/client')
+      this.app.use(route, express.static(clientDir, { index: false }))
+      this.app.get(`${route}*`, (_req, res) => {
+        res.sendFile(join(clientDir, 'index.html'))
+      })
+
+      console.log(`[REACT APP] Production build served at ${route}`)
+    }
+  }
+
+  /**
+   * Mount individual widget files from resources/ directory
+   *
+   * Scans the resources/ directory for .tsx/.ts widget files and creates individual
+   * Vite dev servers for each widget with HMR support. Each widget is served at its
+   * own route: /mcp-use/widgets/{widget-name}
+   *
+   * @param options - Configuration options
+   * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
+   * @param options.resourcesDir - Directory containing widget files (defaults to 'resources')
+   * @returns Promise that resolves when all widgets are mounted
+   *
+   * @example
+   * ```typescript
+   * // Serve all widgets from resources/ at /mcp-use/widgets/{name}
+   * await server.mountWidgets({
+   *   baseRoute: '/mcp-use/widgets',
+   *   resourcesDir: 'resources'
+   * })
+   * // Now accessible at:
+   * // - /mcp-use/widgets/display-weather
+   * // - /mcp-use/widgets/kanban-board
+   * // etc.
+   * ```
+   */
+  async mountWidgets(options?: {
+    baseRoute?: string
+    resourcesDir?: string
+  }): Promise<void> {
+    const { promises: fs } = await import('node:fs')
+    const baseRoute = options?.baseRoute || '/mcp-use/widgets'
+    const resourcesDir = options?.resourcesDir || 'resources'
+    const srcDir = join(process.cwd(), resourcesDir)
+    
+    // Check if resources directory exists
+    try {
+      await fs.access(srcDir)
+    } catch (error) {
+      console.log(`[WIDGETS] No ${resourcesDir}/ directory found - skipping widget serving`)
+      return
+    }
+    
+    // Find all TSX widget files
+    let entries: string[] = []
+    try {
+      const files = await fs.readdir(srcDir)
+      entries = files
+        .filter(f => f.endsWith('.tsx') || f.endsWith('.ts'))
+        .map(f => join(srcDir, f))
+    } catch (error) {
+      console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`)
+      return
+    }
+    
+    if (entries.length === 0) {
+      console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`)
+      return
+    }
+    
+    // Create a temp directory for widget entry files
+    const tempDir = join(process.cwd(), '.mcp-use-temp')
+    await fs.mkdir(tempDir, { recursive: true }).catch(() => {})
+    
+    const react = (await import('@vitejs/plugin-react')).default
+    const tailwindcss = (await import('@tailwindcss/vite')).default
+    console.log(react, tailwindcss)
+    
+    // Create entry files and Vite servers for each widget
+    for (const entry of entries) {
+      const baseName = entry.split('/').pop()?.replace(/\.tsx?$/, '') || 'widget'
+      const widgetName = baseName
+      
+      // Create temp entry and HTML files for this widget
+      const widgetTempDir = join(tempDir, widgetName)
+      await fs.mkdir(widgetTempDir, { recursive: true })
+      
+      // Create a CSS file with Tailwind and @source directives to scan resources
+      const resourcesPath = join(process.cwd(), resourcesDir)
+      const { relative } = await import('node:path')
+      const relativeResourcesPath = relative(widgetTempDir, resourcesPath).replace(/\\/g, '/')
+      const cssContent = `@import "tailwindcss";
+
+/* Configure Tailwind to scan the resources directory */
+@source "${relativeResourcesPath}";
+`
+      await fs.writeFile(join(widgetTempDir, 'styles.css'), cssContent, 'utf8')
+      
+      const entryContent = `import React from 'react'
+import { createRoot } from 'react-dom/client'
+import './styles.css'
+import Component from '${entry}'
+
+const container = document.getElementById('widget-root')
+if (container && Component) {
+  const root = createRoot(container)
+  root.render(<Component />)
+}
+`
+      
+      const htmlContent = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${widgetName} Widget</title>
+  </head>
+  <body>
+    <div id="widget-root"></div>
+    <script type="module" src="/entry.tsx"></script>
+  </body>
+</html>`
+      
+      await fs.writeFile(join(widgetTempDir, 'entry.tsx'), entryContent, 'utf8')
+      await fs.writeFile(join(widgetTempDir, 'index.html'), htmlContent, 'utf8')
+      
+      // Create a Vite dev server for this widget
+
+      const viteServer = await createServer({
+        root: widgetTempDir,
+        base: `${baseRoute}/${widgetName}/`,
+        plugins: [tailwindcss(), react()],
+        resolve: {
+          alias: {
+            '@': join(process.cwd(), resourcesDir),
+          },
+        },
+        server: {
+          middlewareMode: true,
+          hmr: {
+            port: 24678, // Fixed HMR port
+          },
+        },
+      })
+      
+      // Mount this widget's Vite server at its route
+      this.app.use(`${baseRoute}/${widgetName}`, viteServer.middlewares)
+      
+      console.log(`[WIDGET] ${widgetName} mounted at ${baseRoute}/${widgetName}`)
+    }
+    
+    console.log(`[WIDGETS] Serving ${entries.length} widget(s) with HMR`)
+  }
+
+  /**
    * Mount MCP server endpoints at /mcp
    *
    * Sets up the HTTP transport layer for the MCP server, creating endpoints for
@@ -1080,10 +1302,14 @@ export class McpServer {
    */
   async listen(port?: number): Promise<void> {
     await this.mountMcp()
+    
     this.serverPort = port || 3001
 
-    // Mount inspector after we know the port
+    // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
     this.mountInspector()
+
+    // Setup widget serving with Vite dev servers
+    await this.setupWidgetServers()
 
     this.app.listen(this.serverPort, () => {
       console.log(`[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`)
@@ -1131,6 +1357,163 @@ export class McpServer {
         // Inspector package not installed, skip mounting silently
         // This allows the server to work without the inspector in production
       })
+  }
+
+  /**
+   * Setup widget serving with Vite dev servers
+   * 
+   * Creates Vite dev servers for each widget in the resources directory,
+   * enabling HMR and proper React component serving in development mode.
+   *
+   * @private
+   * @returns Promise that resolves when widget servers are set up
+   */
+  private async setupWidgetServers(): Promise<void> {
+    const { promises: fs } = await import('node:fs')
+    
+    const srcDir = join(process.cwd(), 'resources')
+    
+    // Check if resources directory exists
+    try {
+      await fs.access(srcDir)
+    } catch (error) {
+      console.log('[WIDGETS] No resources/ directory found - skipping widget serving')
+      return
+    }
+    
+    // Find all TSX widget files using Node's fs
+    let entries: string[] = []
+    try {
+      const files = await fs.readdir(srcDir)
+      entries = files
+        .filter(f => f.endsWith('.tsx') || f.endsWith('.ts'))
+        .map(f => join(srcDir, f))
+    } catch (error) {
+      console.log('[WIDGETS] No widgets found in resources/ directory')
+      return
+    }
+    
+    if (entries.length === 0) {
+      console.log('[WIDGETS] No widgets found in resources/ directory')
+      return
+    }
+    
+    // Generate widget manifest
+    await this.generateWidgetManifest(entries)
+    
+    // Create a temp directory for widget entry files
+    const tempDir = join(process.cwd(), '.mcp-use-temp')
+    await fs.mkdir(tempDir, { recursive: true }).catch(() => {})
+    
+      // @ts-ignore - Optional peer dependency
+    const react = (await import('@vitejs/plugin-react')).default
+    const tailwindcss = (await import('@tailwindcss/vite')).default 
+    
+    // Create entry files and Vite servers for each widget
+    for (const entry of entries) {
+      const baseName = entry.split('/').pop()?.replace(/\.tsx?$/, '') || 'widget'
+      const widgetName = baseName
+      
+      // Create temp entry and HTML files for this widget
+      const widgetTempDir = join(tempDir, widgetName)
+      await fs.mkdir(widgetTempDir, { recursive: true })
+      
+      // Create a CSS file with Tailwind and @source directives to scan resources
+      const resourcesPath = join(process.cwd(), 'resources')
+      const { relative } = await import('node:path')
+      const relativeResourcesPath = relative(widgetTempDir, resourcesPath).replace(/\\/g, '/')
+      const cssContent = `@import "tailwindcss";
+
+/* Configure Tailwind to scan the resources directory */
+@source "${relativeResourcesPath}";
+`
+      await fs.writeFile(join(widgetTempDir, 'styles.css'), cssContent, 'utf8')
+      
+      const entryContent = `import React from 'react'
+import { createRoot } from 'react-dom/client'
+import './styles.css'
+import Component from '${entry}'
+
+const container = document.getElementById('widget-root')
+if (container && Component) {
+  const root = createRoot(container)
+  root.render(<Component />)
+}
+`
+      
+      const htmlContent = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${widgetName} Widget</title>
+  </head>
+  <body>
+    <div id="widget-root"></div>
+    <script type="module" src="/entry.tsx"></script>
+  </body>
+</html>`
+      
+      await fs.writeFile(join(widgetTempDir, 'entry.tsx'), entryContent, 'utf8')
+      await fs.writeFile(join(widgetTempDir, 'index.html'), htmlContent, 'utf8')
+      
+      // Create a Vite dev server for this widget
+      const viteServer = await createServer({
+        root: widgetTempDir,
+        base: "/mcp-use/widgets",
+        plugins: [react(), tailwindcss()],
+        resolve: {
+          alias: {
+            '@': join(process.cwd(), 'resources'),
+          },
+        },
+        server: {
+          middlewareMode: true,
+          hmr: {
+            port: 24678, // Fixed HMR port
+          },
+        },
+      })
+      
+      // Mount this widget's Vite server at its route
+      this.app.use(`/mcp-use/widgets/${widgetName}`, viteServer.middlewares)
+    }
+    
+    console.log(`[WIDGETS] Serving ${entries.length} widget(s) with HMR`)
+  }
+
+  /**
+   * Generate widget manifest from TSX files
+   * 
+   * @private
+   */
+  private async generateWidgetManifest(entries: string[]): Promise<void> {
+    const { promises: fs } = await import('node:fs')
+    const outDir = join(process.cwd(), 'dist/resources')
+    const manifest: Record<string, any> = {}
+    
+    for (const entry of entries) {
+      try {
+        // Try to extract schema - this would need the schema-generator utility
+        // For now, create a basic manifest entry
+        const widgetName = entry.split('/').pop()?.replace(/\.tsx?$/, '') || 'widget'
+        manifest[widgetName] = {
+          name: widgetName,
+          description: `Widget: ${widgetName}`,
+          props: {}
+        }
+      } catch (error) {
+        console.warn(`Failed to generate manifest for ${entry}:`, error)
+      }
+    }
+    
+    // Write manifest
+    await fs.mkdir(outDir, { recursive: true }).catch(() => {})
+    await fs.writeFile(
+      join(outDir, 'manifest.json'),
+      JSON.stringify(manifest, null, 2),
+      'utf8'
+    )
   }
 
   /**
