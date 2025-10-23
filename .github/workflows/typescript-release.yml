@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - "libraries/typescript/**"
-      - ".github/workflows/typescript-release.yml"
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -154,7 +153,7 @@ jobs:
           
           echo "✅ Created consolidated GitHub release: $RELEASE_TITLE"
 
-      - name: Sync main to canary
+      - name: Reset canary to main and re-enter prerelease
         if: steps.check.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -166,11 +165,24 @@ jobs:
           # Fetch latest changes
           git fetch origin
 
-          # Checkout canary and merge main
+          # Checkout canary and reset to main (clean slate with stable versions)
           git checkout canary
-          git merge origin/main --no-edit -m "chore: sync version updates from main"
+          git reset --hard origin/main
+          
+          echo "✅ Reset canary to match main"
 
-          # Push canary
-          git push origin canary
+          # Re-enter prerelease mode on canary
+          cd libraries/typescript
+          pnpm changeset pre enter canary
+          
+          echo "✅ Re-entered prerelease mode on canary branch"
 
-          echo "✅ Synced main version updates to canary branch"
+          # Commit the prerelease mode change
+          cd ../..
+          git add .
+          git commit -m "chore: re-enter prerelease mode on canary after stable release"
+
+          # Force push canary (since we did a reset)
+          git push --force origin canary
+
+          echo "✅ Canary branch reset to main and re-entered prerelease mode"
