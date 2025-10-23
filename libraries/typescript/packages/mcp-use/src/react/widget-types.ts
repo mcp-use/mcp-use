@@ -3,6 +3,8 @@
  * Based on: https://developers.openai.com/apps-sdk/build/custom-ux
  */
 
+/* global CustomEvent */
+
 export type UnknownObject = Record<string, unknown>
 
 export type Theme = 'light' | 'dark'

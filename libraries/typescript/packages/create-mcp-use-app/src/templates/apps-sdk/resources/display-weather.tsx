@@ -24,7 +24,7 @@ type WeatherProps = z.infer<typeof propSchema>;
 
 const WeatherWidget: React.FC = () => {
   // Use the useWidget hook to get props from OpenAI Apps SDK
-  const { props, theme, sendFollowUpMessage, callTool, requestDisplayMode } = useWidget<WeatherProps>();
+  const { props, theme } = useWidget<WeatherProps>();
   
   console.log(props)
 
