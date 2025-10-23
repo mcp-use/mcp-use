@@ -1098,7 +1098,31 @@ if (container && Component) {
       // for now expose all widgets as appsSdk
       const type = 'appsSdk'
       
-      const props = {}
+      // Extract metadata from the widget file using Vite SSR
+      let widgetMetadata: any = {}
+      let props = {}
+      let description = widget.description
+      
+      try {
+        const mod = await viteServer.ssrLoadModule(widget.entry)
+        if (mod.widgetMetadata) {
+          widgetMetadata = mod.widgetMetadata
+          description = widgetMetadata.description || widget.description
+          
+          // Convert Zod schema to JSON schema for props if available
+          if (widgetMetadata.inputs) {
+            // The inputs is a Zod schema, we can use zodToJsonSchema or extract shape
+            try {
+              // For now, store the zod schema info
+              props = widgetMetadata.inputs.shape || {}
+            } catch (error) {
+              console.warn(`[WIDGET] Failed to extract props schema for ${widget.name}:`, error)
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`[WIDGET] Failed to load metadata for ${widget.name}:`, error)
+      }
 
       let html = '';
       try {
@@ -1116,13 +1140,13 @@ if (container && Component) {
       this.uiResource({
         name: widget.name,
         title: widget.name,
-        description: widget.description,
+        description: description,
         type: type,
         props: props,
         _meta: {
           'mcp-use/widget': {
             name: widget.name,
-            description: widget.description,
+            description: description,
             type: type,
             props: props,
             html: html
@@ -1130,7 +1154,7 @@ if (container && Component) {
         },
         htmlTemplate: html,
         appsSdkMetadata: {
-          'openai/widgetDescription': widget.description,
+          'openai/widgetDescription': description,
           'openai/toolInvocation/invoking': 'Hand-tossing a map',
           'openai/toolInvocation/invoked': 'Served a fresh map',
           'openai/widgetAccessible': true,
