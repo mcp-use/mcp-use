@@ -1049,7 +1049,13 @@ if (container && Component) {
           'openai/resultCanProduceWidget': true,
           'openai/widgetCSP': {
             connect_domains: [],
-            resource_domains: ['https://persistent.oaistatic.com']
+            resource_domains: [
+              'https://*.oaistatic.com',
+              'https://*.unsplash.com',
+              'https://*.oaiusercontent.com',
+              // always also add the base url of the server
+              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+            ]
           }
         }
       })
