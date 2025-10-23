@@ -420,10 +420,17 @@
                   {
                     "group": "UI Widgets",
                     "icon": "palette",
+                    "tag": "Apps SDK",
                     "pages": [
                       "typescript/server/ui-widgets",
-                      "typescript/server/mcp-ui-resources",
-                      "typescript/server/apps-sdk-resources"
+                      {
+                        "group": "References",
+                        "icon": "book",
+                        "pages": [
+                          "typescript/server/mcp-ui-resources",
+                           "typescript/server/apps-sdk-resources"
+                        ]
+                      }
                     ]
                   },
                   {
