@@ -150,11 +150,8 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.19)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/create-mcp-use-app/src/templates/apps-sdk-demo:
+  packages/create-mcp-use-app/src/templates/apps-sdk:
     dependencies:
-      '@mcp-ui/server':
-        specifier: ^5.11.0
-        version: 5.12.0
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -164,149 +161,58 @@ importers:
       mcp-use:
         specifier: workspace:*
         version: link:../../../../mcp-use
-      zod:
-        specifier: ^3.23.0
-        version: 3.25.76
-    devDependencies:
-      '@mcp-use/cli':
-        specifier: workspace:*
-        version: link:../../../../cli
-      '@mcp-use/inspector':
-        specifier: workspace:*
-        version: link:../../../../inspector
-      '@types/cors':
-        specifier: ^2.8.0
-        version: 2.8.19
-      '@types/express':
-        specifier: ^4.17.0
-        version: 4.17.23
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.19
-      tsx:
+      react:
+        specifier: ^19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.0(react@19.2.0)
+      tailwindcss:
         specifier: ^4.0.0
-        version: 4.20.6
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
+        version: 4.1.15
+      zod:
+        specifier: ^4.1.12
+        version: 4.1.12
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.2
+        version: 19.2.2
+      '@types/react-dom':
+        specifier: ^19.2.2
+        version: 19.2.2(@types/react@19.2.2)
+
+  packages/create-mcp-use-app/src/templates/mcp-ui:
+    dependencies:
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
+      express:
+        specifier: ^4.18.0
+        version: 4.21.2
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../../mcp-use
+      react:
+        specifier: ^19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.0(react@19.2.0)
+      tailwindcss:
+        specifier: ^4.0.0
+        version: 4.1.15
+      zod:
+        specifier: ^4.1.12
+        version: 4.1.12
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.2
+        version: 19.2.2
+      '@types/react-dom':
+        specifier: ^19.2.2
+        version: 19.2.2(@types/react@19.2.2)
 
   packages/create-mcp-use-app/src/templates/starter:
-    dependencies:
-      '@mcp-ui/server':
-        specifier: ^5.11.0
-        version: 5.12.0
-      cors:
-        specifier: ^2.8.5
-        version: 2.8.5
-      express:
-        specifier: ^4.18.0
-        version: 4.21.2
-      mcp-use:
-        specifier: workspace:*
-        version: link:../../../../mcp-use
-    devDependencies:
-      '@mcp-use/cli':
-        specifier: workspace:*
-        version: link:../../../../cli
-      '@mcp-use/inspector':
-        specifier: workspace:*
-        version: link:../../../../inspector
-      '@types/cors':
-        specifier: ^2.8.0
-        version: 2.8.19
-      '@types/express':
-        specifier: ^4.17.0
-        version: 4.17.23
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.19
-      '@types/react':
-        specifier: ^18.0.0
-        version: 18.3.26
-      '@types/react-dom':
-        specifier: ^18.0.0
-        version: 18.3.7(@types/react@18.3.26)
-      concurrently:
-        specifier: ^8.0.0
-        version: 8.2.2
-      esbuild:
-        specifier: '>=0.25.0'
-        version: 0.25.10
-      globby:
-        specifier: ^14.0.2
-        version: 14.1.0
-      react:
-        specifier: ^19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.0(react@19.2.0)
-      tsx:
-        specifier: ^4.0.0
-        version: 4.20.6
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
-
-  packages/create-mcp-use-app/src/templates/ui-resource:
-    dependencies:
-      '@mcp-ui/server':
-        specifier: ^5.11.0
-        version: 5.12.0
-      cors:
-        specifier: ^2.8.5
-        version: 2.8.5
-      express:
-        specifier: ^4.18.0
-        version: 4.21.2
-      mcp-use:
-        specifier: workspace:*
-        version: link:../../../../mcp-use
-    devDependencies:
-      '@mcp-use/cli':
-        specifier: workspace:*
-        version: link:../../../../cli
-      '@mcp-use/inspector':
-        specifier: workspace:*
-        version: link:../../../../inspector
-      '@types/cors':
-        specifier: ^2.8.0
-        version: 2.8.19
-      '@types/express':
-        specifier: ^4.17.0
-        version: 4.17.23
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.19
-      '@types/react':
-        specifier: ^18.0.0
-        version: 18.3.26
-      '@types/react-dom':
-        specifier: ^18.0.0
-        version: 18.3.7(@types/react@18.3.26)
-      concurrently:
-        specifier: ^8.0.0
-        version: 8.2.2
-      esbuild:
-        specifier: '>=0.25.0'
-        version: 0.25.10
-      globby:
-        specifier: ^14.0.2
-        version: 14.1.0
-      react:
-        specifier: ^19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.0(react@19.2.0)
-      tsx:
-        specifier: ^4.0.0
-        version: 4.20.6
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
-
-  packages/create-mcp-use-app/src/templates/weather:
     dependencies:
       cors:
         specifier: ^2.8.5
@@ -3120,11 +3026,6 @@ packages:
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
 
-  concurrently@8.2.2:
-    resolution: {integrity: sha512-1dP4gpXFhei8IOtlXRE/T/4H88ElHgTiUzh71YUmtjTEHMSRS2Z/fgOxHSxxusGHogsRfxNq1vyAwxSC+EVyDg==}
-    engines: {node: ^14.13.0 || >=16.0.0}
-    hasBin: true
-
   concurrently@9.2.1:
     resolution: {integrity: sha512-fsfrO0MxV64Znoy8/l1vVIjjHa29SZyyqPgQBwhiDcaW8wJc2W3XWVOGx4M3oJBnv/zdUZIIp1gDeS98GzP8Ng==}
     engines: {node: '>=18'}
@@ -3210,10 +3111,6 @@ packages:
   data-view-byte-offset@1.0.1:
     resolution: {integrity: sha512-BS8PfmtDGnrgYdOonGZQdLZslWIeCGFP9tpan0hi1Co2Zr2NKADsvGYA8XxuG/4UWgJ6Cjtv+YJnB6MM69QGlQ==}
     engines: {node: '>= 0.4'}
-
-  date-fns@2.30.0:
-    resolution: {integrity: sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==}
-    engines: {node: '>=0.11'}
 
   debug@2.6.9:
     resolution: {integrity: sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==}
@@ -5822,9 +5719,6 @@ packages:
 
   space-separated-tokens@1.1.5:
     resolution: {integrity: sha512-q/JSVd1Lptzhf5bkYm4ob4iWPjx0KiRe3sRFBNrVqbJkFaBm5vbbowy1mymoPNLRa52+oadOhJ+K49wsSeSjTA==}
-
-  spawn-command@0.0.2:
-    resolution: {integrity: sha512-zC8zGoGkmc8J9ndvml8Xksr1Amk9qBujgbF0JAIWO7kXr43w0h/0GJNM/Vustixu+YE8N/MTrQ7N31FvHUACxQ==}
 
   spawndamnit@3.0.1:
     resolution: {integrity: sha512-MmnduQUuHCoFckZoWnXsTg7JaiLBJrKFj9UI2MbRPGaJeVpsLcVBu6P/IGZovziM/YBsellCmsprgNA+w0CzVg==}
@@ -8448,7 +8342,7 @@ snapshots:
 
   '@types/react-syntax-highlighter@15.5.13':
     dependencies:
-      '@types/react': 18.3.26
+      '@types/react': 19.2.2
 
   '@types/react@18.3.26':
     dependencies:
@@ -9230,18 +9124,6 @@ snapshots:
 
   concat-map@0.0.1: {}
 
-  concurrently@8.2.2:
-    dependencies:
-      chalk: 4.1.2
-      date-fns: 2.30.0
-      lodash: 4.17.21
-      rxjs: 7.8.2
-      shell-quote: 1.8.3
-      spawn-command: 0.0.2
-      supports-color: 8.1.1
-      tree-kill: 1.2.2
-      yargs: 17.7.2
-
   concurrently@9.2.1:
     dependencies:
       chalk: 4.1.2
@@ -9321,10 +9203,6 @@ snapshots:
       call-bound: 1.0.4
       es-errors: 1.3.0
       is-data-view: 1.0.2
-
-  date-fns@2.30.0:
-    dependencies:
-      '@babel/runtime': 7.28.4
 
   debug@2.6.9:
     dependencies:
@@ -12312,8 +12190,6 @@ snapshots:
       whatwg-url: 7.1.0
 
   space-separated-tokens@1.1.5: {}
-
-  spawn-command@0.0.2: {}
 
   spawndamnit@3.0.1:
     dependencies:

@@ -15,42 +15,18 @@ const PORT = process.env.PORT || 3000
 
 /**
  * ════════════════════════════════════════════════════════════════════
- * Type 1: External URL (Iframe Widget)
+ * Type 1: External URL (Iframe Widget from `resources/`)
  * ════════════════════════════════════════════════════════════════════
  *
  * Serves a widget from your local filesystem via iframe.
- * Best for: Complex interactive widgets with their own assets
+ * All React components in the `resources/` folder are automatically registered as MCP tools and resources.
  *
  * This automatically:
  * 1. Creates a tool (kanban-board) that accepts parameters
  * 2. Creates a resource (ui://widget/kanban-board) for static access
  * 3. Serves the widget from dist/resources/mcp-use/widgets/kanban-board/
  */
-server.uiResource({
-  type: 'externalUrl',
-  name: 'kanban-board',
-  widget: 'kanban-board',
-  title: 'Kanban Board',
-  description: 'Interactive task management board with drag-and-drop support',
-  props: {
-    initialTasks: {
-      type: 'array',
-      description: 'Initial tasks to display on the board',
-      required: false,
-    },
-    theme: {
-      type: 'string',
-      description: 'Visual theme for the board (light/dark)',
-      required: false,
-      default: 'light'
-    },
-    columns: {
-      type: 'array',
-      description: 'Column configuration for the board',
-      required: false,
-    }
-  }
-} satisfies ExternalUrlUIResource)
+
 
 /**
  * ════════════════════════════════════════════════════════════════════
@@ -58,7 +34,6 @@ server.uiResource({
  * ════════════════════════════════════════════════════════════════════
  *
  * Renders HTML content directly without an iframe.
- * Best for: Simple visualizations, status displays, formatted text
  *
  * This creates:
  * - Tool: welcome-card
@@ -157,7 +132,6 @@ server.uiResource({
  * ════════════════════════════════════════════════════════════════════
  *
  * Uses Remote DOM to render interactive components.
- * Best for: Lightweight interactive UIs using MCP-UI React components
  *
  * This creates:
  * - Tool: quick-poll
