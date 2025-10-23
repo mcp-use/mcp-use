@@ -144,7 +144,7 @@ export function OpenAIComponentRenderer({
         }
         urlParams.set('mcpUseParams', JSON.stringify(params))
 
-        if (toolResult?._meta?.['mcp-use/widget']?.html) {
+        if (toolResult?._meta?.['mcp-use/widget']?.html && toolResult?._meta?.['mcp-use/widget']?.dev) {
           setWidgetUrl(`${new URL(serverBaseUrl || '').origin}/mcp-use/widgets/${toolResult?._meta?.['mcp-use/widget']?.name}?${urlParams.toString()}`)
         }
         else {

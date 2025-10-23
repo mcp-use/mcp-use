@@ -321,272 +321,6 @@ export class McpServer {
     return this
   }
 
-  /**
-   * Register an Apps SDK compatible UI widget as both a tool and a resource
-   *
-   * This method automatically converts a widget from the resources directory into an
-   * Apps SDK compatible format by inlining all HTML, CSS, and JavaScript into a single
-   * htmlTemplate. It reads the built widget files and creates a text/html+skybridge
-   * resource that works with OpenAI's Apps SDK.
-   *
-   * @param widgetName - Widget name to load from the manifest
-   * @param options - Optional Apps SDK metadata configuration
-   * @param options.appsSdkMetadata - Apps SDK specific metadata (CSP, widget description, etc.)
-   * @param options.title - Override the auto-generated title
-   * @param options.description - Override the description from manifest
-   * @param options.size - Preferred widget size [width, height] (e.g., ['800px', '600px'])
-   * @returns The server instance for method chaining
-   *
-   * @example
-   * ```typescript
-   * // Simple usage - auto-loads from generated schema
-   * server.appsUiResource('display-weather')
-   * 
-   * // With custom metadata
-   * server.appsUiResource('display-weather', {
-   *   appsSdkMetadata: {
-   *     'openai/widgetDescription': 'Interactive weather display widget',
-   *     'openai/toolInvocation/invoking': 'Fetching weather data...',
-   *     'openai/toolInvocation/invoked': 'Weather displayed',
-   *     'openai/widgetAccessible': true,
-   *     'openai/resultCanProduceWidget': true,
-   *     'openai/widgetCSP': {
-   *       connect_domains: ['https://chatgpt.com'],
-   *       resource_domains: ['https://*.oaistatic.com']
-   *       // Note: If MCP_URL/baseUrl is set, it will be automatically added to resource_domains
-   *     }
-   *   }
-   * })
-   * ```
-   */
-  appsUiResource(
-    widgetName: string, 
-    options?: {
-      appsSdkMetadata?: Record<string, any>,
-      title?: string,
-      description?: string,
-      size?: [string, string]
-    }
-  ): this {
-    // Load widget schema from manifest
-    const schema :any= {}
-    
-    // Read the built widget's HTML file to extract asset references
-    const widgetHtmlPath = join(process.cwd(), 'dist/resources/mcp-use/widgets', widgetName, 'index.html')
-    
-    try {
-      const htmlContent = readFileSync(widgetHtmlPath, 'utf8')
-      
-      // Extract the script src from the HTML
-      const scriptMatch = htmlContent.match(/<script type="module" src="\.\/assets\/([^"]+)"/)
-      if (!scriptMatch) {
-        throw new Error(`Could not find script tag in ${widgetName}/index.html`)
-      }
-      
-      const scriptFile = scriptMatch[1]
-      
-      // Extract the styles from the HTML
-      const styleMatch = htmlContent.match(/<style>([\s\S]*?)<\/style>/)
-      const styles = styleMatch ? styleMatch[1] : ''
-      
-      // Store the template data for runtime generation
-      const templateData = {
-        widgetName,
-        scriptFile,
-        styles,
-        title: schema.title || widgetName
-      }
-      
-      // Create a function that generates the HTML template at runtime with the correct port
-      const generateHtmlTemplate = () => {
-        // Use baseUrl if provided, otherwise construct from host:port
-        const baseUrl = this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort || 3001}`
-        const scriptUrl = `${baseUrl}/mcp-use/widgets/${widgetName}/assets/${scriptFile}`
-        
-        return `
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${templateData.title}</title>
-    <style>${styles}</style>
-  </head>
-  <body>
-    <div id="widget-root"></div>
-    <script type="module" src="${scriptUrl}"></script>
-  </body>
-</html>
-        `.trim()
-      }
-      
-      // For Apps SDK, we need to use rawHtml type with dynamic template generation
-      // We'll create a custom UIResourceDefinition that generates HTML at request time
-      
-      // Prepare Apps SDK metadata with automatic CSP configuration
-      const appsSdkMetadata = options?.appsSdkMetadata || {}
-      
-      // Automatically add the base URL domain to CSP resource_domains if baseUrl is set
-      if (this.serverBaseUrl) {
-        try {
-          const url = new URL(this.serverBaseUrl)
-          const domain = `${url.protocol}//${url.hostname}${url.port ? ':' + url.port : ''}`
-          
-          // Initialize CSP if not present
-          if (!appsSdkMetadata['openai/widgetCSP']) {
-            appsSdkMetadata['openai/widgetCSP'] = {
-              connect_domains: [],
-              resource_domains: []
-            }
-          }
-          
-          // Ensure resource_domains exists and add the domain if not already present
-          const csp = appsSdkMetadata['openai/widgetCSP'] as any
-          if (!csp.resource_domains) {
-            csp.resource_domains = []
-          }
-          if (!csp.resource_domains.includes(domain)) {
-            csp.resource_domains.push(domain)
-            console.log(`[Apps SDK] Added ${domain} to CSP resource_domains for widget "${widgetName}"`)
-          }
-        } catch (e) {
-          console.warn('Failed to parse baseUrl for CSP configuration', e)
-        }
-      }
-      
-      const definition: UIResourceDefinition = {
-        type: 'rawHtml',
-        name: widgetName,
-        title: options?.title || schema.title,
-        description: options?.description || schema.description,
-        props: schema.props,
-        htmlContent: '', // Placeholder, will be replaced
-        size: options?.size,
-        appsSdkMetadata
-      }
-      
-      // Override the resource registration to generate HTML at runtime
-      const resourceUri = `ui://widget/${widgetName}.html`
-      const mimeType = 'text/html+skybridge'
-      
-      // Register the resource with dynamic HTML generation
-      this.resource({
-        name: widgetName,
-        uri: resourceUri,
-        title: definition.title,
-        description: definition.description,
-        mimeType,
-        annotations: definition.annotations,
-        _meta: definition._meta,
-        readCallback: async () => {
-          const htmlTemplate = generateHtmlTemplate()
-          const resource: any = {
-            uri: resourceUri,
-            mimeType,
-            text: htmlTemplate
-          }
-          
-          // Add metadata if provided
-          if (definition.appsSdkMetadata && Object.keys(definition.appsSdkMetadata).length > 0) {
-            resource._meta = definition.appsSdkMetadata
-          }
-          
-          return {
-            contents: [resource]
-          }
-        }
-      })
-      
-      // Register the resource template for dynamic URIs
-      this.resourceTemplate({
-        name: `${widgetName}-dynamic`,
-        resourceTemplate: {
-          uriTemplate: `ui://widget/${widgetName}-{id}.html`,
-          name: definition.title || widgetName,
-          description: definition.description,
-          mimeType
-        },
-        _meta: definition._meta,
-        title: definition.title,
-        description: definition.description,
-        annotations: definition.annotations,
-        readCallback: async (uri, params) => {
-          const htmlTemplate = generateHtmlTemplate()
-          const resource: any = {
-            uri: uri.toString(),
-            mimeType,
-            text: htmlTemplate
-          }
-          
-          if (definition.appsSdkMetadata && Object.keys(definition.appsSdkMetadata).length > 0) {
-            resource._meta = definition.appsSdkMetadata
-          }
-          
-          return {
-            contents: [resource]
-          }
-        }
-      })
-      
-      // Register the tool
-      const toolName = widgetName
-      const displayName = definition.title || widgetName
-      const toolMetadata: Record<string, unknown> = {
-        'openai/outputTemplate': resourceUri
-      }
-      
-      // Copy over tool-relevant metadata fields from appsSdkMetadata
-      if (definition.appsSdkMetadata) {
-        const toolMetadataFields = [
-          'openai/toolInvocation/invoking',
-          'openai/toolInvocation/invoked',
-          'openai/widgetAccessible',
-          'openai/resultCanProduceWidget'
-        ] as const
-        
-        for (const field of toolMetadataFields) {
-          if (definition.appsSdkMetadata[field] !== undefined) {
-            toolMetadata[field] = definition.appsSdkMetadata[field]
-          }
-        }
-      }
-      
-      this.tool({
-        name: toolName,
-        title: definition.title,
-        description: definition.title || definition.description || `Display ${displayName}`,
-        inputs: this.convertPropsToInputs(definition.props),
-        _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
-        cb: async (params) => {
-          // Generate a unique URI with random ID for each invocation
-          const randomId = Math.random().toString(36).substring(2, 15)
-          const uniqueUri = `ui://widget/${widgetName}-${randomId}.html`
-          
-          // Update toolMetadata with the unique URI
-          const uniqueToolMetadata = { ...toolMetadata, 'openai/outputTemplate': uniqueUri }
-          
-          return {
-            _meta: uniqueToolMetadata,
-            content: [
-              {
-                type: 'text',
-                text: `Displaying ${displayName}`
-              }
-            ],
-            structuredContent: params
-          }
-        }
-      })
-      
-      return this
-    } catch (error) {
-      throw new Error(
-        `Failed to load widget files for "${widgetName}". ` +
-        `Make sure to run the build process to generate the widget files. ` +
-        `Error: ${error instanceof Error ? error.message : String(error)}`
-      )
-    }
-  }
 
   /**
    * Register a UI widget as both a tool and a resource
@@ -922,31 +656,70 @@ export class McpServer {
 
 
   /**
-   * Mount individual widget files from resources/ directory
+   * Check if server is running in production mode
+   * 
+   * @private
+   * @returns true if in production mode, false otherwise
+   */
+  private isProductionMode(): boolean {
+    // Only check NODE_ENV - CLI commands set this explicitly
+    // 'mcp-use dev' sets NODE_ENV=development
+    // 'mcp-use start' sets NODE_ENV=production
+    return process.env.NODE_ENV === 'production'
+  }
+
+  /**
+   * Read build manifest file
+   * 
+   * @private
+   * @returns Build manifest or null if not found
+   */
+  private readBuildManifest(): { includeInspector: boolean; widgets: string[]; buildTime?: string } | null {
+    try {
+      const manifestPath = join(process.cwd(), 'dist', '.mcp-use-manifest.json')
+      const content = readFileSync(manifestPath, 'utf8')
+      return JSON.parse(content)
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Mount widget files - automatically chooses between dev and production mode
    *
-   * Scans the resources/ directory for .tsx/.ts widget files and creates individual
-   * Vite dev servers for each widget with HMR support. Each widget is served at its
-   * own route: /mcp-use/widgets/{widget-name}
+   * In development mode: creates Vite dev servers with HMR support
+   * In production mode: serves pre-built static widgets
    *
    * @param options - Configuration options
    * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
    * @param options.resourcesDir - Directory containing widget files (defaults to 'resources')
    * @returns Promise that resolves when all widgets are mounted
-   *
-   * @example
-   * ```typescript
-   * // Serve all widgets from resources/ at /mcp-use/widgets/{name}
-   * await server.mountWidgets({
-   *   baseRoute: '/mcp-use/widgets',
-   *   resourcesDir: 'resources'
-   * })
-   * // Now accessible at:
-   * // - /mcp-use/widgets/display-weather
-   * // - /mcp-use/widgets/kanban-board
-   * // etc.
-   * ```
    */
   async mountWidgets(options?: {
+    baseRoute?: string
+    resourcesDir?: string
+  }): Promise<void> {
+    if (this.isProductionMode()) {
+      await this.mountWidgetsProduction(options)
+    } else {
+      await this.mountWidgetsDev(options)
+    }
+  }
+
+  /**
+   * Mount individual widget files from resources/ directory in development mode
+   *
+   * Scans the resources/ directory for .tsx/.ts widget files and creates individual
+   * Vite dev servers for each widget with HMR support. Each widget is served at its
+   * own route: /mcp-use/widgets/{widget-name}
+   *
+   * @private
+   * @param options - Configuration options
+   * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
+   * @param options.resourcesDir - Directory containing widget files (defaults to 'resources')
+   * @returns Promise that resolves when all widgets are mounted
+   */
+  private async mountWidgetsDev(options?: {
     baseRoute?: string
     resourcesDir?: string
   }): Promise<void> {
@@ -1045,7 +818,12 @@ if (container && Component) {
       await fs.writeFile(join(widgetTempDir, 'index.html'), htmlContent, 'utf8')
     }
     
-    // Create a single Vite dev server for all widgets
+    // Build the server origin URL
+    const serverOrigin = this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort}`
+    
+    // Create a single shared Vite dev server for all widgets
+    console.log(`[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`)
+    
     const viteServer = await createServer({
       root: tempDir,
       base: baseRoute + '/',
@@ -1057,13 +835,13 @@ if (container && Component) {
       },
       server: {
         middlewareMode: true,
+        origin: serverOrigin,
       },
     })
     
-    // Custom middleware to route to the correct widget
+    // Custom middleware to handle widget-specific paths
     this.app.use(baseRoute, (req, res, next) => {
       const urlPath = req.url || ''
-      // Split pathname and query string
       const [pathname, queryString] = urlPath.split('?')
       const widgetMatch = pathname.match(/^\/([^/]+)/)
       
@@ -1076,7 +854,7 @@ if (container && Component) {
           if (pathname === `/${widgetName}` || pathname === `/${widgetName}/`) {
             req.url = `/${widgetName}/index.html${queryString ? '?' + queryString : ''}`
           }
-          // Otherwise keep the original URL (including query string)
+          // For assets, keep the original URL but Vite will handle it from the widget's directory
         }
       }
       
@@ -1086,7 +864,6 @@ if (container && Component) {
     // Mount the single Vite server for all widgets
     this.app.use(baseRoute, viteServer.middlewares)
     
-    console.log(`[WIDGETS] Serving ${entries.length} widget(s) with shared Vite server and HMR`)
     widgets.forEach(widget => {
       console.log(`[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`)
     })
@@ -1150,7 +927,8 @@ if (container && Component) {
             description: description,
             type: type,
             props: props,
-            html: html
+            html: html,
+            dev: true,
           }
         },
         htmlTemplate: html,
@@ -1168,6 +946,116 @@ if (container && Component) {
       })
     }
 
+  }
+
+  /**
+   * Mount pre-built widgets from dist/resources/widgets/ directory in production mode
+   *
+   * Serves static widget bundles that were built using the build command.
+   * Sets up Express routes to serve the HTML and asset files, then registers
+   * tools and resources for each widget.
+   *
+   * @private
+   * @param options - Configuration options
+   * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
+   * @returns Promise that resolves when all widgets are mounted
+   */
+  private async mountWidgetsProduction(options?: {
+    baseRoute?: string
+    resourcesDir?: string
+  }): Promise<void> {
+    const baseRoute = options?.baseRoute || '/mcp-use/widgets'
+    const widgetsDir = join(process.cwd(), 'dist', 'resources', 'widgets')
+    
+    // Check if widgets directory exists
+    if (!existsSync(widgetsDir)) {
+      console.log('[WIDGETS] No dist/resources/widgets/ directory found - skipping widget serving')
+      return
+    }
+    
+    // Setup static file serving routes
+    this.setupWidgetRoutes()
+    
+    // Discover built widgets
+    const widgets = readdirSync(widgetsDir).filter(name => {
+      const widgetPath = join(widgetsDir, name)
+      const indexPath = join(widgetPath, 'index.html')
+      return existsSync(indexPath)
+    })
+    
+    if (widgets.length === 0) {
+      console.log('[WIDGETS] No built widgets found in dist/resources/widgets/')
+      return
+    }
+    
+    console.log(`[WIDGETS] Serving ${widgets.length} pre-built widget(s) from dist/resources/widgets/`)
+    
+    // Register tools and resources for each widget
+    for (const widgetName of widgets) {
+      const widgetPath = join(widgetsDir, widgetName)
+      const indexPath = join(widgetPath, 'index.html')
+      const metadataPath = join(widgetPath, 'metadata.json')
+      
+      // Read the HTML template
+      let html = ''
+      try {
+        html = readFileSync(indexPath, 'utf8')
+      } catch (error) {
+        console.error(`[WIDGET] Failed to read ${widgetName}/index.html:`, error)
+        continue
+      }
+      
+      // Read the metadata file if it exists
+      let metadata: any = {}
+      let props = {}
+      let description = `Widget: ${widgetName}`
+      
+      try {
+        const metadataContent = readFileSync(metadataPath, 'utf8')
+        metadata = JSON.parse(metadataContent)
+        if (metadata.description) {
+          description = metadata.description
+        }
+        if (metadata.inputs) {
+          props = metadata.inputs
+        }
+      } catch (error) {
+        // Metadata file doesn't exist or couldn't be read - use defaults
+        console.log(`[WIDGET] No metadata found for ${widgetName}, using defaults`)
+      }
+      
+      this.uiResource({
+        name: widgetName,
+        title: widgetName,
+        description: description,
+        type: 'appsSdk',
+        props: props,
+        _meta: {
+          'mcp-use/widget': {
+            name: widgetName,
+            description: description,
+            type: 'appsSdk',
+            props: props,
+            html: html,
+            dev: false,
+          }
+        },
+        htmlTemplate: html,
+        appsSdkMetadata: {
+          'openai/widgetDescription': description,
+          'openai/toolInvocation/invoking': `Loading ${widgetName}...`,
+          'openai/toolInvocation/invoked': `${widgetName} ready`,
+          'openai/widgetAccessible': true,
+          'openai/resultCanProduceWidget': true,
+          'openai/widgetCSP': {
+            connect_domains: [],
+            resource_domains: ['https://persistent.oaistatic.com']
+          }
+        }
+      })
+      
+      console.log(`[WIDGET] ${widgetName} mounted at ${baseRoute}/${widgetName}`)
+    }
   }
 
   /**
@@ -1301,8 +1189,8 @@ if (container && Component) {
    * a web-based interface for testing and debugging MCP servers. The inspector
    * automatically connects to the local MCP server endpoints.
    *
-   * This method gracefully handles cases where the inspector package is not installed,
-   * allowing the server to function without the inspector in production environments.
+   * In production mode, only mounts if the build manifest indicates inspector was included
+   * (built with --with-inspector flag).
    *
    * @private
    * @returns void
@@ -1318,6 +1206,15 @@ if (container && Component) {
    */
   private mountInspector(): void {
     if (this.inspectorMounted) return
+
+    // In production, only mount if build manifest says so
+    if (this.isProductionMode()) {
+      const manifest = this.readBuildManifest()
+      if (!manifest?.includeInspector) {
+        console.log('[INSPECTOR] Skipped in production (use --with-inspector flag during build)')
+        return
+      }
+    }
 
     // Try to dynamically import the inspector package
     // Using dynamic import makes it truly optional - won't fail if not installed
@@ -1340,7 +1237,7 @@ if (container && Component) {
    * Setup default widget serving routes
    *
    * Configures Express routes to serve MCP UI widgets and their static assets.
-   * Widgets are served from the dist/resources/mcp-use/widgets directory and can
+   * Widgets are served from the dist/resources/widgets directory and can
    * be accessed via HTTP endpoints for embedding in web applications.
    *
    * Routes created:
@@ -1362,7 +1259,7 @@ if (container && Component) {
     this.app.get('/mcp-use/widgets/:widget/assets/*', (req, res, next) => {
       const widget = req.params.widget
       const assetFile = (req.params as any)[0]
-      const assetPath = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets', widget, 'assets', assetFile)
+      const assetPath = join(process.cwd(), 'dist', 'resources', 'widgets', widget, 'assets', assetFile)
       res.sendFile(assetPath, err => (err ? next() : undefined))
     })
 
@@ -1370,7 +1267,7 @@ if (container && Component) {
     this.app.get('/mcp-use/widgets/assets/*', (req, res, next) => {
       const assetFile = (req.params as any)[0]
       // Try to find which widget this asset belongs to by checking all widget directories
-      const widgetsDir = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets')
+      const widgetsDir = join(process.cwd(), 'dist', 'resources', 'widgets')
 
       try {
         const widgets = readdirSync(widgetsDir)
@@ -1388,9 +1285,9 @@ if (container && Component) {
     })
 
     // Serve each widget's index.html at its route
-    // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/mcp-use/widgets/kanban-board/index.html
+    // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
     this.app.get('/mcp-use/widgets/:widget', (req, res, next) => {
-      const filePath = join(process.cwd(), 'dist', 'resources', 'mcp-use', 'widgets', req.params.widget, 'index.html')
+      const filePath = join(process.cwd(), 'dist', 'resources', 'widgets', req.params.widget, 'index.html')
       res.sendFile(filePath, err => (err ? next() : undefined))
     })
   }
