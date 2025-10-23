@@ -7,7 +7,5 @@
     "@mcp-use/inspector": "0.4.6",
     "mcp-use": "1.1.6"
   },
-  "changesets": [
-    "easy-wings-learn"
-  ]
+  "changesets": []
 }
