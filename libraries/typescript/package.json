@@ -33,7 +33,8 @@
     "test_app": "pnpm test_app:starter",
     "test_app:starter": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template starter && cd test_app && pnpm install && pnpm dev",
     "test_app:ui-resource": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template ui-resource && cd test_app && pnpm install && pnpm dev",
-    "test_app:apps-sdk": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template apps-sdk-demo && cd test_app && pnpm install && pnpm dev"
+    "test_app:apps-sdk": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template apps-sdk-demo && cd test_app && pnpm install && pnpm dev",
+    "test_app:weather": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template weather && cd test_app && pnpm install && pnpm dev"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
