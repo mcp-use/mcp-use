@@ -20,7 +20,35 @@ The `mcp-use` package provides a powerful and intuitive framework for building M
 
 ## Installation
 
-Install the package via npm:
+### Recommended: Using create-mcp-use-app
+
+The easiest way to get started is to use the `create-mcp-use-app` command, which scaffolds a complete MCP server project with all necessary configuration:
+
+<CodeGroup>
+```bash npm
+npx create-mcp-use-app my-mcp-server
+cd my-mcp-server
+npm run dev
+```
+
+```bash pnpm
+pnpm create mcp-use-app my-mcp-server
+cd my-mcp-server
+pnpm run dev
+```
+
+```bash yarn
+yarn create mcp-use-app my-mcp-server
+cd my-mcp-server
+yarn dev
+```
+</CodeGroup>
+
+This creates a fully configured project with TypeScript setup, build tools, and example templates.
+
+### Manual Installation
+
+If you prefer to set up manually or add mcp-use to an existing project, install the package via npm:
 
 ```bash
 npm install mcp-use
@@ -29,12 +57,14 @@ npm install mcp-use
 For development and testing, you can also install the optional inspector UI:
 
 ```bash
-npm install --save-dev @mcp-use/inspector
+npm install --save-dev @mcp-use/cli
 ```
 
 ## Quick Start
 
-Here's a minimal example to get you started:
+The easiest way to start is with `create-mcp-use-app`, which provides a working example. After running the scaffold command above, your server is ready to go!
+
+For manual setup, here's a minimal example:
 
 ```typescript
 import { createMCPServer } from 'mcp-use/server'

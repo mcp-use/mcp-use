@@ -20,21 +20,93 @@ icon: "download"
 <Info>
   **Prerequisites**:
   - Install [Node.js](https://nodejs.org/) (version 18 or higher)
+  - npm, pnpm, or yarn package manager
 </Info>
 
+### Option 1: Install as a Library (for MCP Agents)
+
+Install mcp_use using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install mcp-use
+```
+
+```bash pnpm
+pnpm add mcp-use
+```
+
+```bash yarn
+yarn add mcp-use
+```
+</CodeGroup>
+
+Then install your preferred LangChain provider:
+
+<CodeGroup>
+```bash npm
+npm install @langchain/openai dotenv
+```
+
+```bash pnpm
+pnpm add @langchain/openai dotenv
+```
+
+```bash yarn
+yarn add @langchain/openai dotenv
+```
+</CodeGroup>
+
+### Option 2: Create an MCP Server (for Building Servers)
+
+The fastest way to scaffold a new MCP server project is to use `create-mcp-use-app`:
+
+<CodeGroup>
+```bash npm
+npx create-mcp-use-app my-mcp-server
+cd my-mcp-server
+npm run dev
+```
+
+```bash pnpm
+pnpm create mcp-use-app my-mcp-server
+cd my-mcp-server
+pnpm run dev
+```
+
+```bash yarn
+yarn create mcp-use-app my-mcp-server
+cd my-mcp-server
+yarn dev
+```
+</CodeGroup>
+
+This command will:
+- Create a new directory with your project name
+- Initialize a TypeScript project with mcp-use configured
+- Set up a basic MCP server template with example tools
+- Install all dependencies automatically
+
+<Tip>
+To see all available options and templates, run:
+```bash
+npx create-mcp-use-app --help
+```
+</Tip>
+
+## Setting Up Your First Project
+
 <Steps>
-  <Step title="Install the library">
-    Install mcp_use using your preferred package manager:
-    
+  <Step title="Create your MCP server or install the library">
+    Use `create-mcp-use-app` for MCP servers or `npm install` for agents (see above).
   </Step>
-  <Step title="Install LLM provider">
-    Choose and install your preferred LangChain provider:
-    
+  <Step title="Configure your LLM provider">
+    Choose and install your preferred LangChain provider.
   </Step>
-  <Step title="Set up environment">
+  <Step title="Set up environment variables">
     Create a `.env` file for your API keys:
 
-    ```bash
+    ```bash .env
     OPENAI_API_KEY=your_openai_key_here
     ANTHROPIC_API_KEY=your_anthropic_key_here
     GROQ_API_KEY=your_groq_key_here
@@ -46,14 +118,9 @@ icon: "download"
 
     <CodeGroup>
 ```typescript TypeScript
-    import { MCPAgent, MCPClient } from 'mcp-use'
-    console.log('mcp_use installed successfully!')
-    ```
-
-```typescript TypeScript
-    import { MCPAgent, MCPClient } from 'mcp-use'
-    console.log('mcp_use installed successfully!')
-    ```
+import { MCPAgent, MCPClient } from 'mcp-use'
+console.log('mcp-use installed successfully!')
+```
 </CodeGroup>
   </Step>
 </Steps>
