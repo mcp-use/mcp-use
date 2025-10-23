@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { useWidget } from 'mcp-use/react';
 import '../styles.css';
 
+/*
+* Apps SDK widget
+* Just export widgetMetadata with description and Zod schema, and mcp-use handles the rest!
+* See docs: https://docs.mcp-use.com/typescript/server/ui-widgets
+*/
+
 const propSchema = z.object({
   city: z.string().describe('The city to display weather for'),
   weather: z.enum(['sunny', 'rain', 'snow', 'cloudy']).describe('The weather condition'),

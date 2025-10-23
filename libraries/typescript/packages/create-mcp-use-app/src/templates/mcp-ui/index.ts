@@ -5,7 +5,7 @@ import type {
   RemoteDomUIResource
 } from 'mcp-use/server'
 
-// Create an MCP server with UIResource support
+// Create an MCP server with MCP-UI UIResource support
 const server = createMCPServer('uiresource-mcp-server', {
   version: '1.0.0',
   description: 'MCP server demonstrating all UIResource types',
