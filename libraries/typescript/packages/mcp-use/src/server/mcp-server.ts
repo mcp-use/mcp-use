@@ -917,19 +917,21 @@ if (container && Component) {
 
       this.uiResource({
         name: widget.name,
-        title: widget.name,
+        title: widgetMetadata.title || widget.name,
         description: description,
         type: type,
         props: props,
         _meta: {
           'mcp-use/widget': {
             name: widget.name,
+            title: widgetMetadata.title || widget.name,
             description: description,
             type: type,
             props: props,
             html: html,
             dev: true,
-          }
+          },
+          ...(widgetMetadata._meta || {}),
         },
         htmlTemplate: html,
         appsSdkMetadata: {
@@ -939,10 +941,18 @@ if (container && Component) {
           'openai/widgetAccessible': true,
           'openai/resultCanProduceWidget': true,
           'openai/widgetCSP': {
-            connect_domains: [],
-            resource_domains: ['https://persistent.oaistatic.com']
+            connect_domains: [
+              ...(widgetMetadata.appsSdkMetadata?.connect_domains || []),
+            ],
+            resource_domains: [
+              'https://*.oaistatic.com',
+              'https://*.oaiusercontent.com',
+              // always also add the base url of the server
+              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+            ]
           }
-        }
+        },
+        ...(widgetMetadata.appsSdkMetadata || {}),
       })
     }
 
@@ -1026,7 +1036,7 @@ if (container && Component) {
       
       this.uiResource({
         name: widgetName,
-        title: widgetName,
+        title: metadata.title || widgetName,
         description: description,
         type: 'appsSdk',
         props: props,
@@ -1038,7 +1048,8 @@ if (container && Component) {
             props: props,
             html: html,
             dev: false,
-          }
+          },
+          ...(metadata._meta || {}),
         },
         htmlTemplate: html,
         appsSdkMetadata: {
@@ -1047,14 +1058,17 @@ if (container && Component) {
           'openai/toolInvocation/invoked': `${widgetName} ready`,
           'openai/widgetAccessible': true,
           'openai/resultCanProduceWidget': true,
+          ...(metadata.appsSdkMetadata || {}),
           'openai/widgetCSP': {
-            connect_domains: [],
+            connect_domains: [
+              ...(metadata.appsSdkMetadata?.connect_domains || []),
+            ],
             resource_domains: [
               'https://*.oaistatic.com',
-              'https://*.unsplash.com',
               'https://*.oaiusercontent.com',
               // always also add the base url of the server
               ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(metadata.appsSdkMetadata?.resource_domains || []),
             ]
           }
         }
