@@ -1,5 +1,7 @@
 # MCP Starter Server
 
+[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-use%2Ftree%2Fmain%2Flibraries%2Ftypescript%2Fpackages%2Fcreate-mcp-use-app%2Fsrc%2Ftemplates%2Fstarter&branch=main&project-name=starter-template&build-command=npm+install&start-command=npm+run+build+%26%26+npm+run+start&port=3000&runtime=node&base-image=node%3A18)
+
 A comprehensive MCP server template with examples of tools, resources, prompts, and all UIResource types.
 
 > 📚 **[View Full Documentation](https://docs.mcp-use.com/typescript/getting-started/quickstart)** - Complete guides, API references, and tutorials
@@ -311,11 +313,11 @@ server.uiResource({
 export const myScript = `
   const container = document.createElement('ui-stack');
   container.setAttribute('direction', 'column');
-  
+
   const text = document.createElement('ui-text');
   text.textContent = 'Hello from Remote DOM!';
   container.appendChild(text);
-  
+
   root.appendChild(container);
 `
 ```
