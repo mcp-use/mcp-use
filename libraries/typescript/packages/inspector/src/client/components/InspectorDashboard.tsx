@@ -2,7 +2,7 @@ import type { CustomHeader } from './CustomHeadersEditor'
 import { CircleMinus, Copy, Loader2, RotateCcw } from 'lucide-react'
 import { useMcp } from 'mcp-use/react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -123,6 +123,7 @@ export function InspectorDashboard() {
     disconnectServer: _disconnectServer,
   } = mcpContext
   const navigate = useNavigate()
+  const location = useLocation()
   const [connectingServers, setConnectingServers] = useState<Set<string>>(
     new Set(),
   )
@@ -398,7 +399,13 @@ export function InspectorDashboard() {
       toast.error('Server is not connected and cannot be inspected')
       return
     }
-    navigate(`/?server=${encodeURIComponent(connection.id)}`)
+    // Preserve tunnelUrl parameter if present
+    const urlParams = new URLSearchParams(location.search)
+    const tunnelUrl = urlParams.get('tunnelUrl')
+    const newUrl = tunnelUrl
+      ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+      : `/?server=${encodeURIComponent(connection.id)}`
+    navigate(newUrl)
   }
 
   // Monitor connecting servers and remove them from the set when they connect or fail
@@ -444,7 +451,13 @@ export function InspectorDashboard() {
     ) {
       console.warn('[InspectorDashboard] Navigating to server:', connection.id)
       setPendingNavigation(null)
-      navigate(`/?server=${encodeURIComponent(connection.id)}`)
+      // Preserve tunnelUrl parameter if present
+      const urlParams = new URLSearchParams(location.search)
+      const tunnelUrl = urlParams.get('tunnelUrl')
+      const newUrl = tunnelUrl
+        ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+        : `/?server=${encodeURIComponent(connection.id)}`
+      navigate(newUrl)
     }
     // Only cancel navigation if connection truly failed with no data loaded
     else if (
