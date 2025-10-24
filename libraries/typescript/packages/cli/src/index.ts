@@ -410,7 +410,7 @@ program
   .option('--port <port>', 'Server port', '3000')
   .option('--host <host>', 'Server host', 'localhost')
   .option('--no-open', 'Do not auto-open inspector')
-  .option('--tunnel', 'Expose server through a tunnel')
+  // .option('--tunnel', 'Expose server through a tunnel')
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -429,17 +429,17 @@ program
 
       // Start tunnel if requested
       let mcpUrl: string | undefined;
-      let tunnelProcess: any = undefined;
-      if (options.tunnel) {
-        try {
-          const tunnelInfo = await startTunnel(port);
-          mcpUrl = tunnelInfo.subdomain;
-          tunnelProcess = tunnelInfo.process;
-        } catch (error) {
-          console.error(chalk.red('Failed to start tunnel:'), error);
-          process.exit(1);
-        }
-      }
+      // let tunnelProcess: any = undefined;
+      // if (options.tunnel) {
+      //   try {
+      //     const tunnelInfo = await startTunnel(port);
+      //     mcpUrl = tunnelInfo.subdomain;
+      //     tunnelProcess = tunnelInfo.process;
+      //   } catch (error) {
+      //     console.error(chalk.red('Failed to start tunnel:'), error);
+      //     process.exit(1);
+      //   }
+      // }
 
       // // Find the main source file
       const serverFile = await findServerFile(projectPath);
@@ -461,9 +461,9 @@ program
       processes.push(serverCommand.process);
       
       // Add tunnel process if it exists
-      if (tunnelProcess) {
-        processes.push(tunnelProcess);
-      }
+      // if (tunnelProcess) {
+      //   processes.push(tunnelProcess);
+      // }
 
       // Auto-open inspector if enabled
       if (options.open !== false) {
