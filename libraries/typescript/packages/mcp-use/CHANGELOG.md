@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.1.8-canary.0
+
+### Patch Changes
+
+- 3074165: fix widget metadata to load from the exported component
+  - @mcp-use/cli@2.1.20-canary.0
+  - @mcp-use/inspector@0.4.8-canary.0
+
 ## 1.1.7
 
 ### Patch Changes

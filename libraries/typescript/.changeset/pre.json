@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.4.7",
     "mcp-use": "1.1.7"
   },
-  "changesets": []
+  "changesets": [
+    "fuzzy-ideas-tie"
+  ]
 }
