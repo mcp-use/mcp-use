@@ -8,6 +8,7 @@
     "mcp-use": "1.1.7"
   },
   "changesets": [
+    "clear-turtles-scream",
     "fuzzy-ideas-tie"
   ]
 }
