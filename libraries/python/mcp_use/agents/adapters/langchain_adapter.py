@@ -98,16 +98,14 @@ class LangChainAdapter(BaseAdapter):
                 """
                 logger.debug(f'MCP tool: "{self.name}" received input: {kwargs}')
 
-                tool_call_id = None
-                if adapter_self.agent:
-                    tool_call_id = adapter_self.agent._generate_tool_call_id()
+                tool_call_id = adapter_self.agent._generate_tool_call_id() if adapter_self.agent else None
 
                 try:
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     try:
                         result_content = str(tool_result.content)
 
-                        if adapter_self.agent and tool_call_id:
+                        if adapter_self.agent:
                             tool_message = adapter_self.agent._create_tool_message(tool_call_id, result_content)
                             adapter_self.agent.add_to_history(tool_message)
 
@@ -116,7 +114,7 @@ class LangChainAdapter(BaseAdapter):
                         logger.error(f"Error parsing tool result: {e}")
                         error_content = format_error(e, tool=self.name, tool_content=tool_result.content)
 
-                        if adapter_self.agent and tool_call_id:
+                        if adapter_self.agent:
                             tool_message = adapter_self.agent._create_tool_message(tool_call_id, error_content)
                             adapter_self.agent.add_to_history(tool_message)
 
@@ -125,7 +123,7 @@ class LangChainAdapter(BaseAdapter):
                 except Exception as e:
                     error_content = format_error(e, tool=self.name) if self.handle_tool_error else str(e)
 
-                    if adapter_self.agent and tool_call_id:
+                    if adapter_self.agent:
                         tool_message = adapter_self.agent._create_tool_message(tool_call_id, error_content)
                         adapter_self.agent.add_to_history(tool_message)
 

@@ -271,7 +271,9 @@ class TestMCPAgentToolCallIDManagement:
         assert len(id1) == 13  # "call_" + 8 chars
 
         # Check uniqueness
-        assert id1 != id2 != id3
+        assert id1 != id2
+        assert id2 != id3
+        assert id1 != id3
 
         # Check UUID format (last 8 chars should be hex)
         uuid_part = id1[5:]  # Remove "call_" prefix
