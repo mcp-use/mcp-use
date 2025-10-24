@@ -46,24 +46,4 @@ def __init__(disallowed_tools: list[str] | None = None, agent: Any = None):
 ```
 
 </Card>
-<Card type="info">
-### `method` fix_schema
-
-Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
-
-
-
-**Parameters**
-><ParamField body="schema" type="dict" required="True" >   The JSON schema to fix. </ParamField>
-
-**Returns**
-><ResponseField name="returns" type="dict" >The fixed JSON schema.</ResponseField>
-
-**Signature**
-```python wrap
-def fix_schema(schema: dict):
-```
-
-</Card>
-
 </div>

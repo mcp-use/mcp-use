@@ -1,5 +1,142 @@
 # @mcp-use/inspector
 
+## 0.4.7
+
+### Patch Changes
+
+- 3c87c42: ## Apps SDK widgets & Automatic Widget Registration
+
+  ### Key Features Added
+
+  #### Automatic UI Widget Registration
+  - **Major Enhancement**: React components in `resources/` folder now auto-register as MCP tools and resources
+  - No boilerplate needed, just export `widgetMetadata` with Zod schema
+  - Automatically creates both MCP tool and `ui://widget/{name}` resource endpoints
+  - Integration with existing manual registration patterns
+
+  #### Template System Restructuring
+  - Renamed `ui-resource` → `mcp-ui` for clarity
+  - Consolidated `apps-sdk-demo` into streamlined `apps-sdk` template
+  - Enhanced `starter` template as default with both MCP-UI and Apps SDK examples
+  - Added comprehensive weather examples to all templates
+
+  #### 📚 Documentation Enhancements
+  - Complete rewrite of template documentation with feature comparison matrices
+  - New "Automatic Widget Registration" section in ui-widgets.mdx
+  - Updated quick start guides for all package managers (npm, pnpm, yarn)
+  - Added practical weather widget implementation examples
+
+- Updated dependencies [3c87c42]
+  - mcp-use@1.1.7
+
+## 0.4.7-canary.0
+
+### Patch Changes
+
+- 6b8fdf2: ## Apps SDK widgets & Automatic Widget Registration
+
+  ### Key Features Added
+
+  #### Automatic UI Widget Registration
+  - **Major Enhancement**: React components in `resources/` folder now auto-register as MCP tools and resources
+  - No boilerplate needed, just export `widgetMetadata` with Zod schema
+  - Automatically creates both MCP tool and `ui://widget/{name}` resource endpoints
+  - Integration with existing manual registration patterns
+
+  #### Template System Restructuring
+  - Renamed `ui-resource` → `mcp-ui` for clarity
+  - Consolidated `apps-sdk-demo` into streamlined `apps-sdk` template
+  - Enhanced `starter` template as default with both MCP-UI and Apps SDK examples
+  - Added comprehensive weather examples to all templates
+
+  #### 📚 Documentation Enhancements
+  - Complete rewrite of template documentation with feature comparison matrices
+  - New "Automatic Widget Registration" section in ui-widgets.mdx
+  - Updated quick start guides for all package managers (npm, pnpm, yarn)
+  - Added practical weather widget implementation examples
+
+- Updated dependencies [6b8fdf2]
+  - mcp-use@1.1.7-canary.0
+
+## 0.4.6
+
+### Patch Changes
+
+- 696b2e1: fix ph use ph-node
+- 696b2e1: fix scarf
+- 696b2e1: The main changes ensure that the proxy does not request or forward compressed responses and that problematic headers are filtered out when forwarding responses.
+- 696b2e1: fix logging
+- 696b2e1: add ph
+- 696b2e1: chore: cleanup logging
+- Updated dependencies [696b2e1]
+- Updated dependencies [696b2e1]
+  - mcp-use@1.1.6
+
+## 0.4.6-canary.7
+
+### Patch Changes
+
+- 21a46d0: fix logging
+
+## 0.4.6-canary.6
+
+### Patch Changes
+
+- c0d9b0b: chore: cleanup logging
+
+## 0.4.6-canary.5
+
+### Patch Changes
+
+- 1f18132: fix ph use ph-node
+
+## 0.4.6-canary.4
+
+### Patch Changes
+
+- f958d73: The main changes ensure that the proxy does not request or forward compressed responses and that problematic headers are filtered out when forwarding responses.
+
+## 0.4.6-canary.3
+
+### Patch Changes
+
+- 6010d08: fix scarf
+
+## 0.4.6-canary.2
+
+### Patch Changes
+
+- Updated dependencies [60f20cb]
+  - mcp-use@1.1.6-canary.1
+
+## 0.4.6-canary.1
+
+### Patch Changes
+
+- 3d759e9: add ph
+
+## 0.4.6-canary.0
+
+### Patch Changes
+
+- Updated dependencies [6960f7f]
+  - mcp-use@1.1.6-canary.0
+
+## 0.4.5
+
+### Patch Changes
+
+- 6dcee78: fix inspector chat formatting
+- Updated dependencies [6dcee78]
+  - mcp-use@1.1.5
+
+## 0.4.5-canary.0
+
+### Patch Changes
+
+- d397711: fix inspector chat formatting
+  - mcp-use@1.1.5-canary.0
+
 ## 0.4.4
 
 ### Patch Changes

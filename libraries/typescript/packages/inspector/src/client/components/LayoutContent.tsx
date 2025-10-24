@@ -8,9 +8,18 @@ import { ToolsTab } from './ToolsTab'
 interface LayoutContentProps {
   selectedServer: MCPConnection | undefined
   activeTab: string
-  toolsSearchRef: RefObject<{ focusSearch: () => void, blurSearch: () => void } | null>
-  promptsSearchRef: RefObject<{ focusSearch: () => void, blurSearch: () => void } | null>
-  resourcesSearchRef: RefObject<{ focusSearch: () => void, blurSearch: () => void } | null>
+  toolsSearchRef: RefObject<{
+    focusSearch: () => void
+    blurSearch: () => void
+  } | null>
+  promptsSearchRef: RefObject<{
+    focusSearch: () => void
+    blurSearch: () => void
+  } | null>
+  resourcesSearchRef: RefObject<{
+    focusSearch: () => void
+    blurSearch: () => void
+  } | null>
   children: ReactNode
 }
 
@@ -43,7 +52,8 @@ export function LayoutContent({
         <PromptsTab
           ref={promptsSearchRef}
           prompts={selectedServer.prompts}
-          callPrompt={selectedServer.callTool} // Using callTool for now, should be callPrompt when available
+          callPrompt={selectedServer.getPrompt}
+          serverId={selectedServer.id}
           isConnected={selectedServer.state === 'ready'}
         />
       )
@@ -62,7 +72,14 @@ export function LayoutContent({
         <ChatTab
           mcpServerUrl={selectedServer.url}
           isConnected={selectedServer.state === 'ready'}
-          oauthState={selectedServer.state as 'pending_auth' | 'authenticating' | 'ready' | 'failed' | undefined}
+          oauthState={
+            selectedServer.state as
+            | 'pending_auth'
+            | 'authenticating'
+            | 'ready'
+            | 'failed'
+            | undefined
+          }
           oauthError={selectedServer.error ?? undefined}
           readResource={selectedServer.readResource}
         />

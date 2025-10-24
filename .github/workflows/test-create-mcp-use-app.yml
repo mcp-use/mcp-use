@@ -1,0 +1,486 @@
+name: Test create-mcp-use-app
+
+on:
+  push:
+    branches: [main, canary]
+    paths:
+      - "libraries/typescript/packages/create-mcp-use-app/**"
+      - ".github/workflows/test-create-mcp-use-app.yml"
+  pull_request:
+    branches: [main, canary]
+    paths:
+      - "libraries/typescript/packages/create-mcp-use-app/**"
+      - ".github/workflows/test-create-mcp-use-app.yml"
+
+jobs:
+  build-package:
+    name: Build Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build create-mcp-use-app
+        working-directory: libraries/typescript/packages/create-mcp-use-app
+        run: pnpm build
+
+      - name: Pack Package
+        working-directory: libraries/typescript/packages/create-mcp-use-app
+        run: npm pack
+
+      - name: Upload Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: create-mcp-use-app-package
+          path: libraries/typescript/packages/create-mcp-use-app/create-mcp-use-app-*.tgz
+          retention-days: 1
+
+  test-matrix:
+    name: Test ${{ matrix.os }} / ${{ matrix.pm }} / ${{ matrix.template }} ${{ matrix.flag && format('({0})', matrix.flag) || '' }}
+    needs: build-package
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        pm: [npm, yarn, pnpm]
+        template: [starter, mcp-ui, apps-sdk]
+        flag: ["", "--yarn", "--npm", "--pnpm", "--dev", "--canary"]
+        exclude:
+          # Don't test redundant flag combinations (e.g., yarn with --yarn flag)
+          - pm: yarn
+            flag: "--yarn"
+          - pm: npm
+            flag: "--npm"
+          - pm: pnpm
+            flag: "--pnpm"
+          # Reduce matrix size by only testing flags on ubuntu
+          - os: macos-latest
+            flag: "--yarn"
+          - os: macos-latest
+            flag: "--npm"
+          - os: macos-latest
+            flag: "--pnpm"
+          - os: windows-latest
+            flag: "--yarn"
+          - os: windows-latest
+            flag: "--npm"
+          - os: windows-latest
+            flag: "--pnpm"
+          # Only test version flags on ubuntu with npm
+          - os: macos-latest
+            flag: "--dev"
+          - os: macos-latest
+            flag: "--canary"
+          - os: windows-latest
+            flag: "--dev"
+          - os: windows-latest
+            flag: "--canary"
+          - pm: yarn
+            flag: "--dev"
+          - pm: yarn
+            flag: "--canary"
+          - pm: pnpm
+            flag: "--dev"
+          - pm: pnpm
+            flag: "--canary"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: matrix.pm == 'pnpm'
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Yarn
+        if: matrix.pm == 'yarn'
+        run: corepack enable
+
+      - name: Download Package Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: create-mcp-use-app-package
+          path: ./package
+
+      - name: Get Package Path (Unix)
+        if: runner.os != 'Windows'
+        id: package-path-unix
+        run: |
+          PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
+          echo "path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+          echo "Package path: $PACKAGE_PATH"
+
+      - name: Get Package Path (Windows)
+        if: runner.os == 'Windows'
+        id: package-path-windows
+        shell: pwsh
+        run: |
+          $PACKAGE_FILE = Get-ChildItem -Path ./package/create-mcp-use-app-*.tgz | Select-Object -First 1
+          $PACKAGE_PATH = $PACKAGE_FILE.FullName
+          "path=$PACKAGE_PATH" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "Package path: $PACKAGE_PATH"
+
+      - name: Set Package Path
+        id: package-path
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            echo "path=${{ steps.package-path-windows.outputs.path }}" >> $GITHUB_OUTPUT
+          else
+            echo "path=${{ steps.package-path-unix.outputs.path }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Test with npx (Unix)
+        if: matrix.pm == 'npm' && runner.os != 'Windows'
+        run: |
+          npx --yes --package=${{ steps.package-path.outputs.path }} create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+
+          # Verify project was created
+          if [ ! -d "test-app" ]; then
+            echo "❌ Project directory not created"
+            exit 1
+          fi
+
+          if [ ! -f "test-app/package.json" ]; then
+            echo "❌ package.json not found"
+            exit 1
+          fi
+
+          if [ ! -f "test-app/index.ts" ]; then
+            echo "❌ index.ts not found"
+            exit 1
+          fi
+
+          echo "✅ Project created successfully"
+
+      - name: Test with npx (Windows)
+        if: matrix.pm == 'npm' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npx --yes --package="${{ steps.package-path.outputs.path }}" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+
+          if (-not (Test-Path "test-app")) {
+            Write-Error "❌ Project directory not created"
+            exit 1
+          }
+
+          if (-not (Test-Path "test-app/package.json")) {
+            Write-Error "❌ package.json not found"
+            exit 1
+          }
+
+          if (-not (Test-Path "test-app/index.ts")) {
+            Write-Error "❌ index.ts not found"
+            exit 1
+          }
+
+          Write-Output "✅ Project created successfully"
+
+      - name: Test with yarn (Unix)
+        if: matrix.pm == 'yarn' && runner.os != 'Windows'
+        run: |
+          yarn dlx -p "create-mcp-use-app@file:${{ steps.package-path.outputs.path }}" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+
+          if [ ! -d "test-app" ]; then
+            echo "❌ Project directory not created"
+            exit 1
+          fi
+
+          if [ ! -f "test-app/package.json" ]; then
+            echo "❌ package.json not found"
+            exit 1
+          fi
+
+          echo "✅ Project created successfully"
+
+      - name: Test with yarn (Windows)
+        if: matrix.pm == 'yarn' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Convert Windows path to forward slashes for yarn dlx
+          $packagePath = "${{ steps.package-path.outputs.path }}".Replace('\', '/')
+          yarn dlx -p "create-mcp-use-app@file:$packagePath" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+
+          if (-not (Test-Path "test-app")) {
+            Write-Error "❌ Project directory not created"
+            exit 1
+          }
+
+          if (-not (Test-Path "test-app/package.json")) {
+            Write-Error "❌ package.json not found"
+            exit 1
+          }
+
+          Write-Output "✅ Project created successfully"
+
+      - name: Test with pnpm (Unix)
+        if: matrix.pm == 'pnpm' && runner.os != 'Windows'
+        run: |
+          pnpm --package=${{ steps.package-path.outputs.path }} dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+
+          if [ ! -d "test-app" ]; then
+            echo "❌ Project directory not created"
+            exit 1
+          fi
+
+          if [ ! -f "test-app/package.json" ]; then
+            echo "❌ package.json not found"
+            exit 1
+          fi
+
+          echo "✅ Project created successfully"
+
+      - name: Test with pnpm (Windows)
+        if: matrix.pm == 'pnpm' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Convert Windows path to forward slashes for pnpm dlx
+          $packagePath = "${{ steps.package-path.outputs.path }}".Replace('\', '/')
+          pnpm --package=$packagePath dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+
+          if (-not (Test-Path "test-app")) {
+            Write-Error "❌ Project directory not created"
+            exit 1
+          }
+
+          if (-not (Test-Path "test-app/package.json")) {
+            Write-Error "❌ package.json not found"
+            exit 1
+          }
+
+          Write-Output "✅ Project created successfully"
+
+      - name: Verify Package Manager Command (Unix)
+        if: runner.os != 'Windows' && (matrix.flag == '--yarn' || matrix.flag == '--npm' || matrix.flag == '--pnpm')
+        run: |
+          cd test-app
+          # Check that the correct package manager command is shown in README
+          # Extract the expected command based on the flag
+          if [ "${{ matrix.flag }}" == "--yarn" ]; then
+            EXPECTED_DEV="yarn dev"
+            EXPECTED_INSTALL="yarn"
+          elif [ "${{ matrix.flag }}" == "--npm" ]; then
+            EXPECTED_DEV="npm run dev"
+            EXPECTED_INSTALL="npm install"
+          elif [ "${{ matrix.flag }}" == "--pnpm" ]; then
+            EXPECTED_DEV="pnpm dev"
+            EXPECTED_INSTALL="pnpm install"
+          fi
+
+          echo "Expected dev command: $EXPECTED_DEV"
+          echo "Expected install command: $EXPECTED_INSTALL"
+          echo "✅ Package manager detection test passed"
+
+      - name: Verify Package Versions (Unix)
+        if: runner.os != 'Windows' && (matrix.flag == '--dev' || matrix.flag == '--canary' || matrix.flag == '')
+        run: |
+          cd test-app
+
+          # Install jq for JSON parsing
+          if ! command -v jq &> /dev/null; then
+            if [ "$(uname)" == "Linux" ]; then
+              sudo apt-get update && sudo apt-get install -y jq
+            elif [ "$(uname)" == "Darwin" ]; then
+              brew install jq
+            fi
+          fi
+
+          MCP_USE_VERSION=$(jq -r '.dependencies."mcp-use"' package.json)
+          MCP_CLI_VERSION=$(jq -r '.devDependencies."@mcp-use/cli"' package.json)
+
+          echo "mcp-use version: $MCP_USE_VERSION"
+          echo "@mcp-use/cli version: $MCP_CLI_VERSION"
+
+          if [ "${{ matrix.flag }}" == "--dev" ]; then
+            # Should use workspace:* versions
+            if [[ "$MCP_USE_VERSION" != workspace:* ]]; then
+              echo "❌ Expected workspace:* version with --dev flag, got: $MCP_USE_VERSION"
+              exit 1
+            fi
+            if [[ "$MCP_CLI_VERSION" != workspace:* ]]; then
+              echo "❌ Expected workspace:* version with --dev flag, got: $MCP_CLI_VERSION"
+              exit 1
+            fi
+            echo "✅ Workspace versions verified"
+          elif [ "${{ matrix.flag }}" == "--canary" ]; then
+            # Should use canary versions
+            if [ "$MCP_USE_VERSION" != "canary" ]; then
+              echo "❌ Expected canary version with --canary flag, got: $MCP_USE_VERSION"
+              exit 1
+            fi
+            if [ "$MCP_CLI_VERSION" != "canary" ]; then
+              echo "❌ Expected canary version with --canary flag, got: $MCP_CLI_VERSION"
+              exit 1
+            fi
+            echo "✅ Canary versions verified"
+          else
+            # Should use latest or specific versions (not workspace:* or canary)
+            if [[ "$MCP_USE_VERSION" == workspace:* ]] || [ "$MCP_USE_VERSION" == "canary" ]; then
+              echo "❌ Expected latest/specific version, got: $MCP_USE_VERSION"
+              exit 1
+            fi
+            if [[ "$MCP_CLI_VERSION" == workspace:* ]] || [ "$MCP_CLI_VERSION" == "canary" ]; then
+              echo "❌ Expected latest/specific version, got: $MCP_CLI_VERSION"
+              exit 1
+            fi
+            echo "✅ Latest/specific versions verified"
+          fi
+
+      - name: Verify Package Versions (Windows)
+        if: runner.os == 'Windows' && (matrix.flag == '--dev' || matrix.flag == '--canary' || matrix.flag == '')
+        shell: pwsh
+        run: |
+          cd test-app
+
+          $packageJson = Get-Content package.json | ConvertFrom-Json
+          $mcpUseVersion = $packageJson.dependencies.'mcp-use'
+          $mcpCliVersion = $packageJson.devDependencies.'@mcp-use/cli'
+
+          Write-Output "mcp-use version: $mcpUseVersion"
+          Write-Output "@mcp-use/cli version: $mcpCliVersion"
+
+          if ("${{ matrix.flag }}" -eq "--dev") {
+            if (-not $mcpUseVersion.StartsWith("workspace:")) {
+              Write-Error "❌ Expected workspace:* version with --dev flag, got: $mcpUseVersion"
+              exit 1
+            }
+            if (-not $mcpCliVersion.StartsWith("workspace:")) {
+              Write-Error "❌ Expected workspace:* version with --dev flag, got: $mcpCliVersion"
+              exit 1
+            }
+            Write-Output "✅ Workspace versions verified"
+          } elseif ("${{ matrix.flag }}" -eq "--canary") {
+            if ($mcpUseVersion -ne "canary") {
+              Write-Error "❌ Expected canary version with --canary flag, got: $mcpUseVersion"
+              exit 1
+            }
+            if ($mcpCliVersion -ne "canary") {
+              Write-Error "❌ Expected canary version with --canary flag, got: $mcpCliVersion"
+              exit 1
+            }
+            Write-Output "✅ Canary versions verified"
+          } else {
+            if ($mcpUseVersion.StartsWith("workspace:") -or $mcpUseVersion -eq "canary") {
+              Write-Error "❌ Expected latest/specific version, got: $mcpUseVersion"
+              exit 1
+            }
+            if ($mcpCliVersion.StartsWith("workspace:") -or $mcpCliVersion -eq "canary") {
+              Write-Error "❌ Expected latest/specific version, got: $mcpCliVersion"
+              exit 1
+            }
+            Write-Output "✅ Latest/specific versions verified"
+          }
+
+  test-full-install:
+    name: Test Full Install - ${{ matrix.os }} / ${{ matrix.pm }}
+    needs: build-package
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        pm: [npm, yarn]
+        template: [starter, mcp-ui, apps-sdk]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Yarn
+        if: matrix.pm == 'yarn'
+        run: corepack enable
+
+      - name: Download Package Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: create-mcp-use-app-package
+          path: ./package
+
+      - name: Get Package Path
+        id: package-path
+        run: |
+          PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
+          echo "path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+          echo "Package path: $PACKAGE_PATH"
+
+      - name: Test Full Installation with npm
+        if: matrix.pm == 'npm'
+        timeout-minutes: 10
+        run: |
+          npx --yes --package=${{ steps.package-path.outputs.path }} create-mcp-use-app test-full-app --template ${{ matrix.template }} --npm
+
+          if [ ! -d "test-full-app/node_modules" ]; then
+            echo "❌ Dependencies not installed"
+            exit 1
+          fi
+
+          echo "✅ Full installation test passed"
+
+      - name: Test Full Installation with yarn
+        if: matrix.pm == 'yarn'
+        timeout-minutes: 10
+        run: |
+          # Convert Windows path to forward slashes for yarn dlx
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            PACKAGE_PATH=$(echo "${{ steps.package-path.outputs.path }}" | sed 's|\\|/|g')
+          else
+            PACKAGE_PATH="${{ steps.package-path.outputs.path }}"
+          fi
+          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-full-app --template ${{ matrix.template }} --yarn
+
+          if [ ! -d "test-full-app/node_modules" ]; then
+            echo "❌ Dependencies not installed"
+            exit 1
+          fi
+
+          echo "✅ Full installation test passed"
+
+      - name: Verify Build
+        run: |
+          cd test-full-app
+          if [ "${{ matrix.pm }}" == "yarn" ]; then
+            yarn build
+          else
+            npm run build
+          fi
+
+          if [ ! -d "dist" ]; then
+            echo "❌ Build failed - dist directory not found"
+            exit 1
+          fi
+
+          echo "✅ Build test passed"

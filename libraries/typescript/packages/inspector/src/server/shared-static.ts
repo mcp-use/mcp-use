@@ -128,7 +128,7 @@ export function registerStaticRoutesWithDevProxy(app: Hono, clientDistPath?: str
     })
   }
   else {
-    // Production mode: use standard static file serving
+    // Production mode OR dev mode with built files: use standard static file serving
     registerStaticRoutes(app, distPath)
   }
 }

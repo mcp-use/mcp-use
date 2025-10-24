@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.1.4",
+  "version": "1.1.7",
   "packageManager": "pnpm@10.6.1",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents and Clients + MCP Servers with support for MCP-UI.",
   "author": "mcp-use, Inc.",
@@ -46,6 +46,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "mcp-use": "./node_modules/@mcp-use/cli/dist/index.js"
+  },
   "files": [
     "dist"
   ],
@@ -57,7 +60,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsup index.ts src/browser.ts src/react/index.ts src/server/index.ts --format cjs,esm --out-dir dist --keep-names && tsc --emitDeclarationOnly --declaration",
+    "build": "rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",
     "test:simple": "vitest run tests/stream_events_simple.test.ts",
@@ -88,7 +91,7 @@
     "example:observability": "tsx examples/client/observability.ts"
   },
   "peerDependencies": {
-    "@mcp-use/inspector": "^0.4.4",
+    "@mcp-use/inspector": "^0.4.7",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "langfuse": "^3.32.0",
@@ -96,9 +99,6 @@
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
-    "@mcp-use/inspector": {
-      "optional": true
-    },
     "cors": {
       "optional": true
     },
@@ -118,11 +118,16 @@
     "@langchain/core": "^0.3.72",
     "@langchain/openai": "^0.6.9",
     "@mcp-ui/server": "^5.12.0",
+    "@mcp-use/cli": "workspace:*",
+    "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/sdk": "1.20.0",
     "@scarf/scarf": "^1.4.0",
+    "@tailwindcss/vite": "^4.1.15",
+    "@vitejs/plugin-react": "^5.0.4",
     "ai": "^4.3.19",
     "commander": "^14.0.1",
     "dotenv": "^16.5.0",
+    "esbuild": ">=0.25.0",
     "langchain": "^0.3.27",
     "lodash-es": "^4.17.21",
     "posthog-node": "^5.1.1",
@@ -130,6 +135,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "uuid": "^11.1.0",
+    "vite": ">=5.4.21",
     "winston": "^3.17.0",
     "winston-transport-browserconsole": "^1.0.5",
     "ws": "^8.18.2",

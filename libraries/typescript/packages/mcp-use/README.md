@@ -587,7 +587,7 @@ server.listen(3000)
 
 This automatically creates:
 
-- **Tool**: `ui_kanban-board` - Accepts parameters and returns UIResource
+- **Tool**: `kanban-board` - Accepts parameters and returns UIResource
 - **Resource**: `ui://widget/kanban-board` - Static access with defaults
 
 #### Three Resource Types

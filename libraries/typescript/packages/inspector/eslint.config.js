@@ -34,6 +34,7 @@ export default antfu({
       MutationObserver: 'readonly',
       ResizeObserver: 'readonly',
       queueMicrotask: 'readonly',
+      __INSPECTOR_VERSION__: 'readonly',
     },
   },
 })

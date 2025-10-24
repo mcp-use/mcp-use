@@ -78,7 +78,7 @@ export function ToolResultRenderer({
         componentUrl={resourceData.uri}
         toolName={toolName}
         toolArgs={toolArgs}
-        toolResult={resourceData}
+        toolResult={parsedResult}
         serverId={serverId}
         readResource={readResource}
         noWrapper={true}

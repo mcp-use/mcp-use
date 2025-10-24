@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "0.4.3",
+  "version": "0.4.6",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
@@ -15,6 +15,7 @@
     "url": "https://github.com/mcp-use/mcp-use/issues"
   },
   "keywords": [
+    "mcp-use",
     "mcp",
     "model-context-protocol",
     "create",
@@ -22,9 +23,7 @@
     "cli",
     "init",
     "starter",
-    "template",
-    "typescript",
-    "react"
+    "template"
   ],
   "bin": {
     "create-mcp-use-app": "./dist/index.js"
@@ -35,6 +34,8 @@
     "copy-templates": "node scripts/copy-templates.js",
     "dev": "tsc --build --watch",
     "test": "vitest --run --passWithNoTests",
+    "test:cli": "./test-cli.sh",
+    "test:cli:full": "RUN_INSTALL_TESTS=yes ./test-cli.sh",
     "lint": "eslint ."
   },
   "files": [

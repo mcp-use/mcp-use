@@ -1,5 +1,5 @@
 import type { Prompt } from '@modelcontextprotocol/sdk/types.js'
-import { Check, Clock, Copy, MessageSquare, Play } from 'lucide-react'
+import type { PromptResult, SavedPrompt } from './prompts'
 import {
   useCallback,
   useEffect,
@@ -8,19 +8,20 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { ListItem, ListTabHeader } from '@/client/components/shared'
-import { Button } from '@/client/components/ui/button'
-import { Input } from '@/client/components/ui/input'
-import { Label } from '@/client/components/ui/label'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/client/components/ui/resizable'
-import { Textarea } from '@/client/components/ui/textarea'
 import { useInspector } from '@/client/context/InspectorContext'
-import { usePrismTheme } from '@/client/hooks/usePrismTheme'
+import { MCPPromptCallEvent, Telemetry } from '@/client/telemetry'
+import {
+  PromptExecutionPanel,
+  PromptResultDisplay,
+  PromptsList,
+  PromptsTabHeader,
+  SavedPromptsList,
+} from './prompts'
 
 export interface PromptsTabRef {
   focusSearch: () => void
@@ -30,35 +31,35 @@ export interface PromptsTabRef {
 interface PromptsTabProps {
   prompts: Prompt[]
   callPrompt: (name: string, args?: Record<string, unknown>) => Promise<any>
+  serverId: string
   isConnected: boolean
 }
 
-interface PromptResult {
-  promptName: string
-  args: Record<string, unknown>
-  result: any
-  error?: string
-  timestamp: number
-}
+const SAVED_PROMPTS_KEY = 'mcp-inspector-saved-prompts'
 
 export function PromptsTab({
   ref,
   prompts,
   callPrompt,
+  serverId,
   isConnected,
 }: PromptsTabProps & { ref?: React.RefObject<PromptsTabRef | null> }) {
+  // State
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null)
+  const [selectedSavedPrompt, setSelectedSavedPrompt] = useState<SavedPrompt | null>(null)
   const { selectedPromptName, setSelectedPromptName } = useInspector()
-  const { prismStyle } = usePrismTheme()
   const [promptArgs, setPromptArgs] = useState<Record<string, unknown>>({})
   const [results, setResults] = useState<PromptResult[]>([])
   const [isExecuting, setIsExecuting] = useState(false)
   const [copiedResult, setCopiedResult] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState('prompts')
+  const [activeTab, setActiveTab] = useState<'prompts' | 'saved'>('prompts')
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([])
+  const [_saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [_promptName, setPromptName] = useState('')
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
-  const searchInputRef = useRef<globalThis.HTMLInputElement>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   // Expose focusSearch and blurSearch methods via ref
   useImperativeHandle(ref, () => ({
@@ -79,6 +80,30 @@ export function PromptsTab({
     },
   }))
 
+  // Load saved prompts from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SAVED_PROMPTS_KEY)
+      if (saved) {
+        const parsedPrompts = JSON.parse(saved)
+        setSavedPrompts(parsedPrompts)
+      }
+    }
+    catch (error) {
+      console.error('[PromptsTab] Failed to load saved prompts:', error)
+    }
+  }, [])
+
+  // Save to localStorage whenever savedPrompts changes
+  const saveSavedPrompts = useCallback((prompts: SavedPrompt[]) => {
+    try {
+      localStorage.setItem(SAVED_PROMPTS_KEY, JSON.stringify(prompts))
+    }
+    catch (error) {
+      console.error('[PromptsTab] Failed to save prompts:', error)
+    }
+  }, [])
+
   // Auto-focus search input when expanded
   useEffect(() => {
     if (isSearchExpanded && searchInputRef.current) {
@@ -92,12 +117,16 @@ export function PromptsTab({
     }
   }, [searchQuery])
 
+  // Filter prompts based on search query
   const filteredPrompts = useMemo(() => {
-    if (!searchQuery) return prompts
+    if (!searchQuery.trim())
+      return prompts
+
+    const query = searchQuery.toLowerCase()
     return prompts.filter(
-      (prompt) =>
-        prompt.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        prompt.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      prompt =>
+        prompt.name.toLowerCase().includes(query)
+        || prompt.description?.toLowerCase().includes(query),
     )
   }, [prompts, searchQuery])
 
@@ -106,25 +135,42 @@ export function PromptsTab({
     // Initialize args with default values based on prompt input schema
     const initialArgs: Record<string, unknown> = {}
     if (prompt.arguments) {
-      Object.entries(prompt.arguments).forEach(([key, prop]) => {
-        const typedProp = prop as any
-        if (typedProp.default !== undefined) {
-          initialArgs[key] = typedProp.default
-        } else if (typedProp.type === 'string') {
-          initialArgs[key] = ''
-        } else if (typedProp.type === 'number') {
-          initialArgs[key] = 0
-        } else if (typedProp.type === 'boolean') {
-          initialArgs[key] = false
-        } else if (typedProp.type === 'array') {
-          initialArgs[key] = []
-        } else if (typedProp.type === 'object') {
-          initialArgs[key] = {}
+      // Handle MCP SDK structure: arguments is an array of PromptArgument objects
+      prompt.arguments.forEach((arg) => {
+        if (arg.default !== undefined) {
+          initialArgs[arg.name] = arg.default
+        }
+        else if (arg.type === 'string') {
+          initialArgs[arg.name] = ''
+        }
+        else if (arg.type === 'number') {
+          initialArgs[arg.name] = 0
+        }
+        else if (arg.type === 'boolean') {
+          initialArgs[arg.name] = false
+        }
+        else if (arg.type === 'array') {
+          initialArgs[arg.name] = []
+        }
+        else if (arg.type === 'object') {
+          initialArgs[arg.name] = {}
         }
       })
     }
     setPromptArgs(initialArgs)
   }, [])
+
+  const loadSavedPrompt = useCallback(
+    (prompt: SavedPrompt) => {
+      const promptObj = prompts.find(p => p.name === prompt.promptName)
+      if (promptObj) {
+        setSelectedPrompt(promptObj)
+        setPromptArgs(prompt.args)
+        setSelectedSavedPrompt(prompt)
+      }
+    },
+    [prompts],
+  )
 
   // Reset focused index when filtered prompts change
   useEffect(() => {
@@ -136,17 +182,17 @@ export function PromptsTab({
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       // Check if any input is focused
       const target = e.target as HTMLElement
-      const isInputFocused =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.contentEditable === 'true'
+      const isInputFocused
+        = target.tagName === 'INPUT'
+          || target.tagName === 'TEXTAREA'
+          || target.contentEditable === 'true'
 
       // Don't handle if input is focused or if modifiers are pressed
       if (isInputFocused || e.metaKey || e.ctrlKey || e.altKey) {
         return
       }
 
-      const items = activeTab === 'prompts' ? filteredPrompts : results
+      const items = activeTab === 'prompts' ? filteredPrompts : savedPrompts
 
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -154,29 +200,26 @@ export function PromptsTab({
           const next = prev + 1
           return next >= items.length ? 0 : next
         })
-      } else if (e.key === 'ArrowUp') {
+      }
+      else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setFocusedIndex((prev) => {
           const next = prev - 1
           return next < 0 ? items.length - 1 : next
         })
-      } else if (e.key === 'Enter' && focusedIndex >= 0) {
+      }
+      else if (e.key === 'Enter' && focusedIndex >= 0) {
         e.preventDefault()
         if (activeTab === 'prompts') {
           const prompt = filteredPrompts[focusedIndex]
           if (prompt) {
             handlePromptSelect(prompt)
           }
-        } else {
-          const result = results[focusedIndex]
-          if (result) {
-            const prompt = prompts.find((p) => p.name === result.promptName)
-            if (prompt) {
-              handlePromptSelect(prompt)
-              setPromptArgs(result.args)
-              // Don't switch tabs - let user stay in history view
-              // setActiveTab('prompts')
-            }
+        }
+        else {
+          const prompt = savedPrompts[focusedIndex]
+          if (prompt) {
+            loadSavedPrompt(prompt)
           }
         }
       }
@@ -187,25 +230,25 @@ export function PromptsTab({
   }, [
     focusedIndex,
     filteredPrompts,
-    results,
+    savedPrompts,
     activeTab,
     handlePromptSelect,
-    prompts,
+    loadSavedPrompt,
   ])
 
   // Scroll focused item into view
   useEffect(() => {
     if (focusedIndex >= 0) {
-      const itemId =
-        activeTab === 'prompts'
+      const itemId
+        = activeTab === 'prompts'
           ? `prompt-${filteredPrompts[focusedIndex]?.name}`
-          : `prompt-result-${focusedIndex}`
+          : `saved-prompt-${savedPrompts[focusedIndex]?.id}`
       const element = document.getElementById(itemId)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
       }
     }
-  }, [focusedIndex, filteredPrompts, activeTab])
+  }, [focusedIndex, filteredPrompts, savedPrompts, activeTab])
 
   // Handle auto-selection from context
   useEffect(() => {
@@ -216,7 +259,7 @@ export function PromptsTab({
     })
 
     if (selectedPromptName && prompts.length > 0) {
-      const prompt = prompts.find((p) => p.name === selectedPromptName)
+      const prompt = prompts.find(p => p.name === selectedPromptName)
       console.warn('[PromptsTab] Prompt lookup result:', {
         selectedPromptName,
         promptFound: !!prompt,
@@ -229,7 +272,7 @@ export function PromptsTab({
         // Clear the selection from context after processing
         setSelectedPromptName(null)
         // Use setTimeout to ensure the component is fully rendered
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           handlePromptSelect(prompt)
           // Scroll to the selected prompt
           const promptElement = document.getElementById(`prompt-${prompt.name}`)
@@ -241,6 +284,8 @@ export function PromptsTab({
             })
           }
         }, 100)
+
+        return () => clearTimeout(timeoutId)
       }
     }
   }, [
@@ -252,358 +297,174 @@ export function PromptsTab({
   ])
 
   const handleArgChange = useCallback((key: string, value: any) => {
-    setPromptArgs((prev) => ({ ...prev, [key]: value }))
+    setPromptArgs(prev => ({ ...prev, [key]: value }))
   }, [])
 
-  const handleExecutePrompt = useCallback(async () => {
-    if (!selectedPrompt || !isConnected) return
+  const executePrompt = useCallback(async () => {
+    if (!selectedPrompt || isExecuting)
+      return
 
     setIsExecuting(true)
-    const timestamp = Date.now()
+    const startTime = Date.now()
 
     try {
       const result = await callPrompt(selectedPrompt.name, promptArgs)
-      setResults((prev) => [
+      const duration = Date.now() - startTime
+
+      // Track successful prompt call
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPPromptCallEvent({
+            promptName: selectedPrompt.name,
+            serverId,
+            success: true,
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+
+      setResults(prev => [
         {
           promptName: selectedPrompt.name,
           args: promptArgs,
           result,
-          timestamp,
+          timestamp: startTime,
+          duration,
         },
         ...prev,
       ])
-    } catch (error) {
-      setResults((prev) => [
-        {
-          promptName: selectedPrompt.name,
-          args: promptArgs,
-          result: null,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp,
-        },
-        ...prev,
-      ])
-    } finally {
+    }
+    catch (error) {
+      // Track failed prompt call
+      const telemetry = Telemetry.getInstance()
+      telemetry
+        .capture(
+          new MCPPromptCallEvent({
+            promptName: selectedPrompt.name,
+            serverId,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        )
+        .catch(() => {
+          // Silently fail - telemetry should not break the application
+        })
+
+      const errorResult = {
+        promptName: selectedPrompt.name,
+        args: promptArgs,
+        result: null,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: startTime,
+        duration: Date.now() - startTime,
+      }
+
+      setResults(prev => [errorResult, ...prev])
+    }
+    finally {
       setIsExecuting(false)
     }
-  }, [selectedPrompt, promptArgs, callPrompt, isConnected])
+  }, [selectedPrompt, promptArgs, isExecuting, callPrompt, serverId])
 
-  const handleCopyResult = useCallback(
-    (index: number) => {
-      const result = results[index]
-      const resultText = result.error
-        ? result.error
-        : JSON.stringify(result.result, null, 2)
-      navigator.clipboard.writeText(resultText)
+  const handleCopyResult = useCallback(async (index: number, result: any) => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(result, null, 2))
       setCopiedResult(index)
       setTimeout(() => setCopiedResult(null), 2000)
+    }
+    catch (error) {
+      console.error('[PromptsTab] Failed to copy result:', error)
+    }
+  }, [])
+
+  const openSaveDialog = useCallback(() => {
+    if (!selectedPrompt)
+      return
+    setPromptName('')
+    setSaveDialogOpen(true)
+  }, [selectedPrompt])
+
+  const deleteSavedPrompt = useCallback(
+    (id: string) => {
+      saveSavedPrompts(savedPrompts.filter(p => p.id !== id))
+      // Clear selection if the deleted prompt was selected
+      if (selectedSavedPrompt?.id === id) {
+        setSelectedSavedPrompt(null)
+      }
     },
-    [results]
+    [savedPrompts, saveSavedPrompts, selectedSavedPrompt],
   )
-
-  const renderInputField = (key: string, prop: any) => {
-    const value = promptArgs[key]
-    const stringValue =
-      typeof value === 'string' ? value : JSON.stringify(value)
-
-    if (prop.type === 'boolean') {
-      return (
-        <div key={key} className="space-y-2">
-          <Label htmlFor={key} className="text-sm font-medium">
-            {key}
-            {prop.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
-          <div className="flex items-center space-x-2">
-            <input
-              id={key}
-              type="checkbox"
-              checked={Boolean(value)}
-              onChange={(e) => handleArgChange(key, e.target.checked)}
-              className="rounded"
-              aria-label={`Toggle ${key}`}
-            />
-            <span className="text-sm text-gray-600">{prop.description}</span>
-          </div>
-        </div>
-      )
-    }
-
-    if (prop.type === 'number') {
-      return (
-        <div key={key} className="space-y-2">
-          <Label htmlFor={key} className="text-sm font-medium">
-            {key}
-            {prop.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
-          <Input
-            id={key}
-            type="number"
-            value={Number(value) || 0}
-            onChange={(e) => handleArgChange(key, Number(e.target.value))}
-            placeholder={prop.description || `Enter ${key}`}
-          />
-          {prop.description && (
-            <p className="text-xs text-gray-500">{prop.description}</p>
-          )}
-        </div>
-      )
-    }
-
-    if (prop.type === 'array' || prop.type === 'object') {
-      return (
-        <div key={key} className="space-y-2">
-          <Label htmlFor={key} className="text-sm font-medium">
-            {key}
-            {prop.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
-          <Textarea
-            id={key}
-            value={stringValue}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value)
-                handleArgChange(key, parsed)
-              } catch {
-                handleArgChange(key, e.target.value)
-              }
-            }}
-            placeholder={prop.description || `Enter ${key} as JSON`}
-            className="font-mono text-sm"
-            rows={4}
-          />
-          {prop.description && (
-            <p className="text-xs text-gray-500">{prop.description}</p>
-          )}
-        </div>
-      )
-    }
-
-    return (
-      <div key={key} className="space-y-2">
-        <Label htmlFor={key} className="text-sm font-medium">
-          {key}
-          {prop.required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-        <Input
-          id={key}
-          value={stringValue}
-          onChange={(e) => handleArgChange(key, e.target.value)}
-          placeholder={prop.description || `Enter ${key}`}
-        />
-        {prop.description && (
-          <p className="text-xs text-gray-500">{prop.description}</p>
-        )}
-      </div>
-    )
-  }
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
-      <ResizablePanel defaultSize={33}>
-        <ListTabHeader
+      <ResizablePanel
+        defaultSize={33}
+        className="flex flex-col h-full relative"
+      >
+        <PromptsTabHeader
           activeTab={activeTab}
           isSearchExpanded={isSearchExpanded}
           searchQuery={searchQuery}
-          primaryTabName="prompts"
-          secondaryTabName="saved"
-          primaryTabTitle="Prompts"
-          secondaryTabTitle="History"
-          primaryCount={filteredPrompts.length}
-          secondaryCount={results.length}
-          primaryIcon={MessageSquare}
-          secondaryIcon={Clock}
-          searchPlaceholder="Search prompts..."
+          filteredPromptsCount={filteredPrompts.length}
+          savedPromptsCount={savedPrompts.length}
           onSearchExpand={() => setIsSearchExpanded(true)}
           onSearchChange={setSearchQuery}
           onSearchBlur={handleSearchBlur}
           onTabSwitch={() =>
-            setActiveTab(activeTab === 'prompts' ? 'saved' : 'prompts')
-          }
+            setActiveTab(activeTab === 'prompts' ? 'saved' : 'prompts')}
           searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
         />
-        {/* Left pane: Prompts list */}
-        <div className="flex flex-col h-full">
-          {activeTab === 'prompts' ? (
-            <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
-              {filteredPrompts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                  <MessageSquare className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
-                  <p className="text-gray-500 dark:text-gray-400">
-                    No prompts available
-                  </p>
-                </div>
-              ) : (
-                filteredPrompts.map((prompt, index) => (
-                  <ListItem
-                    key={prompt.name}
-                    id={`prompt-${prompt.name}`}
-                    isSelected={selectedPrompt?.name === prompt.name}
-                    isFocused={focusedIndex === index}
-                    icon={<MessageSquare className="h-4 w-4" />}
-                    title={prompt.name}
-                    description={prompt.description}
-                    onClick={() => handlePromptSelect(prompt)}
-                  />
-                ))
-              )}
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto border-r dark:border-zinc-700">
-              {results.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <p>No history</p>
-                  <p className="text-sm">
-                    Prompts you execute will appear here
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2 p-4">
-                  {results.map((result, index) => (
-                    <div
-                      key={index}
-                      id={`prompt-result-${index}`}
-                      className="p-3 bg-gray-100 dark:bg-zinc-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-zinc-700"
-                      onClick={() => {
-                        const prompt = prompts.find(
-                          (p) => p.name === result.promptName
-                        )
-                        if (prompt) {
-                          handlePromptSelect(prompt)
-                          setPromptArgs(result.args)
-                          // Don't switch tabs - let user stay in history view
-                          // setActiveTab('prompts')
-                        }
-                      }}
-                    >
-                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                        {result.promptName}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {new Date(result.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+
+        {activeTab === 'prompts'
+          ? (
+              <PromptsList
+                prompts={filteredPrompts}
+                selectedPrompt={selectedPrompt}
+                onPromptSelect={handlePromptSelect}
+                focusedIndex={focusedIndex}
+              />
+            )
+          : (
+              <SavedPromptsList
+                savedPrompts={savedPrompts}
+                selectedPrompt={selectedSavedPrompt}
+                onLoadPrompt={loadSavedPrompt}
+                onDeletePrompt={deleteSavedPrompt}
+                focusedIndex={focusedIndex}
+              />
+            )}
       </ResizablePanel>
 
       <ResizableHandle withHandle />
 
       <ResizablePanel defaultSize={67}>
-        {/* Right pane: Prompt details and execution */}
-        <div className="flex flex-col h-full bg-white dark:bg-black p-6">
-          {selectedPrompt ? (
-            <>
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">
-                  {selectedPrompt.name}
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  {selectedPrompt.description || 'No description available'}
-                </p>
+        <ResizablePanelGroup direction="vertical">
+          <ResizablePanel defaultSize={40}>
+            <PromptExecutionPanel
+              selectedPrompt={selectedPrompt}
+              promptArgs={promptArgs}
+              isExecuting={isExecuting}
+              isConnected={isConnected}
+              onArgChange={handleArgChange}
+              onExecute={executePrompt}
+              onSave={openSaveDialog}
+            />
+          </ResizablePanel>
 
-                {selectedPrompt.arguments &&
-                  Object.keys(selectedPrompt.arguments).length > 0 && (
-                    <div className="space-y-4 mb-6">
-                      <h4 className="text-sm font-medium text-gray-700">
-                        Arguments
-                      </h4>
-                      <div className="space-y-4">
-                        {Object.entries(selectedPrompt.arguments).map(
-                          ([key, prop]) => renderInputField(key, prop)
-                        )}
-                      </div>
-                    </div>
-                  )}
+          <ResizableHandle withHandle />
 
-                <Button
-                  onClick={handleExecutePrompt}
-                  disabled={!isConnected || isExecuting}
-                  className="w-full"
-                >
-                  {isExecuting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      Executing...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Execute Prompt
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {results.length > 0 && (
-                <div className="flex-1 overflow-hidden">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">
-                    Results
-                  </h4>
-                  <div className="space-y-3 overflow-y-auto max-h-96">
-                    {results.map((result, index) => (
-                      <div
-                        key={index}
-                        className="border dark:border-zinc-700 rounded-lg p-3 bg-gray-50 dark:bg-zinc-700"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-700">
-                            {result.promptName}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleCopyResult(index)}
-                            className="h-6 w-6 p-0"
-                          >
-                            {copiedResult === index ? (
-                              <Check className="h-3 w-3 text-green-600" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </div>
-                        <div className="text-xs text-gray-500 mb-2">
-                          {new Date(result.timestamp).toLocaleString()}
-                        </div>
-                        {result.error ? (
-                          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
-                            {result.error}
-                          </div>
-                        ) : (
-                          <SyntaxHighlighter
-                            language="json"
-                            style={prismStyle}
-                            className="text-xs rounded"
-                            customStyle={{
-                              margin: 0,
-                              background: 'transparent',
-                            }}
-                          >
-                            {JSON.stringify(result.result, null, 2)}
-                          </SyntaxHighlighter>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium">Select a prompt</p>
-                <p className="text-sm">
-                  Choose a prompt from the list to see details and execute it
-                </p>
-              </div>
+          <ResizablePanel defaultSize={60}>
+            <div className="flex flex-col h-full">
+              <PromptResultDisplay
+                results={results}
+                copiedResult={copiedResult}
+                onCopy={handleCopyResult}
+              />
             </div>
-          )}
-        </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </ResizablePanel>
     </ResizablePanelGroup>
   )

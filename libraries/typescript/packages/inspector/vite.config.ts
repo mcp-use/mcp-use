@@ -62,8 +62,15 @@ export default defineConfig({
     'global': 'globalThis',
   },
   optimizeDeps: {
-    include: ['mcp-use/react'],
+    include: [
+      'mcp-use/react',
+      'react-syntax-highlighter',
+      'refractor/lib/core',
+    ],
     exclude: ['posthog-node'], // Exclude Node.js-only packages
+  },
+  ssr: {
+    noExternal: ['react-syntax-highlighter', 'refractor'],
   },
   build: {
     outDir: 'dist/client',
@@ -72,9 +79,17 @@ export default defineConfig({
         // Exclude Node.js built-in modules from the bundle
         /^node:/,
       ],
+      onwarn(warning, warn) {
+        // Suppress warnings about externalized modules for refractor
+        if (warning.code === 'UNRESOLVED_IMPORT' && warning.exporter?.includes('refractor')) {
+          return
+        }
+        warn(warning)
+      },
     },
     commonjsOptions: {
       transformMixedEsModules: true,
+      include: [/node_modules/],
     },
   },
   server: {

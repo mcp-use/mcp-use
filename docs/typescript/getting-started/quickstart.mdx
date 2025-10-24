@@ -1,51 +1,117 @@
 ---
 title: "Quickstart"
-description: "Get started with mcp_use in minutes"
+description: "Get started with mcp-use in minutes"
 icon: "rocket"
 ---
 
-# Quickstart Guide
-
 <Info>
-This guide will get you started with mcp_use in **under 5 minutes**. We'll cover installation, basic configuration, and running your first agent.
+This guide will get you started with mcp-use in **under 5 minutes**. We'll cover installation, basic configuration, and running your first agent.
 </Info>
 
-## Installation
+## Overview
 
+| Section | Description |
+|---------|-------------|
+| [MCP Server](#mcp-server) | Set up MCP servers standalone or in an existing Express server |
+| [MCP Agent](#mcp-agent-installation) | Install and initialize the MCP Agent component |
 
+## MCP Server
+
+The fastest way to scaffold a new MCP server is to use the `create-mcp-use-app` command.
+
+<CodeGroup>
+```bash npm
+npx create-mcp-use-app@latest my-mcp-server
+cd my-mcp-server
+npm run dev
+```
+
+```bash pnpm
+pnpm create mcp-use-app@latest my-mcp-server
+cd my-mcp-server
+pnpm run dev
+```
+
+```bash yarn
+yarn create mcp-use-app@latest my-mcp-server
+cd my-mcp-server
+yarn dev
+```
+</CodeGroup>
+
+This command will create a new MCP server with:
+- A complete TypeScript project structure
+- Pre-configured build tools and dev server
+- Example tools and resources to get you started
+- All necessary dependencies installed
 
 <Tip>
-Installing from source gives you access to the latest features and examples!
+To explore available templates and options, run:
+```bash
+npx create-mcp-use-app --help
+```
 </Tip>
 
-## Installing LangChain Providers
+### Project Structure
 
-mcp_use works with various LLM providers through LangChain. You'll need to install the appropriate LangChain provider package for your chosen LLM:
+After creation, your project will have this structure:
 
+```
+my-mcp-server/
+├── src/
+│   ├── index.ts          # Main server entry point
+│   └── tools/            # Your custom tools
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+### Running Your Server
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Your MCP server will be available and ready to accept connections from MCP clients.
+
+### Next Steps
+
+- **Add Tools**: Create new tools in the `src/tools/` directory
+- **Configure Resources**: Set up resources that your server exposes
+- **Deploy**: Follow deployment guides for your hosting platform
+
+## MCP Agent
+
+### Installing LangChain Providers
+
+mcp-use works with various LLM providers through LangChain. You'll need to install the appropriate LangChain provider package for your chosen LLM:
 
 
 <Warning>
-**Tool Calling Required**: Only models with tool calling capabilities can be used with mcp_use. Make sure your chosen model supports function calling or tool use.
+**Tool Calling Required**: Only models with tool calling capabilities can be used with mcp-use. Make sure your chosen model supports function calling or tool use.
 </Warning>
 
 <Tip>
 For other providers, check the [LangChain chat models documentation](https://python.langchain.com/docs/integrations/chat/)
 </Tip>
 
-## Environment Setup
+### Environment Setup
 
 <Note>
 Set up your environment variables in a `.env` file for secure API key management:
 </Note>
 
 ```bash .env
+# LLM Provider Keys (set the ones you want to use)
 OPENAI_API_KEY=your_api_key_here
 ANTHROPIC_API_KEY=your_api_key_here
 GROQ_API_KEY=your_api_key_here
 GOOGLE_API_KEY=your_api_key_here
 ```
 
-## Your First Agent
+### Your First Agent
 
 Here's a simple example to get you started:
 
@@ -147,7 +213,7 @@ Here's a simple example to get you started:
   ```
 </CodeGroup>
 
-## Configuration Options
+### Configuration Options
 
 You can also load servers configuration from a config file:
 
@@ -188,11 +254,11 @@ For multi-server setups, tool restrictions, and advanced configuration options, 
 </Tip>
 
 
-## Available MCP Servers
+### Available MCP Servers
 
-mcp_use supports **any MCP server**. Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) list for available options.
+mcp-use supports **any MCP server**. Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) list for available options.
 
-## Streaming Agent Output
+### Streaming Agent Output
 
 Stream agent responses as they're generated:
 

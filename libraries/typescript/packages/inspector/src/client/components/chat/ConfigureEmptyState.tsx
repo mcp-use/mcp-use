@@ -26,4 +26,3 @@ export function ConfigureEmptyState({ onConfigureClick }: ConfigureEmptyStatePro
     </div>
   )
 }
-

@@ -1713,23 +1713,10 @@ def update_docs_json(docs_json_path: str, api_reference_dir: str) -> None:
                         break  # Found the tab, stop searching tabs
             break  # Found the product, stop searching products
 
-    # Generate new groups JSON string with same formatting as original
-    new_groups_json = json.dumps(api_groups, indent=2, ensure_ascii=False)
-
-    # Find the exact location of the groups array in the Python SDK API Reference tab
-    import re
-
-    # Pattern to match the groups array in Python SDK API Reference tab
-    pattern = r'("product": "Python SDK"[^}]*?"tab": "API Reference"[^}]*?"groups":\s*)\[[^\]]*\]'
-
-    # Replace with new groups while preserving surrounding formatting
-    updated_content = re.sub(
-        pattern, r"\1" + new_groups_json, original_content, flags=re.DOTALL
-    )
-
-    # Write updated docs.json preserving original formatting
+    # Write updated docs.json
     with open(docs_json_path, "w", encoding="utf-8") as f:
-        f.write(updated_content)
+        json.dump(docs_config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 
     print(f"Updated {docs_json_path} with {len(mdx_files)} API reference files")
     print(f"Organized into {len(api_groups)} groups")
@@ -1788,6 +1775,25 @@ def main():
     exclude_patterns = ["telemetry"]
     modules = find_python_modules(package_dir, exclude_patterns)
     print(f"Found {len(modules)} modules (excluding: {', '.join(exclude_patterns)})")
+
+    # Step 1a: Remove stale documentation files
+    print("🔄 Checking for stale documentation files...")
+    existing_mdx_files = (
+        list(Path(output_dir).glob("*.mdx")) if os.path.exists(output_dir) else []
+    )
+    existing_module_names = {f.stem for f in existing_mdx_files}
+    expected_module_names = {module.replace(".", "_") for module in modules}
+
+    stale_files = existing_module_names - expected_module_names
+    if stale_files:
+        print(f"🗑️  Found {len(stale_files)} stale documentation file(s) to remove:")
+        for stale_name in sorted(stale_files):
+            stale_path = Path(output_dir) / f"{stale_name}.mdx"
+            if stale_path.exists():
+                stale_path.unlink()
+                print(f"   - Removed {stale_path}")
+    else:
+        print("✅ No stale documentation files found")
 
     # Generate docs for each module
     success_count = 0

@@ -54,9 +54,10 @@
             "icon": "library",
             "pages": [
               "home/redirects/python",
-              "home/redirects/typescript"
+              "home/redirects/typescript",
+              "home/redirects/inspector"
             ]
-          }, 
+          },
           {
             "group": "Guides",
             "icon": "",
@@ -184,6 +185,15 @@
                 ]
               },
               {
+                "group": "Integrations",
+                "icon": "plug-2",
+                "pages": [
+                  "python/integration/openai",
+                  "python/integration/anthropic",
+                  "python/integration/google"
+                ]
+              },
+              {
                 "group": "Development",
                 "icon": "sparkle",
                 "pages": [
@@ -207,8 +217,11 @@
                     "group": "Adapters",
                     "icon": "plug-2",
                     "pages": [
+                      "python/api-reference/mcp_use_agents_adapters_anthropic",
                       "python/api-reference/mcp_use_agents_adapters_base",
-                      "python/api-reference/mcp_use_agents_adapters_langchain_adapter"
+                      "python/api-reference/mcp_use_agents_adapters_google",
+                      "python/api-reference/mcp_use_agents_adapters_langchain_adapter",
+                      "python/api-reference/mcp_use_agents_adapters_openai"
                     ]
                   },
                   "python/api-reference/mcp_use_agents_base",
@@ -302,10 +315,8 @@
                 "group": "Core",
                 "icon": "package",
                 "pages": [
-                  "python/api-reference/mcp_use_cli",
                   "python/api-reference/mcp_use_client",
                   "python/api-reference/mcp_use_logging",
-                  "python/api-reference/mcp_use_server",
                   "python/api-reference/mcp_use_utils"
                 ]
               },
@@ -409,10 +420,17 @@
                   {
                     "group": "UI Widgets",
                     "icon": "palette",
+                    "tag": "Apps SDK",
                     "pages": [
                       "typescript/server/ui-widgets",
-                      "typescript/server/mcp-ui-resources",
-                      "typescript/server/apps-sdk-resources"
+                      {
+                        "group": "References",
+                        "icon": "book",
+                        "pages": [
+                          "typescript/server/mcp-ui-resources",
+                           "typescript/server/apps-sdk-resources"
+                        ]
+                      }
                     ]
                   },
                   {
@@ -541,6 +559,15 @@
               }
             ]
           }
+        ]
+      },
+      {
+        "product": "Inspector",
+        "description": "Inspector",
+        "icon": "monitor",
+        "pages": [
+          "inspector/index",
+          "inspector/self-hosting"
         ]
       }
     ]

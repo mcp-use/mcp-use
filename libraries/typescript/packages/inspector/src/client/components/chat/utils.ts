@@ -8,4 +8,3 @@ export function hashString(str: string): string {
   }
   return Math.abs(hash).toString(16)
 }
-
