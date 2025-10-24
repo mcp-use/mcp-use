@@ -9,6 +9,7 @@
   },
   "changesets": [
     "clear-turtles-scream",
-    "fuzzy-ideas-tie"
+    "fuzzy-ideas-tie",
+    "whole-states-repeat"
   ]
 }
