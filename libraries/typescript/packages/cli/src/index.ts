@@ -56,28 +56,42 @@ async function waitForServer(port: number, host: string = 'localhost', maxAttemp
 }
 
 // Helper to run a command
-function runCommand(command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(command, args, {
-      cwd,
-      stdio: 'inherit',
-      shell: false,
-      env: env ? { ...process.env, ...env } : process.env,
-    });
+function runCommand(command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv, filterStderr: boolean = false): { promise: Promise<void>; process: any } {
+  const proc = spawn(command, args, {
+    cwd,
+    stdio: filterStderr ? ['inherit', 'inherit', 'pipe'] as const : 'inherit',
+    shell: false,
+    env: env ? { ...process.env, ...env } : process.env,
+  });
 
+  // Filter stderr to suppress tsx's "Force killing" messages
+  if (filterStderr && proc.stderr) {
+    proc.stderr.on('data', (data: Buffer) => {
+      const text = data.toString();
+      // Filter out tsx's force killing message
+      if (!text.includes('Previous process hasn\'t exited yet') && !text.includes('Force killing')) {
+        process.stderr.write(data);
+      }
+    });
+  }
+
+  const promise = new Promise<void>((resolve, reject) => {
     proc.on('error', reject);
-    proc.on('exit', (code) => {
-      if (code === 0) {
+    proc.on('exit', (code: number | null) => {
+      if (code === 0 || code === 130 || code === 143) {
+        // Exit codes: 0 = normal, 130 = SIGINT/SIGTERM, 143 = SIGTERM (alternative)
         resolve();
       } else {
         reject(new Error(`Command failed with exit code ${code}`));
       }
     });
   });
+
+  return { promise, process: proc };
 }
 
 // Helper to start tunnel and get the URL
-async function startTunnel(port: number): Promise<{ url: string; subdomain: string }> {
+async function startTunnel(port: number): Promise<{ url: string; subdomain: string; process: any }> {
   return new Promise((resolve, reject) => {
     console.log(chalk.gray(`Starting tunnel for port ${port}...`));
     
@@ -86,6 +100,8 @@ async function startTunnel(port: number): Promise<{ url: string; subdomain: stri
       shell: false,
     });
     
+    let resolved = false;
+    
     proc.stdout?.on('data', (data) => {
       const text = data.toString();
       process.stdout.write(text);
@@ -93,11 +109,13 @@ async function startTunnel(port: number): Promise<{ url: string; subdomain: stri
       // Look for the tunnel URL in the output
       // Expected format: https://subdomain.tunnel-domain.com
       const urlMatch = text.match(/https?:\/\/([a-z0-9-]+\.[a-z0-9.-]+)/i);
-      if (urlMatch) {
+      if (urlMatch && !resolved) {
         const url = urlMatch[0];
         const subdomain = url;
+        resolved = true;
+        clearTimeout(setupTimeout);
         console.log(chalk.green.bold(`✓ Tunnel established: ${url}`));
-        resolve({ url, subdomain });
+        resolve({ url, subdomain, process: proc });
       }
     });
     
@@ -106,18 +124,22 @@ async function startTunnel(port: number): Promise<{ url: string; subdomain: stri
     });
     
     proc.on('error', (error) => {
-      reject(new Error(`Failed to start tunnel: ${error.message}`));
+      if (!resolved) {
+        clearTimeout(setupTimeout);
+        reject(new Error(`Failed to start tunnel: ${error.message}`));
+      }
     });
     
     proc.on('exit', (code) => {
-      if (code !== 0) {
+      if (code !== 0 && !resolved) {
+        clearTimeout(setupTimeout);
         reject(new Error(`Tunnel process exited with code ${code}`));
       }
     });
     
-    // Timeout after 30 seconds
-    setTimeout(() => {
-      if (proc.exitCode === null) {
+    // Timeout after 30 seconds - only for initial setup
+    const setupTimeout = setTimeout(() => {
+      if (!resolved) {
         proc.kill();
         reject(new Error('Tunnel setup timed out'));
       }
@@ -398,10 +420,12 @@ program
 
       // Start tunnel if requested
       let mcpUrl: string | undefined;
+      let tunnelProcess: any = undefined;
       if (options.tunnel) {
         try {
           const tunnelInfo = await startTunnel(port);
           mcpUrl = tunnelInfo.subdomain;
+          tunnelProcess = tunnelInfo.process;
         } catch (error) {
           console.error(chalk.red('Failed to start tunnel:'), error);
           process.exit(1);
@@ -424,8 +448,13 @@ program
         env.MCP_URL = mcpUrl;
       }
       
-      const serverProc = runCommand('npx', ['tsx', 'watch', serverFile], projectPath, env);
-      processes.push(serverProc);
+      const serverCommand = runCommand('npx', ['tsx', 'watch', serverFile], projectPath, env, true);
+      processes.push(serverCommand.process);
+      
+      // Add tunnel process if it exists
+      if (tunnelProcess) {
+        processes.push(tunnelProcess);
+      }
 
       // Auto-open inspector if enabled
       if (options.open !== false) {
@@ -433,7 +462,13 @@ program
         const ready = await waitForServer(port, host);
         if (ready) {
           const mcpEndpoint = `http://${host}:${port}/mcp`;
-          const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+          let inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+          
+          // Add tunnel URL as query parameter if tunnel is active
+          if (mcpUrl) {
+            inspectorUrl += `&tunnelUrl=${encodeURIComponent(mcpUrl)}`;
+          }
+          
           const readyTime = Date.now() - startTime;
           console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
           console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
@@ -450,8 +485,36 @@ program
       // Handle cleanup
       const cleanup = () => {
         console.log(chalk.gray('\n\nShutting down...'));
-        processes.forEach(proc => proc.kill());
-        process.exit(0);
+        const processesToKill = processes.length;
+        let killedCount = 0;
+        
+        const checkAndExit = () => {
+          killedCount++;
+          if (killedCount >= processesToKill) {
+            process.exit(0);
+          }
+        };
+        
+        processes.forEach(proc => {
+          if (proc && typeof proc.kill === 'function') {
+            // Listen for process exit
+            proc.on('exit', checkAndExit);
+            // Send SIGINT (Ctrl+C) to tsx which it handles more gracefully
+            proc.kill('SIGINT');
+          } else {
+            checkAndExit();
+          }
+        });
+        
+        // Fallback timeout in case processes don't exit
+        setTimeout(() => {
+          processes.forEach(proc => {
+            if (proc && typeof proc.kill === 'function' && proc.exitCode === null) {
+              proc.kill('SIGKILL');
+            }
+          });
+          process.exit(0);
+        }, 1000);
       };
 
       process.on('SIGINT', cleanup);
@@ -480,10 +543,12 @@ program
 
       // Start tunnel if requested
       let mcpUrl: string | undefined;
+      let tunnelProcess: any = undefined;
       if (options.tunnel) {
         try {
           const tunnelInfo = await startTunnel(port);
           mcpUrl = tunnelInfo.subdomain;
+          tunnelProcess = tunnelInfo.process;
         } catch (error) {
           console.error(chalk.red('Failed to start tunnel:'), error);
           process.exit(1);
@@ -520,8 +585,38 @@ program
       // Handle cleanup
       const cleanup = () => {
         console.log('\n\nShutting down...');
-        serverProc.kill();
-        process.exit(0);
+        const processesToKill = 1 + (tunnelProcess ? 1 : 0);
+        let killedCount = 0;
+        
+        const checkAndExit = () => {
+          killedCount++;
+          if (killedCount >= processesToKill) {
+            process.exit(0);
+          }
+        };
+        
+        // Handle server process
+        serverProc.on('exit', checkAndExit);
+        serverProc.kill('SIGTERM');
+        
+        // Handle tunnel process if it exists
+        if (tunnelProcess && typeof tunnelProcess.kill === 'function') {
+          tunnelProcess.on('exit', checkAndExit);
+          tunnelProcess.kill('SIGTERM');
+        } else {
+          checkAndExit();
+        }
+        
+        // Fallback timeout in case processes don't exit
+        setTimeout(() => {
+          if (serverProc.exitCode === null) {
+            serverProc.kill('SIGKILL');
+          }
+          if (tunnelProcess && tunnelProcess.exitCode === null) {
+            tunnelProcess.kill('SIGKILL');
+          }
+          process.exit(0);
+        }, 1000);
       };
 
       process.on('SIGINT', cleanup);
