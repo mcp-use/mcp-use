@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.7-canary.0
+
+### Patch Changes
+
+- bce5d26: Readmes for templates
+
 ## 0.4.6
 
 ### Patch Changes

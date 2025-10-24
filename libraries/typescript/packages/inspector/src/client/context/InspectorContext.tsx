@@ -9,6 +9,7 @@ interface InspectorState {
   selectedToolName: string | null
   selectedPromptName: string | null
   selectedResourceUri: string | null
+  tunnelUrl: string | null
 }
 
 interface InspectorContextType extends InspectorState {
@@ -17,6 +18,7 @@ interface InspectorContextType extends InspectorState {
   setSelectedToolName: (toolName: string | null) => void
   setSelectedPromptName: (promptName: string | null) => void
   setSelectedResourceUri: (resourceUri: string | null) => void
+  setTunnelUrl: (tunnelUrl: string | null) => void
   navigateToItem: (
     serverId: string,
     tab: TabType,
@@ -36,6 +38,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     selectedToolName: null,
     selectedPromptName: null,
     selectedResourceUri: null,
+    tunnelUrl: null,
   })
 
   const setSelectedServerId = useCallback((serverId: string | null) => {
@@ -56,6 +59,10 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
 
   const setSelectedResourceUri = useCallback((resourceUri: string | null) => {
     setState(prev => ({ ...prev, selectedResourceUri: resourceUri }))
+  }, [])
+
+  const setTunnelUrl = useCallback((tunnelUrl: string | null) => {
+    setState(prev => ({ ...prev, tunnelUrl }))
   }, [])
 
   const navigateToItem = useCallback(
@@ -99,6 +106,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setSelectedToolName,
     setSelectedPromptName,
     setSelectedResourceUri,
+    setTunnelUrl,
     navigateToItem,
     clearSelection,
   }
