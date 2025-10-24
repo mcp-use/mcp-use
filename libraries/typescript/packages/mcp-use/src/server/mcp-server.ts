@@ -800,7 +800,7 @@ if (container && Component) {
   root.render(<Component />)
 }
 `
-      
+   
       const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -904,7 +904,30 @@ if (container && Component) {
 
       let html = '';
       try {
-        html = await readFileSync(join(tempDir, widget.name, 'index.html'), 'utf8')
+        html = readFileSync(join(tempDir, widget.name, 'index.html'), 'utf8')
+        // Inject or replace base tag with MCP_URL
+        const mcpUrl = process.env.MCP_URL || '/';
+        console.log('mcpUrl', mcpUrl)
+        if (mcpUrl && html) {
+          // Remove HTML comments temporarily to avoid matching base tags inside comments
+          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
+          
+          // Try to replace existing base tag (only if not in comments)
+          const baseTagRegex = /<base\s+[^>]*\/?>/i;
+          if (baseTagRegex.test(htmlWithoutComments)) {
+            // Find and replace the actual base tag in the original HTML
+            const actualBaseTagMatch = html.match(/<base\s+[^>]*\/?>/i);
+            if (actualBaseTagMatch) {
+              html = html.replace(actualBaseTagMatch[0], `<base href="${mcpUrl}" />`);
+            }
+          } else {
+            // Inject base tag in head if it doesn't exist
+            const headTagRegex = /<head[^>]*>/i;
+            if (headTagRegex.test(html)) {
+              html = html.replace(headTagRegex, (match) => `${match}\n    <base href="${mcpUrl}" />`);
+            }
+          }
+        }
       } catch (error) {
         console.error(`Failed to read html template for widget ${widget.name}`, error)
       }
@@ -1000,6 +1023,29 @@ if (container && Component) {
       let html = ''
       try {
         html = readFileSync(indexPath, 'utf8')
+        // Inject or replace base tag with MCP_URL
+        const mcpUrl = process.env.MCP_URL || '/';
+        console.log('mcpUrl', mcpUrl)
+        if (mcpUrl && html) {
+          // Remove HTML comments temporarily to avoid matching base tags inside comments
+          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
+          
+          // Try to replace existing base tag (only if not in comments)
+          const baseTagRegex = /<base\s+[^>]*\/?>/i;
+          if (baseTagRegex.test(htmlWithoutComments)) {
+            // Find and replace the actual base tag in the original HTML
+            const actualBaseTagMatch = html.match(/<base\s+[^>]*\/?>/i);
+            if (actualBaseTagMatch) {
+              html = html.replace(actualBaseTagMatch[0], `<base href="${mcpUrl}" />`);
+            }
+          } else {
+            // Inject base tag in head if it doesn't exist
+            const headTagRegex = /<head[^>]*>/i;
+            if (headTagRegex.test(html)) {
+              html = html.replace(headTagRegex, (match) => `${match}\n    <base href="${mcpUrl}" />`);
+            }
+          }
+        }
       } catch (error) {
         console.error(`[WIDGET] Failed to read ${widgetName}/index.html:`, error)
         continue
