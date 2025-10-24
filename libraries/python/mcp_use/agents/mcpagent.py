@@ -12,10 +12,10 @@ from typing import TypeVar
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
-from langchain.globals import set_debug
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain.schema.language_model import BaseLanguageModel
+from langchain_core.globals import set_debug
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.language_models import BaseLanguageModel
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables.schema import StreamEvent
