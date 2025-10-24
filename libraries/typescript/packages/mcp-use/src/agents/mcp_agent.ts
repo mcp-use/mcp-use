@@ -26,6 +26,7 @@ import {
 } from '@langchain/core/prompts'
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
 import { zodToJsonSchema } from 'zod-to-json-schema'
+import { ZodError } from 'zod'
 import { LangChainAdapter } from '../adapters/langchain_adapter.js'
 import { logger } from '../logging.js'
 import { ServerManager } from '../managers/server_manager.js'
@@ -290,7 +291,7 @@ export class MCPAgent {
   private async createSystemMessageFromTools(tools: StructuredToolInterface[]): Promise<void> {
     const systemPromptTemplate
       = this.systemPromptTemplateOverride
-        ?? DEFAULT_SYSTEM_PROMPT_TEMPLATE
+      ?? DEFAULT_SYSTEM_PROMPT_TEMPLATE
 
     this.systemMessage = createSystemMessage(
       tools,
@@ -723,7 +724,7 @@ export class MCPAgent {
 
           const changed
             = currentTools.length !== this._tools.length
-              || [...currentToolNames].some(n => !existingToolNames.has(n))
+            || [...currentToolNames].some(n => !existingToolNames.has(n))
 
           if (changed) {
             logger.info(
@@ -756,29 +757,29 @@ export class MCPAgent {
 
             // If structured output is requested, attempt to create it
             if (outputSchema && structuredLlm) {
-                logger.info('🔧 Attempting structured output...')
-                const currentResult = result
-                this._attemptStructuredOutput<T>(
-                  currentResult,
-                  this.llm!,
-                  outputSchema,
-                ).then(structuredResult => {
-                  if (this.memoryEnabled) {
-                    this.addToHistory(new AIMessage(`Structured result: ${JSON.stringify(structuredResult)}`))
-                  }
-  
-                  logger.info('✅ Structured output successful')
-                  structuredOutputSuccessRef.value = true
-                  return structuredResult as string | T
-                }).catch(e => {
+              logger.info('🔧 Attempting structured output...')
+              const currentResult = result
+              this._attemptStructuredOutput<T>(
+                currentResult,
+                this.llm!,
+                outputSchema,
+              ).then(structuredResult => {
+                if (this.memoryEnabled) {
+                  this.addToHistory(new AIMessage(`Structured result: ${JSON.stringify(structuredResult)}`))
+                }
+
+                logger.info('✅ Structured output successful')
+                structuredOutputSuccessRef.value = true
+                return structuredResult as string | T
+              }).catch(e => {
                 logger.warn(`⚠️ Structured output failed: ${e}`)
                 // Continue execution to gather missing information
                 const failedStructuredOutputPrompt = `
                 The current result cannot be formatted into the required structure.
                 Error: ${String(e)}
-                
+
                 Current information: ${currentResult}
-                
+
                 If information is missing, please continue working to gather the missing information needed for:
                 ${schemaDescription}
 
@@ -792,7 +793,7 @@ export class MCPAgent {
                 }
 
                 logger.info('🔄 Continuing execution to gather missing information...')
-              })  
+              })
             }
           }
 
@@ -802,23 +803,23 @@ export class MCPAgent {
             intermediateSteps.push(...stepArray)
 
             for (const step of stepArray) {
-            yield step
-            const { action, observation } = step
-            const toolName = action.tool
-            toolsUsedNames.push(toolName)
-            let toolInputStr = typeof action.toolInput === 'string'
-              ? action.toolInput
-              : JSON.stringify(action.toolInput, null, 2)
-            if (toolInputStr.length > 100)
-              toolInputStr = `${toolInputStr.slice(0, 97)}...`
-            logger.info(`🔧 Tool call: ${toolName} with input: ${toolInputStr}`)
+              yield step
+              const { action, observation } = step
+              const toolName = action.tool
+              toolsUsedNames.push(toolName)
+              let toolInputStr = typeof action.toolInput === 'string'
+                ? action.toolInput
+                : JSON.stringify(action.toolInput, null, 2)
+              if (toolInputStr.length > 100)
+                toolInputStr = `${toolInputStr.slice(0, 97)}...`
+              logger.info(`🔧 Tool call: ${toolName} with input: ${toolInputStr}`)
 
-            let outputStr = String(observation)
-            if (outputStr.length > 100)
-              outputStr = `${outputStr.slice(0, 97)}...`
-            outputStr = outputStr.replace(/\n/g, ' ')
-            logger.info(`📄 Tool result: ${outputStr}`)
-          }
+              let outputStr = String(observation)
+              if (outputStr.length > 100)
+                outputStr = `${outputStr.slice(0, 97)}...`
+              outputStr = outputStr.replace(/\n/g, ' ')
+              logger.info(`📄 Tool result: ${outputStr}`)
+            }
 
             // Detect direct return
             if (stepArray.length) {
@@ -839,6 +840,66 @@ export class MCPAgent {
             runManager?.handleChainError(result)
             break
           }
+
+          // Handle schema validation errors gracefully - allow retry
+          if (e instanceof ZodError || String(e).includes('did not match expected schema')) {
+            let errorDetails: string
+            let errorMessage: string
+            let toolName = 'unknown'
+
+            // Try to get the tool name from the error itself or last step
+            const errorStr = String(e)
+
+            // Try to extract tool name from various error message patterns
+            // Avoid matching "input" from "tool input" - look for actual tool names
+            const toolMatch = errorStr.match(/Executing tool ["']?(\w+)/i) ||
+              errorStr.match(/tool ["'](\w+)["']/i) ||
+              errorStr.match(/tool[_\s]+(\w+)/i)
+
+            if (toolMatch && toolMatch[1] && toolMatch[1] !== 'input') {
+              toolName = toolMatch[1]
+            }
+
+            // Fallback: try to get from last step
+            if (toolName === 'unknown' && intermediateSteps.length > 0) {
+              const lastStep = intermediateSteps[intermediateSteps.length - 1]
+              if (lastStep.action?.tool) {
+                toolName = lastStep.action.tool
+              }
+            }
+
+            if (e instanceof ZodError) {
+              // Extract detailed Zod validation errors
+              const errors = e.errors.map(err => {
+                const path = err.path.length > 0 ? err.path.join('.') : 'root'
+                return `${path}: ${err.message}`
+              }).join('; ')
+              errorDetails = `Field errors: ${errors}`
+              errorMessage = `Tool "${toolName}" validation failed: ${errors}`
+            } else {
+              errorDetails = errorStr
+              errorMessage = `Tool "${toolName}" received invalid arguments. Schema validation failed. Please check argument types and required fields.`
+            }
+
+            if (toolName !== 'unknown') {
+              logger.warn(`⚠️ Schema validation error in step ${stepNum + 1} for tool "${toolName}"`)
+            } else {
+              logger.warn(`⚠️ Schema validation error in step ${stepNum + 1}`)
+            }
+            logger.warn(`   ${errorDetails}`)
+
+            // Create a recoverable error observation for the agent
+            const errorStep: AgentStep = {
+              action: { tool: toolName, toolInput: {}, log: '' },
+              observation: errorMessage,
+            }
+            intermediateSteps.push(errorStep)
+            yield errorStep
+
+            // Continue to next iteration to allow retry
+            continue
+          }
+
           logger.error(`❌ Error during agent execution step ${stepNum + 1}: ${e}`)
           console.error(e)
           result = `Agent stopped due to an error: ${e}`
@@ -1062,13 +1123,13 @@ export class MCPAgent {
       // Convert to structured output if requested
       if (outputSchema && finalResponse) {
         logger.info('🔧 Attempting structured output conversion...')
-        
+
         try {
           // Start the conversion (non-blocking)
           let conversionCompleted = false
           let conversionResult: T | null = null
           let conversionError: Error | null = null
-          
+
           const _conversionPromise = this._attemptStructuredOutput<T>(
             finalResponse,
             this.llm!,
@@ -1082,43 +1143,43 @@ export class MCPAgent {
             conversionError = error
             throw error
           })
-          
+
           // Yield progress events while conversion is running
           let progressCount = 0
-          
+
           while (!conversionCompleted) {
             // Wait 2 seconds
             await new Promise(resolve => setTimeout(resolve, 2000))
-            
+
             if (!conversionCompleted) {
               // Still running - yield progress event
               progressCount++
               yield {
                 event: 'on_structured_output_progress',
-                data: { 
+                data: {
                   message: `Converting to structured output... (${progressCount * 2}s)`,
-                  elapsed: progressCount * 2 
+                  elapsed: progressCount * 2
                 },
               } as unknown as StreamEvent
             }
           }
-          
+
           // Check if conversion succeeded or failed
           if (conversionError) {
             throw conversionError
           }
-          
+
           if (conversionResult) {
             // Yield structured result as a custom event
             yield {
               event: 'on_structured_output',
               data: { output: conversionResult },
             } as unknown as StreamEvent
-            
+
             if (this.memoryEnabled) {
               this.addToHistory(new AIMessage(`Structured result: ${JSON.stringify(conversionResult)}`))
             }
-            
+
             logger.info('✅ Structured output successful')
           }
         } catch (e) {
@@ -1203,7 +1264,7 @@ export class MCPAgent {
     // Schema-aware setup for structured output
     let structuredLlm: BaseLanguageModelInterface | null = null
     let schemaDescription = ''
-    
+
     logger.debug(`🔄 Structured output requested, schema: ${JSON.stringify(zodToJsonSchema(outputSchema), null, 2)}`)
     // Check if withStructuredOutput method exists
     if (llm && 'withStructuredOutput' in llm && typeof (llm as any).withStructuredOutput === 'function') {
@@ -1244,14 +1305,14 @@ export class MCPAgent {
       let formatPrompt = `
       Please format the following information according to the EXACT schema specified below.
       You must use the exact field names and types as shown in the schema.
-      
+
       Required schema format:
       ${schemaDescription}
-      
+
       Content to extract from:
       ${textContent}
-      
-      IMPORTANT: 
+
+      IMPORTANT:
       - Use ONLY the field names specified in the schema
       - Match the data types exactly (string, number, boolean, array, etc.)
       - Include ALL required fields
@@ -1261,7 +1322,7 @@ export class MCPAgent {
       // Add specific error feedback for retry attempts
       if (attempt > 1) {
         formatPrompt += `
-        
+
         PREVIOUS ATTEMPT FAILED with error: ${lastError}
         Please fix the issues mentioned above and ensure the output matches the schema exactly.
         `
@@ -1269,7 +1330,7 @@ export class MCPAgent {
 
       try {
         logger.info(`🔄 Structured output attempt ${attempt} - using streaming approach`)
-        
+
         // Use streaming to avoid blocking the event loop
         const stream = await structuredLlm!.stream(formatPrompt)
         let structuredResult = null
@@ -1277,10 +1338,10 @@ export class MCPAgent {
 
         for await (const chunk of stream) {
           chunkCount++
-          
+
           // Print the chunk for debugging
           logger.info(`Chunk ${chunkCount}: ${JSON.stringify(chunk, null, 2)}`)
-          
+
           // Handle different chunk types
           if (typeof chunk === 'string') {
             // If it's a string, try to parse it as JSON
@@ -1300,7 +1361,7 @@ export class MCPAgent {
               logger.warn(`🔄 Failed to parse chunk as JSON: ${chunk}`)
             }
           }
-          
+
           if (chunkCount % 10 === 0) {
             logger.info(`🔄 Structured output streaming: ${chunkCount} chunks`)
           }
@@ -1381,11 +1442,11 @@ export class MCPAgent {
       // Enhance the query with schema awareness
       const enhancedQuery = `
       ${query}
-      
+
       IMPORTANT: Your response must include sufficient information to populate the following structured output:
-      
+
       ${schemaDescription}
-      
+
       Make sure you gather ALL the required information during your task execution.
       If any required information is missing, continue working to find it.
       `

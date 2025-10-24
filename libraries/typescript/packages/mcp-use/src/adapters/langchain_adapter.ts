@@ -9,7 +9,7 @@ import type { BaseConnector } from '../connectors/base.js'
 
 import { JSONSchemaToZod } from '@dmitryrechkin/json-schema-to-zod'
 import { DynamicStructuredTool } from '@langchain/core/tools'
-import { z } from 'zod'
+import { z, ZodError } from 'zod'
 import { logger } from '../logging.js'
 import { BaseAdapter } from './base.js'
 
@@ -22,6 +22,7 @@ function schemaToZod(schema: unknown): ZodTypeAny {
     return z.any()
   }
 }
+
 
 export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
   constructor(disallowedTools: string[] = []) {
@@ -41,9 +42,24 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     }
 
     // Derive a strict Zod schema for the tool's arguments.
-    const argsSchema: ZodTypeAny = mcpTool.inputSchema
+    let argsSchema: ZodTypeAny = mcpTool.inputSchema
       ? schemaToZod(mcpTool.inputSchema)
       : z.object({}).optional()
+
+    // TEMPORARY HACK: Force schema validation errors for testing
+    // TODO: Remove this hack after testing agent recovery behavior
+    // Only apply to browser_navigate tool for testing
+    if (mcpTool.name === 'browser_navigate' && argsSchema && typeof argsSchema === 'object' && '_def' in argsSchema) {
+      // Replace the URL field with a strict pattern that will reject valid URLs
+      // This creates a mismatch where LLM provides valid URLs but schema expects invalid pattern
+      const originalSchema = argsSchema as z.ZodObject<any>
+      const originalShape = originalSchema._def.shape() || {}
+      argsSchema = z.object({
+        ...originalShape,
+        url: z.string().regex(/^INVALID_PATTERN$/).describe('URL must match pattern INVALID_PATTERN (impossible)')
+      })
+      logger.warn(`⚠️ HACK ACTIVE: Changed URL schema to impossible pattern for tool "${mcpTool.name}"`)
+    }
 
     const tool = new DynamicStructuredTool({
       name: mcpTool.name ?? 'NO NAME',
@@ -52,7 +68,11 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
       func: async (input: Record<string, any>): Promise<string> => {
         logger.debug(`MCP tool "${mcpTool.name}" received input: ${JSON.stringify(input)}`)
         try {
-          const result: CallToolResult = await connector.callTool(mcpTool.name, input)
+          // Remove the hack field before calling the actual tool
+          const cleanInput = { ...input }
+          delete cleanInput._FORCE_SCHEMA_ERROR
+
+          const result: CallToolResult = await connector.callTool(mcpTool.name, cleanInput)
           return JSON.stringify(result)
         }
         catch (err: any) {
@@ -62,6 +82,8 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
       },
     })
 
+    // Note: Schema validation errors from DynamicStructuredTool are handled
+    // at the agent level to allow retry with corrected arguments
     return tool
   }
 }

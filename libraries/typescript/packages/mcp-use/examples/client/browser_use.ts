@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { ChatOpenAI } from '@langchain/openai'
 import { config } from 'dotenv'
 import { MCPAgent, MCPClient } from '../../index.js'
+import { ChatAnthropic } from '@langchain/anthropic'
 
 // Load environment variables from .env file
 config()
@@ -34,7 +35,7 @@ async function main() {
   // Create MCPClient from config file
   const client = new MCPClient(config)
   // Create LLM
-  const llm = new ChatOpenAI({ model: 'gpt-4o' })
+  const llm = new ChatAnthropic({ model: 'claude-sonnet-4-20250514' })
   // const llm = init_chat_model({ model: "llama-3.1-8b-instant", model_provider: "groq" })
   // const llm = new ChatAnthropic({ model: "claude-3-" })
   // const llm = new ChatGroq({ model: "llama3-8b-8192" })
@@ -45,10 +46,10 @@ async function main() {
   // Run the query
   const result = await agent.run(
     `Navigate to https://github.com/mcp-use/mcp-use, give a star to the project and write
-a summary of the project.`,
-    30,
+a summary of the project. Tell me if you could use the browser_navigate tool tell me which errors you exactly encountered, try at most three times, if you still cannot use it, tell me that you cannot use it and why. `,
+    10,
   )
-  console.error(`\nResult: ${result}`)
+  console.error(`\nResult: ${JSON.stringify(result, null, 2)}`)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
