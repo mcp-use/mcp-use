@@ -76,6 +76,55 @@ function runCommand(command: string, args: string[], cwd: string, env?: NodeJS.P
   });
 }
 
+// Helper to start tunnel and get the URL
+async function startTunnel(port: number): Promise<{ url: string; subdomain: string }> {
+  return new Promise((resolve, reject) => {
+    console.log(chalk.gray(`Starting tunnel for port ${port}...`));
+    
+    const proc = spawn('npx', ['--yes', '@mcp-use/tunnel', String(port)], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    });
+    
+    proc.stdout?.on('data', (data) => {
+      const text = data.toString();
+      process.stdout.write(text);
+      
+      // Look for the tunnel URL in the output
+      // Expected format: https://subdomain.tunnel-domain.com
+      const urlMatch = text.match(/https?:\/\/([a-z0-9-]+\.[a-z0-9.-]+)/i);
+      if (urlMatch) {
+        const url = urlMatch[0];
+        const subdomain = url;
+        console.log(chalk.green.bold(`✓ Tunnel established: ${url}`));
+        resolve({ url, subdomain });
+      }
+    });
+    
+    proc.stderr?.on('data', (data) => {
+      process.stderr.write(data);
+    });
+    
+    proc.on('error', (error) => {
+      reject(new Error(`Failed to start tunnel: ${error.message}`));
+    });
+    
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Tunnel process exited with code ${code}`));
+      }
+    });
+    
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      if (proc.exitCode === null) {
+        proc.kill();
+        reject(new Error('Tunnel setup timed out'));
+      }
+    }, 30000);
+  });
+}
+
 
 async function findServerFile(projectPath: string): Promise<string> {
   const candidates = ['index.ts', 'src/index.ts', 'server.ts', 'src/server.ts'];
@@ -330,6 +379,7 @@ program
   .option('--port <port>', 'Server port', '3000')
   .option('--host <host>', 'Server host', 'localhost')
   .option('--no-open', 'Do not auto-open inspector')
+  .option('--tunnel', 'Expose server through a tunnel')
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -346,17 +396,35 @@ program
         port = availablePort;
       }
 
+      // Start tunnel if requested
+      let mcpUrl: string | undefined;
+      if (options.tunnel) {
+        try {
+          const tunnelInfo = await startTunnel(port);
+          mcpUrl = tunnelInfo.subdomain;
+        } catch (error) {
+          console.error(chalk.red('Failed to start tunnel:'), error);
+          process.exit(1);
+        }
+      }
+
       // // Find the main source file
       const serverFile = await findServerFile(projectPath);
 
       // Start all processes concurrently
       const processes: any[] = [];
       
-      const serverProc = runCommand('npx', ['tsx', 'watch', serverFile], projectPath, {
+      const env: NodeJS.ProcessEnv = {
         PORT: String(port),
         HOST: host,
         NODE_ENV: 'development',
-      });
+      };
+      
+      if (mcpUrl) {
+        env.MCP_URL = mcpUrl;
+      }
+      
+      const serverProc = runCommand('npx', ['tsx', 'watch', serverFile], projectPath, env);
       processes.push(serverProc);
 
       // Auto-open inspector if enabled
@@ -364,13 +432,16 @@ program
         const startTime = Date.now();
         const ready = await waitForServer(port, host);
         if (ready) {
-          const mcpUrl = `http://${host}:${port}/mcp`;
-          const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpUrl)}`;
+          const mcpEndpoint = `http://${host}:${port}/mcp`;
+          const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
           const readyTime = Date.now() - startTime;
           console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
           console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
           console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
-          console.log(chalk.whiteBright(`MCP:      ${mcpUrl}`));
+          if (mcpUrl) {
+            console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}`));
+          }
+          console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
           console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
           await open(inspectorUrl);
         }
@@ -399,12 +470,25 @@ program
   .description('Start production server')
   .option('-p, --path <path>', 'Path to project directory', process.cwd())
   .option('--port <port>', 'Server port', '3000')
+  .option('--tunnel', 'Expose server through a tunnel')
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
       const port = parseInt(options.port, 10);
 
       console.log(`\x1b[36m\x1b[1mmcp-use\x1b[0m \x1b[90mVersion: ${packageJson.version}\x1b[0m\n`);
+
+      // Start tunnel if requested
+      let mcpUrl: string | undefined;
+      if (options.tunnel) {
+        try {
+          const tunnelInfo = await startTunnel(port);
+          mcpUrl = tunnelInfo.subdomain;
+        } catch (error) {
+          console.error(chalk.red('Failed to start tunnel:'), error);
+          process.exit(1);
+        }
+      }
 
       // Find the built server file
       let serverFile = 'dist/index.js';
@@ -415,10 +499,22 @@ program
       }
 
       console.log('Starting production server...');
+      
+      const env: NodeJS.ProcessEnv = { 
+        ...process.env, 
+        PORT: String(port), 
+        NODE_ENV: 'production' 
+      };
+      
+      if (mcpUrl) {
+        env.MCP_URL = mcpUrl;
+        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}`));
+      }
+      
       const serverProc = spawn('node', [serverFile], {
         cwd: projectPath,
         stdio: 'inherit',
-        env: { ...process.env, PORT: String(port), NODE_ENV: 'production' },
+        env,
       });
 
       // Handle cleanup
