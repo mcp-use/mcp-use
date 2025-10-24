@@ -428,7 +428,7 @@
                         "icon": "book",
                         "pages": [
                           "typescript/server/mcp-ui-resources",
-                           "typescript/server/apps-sdk-resources"
+                          "typescript/server/apps-sdk-resources"
                         ]
                       }
                     ]
