@@ -43,8 +43,8 @@ async function findAvailablePort(startPort: number, host: string = 'localhost'):
 async function waitForServer(port: number, host: string = 'localhost', maxAttempts = 30): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
-      const response = await fetch(`http://${host}:${port}/inspector`);
-      if (response.ok) {
+      const response = await fetch(`http://${host}:${port}/mcp`);
+      if (response.status !== 404) {
         return true;
       }
     } catch {
@@ -114,7 +114,7 @@ async function startTunnel(port: number): Promise<{ url: string; subdomain: stri
         const subdomain = url;
         resolved = true;
         clearTimeout(setupTimeout);
-        console.log(chalk.green.bold(`✓ Tunnel established: ${url}`));
+        console.log(chalk.green.bold(`✓ Tunnel established: ${url}/mcp`));
         resolve({ url, subdomain, process: proc });
       }
     });
@@ -321,6 +321,15 @@ if (container && Component) {
         root: tempDir,
         base: baseUrl,
         plugins: [tailwindcss(), react()],
+        experimental: {
+          renderBuiltUrl: (filename: string, { hostType }) => {
+            if (['js', 'css'].includes(hostType)) {
+              return { runtime: `window.__getFile(${JSON.stringify(filename)})` }
+            } else {
+              return { relative: true }
+            }
+          }
+        },
         resolve: {
           alias: {
             '@': resourcesDir,

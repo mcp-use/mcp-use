@@ -907,7 +907,6 @@ if (container && Component) {
         html = readFileSync(join(tempDir, widget.name, 'index.html'), 'utf8')
         // Inject or replace base tag with MCP_URL
         const mcpUrl = process.env.MCP_URL || '/';
-        console.log('mcpUrl', mcpUrl)
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
           const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
@@ -928,6 +927,15 @@ if (container && Component) {
             }
           }
         }
+
+        // replace relative path that starts with /mcp-use script and css with absolute  
+        html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+        html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+
+        // add window.__getFile to head
+        html = html.replace(/<head[^>]*>/i, `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widget.name}/"+filename }</script>`)
+
+
       } catch (error) {
         console.error(`Failed to read html template for widget ${widget.name}`, error)
       }
@@ -1025,7 +1033,6 @@ if (container && Component) {
         html = readFileSync(indexPath, 'utf8')
         // Inject or replace base tag with MCP_URL
         const mcpUrl = process.env.MCP_URL || '/';
-        console.log('mcpUrl', mcpUrl)
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
           const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
@@ -1045,6 +1052,15 @@ if (container && Component) {
               html = html.replace(headTagRegex, (match) => `${match}\n    <base href="${mcpUrl}" />`);
             }
           }
+
+          // replace relative path that starts with /mcp-use script and css with absolute  
+          html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+          html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+
+          // add window.__getFile to head
+          html = html.replace(/<head[^>]*>/i, `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widgetName}/"+filename }</script>`)
+
+
         }
       } catch (error) {
         console.error(`[WIDGET] Failed to read ${widgetName}/index.html:`, error)
@@ -1339,7 +1355,16 @@ if (container && Component) {
     // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
     this.app.get('/mcp-use/widgets/:widget', (req, res, next) => {
       const filePath = join(process.cwd(), 'dist', 'resources', 'widgets', req.params.widget, 'index.html')
-      res.sendFile(filePath, err => (err ? next() : undefined))
+
+      let html = readFileSync(filePath, 'utf8')
+      // replace relative path that starts with /mcp-use script and css with absolute  
+      html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+      html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+
+      // add window.__getFile to head
+      html = html.replace(/<head[^>]*>/i, `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${req.params.widget}/"+filename }</script>`)
+
+      res.send(html)
     })
   }
 
