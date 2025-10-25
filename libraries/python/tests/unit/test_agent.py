@@ -5,8 +5,8 @@ Unit tests for the MCPAgent class.
 from unittest.mock import MagicMock, patch
 
 import pytest
-from langchain_core.messages import HumanMessage
 from langchain_core.agents import AgentFinish
+from langchain_core.messages import HumanMessage
 
 from mcp_use.agents.mcpagent import MCPAgent
 from mcp_use.client import MCPClient

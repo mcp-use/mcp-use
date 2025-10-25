@@ -17,15 +17,13 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TypeVar
 
 from langchain.agents import create_agent
+from langchain_core.agents import AgentAction
 from langchain_core.globals import set_debug
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.agents import AgentAction, AgentFinish
-from langchain_core.exceptions import OutputParserException
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
-from langchain_core.utils.input import get_color_mapping
 from pydantic import BaseModel
 
 from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter
@@ -647,7 +645,7 @@ class MCPAgent:
 
             # 2. Build inputs for the agent
             history_to_use = external_history if external_history is not None else self._conversation_history
-            
+
             # Convert messages to format expected by LangChain agent
             langchain_history = []
             for msg in history_to_use:
@@ -658,7 +656,7 @@ class MCPAgent:
 
             display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
             logger.info(f"💬 Received query: '{display_query}'")
-            logger.info(f"🏁 Starting simplified agent execution")
+            logger.info("🏁 Starting simplified agent execution")
 
             # 3. Stream using the built-in astream from CompiledStateGraph
             # The agent graph handles the loop internally
@@ -668,12 +666,12 @@ class MCPAgent:
             restart_count = 0
             accumulated_messages = list(langchain_history) + [HumanMessage(content=query)]
             tools_changed_pending = False  # Track if tools changed but waiting for safe restart point
-            
+
             while restart_count <= max_restarts:
                 # Update inputs with accumulated messages
                 inputs = {"messages": accumulated_messages}
                 should_restart = False
-                
+
                 async for chunk in self._agent_executor.astream(
                     inputs,
                     stream_mode="updates",  # Get updates as they happen
@@ -681,21 +679,21 @@ class MCPAgent:
                     # chunk is a dict with node names as keys
                     # The agent node will have 'messages' with the AI response
                     # The tools node will have 'messages' with tool calls and results
-                    
+
                     for node_name, node_output in chunk.items():
                         logger.debug(f"📦 Node '{node_name}' output: {node_output}")
-                        
+
                         # Extract messages from the node output and accumulate them
                         if "messages" in node_output:
                             messages = node_output["messages"]
                             if not isinstance(messages, list):
                                 messages = [messages]
-                            
+
                             # Add new messages to accumulated messages for potential restart
                             for msg in messages:
                                 if msg not in accumulated_messages:
                                     accumulated_messages.append(msg)
-                            
+
                             for message in messages:
                                 # Track tool calls
                                 if hasattr(message, "tool_calls") and message.tool_calls:
@@ -703,12 +701,12 @@ class MCPAgent:
                                         tool_name = tool_call.get("name", "unknown")
                                         tool_input = tool_call.get("args", {})
                                         self.tools_used_names.append(tool_name)
-                                        
+
                                         tool_input_str = str(tool_input)
                                         if len(tool_input_str) > 100:
                                             tool_input_str = tool_input_str[:97] + "..."
                                         logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
-                                        
+
                                         # Yield as AgentAction for compatibility
                                         action = AgentAction(
                                             tool=tool_name,
@@ -716,7 +714,7 @@ class MCPAgent:
                                             log=f"Calling {tool_name} with {tool_input}"
                                         )
                                         steps_count += 1
-                                
+
                                 # Track tool results (ToolMessage)
                                 if hasattr(message, "type") and message.type == "tool":
                                     observation = message.content
@@ -725,7 +723,7 @@ class MCPAgent:
                                         observation_str = observation_str[:97] + "..."
                                     observation_str = observation_str.replace("\n", " ")
                                     logger.info(f"📄 Tool result: {observation_str}")
-                                    
+
                                     # --- Check for tool updates after tool results (safe restart point) ---
                                     if self.use_server_manager and self.server_manager:
                                         current_tools = self.server_manager.tools
@@ -742,31 +740,31 @@ class MCPAgent:
                                             await self._create_system_message_from_tools(self._tools)
                                             # Recreate the agent executor with the new tools and system message
                                             self._agent_executor = self._create_agent()
-                                            
+
                                             # Set restart flag - safe to restart now after tool results
                                             should_restart = True
                                             restart_count += 1
                                             logger.info(f"🔃 Restarting execution with updated tools (restart {restart_count}/{max_restarts})")
                                             break  # Break out of the message loop
-                                
+
                                 # Track final AI message (without tool calls = final response)
                                 if isinstance(message, AIMessage) and not getattr(message, "tool_calls", None):
                                     final_output = self._normalize_output(message.content)
-                                    logger.info(f"✅ Agent finished with output")
-                        
+                                    logger.info("✅ Agent finished with output")
+
                         # Break out of node loop if restarting
                         if should_restart:
                             break
-                    
+
                     # Break out of chunk loop if restarting
                     if should_restart:
                         break
-                
+
                 # Check if we should restart or if execution completed
                 if not should_restart:
                     # Execution completed successfully without tool changes
                     break
-                
+
                 # If we've hit max restarts, log warning and continue
                 if restart_count > max_restarts:
                     logger.warning(f"⚠️ Max restarts ({max_restarts}) reached. Continuing with current tools.")
@@ -783,7 +781,7 @@ class MCPAgent:
                 try:
                     logger.info("🔧 Attempting structured output...")
                     structured_llm = self.llm.with_structured_output(output_schema)
-                    
+
                     # Get schema description
                     schema_fields = []
                     for field_name, field_info in output_schema.model_fields.items():
@@ -791,14 +789,14 @@ class MCPAgent:
                         required = not hasattr(field_info, "default") or field_info.default is None
                         schema_fields.append(f"- {field_name}: {description} {'(required)' if required else '(optional)'}")
                     schema_description = "\n".join(schema_fields)
-                    
+
                     structured_result = await self._attempt_structured_output(
                         final_output, structured_llm, output_schema, schema_description
                     )
-                    
+
                     if self.memory_enabled:
                         self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
-                    
+
                     logger.info("✅ Structured output successful")
                     success = True
                     yield structured_result
@@ -819,7 +817,7 @@ class MCPAgent:
                 logger.info("🧹 Cleaning up resources after error")
                 await self.close()
             raise
-        
+
         finally:
             # Clean up if necessary
             if manage_connector and not self.client and initialized_here:
