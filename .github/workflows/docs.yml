@@ -25,9 +25,19 @@ jobs:
 
     steps:
       - name: Checkout code
+        if: ${{ github.event_name == 'pull_request' }}
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Checkout (push)
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -78,8 +88,9 @@ jobs:
             echo "✅ API documentation is up to date"
           fi
 
-      - name: Comment on PR
-        if: steps.check_docs.outputs.docs_outdated == 'true' && github.event_name == 'pull_request'
+      - name: Comment on PR (same-repo only)
+        if: steps.check_docs.outputs.docs_outdated == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+
         uses: actions/github-script@v7
         with:
           script: |
@@ -118,7 +129,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fail if docs are outdated
-        if: steps.check_docs.outputs.docs_outdated == 'true'
+        if: steps.check_docs.outputs.docs_outdated == 'true' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           echo "Please update the API documentation and commit the changes."
           exit 1
