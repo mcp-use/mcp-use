@@ -17,11 +17,11 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TypeVar
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain_core.agents import AgentAction
 from langchain_core.globals import set_debug
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
@@ -293,33 +293,26 @@ class MCPAgent:
         if self._system_message:
             system_content = self._system_message.content
 
-        if self.memory_enabled:
-            # Query already in chat_history — don't re-inject it
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    ("system", system_content),
-                    MessagesPlaceholder(variable_name="chat_history"),
-                    ("human", "{input}"),
-                    MessagesPlaceholder(variable_name="agent_scratchpad"),
-                ]
-            )
-        else:
-            # No memory — inject input directly
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    ("system", system_content),
-                    ("human", "{input}"),
-                    MessagesPlaceholder(variable_name="agent_scratchpad"),
-                ]
-            )
-
         tool_names = [tool.name for tool in self._tools]
         logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
 
-        # Use the standard create_tool_calling_agent
-        agent = create_agent(model=self.llm, tools=self._tools, system_prompt=system_content, debug=self.verbose)
+        # Create middleware to enforce max_steps
+        # ModelCallLimitMiddleware limits the number of model calls, which corresponds to agent steps
+        middleware = [ModelCallLimitMiddleware(run_limit=self.max_steps)]
 
-        logger.debug(f"Created agent with max_iterations={self.max_steps} and {len(self.callbacks)} callbacks")
+        # Use the standard create_agent with middleware
+        agent = create_agent(
+            model=self.llm,
+            tools=self._tools,
+            system_prompt=system_content,
+            middleware=middleware,
+            debug=self.verbose
+        )
+
+        logger.debug(
+            f"Created agent with max_steps={self.max_steps} (via ModelCallLimitMiddleware) "
+            f"and {len(self.callbacks)} callbacks"
+        )
         return agent
 
     def get_conversation_history(self) -> list[BaseMessage]:
@@ -394,9 +387,8 @@ class MCPAgent:
     async def _consume_and_return(
         self,
         generator: AsyncGenerator[str | T, None],
-    ) -> str | T:
+    ) -> tuple[str | T, int]:
         """Consume the simplified stream generator and return the final result.
-        TODO: Add steps taken to the return value.
 
         This is used by the run() method with the new astream_simplified implementation.
 
@@ -404,13 +396,17 @@ class MCPAgent:
             generator: The async generator from astream_simplified.
 
         Returns:
-            The final result (string or Pydantic model instance for structured output).
+            A tuple of (final_result, steps_taken). final_result can be a string
+            for regular output or a Pydantic model instance for structured output.
         """
         final_result = ""
+        steps_taken = 0
         async for item in generator:
             # The last item yielded is always the final result
-                final_result = item
-        return final_result
+            final_result = item
+        # Count steps as the number of tools used during execution
+        steps_taken = len(self.tools_used_names)
+        return final_result, steps_taken
 
 
     @telemetry("agent_run")
@@ -466,12 +462,13 @@ class MCPAgent:
         start_time = time.time()
 
         generator = self.stream(
-            query, max_steps, manage_connector, external_history, output_schema=output_schema
+            query, max_steps, manage_connector, external_history, track_execution=False, output_schema=output_schema
         )
         error = None
         result = None
+        steps_taken = 0
         try:
-            result = await self._consume_and_return(generator)
+            result, steps_taken = await self._consume_and_return(generator)
 
         except Exception as e:
             success = False
@@ -480,7 +477,7 @@ class MCPAgent:
             raise
         finally:
             self.telemetry.track_agent_execution(
-                execution_method="run_v2",
+                execution_method="run",
                 query=query,
                 success=success,
                 model_provider=self._model_provider,
@@ -495,7 +492,7 @@ class MCPAgent:
                 max_steps_used=max_steps,
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
-                steps_taken=0,  # Not tracked in simplified version
+                steps_taken=steps_taken,
                 tools_used_count=len(self.tools_used_names),
                 tools_used_names=self.tools_used_names,
                 response=str(self._normalize_output(result)),
@@ -576,6 +573,7 @@ class MCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
+        track_execution: bool = True,
         output_schema: type[T] | None = None,
     ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
         """Simplified async generator using LangChain 1.0.0's create_agent and astream.
@@ -600,7 +598,6 @@ class MCPAgent:
 
         Args:
             query: The query to run.
-            max_steps: Optional maximum number of steps to take.
             manage_connector: Whether to handle the connector lifecycle internally.
             external_history: Optional external history to use instead of the
                 internal conversation history.
@@ -613,6 +610,7 @@ class MCPAgent:
         start_time = time.time()
         success = False
         final_output = None
+        steps_taken = 0
 
         try:
             # 1. Initialize if needed
@@ -649,23 +647,21 @@ class MCPAgent:
             # Convert messages to format expected by LangChain agent
             langchain_history = []
             for msg in history_to_use:
-                if isinstance(msg, (HumanMessage, AIMessage)):
+                if isinstance(msg, HumanMessage | AIMessage):
                     langchain_history.append(msg)
 
             inputs = {"messages": [*langchain_history, HumanMessage(content=query)]}
 
             display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
             logger.info(f"💬 Received query: '{display_query}'")
-            logger.info("🏁 Starting simplified agent execution")
+            logger.info("🏁 Starting agent execution")
 
             # 3. Stream using the built-in astream from CompiledStateGraph
             # The agent graph handles the loop internally
             # With dynamic tool reload: if tools change mid-execution, we interrupt and restart
-            steps_count = 0
             max_restarts = 3  # Prevent infinite restart loops
             restart_count = 0
             accumulated_messages = list(langchain_history) + [HumanMessage(content=query)]
-            tools_changed_pending = False  # Track if tools changed but waiting for safe restart point
 
             while restart_count <= max_restarts:
                 # Update inputs with accumulated messages
@@ -701,19 +697,12 @@ class MCPAgent:
                                         tool_name = tool_call.get("name", "unknown")
                                         tool_input = tool_call.get("args", {})
                                         self.tools_used_names.append(tool_name)
+                                        steps_taken += 1
 
                                         tool_input_str = str(tool_input)
                                         if len(tool_input_str) > 100:
                                             tool_input_str = tool_input_str[:97] + "..."
                                         logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
-
-                                        # Yield as AgentAction for compatibility
-                                        action = AgentAction(
-                                            tool=tool_name,
-                                            tool_input=tool_input,
-                                            log=f"Calling {tool_name} with {tool_input}"
-                                        )
-                                        steps_count += 1
 
                                 # Track tool results (ToolMessage)
                                 if hasattr(message, "type") and message.type == "tool":
@@ -744,7 +733,8 @@ class MCPAgent:
                                             # Set restart flag - safe to restart now after tool results
                                             should_restart = True
                                             restart_count += 1
-                                            logger.info(f"🔃 Restarting execution with updated tools (restart {restart_count}/{max_restarts})")
+                                            logger.info(f"🔃 Restarting execution with updated tools "
+                                                        f"(restart {restart_count}/{max_restarts})")
                                             break  # Break out of the message loop
 
                                 # Track final AI message (without tool calls = final response)
@@ -787,7 +777,8 @@ class MCPAgent:
                     for field_name, field_info in output_schema.model_fields.items():
                         description = getattr(field_info, "description", "") or field_name
                         required = not hasattr(field_info, "default") or field_info.default is None
-                        schema_fields.append(f"- {field_name}: {description} {'(required)' if required else '(optional)'}")
+                        schema_fields.append(f"- {field_name}: {description} "
+                        + ("(required)" if required else "(optional)"))
                     schema_description = "\n".join(schema_fields)
 
                     structured_result = await self._attempt_structured_output(
@@ -812,13 +803,52 @@ class MCPAgent:
 
         except Exception as e:
             logger.error(f"❌ Error running query: {e}")
-            success = False
             if initialized_here and manage_connector:
                 logger.info("🧹 Cleaning up resources after error")
                 await self.close()
             raise
 
         finally:
+            # Track comprehensive execution data
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
+            server_count = 0
+            if self.client:
+                server_count = len(self.client.get_all_active_sessions())
+            elif self.connectors:
+                server_count = len(self.connectors)
+
+            conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
+
+            # Safely access _tools in case initialization failed
+            tools_available = getattr(self, "_tools", [])
+
+            if track_execution:
+                self.telemetry.track_agent_execution(
+                    execution_method="stream",
+                    query=query,
+                    success=success,
+                    model_provider=self._model_provider,
+                    model_name=self._model_name,
+                    server_count=server_count,
+                    server_identifiers=[connector.public_identifier for connector in self.connectors],
+                    total_tools_available=len(tools_available),
+                    tools_available_names=[tool.name for tool in tools_available],
+                    max_steps_configured=self.max_steps,
+                    memory_enabled=self.memory_enabled,
+                    use_server_manager=self.use_server_manager,
+                    max_steps_used=max_steps,
+                    manage_connector=manage_connector,
+                    external_history_used=external_history is not None,
+                    steps_taken=steps_taken,
+                    tools_used_count=len(self.tools_used_names),
+                    tools_used_names=self.tools_used_names,
+                    response=final_output,
+                    execution_time_ms=execution_time_ms,
+                    error_type=None if success else "execution_error",
+                    conversation_history_length=conversation_history_length,
+                )
+
             # Clean up if necessary
             if manage_connector and not self.client and initialized_here:
                 logger.info("🧹 Closing agent after stream completion")
@@ -856,6 +886,7 @@ class MCPAgent:
         effective_max_steps = max_steps or self.max_steps
         self._agent_executor.max_iterations = effective_max_steps
 
+        # 3. Build inputs --------------------------------------------------------
         history_to_use = external_history if external_history is not None else self._conversation_history
         inputs = {"input": query, "chat_history": history_to_use}
 
