@@ -159,8 +159,18 @@ jobs:
 
   python-agent-tests:
     needs: python-lint
-    name: "python-agent"
+    name: "python-agent/${{ matrix.test }}"
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          [
+            agent_run,
+            agent_stream,
+            agent_structured_output,
+            server_manager,
+          ]
     defaults:
       run:
         working-directory: libraries/python
@@ -176,11 +186,11 @@ jobs:
       - name: Install dependencies
         run: |
           uv pip install --system .[dev,anthropic,openai,search,e2b]
-      - name: Run other integration tests
+      - name: Run agent test for ${{ matrix.test }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          pytest tests/integration/agent/
+          pytest tests/integration/agent/test_${{ matrix.test }}.py
 
 
   # TypeScript Jobs

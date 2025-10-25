@@ -111,6 +111,8 @@ async def test_server_manager():
         assert len(server_manager.tools) >= 2
         # Assert the server manager has the greet tool
         assert "greet" in [t.name for t in server_manager.tools]
+        # Assert the gree tool was used by the agent
+        assert "greet" in agent.tools_used_names
 
     finally:
         await agent.close()
