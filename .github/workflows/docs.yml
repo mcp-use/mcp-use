@@ -88,8 +88,9 @@ jobs:
             echo "✅ API documentation is up to date"
           fi
 
-      - name: Comment on PR
-        if: steps.check_docs.outputs.docs_outdated == 'true' && github.event_name == 'pull_request'
+      - name: Comment on PR (same-repo only)
+        if: steps.check_docs.outputs.docs_outdated == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+
         uses: actions/github-script@v7
         with:
           script: |
