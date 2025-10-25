@@ -430,7 +430,7 @@ class MCPAgent:
         Example:
             ```python
             # Regular usage
-            result = await agent.run_v2("What's the weather like?")
+            result = await agent.run("What's the weather like?")
 
             # Structured output usage
             from pydantic import BaseModel, Field
@@ -439,7 +439,7 @@ class MCPAgent:
                 temperature: float = Field(description="Temperature in Celsius")
                 condition: str = Field(description="Weather condition")
 
-            weather: WeatherInfo = await agent.run_v2(
+            weather: WeatherInfo = await agent.run(
                 "What's the weather like?",
                 output_schema=WeatherInfo
             )
