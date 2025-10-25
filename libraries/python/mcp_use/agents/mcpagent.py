@@ -379,6 +379,7 @@ class MCPAgent:
         """
         return self.disallowed_tools
 
+
     async def _consume_and_return(
         self,
         generator: AsyncGenerator[str | T, None],
@@ -391,11 +392,9 @@ class MCPAgent:
             generator: The async generator from astream.
 
         Returns:
-            A tuple of (final_result, steps_taken). final_result can be a string
-            for regular output or a Pydantic model instance for structured output.
+            The final result (string or Pydantic model instance for structured output).
         """
         final_result = ""
-        steps_taken = 0
         async for item in generator:
             # The last item yielded is always the final result
             final_result = item
@@ -429,7 +428,7 @@ class MCPAgent:
         Example:
             ```python
             # Regular usage
-            result = await agent.run("What's the weather like?")
+            result = await agent.run_v2("What's the weather like?")
 
             # Structured output usage
             from pydantic import BaseModel, Field
@@ -438,7 +437,7 @@ class MCPAgent:
                 temperature: float = Field(description="Temperature in Celsius")
                 condition: str = Field(description="Weather condition")
 
-            weather: WeatherInfo = await agent.run(
+            weather: WeatherInfo = await agent.run_v2(
                 "What's the weather like?",
                 output_schema=WeatherInfo
             )
@@ -453,13 +452,13 @@ class MCPAgent:
         start_time = time.time()
 
         generator = self.stream(
-            query, max_steps, manage_connector, external_history, track_execution=False, output_schema=output_schema
+            query, max_steps, manage_connector, external_history, output_schema=output_schema
         )
         error = None
         result = None
         steps_taken = 0
         try:
-            result, steps_taken = await self._consume_and_return(generator)
+            result = await self._consume_and_return(generator)
 
         except Exception as e:
             success = False
@@ -468,7 +467,7 @@ class MCPAgent:
             raise
         finally:
             self.telemetry.track_agent_execution(
-                execution_method="run",
+                execution_method="run_v2",
                 query=query,
                 success=success,
                 model_provider=self._model_provider,
@@ -483,7 +482,7 @@ class MCPAgent:
                 max_steps_used=max_steps,
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
-                steps_taken=steps_taken,
+                steps_taken=0,  # Not tracked in simplified version
                 tools_used_count=len(self.tools_used_names),
                 tools_used_names=self.tools_used_names,
                 response=str(self._normalize_output(result)),
@@ -796,7 +795,6 @@ class MCPAgent:
                 try:
                     logger.info("🔧 Attempting structured output...")
                     structured_llm = self.llm.with_structured_output(output_schema)
-
                     # Get schema description
                     schema_fields = []
                     for field_name, field_info in output_schema.model_fields.items():
