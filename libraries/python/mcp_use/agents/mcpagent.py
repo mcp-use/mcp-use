@@ -411,7 +411,7 @@ class MCPAgent:
         final_result = ""
         async for item in generator:
             # The last item yielded is always the final result
-            final_result = item
+                final_result = item
         return final_result
 
 
@@ -585,6 +585,21 @@ class MCPAgent:
         This method leverages the new LangChain 1.0.0 API where create_agent returns
         a CompiledStateGraph that handles the agent loop internally via astream.
 
+        **Tool Updates with Server Manager:**
+        When using server_manager mode, this method handles dynamic tool updates:
+        - **Before execution:** Updates are applied immediately to the new stream
+        - **During execution:** When tools change, we wait for a "safe restart point"
+          (after tool results complete), then interrupt the stream, recreate the agent
+          with new tools, and resume execution with accumulated messages.
+        - **Safe restart points:** Only restart after tool results to ensure message
+          pairs (tool_use + tool_result) are complete, satisfying LLM API requirements.
+        - **Max restarts:** Limited to 3 restarts to prevent infinite loops
+
+        This interrupt-and-restart approach ensures that tools added mid-execution
+        (e.g., via connect_to_mcp_server) are immediately available to the agent,
+        maintaining the same behavior as the legacy implementation while respecting
+        API constraints.
+
         Args:
             query: The query to run.
             max_steps: Optional maximum number of steps to take.
@@ -613,6 +628,23 @@ class MCPAgent:
             if not self._agent_executor:
                 raise RuntimeError("MCP agent failed to initialize")
 
+            # Check for tool updates before starting execution (if using server manager)
+            if self.use_server_manager and self.server_manager:
+                current_tools = self.server_manager.tools
+                current_tool_names = {tool.name for tool in current_tools}
+                existing_tool_names = {tool.name for tool in self._tools}
+
+                if current_tool_names != existing_tool_names:
+                    logger.info(
+                        f"🔄 Tools changed before execution, updating agent. "
+                        f"New tools: {', '.join(current_tool_names)}"
+                    )
+                    self._tools = current_tools
+                    # Regenerate system message with ALL current tools
+                    await self._create_system_message_from_tools(self._tools)
+                    # Recreate the agent executor with the new tools and system message
+                    self._agent_executor = self._create_agent()
+
             # 2. Build inputs for the agent
             history_to_use = external_history if external_history is not None else self._conversation_history
             
@@ -630,60 +662,115 @@ class MCPAgent:
 
             # 3. Stream using the built-in astream from CompiledStateGraph
             # The agent graph handles the loop internally
+            # With dynamic tool reload: if tools change mid-execution, we interrupt and restart
             steps_count = 0
-            async for chunk in self._agent_executor.astream(
-                inputs,
-                stream_mode="updates",  # Get updates as they happen
-            ):
-                # chunk is a dict with node names as keys
-                # The agent node will have 'messages' with the AI response
-                # The tools node will have 'messages' with tool calls and results
+            max_restarts = 3  # Prevent infinite restart loops
+            restart_count = 0
+            accumulated_messages = list(langchain_history) + [HumanMessage(content=query)]
+            tools_changed_pending = False  # Track if tools changed but waiting for safe restart point
+            
+            while restart_count <= max_restarts:
+                # Update inputs with accumulated messages
+                inputs = {"messages": accumulated_messages}
+                should_restart = False
                 
-                for node_name, node_output in chunk.items():
-                    logger.debug(f"📦 Node '{node_name}' output: {node_output}")
+                async for chunk in self._agent_executor.astream(
+                    inputs,
+                    stream_mode="updates",  # Get updates as they happen
+                ):
+                    # chunk is a dict with node names as keys
+                    # The agent node will have 'messages' with the AI response
+                    # The tools node will have 'messages' with tool calls and results
                     
-                    # Extract messages from the node output
-                    if "messages" in node_output:
-                        messages = node_output["messages"]
-                        if not isinstance(messages, list):
-                            messages = [messages]
+                    for node_name, node_output in chunk.items():
+                        logger.debug(f"📦 Node '{node_name}' output: {node_output}")
                         
-                        for message in messages:
-                            # Track tool calls
-                            if hasattr(message, "tool_calls") and message.tool_calls:
-                                for tool_call in message.tool_calls:
-                                    tool_name = tool_call.get("name", "unknown")
-                                    tool_input = tool_call.get("args", {})
-                                    self.tools_used_names.append(tool_name)
-                                    
-                                    tool_input_str = str(tool_input)
-                                    if len(tool_input_str) > 100:
-                                        tool_input_str = tool_input_str[:97] + "..."
-                                    logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
-                                    
-                                    # Yield as AgentAction for compatibility
-                                    action = AgentAction(
-                                        tool=tool_name,
-                                        tool_input=tool_input,
-                                        log=f"Calling {tool_name} with {tool_input}"
-                                    )
-                                    # We'll yield the action, but observation comes later
-                                    # For now, yield a placeholder tuple
-                                    steps_count += 1
+                        # Extract messages from the node output and accumulate them
+                        if "messages" in node_output:
+                            messages = node_output["messages"]
+                            if not isinstance(messages, list):
+                                messages = [messages]
                             
-                            # Track tool results (ToolMessage)
-                            if hasattr(message, "type") and message.type == "tool":
-                                observation = message.content
-                                observation_str = str(observation)
-                                if len(observation_str) > 100:
-                                    observation_str = observation_str[:97] + "..."
-                                observation_str = observation_str.replace("\n", " ")
-                                logger.info(f"📄 Tool result: {observation_str}")
+                            # Add new messages to accumulated messages for potential restart
+                            for msg in messages:
+                                if msg not in accumulated_messages:
+                                    accumulated_messages.append(msg)
                             
-                            # Track final AI message (without tool calls = final response)
-                            if isinstance(message, AIMessage) and not getattr(message, "tool_calls", None):
-                                final_output = self._normalize_output(message.content)
-                                logger.info(f"✅ Agent finished with output")
+                            for message in messages:
+                                # Track tool calls
+                                if hasattr(message, "tool_calls") and message.tool_calls:
+                                    for tool_call in message.tool_calls:
+                                        tool_name = tool_call.get("name", "unknown")
+                                        tool_input = tool_call.get("args", {})
+                                        self.tools_used_names.append(tool_name)
+                                        
+                                        tool_input_str = str(tool_input)
+                                        if len(tool_input_str) > 100:
+                                            tool_input_str = tool_input_str[:97] + "..."
+                                        logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
+                                        
+                                        # Yield as AgentAction for compatibility
+                                        action = AgentAction(
+                                            tool=tool_name,
+                                            tool_input=tool_input,
+                                            log=f"Calling {tool_name} with {tool_input}"
+                                        )
+                                        steps_count += 1
+                                
+                                # Track tool results (ToolMessage)
+                                if hasattr(message, "type") and message.type == "tool":
+                                    observation = message.content
+                                    observation_str = str(observation)
+                                    if len(observation_str) > 100:
+                                        observation_str = observation_str[:97] + "..."
+                                    observation_str = observation_str.replace("\n", " ")
+                                    logger.info(f"📄 Tool result: {observation_str}")
+                                    
+                                    # --- Check for tool updates after tool results (safe restart point) ---
+                                    if self.use_server_manager and self.server_manager:
+                                        current_tools = self.server_manager.tools
+                                        current_tool_names = {tool.name for tool in current_tools}
+                                        existing_tool_names = {tool.name for tool in self._tools}
+
+                                        if current_tool_names != existing_tool_names:
+                                            logger.info(
+                                                f"🔄 Tools changed during execution. "
+                                                f"New tools: {', '.join(current_tool_names)}"
+                                            )
+                                            self._tools = current_tools
+                                            # Regenerate system message with ALL current tools
+                                            await self._create_system_message_from_tools(self._tools)
+                                            # Recreate the agent executor with the new tools and system message
+                                            self._agent_executor = self._create_agent()
+                                            
+                                            # Set restart flag - safe to restart now after tool results
+                                            should_restart = True
+                                            restart_count += 1
+                                            logger.info(f"🔃 Restarting execution with updated tools (restart {restart_count}/{max_restarts})")
+                                            break  # Break out of the message loop
+                                
+                                # Track final AI message (without tool calls = final response)
+                                if isinstance(message, AIMessage) and not getattr(message, "tool_calls", None):
+                                    final_output = self._normalize_output(message.content)
+                                    logger.info(f"✅ Agent finished with output")
+                        
+                        # Break out of node loop if restarting
+                        if should_restart:
+                            break
+                    
+                    # Break out of chunk loop if restarting
+                    if should_restart:
+                        break
+                
+                # Check if we should restart or if execution completed
+                if not should_restart:
+                    # Execution completed successfully without tool changes
+                    break
+                
+                # If we've hit max restarts, log warning and continue
+                if restart_count > max_restarts:
+                    logger.warning(f"⚠️ Max restarts ({max_restarts}) reached. Continuing with current tools.")
+                    break
 
             # 4. Update conversation history
             if self.memory_enabled:
