@@ -880,8 +880,7 @@ class MCPAgent:
             raise RuntimeError("MCP agent failed to initialise – call initialise() first?")
 
         # 2. Build inputs --------------------------------------------------------
-        effective_max_steps = max_steps or self.max_steps
-        self._agent_executor.max_iterations = effective_max_steps
+        self.max_steps = max_steps or self.max_steps
 
         # 3. Build inputs --------------------------------------------------------
         history_to_use = external_history if external_history is not None else self._conversation_history
