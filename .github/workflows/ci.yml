@@ -177,6 +177,8 @@ jobs:
         run: |
           uv pip install --system .[dev,anthropic,openai,search,e2b]
       - name: Run other integration tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           pytest tests/integration/agent/
 
