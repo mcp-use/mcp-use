@@ -388,12 +388,12 @@ class MCPAgent:
         self,
         generator: AsyncGenerator[str | T, None],
     ) -> tuple[str | T, int]:
-        """Consume the simplified stream generator and return the final result.
+        """Consume the stream generator and return the final result.
 
-        This is used by the run() method with the new astream_simplified implementation.
+        This is used by the run() method with the astream implementation.
 
         Args:
-            generator: The async generator from astream_simplified.
+            generator: The async generator from astream.
 
         Returns:
             A tuple of (final_result, steps_taken). final_result can be a string
@@ -418,10 +418,7 @@ class MCPAgent:
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
     ) -> str | T:
-        """Run a query using LangChain 1.0.0's simplified agent and return the final result.
-
-        This method uses the new astream_simplified implementation that leverages
-        create_agent's built-in loop handling via CompiledStateGraph.astream().
+        """Run a query using LangChain 1.0.0's agent and return the final result.
 
         Args:
             query: The query to run.
@@ -438,7 +435,7 @@ class MCPAgent:
         Example:
             ```python
             # Regular usage
-            result = await agent.run_v2("What's the weather like?")
+            result = await agent.run("What's the weather like?")
 
             # Structured output usage
             from pydantic import BaseModel, Field
@@ -447,7 +444,7 @@ class MCPAgent:
                 temperature: float = Field(description="Temperature in Celsius")
                 condition: str = Field(description="Weather condition")
 
-            weather: WeatherInfo = await agent.run_v2(
+            weather: WeatherInfo = await agent.run(
                 "What's the weather like?",
                 output_schema=WeatherInfo
             )
@@ -576,9 +573,9 @@ class MCPAgent:
         track_execution: bool = True,
         output_schema: type[T] | None = None,
     ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
-        """Simplified async generator using LangChain 1.0.0's create_agent and astream.
+        """Async generator using LangChain 1.0.0's create_agent and astream.
 
-        This method leverages the new LangChain 1.0.0 API where create_agent returns
+        This method leverages the LangChain 1.0.0 API where create_agent returns
         a CompiledStateGraph that handles the agent loop internally via astream.
 
         **Tool Updates with Server Manager:**
