@@ -680,7 +680,7 @@ class MCPAgent:
                         logger.debug(f"📦 Node '{node_name}' output: {node_output}")
 
                         # Extract messages from the node output and accumulate them
-                        if "messages" in node_output:
+                        if node_output is not None and "messages" in node_output:
                             messages = node_output["messages"]
                             if not isinstance(messages, list):
                                 messages = [messages]
