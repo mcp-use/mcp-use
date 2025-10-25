@@ -157,6 +157,30 @@ jobs:
         run: |
           pytest tests/integration/others/
 
+  python-agent-tests:
+    needs: python-lint
+    name: "python-agent"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/python
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: |
+          pip install uv
+      - name: Install dependencies
+        run: |
+          uv pip install --system .[dev,anthropic,openai,search,e2b]
+      - name: Run other integration tests
+        run: |
+          pytest tests/integration/agent/
+
+
   # TypeScript Jobs
   typescript-lint:
     needs: detect-changes
