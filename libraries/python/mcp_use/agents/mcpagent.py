@@ -21,7 +21,7 @@ from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain_core.agents import AgentAction
 from langchain_core.globals import set_debug
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
@@ -893,7 +893,9 @@ class MCPAgent:
                 output = event["data"]["output"]
                 if isinstance(output, list):
                     for message in output:
-                        if not isinstance(message, BaseMessage):
+                        # Filter out ToolMessage (equivalent to old ToolAgentAction)
+                        # to avoid adding intermediate tool execution details to history
+                        if isinstance(message, BaseMessage) and not isinstance(message, ToolMessage):
                             self.add_to_history(message)
             yield event
 
