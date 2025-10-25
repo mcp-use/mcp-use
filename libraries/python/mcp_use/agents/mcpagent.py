@@ -10,7 +10,7 @@ import time
 from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TypeVar
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents import create_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
 from langchain_core.globals import set_debug
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -150,7 +150,7 @@ class MCPAgent:
             self.server_manager = ServerManager(self.client, self.adapter)
 
         # State tracking - initialize _tools as empty list
-        self._agent_executor: AgentExecutor | None = None
+        self._agent_executor = None
         self._system_message: SystemMessage | None = None
         self._tools: list[BaseTool] = []
 
@@ -278,7 +278,7 @@ class MCPAgent:
                 msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)
             ]
 
-    def _create_agent(self) -> AgentExecutor:
+    def _create_agent(self):
         """Create the LangChain agent with the configured system message.
 
         Returns:
@@ -314,18 +314,10 @@ class MCPAgent:
         logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
 
         # Use the standard create_tool_calling_agent
-        agent = create_tool_calling_agent(llm=self.llm, tools=self._tools, prompt=prompt)
+        agent = create_agent(model=self.llm, tools=self._tools, system_prompt=system_content, debug=self.verbose)
 
-        # Use the standard AgentExecutor with callbacks
-        executor = AgentExecutor(
-            agent=agent,
-            tools=self._tools,
-            max_iterations=self.max_steps,
-            verbose=self.verbose,
-            callbacks=self.callbacks,
-        )
-        logger.debug(f"Created agent executor with max_iterations={self.max_steps} and {len(self.callbacks)} callbacks")
-        return executor
+        logger.debug(f"Created agent with max_iterations={self.max_steps} and {len(self.callbacks)} callbacks")
+        return agent
 
     def get_conversation_history(self) -> list[BaseMessage]:
         """Get the current conversation history.
