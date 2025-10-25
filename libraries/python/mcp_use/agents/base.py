@@ -7,7 +7,10 @@ This module provides a base class for agents that use MCP tools.
 from abc import ABC, abstractmethod
 from typing import Any
 
-from mcp_use.client.session import MCPSession
+from litellm import Message
+
+from mcp_use.llm.engine import LLM
+from mcp_use.llm.tools import Tool
 
 
 class BaseAgent(ABC):
@@ -17,22 +20,21 @@ class BaseAgent(ABC):
     Agents are responsible for integrating LLMs with MCP tools.
     """
 
-    def __init__(self, session: MCPSession):
+    def __init__(self, llm: LLM, name: str, instructions: str, tools: list[Tool]):
         """Initialize a new agent.
 
         Args:
-            session: The MCP session to use for tool calls.
+            llm: The LLM to use for tool calls.
+            name: The name of the agent.
+            instructions: The instructions for the agent.
+            tools: The tools to use for the agent.
         """
-        self.session = session
-
-    @abstractmethod
-    async def initialize(self) -> None:
-        """Initialize the agent.
-
-        This method should prepare the agent for use, including initializing
-        the MCP session and setting up any necessary components.
-        """
-        pass
+        self.llm = llm
+        self.name = name
+        self.instructions = instructions
+        self.tools = tools
+        self.messages: list[Message] = [Message(role="system", content=f"{instructions}")]
+        self.tools_map = {tool.name: tool for tool in tools}
 
     @abstractmethod
     async def run(self, query: str, max_steps: int = 10) -> dict[str, Any]:
