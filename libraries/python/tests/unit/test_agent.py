@@ -33,7 +33,7 @@ class TestMCPAgentInitialization:
         assert agent.client is client
         assert agent._is_remote is False
         assert agent._initialized is False
-        assert agent._agent_executor is None
+        assert agent._agent is None
         assert isinstance(agent.tools_used_names, list)
 
     def test_init_requires_llm_for_local(self):
@@ -179,7 +179,7 @@ class TestMCPAgentStream:
         executor.max_iterations = None
 
         async def _init_side_effect():
-            agent._agent_executor = executor
+            agent._agent = executor
             agent._initialized = True
 
         with patch.object(MCPAgent, "initialize", side_effect=_init_side_effect) as mock_init:
@@ -213,7 +213,7 @@ class TestMCPAgentStream:
         executor.max_iterations = None
 
         async def _init_side_effect():
-            agent._agent_executor = executor
+            agent._agent = executor
             agent._initialized = True
 
         with patch.object(MCPAgent, "initialize", side_effect=_init_side_effect):

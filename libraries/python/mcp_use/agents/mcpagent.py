@@ -10,17 +10,14 @@ import time
 from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TypeVar
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.agents.output_parsers.tools import ToolAgentAction
-from langchain.globals import set_debug
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain.schema.language_model import BaseLanguageModel
+from langchain.agents import create_agent
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.exceptions import OutputParserException
+from langchain_core.globals import set_debug
+from langchain_core.language_models import BaseLanguageModel
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
-from langchain_core.utils.input import get_color_mapping
 from pydantic import BaseModel
 
 from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter
@@ -150,7 +147,7 @@ class MCPAgent:
             self.server_manager = ServerManager(self.client, self.adapter)
 
         # State tracking - initialize _tools as empty list
-        self._agent_executor: AgentExecutor | None = None
+        self._agent = None
         self._system_message: SystemMessage | None = None
         self._tools: list[BaseTool] = []
 
@@ -212,7 +209,7 @@ class MCPAgent:
             await self._create_system_message_from_tools(all_tools)
 
         # Create the agent
-        self._agent_executor = self._create_agent()
+        self._agent = self._create_agent()
         self._initialized = True
         logger.info("✨ Agent initialization complete")
 
@@ -278,7 +275,7 @@ class MCPAgent:
                 msg for msg in self._conversation_history if not isinstance(msg, SystemMessage)
             ]
 
-    def _create_agent(self) -> AgentExecutor:
+    def _create_agent(self):
         """Create the LangChain agent with the configured system message.
 
         Returns:
@@ -290,42 +287,13 @@ class MCPAgent:
         if self._system_message:
             system_content = self._system_message.content
 
-        if self.memory_enabled:
-            # Query already in chat_history — don't re-inject it
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    ("system", system_content),
-                    MessagesPlaceholder(variable_name="chat_history"),
-                    ("human", "{input}"),
-                    MessagesPlaceholder(variable_name="agent_scratchpad"),
-                ]
-            )
-        else:
-            # No memory — inject input directly
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    ("system", system_content),
-                    ("human", "{input}"),
-                    MessagesPlaceholder(variable_name="agent_scratchpad"),
-                ]
-            )
-
         tool_names = [tool.name for tool in self._tools]
         logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
 
         # Use the standard create_tool_calling_agent
-        agent = create_tool_calling_agent(llm=self.llm, tools=self._tools, prompt=prompt)
+        agent = create_agent(model=self.llm, tools=self._tools, system_prompt=system_content)
 
-        # Use the standard AgentExecutor with callbacks
-        executor = AgentExecutor(
-            agent=agent,
-            tools=self._tools,
-            max_iterations=self.max_steps,
-            verbose=self.verbose,
-            callbacks=self.callbacks,
-        )
-        logger.debug(f"Created agent executor with max_iterations={self.max_steps} and {len(self.callbacks)} callbacks")
-        return executor
+        return agent
 
     def get_conversation_history(self) -> list[BaseMessage]:
         """Get the current conversation history.
@@ -366,7 +334,7 @@ class MCPAgent:
 
         # Recreate the agent with the new system message if initialized
         if self._initialized and self._tools:
-            self._agent_executor = self._create_agent()
+            self._agent = self._create_agent()
             logger.debug("Agent recreated with new system message")
 
     def set_disallowed_tools(self, disallowed_tools: list[str]) -> None:
@@ -498,12 +466,12 @@ class MCPAgent:
                 initialized_here = True
 
             # Check if initialization succeeded
-            if not self._agent_executor:
+            if not self._agent:
                 raise RuntimeError("MCP agent failed to initialize")
 
             steps = max_steps or self.max_steps
-            if self._agent_executor:
-                self._agent_executor.max_iterations = steps
+            if self._agent:
+                self._agent.max_iterations = steps
 
             display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
             logger.info(f"💬 Received query: '{display_query}'")
@@ -521,11 +489,7 @@ class MCPAgent:
                     langchain_history.append(msg)
 
             intermediate_steps: list[tuple[AgentAction, str]] = []
-            inputs = {"input": query, "chat_history": langchain_history}
-
-            # Construct a mapping of tool name to tool for easy lookup
-            name_to_tool_map = {tool.name: tool for tool in self._tools}
-            color_mapping = get_color_mapping([tool.name for tool in self._tools], excluded_colors=["green", "red"])
+            inputs = [HumanMessage(content=query), *langchain_history]
 
             logger.info(f"🏁 Starting agent execution with max_steps={steps}")
 
@@ -566,13 +530,8 @@ class MCPAgent:
                         # Regenerate system message with ALL current tools
                         await self._create_system_message_from_tools(self._tools)
                         # Recreate the agent executor with the new tools and system message
-                        self._agent_executor = self._create_agent()
-                        self._agent_executor.max_iterations = steps
-                        # Update maps for this iteration
-                        name_to_tool_map = {tool.name: tool for tool in self._tools}
-                        color_mapping = get_color_mapping(
-                            [tool.name for tool in self._tools], excluded_colors=["green", "red"]
-                        )
+                        self._agent = self._create_agent()
+                        self._agent.max_iterations = steps
 
                 logger.info(f"👣 Step {step_num + 1}/{steps}")
 
@@ -580,25 +539,95 @@ class MCPAgent:
                 try:
                     retry_count = 0
                     next_step_output = None
+                    model_message = None
 
                     while retry_count <= self.max_retries_per_step:
                         try:
                             # Use the internal _atake_next_step which handles planning and execution
                             # This requires providing the necessary context like maps and intermediate steps
-                            next_step_output = await self._agent_executor._atake_next_step(
-                                name_to_tool_map=name_to_tool_map,
-                                color_mapping=color_mapping,
-                                inputs=inputs,
-                                intermediate_steps=intermediate_steps,
-                                run_manager=run_manager,
-                            )
+                            formatted_inputs = {
+                                "messages": inputs  # Pass messages as-is to preserve tool_call_id and other metadata
+                            }
+                            async_generator = self._agent.astream(input=formatted_inputs, stream_mode="updates")
+
+                            # Process stream to get ONE complete step
+                            local_model_message = None
+                            tool_call_map = {}  # Map tool_call_id to AgentAction
+                            seen_model = False
+                            seen_tools = False
+                            next_step_output = []
+
+                            async for chunk in async_generator:
+                                # Track which node the update is from
+                                for node_name, node_data in chunk.items():
+                                    if node_name == "model" and not seen_model:
+                                        # Extract AIMessage from model output
+                                        messages = node_data.get("messages", [])
+                                        if messages:
+                                            local_model_message = messages[-1]
+                                            seen_model = True
+                                            # Build AgentActions from tool_calls
+                                            if (
+                                                hasattr(local_model_message, "tool_calls")
+                                                and local_model_message.tool_calls
+                                            ):
+                                                for tool_call in local_model_message.tool_calls:
+                                                    action = AgentAction(
+                                                        tool=tool_call["name"],
+                                                        tool_input=tool_call["args"],
+                                                        log=local_model_message.content
+                                                        if isinstance(local_model_message.content, str)
+                                                        else "",
+                                                    )
+                                                    tool_call_id = tool_call["id"]
+                                                    tool_call_map[tool_call_id] = action
+                                                    next_step_output.append((action, ""))
+                                    elif node_name == "tools" and not seen_tools:
+                                        # Extract tool execution results and update observations
+                                        messages = node_data.get("messages", [])
+                                        for msg in messages:
+                                            if hasattr(msg, "tool_call_id") and hasattr(msg, "content"):
+                                                tool_call_id = msg.tool_call_id
+                                                if tool_call_id in tool_call_map:
+                                                    action = tool_call_map[tool_call_id]
+                                                    # Find and update the corresponding step
+                                                    for i, (a, _) in enumerate(next_step_output):
+                                                        if a == action:
+                                                            next_step_output[i] = (action, msg.content)
+                                                            break
+                                        seen_tools = True
+
+                                # Stop after getting model + tools output (one complete step)
+                                if seen_model and (not tool_call_map or seen_tools):
+                                    break
+
+                            if not local_model_message:
+                                raise ValueError("No model message returned from agent")
+
+                            # Store model message in outer scope
+                            model_message = local_model_message
+
+                            # Handle case where no tool calls (agent finished)
+                            if not tool_call_map:
+                                content = (
+                                    local_model_message.content
+                                    if isinstance(local_model_message.content, str)
+                                    else str(local_model_message.content)
+                                )
+                                next_step_output = AgentFinish(
+                                    return_values={"output": content},
+                                    log=content,
+                                )
 
                             # If we get here, the step succeeded, break out of retry loop
                             break
 
                         except Exception as e:
+                            import traceback
+
                             if not self.retry_on_error or retry_count >= self.max_retries_per_step:
                                 logger.error(f"❌ Validation error during step {step_num + 1}: {e}")
+                                traceback.print_exc()
                                 result = f"Agent stopped due to a validation error: {str(e)}"
                                 success = False
                                 yield result
@@ -608,10 +637,11 @@ class MCPAgent:
                             logger.warning(
                                 f"⚠️ Validation error, retrying ({retry_count}/{self.max_retries_per_step}): {e}"
                             )
+                            traceback.print_exc()
 
                             # Create concise feedback for the LLM about the validation error
                             error_message = f"Error: {str(e)}"
-                            inputs["input"] = error_message
+                            inputs.append(HumanMessage(content=error_message))
 
                             # Continue to next iteration of retry loop
                             continue
@@ -696,16 +726,37 @@ class MCPAgent:
                         observation_str = observation_str.replace("\n", " ")
                         logger.info(f"📄 Tool result: {observation_str}")
 
-                    # Check for return_direct on the last action taken
-                    if len(next_step_output) > 0:
-                        last_step: tuple[AgentAction, str] = next_step_output[-1]
-                        tool_return = self._agent_executor._get_tool_return(last_step)
-                        if tool_return is not None:
-                            logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
-                            agent_finished_successfully = True
-                            result = tool_return.return_values.get("output", "No output generated")
-                            result = self._normalize_output(result)
-                            break
+                    # Add model message and tool results to conversation history for next iteration
+                    # Only add if we have valid data (successful step completion)
+                    if model_message and isinstance(next_step_output, list) and len(next_step_output) > 0:
+                        inputs.append(model_message)
+
+                        from langchain_core.messages import ToolMessage
+
+                        # Match actions to tool_call_ids by index
+                        tool_call_ids = []
+                        if hasattr(model_message, "tool_calls") and model_message.tool_calls:
+                            try:
+                                tool_call_ids = [tc["id"] for tc in model_message.tool_calls]
+                            except (KeyError, TypeError):
+                                # If tool_calls structure is unexpected, skip adding tool messages
+                                logger.warning("Could not extract tool_call_ids from model message")
+                                tool_call_ids = []
+
+                        # Only add tool messages if we have matching tool_call_ids
+                        if len(tool_call_ids) == len(next_step_output):
+                            for idx, (action, observation) in enumerate(next_step_output):
+                                tool_msg = ToolMessage(
+                                    content=str(observation),
+                                    tool_call_id=tool_call_ids[idx],
+                                    name=action.tool,
+                                )
+                                inputs.append(tool_msg)
+                        else:
+                            logger.warning(
+                                f"Mismatch between tool_call_ids ({len(tool_call_ids)}) "
+                                f"and next_step_output ({len(next_step_output)}), skipping tool messages"
+                            )
 
                 except OutputParserException as e:
                     logger.error(f"❌ Output parsing error during step {step_num + 1}: {e}")
@@ -1012,24 +1063,23 @@ class MCPAgent:
             await self.initialize()
             initialised_here = True
 
-        if not self._agent_executor:
+        if not self._agent:
             raise RuntimeError("MCP agent failed to initialise – call initialise() first?")
 
         # 2. Build inputs --------------------------------------------------------
         effective_max_steps = max_steps or self.max_steps
-        self._agent_executor.max_iterations = effective_max_steps
+        self._agent.max_iterations = effective_max_steps
 
         history_to_use = external_history if external_history is not None else self._conversation_history
         inputs = {"input": query, "chat_history": history_to_use}
 
         # 3. Stream & diff -------------------------------------------------------
-        async for event in self._agent_executor.astream_events(inputs):
+        async for event in self._agent.astream_events(inputs):
             if event.get("event") == "on_chain_end":
                 output = event["data"]["output"]
                 if isinstance(output, list):
                     for message in output:
-                        if not isinstance(message, ToolAgentAction):
-                            self.add_to_history(message)
+                        self.add_to_history(message)
             yield event
 
         if self.memory_enabled:
@@ -1119,7 +1169,7 @@ class MCPAgent:
         logger.info("🔌 Closing agent and cleaning up resources...")
         try:
             # Clean up the agent first
-            self._agent_executor = None
+            self._agent = None
             self._tools = []
 
             # If using client with session, close the session through client
@@ -1144,7 +1194,7 @@ class MCPAgent:
         except Exception as e:
             logger.error(f"❌ Error during agent closure: {e}")
             # Still try to clean up references even if there was an error
-            self._agent_executor = None
+            self._agent = None
             if hasattr(self, "_tools"):
                 self._tools = []
             if hasattr(self, "_sessions"):
