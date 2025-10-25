@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 
-from langchain.globals import set_debug as langchain_set_debug
+from langchain_core.globals import set_debug as langchain_set_debug
 
 # Global debug flag - can be set programmatically or from environment
 MCP_USE_DEBUG = 1

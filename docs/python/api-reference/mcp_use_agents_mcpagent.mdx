@@ -16,6 +16,12 @@ MCP: Main integration module with customizable system prompt.
 This module provides the main MCPAgent class that integrates all components
 to provide a simple interface for using MCP tools with different LLMs.
 
+LangChain 1.0.0 Migration:
+- The agent uses create_agent() from langchain.agents which returns a CompiledStateGraph
+- New methods: astream_simplified() and run_v2() leverage the built-in astream() from
+  CompiledStateGraph which handles the agent loop internally
+- Legacy methods: stream() and run() use manual step-by-step execution for backward compatibility
+
 ## MCPAgent
 
 <div>
@@ -179,11 +185,7 @@ def initialize():
 <Card type="info">
 ### `method` run
 
-Run a query using the MCP tools and return the final result.
-
-        This method uses the streaming implementation internally and returns
-        the final result after consuming all intermediate steps. If output_schema
-        is provided, the agent will be schema-aware and return structured output.
+Run a query using LangChain 1.0.0's agent and return the final result.
 
         Example:
             ```python
@@ -266,19 +268,36 @@ def set_system_message(message: str):
 <Card type="info">
 ### `method` stream
 
-Run the agent and yield intermediate steps as an async generator.
+Async generator using LangChain 1.0.0's create_agent and astream.
+
+        This method leverages the LangChain 1.0.0 API where create_agent returns
+        a CompiledStateGraph that handles the agent loop internally via astream.
+
+        **Tool Updates with Server Manager:**
+        When using server_manager mode, this method handles dynamic tool updates:
+        - **Before execution:** Updates are applied immediately to the new stream
+        - **During execution:** When tools change, we wait for a "safe restart point"
+          (after tool results complete), then interrupt the stream, recreate the agent
+          with new tools, and resume execution with accumulated messages.
+        - **Safe restart points:** Only restart after tool results to ensure message
+          pairs (tool_use + tool_result) are complete, satisfying LLM API requirements.
+        - **Max restarts:** Limited to 3 restarts to prevent infinite loops
+
+        This interrupt-and-restart approach ensures that tools added mid-execution
+        (e.g., via connect_to_mcp_server) are immediately available to the agent,
+        maintaining the same behavior as the legacy implementation while respecting
+        API constraints.
 
         Yields:
-            Intermediate steps as (AgentAction, str) tuples, followed by the final result.
-            If output_schema is provided, yields structured output as instance of the schema.
+            Intermediate steps and final result from the agent execution.
 
 
 **Parameters**
 ><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
-><ParamField body="max_steps" type="int | None" default="None" >   Optional maximum number of steps to take. </ParamField>
+><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
 ><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
-><ParamField body="track_execution" type="bool" default="True" >   Whether to track execution for telemetry. </ParamField>
+><ParamField body="track_execution" type="bool" default="True" >   Boolean flag </ParamField>
 ><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
 
 **Returns**

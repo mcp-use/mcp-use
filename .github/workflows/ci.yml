@@ -157,6 +157,42 @@ jobs:
         run: |
           pytest tests/integration/others/
 
+  python-agent-tests:
+    needs: python-lint
+    name: "python-agent/${{ matrix.test }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          [
+            agent_run,
+            agent_stream,
+            agent_structured_output,
+            server_manager,
+          ]
+    defaults:
+      run:
+        working-directory: libraries/python
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: |
+          pip install uv
+      - name: Install dependencies
+        run: |
+          uv pip install --system .[dev,anthropic,openai,search,e2b]
+      - name: Run agent test for ${{ matrix.test }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          pytest tests/integration/agent/test_${{ matrix.test }}.py
+
+
   # TypeScript Jobs
   typescript-lint:
     needs: detect-changes
