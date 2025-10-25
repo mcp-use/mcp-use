@@ -208,8 +208,8 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
         return c.html(`<html><body>Error: ${result.error}</body></html>`, 404)
       }
 
-      // Set security headers
-      const headers = getWidgetSecurityHeaders()
+      // Set security headers with widget-specific CSP
+      const headers = getWidgetSecurityHeaders(widgetData.widgetCSP)
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value)
       })
