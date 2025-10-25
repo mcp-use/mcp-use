@@ -392,9 +392,11 @@ class MCPAgent:
             generator: The async generator from astream.
 
         Returns:
-            The final result (string or Pydantic model instance for structured output).
+            A tuple of (final_result, steps_taken). final_result can be a string
+            for regular output or a Pydantic model instance for structured output.
         """
         final_result = ""
+        steps_taken = 0
         async for item in generator:
             # The last item yielded is always the final result
             final_result = item
@@ -452,13 +454,13 @@ class MCPAgent:
         start_time = time.time()
 
         generator = self.stream(
-            query, max_steps, manage_connector, external_history, output_schema=output_schema
+            query, max_steps, manage_connector, external_history, track_execution=False, output_schema=output_schema
         )
         error = None
         result = None
         steps_taken = 0
         try:
-            result = await self._consume_and_return(generator)
+            result, steps_taken = await self._consume_and_return(generator)
 
         except Exception as e:
             success = False
@@ -467,7 +469,7 @@ class MCPAgent:
             raise
         finally:
             self.telemetry.track_agent_execution(
-                execution_method="run_v2",
+                execution_method="run",
                 query=query,
                 success=success,
                 model_provider=self._model_provider,
@@ -482,7 +484,7 @@ class MCPAgent:
                 max_steps_used=max_steps,
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
-                steps_taken=0,  # Not tracked in simplified version
+                steps_taken=steps_taken,
                 tools_used_count=len(self.tools_used_names),
                 tools_used_names=self.tools_used_names,
                 response=str(self._normalize_output(result)),
