@@ -302,11 +302,7 @@ class MCPAgent:
 
         # Use the standard create_agent with middleware
         agent = create_agent(
-            model=self.llm,
-            tools=self._tools,
-            system_prompt=system_content,
-            middleware=middleware,
-            debug=self.verbose
+            model=self.llm, tools=self._tools, system_prompt=system_content, middleware=middleware, debug=self.verbose
         )
 
         logger.debug(
@@ -383,7 +379,6 @@ class MCPAgent:
         """
         return self.disallowed_tools
 
-
     async def _consume_and_return(
         self,
         generator: AsyncGenerator[str | T, None],
@@ -407,7 +402,6 @@ class MCPAgent:
         # Count steps as the number of tools used during execution
         steps_taken = len(self.tools_used_names)
         return final_result, steps_taken
-
 
     @telemetry("agent_run")
     async def run(
@@ -629,8 +623,7 @@ class MCPAgent:
 
                 if current_tool_names != existing_tool_names:
                     logger.info(
-                        f"🔄 Tools changed before execution, updating agent. "
-                        f"New tools: {', '.join(current_tool_names)}"
+                        f"🔄 Tools changed before execution, updating agent. New tools: {', '.join(current_tool_names)}"
                     )
                     self._tools = current_tools
                     # Regenerate system message with ALL current tools
@@ -730,8 +723,10 @@ class MCPAgent:
                                             # Set restart flag - safe to restart now after tool results
                                             should_restart = True
                                             restart_count += 1
-                                            logger.info(f"🔃 Restarting execution with updated tools "
-                                                        f"(restart {restart_count}/{max_restarts})")
+                                            logger.info(
+                                                f"🔃 Restarting execution with updated tools "
+                                                f"(restart {restart_count}/{max_restarts})"
+                                            )
                                             break  # Break out of the message loop
 
                                 # Track final AI message (without tool calls = final response)
@@ -774,8 +769,9 @@ class MCPAgent:
                     for field_name, field_info in output_schema.model_fields.items():
                         description = getattr(field_info, "description", "") or field_name
                         required = not hasattr(field_info, "default") or field_info.default is None
-                        schema_fields.append(f"- {field_name}: {description} "
-                        + ("(required)" if required else "(optional)"))
+                        schema_fields.append(
+                            f"- {field_name}: {description} " + ("(required)" if required else "(optional)")
+                        )
                     schema_description = "\n".join(schema_fields)
 
                     structured_result = await self._attempt_structured_output(
