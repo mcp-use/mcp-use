@@ -901,7 +901,6 @@ export class MCPAgent {
       if (outputSchema && finalOutput) {
         try {
           logger.info('🔧 Attempting structured output...')
-          
           const structuredResult = await this._attemptStructuredOutput<T>(
             finalOutput,
             this.llm!,
@@ -1136,12 +1135,13 @@ export class MCPAgent {
         logger.info('🔧 Attempting structured output conversion...')
         
         try {
+        
           // Start the conversion (non-blocking)
           let conversionCompleted = false
           let conversionResult: T | null = null
           let conversionError: Error | null = null
           
-          const _conversionPromise = this._attemptStructuredOutput<T>(
+          this._attemptStructuredOutput<T>(
             finalResponse,
             this.llm!,
             outputSchema,
@@ -1263,6 +1263,10 @@ export class MCPAgent {
 
   /**
    * Attempt to create structured output from raw result with validation and retry logic.
+   * 
+   * @param rawResult - The raw text result from the agent
+   * @param llm - LLM to use for structured output
+   * @param outputSchema - The Zod schema to validate against
    */
   private async _attemptStructuredOutput<T>(
     rawResult: string | any,
