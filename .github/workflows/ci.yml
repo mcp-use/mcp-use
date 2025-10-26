@@ -68,6 +68,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install .[dev,anthropic,openai,search,e2b]
       - name: Test with pytest
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
           pytest tests/unit
 
@@ -95,6 +97,8 @@ jobs:
         run: |
           uv pip install --system .[dev,anthropic,openai,search,e2b]
       - name: Run integration tests for ${{ matrix.transport }} transport
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
           pytest tests/integration/transports/test_${{ matrix.transport }}.py
 
@@ -131,6 +135,8 @@ jobs:
         run: |
           uv pip install --system .[dev,anthropic,openai,search,e2b]
       - name: Run integration tests for ${{ matrix.primitive }} primitive
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
           pytest tests/integration/primitives/test_${{ matrix.primitive }}.py
 
@@ -154,6 +160,8 @@ jobs:
         run: |
           uv pip install --system .[dev,anthropic,openai,search,e2b]
       - name: Run other integration tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
           pytest tests/integration/others/
 
@@ -189,6 +197,7 @@ jobs:
       - name: Run agent test for ${{ matrix.test }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
           pytest tests/integration/agent/test_${{ matrix.test }}.py
 
