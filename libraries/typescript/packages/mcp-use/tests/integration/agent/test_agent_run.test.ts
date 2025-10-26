@@ -43,24 +43,13 @@ describe('agent.run() integration test', () => {
       const result = await agent.run(query)
 
       logger.info(`Result: ${result}`)
-      logger.info(`Tools used: ${(agent as any)._tools.filter((t: any) => (agent as any).toolsUsedNames?.includes(t.name)).map((t: any) => t.name)}`)
+      logger.info(`Tools used: ${agent.toolsUsedNames}`)
       logger.info('='.repeat(80) + '\n')
 
       expect(result).toContain('100')
 
-      // Get tools used from conversation history
-      const history = agent.getConversationHistory()
-      console.log("history", history)
-      const toolMessages = history.filter(m => m._getType() === 'tool')
-      expect(toolMessages.length).toBeGreaterThan(0)
-
-      // Check if add tool was called
-      const toolCalls = history.filter(m => {
-        const content = JSON.stringify(m)
-        return content.includes('add')
-      })
-      console.log("toolCalls", toolCalls)
-      expect(toolCalls.length).toBeGreaterThan(0)
+      // Check if add tool was used
+      expect(agent.toolsUsedNames).toContain('add')
     }
     finally {
       await agent.close()

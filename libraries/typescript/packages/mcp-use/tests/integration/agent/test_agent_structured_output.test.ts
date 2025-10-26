@@ -51,16 +51,13 @@ describe('agent structured output integration test', () => {
       logger.info(`Query: ${query}`)
       logger.info(`Output schema: CalculationResult`)
 
-      const r = await agent.run<CalculationResultType>(
+      const result = await agent.run<CalculationResultType>(
         query,
         undefined,
         undefined,
         undefined,
         CalculationResult,
       )
-
-      // parse the result as JSON
-      const result = JSON.parse(r as unknown as string)
 
       logger.info('\nStructured result:')
       logger.info(`  first_number: ${result.first_number}`)
