@@ -11,6 +11,26 @@ import type { ZodSchema } from 'zod'
 import type { MCPClient } from '../client.js'
 import type { BaseConnector } from '../connectors/base.js'
 import type { MCPSession } from '../session.js'
+
+/**
+ * Represents a single step in the agent's execution
+ */
+export interface AgentStep {
+  action: {
+    tool: string
+    toolInput: any
+    log: string
+  }
+  observation: string
+}
+
+/**
+ * Represents the final output of the agent
+ */
+export interface AgentFinish {
+  returnValues: Record<string, any>
+  log: string
+}
 import { CallbackManager } from '@langchain/core/callbacks/manager'
 import {
   AIMessage,
@@ -545,6 +565,58 @@ export class MCPAgent {
     return serverInfo
   }
 
+  private _normalizeOutput(value: any): string {
+    /**
+     * Normalize model outputs into a plain text string.
+     * Similar to Python's _normalize_output method.
+     */
+    try {
+      if (typeof value === 'string') {
+        return value
+      }
+
+      // LangChain messages may have .content which is str or list-like
+      if (value && typeof value === 'object' && 'content' in value) {
+        return this._normalizeOutput(value.content)
+      }
+
+      if (Array.isArray(value)) {
+        const parts: string[] = []
+        for (const item of value) {
+          if (typeof item === 'object' && item !== null) {
+            if ('text' in item && typeof item.text === 'string') {
+              parts.push(item.text)
+            }
+            else if ('content' in item) {
+              parts.push(this._normalizeOutput(item.content))
+            }
+            else {
+              // Fallback to string for unknown shapes
+              parts.push(String(item))
+            }
+          }
+          else {
+            // recurse on .text or str
+            const partText = item && typeof item === 'object' && 'text' in item ? item.text : null
+            if (typeof partText === 'string') {
+              parts.push(partText)
+            }
+            else {
+              const partContent = item && typeof item === 'object' && 'content' in item ? item.content : item
+              parts.push(this._normalizeOutput(partContent))
+            }
+          }
+        }
+        return parts.join('')
+      }
+
+      return String(value)
+    }
+    catch (error) {
+      return String(value)
+    }
+  }
+
   private async _consumeAndReturn<T>(
     generator: AsyncGenerator<AgentStep, string | T, void>,
   ): Promise<string | T> {
@@ -615,63 +687,15 @@ export class MCPAgent {
       return result as string | T
     }
 
-    let result = ''
     let initializedHere = false
     const startTime = Date.now()
+    let success = false
+    let finalOutput: string | null = null
     const toolsUsedNames: string[] = []
     let stepsTaken = 0
-    const structuredOutputSuccess = false
-    const structuredOutputSuccessRef = { value: structuredOutputSuccess }
-
-    
-  }
-
-  /**
-   * Runs the agent and yields intermediate steps as an async generator.
-   * If outputSchema is provided, returns structured output of type T.
-   */
-  public async* stream_legacy<T = string>(
-    query: string,
-    maxSteps?: number,
-    manageConnector = true,
-    externalHistory?: BaseMessage[],
-    outputSchema?: ZodSchema<T>,
-  ): AsyncGenerator<AgentStep, string | T, void> {
-    // Delegate to remote agent if in remote mode
-    if (this.isRemote && this.remoteAgent) {
-      const result = await this.remoteAgent.run(query, maxSteps, manageConnector, externalHistory, outputSchema)
-      return result as string | T
-    }
-
-    let result = ''
-    let initializedHere = false
-    const startTime = Date.now()
-    const toolsUsedNames: string[] = []
-    let stepsTaken = 0
-    const structuredOutputSuccess = false
-    const structuredOutputSuccessRef = { value: structuredOutputSuccess }
-
-    // Schema-aware setup for structured output
-    let structuredLlm: BaseLanguageModelInterface | null = null
-    let schemaDescription = ''
-    if (outputSchema) {
-      query = this._enhanceQueryWithSchema(query, outputSchema)
-      logger.debug(`🔄 Structured output requested, schema: ${JSON.stringify(zodToJsonSchema(outputSchema), null, 2)}`)
-      // Check if withStructuredOutput method exists
-      if (this.llm && 'withStructuredOutput' in this.llm && typeof (this.llm as any).withStructuredOutput === 'function') {
-        structuredLlm = (this.llm as any).withStructuredOutput(outputSchema)
-      }
-      else if (this.llm) {
-        // Fallback: use the same LLM but we'll handle structure in our helper method
-        structuredLlm = this.llm
-      }
-      else {
-        throw new Error('LLM is required for structured output')
-      }
-      schemaDescription = JSON.stringify(zodToJsonSchema(outputSchema), null, 2)
-    }
 
     try {
+      // 1. Initialize if needed
       if (manageConnector && !this._initialized) {
         await this.initialize()
         initializedHere = true
@@ -685,19 +709,30 @@ export class MCPAgent {
         throw new Error('MCP agent failed to initialize')
       }
 
-      const steps = maxSteps ?? this.maxSteps
-      this._agentExecutor.maxIterations = steps
+      // Check for tool updates before starting execution (if using server manager)
+      if (this.useServerManager && this.serverManager) {
+        const currentTools = this.serverManager.tools
+        const currentToolNames = new Set(currentTools.map(t => t.name))
+        const existingToolNames = new Set(this._tools.map(t => t.name))
 
-      const display_query
-        = query.length > 50 ? `${query.slice(0, 50).replace(/\n/g, ' ')}...` : query.replace(/\n/g, ' ')
-      logger.info(`💬 Received query: '${display_query}'`)
-
-      // —–– Record user message
-      if (this.memoryEnabled) {
-        this.addToHistory(new HumanMessage(query))
+        if (currentToolNames.size !== existingToolNames.size
+          || [...currentToolNames].some(n => !existingToolNames.has(n))) {
+          logger.info(
+            `🔄 Tools changed before execution, updating agent. New tools: ${[...currentToolNames].join(', ')}`,
+          )
+          this._tools = currentTools
+          this._tools.push(...this.additionalTools)
+          // Regenerate system message with ALL current tools
+          await this.createSystemMessageFromTools(this._tools)
+          // Recreate the agent executor with the new tools and system message
+          this._agentExecutor = this.createAgent()
+        }
       }
 
+      // 2. Build inputs for the agent
       const historyToUse = externalHistory ?? this.conversationHistory
+      
+      // Convert messages to format expected by LangChain agent
       const langchainHistory: BaseMessage[] = []
       for (const msg of historyToUse) {
         if (msg instanceof HumanMessage || msg instanceof AIMessage) {
@@ -705,179 +740,197 @@ export class MCPAgent {
         }
       }
 
-      const intermediateSteps: AgentStep[] = []
-      const inputs = { input: query, chat_history: langchainHistory } as Record<string, unknown>
+      const inputs = { messages: [...langchainHistory, new HumanMessage(query)] }
 
-      let nameToToolMap: Record<string, StructuredToolInterface> = Object.fromEntries(this._tools.map(t => [t.name, t]))
-      logger.info(`🏁 Starting agent execution with max_steps=${steps}`)
+      const displayQuery = query.length > 50 ? `${query.slice(0, 50).replace(/\n/g, ' ')}...` : query.replace(/\n/g, ' ')
+      logger.info(`💬 Received query: '${displayQuery}'`)
+      logger.info('🏁 Starting agent execution')
 
-      // Create a run manager with our callbacks if we have any - ONCE for the entire execution
-      let runManager: CallbackManagerForChainRun | undefined
-      if (this.callbacks?.length > 0) {
-        // Create an async callback manager with our callbacks
-        const callbackManager = new CallbackManager(undefined, {
-          handlers: this.callbacks,
-          inheritableHandlers: this.callbacks,
-        })
-        // Create a run manager for this chain execution
-        runManager = await callbackManager.handleChainStart({
-          name: 'MCPAgent (mcp-use)',
-          id: ['MCPAgent (mcp-use)'],
-          lc: 1,
-          type: 'not_implemented',
-        } as Serialized, inputs)
-      }
+      // 3. Stream using the built-in astream from CompiledStateGraph
+      // The agent graph handles the loop internally
+      // With dynamic tool reload: if tools change mid-execution, we interrupt and restart
+      const maxRestarts = 3 // Prevent infinite restart loops
+      let restartCount = 0
+      let accumulatedMessages: BaseMessage[] = [...langchainHistory, new HumanMessage(query)]
 
-      for (let stepNum = 0; stepNum < steps; stepNum++) {
-        stepsTaken = stepNum + 1
-        if (this.useServerManager && this.serverManager) {
-          const currentTools = this.serverManager.tools
-          const currentToolNames = new Set(currentTools.map(t => t.name))
-          const existingToolNames = new Set(this._tools.map(t => t.name))
+      while (restartCount <= maxRestarts) {
+        // Update inputs with accumulated messages
+        const currentInputs = { messages: accumulatedMessages }
+        let shouldRestart = false
 
-          const changed
-            = currentTools.length !== this._tools.length
-              || [...currentToolNames].some(n => !existingToolNames.has(n))
-
-          if (changed) {
-            logger.info(
-              `🔄 Tools changed before step ${stepNum + 1}, updating agent. New tools: ${[...currentToolNames].join(', ')}`,
-            )
-            this._tools = currentTools
-            this._tools.push(...this.additionalTools)
-            await this.createSystemMessageFromTools(this._tools)
-            this._agentExecutor = this.createAgent()
-            this._agentExecutor.maxIterations = steps
-            nameToToolMap = Object.fromEntries(this._tools.map(t => [t.name, t]))
-          }
+        // Stream agent updates
+        const streamOptions: any = {
+          streamMode: 'updates', // Get updates as they happen
         }
+        
+        const stream = await this._agentExecutor.stream(
+          currentInputs,
+          streamOptions,
+        )
+        
+        for await (const chunk of stream) {
+          // chunk is a dict with node names as keys
+          // The agent node will have 'messages' with the AI response
+          // The tools node will have 'messages' with tool calls and results
 
-        logger.info(`👣 Step ${stepNum + 1}/${steps}`)
+          for (const [nodeName, nodeOutput] of Object.entries(chunk)) {
+            logger.debug(`📦 Node '${nodeName}' output: ${JSON.stringify(nodeOutput)}`)
 
-        try {
-          logger.debug('Starting agent step execution')
-          const nextStepOutput: AgentStep[] | AgentFinish = await this._agentExecutor._takeNextStep(
-            nameToToolMap as Record<string, ToolInterface>,
-            inputs,
-            intermediateSteps,
-            runManager,
-          )
-          // Agent finish handling (AgentFinish contains returnValues property)
-          if ('returnValues' in nextStepOutput) {
-            logger.info(`✅ Agent finished at step ${stepNum + 1}`)
-            result = nextStepOutput.returnValues?.output ?? 'No output generated'
-            runManager?.handleChainEnd({ output: result })
+            // Extract messages from the node output and accumulate them
+            if (nodeOutput && typeof nodeOutput === 'object' && 'messages' in nodeOutput) {
+              let messages = (nodeOutput as any).messages
+              if (!Array.isArray(messages)) {
+                messages = [messages]
+              }
 
-            // If structured output is requested, attempt to create it
-            if (outputSchema && structuredLlm) {
-                logger.info('🔧 Attempting structured output...')
-                const currentResult = result
-                this._attemptStructuredOutput<T>(
-                  currentResult,
-                  this.llm!,
-                  outputSchema,
-                ).then(structuredResult => {
-                  if (this.memoryEnabled) {
-                    this.addToHistory(new AIMessage(`Structured result: ${JSON.stringify(structuredResult)}`))
+              // Add new messages to accumulated messages for potential restart
+              for (const msg of messages) {
+                if (!accumulatedMessages.includes(msg)) {
+                  accumulatedMessages.push(msg)
+                }
+              }
+
+              for (const message of messages) {
+                // Track tool calls
+                if ('tool_calls' in message && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+                  for (const toolCall of message.tool_calls) {
+                    const toolName = toolCall.name || 'unknown'
+                    const toolInput = toolCall.args || {}
+                    toolsUsedNames.push(toolName)
+                    stepsTaken++
+
+                    let toolInputStr = JSON.stringify(toolInput)
+                    if (toolInputStr.length > 100) {
+                      toolInputStr = `${toolInputStr.slice(0, 97)}...`
+                    }
+                    logger.info(`🔧 Tool call: ${toolName} with input: ${toolInputStr}`)
+
+                    // Yield tool call as AgentStep
+                    yield {
+                      action: {
+                        tool: toolName,
+                        toolInput,
+                        log: `Calling tool ${toolName}`,
+                      },
+                      observation: '', // Will be filled in by tool result
+                    }
                   }
-  
-                  logger.info('✅ Structured output successful')
-                  structuredOutputSuccessRef.value = true
-                  return structuredResult as string | T
-                }).catch(e => {
-                logger.warn(`⚠️ Structured output failed: ${e}`)
-                // Continue execution to gather missing information
-                const failedStructuredOutputPrompt = `
-                The current result cannot be formatted into the required structure.
-                Error: ${String(e)}
-                
-                Current information: ${currentResult}
-                
-                If information is missing, please continue working to gather the missing information needed for:
-                ${schemaDescription}
-
-                If the information is complete, please return the result in the required structure.
-                `
-
-                // Add this as feedback and continue the loop
-                inputs.input = failedStructuredOutputPrompt
-                if (this.memoryEnabled) {
-                  this.addToHistory(new HumanMessage(failedStructuredOutputPrompt))
                 }
 
-                logger.info('🔄 Continuing execution to gather missing information...')
-              })  
-            }
-          }
+                // Track tool results (ToolMessage)
+                if (message instanceof ToolMessage || (message && 'type' in message && message.type === 'tool')) {
+                  const observation = message.content
+                  let observationStr = String(observation)
+                  if (observationStr.length > 100) {
+                    observationStr = `${observationStr.slice(0, 97)}...`
+                  }
+                  observationStr = observationStr.replace(/\n/g, ' ')
+                  logger.info(`📄 Tool result: ${observationStr}`)
 
-          // Check if it's an array of steps or a finish result
-          if (Array.isArray(nextStepOutput)) {
-            const stepArray = nextStepOutput as AgentStep[]
-            intermediateSteps.push(...stepArray)
+                  // --- Check for tool updates after tool results (safe restart point) ---
+                  if (this.useServerManager && this.serverManager) {
+                    const currentTools = this.serverManager.tools
+                    const currentToolNames = new Set(currentTools.map(t => t.name))
+                    const existingToolNames = new Set(this._tools.map(t => t.name))
 
-            for (const step of stepArray) {
-            yield step
-            const { action, observation } = step
-            const toolName = action.tool
-            toolsUsedNames.push(toolName)
-            let toolInputStr = typeof action.toolInput === 'string'
-              ? action.toolInput
-              : JSON.stringify(action.toolInput, null, 2)
-            if (toolInputStr.length > 100)
-              toolInputStr = `${toolInputStr.slice(0, 97)}...`
-            logger.info(`🔧 Tool call: ${toolName} with input: ${toolInputStr}`)
+                    if (currentToolNames.size !== existingToolNames.size
+                      || [...currentToolNames].some(n => !existingToolNames.has(n))) {
+                      logger.info(
+                        `🔄 Tools changed during execution. New tools: ${[...currentToolNames].join(', ')}`,
+                      )
+                      this._tools = currentTools
+                      this._tools.push(...this.additionalTools)
+                      // Regenerate system message with ALL current tools
+                      await this.createSystemMessageFromTools(this._tools)
+                      // Recreate the agent executor with the new tools and system message
+                      this._agentExecutor = this.createAgent()
 
-            let outputStr = String(observation)
-            if (outputStr.length > 100)
-              outputStr = `${outputStr.slice(0, 97)}...`
-            outputStr = outputStr.replace(/\n/g, ' ')
-            logger.info(`📄 Tool result: ${outputStr}`)
-          }
+                      // Set restart flag - safe to restart now after tool results
+                      shouldRestart = true
+                      restartCount++
+                      logger.info(
+                        `🔃 Restarting execution with updated tools (restart ${restartCount}/${maxRestarts})`,
+                      )
+                      break // Break out of the message loop
+                    }
+                  }
+                }
 
-            // Detect direct return
-            if (stepArray.length) {
-              const lastStep = stepArray[stepArray.length - 1]
-              const toolReturn: AgentFinish | null = await this._agentExecutor._getToolReturn(lastStep)
-              if (toolReturn) {
-                logger.info(`🏆 Tool returned directly at step ${stepNum + 1}`)
-                result = toolReturn.returnValues?.output ?? 'No output generated'
+                // Track final AI message (without tool calls = final response)
+                if (message instanceof AIMessage && !('tool_calls' in message && Array.isArray(message.tool_calls) && message.tool_calls.length > 0)) {
+                  finalOutput = this._normalizeOutput(message.content)
+                  logger.info('✅ Agent finished with output')
+                }
+              }
+
+              // Break out of node loop if restarting
+              if (shouldRestart) {
                 break
               }
             }
           }
-        }
-        catch (e) {
-          if (e instanceof OutputParserException) {
-            logger.error(`❌ Output parsing error during step ${stepNum + 1}: ${e}`)
-            result = `Agent stopped due to a parsing error: ${e}`
-            runManager?.handleChainError(result)
+
+          // Break out of chunk loop if restarting
+          if (shouldRestart) {
             break
           }
-          logger.error(`❌ Error during agent execution step ${stepNum + 1}: ${e}`)
-          console.error(e)
-          result = `Agent stopped due to an error: ${e}`
-          runManager?.handleChainError(result)
+        }
+
+        // Check if we should restart or if execution completed
+        if (!shouldRestart) {
+          // Execution completed successfully without tool changes
+          break
+        }
+
+        // If we've hit max restarts, log warning and continue
+        if (restartCount > maxRestarts) {
+          logger.warn(`⚠️ Max restarts (${maxRestarts}) reached. Continuing with current tools.`)
           break
         }
       }
 
-      // —–– Post‑loop handling
-      if (!result) {
-        logger.warn(`⚠️ Agent stopped after reaching max iterations (${steps})`)
-        result = `Agent stopped after reaching the maximum number of steps (${steps}).`
-        runManager?.handleChainEnd({ output: result })
+      // 4. Update conversation history
+      if (this.memoryEnabled) {
+        this.addToHistory(new HumanMessage(query))
+        if (finalOutput) {
+          this.addToHistory(new AIMessage(finalOutput))
+        }
       }
 
-      logger.info('🎉 Agent execution complete')
-      structuredOutputSuccessRef.value = true
+      // 5. Handle structured output if requested
+      if (outputSchema && finalOutput) {
+        try {
+          logger.info('🔧 Attempting structured output...')
+          
+          const structuredResult = await this._attemptStructuredOutput<T>(
+            finalOutput,
+            this.llm!,
+            outputSchema,
+          )
 
-      // Return regular result
-      return result as string | T
+          if (this.memoryEnabled) {
+            this.addToHistory(new AIMessage(`Structured result: ${JSON.stringify(structuredResult)}`))
+          }
+
+          logger.info('✅ Structured output successful')
+          success = true
+          return structuredResult
+        }
+        catch (e) {
+          logger.error(`❌ Structured output failed: ${e}`)
+          throw new Error(`Failed to generate structured output: ${e instanceof Error ? e.message : String(e)}`)
+        }
+      }
+
+      // 6. Yield final result
+      logger.info(`🎉 Agent execution complete in ${((Date.now() - startTime) / 1000).toFixed(2)} seconds`)
+      success = true
+      return (finalOutput || 'No output generated') as string | T
     }
     catch (e) {
       logger.error(`❌ Error running query: ${e}`)
       if (initializedHere && manageConnector) {
-        logger.info('🧹 Cleaning up resources after initialization error in run')
+        logger.info('🧹 Cleaning up resources after error')
         await this.close()
       }
       throw e
@@ -896,16 +949,19 @@ export class MCPAgent {
 
       const conversationHistoryLength = this.memoryEnabled ? this.conversationHistory.length : 0
 
+      // Safely access _tools in case initialization failed
+      const toolsAvailable = this._tools || []
+
       await this.telemetry.trackAgentExecution({
         executionMethod: 'stream',
         query,
-        success: structuredOutputSuccess,
+        success,
         modelProvider: this.modelProvider,
         modelName: this.modelName,
         serverCount,
         serverIdentifiers: this.connectors.map(connector => connector.publicIdentifier),
-        totalToolsAvailable: this._tools.length,
-        toolsAvailableNames: this._tools.map(t => t.name),
+        totalToolsAvailable: toolsAvailable.length,
+        toolsAvailableNames: toolsAvailable.map(t => t.name),
         maxStepsConfigured: this.maxSteps,
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
@@ -915,18 +971,20 @@ export class MCPAgent {
         stepsTaken,
         toolsUsedCount: toolsUsedNames.length,
         toolsUsedNames,
-        response: result,
+        response: finalOutput || '',
         executionTimeMs,
-        errorType: structuredOutputSuccess ? null : 'execution_error',
+        errorType: success ? null : 'execution_error',
         conversationHistoryLength,
       })
 
+      // Clean up if necessary
       if (manageConnector && !this.client && initializedHere) {
-        logger.info('🧹 Closing agent after query completion')
+        logger.info('🧹 Closing agent after stream completion')
         await this.close()
       }
     }
   }
+
 
   public async close(): Promise<void> {
     // Delegate to remote agent if in remote mode
