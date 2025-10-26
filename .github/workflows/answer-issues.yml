@@ -1,0 +1,43 @@
+name: Answer Issues
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  answer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv pip install --system mcp-use
+
+      - name: Generate response
+        id: generate
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          MCP_USE_API_KEY: ${{ secrets.PIETRO_MCP_USE_API_KEY }}
+        run: |
+          uv run python .github/agents/answer_issues.py
+          {
+            echo 'response<<EOF_RESPONSE_DELIMITER_a1b2c3d4e5f6'
+            cat /tmp/response.txt
+            echo 'EOF_RESPONSE_DELIMITER_a1b2c3d4e5f6'
+          } >> $GITHUB_OUTPUT
+
+      - name: Post comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "${{ steps.generate.outputs.response }}"
