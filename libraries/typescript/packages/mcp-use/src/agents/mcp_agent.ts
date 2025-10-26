@@ -731,8 +731,6 @@ export class MCPAgent {
         }
       }
 
-      const inputs = { messages: [...langchainHistory, new HumanMessage(query)] }
-
       const displayQuery = query.length > 50 ? `${query.slice(0, 50).replace(/\n/g, ' ')}...` : query.replace(/\n/g, ' ')
       logger.info(`💬 Received query: '${displayQuery}'`)
       logger.info('🏁 Starting agent execution')
@@ -746,16 +744,21 @@ export class MCPAgent {
 
       while (restartCount <= maxRestarts) {
         // Update inputs with accumulated messages
-        const currentInputs = { messages: accumulatedMessages }
+        const inputs = { messages: accumulatedMessages }
         let shouldRestart = false
 
-        // Stream agent updates
+        // Stream agent updates with observability callbacks
         const streamOptions: any = {
           streamMode: 'updates', // Get updates as they happen
+          callbacks: this.callbacks,
+          metadata: this.getMetadata(),
+          tags: this.getTags(),
+          // Pass sessionId for Langfuse if present in metadata
+          ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
         }
         
         const stream = await this._agentExecutor.stream(
-          currentInputs,
+          inputs,
           streamOptions,
         )
         
@@ -974,7 +977,20 @@ export class MCPAgent {
       }
     }
   }
+  /**
+   * Flush observability traces to the configured observability platform.
+   * Important for serverless environments where traces need to be sent before function termination.
+   */
+  public async flush(): Promise<void> {
+    // Delegate to remote agent if in remote mode
+    if (this.isRemote && this.remoteAgent) {
+      // Remote agents don't have observability manager
+      return
+    }
 
+    logger.debug('Flushing observability traces...')
+    await this.observabilityManager.flush()
+  }
 
   public async close(): Promise<void> {
     // Delegate to remote agent if in remote mode
@@ -1081,12 +1097,16 @@ export class MCPAgent {
 
       logger.info('callbacks', this.callbacks)
 
-      // Stream events from the agent executor
+      // Stream events from the agent executor with observability support
       const eventStream = agentExecutor.streamEvents(
         inputs,
         {
           version: 'v2',
           callbacks: this.callbacks.length > 0 ? this.callbacks : undefined,
+          metadata: this.getMetadata(),
+          tags: this.getTags(),
+          // Pass sessionId for Langfuse if present in metadata
+          ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
         },
       )
 
