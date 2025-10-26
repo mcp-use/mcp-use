@@ -1,11 +1,9 @@
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
-import type { CallbackManagerForChainRun } from '@langchain/core/callbacks/manager'
 import type { BaseLanguageModelInterface, LanguageModelLike } from '@langchain/core/language_models/base'
-import type { Serialized } from '@langchain/core/load/serializable'
 import type {
   BaseMessage,
 } from '@langchain/core/messages'
-import type { StructuredToolInterface, ToolInterface } from '@langchain/core/tools'
+import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { StreamEvent } from '@langchain/core/tracers/log_stream'
 import type { ZodSchema } from 'zod'
 import type { MCPClient } from '../client.js'
@@ -24,20 +22,11 @@ export interface AgentStep {
   observation: string
 }
 
-/**
- * Represents the final output of the agent
- */
-export interface AgentFinish {
-  returnValues: Record<string, any>
-  log: string
-}
-import { CallbackManager } from '@langchain/core/callbacks/manager'
 import {
   AIMessage,
   HumanMessage,
   ToolMessage,
 } from '@langchain/core/messages'
-import { OutputParserException } from '@langchain/core/output_parsers'
 import { createAgent, ReactAgent, modelCallLimitMiddleware, SystemMessage } from 'langchain'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { LangChainAdapter } from '../adapters/langchain_adapter.js'
@@ -58,6 +47,7 @@ export class MCPAgent {
   private memoryEnabled: boolean
   private disallowedTools: string[]
   private additionalTools: StructuredToolInterface[]
+  public toolsUsedNames: string[] = []
   private useServerManager: boolean
   private verbose: boolean
   private observe: boolean
@@ -99,6 +89,7 @@ export class MCPAgent {
     additionalInstructions?: string | null
     disallowedTools?: string[]
     additionalTools?: StructuredToolInterface[]
+    toolsUsedNames?: string[]
     useServerManager?: boolean
     verbose?: boolean
     observe?: boolean
@@ -157,6 +148,7 @@ export class MCPAgent {
     this.additionalInstructions = options.additionalInstructions ?? null
     this.disallowedTools = options.disallowedTools ?? []
     this.additionalTools = options.additionalTools ?? []
+    this.toolsUsedNames = options.toolsUsedNames ?? []
     this.useServerManager = options.useServerManager ?? false
     this.verbose = options.verbose ?? false
     this.observe = options.observe ?? true
@@ -691,7 +683,6 @@ export class MCPAgent {
     const startTime = Date.now()
     let success = false
     let finalOutput: string | null = null
-    const toolsUsedNames: string[] = []
     let stepsTaken = 0
 
     try {
@@ -796,7 +787,7 @@ export class MCPAgent {
                   for (const toolCall of message.tool_calls) {
                     const toolName = toolCall.name || 'unknown'
                     const toolInput = toolCall.args || {}
-                    toolsUsedNames.push(toolName)
+                    this.toolsUsedNames.push(toolName)
                     stepsTaken++
 
                     let toolInputStr = JSON.stringify(toolInput)
@@ -968,8 +959,8 @@ export class MCPAgent {
         manageConnector,
         externalHistoryUsed: externalHistory !== undefined,
         stepsTaken,
-        toolsUsedCount: toolsUsedNames.length,
-        toolsUsedNames,
+        toolsUsedCount: this.toolsUsedNames.length,
+        toolsUsedNames: this.toolsUsedNames,
         response: finalOutput || '',
         executionTimeMs,
         errorType: success ? null : 'execution_error',
