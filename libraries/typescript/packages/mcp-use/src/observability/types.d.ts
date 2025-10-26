@@ -3,7 +3,7 @@
  * These modules may not be installed, so we provide minimal type definitions.
  */
 
-declare module 'langfuse-langchain' {
+declare module '@langfuse/langchain' {
   export class CallbackHandler {
     constructor(config?: any)
     verbose?: boolean
