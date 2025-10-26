@@ -7,7 +7,6 @@ import type {
 } from '@langchain/core/messages'
 import type { StructuredToolInterface, ToolInterface } from '@langchain/core/tools'
 import type { StreamEvent } from '@langchain/core/tracers/log_stream'
-import type { AgentFinish, AgentStep } from 'langchain/agents'
 import type { ZodSchema } from 'zod'
 import type { MCPClient } from '../client.js'
 import type { BaseConnector } from '../connectors/base.js'
@@ -16,15 +15,10 @@ import { CallbackManager } from '@langchain/core/callbacks/manager'
 import {
   AIMessage,
   HumanMessage,
-  SystemMessage,
   ToolMessage,
 } from '@langchain/core/messages'
 import { OutputParserException } from '@langchain/core/output_parsers'
-import {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} from '@langchain/core/prompts'
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
+import { createAgent, ReactAgent, modelCallLimitMiddleware, SystemMessage } from 'langchain'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { LangChainAdapter } from '../adapters/langchain_adapter.js'
 import { logger } from '../logging.js'
@@ -53,7 +47,7 @@ export class MCPAgent {
 
   private _initialized = false
   private conversationHistory: BaseMessage[] = []
-  private _agentExecutor: AgentExecutor | null = null
+  private _agentExecutor: ReactAgent | null = null
   private sessions: Record<string, MCPSession> = {}
   private systemMessage: SystemMessage | null = null
   private _tools: StructuredToolInterface[] = []
@@ -310,34 +304,30 @@ export class MCPAgent {
     }
   }
 
-  private createAgent(): AgentExecutor {
+  private createAgent(): ReactAgent {
     if (!this.llm) {
       throw new Error('LLM is required to create agent')
     }
 
-    const systemContent = this.systemMessage?.content ?? 'You are a helpful assistant.'
+    const systemContent = this.systemMessage?.content as string ?? 'You are a helpful assistant.'
 
-    const prompt = ChatPromptTemplate.fromMessages([
-      ['system', systemContent],
-      new MessagesPlaceholder('chat_history'),
-      ['human', '{input}'],
-      new MessagesPlaceholder('agent_scratchpad'),
-    ])
+    const toolNames = this._tools.map(tool => tool.name)
+    logger.info(`🧠 Agent ready with tools: ${toolNames.join(', ')}`)
 
-    const agent = createToolCallingAgent({
-      llm: this.llm as unknown as LanguageModelLike,
+    // Create middleware to enforce max_steps
+    // modelCallLimitMiddleware limits the number of model calls, which corresponds to agent steps
+    const middleware = [modelCallLimitMiddleware({ runLimit: this.maxSteps })]
+
+    const agent = createAgent({
+      model: this.llm as unknown as LanguageModelLike,
       tools: this._tools,
-      prompt,
+      systemPrompt: systemContent,
+      middleware,
     })
 
-    return new AgentExecutor({
-      agent,
-      tools: this._tools,
-      maxIterations: this.maxSteps,
-      verbose: this.verbose,
-      returnIntermediateSteps: true,
-      callbacks: this.callbacks,
-    })
+    logger.debug(`Created agent with max_steps=${this.maxSteps} (via ModelCallLimitMiddleware) and ${this.callbacks.length} callbacks`)
+
+    return agent
   }
 
   public getConversationHistory(): BaseMessage[] {
@@ -612,11 +602,35 @@ export class MCPAgent {
     return this._consumeAndReturn(generator)
   }
 
+  public async* stream<T = string>(
+    query: string,
+    maxSteps?: number,
+    manageConnector = true,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>,
+  ): AsyncGenerator<AgentStep, string | T, void> {
+    // Delegate to remote agent if in remote mode
+    if (this.isRemote && this.remoteAgent) {
+      const result = await this.remoteAgent.run(query, maxSteps, manageConnector, externalHistory, outputSchema)
+      return result as string | T
+    }
+
+    let result = ''
+    let initializedHere = false
+    const startTime = Date.now()
+    const toolsUsedNames: string[] = []
+    let stepsTaken = 0
+    const structuredOutputSuccess = false
+    const structuredOutputSuccessRef = { value: structuredOutputSuccess }
+
+    
+  }
+
   /**
    * Runs the agent and yields intermediate steps as an async generator.
    * If outputSchema is provided, returns structured output of type T.
    */
-  public async* stream<T = string>(
+  public async* stream_legacy<T = string>(
     query: string,
     maxSteps?: number,
     manageConnector = true,
