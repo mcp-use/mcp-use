@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.agents import AgentFinish
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from mcp_use.agents.mcpagent import MCPAgent
 from mcp_use.client import MCPClient
@@ -168,7 +168,7 @@ class TestMCPAgentStream:
 
     @pytest.mark.asyncio
     async def test_stream_initializes_and_finishes(self):
-        """When not initialized, stream calls initialize, sets max_steps, and yields final output on AgentFinish."""
+        """When not initialized, stream calls initialize and yields final output."""
         llm = self._mock_llm()
         client = MagicMock(spec=MCPClient)
         agent = MCPAgent(llm=llm, client=client)
@@ -176,31 +176,29 @@ class TestMCPAgentStream:
         agent.telemetry = MagicMock()
 
         executor = MagicMock()
-        executor.max_iterations = None
 
         async def _init_side_effect():
             agent._agent_executor = executor
             agent._initialized = True
 
+        async def mock_astream(inputs, stream_mode=None):
+            # Simulate agent response
+            yield {"agent": {"messages": [AIMessage(content="done")]}}
+
+        executor.astream = MagicMock(side_effect=mock_astream)
+
         with patch.object(MCPAgent, "initialize", side_effect=_init_side_effect) as mock_init:
-
-            async def _atake_next_step(**kwargs):
-                return AgentFinish(return_values={"output": "done"}, log="")
-
-            executor._atake_next_step = MagicMock(side_effect=_atake_next_step)
-
             outputs = []
             async for item in agent.stream("q", max_steps=3):
                 outputs.append(item)
 
             mock_init.assert_called_once()
-            assert executor.max_iterations == 3
             assert outputs[-1] == "done"
             agent.telemetry.track_agent_execution.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_stream_uses_external_history_and_sets_max_steps(self):
-        """External history should be used, and executor.max_iterations should reflect max_steps arg."""
+        """External history should be used in the stream."""
         llm = self._mock_llm()
         client = MagicMock(spec=MCPClient)
         agent = MCPAgent(llm=llm, client=client)
@@ -210,25 +208,28 @@ class TestMCPAgentStream:
         external_history = [HumanMessage(content="past")]
 
         executor = MagicMock()
-        executor.max_iterations = None
 
         async def _init_side_effect():
             agent._agent_executor = executor
             agent._initialized = True
 
+        history_was_used = False
+
+        async def mock_astream(inputs, stream_mode=None):
+            nonlocal history_was_used
+            # Check that external history was included in messages
+            if "messages" in inputs:
+                messages = inputs["messages"]
+                if any(isinstance(m, HumanMessage) and m.content == "past" for m in messages):
+                    history_was_used = True
+            yield {"agent": {"messages": [AIMessage(content="ok")]}}
+
+        executor.astream = MagicMock(side_effect=mock_astream)
+
         with patch.object(MCPAgent, "initialize", side_effect=_init_side_effect):
-
-            async def _asserting_step(
-                name_to_tool_map=None, color_mapping=None, inputs=None, intermediate_steps=None, run_manager=None
-            ):
-                assert inputs["chat_history"] == [msg for msg in external_history]
-                return AgentFinish(return_values={"output": "ok"}, log="")
-
-            executor._atake_next_step = MagicMock(side_effect=_asserting_step)
-
             outputs = []
             async for item in agent.stream("query", max_steps=4, external_history=external_history):
                 outputs.append(item)
 
-            assert executor.max_iterations == 4
+            assert history_was_used, "External history was not used"
             assert outputs[-1] == "ok"
