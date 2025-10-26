@@ -597,6 +597,12 @@ class MCPAgent:
         Yields:
             Intermediate steps and final result from the agent execution.
         """
+        # Delegate to remote agent if in remote mode
+        if self._is_remote and self._remote_agent:
+            async for item in self._remote_agent.stream(query, max_steps, external_history, output_schema):
+                yield item
+            return
+
         initialized_here = False
         start_time = time.time()
         success = False
