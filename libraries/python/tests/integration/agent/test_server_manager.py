@@ -71,7 +71,7 @@ async def test_server_manager():
 
         @property
         def tools(self) -> list[BaseTool]:
-            return self._tools
+            return list(self._tools)
 
         def has_tool_changes(self, current_tool_names: set[str]) -> bool:
             new_tool_names = {tool.name for tool in self.tools}
