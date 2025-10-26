@@ -1,6 +1,6 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { ServerManager } from '../server_manager.js'
-import { StructuredTool } from 'langchain/tools'
+import { StructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { logger } from '../../logging.js'
 
