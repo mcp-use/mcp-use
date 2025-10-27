@@ -10,7 +10,7 @@ import time
 from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TypeVar
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents import create_tool_calling_agent
 from langchain.agents.output_parsers.tools import ToolAgentAction
 from langchain.globals import set_debug
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -18,12 +18,14 @@ from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain.schema.language_model import BaseLanguageModel
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.exceptions import OutputParserException
+from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
 from langchain_core.utils.input import get_color_mapping
 from pydantic import BaseModel
 
 from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter
+from mcp_use.agents.agent import AgentExecutor
 from mcp_use.agents.managers.base import BaseServerManager
 from mcp_use.agents.managers.server_manager import ServerManager
 
@@ -72,8 +74,10 @@ class MCPAgent:
         base_url: str = "https://cloud.mcp-use.com",
         callbacks: list | None = None,
         chat_id: str | None = None,
+        message_id: str | None = None,
         retry_on_error: bool = True,
         max_retries_per_step: int = 2,
+        metadata: dict[str] | None = None,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -95,6 +99,7 @@ class MCPAgent:
             callbacks: List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler.
             retry_on_error: Whether to retry tool calls that fail due to validation errors.
             max_retries_per_step: Maximum number of retries for validation errors per step.
+            metadata: specific data to be passed to tools without passing through llm
         """
         # Handle remote execution
         if agent_id is not None:
@@ -133,6 +138,8 @@ class MCPAgent:
         # Set up observability callbacks using the ObservabilityManager
         self.observability_manager = ObservabilityManager(custom_callbacks=callbacks)
         self.callbacks = self.observability_manager.get_callbacks()
+        self.metadata = metadata if metadata else {}
+        self.message_id = message_id if message_id else None
 
         # Either client or connector must be provided
         if not client and len(self.connectors) == 0:
@@ -159,14 +166,14 @@ class MCPAgent:
 
     async def initialize(self) -> None:
         """Initialize the MCP client and agent."""
-        logger.info("🚀 Initializing MCP agent and connecting to services...")
+        logger.info("� Initializing MCP agent and connecting to services...")
         # If using server manager, initialize it
         if self.use_server_manager and self.server_manager:
             await self.server_manager.initialize()
             # Get server management tools
             management_tools = self.server_manager.tools
             self._tools = management_tools
-            logger.info(f"🔧 Server manager mode active with {len(management_tools)} management tools")
+            logger.info(f"� Server manager mode active with {len(management_tools)} management tools")
 
             # Create the system message based on available tools
             await self._create_system_message_from_tools(self._tools)
@@ -175,11 +182,11 @@ class MCPAgent:
             if self.client:
                 # First try to get existing sessions
                 self._sessions = self.client.get_all_active_sessions()
-                logger.info(f"🔌 Found {len(self._sessions)} existing sessions")
+                logger.info(f"� Found {len(self._sessions)} existing sessions")
 
                 # If no active sessions exist, create new ones
                 if not self._sessions:
-                    logger.info("🔄 No active sessions found, creating new ones...")
+                    logger.info("� No active sessions found, creating new ones...")
                     self._sessions = await self.client.create_all_sessions()
                     self.connectors = [session.connector for session in self._sessions.values()]
                     logger.info(f"✅ Created {len(self._sessions)} new sessions")
@@ -187,12 +194,12 @@ class MCPAgent:
                 # Create LangChain tools directly from the client using the adapter
                 await self.adapter.create_all(self.client)
                 self._tools = self.adapter.tools + self.adapter.resources + self.adapter.prompts
-                logger.info(f"🛠️ Created {len(self._tools)} LangChain tools from client")
+                logger.info(f"�️ Created {len(self._tools)} LangChain tools from client")
             else:
                 # Using direct connector - only establish connection
                 # LangChainAdapter will handle initialization
                 connectors_to_use = self.connectors
-                logger.info(f"🔗 Connecting to {len(connectors_to_use)} direct connectors...")
+                logger.info(f"� Connecting to {len(connectors_to_use)} direct connectors...")
                 for connector in connectors_to_use:
                     if not hasattr(connector, "client_session") or connector.client_session is None:
                         await connector.connect()
@@ -202,11 +209,11 @@ class MCPAgent:
                 await self.adapter._create_resources_from_connectors(connectors_to_use)
                 await self.adapter._create_prompts_from_connectors(connectors_to_use)
                 self._tools = self.adapter.tools + self.adapter.resources + self.adapter.prompts
-                logger.info(f"🛠️ Created {len(self._tools)} LangChain tools from connectors")
+                logger.info(f"�️ Created {len(self._tools)} LangChain tools from connectors")
 
             # Get all tools for system message generation
             all_tools = self._tools
-            logger.info(f"🧰 Found {len(all_tools)} tools across all connectors")
+            logger.info(f"� Found {len(all_tools)} tools across all connectors")
 
             # Create the system message based on available tools
             await self._create_system_message_from_tools(all_tools)
@@ -311,7 +318,7 @@ class MCPAgent:
             )
 
         tool_names = [tool.name for tool in self._tools]
-        logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
+        logger.info(f"� Agent ready with tools: {', '.join(tool_names)}")
 
         # Use the standard create_tool_calling_agent
         agent = create_tool_calling_agent(llm=self.llm, tools=self._tools, prompt=prompt)
@@ -468,6 +475,10 @@ class MCPAgent:
         start_time = time.time()
         steps_taken = 0
         success = False
+        if self.metadata:
+            config: RunnableConfig = {"metadata": self.metadata}
+        else:
+            config: RunnableConfig = {}
 
         # Schema-aware setup for structured output
         structured_llm = None
@@ -506,7 +517,7 @@ class MCPAgent:
                 self._agent_executor.max_iterations = steps
 
             display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
-            logger.info(f"💬 Received query: '{display_query}'")
+            logger.info(f"� Received query: '{display_query}'")
 
             # Use the provided history or the internal history
             history_to_use = external_history if external_history is not None else self._conversation_history
@@ -527,7 +538,7 @@ class MCPAgent:
             name_to_tool_map = {tool.name: tool for tool in self._tools}
             color_mapping = get_color_mapping([tool.name for tool in self._tools], excluded_colors=["green", "red"])
 
-            logger.info(f"🏁 Starting agent execution with max_steps={steps}")
+            logger.info(f"� Starting agent execution with max_steps={steps}")
 
             # Track whether agent finished successfully vs reached max iterations
             agent_finished_successfully = False
@@ -559,7 +570,7 @@ class MCPAgent:
 
                     if current_tool_names != existing_tool_names:
                         logger.info(
-                            f"🔄 Tools changed before step {step_num + 1}, updating agent."
+                            f"� Tools changed before step {step_num + 1}, updating agent."
                             f"New tools: {', '.join(current_tool_names)}"
                         )
                         self._tools = current_tools
@@ -574,7 +585,7 @@ class MCPAgent:
                             [tool.name for tool in self._tools], excluded_colors=["green", "red"]
                         )
 
-                logger.info(f"👣 Step {step_num + 1}/{steps}")
+                logger.info(f"� Step {step_num + 1}/{steps}")
 
                 # --- Plan and execute the next step ---
                 try:
@@ -591,6 +602,7 @@ class MCPAgent:
                                 inputs=inputs,
                                 intermediate_steps=intermediate_steps,
                                 run_manager=run_manager,
+                                config=config,
                             )
 
                             # If we get here, the step succeeded, break out of retry loop
@@ -629,14 +641,16 @@ class MCPAgent:
                         # If structured output is requested, attempt to create it
                         if output_schema and structured_llm:
                             try:
-                                logger.info("🔧 Attempting structured output...")
+                                logger.info("� Attempting structured output...")
                                 structured_result = await self._attempt_structured_output(
                                     result, structured_llm, output_schema, schema_description
                                 )
 
                                 # Add the final response to conversation history if memory is enabled
                                 if self.memory_enabled:
-                                    self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                                    self.add_to_history(
+                                        AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                                    )
 
                                 logger.info("✅ Structured output successful")
                                 success = True
@@ -661,9 +675,9 @@ class MCPAgent:
                                 # Add this as feedback and continue the loop
                                 inputs["input"] = missing_info_prompt
                                 if self.memory_enabled:
-                                    self.add_to_history(HumanMessage(content=missing_info_prompt))
+                                    self.add_to_history(HumanMessage(content=missing_info_prompt, id=self.message_id))
 
-                                logger.info("🔄 Continuing execution to gather missing information...")
+                                logger.info("� Continuing execution to gather missing information...")
                                 continue
                         else:
                             # Regular execution without structured output
@@ -681,27 +695,27 @@ class MCPAgent:
                             reasoning_str = reasoning.replace("\n", " ")
                             if len(reasoning_str) > 300:
                                 reasoning_str = reasoning_str[:297] + "..."
-                            logger.info(f"💭 Reasoning: {reasoning_str}")
+                            logger.info(f"� Reasoning: {reasoning_str}")
                         tool_name = action.tool
                         self.tools_used_names.append(tool_name)
                         tool_input_str = str(action.tool_input)
                         # Truncate long inputs for readability
                         if len(tool_input_str) > 100:
                             tool_input_str = tool_input_str[:97] + "..."
-                        logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
+                        logger.info(f"� Tool call: {tool_name} with input: {tool_input_str}")
                         # Truncate long outputs for readability
                         observation_str = str(observation)
                         if len(observation_str) > 100:
                             observation_str = observation_str[:97] + "..."
                         observation_str = observation_str.replace("\n", " ")
-                        logger.info(f"📄 Tool result: {observation_str}")
+                        logger.info(f"� Tool result: {observation_str}")
 
                     # Check for return_direct on the last action taken
                     if len(next_step_output) > 0:
                         last_step: tuple[AgentAction, str] = next_step_output[-1]
                         tool_return = self._agent_executor._get_tool_return(last_step)
                         if tool_return is not None:
-                            logger.info(f"🏆 Tool returned directly at step {step_num + 1}")
+                            logger.info(f"� Tool returned directly at step {step_num + 1}")
                             agent_finished_successfully = True
                             result = tool_return.return_values.get("output", "No output generated")
                             result = self._normalize_output(result)
@@ -740,14 +754,16 @@ class MCPAgent:
             # If structured output was requested but not achieved, attempt one final time
             if output_schema and structured_llm and not success:
                 try:
-                    logger.info("🔧 Final attempt at structured output...")
+                    logger.info("� Final attempt at structured output...")
                     structured_result = await self._attempt_structured_output(
                         result, structured_llm, output_schema, schema_description
                     )
 
                     # Add the final response to conversation history if memory is enabled
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                        self.add_to_history(
+                            AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                        )
 
                     logger.info("✅ Final structured output successful")
                     success = True
@@ -759,12 +775,12 @@ class MCPAgent:
                     raise RuntimeError(f"Failed to generate structured output after {steps} steps: {str(e)}") from e
 
             if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
+                self.add_to_history(HumanMessage(content=query, id=self.message_id))
 
             if self.memory_enabled and not output_schema:
-                self.add_to_history(AIMessage(content=self._normalize_output(result)))
+                self.add_to_history(AIMessage(content=self._normalize_output(result), id=self.message_id))
 
-            logger.info(f"🎉 Agent execution complete in {time.time() - start_time} seconds")
+            logger.info(f"� Agent execution complete in {time.time() - start_time} seconds")
             if not success:
                 success = True
 
@@ -775,7 +791,7 @@ class MCPAgent:
         except Exception as e:
             logger.error(f"❌ Error running query: {e}")
             if initialized_here and manage_connector:
-                logger.info("🧹 Cleaning up resources after initialization error in stream")
+                logger.info("� Cleaning up resources after initialization error in stream")
                 await self.close()
             raise
 
@@ -822,7 +838,7 @@ class MCPAgent:
 
             # Clean up if necessary (e.g., if not using client-managed sessions)
             if manage_connector and not self.client and initialized_here:
-                logger.info("🧹 Closing agent after stream completion")
+                logger.info("� Closing agent after stream completion")
                 await self.close()
 
     @telemetry("agent_run")
@@ -1029,18 +1045,20 @@ class MCPAgent:
                 if isinstance(output, list):
                     for message in output:
                         if not isinstance(message, ToolAgentAction):
+                            if self.message_id:
+                                message["id"] = self.message_id
                             self.add_to_history(message)
             yield event
 
         if self.memory_enabled:
-            self.add_to_history(HumanMessage(content=query))
+            self.add_to_history(HumanMessage(content=query, id=self.message_id))
 
         # 5. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
         #  when the agent was initialized in this generator and is not client-managed
         #  and the user does want us to manage the connection.
         if not self.client and initialised_here and manage_connector:
-            logger.info("🧹 Closing agent after generator completion")
+            logger.info("� Closing agent after generator completion")
             await self.close()
 
     @telemetry("agent_stream_events")
@@ -1116,7 +1134,7 @@ class MCPAgent:
             await self._remote_agent.close()
             return
 
-        logger.info("🔌 Closing agent and cleaning up resources...")
+        logger.info("� Closing agent and cleaning up resources...")
         try:
             # Clean up the agent first
             self._agent_executor = None
@@ -1124,14 +1142,14 @@ class MCPAgent:
 
             # If using client with session, close the session through client
             if self.client:
-                logger.info("🔄 Closing sessions through client")
+                logger.info("� Closing sessions through client")
                 await self.client.close_all_sessions()
                 if hasattr(self, "_sessions"):
                     self._sessions = {}
             # If using direct connector, disconnect
             elif self.connectors:
                 for connector in self.connectors:
-                    logger.info("🔄 Disconnecting connector")
+                    logger.info("� Disconnecting connector")
                     await connector.disconnect()
 
             # Clear adapter tool cache
@@ -1139,7 +1157,7 @@ class MCPAgent:
                 self.adapter._connector_tool_map = {}
 
             self._initialized = False
-            logger.info("👋 Agent closed successfully")
+            logger.info("� Agent closed successfully")
 
         except Exception as e:
             logger.error(f"❌ Error during agent closure: {e}")
