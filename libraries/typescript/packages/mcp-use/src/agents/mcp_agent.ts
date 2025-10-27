@@ -759,14 +759,12 @@ export class MCPAgent {
           inputs,
           {
             streamMode: 'updates', // Get updates as they happen
-            configurable: {
-              callbacks: this.callbacks,
-              metadata: this.getMetadata(),
-              tags: this.getTags(),
-              // Pass sessionId for Langfuse if present in metadata
-              ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
-            }
-          }
+            callbacks: this.callbacks,
+            metadata: this.getMetadata(),
+            tags: this.getTags(),
+            // Pass sessionId for Langfuse if present in metadata
+            ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
+          },
         )
         
         for await (const chunk of stream) {
@@ -1109,13 +1107,11 @@ export class MCPAgent {
         {
           streamMode: 'updates',
           version: 'v2',
-          configurable: {
-            callbacks: this.callbacks.length > 0 ? this.callbacks : undefined,
-            metadata: this.getMetadata(),
-            tags: this.getTags(),
-            // Pass sessionId for Langfuse if present in metadata
-            ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
-          },
+          callbacks: this.callbacks,
+          metadata: this.getMetadata(),
+          tags: this.getTags(),
+          // Pass sessionId for Langfuse if present in metadata
+          ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
         },
       )
 
