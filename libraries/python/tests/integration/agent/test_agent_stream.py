@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from langchain_core.agents import AgentAction
 from langchain_openai import ChatOpenAI
 
 from mcp_use import MCPAgent, MCPClient
@@ -34,19 +35,50 @@ async def test_agent_stream():
         logger.info(f"Query: {query}")
 
         chunks = []
+        intermediate_steps = []
+        final_result = None
+
         async for chunk in agent.stream(query):
             chunks.append(chunk)
-            logger.info(f"Chunk {len(chunks)}: {chunk}")
+            if isinstance(chunk, tuple):
+                action, observation = chunk
+                intermediate_steps.append((action, observation))
+                logger.info(f"Step {len(intermediate_steps)}:")
+                logger.info(f"  Tool: {action.tool}")
+                logger.info(f"  Input: {action.tool_input}")
+                logger.info(f"  Log: {action.log[:100]}..." if len(action.log) > 100 else f"  Log: {action.log}")
+                logger.info(f"  Observation: {str(observation)[:100]}...")
+            elif isinstance(chunk, str):
+                final_result = chunk
+                logger.info(f"\nFinal result: {chunk}")
 
-        final_result = chunks[-1]
-        logger.info(f"\nFinal result: {final_result}")
-        logger.info(f"Total chunks: {len(chunks)}")
+        logger.info(f"\nTotal chunks: {len(chunks)}")
+        logger.info(f"Intermediate steps: {len(intermediate_steps)}")
         logger.info(f"Tools used: {agent.tools_used_names}")
         logger.info("=" * 80 + "\n")
 
-        assert len(chunks) > 0
-        assert "30" in str(final_result)
-        assert len(agent.tools_used_names) > 0
+        # Assert we got chunks
+        assert len(chunks) > 0, "Should yield at least one chunk"
+
+        # Assert we got intermediate steps (tool calls)
+        assert len(intermediate_steps) > 0, "Should have at least one intermediate step"
+
+        # Assert intermediate steps have correct structure
+        for action, observation in intermediate_steps:
+            assert isinstance(action, AgentAction), "Action should be an AgentAction"
+            assert hasattr(action, "tool"), "Action should have tool attribute"
+            assert hasattr(action, "tool_input"), "Action should have tool_input attribute"
+            assert hasattr(action, "log"), "Action should have log attribute"
+            assert observation is not None, "Observation should not be None"
+
+        # Assert final result is a string with expected content
+        assert final_result is not None, "Should have a final result"
+        assert isinstance(final_result, str), "Final result should be a string"
+        assert "30" in final_result, "Final result should contain the answer (30)"
+
+        # Assert tools were used
+        assert len(agent.tools_used_names) > 0, "Should have used at least one tool"
+        assert "add" in agent.tools_used_names, "Should have used the 'add' tool"
 
     finally:
         await agent.close()
