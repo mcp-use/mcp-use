@@ -21,8 +21,8 @@ classifiers = [
 ]
 dependencies = [
     "mcp>=1.10.0",
-    "langchain==0.3.27",
-    "langchain-core==0.3.79",
+    "langchain>=1.0.0",
+    "langchain-core>=1.0.0",
     "websockets>=15.0",
     "aiohttp>=3.9.0",
     "pydantic==2.11.10",

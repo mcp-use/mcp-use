@@ -13,45 +13,77 @@ The `stream` method provides a clean interface for receiving intermediate steps 
 <CodeGroup>
 ```python Python
 import asyncio
-from langchain_openai import ChatOpenAI
+
+from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
+
 from mcp_use import MCPAgent, MCPClient
 
-async def step_streaming_example():
-    # Setup agent
+
+async def main():
+    """Run the example using a configuration file."""
+    # Load environment variables
+    load_dotenv()
+
     config = {
-        "mcpServers": {
-            "playwright": {
-                "command": "npx",
-                "args": ["@playwright/mcp@latest"]
-            }
-        }
+        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
     }
-
-    client = MCPClient(config)
-    llm = ChatOpenAI(model="gpt-4")
-    agent = MCPAgent(llm=llm, client=client)
-
-    # Stream the agent's steps
-    print("🤖 Agent is working...")
-    print("-" * 50)
-
-    async for item in agent.stream("Search for the latest Python news and summarize it"):
-        if isinstance(item, str):
-            # Final result
-            print(f"\n✅ Final Result:\n{item}")
+    # Create MCPClient from config file
+    client = MCPClient(config=config)
+    # Create LLM
+    llm = ChatAnthropic(model="claude-sonnet-4-5")
+    # Create agent with the client
+    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    # Run the query
+    async for step in agent.stream(
+        """
+        Can you go on github and tell me how many stars the mcp-use project has?
+        """,
+        max_steps=30,
+    ):
+        if isinstance(step, str):
+            print("-------------Result--------------------------")
+            print("Result:", step)
         else:
-            # Intermediate step (action, observation)
-            action, observation = item
-            print(f"\n🔧 Tool: {action.tool}")
-            print(f"📝 Input: {action.tool_input}")
-            print(f"📄 Result: {observation[:100]}{'...' if len(observation) > 100 else ''}")
+            action, observation = step
+            print("-------------Log--------------------------")
+            print("Log:", action.log)
+            print("--------------------------------")
+            print("-------------Calling--------------------------")
+            print("Calling:", action.tool)
+            print("--------------------------------")
+            print("-------------Input--------------------------")
+            print("Input:", action.tool_input)
+            print("--------------------------------")
+            print("-------------Observation--------------------------")
+            print("Observation:", observation)
+            print("--------------------------------")
 
-    print("\n🎉 Done!")
 
 if __name__ == "__main__":
-    asyncio.run(step_streaming_example())
+    # Run the appropriate example
+    asyncio.run(main())
 ```
 </CodeGroup>
+
+### Understanding Yielded Objects
+
+The `stream` method yields two types of objects during execution:
+
+<CardGroup cols={1}>
+  <Card title="Intermediate Steps (Tuple)" icon="link">
+    Each tool call yields `(AgentAction, observation)`:
+
+    - **`action.log`** - The agent's reasoning text explaining why it's calling the tool
+    - **`action.tool`** - The name of the tool being called (e.g., "add", "echo")
+    - **`action.tool_input`** - The input arguments passed to the tool as a dictionary
+    - **`observation`** - The result returned by the tool after execution
+  </Card>
+
+  <Card title="Final Result (String)" icon="check">
+    After all tool calls complete, the agent yields a final string response with the answer to the query.
+  </Card>
+</CardGroup>
 
 ## Low-Level Event Streaming
 
