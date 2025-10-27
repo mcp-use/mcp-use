@@ -1,6 +1,7 @@
 """OAuth callback server implementation."""
 
 import asyncio
+import html
 from dataclasses import dataclass
 
 import anyio
@@ -65,10 +66,14 @@ class OAuthCallbackServer:
     async def wait_for_code(self, timeout: float = 300) -> CallbackResponse:
         """Wait for the OAuth callback with a timeout (default 5 minutes)."""
         try:
-            response = await asyncio.wait_for(self.response_queue.get(), timeout=timeout)
+            response = await asyncio.wait_for(
+                self.response_queue.get(), timeout=timeout
+            )
             return response
         except TimeoutError:
-            raise TimeoutError(f"OAuth callback not received within {timeout} seconds") from None
+            raise TimeoutError(
+                f"OAuth callback not received within {timeout} seconds"
+            ) from None
         finally:
             await self.shutdown()
 
@@ -106,7 +111,9 @@ class OAuthCallbackServer:
             if response.code:
                 logger.debug("OAuth callback received authorization code")
             else:
-                logger.error(f"OAuth callback error: {response.error} - {response.error_description}")
+                logger.error(
+                    f"OAuth callback error: {response.error} - {response.error_description}"
+                )
 
             # Put response in queue
             try:
@@ -170,8 +177,10 @@ class OAuthCallbackServer:
 
     def _error_html(self, error: str | None, description: str | None) -> str:
         """HTML response for authorization error."""
-        error_msg = error or "Unknown error"
-        desc_msg = description or "Authorization was not completed successfully."
+        error_msg = html.escape(error or "Unknown error")
+        desc_msg = html.escape(
+            description or "Authorization was not completed successfully."
+        )
 
         return f"""
         <!DOCTYPE html>
