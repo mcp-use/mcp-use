@@ -668,6 +668,7 @@ class MCPAgent:
                 async for chunk in self._agent_executor.astream(
                     inputs,
                     stream_mode="updates",  # Get updates as they happen
+                    config={"callbacks": self.callbacks},
                 ):
                     # chunk is a dict with node names as keys
                     # The agent node will have 'messages' with the AI response
@@ -915,7 +916,7 @@ class MCPAgent:
         inputs = {"input": query, "chat_history": history_to_use}
 
         # 3. Stream & diff -------------------------------------------------------
-        async for event in self._agent_executor.astream_events(inputs):
+        async for event in self._agent_executor.astream_events(inputs, config={"callbacks": self.callbacks}):
             if event.get("event") == "on_chain_end":
                 output = event["data"]["output"]
                 if isinstance(output, list):
