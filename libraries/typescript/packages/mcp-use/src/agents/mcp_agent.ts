@@ -4,11 +4,18 @@ import type {
   BaseMessage,
 } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
+import type { BaseCallbackConfig } from '@langchain/core/callbacks/manager'
 import type { StreamEvent } from '@langchain/core/tracers/log_stream'
 import type { ZodSchema } from 'zod'
 import type { MCPClient } from '../client.js'
 import type { BaseConnector } from '../connectors/base.js'
 import type { MCPSession } from '../session.js'
+
+// Langchain StreamConfiguration type
+export type StreamConfiguration = {
+  streamMode?: "updates" | "messages" | "custom" | ("updates" | "messages" | "custom")[]
+  configurable?: BaseCallbackConfig
+}
 
 /**
  * Represents a single step in the agent's execution
@@ -68,7 +75,7 @@ export class MCPAgent {
   private modelName: string
 
   // Observability support
-  private observabilityManager: ObservabilityManager
+  public observabilityManager: ObservabilityManager
   private callbacks: BaseCallbackHandler[] = []
   private metadata: Record<string, any> = {}
   private tags: string[] = []
@@ -748,18 +755,18 @@ export class MCPAgent {
         let shouldRestart = false
 
         // Stream agent updates with observability callbacks
-        const streamOptions: any = {
-          streamMode: 'updates', // Get updates as they happen
-          callbacks: this.callbacks,
-          metadata: this.getMetadata(),
-          tags: this.getTags(),
-          // Pass sessionId for Langfuse if present in metadata
-          ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
-        }
-        
         const stream = await this._agentExecutor.stream(
           inputs,
-          streamOptions,
+          {
+            streamMode: 'updates', // Get updates as they happen
+            configurable: {
+              callbacks: this.callbacks,
+              metadata: this.getMetadata(),
+              tags: this.getTags(),
+              // Pass sessionId for Langfuse if present in metadata
+              ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
+            }
+          }
         )
         
         for await (const chunk of stream) {
@@ -1061,14 +1068,13 @@ export class MCPAgent {
         initializedHere = true
       }
 
-      const agentExecutor = (this as any).agentExecutor
+      const agentExecutor = this._agentExecutor
       if (!agentExecutor) {
         throw new Error('MCP agent failed to initialize')
       }
 
       // Set max iterations
-      const steps = maxSteps ?? this.maxSteps
-      agentExecutor.maxIterations = steps
+      this.maxSteps = maxSteps ?? this.maxSteps
 
       const display_query
         = query.length > 50 ? `${query.slice(0, 50).replace(/\n/g, ' ')}...` : query.replace(/\n/g, ' ')
@@ -1093,20 +1099,23 @@ export class MCPAgent {
       }
 
       // Prepare inputs
-      const inputs = { input: query, chat_history: langchainHistory }
+      const inputs: BaseMessage[] = [...langchainHistory, new HumanMessage(query)]
 
       logger.info('callbacks', this.callbacks)
 
       // Stream events from the agent executor with observability support
       const eventStream = agentExecutor.streamEvents(
-        inputs,
+        {messages: inputs},
         {
+          streamMode: 'updates',
           version: 'v2',
-          callbacks: this.callbacks.length > 0 ? this.callbacks : undefined,
-          metadata: this.getMetadata(),
-          tags: this.getTags(),
-          // Pass sessionId for Langfuse if present in metadata
-          ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
+          configurable: {
+            callbacks: this.callbacks.length > 0 ? this.callbacks : undefined,
+            metadata: this.getMetadata(),
+            tags: this.getTags(),
+            // Pass sessionId for Langfuse if present in metadata
+            ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
+          },
         },
       )
 
