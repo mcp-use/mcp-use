@@ -2,12 +2,14 @@
 title: "Version 1.3.11"
 description: "Enhanced error handling, authorization features, and critical bug fixes"
 icon: "key"
+og:image: "/images/Release1.3.11.png"
 ---
 
-![Release Image 1.3.11](/images/Release1.3.11.png)
-This release brings significant improvements to MCP-Use with enhanced error handling, new authorization capabilities, and several critical bug fixes. The most notable additions include a comprehensive authorization system and improved reliability across HTTP connectors and subprocess management.
+<Card img="/images/Release1.3.11.png" title="Release 1.3.11" href="https://github.com/mcp-use/mcp-use/releases/tag/1.3.11">
+  This release brings significant improvements to MCP-Use with enhanced error handling, new authorization capabilities, and several critical bug fixes. The most notable additions include a comprehensive authorization system and improved reliability across HTTP connectors and subprocess management.
+</Card>
 
-## 🚀 New Features
+## New Features
 
 ### Authorization System
 **[PR #149](https://github.com/pietrozullo/mcp-use/pull/149) by @pietrozullo**
@@ -16,7 +18,7 @@ A comprehensive OAuth2 and Bearer token authentication framework has been added 
 
 For detailed usage examples and configuration options, see the [Authentication documentation](/python/client/authentication).
 
-## 🐛 Bug Fixes & Improvements
+## Bug Fixes & Improvements
 
 ### HTTP Connector Error Handling
 **[PR #279](https://github.com/pietrozullo/mcp-use/pull/279) by @renvins**
@@ -65,7 +67,7 @@ Enhanced the MCPAgent execution flow with comprehensive success/failure tracking
 
 Fixed a critical resource leak in subprocess management when running multiple MCP clients concurrently. The fix ensures proper process termination and cleanup, preventing zombie processes and memory leaks in long-running applications.
 
-## 🔧 Maintenance
+## Maintenance
 
 ### Automated Dependency Updates
 **[PRs #261](https://github.com/pietrozullo/mcp-use/pull/261), [#253](https://github.com/pietrozullo/mcp-use/pull/253), [#248](https://github.com/pietrozullo/mcp-use/pull/248) by @github-actions[bot]**
