@@ -658,6 +658,7 @@ class MCPAgent:
             max_restarts = 3  # Prevent infinite restart loops
             restart_count = 0
             accumulated_messages = list(langchain_history) + [HumanMessage(content=query)]
+            pending_tool_calls = {}  # Map tool_call_id -> AgentAction
 
             while restart_count <= max_restarts:
                 # Update inputs with accumulated messages
@@ -685,13 +686,32 @@ class MCPAgent:
                             for msg in messages:
                                 if msg not in accumulated_messages:
                                     accumulated_messages.append(msg)
-
                             for message in messages:
                                 # Track tool calls
                                 if hasattr(message, "tool_calls") and message.tool_calls:
+                                    # Extract text content from message for the log
+                                    log_text = ""
+                                    if hasattr(message, "content"):
+                                        if isinstance(message.content, str):
+                                            log_text = message.content
+                                        elif isinstance(message.content, list):
+                                            # Extract text blocks from content array
+                                            text_parts = [
+                                                block.get("text", "") if isinstance(block, dict) else str(block)
+                                                for block in message.content
+                                                if isinstance(block, dict) and block.get("type") == "text"
+                                            ]
+                                            log_text = "\n".join(text_parts)
+
                                     for tool_call in message.tool_calls:
                                         tool_name = tool_call.get("name", "unknown")
                                         tool_input = tool_call.get("args", {})
+                                        tool_call_id = tool_call.get("id")
+
+                                        action = AgentAction(tool=tool_name, tool_input=tool_input, log=log_text)
+                                        if tool_call_id:
+                                            pending_tool_calls[tool_call_id] = action
+
                                         self.tools_used_names.append(tool_name)
                                         steps_taken += 1
 
@@ -700,9 +720,15 @@ class MCPAgent:
                                             tool_input_str = tool_input_str[:97] + "..."
                                         logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
 
-                                # Track tool results (ToolMessage)
+                                # Track tool results and yield AgentStep
                                 if hasattr(message, "type") and message.type == "tool":
                                     observation = message.content
+                                    tool_call_id = getattr(message, "tool_call_id", None)
+
+                                    if tool_call_id and tool_call_id in pending_tool_calls:
+                                        action = pending_tool_calls.pop(tool_call_id)
+                                        yield (action, str(observation))
+
                                     observation_str = str(observation)
                                     if len(observation_str) > 100:
                                         observation_str = observation_str[:97] + "..."
