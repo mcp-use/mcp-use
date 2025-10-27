@@ -672,7 +672,7 @@ class MCPAgent:
                 async for chunk in self._agent_executor.astream(
                     inputs,
                     stream_mode="updates",  # Get updates as they happen
-                    config={"callbacks": self.callbacks, "metadata":self.metadata},
+                    config={"callbacks": self.callbacks, "metadata": self.metadata},
                 ):
                     # chunk is a dict with node names as keys
                     # The agent node will have 'messages' with the AI response
@@ -791,9 +791,9 @@ class MCPAgent:
 
             # 4. Update conversation history
             if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query,id=self.message_id))
+                self.add_to_history(HumanMessage(content=query, id=self.message_id))
                 if final_output:
-                    self.add_to_history(AIMessage(content=final_output,id=self.message_id))
+                    self.add_to_history(AIMessage(content=final_output, id=self.message_id))
 
             # 5. Handle structured output if requested
             if output_schema and final_output:
@@ -816,8 +816,9 @@ class MCPAgent:
                     )
 
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}",
-                                                      id=self.message_id))
+                        self.add_to_history(
+                            AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                        )
 
                     logger.info("✅ Structured output successful")
                     success = True

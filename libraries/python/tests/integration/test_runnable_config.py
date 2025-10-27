@@ -55,10 +55,10 @@ async def test_agent_structured_output():
         logger.info(f"  result: {result.result}")
         logger.info(f"  operation: {result.operation}")
         logger.info(f"Tools used: {agent.tools_used_names}")
-        logger.info( f" tools return value is {result}")
+        logger.info(f" tools return value is {result}")
 
         assert isinstance(result, configResult)
-        assert result.result == f"values of a is {metadata['a']} and  b is {metadata['b'] }"
+        assert result.result == f"values of a is {metadata['a']} and  b is {metadata['b']}"
         assert result.first_number == metadata["a"]
         assert result.second_number == metadata["b"]
         assert "check_config" in agent.tools_used_names

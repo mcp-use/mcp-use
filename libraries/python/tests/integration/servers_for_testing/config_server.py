@@ -6,14 +6,13 @@ from langchain_core.runnables import RunnableConfig
 mcp = FastMCP()
 
 
-
-
 @mcp.tool()
 def check_config(config: RunnableConfig | None = None):
     "check the config and return the values"
-    a= config["metadata"]["a"]
+    a = config["metadata"]["a"]
     b = config["metadata"]["b"]
     return f" values of a is {a} and  b is {b}"
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run MCP test server.")
