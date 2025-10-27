@@ -471,6 +471,12 @@ importers:
       langchain:
         specifier: ^1.0.1
         version: 1.0.1(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76))
+      langfuse:
+        specifier: ^3.38.6
+        version: 3.38.6
+      langfuse-langchain:
+        specifier: ^3.38.6
+        version: 3.38.6(langchain@1.0.1(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76)))
       lodash-es:
         specifier: ^4.17.21
         version: 4.17.21
@@ -544,12 +550,6 @@ importers:
       husky:
         specifier: ^9.1.7
         version: 9.1.7
-      langfuse:
-        specifier: ^3.38.6
-        version: 3.38.6
-      langfuse-langchain:
-        specifier: ^3.38.6
-        version: 3.38.6(langchain@1.0.1(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76)))
       lint-staged:
         specifier: ^15.2.11
         version: 15.5.2
