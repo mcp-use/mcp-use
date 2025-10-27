@@ -34,7 +34,7 @@ import {
   HumanMessage,
   ToolMessage,
 } from '@langchain/core/messages'
-import { createAgent, ReactAgent, modelCallLimitMiddleware, SystemMessage } from 'langchain'
+import { createAgent, type ReactAgent, modelCallLimitMiddleware, SystemMessage } from 'langchain'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { LangChainAdapter } from '../adapters/langchain_adapter.js'
 import { logger } from '../logging.js'
@@ -747,7 +747,7 @@ export class MCPAgent {
       // With dynamic tool reload: if tools change mid-execution, we interrupt and restart
       const maxRestarts = 3 // Prevent infinite restart loops
       let restartCount = 0
-      let accumulatedMessages: BaseMessage[] = [...langchainHistory, new HumanMessage(query)]
+      const accumulatedMessages: BaseMessage[] = [...langchainHistory, new HumanMessage(query)]
 
       while (restartCount <= maxRestarts) {
         // Update inputs with accumulated messages
