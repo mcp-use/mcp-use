@@ -19,7 +19,7 @@ from mcp_use.logging import logger
 @pytest.mark.integration
 async def test_agent_structured_output():
     """Test agent returning structured output using Pydantic models."""
-    server_path = Path(__file__).parent / "servers_for_testing" / "config_server.py"
+    server_path = Path(__file__).parent.parent / "servers_for_testing" / "config_server.py"
 
     config = {"mcpServers": {"simple": {"command": sys.executable, "args": [str(server_path), "--transport", "stdio"]}}}
 
