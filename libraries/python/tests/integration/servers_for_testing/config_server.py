@@ -9,7 +9,7 @@ mcp = FastMCP()
 
 
 @mcp.tool()
-def check_config(config: RunnableConfig):
+def check_config(config: RunnableConfig | None = None):
     "check the config and return the values"
     a= config["metadata"]["a"]
     b = config["metadata"]["b"]
