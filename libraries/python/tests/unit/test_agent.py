@@ -181,7 +181,7 @@ class TestMCPAgentStream:
             agent._agent_executor = executor
             agent._initialized = True
 
-        async def mock_astream(inputs, stream_mode=None):
+        async def mock_astream(inputs, stream_mode=None, config=None):
             # Simulate agent response
             yield {"agent": {"messages": [AIMessage(content="done")]}}
 
@@ -215,7 +215,7 @@ class TestMCPAgentStream:
 
         history_was_used = False
 
-        async def mock_astream(inputs, stream_mode=None):
+        async def mock_astream(inputs, stream_mode=None, config=None):
             nonlocal history_was_used
             # Check that external history was included in messages
             if "messages" in inputs:
