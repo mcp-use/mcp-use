@@ -1037,7 +1037,11 @@ class MCPAgent:
                     for message in output:
                         if not isinstance(message, ToolAgentAction):
                             if self.message_id:
-                                message["id"] = self.message_id
+                                try:
+                                    message.id = self.message_id
+                                except (AttributeError, TypeError):
+                                    if isinstance(message, dict):
+                                        message["id"] = self.message_id
                             self.add_to_history(message)
             yield event
 

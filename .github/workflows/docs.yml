@@ -129,7 +129,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fail if docs are outdated
-        if: steps.check_docs.outputs.docs_outdated == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+        if: steps.check_docs.outputs.docs_outdated == 'true' && github.event.pull_request.head.repo.full_name == github.repository && github.event_name == 'pull_request' 
         run: |
           echo "Please update the API documentation and commit the changes."
           exit 1
