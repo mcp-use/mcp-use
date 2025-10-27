@@ -735,6 +735,7 @@ class MCPAgent:
                                         observation_str = observation_str[:97] + "..."
                                     observation_str = observation_str.replace("\n", " ")
                                     logger.info(f"📄 Tool result: {observation_str}")
+
                                     # --- Check for tool updates after tool results (safe restart point) ---
                                     if self.use_server_manager and self.server_manager:
                                         current_tools = self.server_manager.tools
@@ -778,6 +779,7 @@ class MCPAgent:
                 if not should_restart:
                     # Execution completed successfully without tool changes
                     break
+
                 # If we've hit max restarts, log warning and continue
                 if restart_count > max_restarts:
                     logger.warning(f"⚠️ Max restarts ({max_restarts}) reached. Continuing with current tools.")
@@ -794,6 +796,7 @@ class MCPAgent:
                 try:
                     logger.info("🔧 Attempting structured output...")
                     structured_llm = self.llm.with_structured_output(output_schema)
+
                     # Get schema description
                     schema_fields = []
                     for field_name, field_info in output_schema.model_fields.items():
