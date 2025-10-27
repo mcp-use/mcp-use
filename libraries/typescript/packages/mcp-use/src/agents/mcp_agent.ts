@@ -762,6 +762,8 @@ export class MCPAgent {
             callbacks: this.callbacks,
             metadata: this.getMetadata(),
             tags: this.getTags(),
+            // Set trace name for LangChain/Langfuse
+            runName: this.metadata.trace_name || 'mcp-use-agent',
             // Pass sessionId for Langfuse if present in metadata
             ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
           },
@@ -1110,6 +1112,8 @@ export class MCPAgent {
           callbacks: this.callbacks,
           metadata: this.getMetadata(),
           tags: this.getTags(),
+          // Set trace name for LangChain/Langfuse
+          runName: this.metadata.trace_name || 'mcp-use-agent',
           // Pass sessionId for Langfuse if present in metadata
           ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
         },
