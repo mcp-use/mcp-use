@@ -154,6 +154,39 @@ export class ObservabilityManager {
   }
 
   /**
+   * Get the current observability status including metadata and tags.
+   * @returns Object containing enabled status, callback count, handler names, metadata, and tags.
+   */
+  async getStatus(): Promise<{
+    enabled: boolean
+    callbackCount: number
+    handlerNames: string[]
+    metadata: Record<string, any>
+    tags: string[]
+  }> {
+    const callbacks = await this.getCallbacks()
+    const handlerNames = await this.getHandlerNames()
+    
+    // Get current metadata from provider if available
+    const currentMetadata = this.metadataProvider 
+      ? this.metadataProvider() 
+      : (this.metadata || {})
+    
+    // Get current tags from provider if available
+    const currentTags = this.tagsProvider 
+      ? this.tagsProvider() 
+      : []
+    
+    return {
+      enabled: this.observe && callbacks.length > 0,
+      callbackCount: callbacks.length,
+      handlerNames,
+      metadata: currentMetadata,
+      tags: currentTags,
+    }
+  }
+
+  /**
    * Add a callback to the custom callbacks list.
    * @param callback The callback to add.
    */
