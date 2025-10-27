@@ -158,6 +158,33 @@ for function_call in response.function_calls:
 
 None - all existing methods have been updated internally to use LangChain 1.0.0 while maintaining the same API.
 
+### Staying on LangChain 0.3.x
+
+If you need to remain on LangChain 0.3.x, pin `mcp-use` to version 1.3.13:
+
+```bash
+# Using pip
+pip install mcp-use==1.3.13
+
+# Using uv
+uv pip install mcp-use==1.3.13
+```
+
+Or in your `requirements.txt` or `pyproject.toml`:
+
+```toml
+# requirements.txt
+mcp-use==1.3.13
+
+# pyproject.toml
+[project]
+dependencies = [
+    "mcp-use==1.3.13",
+]
+```
+
+Version 1.3.13 is the last release compatible with LangChain 0.3.27.
+
 ## Dependencies
 
 ```toml
