@@ -60,7 +60,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "build": "NODE_OPTIONS='--max-old-space-size=8192' sh -c 'rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration'",
     "test": "vitest",
     "test:run": "vitest run",
     "test:simple": "vitest run tests/stream_events_simple.test.ts",
