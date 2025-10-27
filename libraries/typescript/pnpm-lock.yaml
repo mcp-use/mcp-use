@@ -435,9 +435,6 @@ importers:
       '@langchain/openai':
         specifier: ^1.0.0
         version: 1.0.0(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)
-      '@langfuse/langchain':
-        specifier: ^4.3.0
-        version: 4.3.0(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)
       '@mcp-ui/server':
         specifier: ^5.12.0
         version: 5.12.0
@@ -474,9 +471,6 @@ importers:
       langchain:
         specifier: ^1.0.1
         version: 1.0.1(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76))
-      langfuse:
-        specifier: ^3.32.0
-        version: 3.38.5
       lodash-es:
         specifier: ^4.17.21
         version: 4.17.21
@@ -550,6 +544,12 @@ importers:
       husky:
         specifier: ^9.1.7
         version: 9.1.7
+      langfuse:
+        specifier: ^3.38.6
+        version: 3.38.6
+      langfuse-langchain:
+        specifier: ^3.38.6
+        version: 3.38.6(langchain@1.0.1(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76)))
       lint-staged:
         specifier: ^15.2.11
         version: 15.5.2
@@ -1403,21 +1403,6 @@ packages:
     engines: {node: '>=20'}
     peerDependencies:
       '@langchain/core': ^1.0.0
-
-  '@langfuse/core@4.3.0':
-    resolution: {integrity: sha512-KPSyEAHn5vLivofDtnHCnhrsCBc/NI7lOH38UvIlK0kxMcFeRKvLU2duzeix5A5lzo6Hw4O9FW2bGBwLE3j2rg==}
-
-  '@langfuse/langchain@4.3.0':
-    resolution: {integrity: sha512-YgQEwpo5bY8d1UmhnmtEiXqoc9b84R4X2duZoJZvoTUrwiEtl31oPBHmPWBZk7O0hZ1DVu8/imHhBzt88Fd2LQ==}
-    peerDependencies:
-      '@langchain/core': '>=0.3.0'
-      '@opentelemetry/api': ^1.9.0
-
-  '@langfuse/tracing@4.3.0':
-    resolution: {integrity: sha512-ZfjrktI5GGIQkKYmYhtZcmGlgP5AgDcDzxdipvtvn9IR4EBkKKhWNwBWOb3mrIm9PPVamWG4HHAbeM0yuCVfcA==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      '@opentelemetry/api': ^1.9.0
 
   '@manypkg/find-root@1.1.0':
     resolution: {integrity: sha512-mki5uBvhHzO8kYYix/WRy2WX8S3B5wdVSc9D6KcU5lQNglP2yt58/VfLuAK49glRXChosY8ap2oJ1qgma3GUVA==}
@@ -4488,12 +4473,18 @@ packages:
     peerDependencies:
       '@langchain/core': ^1.0.0
 
-  langfuse-core@3.38.5:
-    resolution: {integrity: sha512-vf/4zxv7/mz97yOpQiCJ7Mok8YZt9a52nn3XWTj+qxll4zenHT+wfAHwvfJ4BnVjK54GbEmP7IB524f/5ltq7g==}
+  langfuse-core@3.38.6:
+    resolution: {integrity: sha512-EcZXa+DK9FJdi1I30+u19eKjuBJ04du6j2Nybk19KKCuraLczg/ppkTQcGvc4QOk//OAi3qUHrajUuV74RXsBQ==}
     engines: {node: '>=18'}
 
-  langfuse@3.38.5:
-    resolution: {integrity: sha512-pvcq9qJh/q/OFGPET4/sFfXRhCcEgONx1NTqZ8bu/hnorD5xZ/qpS+er0esXJ5cuRILEGw9ydKezAeULf8tpyQ==}
+  langfuse-langchain@3.38.6:
+    resolution: {integrity: sha512-XY7M1R/G7bzihm1cCT1CXKlTLfjHfTiWCPOVm/Ko039Cr3Nz945+HOynqUngjhQUdqH0gAwDsFUZookosARJSw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      langchain: '>=0.0.157 <0.4.0'
+
+  langfuse@3.38.6:
+    resolution: {integrity: sha512-mtwfsNGIYvObRh+NYNGlJQJDiBN+Wr3Hnr++wN25mxuOpSTdXX+JQqVCyAqGL5GD2TAXRZ7COsN42Vmp9krYmg==}
     engines: {node: '>=18'}
 
   langsmith@0.3.73:
@@ -7427,20 +7418,6 @@ snapshots:
       zod: 4.1.12
     transitivePeerDependencies:
       - ws
-
-  '@langfuse/core@4.3.0': {}
-
-  '@langfuse/langchain@4.3.0(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@langchain/core': 1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
-      '@langfuse/core': 4.3.0
-      '@langfuse/tracing': 4.3.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/api': 1.9.0
-
-  '@langfuse/tracing@4.3.0(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@langfuse/core': 4.3.0
-      '@opentelemetry/api': 1.9.0
 
   '@manypkg/find-root@1.1.0':
     dependencies:
@@ -10818,13 +10795,19 @@ snapshots:
       - react-dom
       - zod-to-json-schema
 
-  langfuse-core@3.38.5:
+  langfuse-core@3.38.6:
     dependencies:
       mustache: 4.2.0
 
-  langfuse@3.38.5:
+  langfuse-langchain@3.38.6(langchain@1.0.1(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76))):
     dependencies:
-      langfuse-core: 3.38.5
+      langchain: 1.0.1(@langchain/core@1.0.1(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76))
+      langfuse: 3.38.6
+      langfuse-core: 3.38.6
+
+  langfuse@3.38.6:
+    dependencies:
+      langfuse-core: 3.38.6
 
   langsmith@0.3.73(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)):
     dependencies:
