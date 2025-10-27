@@ -22,7 +22,9 @@ MCP-use provides **optional observability integration** to help you debug, monit
 
 MCP-use currently integrates with:
 
-- **[Langfuse](https://langfuse.com)** - Open-source LLM observability with self-hosting options
+- **[Langfuse](https://langfuse.com)** (v3.38.x+) - Open-source LLM observability with self-hosting options
+  - Requires: `langfuse@^3.38.0` and `langfuse-langchain@^3.38.0`
+  - ⚠️ Use the correct package names: `langfuse` and `langfuse-langchain` (NOT `@langfuse/core` or `@langfuse/langchain`)
 
 The platform automatically initializes when you import `mcp-use` if the required environment variables are set.
 
@@ -58,12 +60,39 @@ Your observability dashboard will show something like:
 
 [Langfuse](https://langfuse.com) is an open-source LLM observability platform with both cloud and self-hosted options.
 
+<Note>
+**Version Compatibility**: MCP-use supports `langfuse` and `langfuse-langchain` version 3.38.x+. While these packages show a peer dependency warning with LangChain 1.0, they work correctly with mcp-use and traces are successfully sent to Langfuse.
+</Note>
+
 ## Setup Langfuse
 
 ### 1. Install Langfuse Packages
+
+<Note>
+**Package Names**: Use `langfuse` and `langfuse-langchain` (version 3.38.x+). 
+
+**Do NOT use** `@langfuse/core` or `@langfuse/langchain` - these are incorrect package names and will not work with mcp-use.
+</Note>
+
 ```bash
-npm install langfuse langfuse-langchain
+npm install langfuse@^3.38.0 langfuse-langchain@^3.38.0
 ```
+
+Or if using pnpm:
+
+```bash
+pnpm add langfuse@^3.38.0 langfuse-langchain@^3.38.0
+```
+
+Or if using yarn:
+
+```bash
+yarn add langfuse@^3.38.0 langfuse-langchain@^3.38.0
+```
+
+<Tip>
+**Peer Dependency Warning**: When installing, you may see a peer dependency warning about LangChain versions. This is expected and safe to ignore - the packages work correctly with LangChain 1.0 despite the warning. The Langfuse team is working on updating the peer dependencies for LangChain 1.0 compatibility.
+</Tip>
 
 ### 2. Get Your Keys
 - **Cloud**: Sign up at [cloud.langfuse.com](https://cloud.langfuse.com)
@@ -471,10 +500,19 @@ testLangfuse().catch(console.error)
 
 ### "Package not installed" errors
 
+Make sure you have the correct Langfuse packages installed (version 3.38.x or higher):
+
 ```bash
-# Install the required packages
-npm install langfuse langfuse-langchain
+# Install the required packages with correct names
+npm install langfuse@^3.38.0 langfuse-langchain@^3.38.0
+
+# Verify installation
+npm list langfuse langfuse-langchain
 ```
+
+<Warning>
+**Common Mistake**: Do NOT install `@langfuse/core` or `@langfuse/langchain`. These are incorrect package names and will not work with mcp-use. The correct packages are `langfuse` and `langfuse-langchain` (without the `@` scope).
+</Warning>
 
 ### "API keys not found" warnings
 
