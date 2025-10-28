@@ -729,7 +729,7 @@ export class MCPAgent {
 
       // 2. Build inputs for the agent
       const historyToUse = externalHistory ?? this.conversationHistory
-      
+
       // Convert messages to format expected by LangChain agent
       const langchainHistory: BaseMessage[] = []
       for (const msg of historyToUse) {
@@ -768,7 +768,7 @@ export class MCPAgent {
             ...(this.metadata.session_id && { sessionId: this.metadata.session_id }),
           },
         )
-        
+
         for await (const chunk of stream) {
           // chunk is a dict with node names as keys
           // The agent node will have 'messages' with the AI response
@@ -1107,7 +1107,7 @@ export class MCPAgent {
       const eventStream = agentExecutor.streamEvents(
         {messages: inputs},
         {
-          streamMode: 'updates',
+          streamMode: 'messages',
           version: 'v2',
           callbacks: this.callbacks,
           metadata: this.getMetadata(),
@@ -1133,10 +1133,25 @@ export class MCPAgent {
           totalResponseLength += event.data.chunk.content.length
         }
 
+        // Capture AI message content as it streams
+        if (event.event === 'on_chat_model_stream' && event.data?.chunk) {
+          logger.info('on_chat_model_stream', event.data.chunk)
+          const chunk = event.data.chunk
+          if (chunk.content) {
+            if (!finalResponse) {
+              finalResponse = ''
+            }
+            // Normalize the content to ensure it's a string
+            const normalizedContent = this._normalizeOutput(chunk.content)
+            finalResponse += normalizedContent
+            logger.debug(`📝 Accumulated response length: ${finalResponse.length}`)
+          }
+        }
+
         yield event
 
-        // Capture final response from chain end event
-        if (event.event === 'on_chain_end' && event.data?.output) {
+        // Capture final response from chain end event (fallback)
+        if (event.event === 'on_chain_end' && event.data?.output && !finalResponse) {
           const output = event.data.output
           if (Array.isArray(output) && output.length > 0 && output[0]?.text) {
             finalResponse = output[0].text
@@ -1153,14 +1168,14 @@ export class MCPAgent {
       // Convert to structured output if requested
       if (outputSchema && finalResponse) {
         logger.info('🔧 Attempting structured output conversion...')
-        
+
         try {
-        
+
           // Start the conversion (non-blocking)
           let conversionCompleted = false
           let conversionResult: T | null = null
           let conversionError: Error | null = null
-          
+
           this._attemptStructuredOutput<T>(
             finalResponse,
             this.llm!,
@@ -1174,43 +1189,43 @@ export class MCPAgent {
             conversionError = error
             throw error
           })
-          
+
           // Yield progress events while conversion is running
           let progressCount = 0
-          
+
           while (!conversionCompleted) {
             // Wait 2 seconds
             await new Promise(resolve => setTimeout(resolve, 2000))
-            
+
             if (!conversionCompleted) {
               // Still running - yield progress event
               progressCount++
               yield {
                 event: 'on_structured_output_progress',
-                data: { 
+                data: {
                   message: `Converting to structured output... (${progressCount * 2}s)`,
-                  elapsed: progressCount * 2 
+                  elapsed: progressCount * 2
                 },
               } as unknown as StreamEvent
             }
           }
-          
+
           // Check if conversion succeeded or failed
           if (conversionError) {
             throw conversionError
           }
-          
+
           if (conversionResult) {
             // Yield structured result as a custom event
             yield {
               event: 'on_structured_output',
               data: { output: conversionResult },
             } as unknown as StreamEvent
-            
+
             if (this.memoryEnabled) {
               this.addToHistory(new AIMessage(`Structured result: ${JSON.stringify(conversionResult)}`))
             }
-            
+
             logger.info('✅ Structured output successful')
           }
         } catch (e) {
@@ -1283,7 +1298,7 @@ export class MCPAgent {
 
   /**
    * Attempt to create structured output from raw result with validation and retry logic.
-   * 
+   *
    * @param rawResult - The raw text result from the agent
    * @param llm - LLM to use for structured output
    * @param outputSchema - The Zod schema to validate against
@@ -1299,7 +1314,7 @@ export class MCPAgent {
     // Schema-aware setup for structured output
     let structuredLlm: BaseLanguageModelInterface | null = null
     let schemaDescription = ''
-    
+
     logger.debug(`🔄 Structured output requested, schema: ${JSON.stringify(zodToJsonSchema(outputSchema), null, 2)}`)
     // Check if withStructuredOutput method exists
     if (llm && 'withStructuredOutput' in llm && typeof (llm as any).withStructuredOutput === 'function') {
@@ -1312,7 +1327,9 @@ export class MCPAgent {
     else {
       throw new Error('LLM is required for structured output')
     }
-    schemaDescription = JSON.stringify(zodToJsonSchema(outputSchema), null, 2)
+    const jsonSchema = zodToJsonSchema(outputSchema) as any
+    const { $schema, additionalProperties, ...cleanSchema } = jsonSchema
+    schemaDescription = JSON.stringify(cleanSchema, null, 2)
     logger.info(`🔄 Schema description: ${schemaDescription}`)
 
     // Handle different input formats - rawResult might be an array or object from the agent
@@ -1340,24 +1357,26 @@ export class MCPAgent {
       let formatPrompt = `
       Please format the following information according to the EXACT schema specified below.
       You must use the exact field names and types as shown in the schema.
-      
+
       Required schema format:
       ${schemaDescription}
-      
+
       Content to extract from:
       ${textContent}
-      
-      IMPORTANT: 
+
+      IMPORTANT:
       - Use ONLY the field names specified in the schema
       - Match the data types exactly (string, number, boolean, array, etc.)
       - Include ALL required fields
       - Return valid JSON that matches the schema structure exactly
+      - For missing data: use null for nullable fields, omit optional fields entirely
+      - Do NOT use empty strings ("") or zero (0) as placeholders for missing data
       `
 
       // Add specific error feedback for retry attempts
       if (attempt > 1) {
         formatPrompt += `
-        
+
         PREVIOUS ATTEMPT FAILED with error: ${lastError}
         Please fix the issues mentioned above and ensure the output matches the schema exactly.
         `
@@ -1365,7 +1384,12 @@ export class MCPAgent {
 
       try {
         logger.info(`🔄 Structured output attempt ${attempt} - using streaming approach`)
-        
+        const contentPreview = textContent.length > 300 ? `${textContent.slice(0, 300)}...` : textContent
+        logger.info(`🔄 Content being formatted (${textContent.length} chars): ${contentPreview}`)
+
+        // Log the full prompt being sent to LLM
+        logger.info(`🔄 Full format prompt (${formatPrompt.length} chars):\n${formatPrompt}`)
+
         // Use streaming to avoid blocking the event loop
         const stream = await structuredLlm!.stream(formatPrompt)
         let structuredResult = null
@@ -1373,10 +1397,10 @@ export class MCPAgent {
 
         for await (const chunk of stream) {
           chunkCount++
-          
+
           // Print the chunk for debugging
           logger.info(`Chunk ${chunkCount}: ${JSON.stringify(chunk, null, 2)}`)
-          
+
           // Handle different chunk types
           if (typeof chunk === 'string') {
             // If it's a string, try to parse it as JSON
@@ -1396,7 +1420,7 @@ export class MCPAgent {
               logger.warn(`🔄 Failed to parse chunk as JSON: ${chunk}`)
             }
           }
-          
+
           if (chunkCount % 10 === 0) {
             logger.info(`🔄 Structured output streaming: ${chunkCount} chunks`)
           }
@@ -1472,16 +1496,18 @@ export class MCPAgent {
    */
   private _enhanceQueryWithSchema<T>(query: string, outputSchema: ZodSchema<T>): string {
     try {
-      const schemaDescription = JSON.stringify(zodToJsonSchema(outputSchema), null, 2)
+      const jsonSchema = zodToJsonSchema(outputSchema) as any
+      const { $schema, additionalProperties, ...cleanSchema } = jsonSchema
+      const schemaDescription = JSON.stringify(cleanSchema, null, 2)
 
       // Enhance the query with schema awareness
       const enhancedQuery = `
       ${query}
-      
+
       IMPORTANT: Your response must include sufficient information to populate the following structured output:
-      
+
       ${schemaDescription}
-      
+
       Make sure you gather ALL the required information during your task execution.
       If any required information is missing, continue working to find it.
       `
