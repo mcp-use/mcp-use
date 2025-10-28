@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 0.4.9-canary.1
+
+### Patch Changes
+
+- 3b72cde: fix: enhance widget CSP handling and security headers
+
 ## 0.4.9-canary.0
 
 ### Patch Changes
