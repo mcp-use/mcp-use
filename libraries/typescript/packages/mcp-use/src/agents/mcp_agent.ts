@@ -1135,7 +1135,6 @@ export class MCPAgent {
 
         // Capture AI message content as it streams
         if (event.event === 'on_chat_model_stream' && event.data?.chunk) {
-          logger.info('on_chat_model_stream', event.data.chunk)
           const chunk = event.data.chunk
           if (chunk.content) {
             if (!finalResponse) {
@@ -1308,7 +1307,7 @@ export class MCPAgent {
     llm: LanguageModel,
     outputSchema: ZodSchema<T>,
   ): Promise<T> {
-    logger.info(`🔄 Attempting structured output with schema: ${outputSchema}`)
+    logger.info(`🔄 Attempting structured output with schema: ${JSON.stringify(outputSchema, null, 2)}`)
     logger.info(`🔄 Raw result: ${JSON.stringify(rawResult, null, 2)}`)
 
     // Schema-aware setup for structured output
