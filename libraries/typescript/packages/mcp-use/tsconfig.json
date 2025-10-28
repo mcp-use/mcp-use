@@ -12,7 +12,10 @@
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "skipDefaultLibCheck": true
   },
   "include": ["**/*.ts", "../create-mcp-use-app/src/create-mcp-app.ts"],
   "exclude": ["node_modules", "dist", "examples", "../create-mcp-use-app/src/templates", "test-*"]
