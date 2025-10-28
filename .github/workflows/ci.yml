@@ -12,6 +12,7 @@ jobs:
     outputs:
       python: ${{ steps.filter.outputs.python }}
       typescript: ${{ steps.filter.outputs.typescript }}
+      typescript-agent: ${{ steps.filter.outputs.typescript-agent }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -22,6 +23,11 @@ jobs:
               - 'libraries/python/**'
             typescript:
               - 'libraries/typescript/**'
+            typescript-agent:
+              - 'libraries/typescript/packages/mcp-use/src/agents/**'
+              - 'libraries/typescript/packages/mcp-use/tests/integration/agent/**'
+              - 'libraries/typescript/packages/mcp-use/src/observability/**'
+              - 'libraries/typescript/packages/mcp-use/src/telemetry/**'
 
   # Python Jobs
   python-lint:
@@ -260,7 +266,7 @@ jobs:
       - name: Build Packages
         run: pnpm build
 
-  typescript-test:
+  typescript-unit-tests:
     needs: typescript-lint
     runs-on: ubuntu-latest
     defaults:
@@ -288,8 +294,50 @@ jobs:
       - name: Build Packages
         run: pnpm build
 
-      - name: Run Tests
-        run: pnpm test
+      - name: Run Unit Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter mcp-use test:unit
+
+  # Run agent integration tests only when agent-related files change
+  # This saves CI resources and avoids unnecessary API calls
+  typescript-agent-integration-tests:
+    needs: [detect-changes, typescript-lint]
+    if: needs.detect-changes.outputs.typescript-agent == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
+
+      - name: Run Agent Integration Tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          MCP_USE_LANGFUSE: true
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter mcp-use test:integration:agent
 
   typescript-changeset-check:
     needs: detect-changes

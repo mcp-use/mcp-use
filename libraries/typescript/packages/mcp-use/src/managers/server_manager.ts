@@ -3,6 +3,7 @@ import type { LangChainAdapter } from '../adapters/langchain_adapter.js'
 import type { MCPClient } from '../client.js'
 import type { BaseConnector } from '../connectors/base.js'
 import type { MCPSession } from '../session.js'
+import type { IServerManager } from './types.js'
 import { isEqual } from 'lodash-es'
 import { logger } from '../logging.js'
 import { AcquireActiveMCPServerTool } from './tools/acquire_active_mcp_server.js'
@@ -11,7 +12,7 @@ import { ConnectMCPServerTool } from './tools/connect_mcp_server.js'
 import { ListMCPServersTool } from './tools/list_mcp_servers.js'
 import { ReleaseMCPServerConnectionTool } from './tools/release_mcp_server_connection.js'
 
-export class ServerManager {
+export class ServerManager implements IServerManager {
   public readonly initializedServers: Record<string, boolean> = {}
   public readonly serverTools: Record<string, StructuredToolInterface[]> = {}
 

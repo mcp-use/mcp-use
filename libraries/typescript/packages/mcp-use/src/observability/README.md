@@ -16,7 +16,7 @@ Install the required packages based on your observability platform:
 
 ```bash
 # For Langfuse
-npm install langfuse langfuse-langchain
+npm install langfuse @langfuse/langchain
 ```
 
 ## Configuration
@@ -59,7 +59,7 @@ const result = await agent.run('What\'s the weather?')
 You can provide custom callbacks:
 
 ```typescript
-import { CallbackHandler } from 'langfuse-langchain'
+import { CallbackHandler } from '@langfuse/langchain'
 import { MCPAgent } from 'mcp-use'
 
 const customHandler = new CallbackHandler({

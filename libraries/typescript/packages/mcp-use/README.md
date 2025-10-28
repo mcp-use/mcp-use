@@ -73,7 +73,7 @@ npm install mcp-use
 npm install langchain @langchain/openai dotenv
 
 # Optional: Install observability packages for monitoring
-npm install langfuse langfuse-langchain  # For Langfuse observability
+npm install langfuse @langfuse/langchain  # For Langfuse observability
 ```
 
 Create a `.env`:
