@@ -1,4 +1,4 @@
-import type { ServerManager } from '../server_manager.js'
+import type { IServerManager } from '../types.js'
 import { z } from 'zod'
 import { MCPServerTool } from './base.js'
 
@@ -9,7 +9,7 @@ export class ReleaseMCPServerConnectionTool extends MCPServerTool<typeof Release
   override description = 'Disconnect from the currently active MCP (Model Context Protocol) server'
   override schema = ReleaseConnectionSchema
 
-  constructor(manager: ServerManager) {
+  constructor(manager: IServerManager) {
     super(manager)
   }
 

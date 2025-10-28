@@ -1,5 +1,5 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { ServerManager } from '../server_manager.js'
+import type { IServerManager } from '../types.js'
 import { StructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { logger } from '../../logging.js'
@@ -18,9 +18,9 @@ export class AddMCPServerFromConfigTool extends StructuredTool {
       ),
   })
 
-  private manager: ServerManager
+  private manager: IServerManager
 
-  constructor(manager: ServerManager) {
+  constructor(manager: IServerManager) {
     super()
     this.manager = manager
   }
