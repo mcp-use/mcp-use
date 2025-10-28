@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.2.0-canary.1
+
+### Patch Changes
+
+- 5dd503f: fix: mdoel type for langchain 1.0.0
+  - @mcp-use/cli@2.1.21-canary.2
+  - @mcp-use/inspector@0.4.9-canary.2
+
 ## 1.2.0-canary.0
 
 ### Minor Changes

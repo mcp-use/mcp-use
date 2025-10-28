@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.2.0-canary.0",
+  "version": "1.2.0-canary.1",
   "packageManager": "pnpm@10.6.1",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents and Clients + MCP Servers with support for MCP-UI.",
   "author": "mcp-use, Inc.",
@@ -100,8 +100,8 @@
   "peerDependencies": {
     "@langchain/anthropic": "^1.0.0",
     "@langchain/openai": "^1.0.0",
-    "@mcp-use/cli": "^2.1.21-canary.0",
-    "@mcp-use/inspector": "^0.4.9-canary.0",
+    "@mcp-use/cli": "^2.1.21-canary.2",
+    "@mcp-use/inspector": "^0.4.9-canary.2",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "langfuse": "^3.38.6",
