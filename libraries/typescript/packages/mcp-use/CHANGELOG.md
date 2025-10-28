@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.2.0-canary.0
+
+### Minor Changes
+
+- b24a213: Support Langchain 1.0.0
+
+### Patch Changes
+
+- @mcp-use/cli@2.1.21-canary.0
+- @mcp-use/inspector@0.4.9-canary.0
+
 ## 1.1.8
 
 ### Patch Changes
