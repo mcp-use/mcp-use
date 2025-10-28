@@ -18,5 +18,5 @@
     "skipDefaultLibCheck": true
   },
   "include": ["**/*.ts", "../create-mcp-use-app/src/create-mcp-app.ts"],
-  "exclude": ["node_modules", "dist", "examples", "../create-mcp-use-app/src/templates", "test-*"]
+  "exclude": ["node_modules", "dist", "examples", "tests", "../create-mcp-use-app/src/templates", "test-*"]
 }
