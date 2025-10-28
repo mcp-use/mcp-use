@@ -60,7 +60,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "NODE_OPTIONS='--max-old-space-size=8192' sh -c 'rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration'",
+    "build": "rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",
     "test:simple": "vitest run tests/stream_events_simple.test.ts",
@@ -97,18 +97,41 @@
     "example:observability": "tsx examples/client/observability.ts"
   },
   "peerDependencies": {
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/core": "^1.0.1",
+    "@langchain/openai": "^1.0.0",
+    "@mcp-use/cli": "^2.1.20",
     "@mcp-use/inspector": "^0.4.8",
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "langchain": "^1.0.1",
     "langfuse": "^3.38.6",
     "langfuse-langchain": "^3.38.6",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
+    "@langchain/anthropic": {
+      "optional": true
+    },
+    "@langchain/core": {
+      "optional": true
+    },
+    "@langchain/openai": {
+      "optional": true
+    },
+    "@mcp-use/cli": {
+      "optional": true
+    },
+    "@mcp-use/inspector": {
+      "optional": true
+    },
     "cors": {
       "optional": true
     },
     "express": {
+      "optional": true
+    },
+    "langchain": {
       "optional": true
     },
     "langfuse": {
@@ -120,12 +143,7 @@
   },
   "dependencies": {
     "@dmitryrechkin/json-schema-to-zod": "^1.0.1",
-    "@langchain/anthropic": "^1.0.0",
-    "@langchain/core": "^1.0.1",
-    "@langchain/openai": "^1.0.0",
     "@mcp-ui/server": "^5.12.0",
-    "@mcp-use/cli": "workspace:*",
-    "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/sdk": "1.20.0",
     "@scarf/scarf": "^1.4.0",
     "@tailwindcss/vite": "^4.1.15",
@@ -134,7 +152,6 @@
     "commander": "^14.0.1",
     "dotenv": "^16.5.0",
     "esbuild": ">=0.25.0",
-    "langchain": "^1.0.1",
     "lodash-es": "^4.17.21",
     "posthog-node": "^5.1.1",
     "strict-url-sanitise": "^0.0.1",
@@ -150,6 +167,9 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.13.2",
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/core": "^1.0.1",
+    "@langchain/openai": "^1.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/lodash-es": "^4.17.12",
@@ -161,6 +181,7 @@
     "eslint-plugin-format": "^1.0.1",
     "express": "^4.18.2",
     "husky": "^9.1.7",
+    "langchain": "^1.0.1",
     "lint-staged": "^15.2.11",
     "react": "^19.2.0",
     "typescript": "^5.8.3",
