@@ -7,7 +7,7 @@ from LangChain language models for telemetry purposes.
 
 import importlib.metadata
 
-from langchain_core.language_models.base import BaseLanguageModel
+from langchain_core.language_models import BaseLanguageModel
 
 
 def get_package_version() -> str:

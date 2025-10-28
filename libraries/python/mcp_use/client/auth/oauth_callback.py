@@ -1,6 +1,7 @@
 """OAuth callback server implementation."""
 
 import asyncio
+import html
 from dataclasses import dataclass
 
 import anyio
@@ -170,8 +171,8 @@ class OAuthCallbackServer:
 
     def _error_html(self, error: str | None, description: str | None) -> str:
         """HTML response for authorization error."""
-        error_msg = error or "Unknown error"
-        desc_msg = description or "Authorization was not completed successfully."
+        error_msg = html.escape(error or "Unknown error")
+        desc_msg = html.escape(description or "Authorization was not completed successfully.")
 
         return f"""
         <!DOCTYPE html>
