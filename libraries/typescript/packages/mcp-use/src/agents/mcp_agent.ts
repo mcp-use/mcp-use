@@ -4,18 +4,34 @@ import type {
   BaseMessage,
 } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { BaseCallbackConfig } from '@langchain/core/callbacks/manager'
 import type { StreamEvent } from '@langchain/core/tracers/log_stream'
 import type { ZodSchema } from 'zod'
 import type { MCPClient } from '../client.js'
 import type { BaseConnector } from '../connectors/base.js'
 import type { MCPSession } from '../session.js'
+import {
+  AIMessage,
+  HumanMessage,
+  ToolMessage,
+} from '@langchain/core/messages'
+import { createAgent, type ReactAgent, modelCallLimitMiddleware, SystemMessage, } from 'langchain'
+import { zodToJsonSchema } from 'zod-to-json-schema'
+import { LangChainAdapter } from '../adapters/langchain_adapter.js'
+import { logger } from '../logging.js'
+import { ServerManager } from '../managers/server_manager.js'
+import { ObservabilityManager } from '../observability/index.js'
+import { extractModelInfo, Telemetry } from '../telemetry/index.js'
+import { createSystemMessage } from './prompts/system_prompt_builder.js'
+import { DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE } from './prompts/templates.js'
+import { RemoteAgent } from './remote.js'
 
-// Langchain StreamConfiguration type
-export type StreamConfiguration = {
-  streamMode?: "updates" | "messages" | "custom" | ("updates" | "messages" | "custom")[]
-  configurable?: BaseCallbackConfig
-}
+
+/**
+ * Language model type that accepts any LangChain chat model.
+ * createAgent accepts a LanguageModelLike but ChatOpenAI, ChatAnthropic, etc. are still of type BaseLanguageModelInterface.
+ * Any is used to avoid TypeScript structural typing issues with protected properties until langchain fixes the issue.
+ */
+export type LanguageModel = LanguageModelLike | BaseLanguageModelInterface | any
 
 /**
  * Represents a single step in the agent's execution
@@ -29,24 +45,8 @@ export interface AgentStep {
   observation: string
 }
 
-import {
-  AIMessage,
-  HumanMessage,
-  ToolMessage,
-} from '@langchain/core/messages'
-import { createAgent, type ReactAgent, modelCallLimitMiddleware, SystemMessage } from 'langchain'
-import { zodToJsonSchema } from 'zod-to-json-schema'
-import { LangChainAdapter } from '../adapters/langchain_adapter.js'
-import { logger } from '../logging.js'
-import { ServerManager } from '../managers/server_manager.js'
-import { ObservabilityManager } from '../observability/index.js'
-import { extractModelInfo, Telemetry } from '../telemetry/index.js'
-import { createSystemMessage } from './prompts/system_prompt_builder.js'
-import { DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE } from './prompts/templates.js'
-import { RemoteAgent } from './remote.js'
-
 export class MCPAgent {
-  private llm?: BaseLanguageModelInterface
+  private llm?: LanguageModel
   private client?: MCPClient
   private connectors: BaseConnector[]
   private maxSteps: number
@@ -85,7 +85,7 @@ export class MCPAgent {
   private remoteAgent: RemoteAgent | null = null
 
   constructor(options: {
-    llm?: BaseLanguageModelInterface
+    llm?: LanguageModel,
     client?: MCPClient
     connectors?: BaseConnector[]
     maxSteps?: number
@@ -338,7 +338,7 @@ export class MCPAgent {
     const middleware = [modelCallLimitMiddleware({ runLimit: this.maxSteps })]
 
     const agent = createAgent({
-      model: this.llm as unknown as LanguageModelLike,
+      model: this.llm,
       tools: this._tools,
       systemPrompt: systemContent,
       middleware,
@@ -1290,14 +1290,14 @@ export class MCPAgent {
    */
   private async _attemptStructuredOutput<T>(
     rawResult: string | any,
-    llm: BaseLanguageModelInterface,
+    llm: LanguageModel,
     outputSchema: ZodSchema<T>,
   ): Promise<T> {
     logger.info(`🔄 Attempting structured output with schema: ${outputSchema}`)
     logger.info(`🔄 Raw result: ${JSON.stringify(rawResult, null, 2)}`)
 
     // Schema-aware setup for structured output
-    let structuredLlm: BaseLanguageModelInterface | null = null
+    let structuredLlm: LanguageModel = null
     let schemaDescription = ''
     
     logger.debug(`🔄 Structured output requested, schema: ${JSON.stringify(zodToJsonSchema(outputSchema), null, 2)}`)
@@ -1324,6 +1324,8 @@ export class MCPAgent {
       // Handle object format
       textContent = JSON.stringify(rawResult)
     }
+
+    logger.info("rawResult", rawResult)
 
     // If we couldn't extract text, use the stringified version
     if (!textContent) {
