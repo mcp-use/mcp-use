@@ -65,7 +65,8 @@ describe('mCPAgent streamEvents()', () => {
     })
 
     // Mock the agent executor's streamEvents method
-    const mockStreamEvents = vi.fn().mockImplementation(async function* () {
+    // ReactAgent.streamEvents expects (inputs, config) parameters
+    const mockStreamEvents = vi.fn().mockImplementation(async function* (inputs: any, config: any) {
       // Simulate typical event sequence
       yield {
         event: 'on_chain_start',
@@ -107,14 +108,13 @@ describe('mCPAgent streamEvents()', () => {
     // Mock initialize method
     vi.spyOn(agent, 'initialize').mockResolvedValue(undefined)
 
-    // Mock agentExecutor after initialization
-    Object.defineProperty(agent, 'agentExecutor', {
-      get: () => ({
-        streamEvents: mockStreamEvents,
-        maxIterations: 3,
-      }),
-      configurable: true,
-    })
+    // Mock _agentExecutor after initialization (private property)
+    // ReactAgent interface from langchain
+    ;(agent as any)._agentExecutor = {
+      streamEvents: mockStreamEvents,
+      stream: vi.fn(), // ReactAgent also has stream method
+      invoke: vi.fn(), // ReactAgent also has invoke method
+    }
 
     // Mock tools
     Object.defineProperty(agent, 'tools', {
@@ -178,11 +178,8 @@ describe('mCPAgent streamEvents()', () => {
   it('should initialize agent if not already initialized', async () => {
     const initializeSpy = vi.spyOn(agent, 'initialize')
 
-    // Set initialized to false
-    Object.defineProperty(agent, 'initialized', {
-      get: () => false,
-      configurable: true,
-    })
+    // Set initialized to false (private property)
+    ;(agent as any)._initialized = false
 
     const events = []
     for await (const event of agent.streamEvents('test query')) {
@@ -225,15 +222,13 @@ describe('mCPAgent streamEvents()', () => {
 
   it('should handle errors gracefully', async () => {
     // Mock agent executor to throw error
-    Object.defineProperty(agent, 'agentExecutor', {
-      get: () => ({
-        streamEvents: vi.fn().mockImplementation(async function* () {
-          throw new Error('Test error')
-        }),
-        maxIterations: 3,
+    ;(agent as any)._agentExecutor = {
+      streamEvents: vi.fn().mockImplementation(async function* (inputs: any, config: any) {
+        throw new Error('Test error')
       }),
-      configurable: true,
-    })
+      stream: vi.fn(),
+      invoke: vi.fn(),
+    }
 
     await expect(async () => {
       for await (const event of agent.streamEvents('test query')) {
@@ -243,23 +238,22 @@ describe('mCPAgent streamEvents()', () => {
   })
 
   it('should respect maxSteps parameter', async () => {
-    const mockAgentExecutor = {
-      streamEvents: vi.fn().mockImplementation(async function* () {
-        yield { event: 'test', name: 'test', data: {} }
-      }),
-      maxIterations: 3,
-    }
-
-    Object.defineProperty(agent, 'agentExecutor', {
-      get: () => mockAgentExecutor,
-      configurable: true,
+    const mockStreamEvents = vi.fn().mockImplementation(async function* (inputs: any, config: any) {
+      yield { event: 'test', name: 'test', data: {} }
     })
+
+    ;(agent as any)._agentExecutor = {
+      streamEvents: mockStreamEvents,
+      stream: vi.fn(),
+      invoke: vi.fn(),
+    }
 
     for await (const event of agent.streamEvents('test query', 5)) {
       break
     }
 
-    expect(mockAgentExecutor.maxIterations).toBe(5)
+    // Verify that maxSteps was set on the agent instance
+    expect(agent['maxSteps']).toBe(5)
   })
 
   it('should handle external history', async () => {
@@ -269,18 +263,16 @@ describe('mCPAgent streamEvents()', () => {
 
     // Mock the agent executor to capture inputs
     let capturedInputs: any
-    const mockStreamEvents = vi.fn().mockImplementation(async function* (inputs: any) {
+    const mockStreamEvents = vi.fn().mockImplementation(async function* (inputs: any, config: any) {
       capturedInputs = inputs
       yield { event: 'test', name: 'test', data: {} }
     })
 
-    Object.defineProperty(agent, 'agentExecutor', {
-      get: () => ({
-        streamEvents: mockStreamEvents,
-        maxIterations: 3,
-      }),
-      configurable: true,
-    })
+    ;(agent as any)._agentExecutor = {
+      streamEvents: mockStreamEvents,
+      stream: vi.fn(),
+      invoke: vi.fn(),
+    }
 
     // Mock initialize method
     vi.spyOn(agent, 'initialize').mockResolvedValue(undefined)
@@ -289,7 +281,14 @@ describe('mCPAgent streamEvents()', () => {
       break
     }
 
-    expect(capturedInputs.chat_history).toEqual(externalHistory)
+    // Verify the captured inputs contains the external history
+    // The implementation passes {messages: [...history, new HumanMessage(query)]}
+    expect(capturedInputs).toHaveProperty('messages')
+    expect(Array.isArray(capturedInputs.messages)).toBe(true)
+    // Should include the external history message
+    expect(capturedInputs.messages.some((msg: any) => 
+      msg instanceof HumanMessage && msg.content === 'Previous message'
+    )).toBe(true)
   })
 
   it('should clean up resources on completion', async () => {
@@ -326,15 +325,13 @@ describe('mCPAgent streamEvents() edge cases', () => {
     })
 
     // Mock empty event stream
-    Object.defineProperty(agent, 'agentExecutor', {
-      get: () => ({
-        streamEvents: vi.fn().mockImplementation(async function* () {
-          // Empty generator
-        }),
-        maxIterations: 3,
+    ;(agent as any)._agentExecutor = {
+      streamEvents: vi.fn().mockImplementation(async function* (inputs: any, config: any) {
+        // Empty generator
       }),
-      configurable: true,
-    })
+      stream: vi.fn(),
+      invoke: vi.fn(),
+    }
 
     vi.spyOn(agent, 'initialize').mockResolvedValue(undefined)
     vi.spyOn((agent as any).telemetry, 'trackAgentExecution').mockResolvedValue(undefined)
@@ -361,18 +358,16 @@ describe('mCPAgent streamEvents() edge cases', () => {
     })
 
     // Mock malformed event stream
-    Object.defineProperty(agent, 'agentExecutor', {
-      get: () => ({
-        streamEvents: vi.fn().mockImplementation(async function* () {
-          yield { event: 'malformed' } // Missing required fields
-          yield null // Invalid event
-          yield { event: 'on_chat_model_stream', data: { chunk: { content: 'test' } } }
-          yield { event: 'on_chain_end', data: { output: [{ text: 'test response' }] } }
-        }),
-        maxIterations: 3,
+    ;(agent as any)._agentExecutor = {
+      streamEvents: vi.fn().mockImplementation(async function* (inputs: any, config: any) {
+        yield { event: 'malformed' } // Missing required fields
+        yield null // Invalid event
+        yield { event: 'on_chat_model_stream', data: { chunk: { content: 'test' } } }
+        yield { event: 'on_chain_end', data: { output: [{ text: 'test response' }] } }
       }),
-      configurable: true,
-    })
+      stream: vi.fn(),
+      invoke: vi.fn(),
+    }
 
     vi.spyOn(agent, 'initialize').mockResolvedValue(undefined)
     vi.spyOn((agent as any).telemetry, 'trackAgentExecution').mockResolvedValue(undefined)
