@@ -241,9 +241,13 @@ describe('agent observability integration test', () => {
   }, 60000) // 1 minute timeout
 
   it('should send traces to Langfuse when observability is enabled', async () => {
-    // Skip test if Langfuse credentials are not configured
+    // Skip test if required credentials are not configured
     if (!process.env.LANGFUSE_PUBLIC_KEY || !process.env.LANGFUSE_SECRET_KEY) {
       logger.warn('Skipping observability test: LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY must be set')
+      return
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      logger.warn('Skipping observability test: OPENAI_API_KEY must be set')
       return
     }
 
@@ -395,6 +399,12 @@ describe('agent observability integration test', () => {
   }, 120000) // Increase timeout to 2 minutes for API calls and retries
 
   it('should not send traces when observability is disabled', async () => {
+    // Skip test if OpenAI API key is not configured
+    if (!process.env.OPENAI_API_KEY) {
+      logger.warn('Skipping observability test: OPENAI_API_KEY must be set')
+      return
+    }
+
     // Explicitly disable Langfuse
     process.env.MCP_USE_LANGFUSE = 'false'
 
