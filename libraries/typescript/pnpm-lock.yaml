@@ -430,6 +430,9 @@ importers:
       '@dmitryrechkin/json-schema-to-zod':
         specifier: ^1.0.1
         version: 1.0.1
+      '@langchain/core':
+        specifier: ^1.0.1
+        version: 1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
       '@mcp-ui/server':
         specifier: ^5.12.0
         version: 5.13.1
@@ -463,6 +466,9 @@ importers:
       esbuild:
         specifier: '>=0.25.0'
         version: 0.25.11
+      langchain:
+        specifier: ^1.0.1
+        version: 1.0.2(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76))
       langfuse:
         specifier: ^3.38.6
         version: 3.38.6
@@ -512,9 +518,6 @@ importers:
       '@langchain/anthropic':
         specifier: ^1.0.0
         version: 1.0.0(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(zod@3.25.76)
-      '@langchain/core':
-        specifier: ^1.0.1
-        version: 1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
       '@langchain/openai':
         specifier: ^1.0.0
         version: 1.0.0(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)
@@ -551,9 +554,6 @@ importers:
       husky:
         specifier: ^9.1.7
         version: 9.1.7
-      langchain:
-        specifier: ^1.0.1
-        version: 1.0.2(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76))
       lint-staged:
         specifier: ^15.2.11
         version: 15.5.2
