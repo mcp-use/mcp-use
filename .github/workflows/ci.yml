@@ -297,7 +297,7 @@ jobs:
       - name: Run Unit Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm test:run --exclude 'tests/integration/**'
+        run: pnpm --filter mcp-use test:unit
 
   # Run agent integration tests only when agent-related files change
   # This saves CI resources and avoids unnecessary API calls
@@ -337,7 +337,7 @@ jobs:
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           MCP_USE_LANGFUSE: true
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm test:integration:agent
+        run: pnpm --filter mcp-use test:integration:agent
 
   typescript-changeset-check:
     needs: detect-changes
