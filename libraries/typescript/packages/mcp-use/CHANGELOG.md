@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.2.0-canary.3
+
+### Patch Changes
+
+- da6e7ed: chore: set again cli and inspector as dependencies
+  - @mcp-use/cli@2.1.21-canary.4
+  - @mcp-use/inspector@0.4.9-canary.4
+
 ## 1.2.0-canary.2
 
 ### Patch Changes
