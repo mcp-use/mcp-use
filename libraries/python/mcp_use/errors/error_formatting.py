@@ -1,6 +1,6 @@
 import traceback
 
-from ..logging import logger
+from mcp_use.logging import logger
 
 retryable_exceptions = (TimeoutError, ConnectionError)  # We can add more exceptions here
 

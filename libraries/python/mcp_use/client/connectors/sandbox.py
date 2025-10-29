@@ -31,7 +31,7 @@ except ImportError as e:
 
 from typing import NotRequired, TypedDict
 
-from .base import BaseConnector
+from mcp_use.client.connectors.base import BaseConnector
 
 
 class SandboxOptions(TypedDict):
