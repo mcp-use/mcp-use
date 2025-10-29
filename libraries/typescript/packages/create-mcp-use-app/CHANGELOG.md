@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.8-canary.1
+
+### Patch Changes
+
+- c8a89fc: chore: set again cli and inspector as dependencies
+
 ## 0.4.8-canary.0
 
 ### Patch Changes
