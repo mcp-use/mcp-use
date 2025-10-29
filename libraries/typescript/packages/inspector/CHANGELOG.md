@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.4.9-canary.5
+
+### Patch Changes
+
+- b9b739b: chore: update langchain dependencies
+  - mcp-use@1.2.0-canary.4
+
 ## 0.4.9-canary.4
 
 ### Patch Changes

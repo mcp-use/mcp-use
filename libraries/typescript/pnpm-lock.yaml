@@ -371,8 +371,8 @@ importers:
         specifier: ^1.0.1
         version: 1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@4.1.12))
       '@langchain/google-genai':
-        specifier: ^0.2.18
-        version: 0.2.18(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@4.1.12)))
+        specifier: ^1.0.0
+        version: 1.0.0(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@4.1.12)))
       '@langchain/openai':
         specifier: ^1.0.0
         version: 1.0.0(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@4.1.12)))(ws@8.18.3)
@@ -1314,9 +1314,9 @@ packages:
     resolution: {integrity: sha512-6mOn4bZyO6XT0GGrEijRtMVrmYJGZ8y1BcwyTPDptFz38lP0CEzrKEYB++h+u3TEcAd3eO25l1aGw/zVlVgw2Q==}
     engines: {node: '>=20'}
 
-  '@langchain/google-genai@0.2.18':
-    resolution: {integrity: sha512-m9EiN3VKC01A7/625YQ6Q1Lqq8zueewADX4W5Tcme4RImN75zkg2Z7FYbD1Fo6Zwolc4wBNO6LUtbg3no4rv1Q==}
-    engines: {node: '>=18'}
+  '@langchain/google-genai@1.0.0':
+    resolution: {integrity: sha512-ICUBZl/46nG6+Yhe5v7kp/2TQBGOzqEkpfKPLDeNyJ4x9OOL46xsW3ZZrHJjhGMQuR6/JMmQMTU9kLoYgsd1Tg==}
+    engines: {node: '>=20'}
     peerDependencies:
       '@langchain/core': ^1.0.1
 
@@ -7112,7 +7112,7 @@ snapshots:
       - '@opentelemetry/sdk-trace-base'
       - openai
 
-  '@langchain/google-genai@0.2.18(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@4.1.12)))':
+  '@langchain/google-genai@1.0.0(@langchain/core@1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@4.1.12)))':
     dependencies:
       '@google/generative-ai': 0.24.1
       '@langchain/core': 1.0.2(@opentelemetry/api@1.9.0)(openai@6.7.0(ws@8.18.3)(zod@4.1.12))
