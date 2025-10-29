@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.2.0-canary.5
+
+### Patch Changes
+
+- 940d727: chore: lint
+  - @mcp-use/cli@2.1.21-canary.6
+  - @mcp-use/inspector@0.4.9-canary.6
+
 ## 1.2.0-canary.4
 
 ### Patch Changes
