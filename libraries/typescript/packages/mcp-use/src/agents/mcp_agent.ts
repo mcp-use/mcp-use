@@ -1,20 +1,12 @@
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
 import type { BaseLanguageModelInterface, LanguageModelLike } from '@langchain/core/language_models/base'
-import type {
-  BaseMessage,
-} from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { StreamEvent } from '@langchain/core/tracers/log_stream'
 import type { ZodSchema } from 'zod'
 import type { MCPClient } from '../client.js'
 import type { BaseConnector } from '../connectors/base.js'
 import type { MCPSession } from '../session.js'
-import {
-  AIMessage,
-  HumanMessage,
-  ToolMessage,
-} from '@langchain/core/messages'
-import { createAgent, type ReactAgent, modelCallLimitMiddleware, SystemMessage, } from 'langchain'
+import { createAgent, type ReactAgent, modelCallLimitMiddleware, SystemMessage, AIMessage, HumanMessage, ToolMessage, DynamicTool } from 'langchain'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { LangChainAdapter } from '../adapters/langchain_adapter.js'
 import { logger } from '../logging.js'
@@ -24,7 +16,7 @@ import { extractModelInfo, Telemetry } from '../telemetry/index.js'
 import { createSystemMessage } from './prompts/system_prompt_builder.js'
 import { DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE } from './prompts/templates.js'
 import { RemoteAgent } from './remote.js'
-
+import type { BaseMessage } from './types.js'
 
 /**
  * Language model type that accepts any LangChain chat model.
@@ -339,7 +331,7 @@ export class MCPAgent {
 
     const agent = createAgent({
       model: this.llm,
-      tools: this._tools,
+      tools: this._tools as DynamicTool[],
       systemPrompt: systemContent,
       middleware,
     })
