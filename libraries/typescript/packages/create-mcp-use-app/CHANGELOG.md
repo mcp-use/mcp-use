@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.8-canary.0
+
+### Patch Changes
+
+- 507eb04: update package.json
+
 ## 0.4.7
 
 ### Patch Changes
