@@ -2,10 +2,10 @@
  * Remote agent implementation for executing agents via API.
  */
 
-import type { BaseMessage } from '@langchain/core/messages'
 import type { ZodSchema } from 'zod'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { logger } from '../logging.js'
+import type { BaseMessage } from './types.js'
 
 // API endpoint constants
 const API_CHATS_ENDPOINT = '/api/v1/chats'
