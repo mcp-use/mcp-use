@@ -154,7 +154,7 @@ export function useChatMessagesClientSide({
           llm = new ChatOpenAI({
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature,
+            temperature: llmConfig.temperature ?? 0,
           })
         }
         else if (llmConfig.provider === 'anthropic') {
@@ -162,7 +162,7 @@ export function useChatMessagesClientSide({
           llm = new ChatAnthropic({
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature,
+            temperature: llmConfig.temperature ?? 0,
           })
         }
         else if (llmConfig.provider === 'google') {
@@ -170,7 +170,7 @@ export function useChatMessagesClientSide({
           llm = new ChatGoogleGenerativeAI({
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature,
+            temperature: llmConfig.temperature ?? 0,
           })
         }
         else {
