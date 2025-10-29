@@ -8,6 +8,7 @@
     "mcp-use": "1.1.8"
   },
   "changesets": [
+    "cold-hotels-turn",
     "deep-bats-lie",
     "deep-parents-push",
     "nice-parrots-yawn",
