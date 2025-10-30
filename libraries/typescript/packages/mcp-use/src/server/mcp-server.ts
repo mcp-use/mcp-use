@@ -973,6 +973,8 @@ if (container && Component) {
           'openai/resultCanProduceWidget': true,
           'openai/widgetCSP': {
             connect_domains: [
+              // always also add the base url of the server
+              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
               ...(widgetMetadata.appsSdkMetadata?.connect_domains || []),
             ],
             resource_domains: [
