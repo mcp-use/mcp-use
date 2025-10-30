@@ -177,6 +177,7 @@ jobs:
             agent_run,
             agent_stream,
             agent_structured_output,
+            runnable_config,
             server_manager,
           ]
     defaults:
