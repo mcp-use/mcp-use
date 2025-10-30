@@ -37,7 +37,7 @@ async def main():
     # Create MCPClient from config file
     client = MCPClient.from_dict(config)
     # Create LLM
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatOpenAI(model="gpt-5")
     # llm = init_chat_model(model="llama-3.1-8b-instant", model_provider="groq")
     # llm = ChatAnthropic(model="claude-3-")
     # llm = ChatGroq(model="llama3-8b-8192")
