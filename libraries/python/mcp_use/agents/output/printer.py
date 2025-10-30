@@ -18,7 +18,7 @@ from rich.panel import Panel
 from rich.status import Status
 from rich.text import Text
 
-from .config import OutputConfig
+from mcp_use.agents.output.config import OutputConfig
 
 
 def escape_markdown_tags(content: str, tags: set[str]) -> str:

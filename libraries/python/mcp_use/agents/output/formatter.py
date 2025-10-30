@@ -7,8 +7,8 @@ using the rich library for terminal display.
 
 from typing import Any
 
-from .config import OutputConfig
-from .printer import PanelPrinter
+from mcp_use.agents.output.config import OutputConfig
+from mcp_use.agents.output.printer import PanelPrinter
 
 
 def format_output(

@@ -8,8 +8,8 @@ integrate pretty printing into agent run() and stream() methods.
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from .config import OutputConfig
-from .printer import PanelPrinter, StreamPrinter
+from mcp_use.agents.output.config import OutputConfig
+from mcp_use.agents.output.printer import PanelPrinter, StreamPrinter
 
 
 def format_and_print_result(
