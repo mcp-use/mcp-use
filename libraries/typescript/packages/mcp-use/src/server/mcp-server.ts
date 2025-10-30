@@ -20,7 +20,7 @@ import { requestLogger } from './logging.js'
 import { createUIResourceFromDefinition, type UrlConfig } from './adapters/mcp-ui-adapter.js'
 import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
 import {createServer} from "vite"
-import { WidgetMetadata } from './types/widget.js'
+import type { WidgetMetadata } from './types/widget.js'
 
 
 const TMP_MCP_USE_DIR = '.mcp-use'
