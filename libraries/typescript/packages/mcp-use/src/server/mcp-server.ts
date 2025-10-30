@@ -20,6 +20,7 @@ import { requestLogger } from './logging.js'
 import { createUIResourceFromDefinition, type UrlConfig } from './adapters/mcp-ui-adapter.js'
 import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
 import {createServer} from "vite"
+import { WidgetMetadata } from './types/widget.js'
 
 
 const TMP_MCP_USE_DIR = '.mcp-use'
@@ -877,22 +878,22 @@ if (container && Component) {
       const type = 'appsSdk'
       
       // Extract metadata from the widget file using Vite SSR
-      let widgetMetadata: any = {}
+      let metadata: WidgetMetadata = {}
       let props = {}
       let description = widget.description
       
       try {
         const mod = await viteServer.ssrLoadModule(widget.entry)
         if (mod.widgetMetadata) {
-          widgetMetadata = mod.widgetMetadata
-          description = widgetMetadata.description || widget.description
+          metadata = mod.widgetMetadata
+          description = metadata.description || widget.description
           
           // Convert Zod schema to JSON schema for props if available
-          if (widgetMetadata.inputs) {
+          if (metadata.inputs) {
             // The inputs is a Zod schema, we can use zodToJsonSchema or extract shape
             try {
               // For now, store the zod schema info
-              props = widgetMetadata.inputs.shape || {}
+              props = metadata.inputs.shape || {}
             } catch (error) {
               console.warn(`[WIDGET] Failed to extract props schema for ${widget.name}:`, error)
             }
@@ -901,6 +902,8 @@ if (container && Component) {
       } catch (error) {
         console.warn(`[WIDGET] Failed to load metadata for ${widget.name}:`, error)
       }
+
+      console.log('[WIDGET dev] Metadata:', metadata)
 
       let html = '';
       try {
@@ -948,44 +951,45 @@ if (container && Component) {
 
       this.uiResource({
         name: widget.name,
-        title: widgetMetadata.title || widget.name,
+        title: metadata.title || widget.name,
         description: description,
         type: type,
         props: props,
         _meta: {
           'mcp-use/widget': {
             name: widget.name,
-            title: widgetMetadata.title || widget.name,
+            title: metadata.title || widget.name,
             description: description,
             type: type,
             props: props,
             html: html,
             dev: true,
           },
-          ...(widgetMetadata._meta || {}),
+          ...(metadata._meta || {}),
         },
         htmlTemplate: html,
         appsSdkMetadata: {
           'openai/widgetDescription': description,
-          'openai/toolInvocation/invoking': 'Hand-tossing a map',
-          'openai/toolInvocation/invoked': 'Served a fresh map',
+          'openai/toolInvocation/invoking': `Loading ${widget.name}...`,
+          'openai/toolInvocation/invoked': `${widget.name} ready`,
           'openai/widgetAccessible': true,
           'openai/resultCanProduceWidget': true,
+          ...(metadata.appsSdkMetadata || {}),
           'openai/widgetCSP': {
             connect_domains: [
               // always also add the base url of the server
               ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
-              ...(widgetMetadata.appsSdkMetadata?.connect_domains || []),
+              ...(metadata.appsSdkMetadata?.['openai/widgetCSP']?.connect_domains || []),
             ],
             resource_domains: [
               'https://*.oaistatic.com',
               'https://*.oaiusercontent.com',
               // always also add the base url of the server
               ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(metadata.appsSdkMetadata?.['openai/widgetCSP']?.resource_domains || []),
             ]
           }
         },
-        ...(widgetMetadata.appsSdkMetadata || {}),
       })
     }
 
@@ -1080,7 +1084,7 @@ if (container && Component) {
       }
       
       // Read the metadata file if it exists
-      let metadata: any = {}
+      let metadata: WidgetMetadata = {}
       let props = {}
       let description = `Widget: ${widgetName}`
       
@@ -1125,14 +1129,16 @@ if (container && Component) {
           ...(metadata.appsSdkMetadata || {}),
           'openai/widgetCSP': {
             connect_domains: [
-              ...(metadata.appsSdkMetadata?.connect_domains || []),
+              // always also add the base url of the server
+              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(metadata.appsSdkMetadata?.['openai/widgetCSP']?.connect_domains || []),
             ],
             resource_domains: [
               'https://*.oaistatic.com',
               'https://*.oaiusercontent.com',
               // always also add the base url of the server
               ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
-              ...(metadata.appsSdkMetadata?.resource_domains || []),
+              ...(metadata.appsSdkMetadata?.['openai/widgetCSP']?.resource_domains || []),
             ]
           }
         }
