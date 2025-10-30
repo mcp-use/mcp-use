@@ -397,13 +397,20 @@ program
       console.log(`   ${sanitizedProjectName}/`)
       console.log('   ├── src/')
       console.log('   │   └── server.ts')
-      if (validatedTemplate === 'ui') {
+      if (validatedTemplate === 'apps-sdk') {
         console.log('   ├── resources/')
-        console.log('   │   ├── data-visualization.tsx')
-        console.log('   │   ├── kanban-board.tsx')
-        console.log('   │   └── todo-list.tsx')
+        console.log('   │   └── display-weather.tsx')
       }
-      console.log('   ├── index.ts')
+      if (validatedTemplate === 'mcp-ui') {
+        console.log('   ├── resources/')
+        console.log('   │   └── kanban-board.tsx')
+      }
+      if (validatedTemplate === 'starter') {
+        console.log('   ├── resources/')
+        console.log('   │   └── kanban-board.tsx (MCP-UI example)')
+        console.log('   │   └── display-weather.tsx (OpenAI Apps SDK example)')
+      }
+      console.log('   ├── index.ts (server entry point)')
       console.log('   ├── package.json')
       console.log('   ├── tsconfig.json')
       console.log('   └── README.md')
