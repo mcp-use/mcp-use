@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 from mcp_use import MCPAgent, MCPClient
-from mcp_use.middleware import Middleware, MiddlewareContext, NextFunctionT
+from mcp_use.client.middleware import Middleware, MiddlewareContext, NextFunctionT
 
 
 async def main():
@@ -52,7 +52,7 @@ async def main():
     client = MCPClient(config=config, middleware=[TimingMiddleware()])
 
     # Create LLM
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatOpenAI(model="gpt-5")
 
     # Create agent with the client
     agent = MCPAgent(llm=llm, client=client, max_steps=30)

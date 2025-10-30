@@ -19,7 +19,7 @@ async def main():
     """Run the example using a configuration file."""
     load_dotenv()
     client = MCPClient(config=everything_server)
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    llm = ChatOpenAI(model="gpt-5", temperature=0)
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
 
     result = await agent.run(
