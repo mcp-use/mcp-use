@@ -1,5 +1,70 @@
 # @mcp-use/cli
 
+## 2.1.20
+
+### Patch Changes
+
+- 80213e6: ## Widget Integration & Server Enhancements
+  - Enhanced widget integration capabilities in MCP server with improved handling
+  - Streamlined widget HTML generation with comprehensive logging
+  - Better server reliability and error handling for widget operations
+
+  ## CLI Tunnel Support & Development Workflow
+  - Added comprehensive tunnel support to CLI for seamless server exposure
+  - Enhanced development workflow with tunnel integration capabilities
+  - Disabled tunnel in dev mode for optimal Vite compatibility
+
+  ## Inspector UI & User Experience Improvements
+  - Enhanced inspector UI components with better tunnel URL handling
+  - Improved user experience with updated dependencies and compatibility
+  - Better visual feedback and error handling in inspector interface
+
+  ## Technical Improvements
+  - Enhanced logging capabilities throughout the system
+  - Improved error handling and user feedback mechanisms
+  - Updated dependencies for better stability and performance
+
+- Updated dependencies [80213e6]
+- Updated dependencies [80213e6]
+  - @mcp-use/inspector@0.4.8
+  - mcp-use@1.1.8
+
+## 2.1.20-canary.1
+
+### Patch Changes
+
+- 370120e: ## Widget Integration & Server Enhancements
+  - Enhanced widget integration capabilities in MCP server with improved handling
+  - Streamlined widget HTML generation with comprehensive logging
+  - Better server reliability and error handling for widget operations
+
+  ## CLI Tunnel Support & Development Workflow
+  - Added comprehensive tunnel support to CLI for seamless server exposure
+  - Enhanced development workflow with tunnel integration capabilities
+  - Disabled tunnel in dev mode for optimal Vite compatibility
+
+  ## Inspector UI & User Experience Improvements
+  - Enhanced inspector UI components with better tunnel URL handling
+  - Improved user experience with updated dependencies and compatibility
+  - Better visual feedback and error handling in inspector interface
+
+  ## Technical Improvements
+  - Enhanced logging capabilities throughout the system
+  - Improved error handling and user feedback mechanisms
+  - Updated dependencies for better stability and performance
+
+- Updated dependencies [370120e]
+  - @mcp-use/inspector@0.4.8-canary.1
+  - mcp-use@1.1.8-canary.1
+
+## 2.1.20-canary.0
+
+### Patch Changes
+
+- Updated dependencies [3074165]
+  - mcp-use@1.1.8-canary.0
+  - @mcp-use/inspector@0.4.8-canary.0
+
 ## 2.1.19
 
 ### Patch Changes

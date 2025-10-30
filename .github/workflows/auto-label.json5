@@ -1,0 +1,13 @@
+{
+  labelsSynonyms: {
+    bug: ['error', 'broken', 'not working', 'issue', 'problem'],
+    enhancement: ['feature', 'improvement', 'upgrade'],
+    documentation: ['docs', 'readme'],
+    'python': ['libraries/python', 'mcp-use python', 'python library'],
+    'typescript': ['libraries/typescript', 'mcp-use typescript', 'typescript library', 'inspector']
+  },
+  labelsNotAllowed: [],
+  defaultLabels: [],
+  ignoreComments: true,
+  includeTitle: true
+}

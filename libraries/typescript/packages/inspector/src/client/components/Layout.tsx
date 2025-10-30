@@ -28,10 +28,18 @@ export function Layout({ children }: LayoutProps) {
     activeTab,
     setActiveTab,
     navigateToItem,
+    setTunnelUrl,
   } = useInspector()
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const savedRequests = useSavedRequests()
+  
+  // Read tunnelUrl from query parameters and store in context
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search)
+    const tunnelUrl = urlParams.get('tunnelUrl')
+    setTunnelUrl(tunnelUrl)
+  }, [location.search, setTunnelUrl])
 
   // Refs for search inputs in tabs
   const toolsSearchRef = useRef<{
@@ -79,7 +87,13 @@ export function Layout({ children }: LayoutProps) {
       return
     }
     setSelectedServerId(serverId)
-    navigate(`/?server=${encodeURIComponent(serverId)}`)
+    // Preserve tunnelUrl parameter if present
+    const urlParams = new URLSearchParams(location.search)
+    const tunnelUrl = urlParams.get('tunnelUrl')
+    const newUrl = tunnelUrl
+      ? `/?server=${encodeURIComponent(serverId)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+      : `/?server=${encodeURIComponent(serverId)}`
+    navigate(newUrl)
   }
 
   const handleCommandPaletteNavigate = (
@@ -116,11 +130,14 @@ export function Layout({ children }: LayoutProps) {
       // Use the context's navigateToItem to set all state atomically
       navigateToItem(serverId, tab, itemName)
       // Navigate using query params
-      console.warn(
-        '[Layout] Navigating to:',
-        `/?server=${encodeURIComponent(serverId)}`,
-      )
-      navigate(`/?server=${encodeURIComponent(serverId)}`)
+      // Preserve tunnelUrl parameter if present
+      const urlParams = new URLSearchParams(location.search)
+      const tunnelUrl = urlParams.get('tunnelUrl')
+      const newUrl = tunnelUrl
+        ? `/?server=${encodeURIComponent(serverId)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+        : `/?server=${encodeURIComponent(serverId)}`
+      console.warn('[Layout] Navigating to:', newUrl)
+      navigate(newUrl)
     }
     else {
       console.warn('[Layout] No serverId, just updating tab to:', tab)

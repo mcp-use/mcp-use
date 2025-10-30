@@ -724,7 +724,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
     // If it's a full HTML document, inject at the beginning of head
     modifiedHtml = htmlContent.replace(
       '<head>',
-      `<head><base href="/">${apiScript}`,
+      `<head><!-- <base href="/"> -->${apiScript}`,
     )
   }
   else {
@@ -732,7 +732,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
     modifiedHtml = `<!DOCTYPE html>
 <html>
 <head>
-  <base href="/">
+  <!-- <base href="/"> -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   ${apiScript}

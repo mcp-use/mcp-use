@@ -10,7 +10,7 @@ Special thanks to https://github.com/microsoft/playwright-mcp for the server.
 import asyncio
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 
 from mcp_use import MCPAgent, MCPClient
 
@@ -26,24 +26,33 @@ async def main():
     # Create MCPClient from config file
     client = MCPClient(config=config)
     # Create LLM
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatAnthropic(model="claude-sonnet-4-5")
     # Create agent with the client
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
     # Run the query
     async for step in agent.stream(
         """
-        Navigate to https://github.com/mcp-use/mcp-use, give a star to the project and write
-        a summary of the project.
+        Can you go on github and tell me how many stars the mcp-use project has?
         """,
         max_steps=30,
     ):
         if isinstance(step, str):
+            print("-------------Result--------------------------")
             print("Result:", step)
         else:
             action, observation = step
-            print("Observation:", observation[:20])
+            print("-------------Log--------------------------")
+            print("Log:", action.log)
+            print("--------------------------------")
+            print("-------------Calling--------------------------")
             print("Calling:", action.tool)
+            print("--------------------------------")
+            print("-------------Input--------------------------")
             print("Input:", action.tool_input)
+            print("--------------------------------")
+            print("-------------Observation--------------------------")
+            print("Observation:", observation)
+            print("--------------------------------")
 
 
 if __name__ == "__main__":

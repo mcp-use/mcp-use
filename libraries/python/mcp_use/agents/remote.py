@@ -9,7 +9,7 @@ from typing import Any, TypeVar
 from uuid import UUID
 
 import httpx
-from langchain.schema import BaseMessage
+from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 
 from mcp_use.logging import logger

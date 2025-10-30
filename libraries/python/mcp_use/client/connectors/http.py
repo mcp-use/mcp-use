@@ -13,12 +13,11 @@ from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, Sa
 from mcp.shared.exceptions import McpError
 
 from mcp_use.client.auth.oauth import BearerAuth, OAuth, OAuthClientProvider
+from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.client.exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from mcp_use.client.middleware import CallbackClientSession, Middleware
 from mcp_use.client.task_managers import SseConnectionManager, StreamableHttpConnectionManager
 from mcp_use.logging import logger
-
-from .base import BaseConnector
 
 
 class HttpConnector(BaseConnector):
