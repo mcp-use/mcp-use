@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.4.8-canary.2
+
+### Patch Changes
+
+- a8e5b65: fix: apps sdk metadata setup from widget build
+
 ## 0.4.8-canary.1
 
 ### Patch Changes

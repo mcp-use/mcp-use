@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.2.0-canary.6
+
+### Patch Changes
+
+- a8e5b65: fix: apps sdk metadata setup from widget build
+- Updated dependencies [a8e5b65]
+  - @mcp-use/inspector@0.4.9-canary.7
+  - @mcp-use/cli@2.1.21-canary.7
+
 ## 1.2.0-canary.5
 
 ### Patch Changes
