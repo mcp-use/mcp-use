@@ -1,4 +1,5 @@
 import type { Hono } from 'hono'
+import { logger } from 'hono/logger'
 import {
   generateWidgetContainerHtml,
   generateWidgetContentHtml,
@@ -22,6 +23,9 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
     return c.json({ status: 'ok', timestamp: new Date().toISOString() })
   })
 
+  // Apply logger middleware only to proxy routes
+  app.use('/inspector/api/proxy/*', logger())
+
   app.all('/inspector/api/proxy/*', async (c) => {
     try {
       const targetUrl = c.req.header('X-Target-URL')
@@ -34,15 +38,20 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
       const method = c.req.method
       const headers: Record<string, string> = {}
 
-      // Copy relevant headers, excluding proxy-specific ones
+      // Copy relevant headers, excluding proxy-specific ones and encoding preferences
       const requestHeaders = c.req.header()
       for (const [key, value] of Object.entries(requestHeaders)) {
-        if (!key.toLowerCase().startsWith('x-proxy-')
-          && !key.toLowerCase().startsWith('x-target-')
-          && key.toLowerCase() !== 'host') {
+        const lowerKey = key.toLowerCase()
+        if (!lowerKey.startsWith('x-proxy-')
+          && !lowerKey.startsWith('x-target-')
+          && lowerKey !== 'host'
+          && lowerKey !== 'accept-encoding') { // Don't forward accept-encoding to prevent compression
           headers[key] = value
         }
       }
+
+      // Explicitly request uncompressed response
+      headers['Accept-Encoding'] = 'identity'
 
       // Set the target URL as the host
       try {
@@ -61,10 +70,17 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
         body: body ? new Uint8Array(body) : undefined,
       })
 
-      // Forward the response
+      // Forward response headers, excluding problematic encoding headers
+      // Node.js fetch() auto-decompresses the body but preserves these headers
       const responseHeaders: Record<string, string> = {}
       response.headers.forEach((value, key) => {
-        responseHeaders[key] = value
+        const lowerKey = key.toLowerCase()
+        // Skip compression-related headers that don't match the actual body state
+        if (lowerKey !== 'content-encoding'
+          && lowerKey !== 'transfer-encoding'
+          && lowerKey !== 'content-length') {
+          responseHeaders[key] = value
+        }
       })
 
       return new Response(response.body, {
@@ -217,5 +233,72 @@ export function registerInspectorRoutes(app: Hono, config?: { autoConnectUrl?: s
     return c.json({
       autoConnectUrl: config?.autoConnectUrl || null,
     })
+  })
+
+  // Telemetry proxy endpoint - forwards telemetry events to PostHog from server-side
+  app.post('/inspector/api/tel/posthog', async (c) => {
+    try {
+      const body = await c.req.json()
+      const { event, user_id, properties } = body
+
+      if (!event) {
+        return c.json({ success: false, error: 'Missing event name' }, 400)
+      }
+
+      // Initialize PostHog lazily (only when needed)
+      const { PostHog } = await import('posthog-node')
+      const posthog = new PostHog('phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI', {
+        host: 'https://eu.i.posthog.com',
+      })
+
+      // Use the user_id from the request, or fallback to 'anonymous'
+      const distinctId = user_id || 'anonymous'
+
+      // Capture the event
+      posthog.capture({
+        distinctId,
+        event,
+        properties: properties || {},
+      })
+
+      // Flush to ensure event is sent
+      await posthog.shutdown()
+
+      return c.json({ success: true })
+    }
+    catch (error) {
+      console.error('[Telemetry] Error forwarding to PostHog:', error)
+      // Don't fail - telemetry should be silent
+      return c.json({ success: false })
+    }
+  })
+
+  // Telemetry proxy endpoint - forwards telemetry events to Scarf from server-side
+  app.post('/inspector/api/tel/scarf', async (c) => {
+    try {
+      const body = await c.req.json()
+
+      // Forward to Scarf gateway from server (no CORS issues)
+      const response = await fetch('https://mcpuse.gateway.scarf.sh/events-inspector', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        console.error('[Telemetry] Scarf request failed:', response.status)
+
+        return c.json({ success: false, status: response.status, error: response.statusText })
+      }
+
+      return c.json({ success: true })
+    }
+    catch (error) {
+      console.error('[Telemetry] Error forwarding to Scarf:', error)
+      // Don't fail - telemetry should be silent
+      return c.json({ success: false })
+    }
   })
 }

@@ -6,6 +6,8 @@ export interface ServerConfig {
   name: string
   version: string
   description?: string
+  host?: string // Hostname for widget URLs and server endpoints (defaults to 'localhost')
+  baseUrl?: string // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
 }
 
 export interface InputDefinition {

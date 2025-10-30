@@ -1,7 +1,7 @@
+import type { MCPConnection } from '@/client/context/McpContext'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import type { MCPConnection } from '@/client/context/McpContext'
 
 interface UseAutoConnectOptions {
   connections: MCPConnection[]
@@ -42,18 +42,24 @@ export function useAutoConnect({ connections, addConnection, removeConnection }:
 
   // Load config and initiate auto-connect
   useEffect(() => {
-    if (configLoaded) return
+    if (configLoaded)
+      return
 
     // Check for autoConnect query parameter first
     const urlParams = new URLSearchParams(window.location.search)
     const queryAutoConnectUrl = urlParams.get('autoConnect')
+    const tunnelUrl = urlParams.get('tunnelUrl')
 
     if (queryAutoConnectUrl) {
       const existing = connections.find(c => c.url === queryAutoConnectUrl)
       if (!existing) {
         setIsAutoConnecting(true)
         addConnection(queryAutoConnectUrl, 'Local MCP Server', undefined, 'http')
-        navigate(`/?server=${encodeURIComponent(queryAutoConnectUrl)}`)
+        // Preserve tunnelUrl parameter when navigating
+        const newUrl = tunnelUrl
+          ? `/?server=${encodeURIComponent(queryAutoConnectUrl)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+          : `/?server=${encodeURIComponent(queryAutoConnectUrl)}`
+        navigate(newUrl)
         const timeoutId = setTimeout(() => setIsAutoConnecting(false), 500)
         setConfigLoaded(true)
         return () => clearTimeout(timeoutId)
@@ -128,9 +134,15 @@ export function useAutoConnect({ connections, addConnection, removeConnection }:
     // Handle successful connection
     else if (connection?.state === 'ready') {
       console.warn('[useAutoConnect] Connection succeeded, navigating to server')
-      
+
       // Navigate using the connection ID (which is the original URL)
-      navigate(`/?server=${encodeURIComponent(connection.id)}`)
+      // Preserve tunnelUrl parameter if present
+      const urlParams = new URLSearchParams(window.location.search)
+      const tunnelUrl = urlParams.get('tunnelUrl')
+      const newUrl = tunnelUrl
+        ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+        : `/?server=${encodeURIComponent(connection.id)}`
+      navigate(newUrl)
 
       setTimeout(() => {
         setAutoConnectUrl(null)
@@ -156,4 +168,3 @@ export function useAutoConnect({ connections, addConnection, removeConnection }:
 
   return { isAutoConnecting, autoConnectUrl }
 }
-

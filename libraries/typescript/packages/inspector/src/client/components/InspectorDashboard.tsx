@@ -2,7 +2,7 @@ import type { CustomHeader } from './CustomHeadersEditor'
 import { CircleMinus, Copy, Loader2, RotateCcw } from 'lucide-react'
 import { useMcp } from 'mcp-use/react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -16,6 +16,10 @@ import {
   TooltipTrigger,
 } from '@/client/components/ui/tooltip'
 import { useMcpContext } from '@/client/context/McpContext'
+import {
+  MCPServerAddedEvent,
+  Telemetry,
+} from '@/client/telemetry'
 import { ConnectionSettingsForm } from './ConnectionSettingsForm'
 
 // Temporary connection tester component
@@ -83,7 +87,6 @@ function ConnectionTester({
       || mcpHook.state === 'pending_auth'
     ) {
       // Authentication is in progress - keep waiting for OAuth callback
-
     }
     else if (mcpHook.state === 'failed' && mcpHook.error) {
       // If there's an authUrl available, authentication is in progress - don't fail yet
@@ -120,6 +123,7 @@ export function InspectorDashboard() {
     disconnectServer: _disconnectServer,
   } = mcpContext
   const navigate = useNavigate()
+  const location = useLocation()
   const [connectingServers, setConnectingServers] = useState<Set<string>>(
     new Set(),
   )
@@ -132,6 +136,18 @@ export function InspectorDashboard() {
     '[InspectorDashboard] Render - connections:',
     connections.map(c => ({ id: c.id, state: c.state })),
   )
+
+  // Track inspector open on mount
+  useEffect(() => {
+    const telemetry = Telemetry.getInstance()
+    telemetry
+      .trackInspectorOpen({
+        connectionCount: connections.length,
+      })
+      .catch(() => {
+        // Silently fail - telemetry should not break the application
+      })
+  }, []) // Only run once on mount
 
   // Form state
   const [transportType, setTransportType] = useState('SSE')
@@ -177,53 +193,56 @@ export function InspectorDashboard() {
     }
   }, [])
 
-  const handleAddConnection = useCallback((isRetry = false, overrideConnectionType?: string) => {
-    if (!url.trim())
-      return
+  const handleAddConnection = useCallback(
+    (isRetry = false, overrideConnectionType?: string) => {
+      if (!url.trim())
+        return
 
-    setIsConnecting(true)
-    hasShownToastRef.current = false
-    if (!isRetry) {
-      setHasTriedBothConnectionTypes(false)
-    }
+      setIsConnecting(true)
+      hasShownToastRef.current = false
+      if (!isRetry) {
+        setHasTriedBothConnectionTypes(false)
+      }
 
-    // Use overridden connection type if provided (for retry logic), otherwise use state
-    const effectiveConnectionType = overrideConnectionType || connectionType
+      // Use overridden connection type if provided (for retry logic), otherwise use state
+      const effectiveConnectionType = overrideConnectionType || connectionType
 
-    // Prepare proxy configuration if "Via Proxy" is selected
-    const proxyConfig
-      = effectiveConnectionType === 'Via Proxy' && proxyAddress.trim()
-        ? {
-            proxyAddress: proxyAddress.trim(),
-            customHeaders: customHeaders.reduce((acc, header) => {
-              if (header.name && header.value) {
-                acc[header.name] = header.value
-              }
-              return acc
-            }, {} as Record<string, string>),
-          }
-        : {
-            customHeaders: customHeaders.reduce((acc, header) => {
-              if (header.name && header.value) {
-                acc[header.name] = header.value
-              }
-              return acc
-            }, {} as Record<string, string>),
-          }
+      // Prepare proxy configuration if "Via Proxy" is selected
+      const proxyConfig
+        = effectiveConnectionType === 'Via Proxy' && proxyAddress.trim()
+          ? {
+              proxyAddress: proxyAddress.trim(),
+              customHeaders: customHeaders.reduce((acc, header) => {
+                if (header.name && header.value) {
+                  acc[header.name] = header.value
+                }
+                return acc
+              }, {} as Record<string, string>),
+            }
+          : {
+              customHeaders: customHeaders.reduce((acc, header) => {
+                if (header.name && header.value) {
+                  acc[header.name] = header.value
+                }
+                return acc
+              }, {} as Record<string, string>),
+            }
 
-    // Map UI transport type to actual transport type
-    // "SSE" in UI means "Streamable HTTP" which uses 'http' transport
-    // "WebSocket" in UI means "WebSocket" which uses 'sse' transport
-    const actualTransportType = transportType === 'SSE' ? 'http' : 'sse'
+      // Map UI transport type to actual transport type
+      // "SSE" in UI means "Streamable HTTP" which uses 'http' transport
+      // "WebSocket" in UI means "WebSocket" which uses 'sse' transport
+      const actualTransportType = transportType === 'SSE' ? 'http' : 'sse'
 
-    // Store pending connection config - don't add to saved connections yet
-    setPendingConnectionConfig({
-      url,
-      name: url,
-      proxyConfig,
-      transportType: actualTransportType,
-    })
-  }, [url, connectionType, proxyAddress, customHeaders, transportType])
+      // Store pending connection config - don't add to saved connections yet
+      setPendingConnectionConfig({
+        url,
+        name: url,
+        proxyConfig,
+        transportType: actualTransportType,
+      })
+    },
+    [url, connectionType, proxyAddress, customHeaders, transportType],
+  )
 
   // Handle successful connection
   const handleConnectionSuccess = useCallback(() => {
@@ -240,6 +259,21 @@ export function InspectorDashboard() {
       pendingConnectionConfig.proxyConfig,
       pendingConnectionConfig.transportType,
     )
+
+    // Track server added
+    const telemetry = Telemetry.getInstance()
+    telemetry
+      .capture(
+        new MCPServerAddedEvent({
+          serverId: pendingConnectionConfig.url,
+          serverUrl: pendingConnectionConfig.url,
+          connectionType: pendingConnectionConfig.transportType,
+          viaProxy: !!pendingConnectionConfig.proxyConfig?.proxyAddress,
+        }),
+      )
+      .catch(() => {
+        // Silently fail - telemetry should not break the application
+      })
 
     setPendingConnectionConfig(null)
     toast.success('Connection established successfully')
@@ -365,7 +399,13 @@ export function InspectorDashboard() {
       toast.error('Server is not connected and cannot be inspected')
       return
     }
-    navigate(`/?server=${encodeURIComponent(connection.id)}`)
+    // Preserve tunnelUrl parameter if present
+    const urlParams = new URLSearchParams(location.search)
+    const tunnelUrl = urlParams.get('tunnelUrl')
+    const newUrl = tunnelUrl
+      ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+      : `/?server=${encodeURIComponent(connection.id)}`
+    navigate(newUrl)
   }
 
   // Monitor connecting servers and remove them from the set when they connect or fail
@@ -411,7 +451,13 @@ export function InspectorDashboard() {
     ) {
       console.warn('[InspectorDashboard] Navigating to server:', connection.id)
       setPendingNavigation(null)
-      navigate(`/?server=${encodeURIComponent(connection.id)}`)
+      // Preserve tunnelUrl parameter if present
+      const urlParams = new URLSearchParams(location.search)
+      const tunnelUrl = urlParams.get('tunnelUrl')
+      const newUrl = tunnelUrl
+        ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+        : `/?server=${encodeURIComponent(connection.id)}`
+      navigate(newUrl)
     }
     // Only cancel navigation if connection truly failed with no data loaded
     else if (

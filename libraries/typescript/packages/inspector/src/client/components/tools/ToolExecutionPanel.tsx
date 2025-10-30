@@ -41,9 +41,7 @@ export function ToolExecutionPanel({
       <div className="flex-shrink-0 p-6 pt-3 pb-4 pr-3">
         <div>
           <div className="flex items-center justify-between mb-0">
-            <h2 className="text-base font-medium font-mono text-gray-900 dark:text-gray-100">
-              {selectedTool.name}
-            </h2>
+            <h3 className="text-lg font-semibold mb-2">{selectedTool.name}</h3>
             <div className="flex gap-2">
               <Button
                 onClick={onExecute}

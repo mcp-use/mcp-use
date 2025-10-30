@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/client/lib/utils'
+import { useMcpContext } from '../context/McpContext'
 import { Spinner } from './ui/spinner'
 
 interface OpenAIComponentRendererProps {
@@ -9,6 +10,7 @@ interface OpenAIComponentRendererProps {
   toolResult: any
   serverId: string
   readResource: (uri: string) => Promise<any>
+  resource: any
   className?: string
   noWrapper?: boolean
 }
@@ -35,6 +37,7 @@ export function OpenAIComponentRenderer({
   toolResult,
   serverId,
   readResource,
+  resource,
   className,
   noWrapper = false,
 }: OpenAIComponentRendererProps) {
@@ -53,17 +56,29 @@ export function OpenAIComponentRenderer({
   const toolIdRef = useRef(`tool-${Date.now()}-${Math.random().toString(36).substring(7)}`)
   const toolId = toolIdRef.current
 
+  const servers = useMcpContext()
+  const server = servers.connections.find(connection => connection.id === serverId)
+  const serverBaseUrl = server?.url
+
+  console.log(componentUrl, toolResult)
+
   // Store widget data and set up iframe URL
   useEffect(() => {
     const storeAndSetUrl = async () => {
       try {
+        console.log('[OpenAIComponentRenderer] Starting storeAndSetUrl:', {
+          toolName,
+          toolArgs,
+          toolResult: JSON.stringify(toolResult).substring(0, 200),
+        })
+
         // Extract structured content from tool result
         let structuredContent = null
-        if (toolResult?.structuredContent) {
-          structuredContent = toolResult.structuredContent
+        if (resource?.structuredContent) {
+          structuredContent = resource.structuredContent
         }
-        else if (Array.isArray(toolResult) && toolResult[0]) {
-          const firstResult = toolResult[0]
+        else if (Array.isArray(resource) && resource[0]) {
+          const firstResult = resource[0]
           if (firstResult.output?.value?.structuredContent) {
             structuredContent = firstResult.output.value.structuredContent
           }
@@ -77,11 +92,23 @@ export function OpenAIComponentRenderer({
 
         // Fallback to entire result
         if (!structuredContent) {
-          structuredContent = toolResult
+          structuredContent = resource
         }
+
+        console.log('[OpenAIComponentRenderer] Extracted structuredContent:', structuredContent)
 
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await readResource(componentUrl)
+
+        // For Apps SDK widgets, use structuredContent as toolInput (the actual tool parameters)
+        // toolArgs might be empty or from the initial invocation, structuredContent has the real data
+        const widgetToolInput = structuredContent || toolArgs
+
+        console.log('[OpenAIComponentRenderer] Widget inputs:', {
+          toolArgs,
+          structuredContent,
+          widgetToolInput,
+        })
 
         // Store widget data on server (including the fetched HTML)
         const storeResponse = await fetch('/inspector/api/resources/widget/store', {
@@ -92,7 +119,7 @@ export function OpenAIComponentRenderer({
           body: JSON.stringify({
             serverId,
             uri: componentUrl,
-            toolInput: toolArgs,
+            toolInput: widgetToolInput,
             toolOutput: structuredContent,
             resourceData, // Pass the fetched HTML
             toolId,
@@ -104,8 +131,25 @@ export function OpenAIComponentRenderer({
           throw new Error(`Failed to store widget data: ${errorData.error || storeResponse.statusText}`)
         }
 
-        // Set widget URL directly to content endpoint (skip container page)
-        setWidgetUrl(`/inspector/api/resources/widget-content/${toolId}`)
+        // if the url is the same means we are in dev mode so set widget URL directly to content endpoint (skip container page)
+        // to enable hrm show vite instead
+        // use the mcp server base url
+
+        // pass props as url params (toolInpu, toolOutput)
+        const urlParams = new URLSearchParams()
+        const params = {
+          toolInput: toolArgs,
+          toolOutput: structuredContent,
+          toolId,
+        }
+        urlParams.set('mcpUseParams', JSON.stringify(params))
+
+        if (toolResult?._meta?.['mcp-use/widget']?.html && toolResult?._meta?.['mcp-use/widget']?.dev) {
+          setWidgetUrl(`${new URL(serverBaseUrl || '').origin}/mcp-use/widgets/${toolResult?._meta?.['mcp-use/widget']?.name}?${urlParams.toString()}`)
+        }
+        else {
+          setWidgetUrl(`/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`)
+        }
       }
       catch (error) {
         console.error('Error storing widget data:', error)
@@ -272,12 +316,12 @@ export function OpenAIComponentRenderer({
 
       <div
         ref={containerRef}
-        className={cn('w-full flex justify-center', centerVertically && 'items-center')}
+        className={cn('w-full h-full flex justify-center', centerVertically && 'items-center')}
       >
         <iframe
           ref={iframeRef}
           src={widgetUrl}
-          className={cn('w-full shadow-lg dark:shadow-black/70 max-w-[768px] border border-zinc-200 dark:border-zinc-600 rounded-3xl bg-white')}
+          className={cn('w-full max-w-[768px]  rounded-3xl')}
           style={{ height: `${iframeHeight}px` }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
           title={`OpenAI Component: ${toolName}`}

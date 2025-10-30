@@ -72,4 +72,3 @@ export function ChatInputArea({
     </div>
   )
 }
-

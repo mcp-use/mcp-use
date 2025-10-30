@@ -586,6 +586,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
         const openaiAPI = {
           toolInput: ${safeToolInput},
           toolOutput: ${safeToolOutput},
+          toolResponseMetadata: null,
           displayMode: 'inline',
           maxHeight: 600,
           theme: 'dark',
@@ -659,6 +660,13 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
           async sendFollowUpMessage(args) {
             const prompt = typeof args === 'string' ? args : (args?.prompt || '');
             return this.sendFollowupTurn(prompt);
+          },
+
+          openExternal(payload) {
+            const href = typeof payload === 'string' ? payload : payload?.href;
+            if (href) {
+              window.open(href, '_blank', 'noopener,noreferrer');
+            }
           }
         };
 
@@ -678,9 +686,13 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
 
         setTimeout(() => {
           try {
-            const globalsEvent = new CustomEvent('webplus:set_globals', {
+            const globalsEvent = new CustomEvent('openai:set_globals', {
               detail: {
                 globals: {
+                  toolInput: openaiAPI.toolInput,
+                  toolOutput: openaiAPI.toolOutput,
+                  toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
+                  widgetState: openaiAPI.widgetState,
                   displayMode: openaiAPI.displayMode,
                   maxHeight: openaiAPI.maxHeight,
                   theme: openaiAPI.theme,
@@ -712,7 +724,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
     // If it's a full HTML document, inject at the beginning of head
     modifiedHtml = htmlContent.replace(
       '<head>',
-      `<head><base href="/">${apiScript}`,
+      `<head><!-- <base href="/"> -->${apiScript}`,
     )
   }
   else {
@@ -720,7 +732,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
     modifiedHtml = `<!DOCTYPE html>
 <html>
 <head>
-  <base href="/">
+  <!-- <base href="/"> -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   ${apiScript}

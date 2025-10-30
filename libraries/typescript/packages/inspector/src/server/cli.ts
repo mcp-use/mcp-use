@@ -64,7 +64,8 @@ const app = new Hono()
 
 // Middleware
 app.use('*', cors())
-app.use('*', logger())
+// Apply logger middleware only to proxy routes
+app.use('/inspector/api/proxy/*', logger())
 
 registerInspectorRoutes(app, { autoConnectUrl: mcpUrl })
 
