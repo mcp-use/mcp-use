@@ -1,4 +1,6 @@
 import type { Prompt, Resource, ResourceTemplate, Tool } from '@modelcontextprotocol/sdk/types.js'
+import type { StreamEvent } from '@langchain/core/tracers/log_stream'
+import type { BaseLanguageModelInterface } from '@langchain/core/language_models/base'
 
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
@@ -110,7 +112,7 @@ export type UseMcpResult = {
   getPrompt: (
     name: string,
     args?: Record<string, string>,
-  ) => Promise<{ messages: Array<{ role: 'user' | 'assistant'; content: { type: string; text?: string; [key: string]: any } }> }>
+  ) => Promise<{ messages: Array<{ role: 'user' | 'assistant'; content: { type: string; text?: string;[key: string]: any } }> }>
   /** Manually attempts to reconnect if the state is 'failed'. */
   retry: () => void
   /** Disconnects the client from the MCP server. */
@@ -124,5 +126,32 @@ export type UseMcpResult = {
   authenticate: () => void
   /** Clears all stored authentication data (tokens, client info, etc.) for this server URL from localStorage. */
   clearStorage: () => void
+  /**
+   * Send a chat message using an AI agent with access to MCP tools.
+   *
+   * The agent maintains conversation history and can use all tools from the connected server.
+   *
+   * @param message - User message to send
+   * @param llm - LangChain chat model instance (ChatOpenAI, ChatAnthropic, ChatGoogleGenerativeAI, etc.)
+   * @returns An async generator that yields StreamEvent objects for streaming responses
+   *
+   * @example
+   * ```typescript
+   * import { ChatOpenAI } from '@langchain/openai'
+   *
+   * const llm = new ChatOpenAI({ model: 'gpt-4', apiKey: process.env.OPENAI_API_KEY })
+   *
+   * for await (const event of mcp.sendChatMessage('Hello', llm)) {
+   *   if (event.event === 'on_chat_model_stream') {
+   *     console.log(event.data.chunk.text)
+   *   }
+   * }
+   * ```
+   */
+  sendChatMessage: (
+    message: string,
+    llm: BaseLanguageModelInterface
+  ) => AsyncGenerator<StreamEvent, void, void>
+  /** Clears the chat conversation history. */
+  clearChatHistory: () => void
 }
-
