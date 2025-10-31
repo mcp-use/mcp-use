@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from 'react'
+import type { StreamEvent } from '@langchain/core/tracers/log_stream'
+import type { BaseLanguageModelInterface } from '@langchain/core/language_models/base'
 import { MCPServerRemovedEvent, Telemetry } from '@/client/telemetry'
 
 export interface MCPConnection {
@@ -21,6 +23,7 @@ export interface MCPConnection {
   prompts: any[]
   error: string | null
   authUrl: string | null
+  customHeaders?: Record<string, string>
   callTool: (toolName: string, args: any) => Promise<any>
   readResource: (uri: string) => Promise<any>
   listPrompts: (serverName?: string) => Promise<void>
@@ -28,6 +31,11 @@ export interface MCPConnection {
   authenticate: () => void
   retry: () => void
   clearStorage: () => void
+  sendChatMessage: (
+    message: string,
+    llm: BaseLanguageModelInterface
+  ) => AsyncGenerator<StreamEvent, void, void>
+  clearChatHistory: () => void
 }
 
 interface McpContextType {
@@ -141,6 +149,7 @@ function McpConnectionWrapper({
           prompts: mcpHook.prompts,
           error: mcpHook.error ?? null,
           authUrl: mcpHook.authUrl ?? null,
+          customHeaders,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
@@ -148,6 +157,8 @@ function McpConnectionWrapper({
           authenticate: mcpHook.authenticate,
           retry: mcpHook.retry,
           clearStorage: mcpHook.clearStorage,
+          sendChatMessage: mcpHook.sendChatMessage,
+          clearChatHistory: mcpHook.clearChatHistory,
         }
 
         // Only update if something actually changed
@@ -160,6 +171,8 @@ function McpConnectionWrapper({
           || prev.tools.length !== connection.tools.length
           || prev.resources.length !== connection.resources.length
           || prev.prompts.length !== connection.prompts.length
+          || !prev.sendChatMessage
+          || !prev.clearChatHistory
         ) {
           prevConnectionRef.current = connection
           onUpdateRef.current(connection)
@@ -178,6 +191,7 @@ function McpConnectionWrapper({
         prompts: mcpHook.prompts,
         error: mcpHook.error ?? null,
         authUrl: mcpHook.authUrl ?? null,
+        customHeaders,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
@@ -185,6 +199,8 @@ function McpConnectionWrapper({
         authenticate: mcpHook.authenticate,
         retry: mcpHook.retry,
         clearStorage: mcpHook.clearStorage,
+        sendChatMessage: mcpHook.sendChatMessage,
+        clearChatHistory: mcpHook.clearChatHistory,
       }
 
       // Only update if something actually changed
@@ -197,6 +213,8 @@ function McpConnectionWrapper({
         || prev.tools.length !== connection.tools.length
         || prev.resources.length !== connection.resources.length
         || prev.prompts.length !== connection.prompts.length
+        || !prev.sendChatMessage
+        || !prev.clearChatHistory
       ) {
         prevConnectionRef.current = connection
         onUpdateRef.current(connection)
@@ -211,6 +229,8 @@ function McpConnectionWrapper({
     mcpHook.prompts,
     mcpHook.error,
     mcpHook.authUrl,
+    mcpHook.sendChatMessage,
+    mcpHook.clearChatHistory,
   ])
 
   return null
@@ -238,33 +258,33 @@ export function McpProvider({ children }: { children: ReactNode }) {
         // Validate and filter out invalid connections
         const validConnections = Array.isArray(parsed)
           ? parsed
-              .filter((conn: any) => {
-                // Ensure connection has valid structure with string url and id
-                return (
-                  conn
-                  && typeof conn === 'object'
-                  && typeof conn.id === 'string'
-                  && typeof conn.url === 'string'
-                  && typeof conn.name === 'string'
-                )
-              })
-              .map((conn: any) => {
-                // Migrate existing connections to include transportType
-                if (!conn.transportType) {
-                  conn.transportType = 'http' // Default to 'http' for Streamable HTTP
-                }
-                return conn
-              })
+            .filter((conn: any) => {
+              // Ensure connection has valid structure with string url and id
+              return (
+                conn
+                && typeof conn === 'object'
+                && typeof conn.id === 'string'
+                && typeof conn.url === 'string'
+                && typeof conn.name === 'string'
+              )
+            })
+            .map((conn: any) => {
+              // Migrate existing connections to include transportType
+              if (!conn.transportType) {
+                conn.transportType = 'http' // Default to 'http' for Streamable HTTP
+              }
+              return conn
+            })
           : []
 
         // If we filtered out any invalid connections or migrated transport types, update localStorage
         const hasChanges
           = validConnections.length !== parsed.length
-            || validConnections.some(
-              (conn: any) =>
-                conn.transportType === 'http'
-                && !parsed.find((p: any) => p.id === conn.id && p.transportType),
-            )
+          || validConnections.some(
+            (conn: any) =>
+              conn.transportType === 'http'
+              && !parsed.find((p: any) => p.id === conn.id && p.transportType),
+          )
 
         if (hasChanges) {
           console.warn(
@@ -404,9 +424,13 @@ export function McpProvider({ children }: { children: ReactNode }) {
           readResource: async () => {
             throw new Error('Not connected')
           },
-          authenticate: () => {},
-          retry: () => {},
-          clearStorage: () => {},
+          authenticate: () => { },
+          retry: () => { },
+          clearStorage: () => { },
+          sendChatMessage: async function* () {
+            throw new Error('Not connected')
+          },
+          clearChatHistory: () => { },
         }
       }
 
@@ -487,20 +511,12 @@ export function McpProvider({ children }: { children: ReactNode }) {
         getPrompt: async () => {
           throw new Error('Not connected')
         },
-        authenticate: () => {},
-        retry: () => {},
-        clearStorage: () => {},
+        authenticate: () => { },
+        retry: () => { },
+        clearStorage: () => { },
       }
     })
 
-    console.warn(
-      '[McpContext] Connections updated, version:',
-      connectionVersion,
-      'count:',
-      conns.length,
-      'states:',
-      conns.map(c => `${c.id}:${c.state}`),
-    )
     return conns
   }, [activeConnections, savedConnections, connectionVersion])
 

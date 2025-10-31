@@ -1,6 +1,5 @@
-import type { MCPConfig } from './chat/types'
-
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import type { MCPConnection } from '@/client/context/McpContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { ChatHeader } from './chat/ChatHeader'
 import { ChatInputArea } from './chat/ChatInputArea'
@@ -13,40 +12,25 @@ import { useChatMessagesClientSide } from './chat/useChatMessagesClientSide'
 import { useConfig } from './chat/useConfig'
 
 interface ChatTabProps {
-  // Legacy single-server support
-  mcpServerUrl?: string
-  // New multi-server support
-  mcpConfig?: MCPConfig
+  connection: MCPConnection
   isConnected: boolean
-  // OAuth state from the main Inspector connection
-  oauthState?: 'ready' | 'authenticating' | 'failed' | 'pending_auth'
-  oauthError?: string
-  // If true, runs the agent client-side in the browser
-  // If false, uses the server-side API endpoint
   useClientSide?: boolean
-  // Function to read resources from the MCP server
   readResource?: (uri: string) => Promise<any>
 }
 
 export function ChatTab({
-  mcpServerUrl,
-  mcpConfig,
+  connection,
   isConnected,
-  oauthState: _oauthState,
-  oauthError: _oauthError,
-  useClientSide = true, // Default to client-side execution
+  useClientSide = true,
   readResource,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
-  // For backward compatibility, get the first server URL from config if not provided
-  const effectiveMcpServerUrl = mcpServerUrl || (mcpConfig ? Object.values(mcpConfig.mcpServers)[0]?.url : undefined)
-
   // Use custom hooks for configuration and chat messages
   const {
     llmConfig,
-    authConfig,
+    authConfig: userAuthConfig,
     configDialogOpen,
     setConfigDialogOpen,
     tempProvider,
@@ -57,22 +41,20 @@ export function ChatTab({
     setTempModel,
     saveLLMConfig,
     clearConfig,
-  } = useConfig({ mcpServerUrl: effectiveMcpServerUrl || '' })
+  } = useConfig({ mcpServerUrl: connection.url })
 
   // Use client-side or server-side chat implementation
   const chatHookParams = {
-    mcpServerUrl,
-    mcpConfig,
+    connection,
     llmConfig,
-    authConfig,
     isConnected,
     readResource,
   }
 
   const serverSideChat = useChatMessages({
-    mcpServerUrl: mcpServerUrl || effectiveMcpServerUrl || '',
+    mcpServerUrl: connection.url,
     llmConfig,
-    authConfig,
+    authConfig: userAuthConfig,
     isConnected,
   })
   const clientSideChat = useChatMessagesClientSide(chatHookParams)
@@ -147,7 +129,7 @@ export function ChatTab({
 
         {/* Landing Form */}
         <ChatLandingForm
-          mcpServerUrl={effectiveMcpServerUrl || ''}
+          mcpServerUrl={connection.url}
           inputValue={inputValue}
           isConnected={isConnected}
           isLoading={isLoading}
@@ -188,18 +170,18 @@ export function ChatTab({
       <div className="flex-1 overflow-y-auto p-4 pt-[100px]">
         {!llmConfig
           ? (
-              <ConfigureEmptyState
-                onConfigureClick={() => setConfigDialogOpen(true)}
-              />
-            )
+            <ConfigureEmptyState
+              onConfigureClick={() => setConfigDialogOpen(true)}
+            />
+          )
           : (
-              <MessageList
-                messages={messages}
-                isLoading={isLoading}
-                serverId={effectiveMcpServerUrl}
-                readResource={readResource}
-              />
-            )}
+            <MessageList
+              messages={messages}
+              isLoading={isLoading}
+              serverId={connection.url}
+              readResource={readResource}
+            />
+          )}
       </div>
 
       {/* Input Area */}
