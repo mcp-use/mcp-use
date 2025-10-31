@@ -1,5 +1,24 @@
 # mcp-use
 
+## 1.2.0
+
+### Minor Changes
+
+- 708cc5b: Support Langchain 1.0.0
+
+### Patch Changes
+
+- 708cc5b: fix: mdoel type for langchain 1.0.0
+- 708cc5b: chore: set again cli and inspector as dependencies
+- 708cc5b: chore: lint
+- 708cc5b: Removed useless logs
+- 708cc5b: fix: apps sdk metadata setup from widget build
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+  - @mcp-use/inspector@0.4.9
+  - @mcp-use/cli@2.1.21
+
 ## 1.2.0-canary.6
 
 ### Patch Changes
