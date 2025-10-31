@@ -694,9 +694,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const { MCPAgent } = await import('../agents/mcp_agent.js')
 
         // Create agent with existing client
+        // TODO: Update MCPAgent type definitions to accept BrowserMCPClient or a shared MCPClientInterface
         agentRef.current = new MCPAgent({
           llm,
-          client: clientRef.current as any,
+          client: clientRef.current as BrowserMCPClient,
           maxSteps: 10,
           memoryEnabled: true,
           systemPrompt: 'You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.',
