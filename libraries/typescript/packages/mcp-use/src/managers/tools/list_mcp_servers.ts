@@ -1,4 +1,4 @@
-import type { ServerManager } from '../server_manager.js'
+import type { IServerManager } from '../types.js'
 import { z } from 'zod'
 import { logger } from '../../logging.js'
 import { MCPServerTool } from './base.js'
@@ -10,7 +10,7 @@ export class ListMCPServersTool extends MCPServerTool<typeof EnumerateServersSch
   override description = `Lists all available MCP (Model Context Protocol) servers that can be connected to, along with the tools available on each server. Use this tool to discover servers and see what functionalities they offer.`
   override schema = EnumerateServersSchema
 
-  constructor(manager: ServerManager) {
+  constructor(manager: IServerManager) {
     super(manager)
   }
 

@@ -1,5 +1,84 @@
 # mcp-use
 
+## 1.2.0
+
+### Minor Changes
+
+- 708cc5b: Support Langchain 1.0.0
+
+### Patch Changes
+
+- 708cc5b: fix: mdoel type for langchain 1.0.0
+- 708cc5b: chore: set again cli and inspector as dependencies
+- 708cc5b: chore: lint
+- 708cc5b: Removed useless logs
+- 708cc5b: fix: apps sdk metadata setup from widget build
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+  - @mcp-use/inspector@0.4.9
+  - @mcp-use/cli@2.1.21
+
+## 1.2.0-canary.6
+
+### Patch Changes
+
+- a8e5b65: fix: apps sdk metadata setup from widget build
+- Updated dependencies [a8e5b65]
+  - @mcp-use/inspector@0.4.9-canary.7
+  - @mcp-use/cli@2.1.21-canary.7
+
+## 1.2.0-canary.5
+
+### Patch Changes
+
+- 940d727: chore: lint
+  - @mcp-use/cli@2.1.21-canary.6
+  - @mcp-use/inspector@0.4.9-canary.6
+
+## 1.2.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [b9b739b]
+  - @mcp-use/inspector@0.4.9-canary.5
+  - @mcp-use/cli@2.1.21-canary.5
+
+## 1.2.0-canary.3
+
+### Patch Changes
+
+- da6e7ed: chore: set again cli and inspector as dependencies
+  - @mcp-use/cli@2.1.21-canary.4
+  - @mcp-use/inspector@0.4.9-canary.4
+
+## 1.2.0-canary.2
+
+### Patch Changes
+
+- 3f2d2e9: Removed useless logs
+  - @mcp-use/cli@2.1.21-canary.3
+  - @mcp-use/inspector@0.4.9-canary.3
+
+## 1.2.0-canary.1
+
+### Patch Changes
+
+- 5dd503f: fix: mdoel type for langchain 1.0.0
+  - @mcp-use/cli@2.1.21-canary.2
+  - @mcp-use/inspector@0.4.9-canary.2
+
+## 1.2.0-canary.0
+
+### Minor Changes
+
+- b24a213: Support Langchain 1.0.0
+
+### Patch Changes
+
+- @mcp-use/cli@2.1.21-canary.0
+- @mcp-use/inspector@0.4.9-canary.0
+
 ## 1.1.8
 
 ### Patch Changes

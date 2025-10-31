@@ -1,5 +1,76 @@
 # @mcp-use/inspector
 
+## 0.4.9
+
+### Patch Changes
+
+- 708cc5b: fix: enhance widget CSP handling and security headers
+- 708cc5b: chore: update langchain dependencies
+- 708cc5b: fix: apps sdk metadata setup from widget build
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+  - mcp-use@1.2.0
+
+## 0.4.9-canary.7
+
+### Patch Changes
+
+- a8e5b65: fix: apps sdk metadata setup from widget build
+- Updated dependencies [a8e5b65]
+  - mcp-use@1.2.0-canary.6
+
+## 0.4.9-canary.6
+
+### Patch Changes
+
+- Updated dependencies [940d727]
+  - mcp-use@1.2.0-canary.5
+
+## 0.4.9-canary.5
+
+### Patch Changes
+
+- b9b739b: chore: update langchain dependencies
+  - mcp-use@1.2.0-canary.4
+
+## 0.4.9-canary.4
+
+### Patch Changes
+
+- Updated dependencies [da6e7ed]
+  - mcp-use@1.2.0-canary.3
+
+## 0.4.9-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3f2d2e9]
+  - mcp-use@1.2.0-canary.2
+
+## 0.4.9-canary.2
+
+### Patch Changes
+
+- Updated dependencies [5dd503f]
+  - mcp-use@1.2.0-canary.1
+
+## 0.4.9-canary.1
+
+### Patch Changes
+
+- 3b72cde: fix: enhance widget CSP handling and security headers
+
+## 0.4.9-canary.0
+
+### Patch Changes
+
+- Updated dependencies [b24a213]
+  - mcp-use@1.2.0-canary.0
+
 ## 0.4.8
 
 ### Patch Changes
