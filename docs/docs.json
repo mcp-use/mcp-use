@@ -478,7 +478,8 @@
                       "typescript/client/logging"
                     ]
                   },
-                  "typescript/client/authentication"
+                  "typescript/client/authentication",
+                  "typescript/client/usemcp"
                 ]
               },
               {
@@ -555,7 +556,8 @@
               {
                 "group": "Blog",
                 "pages": [
-                  "python/blog/middleware"
+                  "typescript/blog/client_side",
+                  "typescript/blog/client-vs-sdk"
                 ]
               }
             ]
