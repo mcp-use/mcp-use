@@ -19,7 +19,6 @@ export function useChatMessagesClientSide({
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const toolsMetadataRef = useRef<Map<string, any>>(new Map())
 
   const sendMessage = useCallback(
     async (userInput: string) => {
