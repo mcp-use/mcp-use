@@ -1,5 +1,20 @@
 # @mcp-use/inspector
 
+## 0.4.9
+
+### Patch Changes
+
+- 708cc5b: fix: enhance widget CSP handling and security headers
+- 708cc5b: chore: update langchain dependencies
+- 708cc5b: fix: apps sdk metadata setup from widget build
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+  - mcp-use@1.2.0
+
 ## 0.4.9-canary.7
 
 ### Patch Changes
