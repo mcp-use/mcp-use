@@ -19,10 +19,14 @@ import { readFileSync } from 'node:fs'
 import { requestLogger } from './logging.js'
 import { createUIResourceFromDefinition, type UrlConfig } from './adapters/mcp-ui-adapter.js'
 import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
-import {createServer} from "vite"
+import { createServer } from "vite"
+import { AsyncLocalStorage } from 'node:async_hooks'
 
 
 const TMP_MCP_USE_DIR = '.mcp-use'
+
+// AsyncLocalStorage for request context
+const requestContext = new AsyncLocalStorage<{ req: any; res: any }>()
 
 
 export class McpServer {
@@ -34,6 +38,8 @@ export class McpServer {
   private serverPort?: number
   private serverHost: string
   private serverBaseUrl?: string
+  private excludedMiddlewareRoutes = ['/inspector']
+  private toolMiddleware: Map<string, any> = new Map()
 
   /**
    * Creates a new MCP server instance with Express integration
@@ -71,9 +77,33 @@ export class McpServer {
     // Proxy all Express methods to the underlying app
     return new Proxy(this, {
       get(target, prop) {
+        // McpServer methods - bind to McpServer instance
         if (prop in target) {
-          return (target as any)[prop]
+          const value = (target as any)[prop]
+          return typeof value === 'function' ? value.bind(target) : value
         }
+
+        // Express methods - intercept 'use' to wrap middleware
+        if (prop === 'use') {
+          return function (...args: any[]) {
+            // If the last argument is a middleware function (not a string path)
+            const lastArg = args[args.length - 1]
+            if (typeof lastArg === 'function' && typeof args[0] !== 'string') {
+              const originalMiddleware = lastArg
+              const wrappedMiddleware = (req: any, res: any, next: any) => {
+                // Skip middleware for excluded framework routes
+                if (target.excludedMiddlewareRoutes.some(route => req.path.startsWith(route))) {
+                  return next()
+                }
+                return originalMiddleware(req, res, next)
+              }
+              args[args.length - 1] = wrappedMiddleware
+            }
+            return target.app.use(...args)
+          }
+        }
+
+        // Other Express methods
         const value = (target.app as any)[prop]
         return typeof value === 'function' ? value.bind(target.app) : value
       }
@@ -229,10 +259,12 @@ export class McpServer {
    * @param toolDefinition.inputs - Array of input parameter definitions with types and validation
    * @param toolDefinition.cb - Async callback function that executes the tool logic with provided parameters
    * @param toolDefinition._meta - Optional metadata for the tool (e.g. Apps SDK metadata)
+   * @param middleware - Optional Express middleware for tool-specific authentication/authorization
    * @returns The server instance for method chaining
    *
    * @example
    * ```typescript
+   * // Basic tool
    * server.tool({
    *   name: 'calculate',
    *   description: 'Performs mathematical calculations',
@@ -250,6 +282,17 @@ export class McpServer {
    *     'openai/toolInvocation/invoked': 'Calculation complete'
    *   }
    * })
+   *
+   * // Tool with authentication middleware
+   * server.tool({
+   *   name: 'delete-user',
+   *   description: 'Delete a user (requires authentication)',
+   *   inputs: [{ name: 'userId', type: 'string', required: true }],
+   *   cb: async ({ userId }) => {
+   *     // This only runs if authentication passes
+   *     return { deleted: userId }
+   *   }
+   * }, passport.authenticate('bearer'))
    * ```
    */
   tool(toolDefinition: ToolDefinition): this {
@@ -265,7 +308,8 @@ export class McpServer {
         _meta: toolDefinition._meta
       },
       async (params: any) => {
-        return await toolDefinition.cb(params)
+        const context = requestContext.getStore()
+        return await toolDefinition.cb(params, context)
       },
     )
     return this
@@ -350,7 +394,7 @@ export class McpServer {
    * ```typescript
    * // Simple usage - auto-loads from generated schema
    * server.uiResource('display-weather')
-   * 
+   *
    * // Legacy MCP-UI widget
    * server.uiResource({
    *   type: 'externalUrl',
@@ -457,7 +501,7 @@ export class McpServer {
         readCallback: async (uri, params) => {
           // Use empty params for Apps SDK since structuredContent is passed separately
           const uiResource = this.createWidgetUIResource(definition, {})
-          
+
           return {
             contents: [uiResource.resource]
           }
@@ -503,10 +547,10 @@ export class McpServer {
           // Generate a unique URI with random ID for each invocation
           const randomId = Math.random().toString(36).substring(2, 15)
           const uniqueUri = `ui://widget/${definition.name}-${randomId}.html`
-          
+
           // Update toolMetadata with the unique URI
           const uniqueToolMetadata = { ...toolMetadata, 'openai/outputTemplate': uniqueUri }
-          
+
           return {
             _meta: uniqueToolMetadata,
             content: [
@@ -556,7 +600,7 @@ export class McpServer {
     // If baseUrl is set, parse it to extract protocol, host, and port
     let configBaseUrl = `http://${this.serverHost}`
     let configPort: number | string = this.serverPort || 3001
-    
+
     if (this.serverBaseUrl) {
       try {
         const url = new URL(this.serverBaseUrl)
@@ -567,7 +611,7 @@ export class McpServer {
         console.warn('Failed to parse baseUrl, falling back to host:port', e)
       }
     }
-    
+
     const urlConfig: UrlConfig = {
       baseUrl: configBaseUrl,
       port: configPort
@@ -657,7 +701,7 @@ export class McpServer {
 
   /**
    * Check if server is running in production mode
-   * 
+   *
    * @private
    * @returns true if in production mode, false otherwise
    */
@@ -670,7 +714,7 @@ export class McpServer {
 
   /**
    * Read build manifest file
-   * 
+   *
    * @private
    * @returns Build manifest or null if not found
    */
@@ -727,7 +771,7 @@ export class McpServer {
     const baseRoute = options?.baseRoute || '/mcp-use/widgets'
     const resourcesDir = options?.resourcesDir || 'resources'
     const srcDir = join(process.cwd(), resourcesDir)
-    
+
     // Check if resources directory exists
     try {
       await fs.access(srcDir)
@@ -735,7 +779,7 @@ export class McpServer {
       console.log(`[WIDGETS] No ${resourcesDir}/ directory found - skipping widget serving`)
       return
     }
-    
+
     // Find all TSX widget files
     let entries: string[] = []
     try {
@@ -747,16 +791,16 @@ export class McpServer {
       console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`)
       return
     }
-    
+
     if (entries.length === 0) {
       console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`)
       return
     }
-    
+
     // Create a temp directory for widget entry files
     const tempDir = join(process.cwd(), TMP_MCP_USE_DIR)
-    await fs.mkdir(tempDir, { recursive: true }).catch(() => {})
-    
+    await fs.mkdir(tempDir, { recursive: true }).catch(() => { })
+
     const react = (await import('@vitejs/plugin-react')).default
     const tailwindcss = (await import('@tailwindcss/vite')).default
     console.log(react, tailwindcss)
@@ -771,13 +815,13 @@ export class McpServer {
         entry: entry
       }
     })
-    
+
     // Create entry files for each widget
     for (const widget of widgets) {
       // Create temp entry and HTML files for this widget
       const widgetTempDir = join(tempDir, widget.name)
       await fs.mkdir(widgetTempDir, { recursive: true })
-      
+
       // Create a CSS file with Tailwind and @source directives to scan resources
       const resourcesPath = join(process.cwd(), resourcesDir)
       const { relative } = await import('node:path')
@@ -788,7 +832,7 @@ export class McpServer {
 @source "${relativeResourcesPath}";
 `
       await fs.writeFile(join(widgetTempDir, 'styles.css'), cssContent, 'utf8')
-      
+
       const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
@@ -800,7 +844,7 @@ if (container && Component) {
   root.render(<Component />)
 }
 `
-   
+
       const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -813,17 +857,17 @@ if (container && Component) {
     <script type="module" src="${baseRoute}/${widget.name}/entry.tsx"></script>
   </body>
 </html>`
-      
+
       await fs.writeFile(join(widgetTempDir, 'entry.tsx'), entryContent, 'utf8')
       await fs.writeFile(join(widgetTempDir, 'index.html'), htmlContent, 'utf8')
     }
-    
+
     // Build the server origin URL
     const serverOrigin = this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort}`
-    
+
     // Create a single shared Vite dev server for all widgets
     console.log(`[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`)
-    
+
     const viteServer = await createServer({
       root: tempDir,
       base: baseRoute + '/',
@@ -838,17 +882,17 @@ if (container && Component) {
         origin: serverOrigin,
       },
     })
-    
+
     // Custom middleware to handle widget-specific paths
     this.app.use(baseRoute, (req, res, next) => {
       const urlPath = req.url || ''
       const [pathname, queryString] = urlPath.split('?')
       const widgetMatch = pathname.match(/^\/([^/]+)/)
-      
+
       if (widgetMatch) {
         const widgetName = widgetMatch[1]
         const widget = widgets.find(w => w.name === widgetName)
-        
+
         if (widget) {
           // If requesting the root of a widget, serve its index.html
           if (pathname === `/${widgetName}` || pathname === `/${widgetName}/`) {
@@ -857,13 +901,13 @@ if (container && Component) {
           // For assets, keep the original URL but Vite will handle it from the widget's directory
         }
       }
-      
+
       next()
     })
-    
+
     // Mount the single Vite server for all widgets
     this.app.use(baseRoute, viteServer.middlewares)
-    
+
     widgets.forEach(widget => {
       console.log(`[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`)
     })
@@ -875,18 +919,18 @@ if (container && Component) {
 
       // for now expose all widgets as appsSdk
       const type = 'appsSdk'
-      
+
       // Extract metadata from the widget file using Vite SSR
       let widgetMetadata: any = {}
       let props = {}
       let description = widget.description
-      
+
       try {
         const mod = await viteServer.ssrLoadModule(widget.entry)
         if (mod.widgetMetadata) {
           widgetMetadata = mod.widgetMetadata
           description = widgetMetadata.description || widget.description
-          
+
           // Convert Zod schema to JSON schema for props if available
           if (widgetMetadata.inputs) {
             // The inputs is a Zod schema, we can use zodToJsonSchema or extract shape
@@ -910,7 +954,7 @@ if (container && Component) {
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
           const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
-          
+
           // Try to replace existing base tag (only if not in comments)
           const baseTagRegex = /<base\s+[^>]*\/?>/i;
           if (baseTagRegex.test(htmlWithoutComments)) {
@@ -928,7 +972,7 @@ if (container && Component) {
           }
         }
 
-        // replace relative path that starts with /mcp-use script and css with absolute  
+        // replace relative path that starts with /mcp-use script and css with absolute
         html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
         html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
 
@@ -1007,36 +1051,36 @@ if (container && Component) {
   }): Promise<void> {
     const baseRoute = options?.baseRoute || '/mcp-use/widgets'
     const widgetsDir = join(process.cwd(), 'dist', 'resources', 'widgets')
-    
+
     // Check if widgets directory exists
     if (!existsSync(widgetsDir)) {
       console.log('[WIDGETS] No dist/resources/widgets/ directory found - skipping widget serving')
       return
     }
-    
+
     // Setup static file serving routes
     this.setupWidgetRoutes()
-    
+
     // Discover built widgets
     const widgets = readdirSync(widgetsDir).filter(name => {
       const widgetPath = join(widgetsDir, name)
       const indexPath = join(widgetPath, 'index.html')
       return existsSync(indexPath)
     })
-    
+
     if (widgets.length === 0) {
       console.log('[WIDGETS] No built widgets found in dist/resources/widgets/')
       return
     }
-    
+
     console.log(`[WIDGETS] Serving ${widgets.length} pre-built widget(s) from dist/resources/widgets/`)
-    
+
     // Register tools and resources for each widget
     for (const widgetName of widgets) {
       const widgetPath = join(widgetsDir, widgetName)
       const indexPath = join(widgetPath, 'index.html')
       const metadataPath = join(widgetPath, 'metadata.json')
-      
+
       // Read the HTML template
       let html = ''
       try {
@@ -1046,7 +1090,7 @@ if (container && Component) {
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
           const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
-          
+
           // Try to replace existing base tag (only if not in comments)
           const baseTagRegex = /<base\s+[^>]*\/?>/i;
           if (baseTagRegex.test(htmlWithoutComments)) {
@@ -1063,7 +1107,7 @@ if (container && Component) {
             }
           }
 
-          // replace relative path that starts with /mcp-use script and css with absolute  
+          // replace relative path that starts with /mcp-use script and css with absolute
           html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
           html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
 
@@ -1076,12 +1120,12 @@ if (container && Component) {
         console.error(`[WIDGET] Failed to read ${widgetName}/index.html:`, error)
         continue
       }
-      
+
       // Read the metadata file if it exists
       let metadata: any = {}
       let props = {}
       let description = `Widget: ${widgetName}`
-      
+
       try {
         const metadataContent = readFileSync(metadataPath, 'utf8')
         metadata = JSON.parse(metadataContent)
@@ -1095,7 +1139,7 @@ if (container && Component) {
         // Metadata file doesn't exist or couldn't be read - use defaults
         console.log(`[WIDGET] No metadata found for ${widgetName}, using defaults`)
       }
-      
+
       this.uiResource({
         name: widgetName,
         title: metadata.title || widgetName,
@@ -1135,7 +1179,7 @@ if (container && Component) {
           }
         }
       })
-      
+
       console.log(`[WIDGET] ${widgetName} mounted at ${baseRoute}/${widgetName}`)
     }
   }
@@ -1170,47 +1214,53 @@ if (container && Component) {
     // POST endpoint for messages
     // Create a new transport for each request to support multiple concurrent clients
     this.app.post(endpoint, express.json(), async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true
-      })
+      return requestContext.run({ req, res }, async () => {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true
+        })
 
-      res.on('close', () => {
-        transport.close()
-      })
+        res.on('close', () => {
+          transport.close()
+        })
 
-      await this.server.connect(transport)
-      await transport.handleRequest(req, res, req.body)
+        await this.server.connect(transport)
+        await transport.handleRequest(req, res, req.body)
+      })
     })
 
     // GET endpoint for SSE streaming
     this.app.get(endpoint, async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true
-      })
+      return requestContext.run({ req, res }, async () => {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true
+        })
 
-      res.on('close', () => {
-        transport.close()
-      })
+        res.on('close', () => {
+          transport.close()
+        })
 
-      await this.server.connect(transport)
-      await transport.handleRequest(req, res)
+        await this.server.connect(transport)
+        await transport.handleRequest(req, res)
+      })
     })
 
     // DELETE endpoint for session cleanup
     this.app.delete(endpoint, async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true
-      })
+      return requestContext.run({ req, res }, async () => {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true
+        })
 
-      res.on('close', () => {
-        transport.close()
-      })
+        res.on('close', () => {
+          transport.close()
+        })
 
-      await this.server.connect(transport)
-      await transport.handleRequest(req, res)
+        await this.server.connect(transport)
+        await transport.handleRequest(req, res)
+      })
     })
 
     this.mcpMounted = true
@@ -1241,7 +1291,7 @@ if (container && Component) {
   async listen(port?: number): Promise<void> {
     // Priority: parameter > PORT env var > default (3001)
     this.serverPort = port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3001)
-    
+
     // Update host from HOST env var if set
     if (process.env.HOST) {
       this.serverHost = process.env.HOST
@@ -1252,7 +1302,7 @@ if (container && Component) {
       resourcesDir: 'resources'
     })
     await this.mountMcp()
-    
+
 
     // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
     this.mountInspector()
@@ -1371,7 +1421,7 @@ if (container && Component) {
       const filePath = join(process.cwd(), 'dist', 'resources', 'widgets', req.params.widget, 'index.html')
 
       let html = readFileSync(filePath, 'utf8')
-      // replace relative path that starts with /mcp-use script and css with absolute  
+      // replace relative path that starts with /mcp-use script and css with absolute
       html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
       html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
 
@@ -1447,7 +1497,7 @@ if (container && Component) {
           zodType = z.object({})
           break
         case 'array':
-          zodType = z.array(z.any())
+          zodType = z.array(z.string())
           break
         default:
           zodType = z.any()
@@ -1590,7 +1640,7 @@ export type McpServerInstance = Omit<McpServer, keyof Express> & Express
 
 /**
  * Create a new MCP server instance
- * 
+ *
  * @param name - Server name
    * @param config - Optional server configuration
    * @param config.version - Server version (defaults to '1.0.0')
@@ -1598,7 +1648,7 @@ export type McpServerInstance = Omit<McpServer, keyof Express> & Express
    * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
    * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
    * @returns McpServerInstance with both MCP and Express methods
-   * 
+   *
    * @example
    * ```typescript
    * // Basic usage
@@ -1606,13 +1656,13 @@ export type McpServerInstance = Omit<McpServer, keyof Express> & Express
    *   version: '1.0.0',
    *   description: 'My MCP server'
    * })
-   * 
+   *
    * // With custom host (e.g., for Docker or remote access)
    * const server = createMCPServer('my-server', {
    *   version: '1.0.0',
    *   host: '0.0.0.0' // or 'myserver.com'
    * })
-   * 
+   *
    * // With full base URL (e.g., behind a proxy or custom domain)
    * const server = createMCPServer('my-server', {
    *   version: '1.0.0',

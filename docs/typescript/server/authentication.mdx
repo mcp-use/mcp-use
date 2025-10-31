@@ -1,0 +1,605 @@
+---
+title: "Authentication"
+description: "Secure your MCP server with authentication middleware"
+icon: "lock"
+---
+
+# Authentication
+
+Learn how to add authentication to your MCP server to control access and protect your tools. The framework automatically excludes the inspector UI from authentication so you can debug freely.
+
+## Why Authenticate MCP Servers
+
+MCP servers expose tools that can perform actions (send emails, query databases, make API calls). Without authentication:
+- Anyone can access your server
+- Tools can be invoked without authorization
+- No user context or rate limiting
+
+## How It Works
+
+The framework uses Express middleware for authentication and `AsyncLocalStorage` to safely pass authenticated context to tool callbacks:
+
+```
+HTTP Request → Auth Middleware → MCP Protocol → Tool Callback
+     ↓              ↓                                ↓
+   Headers      Validate Token              Access context.req
+```
+
+**Key features:**
+- Standard Express middleware (use any auth library)
+- Inspector UI automatically bypassed
+- Thread-safe context passing with `AsyncLocalStorage`
+- Access `req`/`res` in tool callbacks
+
+## Basic Authentication
+
+### Bearer Token Authentication
+
+The most common pattern for API authentication:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+
+const server = createMCPServer('authenticated-server', {
+  version: '1.0.0'
+})
+
+// Add authentication middleware
+server.use((req, res, next) => {
+  const authHeader = req.headers['authorization']
+
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Missing Authorization header' })
+  }
+
+  const token = authHeader.replace(/^Bearer\s+/i, '')
+
+  if (!token || token !== process.env.API_KEY) {
+    return res.status(401).json({ error: 'Invalid API key' })
+  }
+
+  next()
+})
+
+// Tools are now protected
+server.tool({
+  name: 'protected-action',
+  description: 'This requires authentication',
+  inputs: [],
+  cb: async () => {
+    return {
+      content: [{
+        type: 'text',
+        text: 'You are authenticated!'
+      }]
+    }
+  }
+})
+
+server.listen(3000)
+```
+
+**Usage:**
+```bash
+# Without auth - rejected
+curl http://localhost:3000/mcp
+
+# With auth - works
+curl -H "Authorization: Bearer your-api-key" http://localhost:3000/mcp
+```
+
+### Accessing Auth Context in Tools
+
+Tools receive a `context` parameter with the Express `req` and `res` objects:
+
+```typescript
+server.use((req, res, next) => {
+  const token = req.headers['authorization']?.replace(/^Bearer\s+/i, '')
+
+  // Store validated data on req
+  req.apiKey = token
+  req.userId = getUserIdFromToken(token)
+
+  next()
+})
+
+server.tool({
+  name: 'send-email',
+  description: 'Send an email using the authenticated API key',
+  inputs: [
+    { name: 'to', type: 'string', required: true },
+    { name: 'subject', type: 'string', required: true },
+    { name: 'body', type: 'string', required: true }
+  ],
+  cb: async (params, context) => {
+    // Access authenticated context
+    const apiKey = context?.req.apiKey
+    const userId = context?.req.userId
+
+    // Use per-user credentials
+    const emailClient = new EmailClient(apiKey)
+    await emailClient.send({
+      from: userId,
+      to: params.to,
+      subject: params.subject,
+      body: params.body
+    })
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Email sent from user ${userId}`
+      }]
+    }
+  }
+})
+```
+
+## Multi-Tenant Authentication
+
+### User-Scoped API Keys
+
+Allow each user to provide their own API keys for third-party services:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+
+const server = createMCPServer('multi-tenant-server', {
+  version: '1.0.0'
+})
+
+// Validate MCP server access
+server.use((req, res, next) => {
+  const authHeader = req.headers['authorization']
+
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Missing Authorization header' })
+  }
+
+  const token = authHeader.replace(/^Bearer\s+/i, '')
+
+  // Store user's third-party API key
+  req.userApiKey = token
+
+  next()
+})
+
+// Tools use per-user credentials
+server.tool({
+  name: 'query-database',
+  description: 'Query a database using user credentials',
+  inputs: [
+    { name: 'query', type: 'string', required: true }
+  ],
+  cb: async (params, context) => {
+    // Each user uses their own database credentials
+    const db = new DatabaseClient(context?.req.userApiKey)
+    const results = await db.query(params.query)
+
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(results)
+      }]
+    }
+  }
+})
+
+server.listen(3000)
+```
+
+**Benefits:**
+- Users manage their own API keys
+- No server-side key storage
+- Users pay their own bills
+- Perfect for SaaS/public APIs
+
+## Advanced Authentication
+
+### JWT Tokens
+
+Use JSON Web Tokens for stateless authentication:
+
+```typescript
+import jwt from 'jsonwebtoken'
+
+const JWT_SECRET = process.env.JWT_SECRET!
+
+server.use((req, res, next) => {
+  const authHeader = req.headers['authorization']
+
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Missing Authorization header' })
+  }
+
+  const token = authHeader.replace(/^Bearer\s+/i, '')
+
+  try {
+    // Verify and decode JWT
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      userId: string
+      email: string
+      permissions: string[]
+    }
+
+    // Store decoded data
+    req.user = decoded
+    next()
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' })
+  }
+})
+
+server.tool({
+  name: 'admin-action',
+  description: 'Requires admin permission',
+  inputs: [],
+  cb: async (params, context) => {
+    const user = context?.req.user
+
+    // Check permissions
+    if (!user.permissions.includes('admin')) {
+      throw new Error('Insufficient permissions')
+    }
+
+    // Perform admin action
+    return {
+      content: [{
+        type: 'text',
+        text: `Admin action performed by ${user.email}`
+      }]
+    }
+  }
+})
+```
+
+### Database Session Validation
+
+Validate sessions against a database:
+
+```typescript
+import { db } from './database'
+
+server.use(async (req, res, next) => {
+  const sessionId = req.headers['x-session-id']
+
+  if (!sessionId) {
+    return res.status(401).json({ error: 'Missing session ID' })
+  }
+
+  try {
+    // Look up session in database
+    const session = await db.sessions.findOne({
+      id: sessionId,
+      expiresAt: { $gt: new Date() }
+    })
+
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid or expired session' })
+    }
+
+    // Update last activity
+    await db.sessions.updateOne(
+      { id: sessionId },
+      { $set: { lastActivity: new Date() } }
+    )
+
+    req.session = session
+    next()
+  } catch (error) {
+    return res.status(500).json({ error: 'Session validation failed' })
+  }
+})
+```
+
+### OAuth Integration
+
+Integrate with OAuth providers:
+
+```typescript
+import passport from 'passport'
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
+
+// Configure Passport
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  callbackURL: '/auth/google/callback'
+}, (accessToken, refreshToken, profile, done) => {
+  // Find or create user
+  return done(null, profile)
+}))
+
+// Use Passport middleware
+server.use(passport.initialize())
+
+// OAuth routes
+server.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+)
+
+server.get('/auth/google/callback',
+  passport.authenticate('google', { session: false }),
+  (req, res) => {
+    // Generate JWT for MCP access
+    const token = jwt.sign(
+      { userId: req.user.id, email: req.user.email },
+      JWT_SECRET
+    )
+    res.json({ token })
+  }
+)
+
+// Protect MCP endpoints
+server.use('/mcp', passport.authenticate('jwt', { session: false }))
+```
+
+## Rate Limiting
+
+Prevent abuse with rate limiting:
+
+```typescript
+import rateLimit from 'express-rate-limit'
+
+// Apply rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each user to 100 requests per window
+  message: 'Too many requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Key by user ID or IP
+  keyGenerator: (req) => {
+    return req.user?.id || req.ip
+  }
+})
+
+server.use(limiter)
+```
+
+## Inspector Access
+
+The framework **automatically excludes `/inspector`** from authentication middleware, so you can debug without auth headers:
+
+```typescript
+// Authentication middleware
+server.use((req, res, next) => {
+  // This is automatically skipped for /inspector routes
+  const token = req.headers['authorization']
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  next()
+})
+
+// Inspector works without auth
+// Visit: http://localhost:3000/inspector ✅
+
+// MCP endpoints require auth
+// POST http://localhost:3000/mcp ❌ (without header)
+```
+
+Routes automatically excluded from middleware:
+- `/inspector` - Inspector UI
+- `/mcp-use/widgets` - Widget assets
+- `/__vite` - Vite HMR in development
+
+To test with auth in inspector, just add the header in the UI.
+
+## Best Practices
+
+### 1. Environment Variables
+Never hardcode secrets:
+
+```typescript
+// ❌ Bad
+const API_KEY = 'sk_live_123456'
+
+// ✅ Good
+const API_KEY = process.env.API_KEY
+
+if (!API_KEY) {
+  throw new Error('API_KEY environment variable is required')
+}
+```
+
+### 2. Validate Early
+Fail fast with clear error messages:
+
+```typescript
+server.use((req, res, next) => {
+  const authHeader = req.headers['authorization']
+
+  if (!authHeader) {
+    return res.status(401).json({
+      error: 'Missing Authorization header',
+      hint: 'Include header: Authorization: Bearer YOUR_API_KEY'
+    })
+  }
+
+  // ... rest of validation
+})
+```
+
+### 3. Log Authentication Events
+Track auth attempts for security:
+
+```typescript
+server.use((req, res, next) => {
+  const token = req.headers['authorization']
+
+  if (!token) {
+    console.warn('Unauthorized access attempt', {
+      ip: req.ip,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    })
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+
+  // Log successful auth
+  console.info('Authenticated request', {
+    userId: getUserId(token),
+    path: req.path
+  })
+
+  next()
+})
+```
+
+### 4. Graceful Context Handling
+Always check if context exists:
+
+```typescript
+cb: async (params, context) => {
+  // ✅ Safe - handles missing context
+  const apiKey = context?.req.apiKey
+
+  if (!apiKey) {
+    throw new Error('Authentication required')
+  }
+
+  // Use apiKey safely
+}
+```
+
+### 5. Separate Concerns
+Don't mix authentication with authorization:
+
+```typescript
+// Authentication - WHO you are
+server.use((req, res, next) => {
+  const user = validateToken(req.headers['authorization'])
+  req.user = user
+  next()
+})
+
+// Authorization - WHAT you can do (in tool callback)
+cb: async (params, context) => {
+  const user = context?.req.user
+
+  if (!user.permissions.includes('delete')) {
+    throw new Error('Permission denied')
+  }
+
+  // Perform action
+}
+```
+
+## Complete Example
+
+Here's a full working example with authentication:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+import { Resend } from 'resend'
+
+const server = createMCPServer('email-service', {
+  version: '1.0.0'
+})
+
+// Authentication middleware
+server.use((req, res, next) => {
+  const authHeader = req.headers['authorization']
+
+  if (!authHeader) {
+    return res.status(401).json({
+      error: 'Missing Authorization header',
+      hint: 'Use: Authorization: Bearer YOUR_RESEND_API_KEY'
+    })
+  }
+
+  const token = authHeader.replace(/^Bearer\s+/i, '')
+
+  if (!token) {
+    return res.status(401).json({
+      error: 'Invalid Authorization format'
+    })
+  }
+
+  // Store the Resend API key
+  req.resendApiKey = token
+  next()
+})
+
+// Email sending tool
+server.tool({
+  name: 'send-email',
+  description: 'Send an email using Resend',
+  inputs: [
+    { name: 'to', type: 'string', required: true, description: 'Recipient email' },
+    { name: 'from', type: 'string', required: true, description: 'Sender email' },
+    { name: 'subject', type: 'string', required: true, description: 'Email subject' },
+    { name: 'html', type: 'string', required: true, description: 'HTML content' }
+  ],
+  cb: async (params, context) => {
+    // Use the authenticated API key
+    const resend = new Resend(context?.req.resendApiKey)
+
+    try {
+      const result = await resend.emails.send({
+        from: params.from,
+        to: params.to,
+        subject: params.subject,
+        html: params.html
+      })
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Email sent successfully! ID: ${result.data?.id}`
+        }]
+      }
+    } catch (error) {
+      throw new Error(`Failed to send email: ${error.message}`)
+    }
+  }
+})
+
+server.listen(3000)
+```
+
+## Security Considerations
+
+1. **HTTPS in Production**: Always use HTTPS to protect tokens in transit
+2. **Token Rotation**: Implement token expiration and rotation
+3. **Rate Limiting**: Prevent brute force attacks
+4. **Input Validation**: Validate all tool parameters
+5. **Error Messages**: Don't leak sensitive info in errors
+6. **Audit Logging**: Track all authenticated actions
+7. **CORS**: Configure CORS appropriately for your use case
+
+## Testing Authentication
+
+```typescript
+// Test without auth
+const response1 = await fetch('http://localhost:3000/mcp', {
+  method: 'POST',
+  body: JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'tools/call',
+    params: { name: 'send-email', arguments: {...} }
+  })
+})
+// Expected: 401 Unauthorized
+
+// Test with valid auth
+const response2 = await fetch('http://localhost:3000/mcp', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer valid-api-key'
+  },
+  body: JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'tools/call',
+    params: { name: 'send-email', arguments: {...} }
+  })
+})
+// Expected: 200 OK
+```
+
+## Next Steps
+
+- [Configuration](/typescript/server/configuration) - Configure CORS, rate limiting, and more
+- [Tools](/typescript/server/tools) - Learn about building tools
+- [Examples](/typescript/server/examples) - See complete server examples
