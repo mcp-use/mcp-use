@@ -1,4 +1,5 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
+// @ts-ignore - Importing from legacy langchain package for compatibility
 import { SystemMessage } from 'langchain'
 
 export function generateToolDescriptions(

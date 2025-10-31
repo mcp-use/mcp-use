@@ -6,6 +6,7 @@ import type { ZodSchema } from 'zod'
 import type { MCPClient } from '../client.js'
 import type { BaseConnector } from '../connectors/base.js'
 import type { MCPSession } from '../session.js'
+// @ts-ignore - Importing from legacy langchain package for compatibility
 import { createAgent, type ReactAgent, modelCallLimitMiddleware, SystemMessage, AIMessage, HumanMessage, ToolMessage, type DynamicTool } from 'langchain'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { LangChainAdapter } from '../adapters/langchain_adapter.js'
