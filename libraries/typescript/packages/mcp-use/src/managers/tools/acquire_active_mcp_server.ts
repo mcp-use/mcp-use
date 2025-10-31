@@ -1,4 +1,4 @@
-import type { ServerManager } from '../server_manager.js'
+import type { IServerManager } from '../types.js'
 import { z } from 'zod'
 import { MCPServerTool } from './base.js'
 
@@ -9,7 +9,7 @@ export class AcquireActiveMCPServerTool extends MCPServerTool<typeof PresentActi
   override description = 'Get the currently active MCP (Model Context Protocol) server'
   override schema = PresentActiveServerSchema
 
-  constructor(manager: ServerManager) {
+  constructor(manager: IServerManager) {
     super(manager)
   }
 

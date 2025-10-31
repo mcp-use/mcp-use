@@ -5,6 +5,7 @@ import { createMCPServer } from 'mcp-use/server'
 const server = createMCPServer('my-mcp-server', {
   version: '1.0.0',
   description: 'My first MCP server with all features',
+  baseUrl: process.env.MCP_URL, // Full base URL (e.g., https://myserver.com)
 })
 
 

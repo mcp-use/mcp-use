@@ -24,6 +24,7 @@ export interface LLMConfig {
   provider: 'openai' | 'anthropic' | 'google'
   apiKey: string
   model: string
+  temperature?: number
 }
 
 export interface AuthConfig {

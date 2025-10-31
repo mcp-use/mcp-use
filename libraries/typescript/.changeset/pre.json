@@ -1,0 +1,22 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.1.20",
+    "create-mcp-use-app": "0.4.7",
+    "@mcp-use/inspector": "0.4.8",
+    "mcp-use": "1.1.8"
+  },
+  "changesets": [
+    "cold-hotels-turn",
+    "deep-bats-lie",
+    "deep-parents-push",
+    "few-badgers-nail",
+    "goofy-moose-bathe",
+    "lazy-webs-wait",
+    "nice-parrots-yawn",
+    "public-rules-fall",
+    "wise-owls-wink",
+    "yummy-ends-kneel"
+  ]
+}

@@ -28,7 +28,7 @@ async function initializeLangfuse(agentId?: string, metadata?: Record<string, an
     // Dynamically import to avoid errors if package not installed
     const langfuseModule = await import('langfuse-langchain').catch(() => null)
     if (!langfuseModule) {
-      logger.debug('Langfuse package not installed - tracing disabled. Install with: npm install langfuse-langchain')
+      logger.debug('Langfuse package not installed - tracing disabled. Install with: npm install @langfuse/langchain')
       return
     }
 
@@ -195,6 +195,10 @@ async function initializeLangfuse(agentId?: string, metadata?: Record<string, an
     }
 
     // Create the handler with configuration
+    // Get initial metadata and tags for handler initialization
+    const initialMetadata = metadata || (metadataProvider ? metadataProvider() : {})
+    const initialTags = tagsProvider ? tagsProvider() : []
+    
     const config = {
       publicKey: process.env.LANGFUSE_PUBLIC_KEY,
       secretKey: process.env.LANGFUSE_SECRET_KEY,
@@ -204,7 +208,21 @@ async function initializeLangfuse(agentId?: string, metadata?: Record<string, an
       release: process.env.LANGFUSE_RELEASE,
       requestTimeout: Number.parseInt(process.env.LANGFUSE_REQUEST_TIMEOUT || '10000'),
       enabled: process.env.LANGFUSE_ENABLED !== 'false',
+      // Set trace name - can be customized via metadata.trace_name or defaults to 'mcp-use-agent'
+      traceName: initialMetadata.trace_name || process.env.LANGFUSE_TRACE_NAME || 'mcp-use-agent',
+      // Pass sessionId, userId, and tags to the handler
+      sessionId: initialMetadata.session_id || undefined,
+      userId: initialMetadata.user_id || undefined,
+      tags: initialTags.length > 0 ? initialTags : undefined,
+      metadata: initialMetadata || undefined,
     }
+    
+    logger.debug('Langfuse handler config:', JSON.stringify({
+      traceName: config.traceName,
+      sessionId: config.sessionId,
+      userId: config.userId,
+      tags: config.tags,
+    }, null, 2))
 
     langfuseState.handler = new LoggingCallbackHandler(config, agentId, metadata, metadataProvider, tagsProvider) as unknown as BaseCallbackHandler
     logger.debug('Langfuse observability initialized successfully with logging enabled')
