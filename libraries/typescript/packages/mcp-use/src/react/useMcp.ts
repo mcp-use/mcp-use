@@ -16,6 +16,7 @@ import type { UseMcpOptions, UseMcpResult } from './types.js';
 const DEFAULT_RECONNECT_DELAY = 3000
 const DEFAULT_RETRY_DELAY = 5000
 const AUTH_TIMEOUT = 5 * 60 * 1000
+const DEFAULT_MAX_STEPS = 10
 
 // Define Transport types literal for clarity
 type TransportType = 'http' | 'sse'
@@ -684,6 +685,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       addLog('info', `Sending chat message: ${message.slice(0, 50)}...`)
 
       // Check if LLM instance changed or agent doesn't exist
+      // Note: Uses reference equality - callers should use useMemo() to keep same LLM instance
       const llmChanged = !agentRef.current || agentRef.current.llm !== llm
 
       // Lazy create or recreate agent when LLM changes
@@ -697,8 +699,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // TODO: Update MCPAgent type definitions to accept BrowserMCPClient or a shared MCPClientInterface
         agentRef.current = new MCPAgent({
           llm,
-          client: clientRef.current as BrowserMCPClient,
-          maxSteps: 10,
+          client: clientRef.current as any,
+          maxSteps: DEFAULT_MAX_STEPS,
           memoryEnabled: true,
           systemPrompt: 'You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.',
         })
@@ -710,7 +712,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       // Stream events from agent
       yield* agentRef.current.streamEvents(
         message,
-        10,        // maxSteps
+        DEFAULT_MAX_STEPS,
         false,     // manageConnector - don't manage, already connected
         undefined  // externalHistory - agent maintains its own with memoryEnabled
       )
