@@ -31,11 +31,11 @@ export interface MCPConnection {
   authenticate: () => void
   retry: () => void
   clearStorage: () => void
-  sendChatMessage: (
+  sendChatMessage?: (
     message: string,
     llm: BaseLanguageModelInterface
   ) => AsyncGenerator<StreamEvent, void, void>
-  clearChatHistory: () => void
+  clearChatHistory?: () => void
 }
 
 interface McpContextType {
@@ -427,10 +427,6 @@ export function McpProvider({ children }: { children: ReactNode }) {
           authenticate: () => { },
           retry: () => { },
           clearStorage: () => { },
-          sendChatMessage: async function* () {
-            throw new Error('Not connected')
-          },
-          clearChatHistory: () => { },
         }
       }
 
