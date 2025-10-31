@@ -188,6 +188,7 @@
                 "group": "Integrations",
                 "icon": "plug-2",
                 "pages": [
+                  "python/integration/langchain",
                   "python/integration/openai",
                   "python/integration/anthropic",
                   "python/integration/google"
