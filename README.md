@@ -88,7 +88,7 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>🎨 Build ChatGPT Apps Apps</h3>
+      <h3>🎨 Build ChatGPT Apps</h3>
       <p>Create interactive UIs with mcp-ui, react and live reload.</p>
       <p>
         <a href="./libraries/typescript/README.md#mcp-ui-resources">Quick Start</a> | 
