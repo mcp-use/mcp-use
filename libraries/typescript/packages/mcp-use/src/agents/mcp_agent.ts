@@ -6,7 +6,6 @@ import type { ZodSchema } from 'zod'
 import type { MCPClient } from '../client.js'
 import type { BaseConnector } from '../connectors/base.js'
 import type { MCPSession } from '../session.js'
-// @ts-ignore - Importing from legacy langchain package for compatibility
 import { createAgent, type ReactAgent, modelCallLimitMiddleware, SystemMessage, AIMessage, HumanMessage, ToolMessage, type DynamicTool } from 'langchain'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { LangChainAdapter } from '../adapters/langchain_adapter.js'
@@ -296,7 +295,7 @@ export class MCPAgent {
   private async createSystemMessageFromTools(tools: StructuredToolInterface[]): Promise<void> {
     const systemPromptTemplate
       = this.systemPromptTemplateOverride
-        ?? DEFAULT_SYSTEM_PROMPT_TEMPLATE
+      ?? DEFAULT_SYSTEM_PROMPT_TEMPLATE
 
     this.systemMessage = createSystemMessage(
       tools,
@@ -1098,7 +1097,7 @@ export class MCPAgent {
 
       // Stream events from the agent executor with observability support
       const eventStream = agentExecutor.streamEvents(
-        {messages: inputs},
+        { messages: inputs },
         {
           streamMode: 'messages',
           version: 'v2',
