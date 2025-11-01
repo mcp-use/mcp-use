@@ -13,6 +13,7 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       typescript: ${{ steps.filter.outputs.typescript }}
       typescript-agent: ${{ steps.filter.outputs.typescript-agent }}
+      create-mcp-use-app: ${{ steps.filter.outputs.create-mcp-use-app }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -28,6 +29,8 @@ jobs:
               - 'libraries/typescript/packages/mcp-use/tests/integration/agent/**'
               - 'libraries/typescript/packages/mcp-use/src/observability/**'
               - 'libraries/typescript/packages/mcp-use/src/telemetry/**'
+            create-mcp-use-app:
+              - 'libraries/typescript/packages/create-mcp-use-app/**'
 
   # Python Jobs
   python-lint:
@@ -266,44 +269,90 @@ jobs:
       - name: Build Packages
         run: pnpm build
 
-  typescript-unit-tests:
+  typescript-test-mcp-use:
     needs: typescript-lint
+    name: "typescript/mcp-use"
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: libraries/typescript
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
         with:
           version: 10.6.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
-
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
-
       - name: Build Packages
         run: pnpm build
-
-      - name: Run Unit Tests
+      - name: Run mcp-use Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter mcp-use test:unit
+        run: pnpm --filter mcp-use test:unit --if-present
+
+  typescript-test-inspector:
+    needs: typescript-lint
+    name: "typescript/inspector"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Build Packages
+        run: pnpm build
+      - name: Run Inspector Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter @mcp-use/inspector test --if-present
+
+  typescript-test-cli:
+    needs: typescript-lint
+    name: "typescript/cli"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Build Packages
+        run: pnpm build
+      - name: Run CLI Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter @mcp-use/cli test --if-present
 
   # Run agent integration tests only when agent-related files change
   # This saves CI resources and avoids unnecessary API calls
   typescript-agent-integration-tests:
     needs: [detect-changes, typescript-lint]
     if: needs.detect-changes.outputs.typescript-agent == 'true'
+    name: "typescript/agent-integration"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -378,3 +427,101 @@ jobs:
             echo ""
             echo "If this PR doesn't require a changeset (docs, tests, internal changes), you can ignore this message."
           fi
+
+  # create-mcp-use-app Tests (only when CLI package changes)
+  create-mcp-use-app-build:
+    needs: [detect-changes, typescript-lint]
+    if: needs.detect-changes.outputs.create-mcp-use-app == 'true'
+    name: "typescript/create-mcp-use-app/build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --no-frozen-lockfile
+      - name: Build create-mcp-use-app
+        working-directory: libraries/typescript/packages/create-mcp-use-app
+        run: pnpm build
+      - name: Pack Package
+        working-directory: libraries/typescript/packages/create-mcp-use-app
+        run: npm pack
+      - name: Upload Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: create-mcp-use-app-package
+          path: libraries/typescript/packages/create-mcp-use-app/create-mcp-use-app-*.tgz
+          retention-days: 1
+
+  create-mcp-use-app-tests:
+    needs: create-mcp-use-app-build
+    name: "typescript/create-app/${{ matrix.template }}/${{ matrix.os }}/${{ matrix.pm }}${{ matrix.flag && format('/{0}', matrix.flag) || '' }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        pm: [npm, yarn, pnpm]
+        template: [starter, mcp-ui, apps-sdk]
+        flag: ["", "--dev"]
+        exclude:
+          # Only test --dev on ubuntu with npm
+          - os: macos-latest
+            flag: "--dev"
+          - os: windows-latest
+            flag: "--dev"
+          - pm: yarn
+            flag: "--dev"
+          - pm: pnpm
+            flag: "--dev"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        if: matrix.pm == 'pnpm'
+        with:
+          version: 10.6.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Setup Yarn
+        if: matrix.pm == 'yarn'
+        run: corepack enable
+      - name: Download Package Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: create-mcp-use-app-package
+          path: ./package
+      - name: Test CLI Creation
+        run: |
+          # Get package path
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            PACKAGE_PATH=$(powershell -Command "(Get-ChildItem ./package/create-mcp-use-app-*.tgz).FullName")
+          else
+            PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
+          fi
+
+          # Run create command based on PM
+          case "${{ matrix.pm }}" in
+            npm)
+              npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+              ;;
+            yarn)
+              yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+              ;;
+            pnpm)
+              pnpm --package="$PACKAGE_PATH" dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+              ;;
+          esac
+
+          # Verify creation
+          [ -d "test-app" ] || exit 1
+          [ -f "test-app/package.json" ] || exit 1
+          [ -f "test-app/index.ts" ] || exit 1
+          echo "✅ Project created successfully"
