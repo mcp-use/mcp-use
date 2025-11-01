@@ -293,7 +293,7 @@ jobs:
       - name: Run mcp-use Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter mcp-use test:unit --if-present
+        run: pnpm --filter mcp-use --if-present test:unit
 
   typescript-test-inspector:
     needs: typescript-lint
@@ -319,7 +319,7 @@ jobs:
       - name: Run Inspector Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter @mcp-use/inspector test --if-present
+        run: pnpm --filter @mcp-use/inspector --if-present test
 
   typescript-test-cli:
     needs: typescript-lint
@@ -345,7 +345,7 @@ jobs:
       - name: Run CLI Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter @mcp-use/cli test --if-present
+        run: pnpm --filter @mcp-use/cli --if-present test
 
   # Run agent integration tests only when agent-related files change
   # This saves CI resources and avoids unnecessary API calls
@@ -462,7 +462,7 @@ jobs:
 
   create-mcp-use-app-tests:
     needs: create-mcp-use-app-build
-    name: "typescript/create-app/${{ matrix.template }}/${{ matrix.os }}/${{ matrix.pm }}${{ matrix.flag && format('/{0}', matrix.flag) || '' }}"
+    name: "typescript/create-app-tests"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
