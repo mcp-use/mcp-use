@@ -38,6 +38,7 @@ from mcp_use.agents.managers.server_manager import ServerManager
 
 # Import observability manager
 from mcp_use.agents.observability import ObservabilityManager
+from mcp_use.agents.output import OutputConfig, format_and_print_result, format_error, format_stream_with_panels
 from mcp_use.agents.prompts.system_prompt_builder import create_system_message
 from mcp_use.agents.prompts.templates import (
     DEFAULT_SYSTEM_PROMPT_TEMPLATE,
@@ -86,6 +87,8 @@ class MCPAgent:
         chat_id: str | None = None,
         retry_on_error: bool = True,
         max_retries_per_step: int = 2,
+        output_config: OutputConfig | None = None,
+        pretty_print: bool = True,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -107,7 +110,16 @@ class MCPAgent:
             callbacks: List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler.
             retry_on_error: Whether to retry tool calls that fail due to validation errors.
             max_retries_per_step: Maximum number of retries for validation errors per step.
+            output_config: Configuration for output formatting. Uses defaults if None.
+            pretty_print: Whether to format output with pretty printing.
         """
+        self.output_config = output_config or OutputConfig()
+        self.pretty_print = pretty_print
+
+        # Suppress logging when auto formatting is enabled
+        if self.pretty_print:
+            logging.getLogger("mcp_use").setLevel(logging.ERROR)
+
         # Handle remote execution
         if agent_id is not None:
             self._remote_agent = RemoteAgent(agent_id=agent_id, api_key=api_key, base_url=base_url, chat_id=chat_id)
@@ -426,6 +438,7 @@ class MCPAgent:
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
+        pretty_print: bool | None = None,
     ) -> str | T:
         """Run a query using LangChain 1.0.0's agent and return the final result.
 
@@ -436,7 +449,7 @@ class MCPAgent:
             external_history: Optional external history to use instead of the
                 internal conversation history.
             output_schema: Optional Pydantic BaseModel class for structured output.
-
+            pretty_print: Whether to format output with pretty printing.
         Returns:
             The result of running the query as a string, or if output_schema is provided,
             an instance of the specified Pydantic model.
@@ -474,6 +487,7 @@ class MCPAgent:
             external_history,
             track_execution=False,
             output_schema=output_schema,
+            pretty_print=pretty_print,
         )
         error = None
         result = None
@@ -481,10 +495,24 @@ class MCPAgent:
         try:
             result, steps_taken = await self._consume_and_return(generator)
 
+            if self.pretty_print and result is not None:
+                execution_time_ms = int((time.time() - start_time) * 1000)
+                format_and_print_result(
+                    query=query,
+                    result=result,
+                    execution_time_ms=execution_time_ms,
+                    config=self.output_config,
+                )
+
         except Exception as e:
             success = False
             error = str(e)
-            logger.error(f"❌ Error during agent execution: {e}")
+            if self.pretty_print:
+                format_error(
+                    query=query,
+                    error=str(e),
+                    config=self.output_config,
+                )
             raise
         finally:
             self.telemetry.track_agent_execution(
@@ -590,6 +618,7 @@ class MCPAgent:
         external_history: list[BaseMessage] | None = None,
         track_execution: bool = True,
         output_schema: type[T] | None = None,
+        pretty_print: bool | None = None,
     ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
         """Async generator using LangChain 1.0.0's create_agent and astream.
 
@@ -617,10 +646,40 @@ class MCPAgent:
             external_history: Optional external history to use instead of the
                 internal conversation history.
             output_schema: Optional Pydantic BaseModel class for structured output.
+            pretty_print: Whether to format output with pretty printing.
 
         Yields:
             Intermediate steps and final result from the agent execution.
         """
+        # Create internal generator
+        internal_stream = self._stream_internal(
+            query, max_steps, manage_connector, external_history, track_execution, output_schema
+        )
+
+        # Use pretty_print parameter if provided, otherwise use instance default
+        use_pretty_print = pretty_print if pretty_print is not None else self.pretty_print
+
+        if use_pretty_print:
+            async for item in format_stream_with_panels(
+                query=query,
+                stream=internal_stream,
+                config=self.output_config,
+                stream_intermediate_steps=self.output_config.show_steps,
+            ):
+                yield item
+        else:
+            async for item in internal_stream:
+                yield item
+
+    async def _stream_internal(
+        self,
+        query: str,
+        max_steps: int | None = None,
+        manage_connector: bool = True,
+        external_history: list[BaseMessage] | None = None,
+        track_execution: bool = True,
+        output_schema: type[T] | None = None,
+    ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
             async for item in self._remote_agent.stream(query, max_steps, external_history, output_schema):
@@ -855,8 +914,7 @@ class MCPAgent:
             success = True
             yield final_output or "No output generated"
 
-        except Exception as e:
-            logger.error(f"❌ Error running query: {e}")
+        except Exception:
             if initialized_here and manage_connector:
                 logger.info("🧹 Cleaning up resources after error")
                 await self.close()
