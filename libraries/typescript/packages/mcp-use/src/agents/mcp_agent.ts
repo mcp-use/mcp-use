@@ -295,7 +295,7 @@ export class MCPAgent {
   private async createSystemMessageFromTools(tools: StructuredToolInterface[]): Promise<void> {
     const systemPromptTemplate
       = this.systemPromptTemplateOverride
-        ?? DEFAULT_SYSTEM_PROMPT_TEMPLATE
+      ?? DEFAULT_SYSTEM_PROMPT_TEMPLATE
 
     this.systemMessage = createSystemMessage(
       tools,
@@ -1097,7 +1097,7 @@ export class MCPAgent {
 
       // Stream events from the agent executor with observability support
       const eventStream = agentExecutor.streamEvents(
-        {messages: inputs},
+        { messages: inputs },
         {
           streamMode: 'messages',
           version: 'v2',

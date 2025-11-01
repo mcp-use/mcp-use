@@ -233,10 +233,10 @@ export function useChatMessages({
                   prev.map(msg =>
                     msg.id === assistantMessageId
                       ? {
-                          ...msg,
-                          parts: [...parts],
-                          content: '', // Clear content since we're using parts
-                        }
+                        ...msg,
+                        parts: [...parts],
+                        content: '', // Clear content since we're using parts
+                      }
                       : msg,
                   ),
                 )
@@ -252,12 +252,23 @@ export function useChatMessages({
         }
       }
       catch (error) {
+        // Extract detailed error message with HTTP status
+        let errorDetail = 'Unknown error occurred'
+        if (error instanceof Error) {
+          errorDetail = error.message
+          const errorAny = error as any
+          if (errorAny.status) {
+            errorDetail = `HTTP ${errorAny.status}: ${errorDetail}`
+          }
+          if (errorAny.code === 401 || errorDetail.includes('401') || errorDetail.includes('Unauthorized')) {
+            errorDetail = `Authentication failed (401). Check your Authorization header in the connection settings.`
+          }
+        }
+
         const errorMessage: Message = {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: `Error: ${
-            error instanceof Error ? error.message : 'Unknown error occurred'
-          }`,
+          content: `Error: ${errorDetail}`,
           timestamp: Date.now(),
         }
         setMessages(prev => [...prev, errorMessage])

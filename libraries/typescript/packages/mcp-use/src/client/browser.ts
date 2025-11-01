@@ -26,7 +26,7 @@ export class BrowserMCPClient extends BaseMCPClient {
    * Supports HTTP and WebSocket connectors only
    */
   protected createConnectorFromConfig(serverConfig: Record<string, any>): BaseConnector {
-    const { url, transport, headers, authToken } = serverConfig
+    const { url, transport, headers, authToken, authProvider } = serverConfig
 
     if (!url) {
       throw new Error('Server URL is required')
@@ -36,6 +36,7 @@ export class BrowserMCPClient extends BaseMCPClient {
     const connectorOptions = {
       headers,
       authToken,
+      authProvider,  // ← Pass OAuth provider to connector
     }
 
     // Determine transport type
@@ -51,4 +52,3 @@ export class BrowserMCPClient extends BaseMCPClient {
     }
   }
 }
-

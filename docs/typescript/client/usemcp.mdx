@@ -1,0 +1,956 @@
+---
+title: "useMcp Hook"
+description: "React hook for connecting to and interacting with MCP servers"
+icon: "webhook"
+tag: "New"
+---
+
+# useMcp Hook
+
+The `useMcp` hook provides a complete React interface for MCP server connections. It handles connection management, authentication, tool execution, and AI chat—all with automatic reconnection and OAuth support.
+
+## Basic Usage
+
+```typescript
+import { useMcp } from 'mcp-use/react'
+
+function MyComponent() {
+  const mcp = useMcp({
+    url: 'http://localhost:3000/mcp',
+    customHeaders: {
+      Authorization: 'Bearer YOUR_API_KEY'
+    }
+  })
+
+  // Wait for connection
+  if (mcp.state !== 'ready') {
+    return <div>Connecting...</div>
+  }
+
+  // Show available tools
+  return (
+    <div>
+      <h2>Available Tools</h2>
+      <ul>
+        {mcp.tools.map(tool => (
+          <li key={tool.name}>{tool.name}: {tool.description}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```
+
+## Connection States
+
+The hook manages connection state automatically:
+
+```typescript
+const mcp = useMcp({ url })
+
+// State progression:
+// 'discovering' → Initial state, attempting connection
+// 'authenticating' → OAuth flow in progress
+// 'pending_auth' → Waiting for user to approve OAuth
+// 'ready' → Connected and ready to use
+// 'failed' → Connection failed (check mcp.error)
+```
+
+### Handling Connection States
+
+```typescript
+function ConnectionStatus() {
+  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+
+  switch (mcp.state) {
+    case 'discovering':
+      return <Spinner>Connecting...</Spinner>
+
+    case 'authenticating':
+      return <div>Authenticating... Check for popup window</div>
+
+    case 'pending_auth':
+      return (
+        <button onClick={mcp.authenticate}>
+          Click to Authenticate
+        </button>
+      )
+
+    case 'ready':
+      return <div>✅ Connected ({mcp.tools.length} tools available)</div>
+
+    case 'failed':
+      return (
+        <div>
+          ❌ Connection failed: {mcp.error}
+          <button onClick={mcp.retry}>Retry</button>
+        </div>
+      )
+  }
+}
+```
+
+## Configuration Options
+
+```typescript
+interface UseMcpOptions {
+  // Required
+  url: string                              // MCP server URL
+
+  // Connection
+  enabled?: boolean                        // Enable/disable connection (default: true)
+  customHeaders?: Record<string, string>   // Custom headers (auth, etc.)
+  transportType?: 'auto' | 'http' | 'sse'  // Transport preference
+  timeout?: number                         // Connection timeout (ms, default: 30000)
+  sseReadTimeout?: number                  // SSE read timeout (ms, default: 300000)
+
+  // OAuth
+  clientName?: string                      // OAuth client name
+  clientUri?: string                       // OAuth client URI
+  callbackUrl?: string                     // OAuth callback URL
+  preventAutoAuth?: boolean                // Prevent automatic OAuth popup
+  onPopupWindow?: (win: Window) => void    // OAuth popup window handler
+  storageKeyPrefix?: string                // localStorage key prefix
+
+  // Reconnection
+  autoRetry?: boolean | number             // Auto-retry on failure
+  autoReconnect?: number                   // Auto-reconnect delay (ms)
+
+  // Client info
+  clientConfig?: {
+    name?: string                          // Client name
+    version?: string                       // Client version
+  }
+}
+```
+
+## Authentication
+
+### Bearer Token Authentication
+
+```typescript
+const mcp = useMcp({
+  url: 'http://localhost:3000/mcp',
+  customHeaders: {
+    Authorization: 'Bearer YOUR_API_KEY'
+  }
+})
+```
+
+### OAuth Authentication
+
+```typescript
+const mcp = useMcp({
+  url: 'https://mcp.linear.app/mcp',
+  clientName: 'My App',
+  callbackUrl: window.location.origin + '/oauth/callback',
+  onPopupWindow: (popup) => {
+    // Track popup for UX
+    console.log('OAuth popup opened:', popup)
+  }
+})
+
+// OAuth handled automatically:
+// 1. Server returns 401
+// 2. SDK triggers OAuth popup
+// 3. User authorizes
+// 4. Popup sends callback
+// 5. Connection retries with token
+```
+
+### OAuth Callback Page
+
+Create an OAuth callback route to handle redirects:
+
+```typescript
+// /oauth/callback route
+import { useEffect } from 'react'
+
+export function OAuthCallback() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const error = params.get('error')
+
+    if (window.opener) {
+      window.opener.postMessage({
+        type: 'mcp_auth_callback',
+        success: !error,
+        code: code,
+        error: error
+      }, window.location.origin)
+
+      window.close()
+    }
+  }, [])
+
+  return <div>Authentication successful. You can close this window.</div>
+}
+```
+
+## Calling Tools
+
+```typescript
+function ToolExecutor() {
+  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+  const [result, setResult] = useState(null)
+
+  const handleSendEmail = async () => {
+    try {
+      const result = await mcp.callTool('send-email', {
+        to: 'user@example.com',
+        subject: 'Hello',
+        body: 'Test message'
+      })
+      setResult(result)
+    } catch (error) {
+      console.error('Tool call failed:', error)
+    }
+  }
+
+  return (
+    <div>
+      <button onClick={handleSendEmail} disabled={mcp.state !== 'ready'}>
+        Send Email
+      </button>
+      {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
+    </div>
+  )
+}
+```
+
+## Reading Resources
+
+```typescript
+function ResourceViewer({ uri }: { uri: string }) {
+  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+  const [content, setContent] = useState('')
+
+  useEffect(() => {
+    if (mcp.state === 'ready') {
+      mcp.readResource(uri).then(resource => {
+        setContent(resource.contents[0].text)
+      })
+    }
+  }, [mcp.state, uri])
+
+  return (
+    <div>
+      <h3>Resource: {uri}</h3>
+      <pre>{content}</pre>
+    </div>
+  )
+}
+```
+
+## Listing Resources and Prompts
+
+```typescript
+function ServerExplorer() {
+  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+
+  const handleListResources = async () => {
+    await mcp.listResources()
+    // Updates mcp.resources state
+  }
+
+  const handleListPrompts = async () => {
+    await mcp.listPrompts()
+    // Updates mcp.prompts state
+  }
+
+  return (
+    <div>
+      <button onClick={handleListResources}>Refresh Resources</button>
+      <button onClick={handleListPrompts}>Refresh Prompts</button>
+
+      <h3>Resources ({mcp.resources.length})</h3>
+      <ul>
+        {mcp.resources.map(r => (
+          <li key={r.uri}>{r.name || r.uri}</li>
+        ))}
+      </ul>
+
+      <h3>Prompts ({mcp.prompts.length})</h3>
+      <ul>
+        {mcp.prompts.map(p => (
+          <li key={p.name}>{p.name}: {p.description}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```
+
+## AI Chat with MCP Tools
+
+The hook provides built-in AI chat functionality that creates agents with access to all MCP tools:
+
+```typescript
+import { useMcp } from 'mcp-use/react'
+import { ChatOpenAI } from '@langchain/openai'
+import { useState, useMemo } from 'react'
+
+function ChatInterface() {
+  const mcp = useMcp({
+    url: 'http://localhost:3000/mcp',
+    customHeaders: { Authorization: 'Bearer YOUR_API_KEY' }
+  })
+
+  // Create LLM instance
+  const llm = useMemo(() => new ChatOpenAI({
+    model: 'gpt-4',
+    apiKey: process.env.OPENAI_API_KEY,
+    temperature: 0.7
+  }), [])
+
+  const [messages, setMessages] = useState<Array<{role: string, content: string}>>([])
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleSend = async () => {
+    if (!input.trim() || mcp.state !== 'ready') return
+
+    // Add user message
+    const userMessage = { role: 'user', content: input }
+    setMessages(prev => [...prev, userMessage])
+    setInput('')
+    setIsLoading(true)
+
+    try {
+      let assistantContent = ''
+
+      // Stream response from AI agent
+      for await (const event of mcp.sendChatMessage(input, llm)) {
+        // Handle streaming text
+        if (event.event === 'on_chat_model_stream' && event.data?.chunk?.text) {
+          assistantContent += event.data.chunk.text
+
+          // Update UI with streaming text
+          setMessages(prev => {
+            const last = prev[prev.length - 1]
+            if (last?.role === 'assistant') {
+              return [
+                ...prev.slice(0, -1),
+                { role: 'assistant', content: assistantContent }
+              ]
+            }
+            return [...prev, { role: 'assistant', content: assistantContent }]
+          })
+        }
+
+        // Handle tool calls
+        if (event.event === 'on_tool_start') {
+          console.log('Using tool:', event.name)
+        }
+      }
+    } catch (error) {
+      console.error('Chat error:', error)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Error: ${error.message}`
+      }])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="messages">
+        {messages.map((msg, i) => (
+          <div key={i} className={msg.role}>
+            <strong>{msg.role}:</strong> {msg.content}
+          </div>
+        ))}
+      </div>
+
+      <input
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && handleSend()}
+        disabled={isLoading || mcp.state !== 'ready'}
+      />
+
+      <button onClick={handleSend} disabled={isLoading}>
+        {isLoading ? 'Sending...' : 'Send'}
+      </button>
+
+      <button onClick={mcp.clearChatHistory}>
+        Clear History
+      </button>
+    </div>
+  )
+}
+```
+
+### Supported LLM Providers
+
+You can use any LangChain chat model:
+
+```typescript
+// OpenAI
+import { ChatOpenAI } from '@langchain/openai'
+const llm = new ChatOpenAI({
+  model: 'gpt-4',
+  apiKey: process.env.OPENAI_API_KEY,
+  temperature: 0.7
+})
+for await (const event of mcp.sendChatMessage(message, llm)) { /* ... */ }
+
+// Anthropic
+import { ChatAnthropic } from '@langchain/anthropic'
+const llm = new ChatAnthropic({
+  model: 'claude-3-5-sonnet-20241022',
+  apiKey: process.env.ANTHROPIC_API_KEY
+})
+for await (const event of mcp.sendChatMessage(message, llm)) { /* ... */ }
+
+// Google
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
+const llm = new ChatGoogleGenerativeAI({
+  model: 'gemini-pro',
+  apiKey: process.env.GOOGLE_API_KEY
+})
+for await (const event of mcp.sendChatMessage(message, llm)) { /* ... */ }
+
+// Or any other LangChain-compatible model
+import { ChatOllama } from '@langchain/community/chat_models/ollama'
+const llm = new ChatOllama({ model: 'llama2' })
+for await (const event of mcp.sendChatMessage(message, llm)) { /* ... */ }
+```
+
+## Error Handling
+
+```typescript
+function RobustConnection() {
+  const mcp = useMcp({
+    url: 'http://localhost:3000/mcp',
+    autoRetry: 5000,  // Auto-retry every 5 seconds on failure
+  })
+
+  // Monitor errors
+  useEffect(() => {
+    if (mcp.state === 'failed') {
+      console.error('Connection failed:', mcp.error)
+
+      // Common errors:
+      if (mcp.error?.includes('401')) {
+        alert('Add your Authorization header in settings')
+      } else if (mcp.error?.includes('ECONNREFUSED')) {
+        alert('Server is not running on ' + url)
+      }
+    }
+  }, [mcp.state, mcp.error])
+
+  return (
+    <div>
+      {mcp.state === 'failed' && (
+        <div className="error">
+          {mcp.error}
+          <button onClick={mcp.retry}>Retry Connection</button>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+## Automatic Reconnection
+
+```typescript
+const mcp = useMcp({
+  url: 'http://localhost:3000/mcp',
+  autoReconnect: 3000,  // Reconnect after 3 seconds if connection drops
+  autoRetry: 5000,      // Retry every 5 seconds on failure
+})
+
+// The hook automatically:
+// - Detects connection drops
+// - Waits specified delay
+// - Attempts reconnection
+// - Maintains state across retries
+```
+
+## Debugging and Logs
+
+```typescript
+function ConnectionDebugger() {
+  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+
+  return (
+    <div>
+      <h3>Connection Logs</h3>
+      <div className="logs">
+        {mcp.log.map((entry, i) => (
+          <div key={i} className={entry.level}>
+            [{new Date(entry.timestamp).toLocaleTimeString()}]
+            [{entry.level}] {entry.message}
+          </div>
+        ))}
+      </div>
+
+      <button onClick={mcp.clearStorage}>
+        Clear OAuth Tokens
+      </button>
+    </div>
+  )
+}
+```
+
+## Transport Selection
+
+The hook supports multiple transports with automatic fallback:
+
+```typescript
+// Automatic (default): Try HTTP, fallback to SSE
+const mcp1 = useMcp({
+  url: 'http://localhost:3000/mcp',
+  transportType: 'auto'  // Default
+})
+
+// Force HTTP only
+const mcp2 = useMcp({
+  url: 'http://localhost:3000/mcp',
+  transportType: 'http'
+})
+
+// Force SSE only
+const mcp3 = useMcp({
+  url: 'http://localhost:3000/mcp',
+  transportType: 'sse'
+})
+```
+
+## Complete Example: Todo App
+
+```typescript
+import { useMcp } from 'mcp-use/react'
+import { useState, useEffect } from 'react'
+
+function TodoApp() {
+  const mcp = useMcp({
+    url: 'http://localhost:3000/mcp',
+    customHeaders: {
+      Authorization: `Bearer ${process.env.API_KEY}`
+    },
+    autoReconnect: 3000
+  })
+
+  const [todos, setTodos] = useState([])
+  const [newTodo, setNewTodo] = useState('')
+
+  // Load todos when connected
+  useEffect(() => {
+    if (mcp.state === 'ready') {
+      loadTodos()
+    }
+  }, [mcp.state])
+
+  const loadTodos = async () => {
+    try {
+      const result = await mcp.callTool('list-todos', {})
+      setTodos(result.todos || [])
+    } catch (error) {
+      console.error('Failed to load todos:', error)
+    }
+  }
+
+  const addTodo = async () => {
+    if (!newTodo.trim()) return
+
+    try {
+      await mcp.callTool('create-todo', {
+        text: newTodo,
+        completed: false
+      })
+      setNewTodo('')
+      await loadTodos()
+    } catch (error) {
+      console.error('Failed to create todo:', error)
+    }
+  }
+
+  const toggleTodo = async (id: string) => {
+    try {
+      await mcp.callTool('toggle-todo', { id })
+      await loadTodos()
+    } catch (error) {
+      console.error('Failed to toggle todo:', error)
+    }
+  }
+
+  if (mcp.state === 'discovering') {
+    return <div>Connecting to server...</div>
+  }
+
+  if (mcp.state === 'failed') {
+    return (
+      <div>
+        <p>Connection failed: {mcp.error}</p>
+        <button onClick={mcp.retry}>Retry</button>
+      </div>
+    )
+  }
+
+  if (mcp.state !== 'ready') {
+    return <div>Authenticating...</div>
+  }
+
+  return (
+    <div>
+      <h1>Todos</h1>
+
+      <div>
+        <input
+          value={newTodo}
+          onChange={e => setNewTodo(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addTodo()}
+          placeholder="Add a todo..."
+        />
+        <button onClick={addTodo}>Add</button>
+      </div>
+
+      <ul>
+        {todos.map(todo => (
+          <li key={todo.id}>
+            <input
+              type="checkbox"
+              checked={todo.completed}
+              onChange={() => toggleTodo(todo.id)}
+            />
+            <span style={{ textDecoration: todo.completed ? 'line-through' : 'none' }}>
+              {todo.text}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="status">
+        Connected to {mcp.tools.length} tools
+      </div>
+    </div>
+  )
+}
+```
+
+## API Reference
+
+### State Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `state` | `'discovering' \| 'authenticating' \| 'pending_auth' \| 'ready' \| 'failed'` | Current connection state |
+| `tools` | `Tool[]` | Available tools from the server |
+| `resources` | `Resource[]` | Available resources |
+| `prompts` | `Prompt[]` | Available prompt templates |
+| `error` | `string \| undefined` | Error message if connection failed |
+| `log` | `Array<{level, message, timestamp}>` | Connection log entries |
+| `authUrl` | `string \| undefined` | OAuth authorization URL (if manual auth needed) |
+
+### Methods
+
+#### `callTool(name, args)`
+
+Execute a tool on the MCP server.
+
+```typescript
+const result = await mcp.callTool('tool-name', {
+  param1: 'value1',
+  param2: 'value2'
+})
+```
+
+#### `readResource(uri)`
+
+Read a resource by URI.
+
+```typescript
+const resource = await mcp.readResource('file:///path/to/file')
+console.log(resource.contents[0].text)
+```
+
+#### `listResources()`
+
+Refresh the list of available resources.
+
+```typescript
+await mcp.listResources()
+// mcp.resources is now updated
+```
+
+#### `listPrompts()`
+
+Refresh the list of available prompts.
+
+```typescript
+await mcp.listPrompts()
+// mcp.prompts is now updated
+```
+
+#### `getPrompt(name, args)`
+
+Get a prompt template with arguments.
+
+```typescript
+const prompt = await mcp.getPrompt('code-review', {
+  language: 'typescript',
+  focus: 'security'
+})
+console.log(prompt.messages)
+```
+
+#### `sendChatMessage(message, llm)`
+
+Send a chat message using an AI agent with access to MCP tools.
+
+```typescript
+import { ChatOpenAI } from '@langchain/openai'
+
+const llm = new ChatOpenAI({
+  model: 'gpt-4',
+  apiKey: process.env.OPENAI_API_KEY
+})
+
+for await (const event of mcp.sendChatMessage('Send an email to john@example.com', llm)) {
+  if (event.event === 'on_chat_model_stream') {
+    console.log(event.data.chunk.text)
+  }
+}
+```
+
+#### `clearChatHistory()`
+
+Clear the AI agent's conversation history.
+
+```typescript
+mcp.clearChatHistory()
+```
+
+#### `retry()`
+
+Manually retry connection after failure.
+
+```typescript
+if (mcp.state === 'failed') {
+  mcp.retry()
+}
+```
+
+#### `disconnect()`
+
+Disconnect from the server.
+
+```typescript
+await mcp.disconnect()
+```
+
+#### `authenticate()`
+
+Trigger manual OAuth authentication flow.
+
+```typescript
+if (mcp.state === 'pending_auth') {
+  mcp.authenticate()  // Opens OAuth popup
+}
+```
+
+#### `clearStorage()`
+
+Clear OAuth tokens and disconnect.
+
+```typescript
+mcp.clearStorage()  // Removes tokens from localStorage
+```
+
+## Advanced Patterns
+
+### Conditional Connection
+
+```typescript
+function ConditionalMcp({ enabled }: { enabled: boolean }) {
+  const mcp = useMcp({
+    url: 'http://localhost:3000/mcp',
+    enabled: enabled  // Only connect when enabled is true
+  })
+
+  return (
+    <div>
+      {enabled ? (
+        <div>Connection state: {mcp.state}</div>
+      ) : (
+        <div>Connection disabled</div>
+      )}
+    </div>
+  )
+}
+```
+
+### Multiple Independent Connections
+
+```typescript
+function MultiServerApp() {
+  const github = useMcp({ url: 'https://api.github.com/mcp' })
+  const linear = useMcp({ url: 'https://mcp.linear.app/mcp' })
+  const custom = useMcp({ url: 'http://localhost:3000/mcp' })
+
+  // Each connection is independent
+  return (
+    <div>
+      <div>GitHub: {github.state} ({github.tools.length} tools)</div>
+      <div>Linear: {linear.state} ({linear.tools.length} tools)</div>
+      <div>Custom: {custom.state} ({custom.tools.length} tools)</div>
+    </div>
+  )
+}
+```
+
+### Custom Connection Flow
+
+```typescript
+function CustomConnectionFlow() {
+  const [url, setUrl] = useState('')
+  const [shouldConnect, setShouldConnect] = useState(false)
+
+  const mcp = useMcp({
+    url: url,
+    enabled: shouldConnect && url !== ''
+  })
+
+  const handleConnect = () => {
+    if (url) {
+      setShouldConnect(true)
+    }
+  }
+
+  const handleDisconnect = () => {
+    setShouldConnect(false)
+    mcp.disconnect()
+  }
+
+  return (
+    <div>
+      <input
+        value={url}
+        onChange={e => setUrl(e.target.value)}
+        placeholder="MCP Server URL"
+        disabled={shouldConnect}
+      />
+
+      {!shouldConnect ? (
+        <button onClick={handleConnect}>Connect</button>
+      ) : (
+        <button onClick={handleDisconnect}>Disconnect</button>
+      )}
+
+      {mcp.state === 'ready' && (
+        <div>✅ Connected with {mcp.tools.length} tools</div>
+      )}
+    </div>
+  )
+}
+```
+
+## Best Practices
+
+### 1. Handle All Connection States
+
+Always handle all possible states to provide good UX:
+
+```typescript
+const renderConnectionState = (mcp: UseMcpResult) => {
+  switch (mcp.state) {
+    case 'discovering':
+      return <Spinner />
+    case 'authenticating':
+      return <div>Check popup for authentication...</div>
+    case 'pending_auth':
+      return <button onClick={mcp.authenticate}>Authenticate</button>
+    case 'ready':
+      return <div>✅ Connected</div>
+    case 'failed':
+      return <div>❌ {mcp.error} <button onClick={mcp.retry}>Retry</button></div>
+  }
+}
+```
+
+### 2. Wait for 'ready' State
+
+Don't call methods until connected:
+
+```typescript
+const handleAction = async () => {
+  if (mcp.state !== 'ready') {
+    alert('Not connected yet')
+    return
+  }
+
+  await mcp.callTool('my-tool', {})
+}
+```
+
+### 3. Clean Up on Unmount
+
+The hook automatically disconnects on unmount, but you can force cleanup:
+
+```typescript
+useEffect(() => {
+  return () => {
+    mcp.disconnect()
+  }
+}, [])
+```
+
+### 4. Secure API Keys
+
+Never hardcode API keys:
+
+```typescript
+// ❌ Bad
+const mcp = useMcp({
+  customHeaders: { Authorization: 'Bearer sk_live_12345' }
+})
+
+// ✅ Good
+const mcp = useMcp({
+  customHeaders: {
+    Authorization: `Bearer ${process.env.REACT_APP_API_KEY}`
+  }
+})
+```
+
+## TypeScript Types
+
+```typescript
+import type { UseMcpOptions, UseMcpResult } from 'mcp-use/react'
+
+// Full type definitions available
+const options: UseMcpOptions = {
+  url: 'http://localhost:3000/mcp',
+  customHeaders: { Authorization: 'Bearer xxx' },
+  autoRetry: true,
+  transportType: 'auto'
+}
+
+const mcp: UseMcpResult = useMcp(options)
+```
+
+## Comparison with MCPClient
+
+| Feature | useMcp Hook | MCPClient Class |
+|---------|-------------|-----------------|
+| Use case | React apps | Any TypeScript app |
+| Multi-server | Single server | Multiple servers |
+| Reconnection | Automatic | Manual |
+| React state | Built-in | Manual useState |
+| Chat support | Built-in | Via MCPAgent |
+| Best for | UI components | Background services, agents |
+
+For multi-server AI agents, use [`MCPClient`](/typescript/client/client-configuration) + [`MCPAgent`](/typescript/agent/agent-configuration) instead.
+
+## Next Steps
+
+- [Authentication](/typescript/client/authentication) - OAuth and custom auth setup
+- [MCPClient](/typescript/client/client-configuration) - Multi-server class-based client
+- [Building Agents](/typescript/agent/building-custom-agents) - AI agents with MCP tools
+- [Connection Types](/typescript/client/connection-types) - HTTP, SSE, WebSocket, stdio

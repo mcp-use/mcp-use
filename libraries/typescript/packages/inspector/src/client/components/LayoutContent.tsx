@@ -70,17 +70,8 @@ export function LayoutContent({
     case 'chat':
       return (
         <ChatTab
-          mcpServerUrl={selectedServer.url}
+          connection={selectedServer}
           isConnected={selectedServer.state === 'ready'}
-          oauthState={
-            selectedServer.state as
-            | 'pending_auth'
-            | 'authenticating'
-            | 'ready'
-            | 'failed'
-            | undefined
-          }
-          oauthError={selectedServer.error ?? undefined}
           readResource={selectedServer.readResource}
         />
       )
