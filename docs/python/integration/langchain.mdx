@@ -1,0 +1,211 @@
+---
+title: "LangChain"
+description: "Use mcp-use tools, resources, and prompts directly with LangChain agents"
+tag: "New"
+icon: "https://cdn.mcp-use.com/langchain.svg"
+---
+
+# Using mcp-use with LangChain
+
+The LangChain adapter allows you to seamlessly integrate tools, resources, and prompts from any MCP server with LangChain agents. This enables you to use `mcp-use` as a comprehensive tool provider for your LangChain-powered agents.
+
+## How it Works
+
+The `LangChainAdapter` converts not only tools but also resources and prompts from your active MCP servers into a format compatible with LangChain's tool-calling feature. It maps each of these MCP constructs to a callable function that the LangChain agent can request.
+
+-   **Tools** are converted directly to LangChain tools.
+-   **Resources** are converted into functions that take no arguments and read the resource's content.
+-   **Prompts** are converted into functions that accept the prompt's arguments.
+
+The adapter maintains a mapping of these generated functions to their actual execution logic, allowing you to easily call them when requested by the agent.
+
+## Step-by-Step Guide
+
+Here's how to use the adapter to provide MCP tools, resources, and prompts to a LangChain agent.
+
+<Note>
+Before starting, install the LangChain SDK:
+```bash
+uv pip install langchain
+```
+</Note>
+
+<Steps>
+    <Step name="Initialize MCPClient">
+        First, set up your `MCPClient` with the desired MCP servers. This part of the process is the same as any other `mcp-use` application.
+
+        ```python
+        from mcp_use import MCPClient
+
+        config = {
+            "mcpServers": {
+                "airbnb": {"command": "npx", "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]},
+            }
+        }
+
+        client = MCPClient(config=config)
+        ```
+    </Step>
+
+    <Step name="Create the LangChain Adapter">
+        Next, instantiate the `LangChainAdapter`. This adapter will be responsible for converting MCP constructs into a format LangChain can understand.
+
+        ```python
+        from mcp_use.agents.adapters import LangChainAdapter
+
+        # Creates the adapter for LangChain's format
+        adapter = LangChainAdapter()
+        ```
+        <Tip>
+        You can pass a `disallowed_tools` list to the adapter's constructor to prevent specific tools, resources, or prompts from being exposed to the model.
+        </Tip>
+    </Step>
+
+    <Step name="Generate LangChain-Compatible Tools">
+        Use the `create_all` method on the adapter to inspect all connected MCP servers and generate a list of tools, resources and prompts in the LangChain tool format.
+
+        ```python
+        # Convert tools from active connectors to the LangChain's format
+        # this will populates the list of tools, resources and prompts
+        await adapter.create_all(client)
+
+        # If you decided to create all tools (list concatenation)
+        langchain_tools = adapter.tools + adapter.resources + adapter.prompts
+        ```
+
+        This list will include tools generated from your MCP tools, resources, and prompts.
+
+        <Tip>
+        If you don't want to create all tools, you can call single functions. For example, if you only want to use tools and resources, you can do the following:
+
+        ```python
+        await adapter.create_tools(client)
+        await adapter.create_resources(client)
+
+        # Then, you can decide which ones to use:
+        langchain_tools = adapter.tools + adapter.resources
+        ```
+        </Tip>
+    </Step>
+
+    <Step name="Create and Run the LangChain Agent">
+        Now, you can use the generated `langchain_tools` to create a LangChain agent. The agent will use the descriptions of these tools to decide if it needs to call any of them to answer the user's query.
+
+        ```python
+        from langchain.agents import create_agent
+        from langchain.chat_models import init_chat_model
+
+        # Create chat model
+        model = init_chat_model(
+            "gpt-4o-mini", temperature=0.5, timeout=10, max_tokens=1000
+        )
+        # Create the LangChain agent
+        agent = create_agent(
+            model=model,
+            tools=langchain_tools,
+            system_prompt="You are a helpful assistant",
+        )
+
+        # Run the agent
+        result = await agent.ainvoke(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Please tell me the cheapest hotel for two people in Trapani.",
+                    }
+                ]
+            }
+        )
+
+        print(result)
+        ```
+    </Step>
+</Steps>
+
+## Complete Example
+
+For reference, here is the complete, runnable code for integrating mcp-use with LangChain.
+
+```python
+import asyncio
+from dataclasses import dataclass
+
+from dotenv import load_dotenv
+from langchain.agents import create_agent
+from langchain.chat_models import init_chat_model
+
+from mcp_use import MCPClient
+from mcp_use.agents.adapters import LangChainAdapter
+
+# This example demonstrates how to use our integration
+# adapters to use MCP tools and convert to the right format.
+# In particularly, this example uses the LangChainAdapter.
+
+load_dotenv()
+
+
+# We use a dataclass here, but Pydantic models are also supported.
+@dataclass
+class ResponseFormat:
+    """Response schema for the agent."""
+
+    # AirBnb response (available dates, prices, and relevant information)
+    relevant_response: str
+
+
+async def main():
+    config = {
+        "mcpServers": {
+            "airbnb": {
+                "command": "npx",
+                "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"],
+            },
+        }
+    }
+
+    try:
+        client = MCPClient(config=config)
+
+        # Creates the adapter for LangChain's format
+        adapter = LangChainAdapter()
+
+        # Convert tools from active connectors to the LangChain's format
+        await adapter.create_all(client)
+
+        # List concatenation (if you loaded all tools)
+        langchain_tools = adapter.tools + adapter.resources + adapter.prompts
+
+        # Create chat model
+        model = init_chat_model(
+            "gpt-4o-mini", temperature=0.5, timeout=10, max_tokens=1000
+        )
+        # Create the LangChain agent
+        agent = create_agent(
+            model=model,
+            tools=langchain_tools,
+            system_prompt="You are a helpful assistant",
+            response_format=ResponseFormat,
+        )
+
+        # Run the agent
+        result = await agent.ainvoke(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Please tell me the cheapest hotel for two people in Trapani.",
+                    }
+                ]
+            }
+        )
+
+        print(result["structured_response"])
+    except Exception as e:
+        print(f"Error: {e}")
+        raise e
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
