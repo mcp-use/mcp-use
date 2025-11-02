@@ -141,14 +141,14 @@ Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum ha
 
 
 **Parameters**
-><ParamField body="schema" type="dict" required="True" >   The JSON schema to fix. </ParamField>
+><ParamField body="schema" type="Any" required="True" >   The JSON schema to fix. </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="dict" >The fixed JSON schema.</ResponseField>
+><ResponseField name="returns" type="Any" >The fixed JSON schema.</ResponseField>
 
 **Signature**
 ```python wrap
-def fix_schema(schema: dict):
+def fix_schema(schema: Any):
 ```
 
 </Card>
