@@ -1,5 +1,19 @@
 # @mcp-use/inspector
 
+## 0.4.10
+
+### Patch Changes
+
+- 9e555ef: fix: inspector deps
+  - mcp-use@1.2.1
+
+## 0.4.10-canary.0
+
+### Patch Changes
+
+- a5a6919: fix: inspector deps
+  - mcp-use@1.2.1-canary.0
+
 ## 0.4.9
 
 ### Patch Changes
