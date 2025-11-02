@@ -21,7 +21,14 @@ async def main():
     load_dotenv()
 
     config = {
-        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
+        "mcpServers": {
+            "playwright": {
+                "command": "npx",
+                "args": ["@playwright/mcp@latest"],
+                "env": {"DISPLAY": ":1"},
+                "connection_timeout": 10,
+            }
+        }
     }
     # Create MCPClient from config file
     client = MCPClient(config=config)

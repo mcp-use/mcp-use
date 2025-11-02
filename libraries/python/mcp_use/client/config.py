@@ -55,6 +55,7 @@ def create_connector_from_config(
 
     # Stdio connector (command-based)
     if is_stdio_server(server_config) and not sandbox:
+        print(f"server_config: {server_config}")
         return StdioConnector(
             command=server_config["command"],
             args=server_config["args"],
@@ -64,6 +65,7 @@ def create_connector_from_config(
             message_handler=message_handler,
             logging_callback=logging_callback,
             middleware=middleware,
+            timeout=server_config.get("connection_timeout", None),
         )
 
     # Sandboxed connector
