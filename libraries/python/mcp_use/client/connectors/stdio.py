@@ -9,6 +9,7 @@ import sys
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.client.stdio import PROCESS_TERMINATION_TIMEOUT
 
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.client.middleware import CallbackClientSession, Middleware
@@ -30,6 +31,7 @@ class StdioConnector(BaseConnector):
         args: list[str] | None = None,
         env: dict[str, str] | None = None,
         errlog=sys.stderr,
+        timeout: float = PROCESS_TERMINATION_TIMEOUT,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
@@ -57,6 +59,7 @@ class StdioConnector(BaseConnector):
         self.args = args or []  # Ensure args is never None
         self.env = env
         self.errlog = errlog
+        self.timeout = timeout
 
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
@@ -70,7 +73,7 @@ class StdioConnector(BaseConnector):
             server_params = StdioServerParameters(command=self.command, args=self.args, env=self.env)
 
             # Create and start the connection manager
-            self._connection_manager = StdioConnectionManager(server_params, self.errlog)
+            self._connection_manager = StdioConnectionManager(server_params, self.errlog, self.timeout)
             read_stream, write_stream = await self._connection_manager.start()
 
             # Create the client session
