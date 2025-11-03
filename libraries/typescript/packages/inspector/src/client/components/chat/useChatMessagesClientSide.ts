@@ -56,7 +56,7 @@ export function useChatMessagesClientSide({
             toolName: string
             args: Record<string, unknown>
             result?: any
-            state?: string
+            state?: 'pending' | 'result' | 'error'
           }
         }> = []
 
@@ -227,108 +227,84 @@ export function useChatMessagesClientSide({
             })
 
             if (toolPart && toolPart.toolInvocation) {
-              const result = event.data?.output
-              toolPart.toolInvocation.result = result
-              toolPart.toolInvocation.state = 'result'
+              let result = event.data?.output
 
-              // Parse result to check for Apps SDK component in the result's _meta field
-              let parsedResult = result
-              if (typeof result === 'string') {
+              // Unwrap LangChain ToolMessage wrapper: kwargs.content contains the actual output
+              if (result?.kwargs?.content && typeof result.kwargs.content === 'string') {
                 try {
-                  parsedResult = JSON.parse(result)
+                  result = JSON.parse(result.kwargs.content)
                 }
                 catch (error) {
-                  console.warn('[useChatMessagesClientSide] Failed to parse result:', error)
+                  console.warn('[useChatMessagesClientSide] Failed to parse kwargs.content:', error)
+                  result = result.kwargs.content
+                }
+              }
+              // Fallback: try parsing result.content if it's a string
+              else if (result?.content && typeof result.content === 'string') {
+                try {
+                  result = JSON.parse(result.content)
+                }
+                catch (error) {
+                  result = result.content
                 }
               }
 
-              // Check result's _meta field for Apps SDK component
-              const appsSdkUri = parsedResult?._meta?.['openai/outputTemplate']
+              // Store the unwrapped result
+              toolPart.toolInvocation.result = result
+              toolPart.toolInvocation.state = 'result'
 
-              console.log('[useChatMessagesClientSide] Apps SDK check:', {
+              // Check result's _meta field for Apps SDK component
+              const appsSdkUri = result?._meta?.['openai/outputTemplate']
+
+              console.log('[useChatMessagesClientSide] Tool result:', {
                 toolName: event.name,
-                hasParsedResult: !!parsedResult,
-                hasMeta: !!parsedResult?._meta,
+                hasMeta: !!result?._meta,
+                hasStructuredContent: !!result?.structuredContent,
                 appsSdkUri,
               })
 
               if (appsSdkUri && typeof appsSdkUri === 'string' && readResource) {
-                // Fetch the resource in the background
+                // Fetch the resource now (await instead of IIFE)
                 console.log('[useChatMessagesClientSide] Detected Apps SDK component, fetching resource:', appsSdkUri)
-                  ; (async () => {
-                    try {
-                      // Use the readResource function passed from the inspector connection
-                      const resourceData = await readResource(appsSdkUri)
+                try {
+                  // Use the readResource function passed from the inspector connection
+                  const resourceData = await readResource(appsSdkUri)
 
-                      console.log('[useChatMessagesClientSide] Resource fetched:', resourceData)
+                  console.log('[useChatMessagesClientSide] Resource fetched:', resourceData)
 
-                      // Extract structured content from parsed result
-                      let structuredContent = null
-                      if (parsedResult?.structuredContent) {
-                        structuredContent = parsedResult.structuredContent
-                      }
-                      else if (Array.isArray(parsedResult) && parsedResult[0]) {
-                        const firstResult = parsedResult[0]
-                        if (firstResult.output?.value?.structuredContent) {
-                          structuredContent = firstResult.output.value.structuredContent
-                        }
-                        else if (firstResult.structuredContent) {
-                          structuredContent = firstResult.structuredContent
-                        }
-                        else if (firstResult.output?.value) {
-                          structuredContent = firstResult.output.value
-                        }
-                      }
+                  // Extract structured content from result
+                  const structuredContent = result?.structuredContent || null
 
-                      // Fallback to entire parsed result
-                      if (!structuredContent) {
-                        structuredContent = parsedResult
-                      }
+                  // Add the fetched resource contents to the result's content array
+                  if (resourceData?.contents && Array.isArray(resourceData.contents)) {
+                    // Convert resource contents to MCP resource format
+                    const mcpResources = resourceData.contents.map((content: any) => ({
+                      type: 'resource',
+                      resource: content,
+                    }))
 
-                      // Add the fetched resource contents to the result's content array
-                      if (resourceData?.contents && Array.isArray(resourceData.contents)) {
-                        // Convert resource contents to MCP resource format
-                        const mcpResources = resourceData.contents.map((content: any) => ({
-                          type: 'resource',
-                          resource: content,
-                        }))
+                    console.log('[useChatMessagesClientSide] Created MCP resources:', mcpResources)
 
-                        console.log('[useChatMessagesClientSide] Created MCP resources:', mcpResources)
-
-                        // Update the tool result with the fetched resources
-                        if (toolPart.toolInvocation) {
-                          const updatedResult = {
-                            ...parsedResult,
-                            content: [
-                              ...(parsedResult.content || []),
-                              ...mcpResources,
-                            ],
-                            structuredContent,
-                          }
-
-                          console.log('[useChatMessagesClientSide] Updated result:', updatedResult)
-                          // Store as JSON string to match the format
-                          toolPart.toolInvocation.result = JSON.stringify(updatedResult)
-
-                          setMessages(prev =>
-                            prev.map(msg =>
-                              msg.id === assistantMessageId
-                                ? { ...msg, parts: [...parts] }
-                                : msg,
-                            ),
-                          )
-
-                          console.log('[useChatMessagesClientSide] Messages state updated with resource')
-                        }
-                      }
-                      else {
-                        console.warn('[useChatMessagesClientSide] No contents in resourceData:', resourceData)
-                      }
+                    // Update the tool result with the fetched resources
+                    const updatedResult = {
+                      ...result,
+                      content: [
+                        ...(result.content || []),
+                        ...mcpResources,
+                      ],
+                      structuredContent,
                     }
-                    catch (error) {
-                      console.error('Failed to fetch Apps SDK resource:', error)
-                    }
-                  })()
+
+                    toolPart.toolInvocation.result = updatedResult
+                    console.log('[useChatMessagesClientSide] Updated result with resources')
+                  }
+                  else {
+                    console.warn('[useChatMessagesClientSide] No contents in resourceData:', resourceData)
+                  }
+                }
+                catch (error) {
+                  console.error('Failed to fetch Apps SDK resource:', error)
+                }
               }
 
               setMessages(prev =>
