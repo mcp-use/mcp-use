@@ -70,6 +70,7 @@ export function LayoutContent({
     case 'chat':
       return (
         <ChatTab
+          key={selectedServer.id}
           connection={selectedServer}
           isConnected={selectedServer.state === 'ready'}
           readResource={selectedServer.readResource}
