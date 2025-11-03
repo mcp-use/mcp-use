@@ -5,7 +5,6 @@ import type {
   ResourceTemplate,
   Tool
 } from '@modelcontextprotocol/sdk/types.js';
-import type { BaseLanguageModelInterface } from '@langchain/core/language_models/base';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { sanitizeUrl } from 'strict-url-sanitise';
 import { BrowserMCPClient } from '../client/browser.js';
@@ -16,7 +15,6 @@ import type { UseMcpOptions, UseMcpResult } from './types.js';
 const DEFAULT_RECONNECT_DELAY = 3000
 const DEFAULT_RETRY_DELAY = 5000
 const AUTH_TIMEOUT = 5 * 60 * 1000
-const DEFAULT_MAX_STEPS = 10
 
 // Define Transport types literal for clarity
 type TransportType = 'http' | 'sse'
