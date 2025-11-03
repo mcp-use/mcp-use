@@ -1,6 +1,5 @@
 import type { Prompt, Resource, ResourceTemplate, Tool } from '@modelcontextprotocol/sdk/types.js'
-import type { StreamEvent } from '@langchain/core/tracers/log_stream'
-import type { BaseLanguageModelInterface } from '@langchain/core/language_models/base'
+import type { BrowserMCPClient } from '../client/browser.js'
 
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
@@ -127,31 +126,24 @@ export type UseMcpResult = {
   /** Clears all stored authentication data (tokens, client info, etc.) for this server URL from localStorage. */
   clearStorage: () => void
   /**
-   * Send a chat message using an AI agent with access to MCP tools.
-   *
-   * The agent maintains conversation history and can use all tools from the connected server.
-   *
-   * @param message - User message to send
-   * @param llm - LangChain chat model instance (ChatOpenAI, ChatAnthropic, ChatGoogleGenerativeAI, etc.)
-   * @returns An async generator that yields StreamEvent objects for streaming responses
+   * The underlying BrowserMCPClient instance.
+   * Use this to create an MCPAgent for AI chat functionality.
    *
    * @example
    * ```typescript
+   * import { MCPAgent } from 'mcp-use'
    * import { ChatOpenAI } from '@langchain/openai'
    *
-   * const llm = new ChatOpenAI({ model: 'gpt-4', apiKey: process.env.OPENAI_API_KEY })
+   * const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+   * const llm = new ChatOpenAI({ model: 'gpt-4' })
    *
-   * for await (const event of mcp.sendChatMessage('Hello', llm)) {
-   *   if (event.event === 'on_chat_model_stream') {
-   *     console.log(event.data.chunk.text)
-   *   }
+   * const agent = new MCPAgent({ llm, client: mcp.client })
+   * await agent.initialize()
+   *
+   * for await (const event of agent.streamEvents('Hello')) {
+   *   console.log(event)
    * }
    * ```
    */
-  sendChatMessage: (
-    message: string,
-    llm: BaseLanguageModelInterface
-  ) => AsyncGenerator<StreamEvent, void, void>
-  /** Clears the chat conversation history. */
-  clearChatHistory: () => void
+  client: BrowserMCPClient | null
 }

@@ -284,18 +284,28 @@ function ServerExplorer() {
 
 ## AI Chat with MCP Tools
 
-The hook provides built-in AI chat functionality that creates agents with access to all MCP tools:
+The `useMcp` hook exposes the underlying `client` which you can use to create an AI agent with access to all MCP tools.
+
+<Note>
+**For browser apps**: Use dynamic import of `mcp-use/browser` (shown below) to avoid bundling server-side code.
+**For Node.js apps**: You can import directly from `mcp-use`.
+</Note>
 
 ```typescript
 import { useMcp } from 'mcp-use/react'
 import { ChatOpenAI } from '@langchain/openai'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 
 function ChatInterface() {
   const mcp = useMcp({
     url: 'http://localhost:3000/mcp',
     customHeaders: { Authorization: 'Bearer YOUR_API_KEY' }
   })
+
+  const [agent, setAgent] = useState(null)
+  const [messages, setMessages] = useState<Array<{role: string, content: string}>>([])
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   // Create LLM instance
   const llm = useMemo(() => new ChatOpenAI({
@@ -304,14 +314,25 @@ function ChatInterface() {
     temperature: 0.7
   }), [])
 
-  const [messages, setMessages] = useState<Array<{role: string, content: string}>>([])
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  // Create agent when connection is ready
+  useEffect(() => {
+    if (mcp.state === 'ready' && mcp.client && !agent) {
+      // Use dynamic import for browser environments to avoid bundling server-side code
+      import('mcp-use/browser').then(({ MCPAgent }) => {
+        const newAgent = new MCPAgent({
+          llm,
+          client: mcp.client,
+          memoryEnabled: true,
+          systemPrompt: 'You are a helpful assistant.'
+        })
+        newAgent.initialize().then(() => setAgent(newAgent))
+      })
+    }
+  }, [mcp.state, mcp.client, llm])
 
   const handleSend = async () => {
-    if (!input.trim() || mcp.state !== 'ready') return
+    if (!input.trim() || !agent) return
 
-    // Add user message
     const userMessage = { role: 'user', content: input }
     setMessages(prev => [...prev, userMessage])
     setInput('')
@@ -321,7 +342,7 @@ function ChatInterface() {
       let assistantContent = ''
 
       // Stream response from AI agent
-      for await (const event of mcp.sendChatMessage(input, llm)) {
+      for await (const event of agent.streamEvents(input)) {
         // Handle streaming text
         if (event.event === 'on_chat_model_stream' && event.data?.chunk?.text) {
           assistantContent += event.data.chunk.text
@@ -355,6 +376,13 @@ function ChatInterface() {
     }
   }
 
+  const handleClearHistory = () => {
+    if (agent) {
+      agent.clearConversationHistory()
+      setMessages([])
+    }
+  }
+
   return (
     <div>
       <div className="messages">
@@ -369,14 +397,14 @@ function ChatInterface() {
         value={input}
         onChange={e => setInput(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && handleSend()}
-        disabled={isLoading || mcp.state !== 'ready'}
+        disabled={isLoading || !agent}
       />
 
-      <button onClick={handleSend} disabled={isLoading}>
+      <button onClick={handleSend} disabled={isLoading || !agent}>
         {isLoading ? 'Sending...' : 'Send'}
       </button>
 
-      <button onClick={mcp.clearChatHistory}>
+      <button onClick={handleClearHistory} disabled={!agent}>
         Clear History
       </button>
     </div>
@@ -384,19 +412,23 @@ function ChatInterface() {
 }
 ```
 
+**Key features:**
+- 🧠 **Conversation memory**: The agent remembers previous messages (set `memoryEnabled: true`)
+- 🛠️ **Automatic tool access**: Agent can call any MCP tool from the connected server
+- ⚡ **Streaming responses**: Real-time token streaming for better UX
+- 🔄 **Agent persistence**: Reuse the same agent across messages for memory
+
 ### Supported LLM Providers
 
-You can use any LangChain chat model:
+MCPAgent works with any LangChain chat model:
 
 ```typescript
 // OpenAI
 import { ChatOpenAI } from '@langchain/openai'
 const llm = new ChatOpenAI({
   model: 'gpt-4',
-  apiKey: process.env.OPENAI_API_KEY,
-  temperature: 0.7
+  apiKey: process.env.OPENAI_API_KEY
 })
-for await (const event of mcp.sendChatMessage(message, llm)) { /* ... */ }
 
 // Anthropic
 import { ChatAnthropic } from '@langchain/anthropic'
@@ -404,7 +436,6 @@ const llm = new ChatAnthropic({
   model: 'claude-3-5-sonnet-20241022',
   apiKey: process.env.ANTHROPIC_API_KEY
 })
-for await (const event of mcp.sendChatMessage(message, llm)) { /* ... */ }
 
 // Google
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
@@ -412,12 +443,10 @@ const llm = new ChatGoogleGenerativeAI({
   model: 'gemini-pro',
   apiKey: process.env.GOOGLE_API_KEY
 })
-for await (const event of mcp.sendChatMessage(message, llm)) { /* ... */ }
 
 // Or any other LangChain-compatible model
 import { ChatOllama } from '@langchain/community/chat_models/ollama'
 const llm = new ChatOllama({ model: 'llama2' })
-for await (const event of mcp.sendChatMessage(message, llm)) { /* ... */ }
 ```
 
 ## Error Handling
@@ -700,32 +729,37 @@ const prompt = await mcp.getPrompt('code-review', {
 console.log(prompt.messages)
 ```
 
-#### `sendChatMessage(message, llm)`
+#### `client`
 
-Send a chat message using an AI agent with access to MCP tools.
+The underlying BrowserMCPClient instance. Use this to create an MCPAgent for AI chat functionality.
 
 ```typescript
 import { ChatOpenAI } from '@langchain/openai'
 
-const llm = new ChatOpenAI({
-  model: 'gpt-4',
-  apiKey: process.env.OPENAI_API_KEY
+const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+
+// For browser environments, use dynamic import
+const { MCPAgent } = await import('mcp-use/browser')
+
+// Create agent with the exposed client
+const agent = new MCPAgent({
+  llm: new ChatOpenAI({ model: 'gpt-4' }),
+  client: mcp.client,
+  memoryEnabled: true
 })
 
-for await (const event of mcp.sendChatMessage('Send an email to john@example.com', llm)) {
-  if (event.event === 'on_chat_model_stream') {
-    console.log(event.data.chunk.text)
-  }
+await agent.initialize()
+
+// Use agent for chat
+for await (const event of agent.streamEvents('Send an email')) {
+  console.log(event)
 }
+
+// Clear conversation history
+agent.clearConversationHistory()
 ```
 
-#### `clearChatHistory()`
-
-Clear the AI agent's conversation history.
-
-```typescript
-mcp.clearChatHistory()
-```
+**Note**: Use `import('mcp-use/browser')` for browser apps to avoid bundling server-side connectors (stdio, etc.).
 
 #### `retry()`
 

@@ -9,8 +9,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { StreamEvent } from '@langchain/core/tracers/log_stream'
-import type { BaseLanguageModelInterface } from '@langchain/core/language_models/base'
 import { MCPServerRemovedEvent, Telemetry } from '@/client/telemetry'
 
 export interface MCPConnection {
@@ -31,11 +29,7 @@ export interface MCPConnection {
   authenticate: () => void
   retry: () => void
   clearStorage: () => void
-  sendChatMessage: (
-    message: string,
-    llm: BaseLanguageModelInterface
-  ) => AsyncGenerator<StreamEvent, void, void>
-  clearChatHistory: () => void
+  client: any
 }
 
 interface McpContextType {
@@ -157,8 +151,7 @@ function McpConnectionWrapper({
           authenticate: mcpHook.authenticate,
           retry: mcpHook.retry,
           clearStorage: mcpHook.clearStorage,
-          sendChatMessage: mcpHook.sendChatMessage,
-          clearChatHistory: mcpHook.clearChatHistory,
+          client: mcpHook.client,
         }
 
         // Only update if something actually changed
@@ -171,8 +164,7 @@ function McpConnectionWrapper({
           || prev.tools.length !== connection.tools.length
           || prev.resources.length !== connection.resources.length
           || prev.prompts.length !== connection.prompts.length
-          || !prev.sendChatMessage
-          || !prev.clearChatHistory
+          || !prev.client
         ) {
           prevConnectionRef.current = connection
           onUpdateRef.current(connection)
@@ -199,8 +191,7 @@ function McpConnectionWrapper({
         authenticate: mcpHook.authenticate,
         retry: mcpHook.retry,
         clearStorage: mcpHook.clearStorage,
-        sendChatMessage: mcpHook.sendChatMessage,
-        clearChatHistory: mcpHook.clearChatHistory,
+        client: mcpHook.client,
       }
 
       // Only update if something actually changed
@@ -213,8 +204,7 @@ function McpConnectionWrapper({
         || prev.tools.length !== connection.tools.length
         || prev.resources.length !== connection.resources.length
         || prev.prompts.length !== connection.prompts.length
-        || !prev.sendChatMessage
-        || !prev.clearChatHistory
+        || !prev.client
       ) {
         prevConnectionRef.current = connection
         onUpdateRef.current(connection)
@@ -229,8 +219,7 @@ function McpConnectionWrapper({
     mcpHook.prompts,
     mcpHook.error,
     mcpHook.authUrl,
-    mcpHook.sendChatMessage,
-    mcpHook.clearChatHistory,
+    mcpHook.client,
   ])
 
   return null
@@ -427,11 +416,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
           authenticate: () => { },
           retry: () => { },
           clearStorage: () => { },
-          sendChatMessage: async function* () {
-            yield* []
-            throw new Error('Not connected')
-          },
-          clearChatHistory: () => { },
+          client: null,
         }
       }
 
@@ -515,11 +500,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
         authenticate: () => { },
         retry: () => { },
         clearStorage: () => { },
-        sendChatMessage: async function* () {
-          yield* []
-          throw new Error('Not connected')
-        },
-        clearChatHistory: () => { },
+        client: null,
       }
     })
 

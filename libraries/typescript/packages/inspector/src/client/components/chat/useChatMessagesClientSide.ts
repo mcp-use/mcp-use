@@ -19,6 +19,8 @@ export function useChatMessagesClientSide({
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const agentRef = useRef<any>(null)
+  const llmRef = useRef<any>(null)
 
   const sendMessage = useCallback(
     async (userInput: string) => {
@@ -70,35 +72,69 @@ export function useChatMessagesClientSide({
           },
         ])
 
-        // Create LLM instance from config
-        let llm: any
-        if (llmConfig.provider === 'openai') {
-          const { ChatOpenAI } = await import('@langchain/openai')
-          llm = new ChatOpenAI({
+        // Create LLM instance from config (reuse if config hasn't changed)
+        if (!llmRef.current ||
+          llmRef.current.provider !== llmConfig.provider ||
+          llmRef.current.model !== llmConfig.model ||
+          llmRef.current.apiKey !== llmConfig.apiKey) {
+
+          let llm: any
+          if (llmConfig.provider === 'openai') {
+            const { ChatOpenAI } = await import('@langchain/openai')
+            llm = new ChatOpenAI({
+              model: llmConfig.model,
+              apiKey: llmConfig.apiKey,
+              temperature: llmConfig.temperature ?? 0.7,
+            })
+          } else if (llmConfig.provider === 'anthropic') {
+            const { ChatAnthropic } = await import('@langchain/anthropic')
+            llm = new ChatAnthropic({
+              model: llmConfig.model,
+              apiKey: llmConfig.apiKey,
+              temperature: llmConfig.temperature ?? 0.7,
+            })
+          } else if (llmConfig.provider === 'google') {
+            const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai')
+            llm = new ChatGoogleGenerativeAI({
+              model: llmConfig.model,
+              apiKey: llmConfig.apiKey,
+              temperature: llmConfig.temperature ?? 0.7,
+            })
+          } else {
+            throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`)
+          }
+
+          llmRef.current = {
+            instance: llm,
+            provider: llmConfig.provider,
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature ?? 0.7,
-          })
-        } else if (llmConfig.provider === 'anthropic') {
-          const { ChatAnthropic } = await import('@langchain/anthropic')
-          llm = new ChatAnthropic({
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature ?? 0.7,
-          })
-        } else if (llmConfig.provider === 'google') {
-          const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai')
-          llm = new ChatGoogleGenerativeAI({
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature ?? 0.7,
-          })
-        } else {
-          throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`)
+          }
         }
 
-        // Stream events from connection
-        for await (const event of connection.sendChatMessage(userInput, llm)) {
+        // Create or reuse agent
+        if (!agentRef.current || agentRef.current.llm !== llmRef.current.instance) {
+          // Dynamic import from browser export to avoid bundling server-side code
+          const { MCPAgent } = await import('mcp-use/browser')
+
+          agentRef.current = new MCPAgent({
+            llm: llmRef.current.instance,
+            client: connection.client,
+            memoryEnabled: true,
+            systemPrompt: 'You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.',
+          })
+          await agentRef.current.initialize()
+        } else {
+          console.log('[useChatMessagesClientSide] Reusing existing agent. History length:', agentRef.current.conversationHistory?.length)
+        }
+
+        // Stream events from agent
+        for await (const event of agentRef.current.streamEvents(
+          userInput,
+          10,        // maxSteps
+          false,     // manageConnector - don't manage, already connected
+          undefined  // externalHistory - agent maintains its own with memoryEnabled
+        )) {
           // Check for abort
           if (abortControllerRef.current?.signal.aborted) {
             break
@@ -397,8 +433,10 @@ export function useChatMessagesClientSide({
 
   const clearMessages = useCallback(() => {
     setMessages([])
-    connection.clearChatHistory()
-  }, [connection])
+    if (agentRef.current) {
+      agentRef.current.clearConversationHistory()
+    }
+  }, [])
 
   return {
     messages,

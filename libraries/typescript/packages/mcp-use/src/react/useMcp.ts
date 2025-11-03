@@ -85,7 +85,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
   const clientRef = useRef<BrowserMCPClient | null>(null)
   const authProviderRef = useRef<BrowserOAuthClientProvider | null>(null)
-  const agentRef = useRef<any>(null)
   const connectingRef = useRef<boolean>(false)
   const isMountedRef = useRef<boolean>(true)
   const connectAttemptRef = useRef<number>(0)
@@ -645,92 +644,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     [state]
   )
 
-  /**
-   * Send a chat message using an AI agent with access to MCP tools
-   *
-   * Creates a LangChain agent that can use all tools from the connected MCP server.
-   * The agent maintains conversation history across messages.
-   *
-   * @param message - User message to send
-   * @param llm - LangChain chat model instance (ChatOpenAI, ChatAnthropic, etc.)
-   * @yields Stream events from the agent execution
-   * @throws {Error} If client is not ready
-   *
-   * @example
-   * ```typescript
-   * import { ChatOpenAI } from '@langchain/openai'
-   *
-   * const llm = new ChatOpenAI({
-   *   model: 'gpt-4',
-   *   apiKey: process.env.OPENAI_API_KEY,
-   *   temperature: 0.7
-   * })
-   *
-   * for await (const event of mcp.sendChatMessage('Send an email to john@example.com', llm)) {
-   *   if (event.event === 'on_chat_model_stream') {
-   *     console.log(event.data.chunk.text)
-   *   }
-   * }
-   * ```
-   */
-  const sendChatMessage = useCallback(
-    async function* (
-      message: string,
-      llm: BaseLanguageModelInterface
-    ): AsyncGenerator<any, void, void> {
-      if (stateRef.current !== 'ready' || !clientRef.current) {
-        throw new Error(`MCP client is not ready (current state: ${stateRef.current}). Cannot send chat message.`)
-      }
-
-      addLog('info', `Sending chat message: ${message.slice(0, 50)}...`)
-
-      // Check if LLM instance changed or agent doesn't exist
-      // Note: Uses reference equality - callers should use useMemo() to keep same LLM instance
-      const llmChanged = !agentRef.current || agentRef.current.llm !== llm
-
-      // Lazy create or recreate agent when LLM changes
-      if (llmChanged) {
-        addLog('debug', agentRef.current ? 'LLM instance changed, recreating agent' : 'Creating agent for first chat')
-
-        // Import MCPAgent
-        const { MCPAgent } = await import('../agents/mcp_agent.js')
-
-        // Create agent with existing client
-        // TODO: Update MCPAgent type definitions to accept BrowserMCPClient or a shared MCPClientInterface
-        agentRef.current = new MCPAgent({
-          llm,
-          client: clientRef.current as any,
-          maxSteps: DEFAULT_MAX_STEPS,
-          memoryEnabled: true,
-          systemPrompt: 'You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.',
-        })
-
-        // Initialize agent (won't reconnect, just builds tools from existing sessions)
-        await agentRef.current.initialize()
-      }
-
-      // Stream events from agent
-      yield* agentRef.current.streamEvents(
-        message,
-        DEFAULT_MAX_STEPS,
-        false,     // manageConnector - don't manage, already connected
-        undefined  // externalHistory - agent maintains its own with memoryEnabled
-      )
-    },
-    [state, addLog]
-  )
-
-  /**
-   * Clear the AI agent's conversation history
-   * Useful for starting a fresh conversation
-   */
-  const clearChatHistory = useCallback(() => {
-    if (agentRef.current) {
-      agentRef.current.clearConversationHistory()
-      addLog('debug', 'Chat history cleared')
-    }
-  }, [addLog])
-
   // ===== Effects =====
 
   /**
@@ -826,9 +739,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     return () => {
       isMountedRef.current = false
       addLog('debug', 'useMcp unmounting, disconnecting.')
-      if (agentRef.current) {
-        agentRef.current = null
-      }
       disconnect(true)
     }
   }, [url, enabled, storageKeyPrefix, callbackUrl, clientName, clientUri, clientConfig.name, clientConfig.version])
@@ -864,6 +774,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     error,
     log,
     authUrl,
+    client: clientRef.current,
     callTool,
     readResource,
     listResources,
@@ -873,7 +784,5 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     disconnect,
     authenticate,
     clearStorage,
-    sendChatMessage,
-    clearChatHistory,
   }
 }
