@@ -184,7 +184,7 @@ export abstract class BaseConnector {
 
     logger.debug(`Reading resource ${uri}`)
     const res = await this.client.readResource({ uri }, options)
-    return { content: res.content, mimeType: res.mimeType }
+    return res
   }
 
   /**

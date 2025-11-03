@@ -551,14 +551,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
         const result = await session.connector.readResource(uri)
         addLog('info', 'Resource read successful:', result)
-        // Convert to expected format
-        return {
-          contents: Array.isArray(result.content) ? result.content : [{
-            uri,
-            text: typeof result.content === 'string' ? result.content : JSON.stringify(result.content),
-            mimeType: result.mimeType
-          }]
-        }
+        return result
       } catch (err) {
         addLog('error', 'Resource read failed:', err)
         throw err

@@ -1,5 +1,6 @@
 import type {
   CallToolResult,
+  ReadResourceResult,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js'
 import { v4 as uuidv4 } from 'uuid'
@@ -162,9 +163,9 @@ export class WebSocketConnector extends BaseConnector {
     return { resources: Array.isArray(resources) ? resources : [] }
   }
 
-  async readResource(uri: string): Promise<{ content: ArrayBuffer, mimeType: string }> {
+  async readResource(uri: string): Promise<ReadResourceResult> {
     const res = await this.sendRequest('resources/read', { uri })
-    return { content: res.content, mimeType: res.mimeType }
+    return res
   }
 
   async request(method: string, params: Record<string, any> | null = null): Promise<any> {
