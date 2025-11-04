@@ -1,22 +1,22 @@
-import { Clock } from 'lucide-react'
-import { ListItem } from '@/client/components/shared'
+import { Clock } from "lucide-react";
+import { ListItem } from "@/client/components/shared";
 
 export interface SavedPrompt {
-  id: string
-  name: string
-  promptName: string
-  args: Record<string, unknown>
-  savedAt: number
-  serverId?: string
-  serverName?: string
+  id: string;
+  name: string;
+  promptName: string;
+  args: Record<string, unknown>;
+  savedAt: number;
+  serverId?: string;
+  serverName?: string;
 }
 
 interface SavedPromptsListProps {
-  savedPrompts: SavedPrompt[]
-  selectedPrompt: SavedPrompt | null
-  onLoadPrompt: (prompt: SavedPrompt) => void
-  onDeletePrompt: (id: string) => void
-  focusedIndex: number
+  savedPrompts: SavedPrompt[];
+  selectedPrompt: SavedPrompt | null;
+  onLoadPrompt: (prompt: SavedPrompt) => void;
+  onDeletePrompt: (id: string) => void;
+  focusedIndex: number;
 }
 
 export function SavedPromptsList({
@@ -35,7 +35,7 @@ export function SavedPromptsList({
           Prompts you execute will appear here
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -53,5 +53,5 @@ export function SavedPromptsList({
         />
       ))}
     </div>
-  )
+  );
 }

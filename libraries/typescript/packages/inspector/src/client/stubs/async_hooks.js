@@ -1,72 +1,76 @@
 // Browser stub for node:async_hooks
 export class AsyncLocalStorage {
-    constructor() {
-        this.store = undefined
-    }
+  constructor() {
+    this.store = undefined;
+  }
 
-    getStore() {
-        return this.store
-    }
+  getStore() {
+    return this.store;
+  }
 
-    run(store, callback, ...args) {
-        this.store = store
-        try {
-            return callback(...args)
-        } finally {
-            this.store = undefined
-        }
+  run(store, callback, ...args) {
+    this.store = store;
+    try {
+      return callback(...args);
+    } finally {
+      this.store = undefined;
     }
+  }
 
-    exit(callback, ...args) {
-        const previousStore = this.store
-        this.store = undefined
-        try {
-            return callback(...args)
-        } finally {
-            this.store = previousStore
-        }
+  exit(callback, ...args) {
+    const previousStore = this.store;
+    this.store = undefined;
+    try {
+      return callback(...args);
+    } finally {
+      this.store = previousStore;
     }
+  }
 
-    enterWith(store) {
-        this.store = store
-    }
+  enterWith(store) {
+    this.store = store;
+  }
 
-    disable() {
-        this.store = undefined
-    }
+  disable() {
+    this.store = undefined;
+  }
 }
 
 export class AsyncResource {
-    constructor() { }
+  constructor() {}
 
-    runInAsyncScope(fn, thisArg, ...args) {
-        return fn.apply(thisArg, args)
-    }
+  runInAsyncScope(fn, thisArg, ...args) {
+    return fn.apply(thisArg, args);
+  }
 
-    emitDestroy() { }
-    asyncId() { return 1 }
-    triggerAsyncId() { return 0 }
+  emitDestroy() {}
+  asyncId() {
+    return 1;
+  }
+  triggerAsyncId() {
+    return 0;
+  }
 }
 
 export function executionAsyncId() {
-    return 1
+  return 1;
 }
 
 export function triggerAsyncId() {
-    return 0
+  return 0;
 }
 
 export function createHook() {
-    return {
-        enable() { },
-        disable() { },
-    }
+  return {
+    enable() {},
+    disable() {},
+  };
 }
 
 export default {
-    AsyncLocalStorage,
-    AsyncResource,
-    executionAsyncId,
-    triggerAsyncId,
-    createHook,
-}
+  AsyncLocalStorage,
+  AsyncResource,
+  executionAsyncId,
+  triggerAsyncId,
+  createHook,
+};

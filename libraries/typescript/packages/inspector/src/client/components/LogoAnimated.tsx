@@ -1,6 +1,6 @@
-import { motion } from 'framer-motion'
-import { useState } from 'react'
-import { cn } from '@/client/lib/utils'
+import { motion } from "framer-motion";
+import { useState } from "react";
+import { cn } from "@/client/lib/utils";
 
 /**
  * HoverDrawLogo (timed sequence)
@@ -12,27 +12,27 @@ import { cn } from '@/client/lib/utils'
  */
 export default function LogoAnimated({
   className,
-  state = 'collapsed',
-  href = 'https://mcp-use.com',
+  state = "collapsed",
+  href = "https://mcp-use.com",
 }: {
-  className?: string
-  state?: 'expanded' | 'collapsed'
-  href?: string
+  className?: string;
+  state?: "expanded" | "collapsed";
+  href?: string;
 }) {
-  const [isHovered, setIsHovered] = useState(false)
+  const [isHovered, setIsHovered] = useState(false);
 
   // Tune these three to taste
-  const FADE_OUT = 0.2 // seconds
-  const DRAW = 0.7 // seconds
-  const FADE_IN = 0.6 // seconds
-  const STROKE_WIDTH = 4
-  const TOTAL = FADE_OUT + DRAW + FADE_IN
+  const FADE_OUT = 0.2; // seconds
+  const DRAW = 0.7; // seconds
+  const FADE_IN = 0.6; // seconds
+  const STROKE_WIDTH = 4;
+  const TOTAL = FADE_OUT + DRAW + FADE_IN;
 
   // Precomputed keyframe "times" for a single synced timeline (0..1)
-  const T0 = 0 // start
-  const T1 = FADE_OUT / TOTAL // after fade out
-  const T2 = (FADE_OUT + DRAW) / TOTAL // after outline draw
-  const T3 = 1 // end after fade in
+  const T0 = 0; // start
+  const T1 = FADE_OUT / TOTAL; // after fade out
+  const T2 = (FADE_OUT + DRAW) / TOTAL; // after outline draw
+  const T3 = 1; // end after fade in
 
   return (
     <a
@@ -40,9 +40,9 @@ export default function LogoAnimated({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'flex items-center transition-opacity -my-3',
-        state === 'expanded' ? 'space-x-2' : '',
-        className,
+        "flex items-center transition-opacity -my-3",
+        state === "expanded" ? "space-x-2" : "",
+        className
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -51,10 +51,10 @@ export default function LogoAnimated({
         <motion.svg
           viewBox="0 0 303 303"
           initial="rest"
-          animate={isHovered ? 'hover' : 'rest'}
+          animate={isHovered ? "hover" : "rest"}
           className={cn(
-            'text-foreground',
-            state === 'expanded' ? 'size-[40px]' : 'size-[20px]',
+            "text-foreground",
+            state === "expanded" ? "size-[40px]" : "size-[20px]"
           )}
         >
           {/* FILLED SHAPES (1: fade out, 3: fade back in) */}
@@ -67,7 +67,7 @@ export default function LogoAnimated({
                 transition: {
                   duration: TOTAL,
                   times: [T0, T1, T2, T3],
-                  ease: 'easeInOut',
+                  ease: "easeInOut",
                 },
               },
             }}
@@ -113,7 +113,7 @@ export default function LogoAnimated({
           </g>
         </motion.svg>
       </div>
-      {state === 'expanded' && (
+      {state === "expanded" && (
         <div className="font-ubuntu flex flex-col items-start -space-y-1 mr-3">
           <h1 className="text-xl font-medium">mcp-use</h1>
           <span className="text-lg text-muted-foreground tracking-wide font-sans font-light">
@@ -122,7 +122,7 @@ export default function LogoAnimated({
         </div>
       )}
     </a>
-  )
+  );
 }
 
 /** Draw-animated path using a shared timeline. */
@@ -131,11 +131,11 @@ function AnimatedStrokePath({
   times,
   total,
 }: {
-  d: string
-  times: { T0: number, T1: number, T2: number, T3: number }
-  total: number
+  d: string;
+  times: { T0: number; T1: number; T2: number; T3: number };
+  total: number;
 }) {
-  const { T0, T1, T2, T3 } = times
+  const { T0, T1, T2, T3 } = times;
   return (
     <motion.path
       d={d}
@@ -148,12 +148,12 @@ function AnimatedStrokePath({
           transition: {
             duration: total,
             times: [T0, T1, T2, T3],
-            ease: 'easeInOut',
+            ease: "easeInOut",
           },
         },
       }}
     />
-  )
+  );
 }
 
 /** Draw-animated circle using a shared timeline. */
@@ -164,13 +164,13 @@ function AnimatedStrokeCircle({
   times,
   total,
 }: {
-  cx: number
-  cy: number
-  r: number
-  times: { T0: number, T1: number, T2: number, T3: number }
-  total: number
+  cx: number;
+  cy: number;
+  r: number;
+  times: { T0: number; T1: number; T2: number; T3: number };
+  total: number;
 }) {
-  const { T0, T1, T2, T3 } = times
+  const { T0, T1, T2, T3 } = times;
   return (
     <motion.circle
       cx={cx}
@@ -184,10 +184,10 @@ function AnimatedStrokeCircle({
           transition: {
             duration: total,
             times: [T0, T1, T2, T3],
-            ease: 'easeInOut',
+            ease: "easeInOut",
           },
         },
       }}
     />
-  )
+  );
 }

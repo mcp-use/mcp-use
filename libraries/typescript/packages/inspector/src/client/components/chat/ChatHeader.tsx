@@ -1,29 +1,29 @@
-import type { LLMConfig } from './types'
+import type { LLMConfig } from "./types";
 
-import { Badge } from '@/client/components/ui/badge'
-import { Button } from '@/client/components/ui/button'
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/client/components/ui/tooltip'
-import { ConfigurationDialog } from './ConfigurationDialog'
+} from "@/client/components/ui/tooltip";
+import { ConfigurationDialog } from "./ConfigurationDialog";
 
 interface ChatHeaderProps {
-  llmConfig: LLMConfig | null
-  hasMessages: boolean
-  configDialogOpen: boolean
-  onConfigDialogOpenChange: (open: boolean) => void
-  onClearChat: () => void
+  llmConfig: LLMConfig | null;
+  hasMessages: boolean;
+  configDialogOpen: boolean;
+  onConfigDialogOpenChange: (open: boolean) => void;
+  onClearChat: () => void;
   // Configuration props
-  tempProvider: 'openai' | 'anthropic' | 'google'
-  tempModel: string
-  tempApiKey: string
-  onProviderChange: (provider: 'openai' | 'anthropic' | 'google') => void
-  onModelChange: (model: string) => void
-  onApiKeyChange: (apiKey: string) => void
-  onSaveConfig: () => void
-  onClearConfig: () => void
+  tempProvider: "openai" | "anthropic" | "google";
+  tempModel: string;
+  tempApiKey: string;
+  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  onModelChange: (model: string) => void;
+  onApiKeyChange: (apiKey: string) => void;
+  onSaveConfig: () => void;
+  onClearConfig: () => void;
 }
 
 export function ChatHeader({
@@ -58,9 +58,7 @@ export function ChatHeader({
                   alt={llmConfig.provider}
                   className="w-4 h-4 mr-0"
                 />
-                {llmConfig.provider}
-                /
-                {llmConfig.model}
+                {llmConfig.provider}/{llmConfig.model}
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
@@ -71,7 +69,11 @@ export function ChatHeader({
       </div>
       <div className="flex items-center gap-2 pr-3 pt-2">
         {hasMessages && (
-          <Button size="default" className="pr-1 pl-3 cursor-pointer" onClick={onClearChat}>
+          <Button
+            size="default"
+            className="pr-1 pl-3 cursor-pointer"
+            onClick={onClearChat}
+          >
             New Chat
             <span className="text-[12px]  border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500">
               ⌘O
@@ -90,9 +92,9 @@ export function ChatHeader({
           onSave={onSaveConfig}
           onClear={onClearConfig}
           showClearButton={!!llmConfig}
-          buttonLabel={llmConfig ? 'Change API Key' : 'Configure API Key'}
+          buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
         />
       </div>
     </div>
-  )
+  );
 }

@@ -1,13 +1,13 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js'
-import { Wrench } from 'lucide-react'
-import { ListItem } from '@/client/components/shared'
-import { Badge } from '@/client/components/ui/badge'
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { Wrench } from "lucide-react";
+import { ListItem } from "@/client/components/shared";
+import { Badge } from "@/client/components/ui/badge";
 
 interface ToolsListProps {
-  tools: Tool[]
-  selectedTool: Tool | null
-  onToolSelect: (tool: Tool) => void
-  focusedIndex: number
+  tools: Tool[];
+  selectedTool: Tool | null;
+  onToolSelect: (tool: Tool) => void;
+  focusedIndex: number;
 }
 
 export function ToolsList({
@@ -22,7 +22,7 @@ export function ToolsList({
         <Wrench className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
         <p className="text-gray-500 dark:text-gray-400">No tools available</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -42,9 +42,7 @@ export function ToolsList({
                 variant="outline"
                 className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
               >
-                {Object.keys(tool.inputSchema.properties).length}
-                {' '}
-                params
+                {Object.keys(tool.inputSchema.properties).length} params
               </Badge>
             )
           }
@@ -52,5 +50,5 @@ export function ToolsList({
         />
       ))}
     </div>
-  )
+  );
 }

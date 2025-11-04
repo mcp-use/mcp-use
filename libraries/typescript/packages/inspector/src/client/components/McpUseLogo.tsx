@@ -1,21 +1,21 @@
-import { cn } from '@/client/lib/utils'
+import { cn } from "@/client/lib/utils";
 
 interface McpUseLogoProps {
-  className?: string
-  size?: 'sm' | 'md' | 'lg'
+  className?: string;
+  size?: "sm" | "md" | "lg";
 }
 
-export function McpUseLogo({ className, size = 'md' }: McpUseLogoProps) {
+export function McpUseLogo({ className, size = "md" }: McpUseLogoProps) {
   const sizeClasses = {
-    sm: 'h-4 w-4',
-    md: 'h-5 w-5',
-    lg: 'h-6 w-6',
-  }
+    sm: "h-4 w-4",
+    md: "h-5 w-5",
+    lg: "h-6 w-6",
+  };
 
   return (
     <svg
       viewBox="0 0 303 303"
-      className={cn('text-current', sizeClasses[size], className)}
+      className={cn("text-current", sizeClasses[size], className)}
       fill="currentColor"
       fillRule="nonzero"
       stroke="currentColor"
@@ -27,5 +27,5 @@ export function McpUseLogo({ className, size = 'md' }: McpUseLogoProps) {
       <circle cx="70.3" cy="232.3" r="50" />
       <circle cx="232.3" cy="70.3" r="50" />
     </svg>
-  )
+  );
 }

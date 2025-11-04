@@ -6,14 +6,14 @@
  */
 
 // Import observability providers - order matters for initialization
-import './langfuse.js'
+import "./langfuse.js";
 
 // Re-export individual handlers for direct usage if needed
 export {
   langfuseClient,
   langfuseHandler,
   langfuseInitPromise,
-} from './langfuse.js'
+} from "./langfuse.js";
 
 // Export the manager and its utilities
 export {
@@ -21,4 +21,4 @@ export {
   getDefaultManager,
   type ObservabilityConfig,
   ObservabilityManager,
-} from './manager.js'
+} from "./manager.js";

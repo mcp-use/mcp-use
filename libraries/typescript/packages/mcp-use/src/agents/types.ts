@@ -1,3 +1,12 @@
-import type { AIMessage, HumanMessage, ToolMessage, SystemMessage } from 'langchain'
+import type {
+  AIMessage,
+  HumanMessage,
+  ToolMessage,
+  SystemMessage,
+} from "langchain";
 
-export type BaseMessage = AIMessage | HumanMessage | ToolMessage | SystemMessage
+export type BaseMessage =
+  | AIMessage
+  | HumanMessage
+  | ToolMessage
+  | SystemMessage;

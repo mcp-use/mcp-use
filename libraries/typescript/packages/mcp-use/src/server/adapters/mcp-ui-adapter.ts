@@ -9,21 +9,21 @@
  * Official Apps SDK Docs: https://developers.openai.com/apps-sdk/build/mcp-server
  */
 
-import { createUIResource, type AdaptersConfig } from '@mcp-ui/server'
+import { createUIResource, type AdaptersConfig } from "@mcp-ui/server";
 
 import type {
   UIResourceContent,
   UIResourceDefinition,
   UIEncoding,
-  AppsSdkMetadata
-} from '../types/resource.js'
+  AppsSdkMetadata,
+} from "../types/resource.js";
 
 /**
  * Configuration for building widget URLs
  */
 export interface UrlConfig {
-  baseUrl: string
-  port: number | string
+  baseUrl: string;
+  port: number | string;
 }
 
 /**
@@ -42,14 +42,14 @@ export function buildWidgetUrl(
   const url = new URL(
     `/mcp-use/widgets/${widget}`,
     `${config.baseUrl}:${config.port}`
-  )
+  );
 
   // Pass all props as a single JSON-encoded parameter
   if (props && Object.keys(props).length > 0) {
-    url.searchParams.set('props', JSON.stringify(props))
+    url.searchParams.set("props", JSON.stringify(props));
   }
 
-  return url.toString()
+  return url.toString();
 }
 
 /**
@@ -65,17 +65,17 @@ export function buildWidgetUrl(
 export function createExternalUrlResource(
   uri: string,
   iframeUrl: string,
-  encoding: UIEncoding = 'text',
+  encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
 ): UIResourceContent {
   return createUIResource({
     uri: uri as `ui://${string}`,
-    content: { type: 'externalUrl', iframeUrl },
+    content: { type: "externalUrl", iframeUrl },
     encoding,
     adapters: adapters,
     metadata: metadata,
-  })
+  });
 }
 
 /**
@@ -91,17 +91,17 @@ export function createExternalUrlResource(
 export function createRawHtmlResource(
   uri: string,
   htmlString: string,
-  encoding: UIEncoding = 'text',
+  encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
 ): UIResourceContent {
   return createUIResource({
     uri: uri as `ui://${string}`,
-    content: { type: 'rawHtml', htmlString },
+    content: { type: "rawHtml", htmlString },
     encoding,
     adapters: adapters,
-    metadata: metadata
-  })
+    metadata: metadata,
+  });
 }
 
 /**
@@ -118,40 +118,40 @@ export function createRawHtmlResource(
 export function createRemoteDomResource(
   uri: string,
   script: string,
-  framework: 'react' | 'webcomponents' = 'react',
-  encoding: UIEncoding = 'text',
+  framework: "react" | "webcomponents" = "react",
+  encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
 ): UIResourceContent {
   return createUIResource({
     uri: uri as `ui://${string}`,
-    content: { type: 'remoteDom', script, framework },
+    content: { type: "remoteDom", script, framework },
     encoding,
     adapters: adapters,
-    metadata: metadata
-  })
+    metadata: metadata,
+  });
 }
 
 /**
  * Create a UIResource for OpenAI Apps SDK
- * 
+ *
  * This creates a resource compatible with OpenAI's Apps SDK using the
  * text/html+skybridge mime type. The HTML template should contain the
  * component code with embedded JS/CSS.
- * 
+ *
  * The Apps SDK pattern:
  * - Uses mime type text/html+skybridge
  * - Tool's structuredContent gets injected as window.openai.toolOutput
  * - Supports Apps SDK metadata (CSP, widget domain, description, etc.)
- * 
+ *
  * @param uri - Resource URI (must start with ui://)
  * @param htmlTemplate - HTML template with embedded component code
  * @param metadata - Apps SDK metadata (CSP, description, domain, etc.)
  * @returns UIResourceContent object
- * 
+ *
  * @see https://developers.openai.com/apps-sdk/build/mcp-server
  * @see https://mcpui.dev/guide/apps-sdk
- * 
+ *
  * @example
  * ```typescript
  * const resource = createAppsSdkResource(
@@ -181,19 +181,19 @@ export function createAppsSdkResource(
   // from https://developers.openai.com/apps-sdk/build/mcp-server
   const resource: any = {
     uri,
-    mimeType: 'text/html+skybridge',
-    text: htmlTemplate
-  }
+    mimeType: "text/html+skybridge",
+    text: htmlTemplate,
+  };
 
   // Add metadata if provided
   if (metadata && Object.keys(metadata).length > 0) {
-    resource._meta = metadata
+    resource._meta = metadata;
   }
 
   return {
-    type: 'resource',
-    resource
-  }
+    type: "resource",
+    resource,
+  };
 }
 
 /**
@@ -213,35 +213,36 @@ export function createUIResourceFromDefinition(
   config: UrlConfig
 ): UIResourceContent {
   // For Apps SDK, use .html extension following the convention
-  const uri = definition.type === 'appsSdk'
-    ? `ui://widget/${definition.name}.html` as `ui://${string}`
-    : `ui://widget/${definition.name}` as `ui://${string}`
-  const encoding = definition.encoding || 'text'
+  const uri =
+    definition.type === "appsSdk"
+      ? (`ui://widget/${definition.name}.html` as `ui://${string}`)
+      : (`ui://widget/${definition.name}` as `ui://${string}`);
+  const encoding = definition.encoding || "text";
 
   switch (definition.type) {
-    case 'externalUrl': {
-      const widgetUrl = buildWidgetUrl(definition.widget, params, config)
+    case "externalUrl": {
+      const widgetUrl = buildWidgetUrl(definition.widget, params, config);
       return createExternalUrlResource(
         uri,
         widgetUrl,
         encoding,
         definition.adapters,
         definition.appsSdkMetadata
-      )
+      );
     }
 
-    case 'rawHtml': {
+    case "rawHtml": {
       return createRawHtmlResource(
         uri,
         definition.htmlContent,
         encoding,
         definition.adapters,
         definition.appsSdkMetadata
-      )
+      );
     }
 
-    case 'remoteDom': {
-      const framework = definition.framework || 'react'
+    case "remoteDom": {
+      const framework = definition.framework || "react";
       return createRemoteDomResource(
         uri,
         definition.script,
@@ -249,22 +250,21 @@ export function createUIResourceFromDefinition(
         encoding,
         definition.adapters,
         definition.appsSdkMetadata
-      )
+      );
     }
 
-    case 'appsSdk': {
+    case "appsSdk": {
       return createAppsSdkResource(
         uri,
         definition.htmlTemplate,
         definition.appsSdkMetadata
-      )
+      );
     }
 
     default: {
       // TypeScript exhaustiveness check
-      const _exhaustive: never = definition
-      throw new Error(`Unknown UI resource type: ${(_exhaustive as any).type}`)
+      const _exhaustive: never = definition;
+      throw new Error(`Unknown UI resource type: ${(_exhaustive as any).type}`);
     }
   }
 }
-
