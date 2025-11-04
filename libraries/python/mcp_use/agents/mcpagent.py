@@ -17,7 +17,12 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TypeVar
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import ModelCallLimitMiddleware
+from langchain.agents.middleware import (
+    ModelCallLimitMiddleware,
+    ModelRequest,
+    wrap_model_call,
+)
+from langchain.agents.structured_output import AutoStrategy
 from langchain_core.agents import AgentAction
 from langchain_core.globals import set_debug
 from langchain_core.language_models import BaseLanguageModel
@@ -171,6 +176,17 @@ class MCPAgent:
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
 
+    @wrap_model_call
+    async def dynamic_structured_output(request: ModelRequest, handler):
+        # Get the format from the context
+        format_model = request.runtime.context.get("response_format")
+
+        # TODO: Do some checks to trigger strucured only on final step
+        if format_model:
+            request = request.override(response_format=AutoStrategy(schema=format_model))
+
+        return await handler(request)
+
     async def initialize(self) -> None:
         """Initialize the MCP client and agent."""
         logger.info("🚀 Initializing MCP agent and connecting to services...")
@@ -309,7 +325,7 @@ class MCPAgent:
 
         # Create middleware to enforce max_steps
         # ModelCallLimitMiddleware limits the number of model calls, which corresponds to agent steps
-        middleware = [ModelCallLimitMiddleware(run_limit=self.max_steps)]
+        middleware = [ModelCallLimitMiddleware(run_limit=self.max_steps), self.dynamic_structured_output]
 
         # Use the standard create_agent with middleware
         agent = create_agent(
@@ -693,6 +709,7 @@ class MCPAgent:
                     inputs,
                     stream_mode="updates",  # Get updates as they happen
                     config={"callbacks": self.callbacks},
+                    context={"response_format": output_schema},
                 ):
                     # chunk is a dict with node names as keys
                     # The agent node will have 'messages' with the AI response
@@ -700,6 +717,9 @@ class MCPAgent:
 
                     for node_name, node_output in chunk.items():
                         logger.debug(f"📦 Node '{node_name}' output: {node_output}")
+
+                        if node_output and "structured_response" in node_output:
+                            structured_response = node_output
 
                         # Extract messages from the node output and accumulate them
                         if node_output is not None and "messages" in node_output:
@@ -823,28 +843,14 @@ class MCPAgent:
             if output_schema and final_output:
                 try:
                     logger.info("🔧 Attempting structured output...")
-                    structured_llm = self.llm.with_structured_output(output_schema)
-
-                    # Get schema description
-                    schema_fields = []
-                    for field_name, field_info in output_schema.model_fields.items():
-                        description = getattr(field_info, "description", "") or field_name
-                        required = not hasattr(field_info, "default") or field_info.default is None
-                        schema_fields.append(
-                            f"- {field_name}: {description} " + ("(required)" if required else "(optional)")
-                        )
-                    schema_description = "\n".join(schema_fields)
-
-                    structured_result = await self._attempt_structured_output(
-                        final_output, structured_llm, output_schema, schema_description
-                    )
+                    structured_response = structured_response["structured_response"]
 
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                        self.add_to_history(AIMessage(content=f"Structured result: {structured_response}"))
 
                     logger.info("✅ Structured output successful")
                     success = True
-                    yield structured_result
+                    yield structured_response
                     return
                 except Exception as e:
                     logger.error(f"❌ Structured output failed: {e}")
