@@ -114,9 +114,7 @@ export type UseMcpResult = {
    * @returns A promise that resolves with the resource contents.
    * @throws If the client is not in the 'ready' state or the read fails.
    */
-  readResource: (
-    uri: string
-  ) => Promise<{
+  readResource: (uri: string) => Promise<{
     contents: Array<{
       uri: string;
       mimeType?: string;
