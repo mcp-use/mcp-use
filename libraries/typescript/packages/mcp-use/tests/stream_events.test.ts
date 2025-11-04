@@ -1,5 +1,3 @@
- 
-
 /**
  * Tests for MCPAgent streamEvents() method
  *
@@ -11,49 +9,49 @@
  * - Tracks telemetry correctly
  */
 
-import type { StreamEvent } from '../index.js'
-import { HumanMessage } from '@langchain/core/messages'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MCPAgent, MCPClient } from '../index.js'
+import type { StreamEvent } from "../index.js";
+import { HumanMessage } from "@langchain/core/messages";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MCPAgent, MCPClient } from "../index.js";
 
 // Mock the MCP client for testing
-vi.mock('../src/client.js', () => ({
+vi.mock("../src/client.js", () => ({
   MCPClient: vi.fn().mockImplementation(() => ({
     getAllActiveSessions: vi.fn().mockResolvedValue({}),
     createAllSessions: vi.fn().mockResolvedValue({}),
     closeAllSessions: vi.fn().mockResolvedValue(undefined),
   })),
-}))
+}));
 
 // Mock the LangChain adapter
-vi.mock('../src/adapters/langchain_adapter.js', () => ({
+vi.mock("../src/adapters/langchain_adapter.js", () => ({
   LangChainAdapter: vi.fn().mockImplementation(() => ({
     createToolsFromConnectors: vi.fn().mockResolvedValue([
       {
-        name: 'test_tool',
-        description: 'A test tool',
+        name: "test_tool",
+        description: "A test tool",
         schema: {},
-        func: vi.fn().mockResolvedValue('Test tool result'),
+        func: vi.fn().mockResolvedValue("Test tool result"),
       },
     ]),
   })),
-}))
+}));
 
-describe('mCPAgent streamEvents()', () => {
-  let agent: MCPAgent
-  let mockClient: any
-  let mockLLM: any
+describe("mCPAgent streamEvents()", () => {
+  let agent: MCPAgent;
+  let mockClient: any;
+  let mockLLM: any;
 
   beforeEach(() => {
     // Create mock LLM that supports streamEvents
     mockLLM = {
-      invoke: vi.fn().mockResolvedValue({ content: 'Test response' }),
-      _modelType: 'chat_anthropic',
-      _llmType: 'anthropic',
-    }
+      invoke: vi.fn().mockResolvedValue({ content: "Test response" }),
+      _modelType: "chat_anthropic",
+      _llmType: "anthropic",
+    };
 
     // Create mock client
-    mockClient = new MCPClient({})
+    mockClient = new MCPClient({});
 
     // Create agent with mocked dependencies
     agent = new MCPAgent({
@@ -62,321 +60,367 @@ describe('mCPAgent streamEvents()', () => {
       maxSteps: 3,
       memoryEnabled: true,
       verbose: false,
-    })
+    });
 
     // Mock the agent executor's streamEvents method
     // ReactAgent.streamEvents expects (inputs, config) parameters
-    const mockStreamEvents = vi.fn().mockImplementation(async function* (inputs: any, config: any) {
+    const mockStreamEvents = vi.fn().mockImplementation(async function* (
+      inputs: any,
+      config: any
+    ) {
       // Simulate typical event sequence
       yield {
-        event: 'on_chain_start',
-        name: 'AgentExecutor',
-        data: { input: { input: 'test query' } },
-      }
+        event: "on_chain_start",
+        name: "AgentExecutor",
+        data: { input: { input: "test query" } },
+      };
 
       yield {
-        event: 'on_chat_model_stream',
-        name: 'ChatAnthropic',
-        data: { chunk: { content: 'Hello' } },
-      }
+        event: "on_chat_model_stream",
+        name: "ChatAnthropic",
+        data: { chunk: { content: "Hello" } },
+      };
 
       yield {
-        event: 'on_chat_model_stream',
-        name: 'ChatAnthropic',
-        data: { chunk: { content: ' world' } },
-      }
+        event: "on_chat_model_stream",
+        name: "ChatAnthropic",
+        data: { chunk: { content: " world" } },
+      };
 
       yield {
-        event: 'on_tool_start',
-        name: 'test_tool',
-        data: { input: { query: 'test' } },
-      }
+        event: "on_tool_start",
+        name: "test_tool",
+        data: { input: { query: "test" } },
+      };
 
       yield {
-        event: 'on_tool_end',
-        name: 'test_tool',
-        data: { output: 'Tool result' },
-      }
+        event: "on_tool_end",
+        name: "test_tool",
+        data: { output: "Tool result" },
+      };
 
       yield {
-        event: 'on_chain_end',
-        name: 'AgentExecutor',
-        data: { output: [{ text: 'Hello world' }] },
-      }
-    })
+        event: "on_chain_end",
+        name: "AgentExecutor",
+        data: { output: [{ text: "Hello world" }] },
+      };
+    });
 
     // Mock initialize method
-    vi.spyOn(agent, 'initialize').mockResolvedValue(undefined)
+    vi.spyOn(agent, "initialize").mockResolvedValue(undefined);
 
     // Mock _agentExecutor after initialization (private property)
     // ReactAgent interface from langchain
-    ;(agent as any)._agentExecutor = {
+    (agent as any)._agentExecutor = {
       streamEvents: mockStreamEvents,
       stream: vi.fn(), // ReactAgent also has stream method
       invoke: vi.fn(), // ReactAgent also has invoke method
-    }
+    };
 
     // Mock tools
-    Object.defineProperty(agent, 'tools', {
-      get: () => [{ name: 'test_tool' }],
+    Object.defineProperty(agent, "tools", {
+      get: () => [{ name: "test_tool" }],
       configurable: true,
-    })
+    });
 
     // Mock telemetry using bracket notation to access private property
-    vi.spyOn((agent as any).telemetry, 'trackAgentExecution').mockResolvedValue(undefined)
-  })
+    vi.spyOn((agent as any).telemetry, "trackAgentExecution").mockResolvedValue(
+      undefined
+    );
+  });
 
   afterEach(() => {
-    vi.clearAllMocks()
-  })
+    vi.clearAllMocks();
+  });
 
-  it('should yield StreamEvent objects', async () => {
-    const events: StreamEvent[] = []
+  it("should yield StreamEvent objects", async () => {
+    const events: StreamEvent[] = [];
 
-    for await (const event of agent.streamEvents('test query')) {
-      events.push(event)
+    for await (const event of agent.streamEvents("test query")) {
+      events.push(event);
     }
 
-    expect(events).toHaveLength(6)
+    expect(events).toHaveLength(6);
 
     // Check event structure
     events.forEach((event) => {
-      expect(event).toHaveProperty('event')
-      expect(event).toHaveProperty('name')
-      expect(event).toHaveProperty('data')
-    })
-  })
+      expect(event).toHaveProperty("event");
+      expect(event).toHaveProperty("name");
+      expect(event).toHaveProperty("data");
+    });
+  });
 
-  it('should handle token streaming correctly', async () => {
-    const tokens: string[] = []
+  it("should handle token streaming correctly", async () => {
+    const tokens: string[] = [];
 
-    for await (const event of agent.streamEvents('test query')) {
-      if (event.event === 'on_chat_model_stream' && event.data?.chunk?.content) {
-        tokens.push(event.data.chunk.content)
+    for await (const event of agent.streamEvents("test query")) {
+      if (
+        event.event === "on_chat_model_stream" &&
+        event.data?.chunk?.content
+      ) {
+        tokens.push(event.data.chunk.content);
       }
     }
 
-    expect(tokens).toEqual(['Hello', ' world'])
-  })
+    expect(tokens).toEqual(["Hello", " world"]);
+  });
 
-  it('should track tool execution events', async () => {
-    const toolEvents: StreamEvent[] = []
+  it("should track tool execution events", async () => {
+    const toolEvents: StreamEvent[] = [];
 
-    for await (const event of agent.streamEvents('test query')) {
-      if (event.event.includes('tool')) {
-        toolEvents.push(event)
+    for await (const event of agent.streamEvents("test query")) {
+      if (event.event.includes("tool")) {
+        toolEvents.push(event);
       }
     }
 
-    expect(toolEvents).toHaveLength(2)
-    expect(toolEvents[0].event).toBe('on_tool_start')
-    expect(toolEvents[0].name).toBe('test_tool')
-    expect(toolEvents[1].event).toBe('on_tool_end')
-    expect(toolEvents[1].name).toBe('test_tool')
-  })
+    expect(toolEvents).toHaveLength(2);
+    expect(toolEvents[0].event).toBe("on_tool_start");
+    expect(toolEvents[0].name).toBe("test_tool");
+    expect(toolEvents[1].event).toBe("on_tool_end");
+    expect(toolEvents[1].name).toBe("test_tool");
+  });
 
-  it('should initialize agent if not already initialized', async () => {
-    const initializeSpy = vi.spyOn(agent, 'initialize')
+  it("should initialize agent if not already initialized", async () => {
+    const initializeSpy = vi.spyOn(agent, "initialize");
 
     // Set initialized to false (private property)
-    ;(agent as any)._initialized = false
+    (agent as any)._initialized = false;
 
-    const events = []
-    for await (const event of agent.streamEvents('test query')) {
-      events.push(event)
-      break // Just get first event
+    const events = [];
+    for await (const event of agent.streamEvents("test query")) {
+      events.push(event);
+      break; // Just get first event
     }
 
-    expect(initializeSpy).toHaveBeenCalled()
-  })
+    expect(initializeSpy).toHaveBeenCalled();
+  });
 
-  it('should handle memory correctly when enabled', async () => {
-    const addToHistorySpy = vi.spyOn(agent as any, 'addToHistory')
+  it("should handle memory correctly when enabled", async () => {
+    const addToHistorySpy = vi.spyOn(agent as any, "addToHistory");
 
     // Consume all events
-    const events = []
-    for await (const event of agent.streamEvents('test query')) {
-      events.push(event)
+    const events = [];
+    for await (const event of agent.streamEvents("test query")) {
+      events.push(event);
     }
 
     // Should add user message and AI response to history
-    expect(addToHistorySpy).toHaveBeenCalledTimes(2)
-  })
+    expect(addToHistorySpy).toHaveBeenCalledTimes(2);
+  });
 
-  it('should track telemetry', async () => {
-    const telemetrySpy = vi.spyOn((agent as any).telemetry, 'trackAgentExecution')
+  it("should track telemetry", async () => {
+    const telemetrySpy = vi.spyOn(
+      (agent as any).telemetry,
+      "trackAgentExecution"
+    );
 
     // Consume all events
-    for await (const event of agent.streamEvents('test query')) {
+    for await (const event of agent.streamEvents("test query")) {
       // Just consume events
     }
 
     expect(telemetrySpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        executionMethod: 'streamEvents',
-        query: 'test query',
+        executionMethod: "streamEvents",
+        query: "test query",
         success: true,
-      }),
-    )
-  })
+      })
+    );
+  });
 
-  it('should handle errors gracefully', async () => {
+  it("should handle errors gracefully", async () => {
     // Mock agent executor to throw error
-    ;(agent as any)._agentExecutor = {
-      streamEvents: vi.fn().mockImplementation(async function* (inputs: any, config: any) {
-        throw new Error('Test error')
+    (agent as any)._agentExecutor = {
+      streamEvents: vi.fn().mockImplementation(async function* (
+        inputs: any,
+        config: any
+      ) {
+        throw new Error("Test error");
       }),
       stream: vi.fn(),
       invoke: vi.fn(),
-    }
+    };
 
     await expect(async () => {
-      for await (const event of agent.streamEvents('test query')) {
+      for await (const event of agent.streamEvents("test query")) {
         // Should not reach here
       }
-    }).rejects.toThrow('Test error')
-  })
+    }).rejects.toThrow("Test error");
+  });
 
-  it('should respect maxSteps parameter', async () => {
-    const mockStreamEvents = vi.fn().mockImplementation(async function* (inputs: any, config: any) {
-      yield { event: 'test', name: 'test', data: {} }
-    })
+  it("should respect maxSteps parameter", async () => {
+    const mockStreamEvents = vi.fn().mockImplementation(async function* (
+      inputs: any,
+      config: any
+    ) {
+      yield { event: "test", name: "test", data: {} };
+    });
 
-    ;(agent as any)._agentExecutor = {
+    (agent as any)._agentExecutor = {
       streamEvents: mockStreamEvents,
       stream: vi.fn(),
       invoke: vi.fn(),
-    }
+    };
 
-    for await (const event of agent.streamEvents('test query', 5)) {
-      break
+    for await (const event of agent.streamEvents("test query", 5)) {
+      break;
     }
 
     // Verify that maxSteps was set on the agent instance
-    expect(agent['maxSteps']).toBe(5)
-  })
+    expect(agent["maxSteps"]).toBe(5);
+  });
 
-  it('should handle external history', async () => {
-    const externalHistory = [
-      new HumanMessage('Previous message'),
-    ]
+  it("should handle external history", async () => {
+    const externalHistory = [new HumanMessage("Previous message")];
 
     // Mock the agent executor to capture inputs
-    let capturedInputs: any
-    const mockStreamEvents = vi.fn().mockImplementation(async function* (inputs: any, config: any) {
-      capturedInputs = inputs
-      yield { event: 'test', name: 'test', data: {} }
-    })
+    let capturedInputs: any;
+    const mockStreamEvents = vi.fn().mockImplementation(async function* (
+      inputs: any,
+      config: any
+    ) {
+      capturedInputs = inputs;
+      yield { event: "test", name: "test", data: {} };
+    });
 
-    ;(agent as any)._agentExecutor = {
+    (agent as any)._agentExecutor = {
       streamEvents: mockStreamEvents,
       stream: vi.fn(),
       invoke: vi.fn(),
-    }
+    };
 
     // Mock initialize method
-    vi.spyOn(agent, 'initialize').mockResolvedValue(undefined)
+    vi.spyOn(agent, "initialize").mockResolvedValue(undefined);
 
-    for await (const event of agent.streamEvents('test query', undefined, true, externalHistory)) {
-      break
+    for await (const event of agent.streamEvents(
+      "test query",
+      undefined,
+      true,
+      externalHistory
+    )) {
+      break;
     }
 
     // Verify the captured inputs contains the external history
     // The implementation passes {messages: [...history, new HumanMessage(query)]}
-    expect(capturedInputs).toHaveProperty('messages')
-    expect(Array.isArray(capturedInputs.messages)).toBe(true)
+    expect(capturedInputs).toHaveProperty("messages");
+    expect(Array.isArray(capturedInputs.messages)).toBe(true);
     // Should include the external history message
-    expect(capturedInputs.messages.some((msg: any) => 
-      msg instanceof HumanMessage && msg.content === 'Previous message'
-    )).toBe(true)
-  })
+    expect(
+      capturedInputs.messages.some(
+        (msg: any) =>
+          msg instanceof HumanMessage && msg.content === "Previous message"
+      )
+    ).toBe(true);
+  });
 
-  it('should clean up resources on completion', async () => {
-    const closeSpy = vi.spyOn(agent, 'close').mockResolvedValue(undefined)
+  it("should clean up resources on completion", async () => {
+    const closeSpy = vi.spyOn(agent, "close").mockResolvedValue(undefined);
 
     // Test with manageConnector=true and no client
-    Object.defineProperty(agent, 'client', {
+    Object.defineProperty(agent, "client", {
       get: () => undefined,
       configurable: true,
-    })
+    });
 
     // Consume all events
-    for await (const event of agent.streamEvents('test query', undefined, true)) {
+    for await (const event of agent.streamEvents(
+      "test query",
+      undefined,
+      true
+    )) {
       // Just consume events
     }
 
     // Note: cleanup only happens if initialized in this call and no client
     // This is hard to test with our current mocking setup, but the logic is there
-  })
-})
+  });
+});
 
-describe('mCPAgent streamEvents() edge cases', () => {
-  it('should handle empty event stream', async () => {
+describe("mCPAgent streamEvents() edge cases", () => {
+  it("should handle empty event stream", async () => {
     const mockLLM = {
-      invoke: vi.fn().mockResolvedValue({ content: 'Test response' }),
-      _modelType: 'chat_anthropic',
-    }
+      invoke: vi.fn().mockResolvedValue({ content: "Test response" }),
+      _modelType: "chat_anthropic",
+    };
 
-    const mockClient = new MCPClient({})
+    const mockClient = new MCPClient({});
     const agent = new MCPAgent({
       llm: mockLLM as any,
       client: mockClient,
       maxSteps: 3,
-    })
+    });
 
     // Mock empty event stream
-    ;(agent as any)._agentExecutor = {
-      streamEvents: vi.fn().mockImplementation(async function* (inputs: any, config: any) {
+    (agent as any)._agentExecutor = {
+      streamEvents: vi.fn().mockImplementation(async function* (
+        inputs: any,
+        config: any
+      ) {
         // Empty generator
       }),
       stream: vi.fn(),
       invoke: vi.fn(),
+    };
+
+    vi.spyOn(agent, "initialize").mockResolvedValue(undefined);
+    vi.spyOn((agent as any).telemetry, "trackAgentExecution").mockResolvedValue(
+      undefined
+    );
+
+    const events = [];
+    for await (const event of agent.streamEvents("test query")) {
+      events.push(event);
     }
 
-    vi.spyOn(agent, 'initialize').mockResolvedValue(undefined)
-    vi.spyOn((agent as any).telemetry, 'trackAgentExecution').mockResolvedValue(undefined)
+    expect(events).toHaveLength(0);
+  });
 
-    const events = []
-    for await (const event of agent.streamEvents('test query')) {
-      events.push(event)
-    }
-
-    expect(events).toHaveLength(0)
-  })
-
-  it('should handle malformed events gracefully', async () => {
+  it("should handle malformed events gracefully", async () => {
     const mockLLM = {
-      invoke: vi.fn().mockResolvedValue({ content: 'Test response' }),
-      _modelType: 'chat_anthropic',
-    }
+      invoke: vi.fn().mockResolvedValue({ content: "Test response" }),
+      _modelType: "chat_anthropic",
+    };
 
-    const mockClient = new MCPClient({})
+    const mockClient = new MCPClient({});
     const agent = new MCPAgent({
       llm: mockLLM as any,
       client: mockClient,
       maxSteps: 3,
-    })
+    });
 
     // Mock malformed event stream
-    ;(agent as any)._agentExecutor = {
-      streamEvents: vi.fn().mockImplementation(async function* (inputs: any, config: any) {
-        yield { event: 'malformed' } // Missing required fields
-        yield null // Invalid event
-        yield { event: 'on_chat_model_stream', data: { chunk: { content: 'test' } } }
-        yield { event: 'on_chain_end', data: { output: [{ text: 'test response' }] } }
+    (agent as any)._agentExecutor = {
+      streamEvents: vi.fn().mockImplementation(async function* (
+        inputs: any,
+        config: any
+      ) {
+        yield { event: "malformed" }; // Missing required fields
+        yield null; // Invalid event
+        yield {
+          event: "on_chat_model_stream",
+          data: { chunk: { content: "test" } },
+        };
+        yield {
+          event: "on_chain_end",
+          data: { output: [{ text: "test response" }] },
+        };
       }),
       stream: vi.fn(),
       invoke: vi.fn(),
+    };
+
+    vi.spyOn(agent, "initialize").mockResolvedValue(undefined);
+    vi.spyOn((agent as any).telemetry, "trackAgentExecution").mockResolvedValue(
+      undefined
+    );
+
+    const events = [];
+    for await (const event of agent.streamEvents("test query")) {
+      events.push(event);
     }
 
-    vi.spyOn(agent, 'initialize').mockResolvedValue(undefined)
-    vi.spyOn((agent as any).telemetry, 'trackAgentExecution').mockResolvedValue(undefined)
-
-    const events = []
-    for await (const event of agent.streamEvents('test query')) {
-      events.push(event)
-    }
-
-    expect(events).toHaveLength(3) // Should still yield all events, even malformed ones
-  })
-})
+    expect(events).toHaveLength(3); // Should still yield all events, even malformed ones
+  });
+});

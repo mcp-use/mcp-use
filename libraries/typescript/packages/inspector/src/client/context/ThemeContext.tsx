@@ -1,102 +1,101 @@
-'use client'
+"use client";
 
-import type { ReactNode } from 'react'
-import { createContext, use, useEffect, useState } from 'react'
+import type { ReactNode } from "react";
+import { createContext, use, useEffect, useState } from "react";
 
-type Theme = 'light' | 'dark' | 'system'
+type Theme = "light" | "dark" | "system";
 
 interface ThemeContextType {
-  theme: Theme
-  setTheme: (theme: Theme) => void
-  resolvedTheme: 'light' | 'dark'
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  resolvedTheme: "light" | "dark";
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function useTheme() {
-  const context = use(ThemeContext)
+  const context = use(ThemeContext);
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider')
+    throw new Error("useTheme must be used within a ThemeProvider");
   }
-  return context
+  return context;
 }
 
 interface ThemeProviderProps {
-  children: ReactNode
-  defaultTheme?: Theme
-  storageKey?: string
+  children: ReactNode;
+  defaultTheme?: Theme;
+  storageKey?: string;
 }
 
 export function ThemeProvider({
   children,
-  defaultTheme = 'system',
-  storageKey = 'theme',
+  defaultTheme = "system",
+  storageKey = "theme",
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme)
-  const [mounted, setMounted] = useState(false)
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const [mounted, setMounted] = useState(false);
 
   // Get system theme preference
-  const getSystemTheme = (): 'light' | 'dark' => {
-    if (typeof window === 'undefined')
-      return 'light'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
+  const getSystemTheme = (): "light" | "dark" => {
+    if (typeof window === "undefined") return "light";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  };
 
   // Get resolved theme (actual theme being used)
-  const resolvedTheme = theme === 'system' ? getSystemTheme() : theme
+  const resolvedTheme = theme === "system" ? getSystemTheme() : theme;
 
   // Apply theme to document
   const applyTheme = (newTheme: Theme) => {
-    const root = document.documentElement
-    const actualTheme = newTheme === 'system' ? getSystemTheme() : newTheme
+    const root = document.documentElement;
+    const actualTheme = newTheme === "system" ? getSystemTheme() : newTheme;
 
-    root.classList.remove('light', 'dark')
-    root.classList.add(actualTheme)
+    root.classList.remove("light", "dark");
+    root.classList.add(actualTheme);
 
     // Store theme preference
-    localStorage.setItem(storageKey, newTheme)
-  }
+    localStorage.setItem(storageKey, newTheme);
+  };
 
   // Initialize theme on mount
   useEffect(() => {
-    setMounted(true)
+    setMounted(true);
 
     // Get stored theme or use default
-    const storedTheme = localStorage.getItem(storageKey) as Theme
-    const initialTheme = storedTheme || defaultTheme
+    const storedTheme = localStorage.getItem(storageKey) as Theme;
+    const initialTheme = storedTheme || defaultTheme;
 
-    setTheme(initialTheme)
-    applyTheme(initialTheme)
-  }, [defaultTheme, storageKey])
+    setTheme(initialTheme);
+    applyTheme(initialTheme);
+  }, [defaultTheme, storageKey]);
 
   // Listen for system theme changes
   useEffect(() => {
-    if (theme !== 'system')
-      return
+    if (theme !== "system") return;
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => {
-      applyTheme('system')
-    }
+      applyTheme("system");
+    };
 
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [theme])
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [theme]);
 
   // Update theme when it changes
   useEffect(() => {
-    if (!mounted)
-      return
-    applyTheme(theme)
-  }, [theme, mounted])
+    if (!mounted) return;
+    applyTheme(theme);
+  }, [theme, mounted]);
 
   const handleSetTheme = (newTheme: Theme) => {
-    setTheme(newTheme)
-  }
+    setTheme(newTheme);
+  };
 
   return (
     <ThemeContext value={{ theme, setTheme: handleSetTheme, resolvedTheme }}>
       {children}
     </ThemeContext>
-  )
+  );
 }

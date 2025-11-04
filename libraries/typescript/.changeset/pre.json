@@ -1,0 +1,14 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.1.22",
+    "create-mcp-use-app": "0.4.8",
+    "@mcp-use/inspector": "0.4.10",
+    "mcp-use": "1.2.1"
+  },
+  "changesets": [
+    "lemon-islands-juggle",
+    "light-nails-wonder"
+  ]
+}

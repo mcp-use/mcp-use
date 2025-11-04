@@ -5,41 +5,41 @@
 
 /* global CustomEvent */
 
-export type UnknownObject = Record<string, unknown>
+export type UnknownObject = Record<string, unknown>;
 
-export type Theme = 'light' | 'dark'
+export type Theme = "light" | "dark";
 
-export type DisplayMode = 'pip' | 'inline' | 'fullscreen'
+export type DisplayMode = "pip" | "inline" | "fullscreen";
 
-export type DeviceType = 'mobile' | 'tablet' | 'desktop' | 'unknown'
+export type DeviceType = "mobile" | "tablet" | "desktop" | "unknown";
 
 export type SafeAreaInsets = {
-  top: number
-  bottom: number
-  left: number
-  right: number
-}
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+};
 
 export type SafeArea = {
-  insets: SafeAreaInsets
-}
+  insets: SafeAreaInsets;
+};
 
 export type UserAgent = {
-  device: { type: DeviceType }
+  device: { type: DeviceType };
   capabilities: {
-    hover: boolean
-    touch: boolean
-  }
-}
+    hover: boolean;
+    touch: boolean;
+  };
+};
 
 export type CallToolResponse = {
   content: Array<{
-    type: string
-    text?: string
-    [key: string]: any
-  }>
-  isError?: boolean
-}
+    type: string;
+    text?: string;
+    [key: string]: any;
+  }>;
+  isError?: boolean;
+};
 
 export interface OpenAiGlobals<
   ToolInput extends UnknownObject = UnknownObject,
@@ -47,34 +47,34 @@ export interface OpenAiGlobals<
   ToolResponseMetadata extends UnknownObject = UnknownObject,
   WidgetState extends UnknownObject = UnknownObject,
 > {
-  theme: Theme
-  userAgent: UserAgent
-  locale: string
+  theme: Theme;
+  userAgent: UserAgent;
+  locale: string;
 
   // layout
-  maxHeight: number
-  displayMode: DisplayMode
-  safeArea: SafeArea
+  maxHeight: number;
+  displayMode: DisplayMode;
+  safeArea: SafeArea;
 
   // state
-  toolInput: ToolInput
-  toolOutput: ToolOutput | null
-  toolResponseMetadata: ToolResponseMetadata | null
-  widgetState: WidgetState | null
+  toolInput: ToolInput;
+  toolOutput: ToolOutput | null;
+  toolResponseMetadata: ToolResponseMetadata | null;
+  widgetState: WidgetState | null;
 }
 
 export interface API<WidgetState extends UnknownObject = UnknownObject> {
   /** Calls a tool on your MCP. Returns the full response. */
   callTool: (
     name: string,
-    args: Record<string, unknown>,
-  ) => Promise<CallToolResponse>
+    args: Record<string, unknown>
+  ) => Promise<CallToolResponse>;
 
   /** Triggers a followup turn in the ChatGPT conversation */
-  sendFollowUpMessage: (args: { prompt: string }) => Promise<void>
+  sendFollowUpMessage: (args: { prompt: string }) => Promise<void>;
 
   /** Opens an external link, redirects web page or mobile app */
-  openExternal(payload: { href: string }): void
+  openExternal(payload: { href: string }): void;
 
   /** For transitioning an app from inline to fullscreen or pip */
   requestDisplayMode: (args: { mode: DisplayMode }) => Promise<{
@@ -82,29 +82,29 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
      * The granted display mode. The host may reject the request.
      * For mobile, PiP is always coerced to fullscreen.
      */
-    mode: DisplayMode
-  }>
+    mode: DisplayMode;
+  }>;
 
   /** Persist widget state that will be shown to the model */
-  setWidgetState: (state: WidgetState) => Promise<void>
+  setWidgetState: (state: WidgetState) => Promise<void>;
 }
 
 // Event types
-export const SET_GLOBALS_EVENT_TYPE = 'openai:set_globals'
+export const SET_GLOBALS_EVENT_TYPE = "openai:set_globals";
 
 export class SetGlobalsEvent extends CustomEvent<{
-  globals: Partial<OpenAiGlobals>
+  globals: Partial<OpenAiGlobals>;
 }> {
-  readonly type = SET_GLOBALS_EVENT_TYPE
+  readonly type = SET_GLOBALS_EVENT_TYPE;
 }
 
 declare global {
   interface Window {
-    openai?: API<any> & OpenAiGlobals<any, any, any, any>
+    openai?: API<any> & OpenAiGlobals<any, any, any, any>;
   }
 
   interface WindowEventMap {
-    [SET_GLOBALS_EVENT_TYPE]: SetGlobalsEvent
+    [SET_GLOBALS_EVENT_TYPE]: SetGlobalsEvent;
   }
 }
 
@@ -119,41 +119,45 @@ export interface UseWidgetResult<
 > {
   // Props and state
   /** Widget props (mapped from toolInput for MCP compatibility) */
-  props: TProps
+  props: TProps;
   /** Tool output from the last execution */
-  output: TOutput | null
+  output: TOutput | null;
   /** Response metadata from the tool */
-  metadata: TMetadata | null
+  metadata: TMetadata | null;
   /** Persisted widget state */
-  state: TState | null
+  state: TState | null;
   /** Update widget state (persisted and shown to model) */
-  setState: (state: TState | ((prevState: TState | null) => TState)) => Promise<void>
+  setState: (
+    state: TState | ((prevState: TState | null) => TState)
+  ) => Promise<void>;
 
   // Layout and theme
   /** Current theme (light/dark) */
-  theme: Theme
+  theme: Theme;
   /** Current display mode */
-  displayMode: DisplayMode
+  displayMode: DisplayMode;
   /** Safe area insets for layout */
-  safeArea: SafeArea
+  safeArea: SafeArea;
   /** Maximum height available */
-  maxHeight: number
+  maxHeight: number;
   /** User agent information */
-  userAgent: UserAgent
+  userAgent: UserAgent;
   /** Current locale */
-  locale: string
+  locale: string;
 
   // Actions
   /** Call a tool on the MCP server */
-  callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResponse>
+  callTool: (
+    name: string,
+    args: Record<string, unknown>
+  ) => Promise<CallToolResponse>;
   /** Send a follow-up message to the conversation */
-  sendFollowUpMessage: (prompt: string) => Promise<void>
+  sendFollowUpMessage: (prompt: string) => Promise<void>;
   /** Open an external URL */
-  openExternal: (href: string) => void
+  openExternal: (href: string) => void;
   /** Request a different display mode */
-  requestDisplayMode: (mode: DisplayMode) => Promise<{ mode: DisplayMode }>
+  requestDisplayMode: (mode: DisplayMode) => Promise<{ mode: DisplayMode }>;
 
   /** Whether the widget API is available */
-  isAvailable: boolean
+  isAvailable: boolean;
 }
-

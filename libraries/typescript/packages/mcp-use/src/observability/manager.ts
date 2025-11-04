@@ -5,46 +5,46 @@
  * from various platforms (Langfuse, Laminar, etc.) in a clean and extensible way.
  */
 
-import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
-import { logger } from '../logging.js'
+import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
+import { logger } from "../logging.js";
 
 export interface ObservabilityConfig {
   /** Custom callbacks to use instead of defaults */
-  customCallbacks?: BaseCallbackHandler[]
+  customCallbacks?: BaseCallbackHandler[];
   /** Whether to enable verbose logging */
-  verbose?: boolean
+  verbose?: boolean;
   /** Whether to enable observability (defaults to true) */
-  observe?: boolean
+  observe?: boolean;
   /** Agent ID for tagging traces */
-  agentId?: string
+  agentId?: string;
   /** Metadata to add to traces */
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>;
   /** Function to get current metadata from agent */
-  metadataProvider?: () => Record<string, any>
+  metadataProvider?: () => Record<string, any>;
   /** Function to get current tags from agent */
-  tagsProvider?: () => string[]
+  tagsProvider?: () => string[];
 }
 
 export class ObservabilityManager {
-  private customCallbacks?: BaseCallbackHandler[]
-  private availableHandlers: BaseCallbackHandler[] = []
-  private handlerNames: string[] = []
-  private initialized = false
-  private verbose: boolean
-  private observe: boolean
-  private agentId?: string
-  private metadata?: Record<string, any>
-  private metadataProvider?: () => Record<string, any>
-  private tagsProvider?: () => string[]
+  private customCallbacks?: BaseCallbackHandler[];
+  private availableHandlers: BaseCallbackHandler[] = [];
+  private handlerNames: string[] = [];
+  private initialized = false;
+  private verbose: boolean;
+  private observe: boolean;
+  private agentId?: string;
+  private metadata?: Record<string, any>;
+  private metadataProvider?: () => Record<string, any>;
+  private tagsProvider?: () => string[];
 
   constructor(config: ObservabilityConfig = {}) {
-    this.customCallbacks = config.customCallbacks
-    this.verbose = config.verbose ?? false
-    this.observe = config.observe ?? true
-    this.agentId = config.agentId
-    this.metadata = config.metadata
-    this.metadataProvider = config.metadataProvider
-    this.tagsProvider = config.tagsProvider
+    this.customCallbacks = config.customCallbacks;
+    this.verbose = config.verbose ?? false;
+    this.observe = config.observe ?? true;
+    this.agentId = config.agentId;
+    this.metadata = config.metadata;
+    this.metadataProvider = config.metadataProvider;
+    this.tagsProvider = config.tagsProvider;
   }
 
   /**
@@ -52,42 +52,54 @@ export class ObservabilityManager {
    */
   private async collectAvailableHandlers(): Promise<void> {
     if (this.initialized) {
-      return
+      return;
     }
 
     // Import handlers lazily to avoid circular imports
     try {
-      const { langfuseHandler, langfuseInitPromise } = await import('./langfuse.js')
+      const { langfuseHandler, langfuseInitPromise } = await import(
+        "./langfuse.js"
+      );
 
       // If we have an agent ID, metadata, or providers, we need to reinitialize Langfuse
-      if (this.agentId || this.metadata || this.metadataProvider || this.tagsProvider) {
+      if (
+        this.agentId ||
+        this.metadata ||
+        this.metadataProvider ||
+        this.tagsProvider
+      ) {
         // Import the initialization function directly
-        const { initializeLangfuse } = await import('./langfuse.js')
-        await initializeLangfuse(this.agentId, this.metadata, this.metadataProvider, this.tagsProvider)
-        logger.debug(`ObservabilityManager: Reinitialized Langfuse with agent ID: ${this.agentId}, metadata: ${JSON.stringify(this.metadata)}`)
-      }
-      else {
+        const { initializeLangfuse } = await import("./langfuse.js");
+        await initializeLangfuse(
+          this.agentId,
+          this.metadata,
+          this.metadataProvider,
+          this.tagsProvider
+        );
+        logger.debug(
+          `ObservabilityManager: Reinitialized Langfuse with agent ID: ${this.agentId}, metadata: ${JSON.stringify(this.metadata)}`
+        );
+      } else {
         // Wait for existing initialization to complete
-        const initPromise = langfuseInitPromise()
+        const initPromise = langfuseInitPromise();
         if (initPromise) {
-          await initPromise
+          await initPromise;
         }
       }
 
-      const handler = langfuseHandler()
+      const handler = langfuseHandler();
       if (handler) {
-        this.availableHandlers.push(handler)
-        this.handlerNames.push('Langfuse')
-        logger.debug('ObservabilityManager: Langfuse handler available')
+        this.availableHandlers.push(handler);
+        this.handlerNames.push("Langfuse");
+        logger.debug("ObservabilityManager: Langfuse handler available");
       }
-    }
-    catch {
-      logger.debug('ObservabilityManager: Langfuse module not available')
+    } catch {
+      logger.debug("ObservabilityManager: Langfuse module not available");
     }
 
     // Future: Add more platforms here...
 
-    this.initialized = true
+    this.initialized = true;
   }
 
   /**
@@ -97,27 +109,32 @@ export class ObservabilityManager {
   async getCallbacks(): Promise<BaseCallbackHandler[]> {
     // If observability is disabled, return empty array
     if (!this.observe) {
-      logger.debug('ObservabilityManager: Observability disabled via observe=false')
-      return []
+      logger.debug(
+        "ObservabilityManager: Observability disabled via observe=false"
+      );
+      return [];
     }
 
     // If custom callbacks were provided, use those
     if (this.customCallbacks) {
-      logger.debug(`ObservabilityManager: Using ${this.customCallbacks.length} custom callbacks`)
-      return this.customCallbacks
+      logger.debug(
+        `ObservabilityManager: Using ${this.customCallbacks.length} custom callbacks`
+      );
+      return this.customCallbacks;
     }
 
     // Otherwise, collect and return all available handlers
-    await this.collectAvailableHandlers()
+    await this.collectAvailableHandlers();
 
     if (this.availableHandlers.length > 0) {
-      logger.debug(`ObservabilityManager: Using ${this.availableHandlers.length} handlers`)
-    }
-    else {
-      logger.debug('ObservabilityManager: No callbacks configured')
+      logger.debug(
+        `ObservabilityManager: Using ${this.availableHandlers.length} handlers`
+      );
+    } else {
+      logger.debug("ObservabilityManager: No callbacks configured");
     }
 
-    return this.availableHandlers
+    return this.availableHandlers;
   }
 
   /**
@@ -127,16 +144,16 @@ export class ObservabilityManager {
   async getHandlerNames(): Promise<string[]> {
     // If observability is disabled, return empty array
     if (!this.observe) {
-      return []
+      return [];
     }
 
     if (this.customCallbacks) {
       // For custom callbacks, try to get their class names
-      return this.customCallbacks.map(cb => cb.constructor.name)
+      return this.customCallbacks.map((cb) => cb.constructor.name);
     }
 
-    await this.collectAvailableHandlers()
-    return this.handlerNames
+    await this.collectAvailableHandlers();
+    return this.handlerNames;
   }
 
   /**
@@ -146,11 +163,11 @@ export class ObservabilityManager {
   async hasCallbacks(): Promise<boolean> {
     // If observability is disabled, no callbacks are available
     if (!this.observe) {
-      return false
+      return false;
     }
 
-    const callbacks = await this.getCallbacks()
-    return callbacks.length > 0
+    const callbacks = await this.getCallbacks();
+    return callbacks.length > 0;
   }
 
   /**
@@ -158,32 +175,30 @@ export class ObservabilityManager {
    * @returns Object containing enabled status, callback count, handler names, metadata, and tags.
    */
   async getStatus(): Promise<{
-    enabled: boolean
-    callbackCount: number
-    handlerNames: string[]
-    metadata: Record<string, any>
-    tags: string[]
+    enabled: boolean;
+    callbackCount: number;
+    handlerNames: string[];
+    metadata: Record<string, any>;
+    tags: string[];
   }> {
-    const callbacks = await this.getCallbacks()
-    const handlerNames = await this.getHandlerNames()
-    
+    const callbacks = await this.getCallbacks();
+    const handlerNames = await this.getHandlerNames();
+
     // Get current metadata from provider if available
-    const currentMetadata = this.metadataProvider 
-      ? this.metadataProvider() 
-      : (this.metadata || {})
-    
+    const currentMetadata = this.metadataProvider
+      ? this.metadataProvider()
+      : this.metadata || {};
+
     // Get current tags from provider if available
-    const currentTags = this.tagsProvider 
-      ? this.tagsProvider() 
-      : []
-    
+    const currentTags = this.tagsProvider ? this.tagsProvider() : [];
+
     return {
       enabled: this.observe && callbacks.length > 0,
       callbackCount: callbacks.length,
       handlerNames,
       metadata: currentMetadata,
       tags: currentTags,
-    }
+    };
   }
 
   /**
@@ -192,18 +207,20 @@ export class ObservabilityManager {
    */
   addCallback(callback: BaseCallbackHandler): void {
     if (!this.customCallbacks) {
-      this.customCallbacks = []
+      this.customCallbacks = [];
     }
-    this.customCallbacks.push(callback)
-    logger.debug(`ObservabilityManager: Added custom callback: ${callback.constructor.name}`)
+    this.customCallbacks.push(callback);
+    logger.debug(
+      `ObservabilityManager: Added custom callback: ${callback.constructor.name}`
+    );
   }
 
   /**
    * Clear all custom callbacks.
    */
   clearCallbacks(): void {
-    this.customCallbacks = []
-    logger.debug('ObservabilityManager: Cleared all custom callbacks')
+    this.customCallbacks = [];
+    logger.debug("ObservabilityManager: Cleared all custom callbacks");
   }
 
   /**
@@ -212,13 +229,16 @@ export class ObservabilityManager {
    */
   async flush(): Promise<void> {
     // Flush Langfuse traces
-    const callbacks = await this.getCallbacks()
+    const callbacks = await this.getCallbacks();
     for (const callback of callbacks) {
-      if ('flushAsync' in callback && typeof callback.flushAsync === 'function') {
-        await callback.flushAsync()
+      if (
+        "flushAsync" in callback &&
+        typeof callback.flushAsync === "function"
+      ) {
+        await callback.flushAsync();
       }
     }
-    logger.debug('ObservabilityManager: All traces flushed')
+    logger.debug("ObservabilityManager: All traces flushed");
   }
 
   /**
@@ -226,36 +246,41 @@ export class ObservabilityManager {
    */
   async shutdown(): Promise<void> {
     // Flush before shutdown
-    await this.flush()
+    await this.flush();
 
     // Shutdown other callbacks
-    const callbacks = await this.getCallbacks()
+    const callbacks = await this.getCallbacks();
     for (const callback of callbacks) {
       // Check if the callback has a shutdown method (like Langfuse)
-      if ('shutdownAsync' in callback && typeof callback.shutdownAsync === 'function') {
-        await callback.shutdownAsync()
-      }
-      else if ('shutdown' in callback && typeof callback.shutdown === 'function') {
-        await (callback as any).shutdown()
+      if (
+        "shutdownAsync" in callback &&
+        typeof callback.shutdownAsync === "function"
+      ) {
+        await callback.shutdownAsync();
+      } else if (
+        "shutdown" in callback &&
+        typeof callback.shutdown === "function"
+      ) {
+        await (callback as any).shutdown();
       }
     }
-    logger.debug('ObservabilityManager: All handlers shutdown')
+    logger.debug("ObservabilityManager: All handlers shutdown");
   }
 
   /**
    * String representation of the ObservabilityManager.
    */
   toString(): string {
-    const names = this.handlerNames
+    const names = this.handlerNames;
     if (names.length > 0) {
-      return `ObservabilityManager(handlers=${names.join(', ')})`
+      return `ObservabilityManager(handlers=${names.join(", ")})`;
     }
-    return 'ObservabilityManager(no handlers)'
+    return "ObservabilityManager(no handlers)";
   }
 }
 
 // Singleton instance for easy access
-let defaultManager: ObservabilityManager | null = null
+let defaultManager: ObservabilityManager | null = null;
 
 /**
  * Get the default ObservabilityManager instance.
@@ -263,9 +288,9 @@ let defaultManager: ObservabilityManager | null = null
  */
 export function getDefaultManager(): ObservabilityManager {
   if (!defaultManager) {
-    defaultManager = new ObservabilityManager()
+    defaultManager = new ObservabilityManager();
   }
-  return defaultManager
+  return defaultManager;
 }
 
 /**
@@ -273,6 +298,8 @@ export function getDefaultManager(): ObservabilityManager {
  * @param config Configuration options
  * @returns A new ObservabilityManager instance.
  */
-export function createManager(config: ObservabilityConfig = {}): ObservabilityManager {
-  return new ObservabilityManager(config)
+export function createManager(
+  config: ObservabilityConfig = {}
+): ObservabilityManager {
+  return new ObservabilityManager(config);
 }

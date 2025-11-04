@@ -6,45 +6,52 @@
  * information until all required fields can be populated.
  */
 
-import { ChatAnthropic } from '@langchain/anthropic'
-import { config } from 'dotenv'
-import { z } from 'zod'
-import { MCPAgent, MCPClient } from '../../index.js'
+import { ChatAnthropic } from "@langchain/anthropic";
+import { config } from "dotenv";
+import { z } from "zod";
+import { MCPAgent, MCPClient } from "../../index.js";
 
 // Load environment variables from .env file
-config()
+config();
 
 // Define the structured output schema using Zod
 const RepoInfoSchema = z.object({
-  name: z.string().describe('Name of the repository'),
-  description: z.string().describe('Description of the repository'),
-  stars: z.number().describe('Number of stars on GitHub'),
-  contributors: z.number().describe('Number of contributors'),
-  dependents: z.number().describe('Number of dependents/packages using this library'),
-  language: z.string().describe('Primary programming language'),
-  license: z.string().nullable().describe('License type'),
-  created_at: z.string().describe('Repository creation date'),
-  last_updated: z.string().describe('Last update date'),
-})
+  name: z.string().describe("Name of the repository"),
+  description: z.string().describe("Description of the repository"),
+  stars: z.number().describe("Number of stars on GitHub"),
+  contributors: z.number().describe("Number of contributors"),
+  dependents: z
+    .number()
+    .describe("Number of dependents/packages using this library"),
+  language: z.string().describe("Primary programming language"),
+  license: z.string().nullable().describe("License type"),
+  created_at: z.string().describe("Repository creation date"),
+  last_updated: z.string().describe("Last update date"),
+});
 
-type RepoInfo = z.infer<typeof RepoInfoSchema>
+type RepoInfo = z.infer<typeof RepoInfoSchema>;
 
 async function main() {
   const mcpConfig = {
     mcpServers: {
       playwright: {
-        command: 'npx',
-        args: ['@playwright/mcp@latest'],
+        command: "npx",
+        args: ["@playwright/mcp@latest"],
         env: {
-          DISPLAY: ':1',
+          DISPLAY: ":1",
         },
       },
     },
-  }
+  };
 
-  const client = new MCPClient(mcpConfig)
-  const llm = new ChatAnthropic({ model: 'claude-haiku-4-5' })
-  const agent = new MCPAgent({ llm, client, maxSteps: 50, memoryEnabled: true})
+  const client = new MCPClient(mcpConfig);
+  const llm = new ChatAnthropic({ model: "claude-haiku-4-5" });
+  const agent = new MCPAgent({
+    llm,
+    client,
+    maxSteps: 50,
+    memoryEnabled: true,
+  });
 
   try {
     // Use structured output with intelligent retry
@@ -68,56 +75,54 @@ async function main() {
       50, // maxSteps
       true, // manageConnector
       [], // externalHistory
-      RepoInfoSchema, // outputSchema - this enables structured output
-    )
+      RepoInfoSchema // outputSchema - this enables structured output
+    );
 
-    let result: RepoInfo | null = null
+    let result: RepoInfo | null = null;
 
     for await (const event of eventStream) {
       // Look for structured output event
-      if (event.event === 'on_structured_output' && event.data?.output) {
+      if (event.event === "on_structured_output" && event.data?.output) {
         try {
           // Parse the structured output
-          const parsed = RepoInfoSchema.parse(event.data.output)
-          result = parsed
-          console.log('✅ Structured output received!')
-          break
+          const parsed = RepoInfoSchema.parse(event.data.output);
+          result = parsed;
+          console.log("✅ Structured output received!");
+          break;
         } catch (e) {
-          console.error('❌ Failed to parse structured output:', e)
+          console.error("❌ Failed to parse structured output:", e);
         }
-      } else if (event.event === 'on_structured_output_progress') {
-        console.log('Processing...')
-      } else if (event.event === 'on_structured_output_error') {
-        console.error('❌ Structured output error')
+      } else if (event.event === "on_structured_output_progress") {
+        console.log("Processing...");
+      } else if (event.event === "on_structured_output_error") {
+        console.error("❌ Structured output error");
       }
     }
     if (!result) {
-      throw new Error('Failed to obtain structured output')
+      throw new Error("Failed to obtain structured output");
     }
 
     // Now you have strongly-typed, validated data!
-    console.log(`Name: ${result.name}`)
-    console.log(`Description: ${result.description}`)
-    console.log(`Stars: ${result.stars.toLocaleString()}`)
-    console.log(`Contributors: ${result.contributors}`)
-    console.log(`Dependents: ${result.dependents}`)
-    console.log(`Language: ${result.language}`)
-    console.log(`License: ${result.license || 'Not specified'}`)
-    console.log(`Created: ${result.created_at}`)
-    console.log(`Last Updated: ${result.last_updated}`)
-  }
-  catch (error) {
-    console.error('Error:', error)
-  }
-  finally {
-    await agent.close()
+    console.log(`Name: ${result.name}`);
+    console.log(`Description: ${result.description}`);
+    console.log(`Stars: ${result.stars.toLocaleString()}`);
+    console.log(`Contributors: ${result.contributors}`);
+    console.log(`Dependents: ${result.dependents}`);
+    console.log(`Language: ${result.language}`);
+    console.log(`License: ${result.license || "Not specified"}`);
+    console.log(`Created: ${result.created_at}`);
+    console.log(`Last Updated: ${result.last_updated}`);
+  } catch (error) {
+    console.error("Error:", error);
+  } finally {
+    await agent.close();
   }
 }
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-  process.exit(1)
-})
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  process.exit(1);
+});
 
-main().catch(console.error)
+main().catch(console.error);

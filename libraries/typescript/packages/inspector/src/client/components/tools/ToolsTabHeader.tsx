@@ -1,17 +1,17 @@
-import { Database, Wrench } from 'lucide-react'
-import { ListTabHeader } from '@/client/components/shared'
+import { Database, Wrench } from "lucide-react";
+import { ListTabHeader } from "@/client/components/shared";
 
 interface ToolsTabHeaderProps {
-  activeTab: 'tools' | 'saved'
-  isSearchExpanded: boolean
-  searchQuery: string
-  filteredToolsCount: number
-  savedRequestsCount: number
-  onSearchExpand: () => void
-  onSearchChange: (query: string) => void
-  onSearchBlur: () => void
-  onTabSwitch: () => void
-  searchInputRef: React.RefObject<HTMLInputElement>
+  activeTab: "tools" | "saved";
+  isSearchExpanded: boolean;
+  searchQuery: string;
+  filteredToolsCount: number;
+  savedRequestsCount: number;
+  onSearchExpand: () => void;
+  onSearchChange: (query: string) => void;
+  onSearchBlur: () => void;
+  onTabSwitch: () => void;
+  searchInputRef: React.RefObject<HTMLInputElement>;
 }
 
 export function ToolsTabHeader({
@@ -46,5 +46,5 @@ export function ToolsTabHeader({
       onTabSwitch={onTabSwitch}
       searchInputRef={searchInputRef}
     />
-  )
+  );
 }

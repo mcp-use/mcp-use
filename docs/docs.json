@@ -479,7 +479,8 @@
                       "typescript/client/logging"
                     ]
                   },
-                  "typescript/client/authentication"
+                  "typescript/client/authentication",
+                  "typescript/client/usemcp"
                 ]
               },
               {
@@ -556,7 +557,8 @@
               {
                 "group": "Blog",
                 "pages": [
-                  "python/blog/middleware"
+                  "typescript/blog/client_side",
+                  "typescript/blog/client-vs-sdk"
                 ]
               }
             ]
@@ -665,6 +667,13 @@
         ]
       }
     ]
+  },
+  "integrations": {
+    "posthog": {
+      "apiKey": "phc_Ss9Lp8KP60Gh7ii8Ysx8cPl9WMKjh3oqgwZcQjR0BqV",
+      "apiHost": "https://eu.i.posthog.com",
+      "sessionRecording": true
+    }
   },
   "seo": {
     "metatags": {

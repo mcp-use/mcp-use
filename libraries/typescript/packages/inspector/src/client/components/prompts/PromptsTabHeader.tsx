@@ -1,17 +1,17 @@
-import { Clock, MessageSquare } from 'lucide-react'
-import { ListTabHeader } from '@/client/components/shared'
+import { Clock, MessageSquare } from "lucide-react";
+import { ListTabHeader } from "@/client/components/shared";
 
 interface PromptsTabHeaderProps {
-  activeTab: 'prompts' | 'saved'
-  isSearchExpanded: boolean
-  searchQuery: string
-  filteredPromptsCount: number
-  savedPromptsCount: number
-  onSearchExpand: () => void
-  onSearchChange: (query: string) => void
-  onSearchBlur: () => void
-  onTabSwitch: () => void
-  searchInputRef: React.RefObject<HTMLInputElement>
+  activeTab: "prompts" | "saved";
+  isSearchExpanded: boolean;
+  searchQuery: string;
+  filteredPromptsCount: number;
+  savedPromptsCount: number;
+  onSearchExpand: () => void;
+  onSearchChange: (query: string) => void;
+  onSearchBlur: () => void;
+  onTabSwitch: () => void;
+  searchInputRef: React.RefObject<HTMLInputElement>;
 }
 
 export function PromptsTabHeader({
@@ -46,5 +46,5 @@ export function PromptsTabHeader({
       onTabSwitch={onTabSwitch}
       searchInputRef={searchInputRef}
     />
-  )
+  );
 }
