@@ -843,11 +843,6 @@ export class McpServer {
 
     const react = (await import("@vitejs/plugin-react")).default;
     const tailwindcss = (await import("@tailwindcss/vite")).default;
-    console.log(react, tailwindcss);
-
-    const react = (await import("@vitejs/plugin-react")).default;
-    const tailwindcss = (await import("@tailwindcss/vite")).default;
-    console.log(react, tailwindcss);
 
     const widgets = entries.map((entry) => {
       const baseName =
