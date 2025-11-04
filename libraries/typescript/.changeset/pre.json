@@ -8,6 +8,7 @@
     "mcp-use": "1.2.1"
   },
   "changesets": [
+    "lemon-islands-juggle",
     "light-nails-wonder"
   ]
 }
