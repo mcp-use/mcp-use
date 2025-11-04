@@ -4,20 +4,20 @@
 
 export function config(options) {
   // Return empty config - env vars don't work the same way in browser
-  return { parsed: {}, error: null }
+  return { parsed: {}, error: null };
 }
 
 export function configDotenv(options) {
   // No-op in browser
-  return { parsed: {}, error: null }
+  return { parsed: {}, error: null };
 }
 
 export function parse(src) {
-  return {}
+  return {};
 }
 
 export default {
   config,
   configDotenv,
   parse,
-}
+};

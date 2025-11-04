@@ -1,23 +1,23 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import ReactExample from './react_example'
-import OAuthCallback from './oauth-callback'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import ReactExample from "./react_example";
+import OAuthCallback from "./oauth-callback";
 
 // Simple router based on pathname
 function App() {
-  const path = window.location.pathname
-  
+  const path = window.location.pathname;
+
   // Route to OAuth callback page
-  if (path === '/oauth/callback') {
-    return <OAuthCallback />
+  if (path === "/oauth/callback") {
+    return <OAuthCallback />;
   }
-  
+
   // Default to main example
-  return <ReactExample />
+  return <ReactExample />;
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
-)
+  </React.StrictMode>
+);

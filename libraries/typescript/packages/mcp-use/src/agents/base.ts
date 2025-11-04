@@ -1,19 +1,19 @@
-import type { MCPSession } from '../session.js'
+import type { MCPSession } from "../session.js";
 
 export abstract class BaseAgent {
-  protected session: MCPSession
+  protected session: MCPSession;
 
   /**
    * @param session MCP session used for tool invocation
    */
   constructor(session: MCPSession) {
-    this.session = session
+    this.session = session;
   }
 
   /**
    * Initialize the agent, including initializing the MCP session
    */
-  public abstract initialize(): Promise<void>
+  public abstract initialize(): Promise<void>;
 
   /**
    * Run the agent on a query with a maximum number of steps
@@ -24,7 +24,7 @@ export abstract class BaseAgent {
   public abstract run(
     query: string,
     maxSteps?: number
-  ): Promise<Record<string, any>>
+  ): Promise<Record<string, any>>;
 
   /**
    * Perform a single step given the query and previous steps
@@ -35,5 +35,5 @@ export abstract class BaseAgent {
   public abstract step(
     query: string,
     previousSteps?: Array<Record<string, any>>
-  ): Promise<Record<string, any>>
+  ): Promise<Record<string, any>>;
 }

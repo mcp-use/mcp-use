@@ -2,37 +2,37 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/client/components/ui/tooltip'
+} from "@/client/components/ui/tooltip";
 
 interface StatusDotProps {
-  status: string
+  status: string;
 }
 
 export function StatusDot({ status }: StatusDotProps) {
   const getStatusInfo = (statusValue: string) => {
     switch (statusValue) {
-      case 'ready':
+      case "ready":
         return {
-          color: 'bg-emerald-500',
-          ringColor: 'ring-emerald-500',
-          tooltip: 'Connected',
-        }
-      case 'failed':
+          color: "bg-emerald-500",
+          ringColor: "ring-emerald-500",
+          tooltip: "Connected",
+        };
+      case "failed":
         return {
-          color: 'bg-red-500',
-          ringColor: 'ring-red-500',
-          tooltip: 'Failed',
-        }
+          color: "bg-red-500",
+          ringColor: "ring-red-500",
+          tooltip: "Failed",
+        };
       default:
         return {
-          color: 'bg-yellow-500',
-          ringColor: 'ring-yellow-500',
+          color: "bg-yellow-500",
+          ringColor: "ring-yellow-500",
           tooltip: statusValue,
-        }
+        };
     }
-  }
+  };
 
-  const { color, ringColor, tooltip } = getStatusInfo(status)
+  const { color, ringColor, tooltip } = getStatusInfo(status);
 
   return (
     <Tooltip>
@@ -50,5 +50,5 @@ export function StatusDot({ status }: StatusDotProps) {
         <p>{tooltip}</p>
       </TooltipContent>
     </Tooltip>
-  )
+  );
 }

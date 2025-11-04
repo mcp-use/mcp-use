@@ -1,170 +1,202 @@
-import type { MCPConnection } from '@/client/context/McpContext'
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
+import type { MCPConnection } from "@/client/context/McpContext";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface UseAutoConnectOptions {
-  connections: MCPConnection[]
+  connections: MCPConnection[];
   addConnection: (
     url: string,
     name?: string,
     proxyConfig?: {
-      proxyAddress?: string
-      customHeaders?: Record<string, string>
+      proxyAddress?: string;
+      customHeaders?: Record<string, string>;
     },
-    transportType?: 'http' | 'sse'
-  ) => void
-  removeConnection: (id: string) => void
+    transportType?: "http" | "sse"
+  ) => void;
+  removeConnection: (id: string) => void;
 }
 
 interface AutoConnectState {
-  isAutoConnecting: boolean
-  autoConnectUrl: string | null
+  isAutoConnecting: boolean;
+  autoConnectUrl: string | null;
 }
 
-export function useAutoConnect({ connections, addConnection, removeConnection }: UseAutoConnectOptions): AutoConnectState {
-  const navigate = useNavigate()
-  const [isAutoConnecting, setIsAutoConnecting] = useState(false)
-  const [autoConnectUrl, setAutoConnectUrl] = useState<string | null>(null)
-  const [hasTriedBothModes, setHasTriedBothModes] = useState(false)
-  const [useDirectMode, setUseDirectMode] = useState(true)
-  const [autoSwitch, setAutoSwitch] = useState(true)
-  const [configLoaded, setConfigLoaded] = useState(false)
-  const retryScheduledRef = useRef(false)
+export function useAutoConnect({
+  connections,
+  addConnection,
+  removeConnection,
+}: UseAutoConnectOptions): AutoConnectState {
+  const navigate = useNavigate();
+  const [isAutoConnecting, setIsAutoConnecting] = useState(false);
+  const [autoConnectUrl, setAutoConnectUrl] = useState<string | null>(null);
+  const [hasTriedBothModes, setHasTriedBothModes] = useState(false);
+  const [useDirectMode, setUseDirectMode] = useState(true);
+  const [autoSwitch, setAutoSwitch] = useState(true);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const retryScheduledRef = useRef(false);
 
   // Load auto-switch setting from localStorage
   useEffect(() => {
-    const autoSwitchSetting = localStorage.getItem('mcp-inspector-auto-switch')
+    const autoSwitchSetting = localStorage.getItem("mcp-inspector-auto-switch");
     if (autoSwitchSetting !== null) {
-      setAutoSwitch(autoSwitchSetting === 'true')
+      setAutoSwitch(autoSwitchSetting === "true");
     }
-  }, [])
+  }, []);
 
   // Load config and initiate auto-connect
   useEffect(() => {
-    if (configLoaded)
-      return
+    if (configLoaded) return;
 
     // Check for autoConnect query parameter first
-    const urlParams = new URLSearchParams(window.location.search)
-    const queryAutoConnectUrl = urlParams.get('autoConnect')
-    const tunnelUrl = urlParams.get('tunnelUrl')
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryAutoConnectUrl = urlParams.get("autoConnect");
+    const tunnelUrl = urlParams.get("tunnelUrl");
 
     if (queryAutoConnectUrl) {
-      const existing = connections.find(c => c.url === queryAutoConnectUrl)
+      const existing = connections.find((c) => c.url === queryAutoConnectUrl);
       if (!existing) {
-        setIsAutoConnecting(true)
-        addConnection(queryAutoConnectUrl, 'Local MCP Server', undefined, 'http')
+        setIsAutoConnecting(true);
+        addConnection(
+          queryAutoConnectUrl,
+          "Local MCP Server",
+          undefined,
+          "http"
+        );
         // Preserve tunnelUrl parameter when navigating
         const newUrl = tunnelUrl
           ? `/?server=${encodeURIComponent(queryAutoConnectUrl)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-          : `/?server=${encodeURIComponent(queryAutoConnectUrl)}`
-        navigate(newUrl)
-        const timeoutId = setTimeout(() => setIsAutoConnecting(false), 500)
-        setConfigLoaded(true)
-        return () => clearTimeout(timeoutId)
+          : `/?server=${encodeURIComponent(queryAutoConnectUrl)}`;
+        navigate(newUrl);
+        const timeoutId = setTimeout(() => setIsAutoConnecting(false), 500);
+        setConfigLoaded(true);
+        return () => clearTimeout(timeoutId);
       }
-      setConfigLoaded(true)
-      return
+      setConfigLoaded(true);
+      return;
     }
 
     // Fallback to config.json
-    fetch('/inspector/config.json')
-      .then(res => res.json())
+    fetch("/inspector/config.json")
+      .then((res) => res.json())
       .then((config: { autoConnectUrl: string | null }) => {
-        setConfigLoaded(true)
+        setConfigLoaded(true);
         if (config.autoConnectUrl) {
-          const existing = connections.find(c => c.url === config.autoConnectUrl)
+          const existing = connections.find(
+            (c) => c.url === config.autoConnectUrl
+          );
           if (!existing) {
-            setAutoConnectUrl(config.autoConnectUrl)
-            setHasTriedBothModes(false)
-            setUseDirectMode(true)
-            setIsAutoConnecting(true)
-            addConnection(config.autoConnectUrl, 'Local MCP Server', undefined, 'http')
+            setAutoConnectUrl(config.autoConnectUrl);
+            setHasTriedBothModes(false);
+            setUseDirectMode(true);
+            setIsAutoConnecting(true);
+            addConnection(
+              config.autoConnectUrl,
+              "Local MCP Server",
+              undefined,
+              "http"
+            );
           }
         }
       })
-      .catch(() => setConfigLoaded(true))
-  }, [configLoaded, connections, addConnection, navigate])
+      .catch(() => setConfigLoaded(true));
+  }, [configLoaded, connections, addConnection, navigate]);
 
   // Auto-connect retry logic
   useEffect(() => {
-    if (!autoConnectUrl || hasTriedBothModes || !autoSwitch || retryScheduledRef.current) {
-      return
+    if (
+      !autoConnectUrl ||
+      hasTriedBothModes ||
+      !autoSwitch ||
+      retryScheduledRef.current
+    ) {
+      return;
     }
 
-    const connection = connections.find(c => c.url === autoConnectUrl)
+    const connection = connections.find((c) => c.url === autoConnectUrl);
 
     // Handle failed connection - retry with alternate mode
-    if (connection?.state === 'failed' && connection.error) {
-      console.warn('[useAutoConnect] Connection failed, trying alternate mode...')
-      removeConnection(connection.id)
+    if (connection?.state === "failed" && connection.error) {
+      console.warn(
+        "[useAutoConnect] Connection failed, trying alternate mode..."
+      );
+      removeConnection(connection.id);
 
       if (useDirectMode) {
         // Failed with direct, try proxy
-        toast.error('Direct connection failed, trying with proxy...')
-        setHasTriedBothModes(true)
-        setUseDirectMode(false)
-        retryScheduledRef.current = true
+        toast.error("Direct connection failed, trying with proxy...");
+        setHasTriedBothModes(true);
+        setUseDirectMode(false);
+        retryScheduledRef.current = true;
 
         queueMicrotask(() => {
           setTimeout(() => {
-            const proxyAddress = `${window.location.origin}/inspector/api/proxy/mcp`
-            console.warn('[useAutoConnect] Retrying with proxy:', proxyAddress)
-            setIsAutoConnecting(true)
-            retryScheduledRef.current = false
+            const proxyAddress = `${window.location.origin}/inspector/api/proxy/mcp`;
+            console.warn("[useAutoConnect] Retrying with proxy:", proxyAddress);
+            setIsAutoConnecting(true);
+            retryScheduledRef.current = false;
             addConnection(
               autoConnectUrl,
-              'Local MCP Server',
+              "Local MCP Server",
               { proxyAddress, customHeaders: {} },
-              'http',
-            )
-          }, 1000)
-        })
-      }
-      else {
+              "http"
+            );
+          }, 1000);
+        });
+      } else {
         // Both modes failed - clear loading and reset state
-        toast.error('Proxy connection also failed')
-        setHasTriedBothModes(true)
-        setIsAutoConnecting(false)
-        setAutoConnectUrl(null)
-        retryScheduledRef.current = false
+        toast.error("Proxy connection also failed");
+        setHasTriedBothModes(true);
+        setIsAutoConnecting(false);
+        setAutoConnectUrl(null);
+        retryScheduledRef.current = false;
       }
     }
     // Handle successful connection
-    else if (connection?.state === 'ready') {
-      console.warn('[useAutoConnect] Connection succeeded, navigating to server')
+    else if (connection?.state === "ready") {
+      console.warn(
+        "[useAutoConnect] Connection succeeded, navigating to server"
+      );
 
       // Navigate using the connection ID (which is the original URL)
       // Preserve tunnelUrl parameter if present
-      const urlParams = new URLSearchParams(window.location.search)
-      const tunnelUrl = urlParams.get('tunnelUrl')
+      const urlParams = new URLSearchParams(window.location.search);
+      const tunnelUrl = urlParams.get("tunnelUrl");
       const newUrl = tunnelUrl
         ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-        : `/?server=${encodeURIComponent(connection.id)}`
-      navigate(newUrl)
+        : `/?server=${encodeURIComponent(connection.id)}`;
+      navigate(newUrl);
 
       setTimeout(() => {
-        setAutoConnectUrl(null)
-        setHasTriedBothModes(false)
-        setIsAutoConnecting(false)
-        retryScheduledRef.current = false
-      }, 100)
+        setAutoConnectUrl(null);
+        setHasTriedBothModes(false);
+        setIsAutoConnecting(false);
+        retryScheduledRef.current = false;
+      }, 100);
     }
-  }, [connections, autoConnectUrl, hasTriedBothModes, useDirectMode, autoSwitch, addConnection, removeConnection, navigate])
+  }, [
+    connections,
+    autoConnectUrl,
+    hasTriedBothModes,
+    useDirectMode,
+    autoSwitch,
+    addConnection,
+    removeConnection,
+    navigate,
+  ]);
 
   // Clear loading state for query param auto-connects (simple case)
   useEffect(() => {
     if (isAutoConnecting && connections.length > 0 && !autoConnectUrl) {
       const hasEstablishedConnection = connections.some(
-        conn => conn.state !== 'connecting' && conn.state !== 'loading',
-      )
+        (conn) => conn.state !== "connecting" && conn.state !== "loading"
+      );
       if (hasEstablishedConnection) {
-        const timeoutId = setTimeout(() => setIsAutoConnecting(false), 500)
-        return () => clearTimeout(timeoutId)
+        const timeoutId = setTimeout(() => setIsAutoConnecting(false), 500);
+        return () => clearTimeout(timeoutId);
       }
     }
-  }, [isAutoConnecting, connections, autoConnectUrl])
+  }, [isAutoConnecting, connections, autoConnectUrl]);
 
-  return { isAutoConnecting, autoConnectUrl }
+  return { isAutoConnecting, autoConnectUrl };
 }

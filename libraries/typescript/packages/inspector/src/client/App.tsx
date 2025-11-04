@@ -1,10 +1,10 @@
-import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
-import { InspectorDashboard } from '@/client/components/InspectorDashboard'
-import { Layout } from '@/client/components/Layout'
-import { Toaster } from '@/client/components/ui/sonner'
-import { InspectorProvider } from './context/InspectorContext'
-import { McpProvider } from './context/McpContext'
-import { ThemeProvider } from './context/ThemeContext'
+import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { InspectorDashboard } from "@/client/components/InspectorDashboard";
+import { Layout } from "@/client/components/Layout";
+import { Toaster } from "@/client/components/ui/sonner";
+import { InspectorProvider } from "./context/InspectorContext";
+import { McpProvider } from "./context/McpContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 function App() {
   return (
@@ -22,7 +22,7 @@ function App() {
         </InspectorProvider>
       </McpProvider>
     </ThemeProvider>
-  )
+  );
 }
 
-export default App
+export default App;

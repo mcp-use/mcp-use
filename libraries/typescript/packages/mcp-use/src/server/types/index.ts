@@ -6,8 +6,8 @@
 export {
   ServerConfig,
   InputDefinition,
-  ResourceAnnotations
-} from './common.js'
+  ResourceAnnotations,
+} from "./common.js";
 
 // Resource types including UIResource
 export {
@@ -31,17 +31,11 @@ export {
   DiscoverWidgetsOptions,
   // Apps SDK types
   AppsSdkMetadata,
-  AppsSdkToolMetadata
-} from './resource.js'
+  AppsSdkToolMetadata,
+} from "./resource.js";
 
 // Tool types
-export {
-  ToolCallback,
-  ToolDefinition
-} from './tool.js'
+export { ToolCallback, ToolDefinition } from "./tool.js";
 
 // Prompt types
-export {
-  PromptCallback,
-  PromptDefinition
-} from './prompt.js'
+export { PromptCallback, PromptDefinition } from "./prompt.js";

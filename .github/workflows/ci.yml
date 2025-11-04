@@ -216,13 +216,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test:
-          [
-            agent_run,
-            agent_stream,
-            agent_structured_output,
-            server_manager,
-          ]
+        test: [agent_run, agent_stream, agent_structured_output, server_manager]
     defaults:
       run:
         working-directory: libraries/python
@@ -244,7 +238,6 @@ jobs:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
           pytest tests/integration/agent/test_${{ matrix.test }}.py
-
 
   # TypeScript Jobs
   typescript-lint:
@@ -272,6 +265,9 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
+
+      - name: Check Formatting
+        run: pnpm format:check
 
       - name: Run Linter
         run: pnpm lint
@@ -501,6 +497,7 @@ jobs:
           name: create-mcp-use-app-package
           path: ./package
       - name: Test CLI Creation
+        shell: bash
         run: |
           # Get package path
           if [ "${{ runner.os }}" == "Windows" ]; then

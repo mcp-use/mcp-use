@@ -2,28 +2,48 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="https://inspector-cdn.mcp-use.com/favicon-black.svg" />
-    <link rel="icon" type="image/svg+xml" href="https://inspector-cdn.mcp-use.com/favicon-white.svg" media="(prefers-color-scheme: dark)" />
-    <link rel="icon" type="image/svg+xml" href="https://inspector-cdn.mcp-use.com/favicon-black.svg" media="(prefers-color-scheme: light)" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="https://inspector-cdn.mcp-use.com/favicon-black.svg"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="https://inspector-cdn.mcp-use.com/favicon-white.svg"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="https://inspector-cdn.mcp-use.com/favicon-black.svg"
+      media="(prefers-color-scheme: light)"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
     <title>Inspector | mcp-use</title>
   </head>
   <body>
     <script>
       // Ensure process is defined globally before any modules load
       // This prevents "process is not defined" errors in browser environments
-      if (typeof window !== 'undefined' && typeof window.process === 'undefined') {
+      if (
+        typeof window !== "undefined" &&
+        typeof window.process === "undefined"
+      ) {
         window.process = {
           env: {},
-          platform: 'browser',
+          platform: "browser",
           browser: true,
-          version: 'v18.0.0',
-          versions: { node: '18.0.0' },
-          cwd: () => '/',
-          nextTick: (fn, ...args) => queueMicrotask(() => fn(...args))
+          version: "v18.0.0",
+          versions: { node: "18.0.0" },
+          cwd: () => "/",
+          nextTick: (fn, ...args) => queueMicrotask(() => fn(...args)),
         };
       }
     </script>
