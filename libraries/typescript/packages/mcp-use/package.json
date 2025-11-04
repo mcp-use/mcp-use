@@ -30,6 +30,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./agent": {
+      "types": "./dist/src/agents/index.d.ts",
+      "import": "./dist/src/agents/index.js"
+    },
     "./browser": {
       "types": "./dist/src/browser.d.ts",
       "import": "./dist/src/browser.js"
