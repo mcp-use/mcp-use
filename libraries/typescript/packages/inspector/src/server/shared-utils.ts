@@ -572,8 +572,8 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
   const widgetStateKey = `openai-widget-state:${toolId}`
 
   // Safely serialize data to avoid script injection issues
-  const safeToolInput = JSON.stringify(toolInput).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
-  const safeToolOutput = JSON.stringify(toolOutput).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+  const safeToolInput = JSON.stringify(toolInput ?? null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+  const safeToolOutput = JSON.stringify(toolOutput ?? null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
   const safeToolId = JSON.stringify(toolId)
   const safeWidgetStateKey = JSON.stringify(widgetStateKey)
 
@@ -582,7 +582,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
     <script>
       (function() {
         'use strict';
-        
+
         // Change URL to "/" for React Router compatibility
         if (window.location.pathname !== '/') {
           history.replaceState(null, '', '/');

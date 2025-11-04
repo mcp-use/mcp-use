@@ -10,7 +10,6 @@ interface OpenAIComponentRendererProps {
   toolResult: any
   serverId: string
   readResource: (uri: string) => Promise<any>
-  resource: any
   className?: string
   noWrapper?: boolean
 }
@@ -37,7 +36,6 @@ export function OpenAIComponentRenderer({
   toolResult,
   serverId,
   readResource,
-  resource,
   className,
   noWrapper = false,
 }: OpenAIComponentRendererProps) {
@@ -72,28 +70,8 @@ export function OpenAIComponentRenderer({
           toolResult: JSON.stringify(toolResult).substring(0, 200),
         })
 
-        // Extract structured content from tool result
-        let structuredContent = null
-        if (resource?.structuredContent) {
-          structuredContent = resource.structuredContent
-        }
-        else if (Array.isArray(resource) && resource[0]) {
-          const firstResult = resource[0]
-          if (firstResult.output?.value?.structuredContent) {
-            structuredContent = firstResult.output.value.structuredContent
-          }
-          else if (firstResult.structuredContent) {
-            structuredContent = firstResult.structuredContent
-          }
-          else if (firstResult.output?.value) {
-            structuredContent = firstResult.output.value
-          }
-        }
-
-        // Fallback to entire result
-        if (!structuredContent) {
-          structuredContent = resource
-        }
+        // Extract structured content from tool result (the actual tool parameters)
+        const structuredContent = toolResult?.structuredContent || null
 
         console.log('[OpenAIComponentRenderer] Extracted structuredContent:', structuredContent)
 
@@ -147,7 +125,7 @@ export function OpenAIComponentRenderer({
         // pass props as url params (toolInpu, toolOutput)
         const urlParams = new URLSearchParams()
         const params = {
-          toolInput: toolArgs,
+          toolInput: widgetToolInput,
           toolOutput: structuredContent,
           toolId,
         }

@@ -32,7 +32,7 @@ async function startServer() {
 
     if (!available) {
       if (isDev) {
-        console.error(`❌ Port ${port} is not available. Please stop the process using this port and try again.`)
+        console.error(`❌❌❌ Port ${port} is not available (probably used by Vite dev server as fallback so you should stop port 3000). Please stop the process using this port and try again.`)
         process.exit(1)
       }
       else {

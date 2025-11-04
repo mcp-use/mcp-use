@@ -67,8 +67,11 @@ export class HttpConnector extends BaseConnector {
     catch (err) {
       // Check if this is a 4xx error that indicates we should try SSE fallback
       let fallbackReason = 'Unknown error'
+      let is401Error = false
 
       if (err instanceof StreamableHTTPError) {
+        is401Error = err.code === 401
+
         // Check for "Missing session ID" error (HTTP 400 from FastMCP)
         if (err.code === 400 && err.message.includes('Missing session ID')) {
           fallbackReason = 'Server requires session ID (FastMCP compatibility) - using SSE transport'
@@ -87,11 +90,13 @@ export class HttpConnector extends BaseConnector {
         // Check for 404/405 in error message as fallback detection
         const errorStr = err.toString()
         const errorMsg = err.message || ''
-        
+
+        is401Error = errorStr.includes('401') || errorMsg.includes('Unauthorized')
+
         // Check for "Missing session ID" error in the message (from both direct errors and wrapped errors)
-        if (errorStr.includes('Missing session ID') 
-            || errorStr.includes('Bad Request: Missing session ID')
-            || errorMsg.includes('FastMCP session ID error')) {
+        if (errorStr.includes('Missing session ID')
+          || errorStr.includes('Bad Request: Missing session ID')
+          || errorMsg.includes('FastMCP session ID error')) {
           fallbackReason = 'Server requires session ID (FastMCP compatibility) - using SSE transport'
           logger.warn(`⚠️  ${fallbackReason}`)
         }
@@ -105,17 +110,35 @@ export class HttpConnector extends BaseConnector {
         }
       }
 
+      // Don't fallback on 401 - SSE will fail too
+      if (is401Error) {
+        logger.info('Authentication required - skipping SSE fallback')
+        await this.cleanupResources()
+        const authError = new Error('Authentication required') as any
+        authError.code = 401
+        throw authError
+      }
+
       // Always try SSE fallback for maximum compatibility
       logger.info('🔄 Falling back to SSE transport...')
 
       try {
         await this.connectWithSse(baseUrl)
       }
-      catch (sseErr) {
+      catch (sseErr: any) {
         logger.error(`Failed to connect with both transports:`)
         logger.error(`  Streamable HTTP: ${fallbackReason}`)
         logger.error(`  SSE: ${sseErr}`)
         await this.cleanupResources()
+
+        // Preserve 401 error code if SSE also failed with 401
+        const sseIs401 = sseErr?.message?.includes('401') || sseErr?.message?.includes('Unauthorized')
+        if (sseIs401) {
+          const authError = new Error('Authentication required') as any
+          authError.code = 401
+          throw authError
+        }
+
         throw new Error('Could not connect to server with any available transport')
       }
     }
@@ -127,6 +150,7 @@ export class HttpConnector extends BaseConnector {
       this.connectionManager = new StreamableHttpConnectionManager(
         baseUrl,
         {
+          authProvider: this.opts.authProvider,  // ← Pass OAuth provider to SDK
           requestInit: {
             headers: this.headers,
           },
@@ -144,7 +168,7 @@ export class HttpConnector extends BaseConnector {
       // Create and connect the client
       // This performs both initialize AND initialized notification
       this.client = new Client(this.clientInfo, this.opts.clientOptions)
-      
+
       try {
         await this.client.connect(transport)
       }
