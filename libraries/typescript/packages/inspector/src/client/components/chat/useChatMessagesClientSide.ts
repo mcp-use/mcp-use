@@ -405,16 +405,20 @@ export function useChatMessagesClientSide({
         }
 
         // Extract detailed error message
-        let errorDetail = 'Unknown error occurred'
+        let errorDetail = "Unknown error occurred";
         if (error instanceof Error) {
-          errorDetail = error.message
+          errorDetail = error.message;
           // Check if error has HTTP status info
-          const errorAny = error as any
+          const errorAny = error as any;
           if (errorAny.status) {
-            errorDetail = `HTTP ${errorAny.status}: ${errorDetail}`
+            errorDetail = `HTTP ${errorAny.status}: ${errorDetail}`;
           }
-          if (errorAny.code === 401 || errorDetail.includes('401') || errorDetail.includes('Unauthorized')) {
-            errorDetail = `Authentication failed (401). Check your Authorization header in the connection settings.`
+          if (
+            errorAny.code === 401 ||
+            errorDetail.includes("401") ||
+            errorDetail.includes("Unauthorized")
+          ) {
+            errorDetail = `Authentication failed (401). Check your Authorization header in the connection settings.`;
           }
         }
 

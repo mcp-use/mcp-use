@@ -126,11 +126,11 @@ export class HttpConnector extends BaseConnector {
 
       // Don't fallback on 401 - SSE will fail too
       if (is401Error) {
-        logger.info('Authentication required - skipping SSE fallback')
-        await this.cleanupResources()
-        const authError = new Error('Authentication required') as any
-        authError.code = 401
-        throw authError
+        logger.info("Authentication required - skipping SSE fallback");
+        await this.cleanupResources();
+        const authError = new Error("Authentication required") as any;
+        authError.code = 401;
+        throw authError;
       }
 
       // Always try SSE fallback for maximum compatibility

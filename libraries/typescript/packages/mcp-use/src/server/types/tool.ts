@@ -5,7 +5,7 @@ import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 export type ToolCallback = (
   params: Record<string, any>,
   context?: { req: any; res: any }
-) => Promise<CallToolResult>
+) => Promise<CallToolResult>;
 
 export interface ToolDefinition {
   /** Unique identifier for the tool */
@@ -21,5 +21,5 @@ export interface ToolDefinition {
   /** Tool annotations */
   annotations?: ToolAnnotations;
   /** Metadata for the tool */
-  _meta?: Record<string, unknown>
+  _meta?: Record<string, unknown>;
 }
