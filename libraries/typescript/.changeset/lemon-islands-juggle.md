@@ -13,4 +13,4 @@ Standardize code formatting with ESLint + Prettier integration
 - Add Prettier format checks to CI pipeline
 - Remove `@antfu/eslint-config` in favor of unified root ESLint configuration
 - Enforce semicolons and consistent code style with `.prettierrc.json`
-- Exclude markdown files from formatting via `.prettierignore`
+- Exclude markdown and JSON files from formatting via `.prettierignore`

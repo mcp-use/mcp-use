@@ -1,6 +1,9 @@
 # Ignore markdown files
 *.md
 
+# Ignore JSON files
+*.json
+
 # Build outputs
 **/dist/**
 **/build/**
