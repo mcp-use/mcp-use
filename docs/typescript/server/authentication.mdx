@@ -2,6 +2,7 @@
 title: "Authentication"
 description: "Secure your MCP server with authentication middleware"
 icon: "lock"
+tag: "New"
 ---
 
 # Authentication
@@ -30,6 +31,54 @@ HTTP Request → Auth Middleware → MCP Protocol → Tool Callback
 - Inspector UI automatically bypassed
 - Thread-safe context passing with `AsyncLocalStorage`
 - Access `req`/`res` in tool callbacks
+
+### How It Works Internally
+
+When you call `server.use(middleware)`, the framework automatically wraps your middleware using a Proxy:
+
+**What gets wrapped:**
+- **MCP routes** (`/mcp`) → Runs through `AsyncLocalStorage.run()` to capture `req`/`res` context
+- **Your middleware** → Automatically skipped for excluded framework routes
+
+**What gets excluded:**
+- `/inspector` → Inspector UI (so you can debug without auth)
+- `/mcp-use/widgets` → Widget assets
+- `/__vite` → Vite HMR in development (dev mode only)
+
+**Example flow:**
+```typescript
+// You write this:
+server.use((req, res, next) => {
+  // Your auth logic
+  validateToken(req.headers['authorization'])
+  next()
+})
+
+// Framework transforms it to:
+server.use((req, res, next) => {
+  // Skip for excluded routes
+  if (req.path.startsWith('/inspector')) {
+    return next()
+  }
+
+  // Run your middleware for other routes
+  validateToken(req.headers['authorization'])
+  next()
+})
+
+// MCP endpoints wrapped with context:
+app.post('/mcp', (req, res) => {
+  requestContext.run({ req, res }, async () => {
+    // Tool callbacks can now access context
+  })
+})
+```
+
+This means:
+- ✅ Add auth once with `server.use()`
+- ✅ Inspector UI works without auth headers
+- ✅ Tool callbacks receive authenticated context
+- ✅ No manual route exclusions needed
 
 ## Basic Authentication
 
