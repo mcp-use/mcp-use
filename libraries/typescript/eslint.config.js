@@ -2,6 +2,7 @@ import eslint from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import importPlugin from 'eslint-plugin-import';
+import prettierConfig from 'eslint-config-prettier';
 
 export default [
   {
@@ -147,7 +148,7 @@ export default [
         'error',
         'WithStatement',
         {
-          message: "substr() is deprecated, use slice() or substring() instead",
+          message: 'substr() is deprecated, use slice() or substring() instead',
           selector: "MemberExpression > Identifier[name='substr']",
         },
       ],
@@ -248,10 +249,7 @@ export default [
   },
   // CLI packages
   {
-    files: [
-      'packages/cli/**/*.ts',
-      'packages/create-mcp-use-app/**/*.ts',
-    ],
+    files: ['packages/cli/**/*.ts', 'packages/create-mcp-use-app/**/*.ts'],
     rules: {
       'no-console': 'off',
       'no-process-exit': 'off',
@@ -329,5 +327,6 @@ export default [
       'require-yield': 'off',
     },
   },
+  // Prettier - must be last to override other configs
+  prettierConfig,
 ];
-
