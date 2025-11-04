@@ -66,7 +66,7 @@ class BaseAdapter(ABC):
             return str(tool_result)
 
     @telemetry("adapter_fix_schema")
-    def fix_schema(self, schema: dict) -> dict:
+    def fix_schema(self, schema: Any) -> Any:
         """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
 
         Args:
@@ -86,6 +86,8 @@ class BaseAdapter(ABC):
 
             for key, value in schema.items():
                 schema[key] = self.fix_schema(value)  # Apply recursively
+        elif isinstance(schema, list):
+            return [self.fix_schema(item) for item in schema]
         return schema
 
     async def _get_connectors(self, client: MCPClient) -> list[BaseConnector]:

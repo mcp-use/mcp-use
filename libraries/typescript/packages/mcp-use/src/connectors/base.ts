@@ -14,6 +14,10 @@ export interface ConnectorInitOptions {
    * methods when they issue SDK requests. Can be overridden per‑call.
    */
   defaultRequestOptions?: RequestOptions
+  /**
+   * OAuth client provider for automatic authentication
+   */
+  authProvider?: any
 }
 
 /**
@@ -23,6 +27,7 @@ export abstract class BaseConnector {
   protected client: Client | null = null
   protected connectionManager: ConnectionManager<any> | null = null
   protected toolsCache: Tool[] | null = null
+  protected capabilitiesCache: any = null
   protected connected = false
   protected readonly opts: ConnectorInitOptions
 
@@ -70,12 +75,14 @@ export abstract class BaseConnector {
 
     // Cache server capabilities for callers who need them.
     const capabilities = this.client.getServerCapabilities()
+    this.capabilitiesCache = capabilities
 
     // Fetch and cache tools
     const listToolsRes = await this.client.listTools(undefined, defaultRequestOptions)
     this.toolsCache = (listToolsRes.tools ?? []) as Tool[]
 
     logger.debug(`Fetched ${this.toolsCache.length} tools from server`)
+    logger.debug('Server capabilities:', capabilities)
     return capabilities
   }
 
@@ -101,7 +108,7 @@ export abstract class BaseConnector {
 
   /**
    * List resources from the server with optional pagination
-   * 
+   *
    * @param cursor - Optional cursor for pagination
    * @param options - Request options
    * @returns Resource list with optional nextCursor for pagination
@@ -117,7 +124,7 @@ export abstract class BaseConnector {
 
   /**
    * List all resources from the server, automatically handling pagination
-   * 
+   *
    * @param options - Request options
    * @returns Complete list of all resources
    */
@@ -126,22 +133,37 @@ export abstract class BaseConnector {
       throw new Error('MCP client is not connected')
     }
 
-    logger.debug('Listing all resources (with auto-pagination)')
-    const allResources: any[] = []
-    let cursor: string | undefined = undefined
+    // Check if server advertises resources capability
+    if (!this.capabilitiesCache?.resources) {
+      logger.debug('Server does not advertise resources capability, skipping')
+      return { resources: [] }
+    }
 
-    do {
-      const result = await this.client.listResources({ cursor }, options)
-      allResources.push(...(result.resources || []))
-      cursor = result.nextCursor
-    } while (cursor)
+    try {
+      logger.debug('Listing all resources (with auto-pagination)')
+      const allResources: any[] = []
+      let cursor: string | undefined = undefined
 
-    return { resources: allResources }
+      do {
+        const result = await this.client.listResources({ cursor }, options)
+        allResources.push(...(result.resources || []))
+        cursor = result.nextCursor
+      } while (cursor)
+
+      return { resources: allResources }
+    } catch (err: any) {
+      // Gracefully handle if server advertises but doesn't actually support it
+      if (err.code === -32601) {
+        logger.debug('Server advertised resources but method not found')
+        return { resources: [] }
+      }
+      throw err
+    }
   }
 
   /**
    * List resource templates from the server
-   * 
+   *
    * @param options - Request options
    * @returns List of available resource templates
    */
@@ -162,12 +184,12 @@ export abstract class BaseConnector {
 
     logger.debug(`Reading resource ${uri}`)
     const res = await this.client.readResource({ uri }, options)
-    return { content: res.content, mimeType: res.mimeType }
+    return res
   }
 
   /**
    * Subscribe to resource updates
-   * 
+   *
    * @param uri - URI of the resource to subscribe to
    * @param options - Request options
    */
@@ -182,7 +204,7 @@ export abstract class BaseConnector {
 
   /**
    * Unsubscribe from resource updates
-   * 
+   *
    * @param uri - URI of the resource to unsubscribe from
    * @param options - Request options
    */
@@ -200,8 +222,23 @@ export abstract class BaseConnector {
       throw new Error('MCP client is not connected')
     }
 
-    logger.debug('Listing prompt')
-    return await this.client.listPrompts()
+    // Check if server advertises prompts capability
+    if (!this.capabilitiesCache?.prompts) {
+      logger.debug('Server does not advertise prompts capability, skipping')
+      return { prompts: [] }
+    }
+
+    try {
+      logger.debug('Listing prompts')
+      return await this.client.listPrompts()
+    } catch (err: any) {
+      // Gracefully handle if server advertises but doesn't actually support it
+      if (err.code === -32601) {
+        logger.debug('Server advertised prompts but method not found')
+        return { prompts: [] }
+      }
+      throw err
+    }
   }
 
   async getPrompt(name: string, args: Record<string, any>) {

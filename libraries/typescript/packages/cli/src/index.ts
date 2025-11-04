@@ -294,6 +294,8 @@ if (container && Component) {
         const mod = await metadataServer.ssrLoadModule(entry);
         if (mod.widgetMetadata) {
           widgetMetadata = {
+            ...mod.widgetMetadata,
+            title: mod.widgetMetadata.title || widgetName,
             description: mod.widgetMetadata.description,
             inputs: mod.widgetMetadata.inputs?.shape || {},
           };

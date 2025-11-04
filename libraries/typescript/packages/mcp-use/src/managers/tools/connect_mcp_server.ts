@@ -1,6 +1,6 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { BaseConnector } from '../../connectors/base.js'
-import type { ServerManager } from '../server_manager.js'
+import type { IServerManager } from '../types.js'
 import type { SchemaOutputT } from './base.js'
 import { z } from 'zod'
 import { logger } from '../../logging.js'
@@ -15,7 +15,7 @@ export class ConnectMCPServerTool extends MCPServerTool<typeof ConnectMCPServerS
   override description = 'Connect to a specific MCP (Model Context Protocol) server to use its tools. Use this tool to connect to a specific server and use its tools.'
   override schema = ConnectMCPServerSchema
 
-  constructor(manager: ServerManager) {
+  constructor(manager: IServerManager) {
     super(manager)
   }
 

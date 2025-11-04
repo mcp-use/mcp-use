@@ -50,6 +50,7 @@ export default defineConfig({
       'util': path.resolve(__dirname, './src/client/stubs/util.js'),
       'path': path.resolve(__dirname, './src/client/stubs/path.js'),
       'process': path.resolve(__dirname, './src/client/stubs/process.js'),
+      'node:async_hooks': path.resolve(__dirname, './src/client/stubs/async_hooks.js'),
     },
   },
   define: {
@@ -75,10 +76,6 @@ export default defineConfig({
   build: {
     outDir: 'dist/client',
     rollupOptions: {
-      external: [
-        // Exclude Node.js built-in modules from the bundle
-        /^node:/,
-      ],
       onwarn(warning, warn) {
         // Suppress warnings about externalized modules for refractor
         if (warning.code === 'UNRESOLVED_IMPORT' && warning.exporter?.includes('refractor')) {

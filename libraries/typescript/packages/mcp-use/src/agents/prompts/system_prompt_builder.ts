@@ -1,5 +1,6 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import { SystemMessage } from '@langchain/core/messages'
+
+import { SystemMessage } from 'langchain'
 
 export function generateToolDescriptions(
   tools: StructuredToolInterface[],

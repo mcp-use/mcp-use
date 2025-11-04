@@ -420,6 +420,10 @@ export interface WidgetData {
   resourceData: any
   toolId: string
   timestamp: number
+  widgetCSP?: {
+    connect_domains?: string[]
+    resource_domains?: string[]
+  }
 }
 
 const widgetDataStore = new Map<string, WidgetData>()
@@ -442,10 +446,10 @@ setInterval(
  * Store widget data for rendering
  */
 export function storeWidgetData(data: Omit<WidgetData, 'timestamp'>): { success: boolean, error?: string } {
-  const { serverId, uri, toolInput, toolOutput, resourceData, toolId } = data
+  const { serverId, uri, toolInput, toolOutput, resourceData, toolId, widgetCSP } = data
 
   console.log('[Widget Store] Received request for toolId:', toolId)
-  console.log('[Widget Store] Fields:', { serverId, uri, hasResourceData: !!resourceData, hasToolInput: !!toolInput, hasToolOutput: !!toolOutput })
+  console.log('[Widget Store] Fields:', { serverId, uri, hasResourceData: !!resourceData, hasToolInput: !!toolInput, hasToolOutput: !!toolOutput, hasWidgetCSP: !!widgetCSP })
 
   if (!serverId || !uri || !toolId || !resourceData) {
     const missingFields = []
@@ -471,6 +475,7 @@ export function storeWidgetData(data: Omit<WidgetData, 'timestamp'>): { success:
     resourceData,
     toolId,
     timestamp: Date.now(),
+    widgetCSP,
   })
 
   console.log('[Widget Store] Data stored successfully for toolId:', toolId)
@@ -567,8 +572,8 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
   const widgetStateKey = `openai-widget-state:${toolId}`
 
   // Safely serialize data to avoid script injection issues
-  const safeToolInput = JSON.stringify(toolInput).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
-  const safeToolOutput = JSON.stringify(toolOutput).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+  const safeToolInput = JSON.stringify(toolInput ?? null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+  const safeToolOutput = JSON.stringify(toolOutput ?? null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
   const safeToolId = JSON.stringify(toolId)
   const safeWidgetStateKey = JSON.stringify(widgetStateKey)
 
@@ -577,7 +582,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
     <script>
       (function() {
         'use strict';
-        
+
         // Change URL to "/" for React Router compatibility
         if (window.location.pathname !== '/') {
           history.replaceState(null, '', '/');
@@ -752,7 +757,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): { html: strin
 /**
  * Get security headers for widget content
  */
-export function getWidgetSecurityHeaders(): Record<string, string> {
+export function getWidgetSecurityHeaders(widgetCSP?: { connect_domains?: string[], resource_domains?: string[] }): Record<string, string> {
   const trustedCdns = [
     'https://persistent.oaistatic.com',
     'https://*.oaistatic.com',
@@ -760,19 +765,33 @@ export function getWidgetSecurityHeaders(): Record<string, string> {
     'https://cdn.jsdelivr.net',
     'https://cdnjs.cloudflare.com',
     'https://cdn.skypack.dev',
-  ].join(' ')
+  ]
+
+  // Merge widget-specific resource domains with trusted CDNs
+  const allResourceDomains = [...trustedCdns]
+  if (widgetCSP?.resource_domains) {
+    allResourceDomains.push(...widgetCSP.resource_domains)
+  }
+
+  const resourceDomainsStr = allResourceDomains.join(' ')
+
+  // Build connect-src with widget-specific domains
+  let connectSrc = '\'self\' https: wss: ws:'
+  if (widgetCSP?.connect_domains && widgetCSP.connect_domains.length > 0) {
+    connectSrc = `'self' ${widgetCSP.connect_domains.join(' ')} https: wss: ws:`
+  }
 
   return {
     'Content-Security-Policy': [
       'default-src \'self\'',
-      `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${trustedCdns}`,
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${resourceDomainsStr}`,
       'worker-src \'self\' blob:',
       'child-src \'self\' blob:',
-      `style-src 'self' 'unsafe-inline' ${trustedCdns}`,
+      `style-src 'self' 'unsafe-inline' ${resourceDomainsStr}`,
       'img-src \'self\' data: https: blob:',
       'media-src \'self\' data: https: blob:',
-      `font-src 'self' data: ${trustedCdns}`,
-      'connect-src \'self\' https: wss: ws:',
+      `font-src 'self' data: ${resourceDomainsStr}`,
+      `connect-src ${connectSrc}`,
       'frame-ancestors \'self\'',
     ].join('; '),
     'X-Frame-Options': 'SAMEORIGIN',

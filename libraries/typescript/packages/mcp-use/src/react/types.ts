@@ -1,4 +1,5 @@
 import type { Prompt, Resource, ResourceTemplate, Tool } from '@modelcontextprotocol/sdk/types.js'
+import type { BrowserMCPClient } from '../client/browser.js'
 
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
@@ -110,7 +111,7 @@ export type UseMcpResult = {
   getPrompt: (
     name: string,
     args?: Record<string, string>,
-  ) => Promise<{ messages: Array<{ role: 'user' | 'assistant'; content: { type: string; text?: string; [key: string]: any } }> }>
+  ) => Promise<{ messages: Array<{ role: 'user' | 'assistant'; content: { type: string; text?: string;[key: string]: any } }> }>
   /** Manually attempts to reconnect if the state is 'failed'. */
   retry: () => void
   /** Disconnects the client from the MCP server. */
@@ -124,5 +125,25 @@ export type UseMcpResult = {
   authenticate: () => void
   /** Clears all stored authentication data (tokens, client info, etc.) for this server URL from localStorage. */
   clearStorage: () => void
+  /**
+   * The underlying BrowserMCPClient instance.
+   * Use this to create an MCPAgent for AI chat functionality.
+   *
+   * @example
+   * ```typescript
+   * import { MCPAgent } from 'mcp-use'
+   * import { ChatOpenAI } from '@langchain/openai'
+   *
+   * const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+   * const llm = new ChatOpenAI({ model: 'gpt-4' })
+   *
+   * const agent = new MCPAgent({ llm, client: mcp.client })
+   * await agent.initialize()
+   *
+   * for await (const event of agent.streamEvents('Hello')) {
+   *   console.log(event)
+   * }
+   * ```
+   */
+  client: BrowserMCPClient | null
 }
-

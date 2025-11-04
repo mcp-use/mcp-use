@@ -211,22 +211,22 @@ export function InspectorDashboard() {
       const proxyConfig
         = effectiveConnectionType === 'Via Proxy' && proxyAddress.trim()
           ? {
-              proxyAddress: proxyAddress.trim(),
-              customHeaders: customHeaders.reduce((acc, header) => {
-                if (header.name && header.value) {
-                  acc[header.name] = header.value
-                }
-                return acc
-              }, {} as Record<string, string>),
-            }
+            proxyAddress: proxyAddress.trim(),
+            customHeaders: customHeaders.reduce((acc, header) => {
+              if (header.name && header.value) {
+                acc[header.name] = header.value
+              }
+              return acc
+            }, {} as Record<string, string>),
+          }
           : {
-              customHeaders: customHeaders.reduce((acc, header) => {
-                if (header.name && header.value) {
-                  acc[header.name] = header.value
-                }
-                return acc
-              }, {} as Record<string, string>),
-            }
+            customHeaders: customHeaders.reduce((acc, header) => {
+              if (header.name && header.value) {
+                acc[header.name] = header.value
+              }
+              return acc
+            }, {} as Record<string, string>),
+          }
 
       // Map UI transport type to actual transport type
       // "SSE" in UI means "Streamable HTTP" which uses 'http' transport
@@ -249,7 +249,6 @@ export function InspectorDashboard() {
     if (!pendingConnectionConfig)
       return
 
-    console.warn('[InspectorDashboard] Connection ready! Saving to list...')
     setIsConnecting(false)
 
     // Add to saved connections now that it's successful
@@ -288,10 +287,13 @@ export function InspectorDashboard() {
   // Handle failed connection
   const handleConnectionFailure = useCallback(
     (errorMessage: string) => {
-      console.warn('[InspectorDashboard] Connection failed:', errorMessage)
+      // Skip auto-switch for auth errors (both transports will fail the same way)
+      const isAuthError = errorMessage.includes('401') ||
+        errorMessage.includes('Unauthorized') ||
+        errorMessage.includes('Authentication required')
 
       // Try auto-switch if enabled and we haven't tried both connection types yet
-      if (autoSwitch && !hasTriedBothConnectionTypes) {
+      if (autoSwitch && !hasTriedBothConnectionTypes && !isAuthError) {
         const shouldTryProxy = connectionType === 'Direct'
         const shouldTryDirect = connectionType === 'Via Proxy'
 
@@ -433,15 +435,8 @@ export function InspectorDashboard() {
     const connection = connections.find(c => c.id === pendingNavigation)
     const hasData
       = (connection?.tools?.length || 0) > 0
-        || (connection?.resources?.length || 0) > 0
-        || (connection?.prompts?.length || 0) > 0
-
-    console.warn('[InspectorDashboard] Pending navigation check:', {
-      pendingNavigation,
-      connectionState: connection?.state,
-      hasData,
-      toolsCount: connection?.tools?.length || 0,
-    })
+      || (connection?.resources?.length || 0) > 0
+      || (connection?.prompts?.length || 0) > 0
 
     // Navigate if connection is ready OR if it has loaded some data (partial success)
     if (
@@ -449,7 +444,6 @@ export function InspectorDashboard() {
       && (connection.state === 'ready'
         || (hasData && connection.state !== 'connecting'))
     ) {
-      console.warn('[InspectorDashboard] Navigating to server:', connection.id)
       setPendingNavigation(null)
       // Preserve tunnelUrl parameter if present
       const urlParams = new URLSearchParams(location.search)
@@ -493,7 +487,7 @@ export function InspectorDashboard() {
                   v
                   {(typeof window !== 'undefined'
                     && (window as any).__INSPECTOR_VERSION__)
-                  || '1.0.0'}
+                    || '1.0.0'}
                 </Badge>
               </a>
             </TooltipTrigger>
@@ -536,145 +530,144 @@ export function InspectorDashboard() {
           </div>
           {connections.length === 0
             ? (
-                <NotFound message="No servers connected yet. Add a server above to get started." />
-              )
+              <NotFound message="No servers connected yet. Add a server above to get started." />
+            )
             : (
-                <div className="grid gap-3">
-                  {connections.map(connection => (
-                    <div
-                      key={connection.id}
-                      onClick={() => handleServerClick(connection)}
-                      className="group rounded-lg bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-4 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <h4 className="font-semibold text-sm">
-                              {connection.name}
-                            </h4>
-                            <div className="flex items-center gap-2">
-                              {connectingServers.has(connection.id)
+              <div className="grid gap-3">
+                {connections.map(connection => (
+                  <div
+                    key={connection.id}
+                    onClick={() => handleServerClick(connection)}
+                    className="group rounded-lg bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-4 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <h4 className="font-semibold text-sm">
+                            {connection.name}
+                          </h4>
+                          <div className="flex items-center gap-2">
+                            {connectingServers.has(connection.id)
+                              ? (
+                                <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                              )
+                              : connection.error
+                                && connection.state !== 'ready'
                                 ? (
-                                    <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                                  )
-                                : connection.error
-                                  && connection.state !== 'ready'
-                                  ? (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              handleCopyError(connection.error!)
-                                            }}
-                                            className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
-                                            title="Click to copy error message"
-                                            aria-label="Copy error message to clipboard"
-                                          />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p className="max-w-xs">{connection.error}</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    )
-                                  : (
-                                      <div
-                                        className={`w-2 h-2 rounded-full ${
-                                          connection.state === 'disconnected'
-                                            ? 'bg-gray-400 dark:bg-gray-600'
-                                            : connection.state === 'ready'
-                                              ? 'bg-emerald-600 animate-status-pulse'
-                                              : connection.state === 'failed'
-                                                ? 'bg-rose-600 animate-status-pulse-red'
-                                                : 'bg-yellow-500 animate-status-pulse-yellow'
-                                        }`}
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleCopyError(connection.error!)
+                                        }}
+                                        className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
+                                        title="Click to copy error message"
+                                        aria-label="Copy error message to clipboard"
                                       />
-                                    )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-muted-foreground dark:text-zinc-400 font-mono">
-                              {connection.url}
-                            </p>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    navigator.clipboard.writeText(connection.url)
-                                    toast.success('URL copied to clipboard')
-                                  }}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
-                                  title="Copy URL"
-                                >
-                                  <Copy className="w-3 h-3 text-muted-foreground" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Copy URL</p>
-                              </TooltipContent>
-                            </Tooltip>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="max-w-xs">{connection.error}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )
+                                : (
+                                  <div
+                                    className={`w-2 h-2 rounded-full ${connection.state === 'disconnected'
+                                      ? 'bg-gray-400 dark:bg-gray-600'
+                                      : connection.state === 'ready'
+                                        ? 'bg-emerald-600 animate-status-pulse'
+                                        : connection.state === 'failed'
+                                          ? 'bg-rose-600 animate-status-pulse-red'
+                                          : 'bg-yellow-500 animate-status-pulse-yellow'
+                                      }`}
+                                  />
+                                )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-muted-foreground dark:text-zinc-400 font-mono">
+                            {connection.url}
+                          </p>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={e =>
-                                  handleActionClick(e, () =>
-                                    handleCopyConnectionConfig(connection))}
-                                className="h-8 w-8 p-0"
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  navigator.clipboard.writeText(connection.url)
+                                  toast.success('URL copied to clipboard')
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
+                                title="Copy URL"
                               >
-                                <Copy className="w-4 h-4" />
-                              </Button>
+                                <Copy className="w-3 h-3 text-muted-foreground" />
+                              </button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Copy connection config</p>
+                              <p>Copy URL</p>
                             </TooltipContent>
                           </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={e =>
-                                  handleActionClick(e, () =>
-                                    removeConnection(connection.id))}
-                                className="h-8 w-8 p-0"
-                              >
-                                <CircleMinus className="w-4 h-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Remove connection</p>
-                            </TooltipContent>
-                          </Tooltip>
-                          {connection.state !== 'disconnected' && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={e =>
-                                    handleActionClick(e, connection.retry)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <RotateCcw className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Resync connection</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
                         </div>
                       </div>
-                      {connection.state === 'pending_auth'
-                        && connection.authUrl && (
+                      <div className="flex items-center gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={e =>
+                                handleActionClick(e, () =>
+                                  handleCopyConnectionConfig(connection))}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Copy connection config</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={e =>
+                                handleActionClick(e, () =>
+                                  removeConnection(connection.id))}
+                              className="h-8 w-8 p-0"
+                            >
+                              <CircleMinus className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Remove connection</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        {connection.state !== 'disconnected' && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={e =>
+                                  handleActionClick(e, connection.retry)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Resync connection</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </div>
+                    {connection.state === 'pending_auth'
+                      && connection.authUrl && (
                         <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
                           <Button
                             size="sm"
@@ -696,10 +689,10 @@ export function InspectorDashboard() {
                           </a>
                         </div>
                       )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
+            )}
         </div>
       </div>
 
