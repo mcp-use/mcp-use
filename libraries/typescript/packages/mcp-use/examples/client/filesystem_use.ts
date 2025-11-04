@@ -8,47 +8,47 @@
  * for the server.
  */
 
-import { ChatOpenAI } from '@langchain/openai'
-import { config } from 'dotenv'
-import { MCPAgent, MCPClient } from '../../index.js'
+import { ChatOpenAI } from "@langchain/openai";
+import { config } from "dotenv";
+import { MCPAgent, MCPClient } from "../../index.js";
 
 // Load environment variables from .env file
-config()
+config();
 
 const serverConfig = {
   mcpServers: {
     filesystem: {
-      command: 'npx',
+      command: "npx",
       args: [
-        '-y',
-        '@modelcontextprotocol/server-filesystem',
-        'THE_PATH_TO_YOUR_DIRECTORY',
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "THE_PATH_TO_YOUR_DIRECTORY",
       ],
     },
   },
-}
+};
 
 async function main() {
   // Create MCPClient from config
-  const client = MCPClient.fromDict(serverConfig)
+  const client = MCPClient.fromDict(serverConfig);
 
   // Create LLM
-  const llm = new ChatOpenAI({ model: 'gpt-4o' })
+  const llm = new ChatOpenAI({ model: "gpt-4o" });
   // const llm = init_chat_model({ model: "llama-3.1-8b-instant", model_provider: "groq" })
   // const llm = new ChatAnthropic({ model: "claude-3-" })
   // const llm = new ChatGroq({ model: "llama3-8b-8192" })
 
   // Create agent with the client
-  const agent = new MCPAgent({ llm, client, maxSteps: 30 })
+  const agent = new MCPAgent({ llm, client, maxSteps: 30 });
 
   // Run the query
   const result = await agent.run(
-    'Hello can you give me a list of files and directories in the current directory',
-    30,
-  )
-  console.log(`\nResult: ${result}`)
+    "Hello can you give me a list of files and directories in the current directory",
+    30
+  );
+  console.log(`\nResult: ${result}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error)
+  main().catch(console.error);
 }

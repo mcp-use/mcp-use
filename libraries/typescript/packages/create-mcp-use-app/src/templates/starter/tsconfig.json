@@ -22,4 +22,3 @@
   "include": ["index.ts", "src/**/*", "resources/**/*", "server.ts"],
   "exclude": ["node_modules", "dist"]
 }
-

@@ -1,3 +1,6 @@
-export { type ResourceResult, ResourceResultDisplay } from './ResourceResultDisplay'
-export { ResourcesList } from './ResourcesList'
-export { ResourcesTabHeader } from './ResourcesTabHeader'
+export {
+  type ResourceResult,
+  ResourceResultDisplay,
+} from "./ResourceResultDisplay";
+export { ResourcesList } from "./ResourcesList";
+export { ResourcesTabHeader } from "./ResourcesTabHeader";

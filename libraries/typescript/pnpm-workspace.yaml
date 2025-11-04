@@ -7,5 +7,5 @@ packages:
   - packages/create-mcp-use-app/src/templates/mcp-ui
   - packages/create-mcp-use-app/src/templates/apps-sdk
 onlyBuiltDependencies:
-  - '@tailwindcss/oxide'
+  - "@tailwindcss/oxide"
   - esbuild

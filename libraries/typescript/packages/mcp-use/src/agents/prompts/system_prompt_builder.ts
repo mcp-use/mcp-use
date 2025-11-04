@@ -1,47 +1,45 @@
-import type { StructuredToolInterface } from '@langchain/core/tools'
+import type { StructuredToolInterface } from "@langchain/core/tools";
 
-import { SystemMessage } from 'langchain'
+import { SystemMessage } from "langchain";
 
 export function generateToolDescriptions(
   tools: StructuredToolInterface[],
-  disallowedTools?: string[],
+  disallowedTools?: string[]
 ): string[] {
-  const disallowedSet = new Set(disallowedTools ?? [])
-  const descriptions: string[] = []
+  const disallowedSet = new Set(disallowedTools ?? []);
+  const descriptions: string[] = [];
 
   for (const tool of tools) {
-    if (disallowedSet.has(tool.name))
-      continue
-    const escaped = tool.description
-      .replace(/\{/g, '{{')
-      .replace(/\}/g, '}}')
-    descriptions.push(`- ${tool.name}: ${escaped}`)
+    if (disallowedSet.has(tool.name)) continue;
+    const escaped = tool.description.replace(/\{/g, "{{").replace(/\}/g, "}}");
+    descriptions.push(`- ${tool.name}: ${escaped}`);
   }
 
-  return descriptions
+  return descriptions;
 }
 
 export function buildSystemPromptContent(
   template: string,
   toolDescriptionLines: string[],
-  additionalInstructions?: string,
+  additionalInstructions?: string
 ): string {
-  const block = toolDescriptionLines.join('\n')
+  const block = toolDescriptionLines.join("\n");
 
-  let content: string
-  if (template.includes('{tool_descriptions}')) {
-    content = template.replace('{tool_descriptions}', block)
-  }
-  else {
-    console.warn('`{tool_descriptions}` placeholder not found; appending at end.')
-    content = `${template}\n\nAvailable tools:\n${block}`
+  let content: string;
+  if (template.includes("{tool_descriptions}")) {
+    content = template.replace("{tool_descriptions}", block);
+  } else {
+    console.warn(
+      "`{tool_descriptions}` placeholder not found; appending at end."
+    );
+    content = `${template}\n\nAvailable tools:\n${block}`;
   }
 
   if (additionalInstructions) {
-    content += `\n\n${additionalInstructions}`
+    content += `\n\n${additionalInstructions}`;
   }
 
-  return content
+  return content;
 }
 
 export function createSystemMessage(
@@ -51,22 +49,22 @@ export function createSystemMessage(
   useServerManager: boolean,
   disallowedTools?: string[],
   userProvidedPrompt?: string,
-  additionalInstructions?: string,
+  additionalInstructions?: string
 ): SystemMessage {
   if (userProvidedPrompt) {
-    return new SystemMessage({ content: userProvidedPrompt })
+    return new SystemMessage({ content: userProvidedPrompt });
   }
 
   const template = useServerManager
     ? serverManagerTemplate
-    : systemPromptTemplate
+    : systemPromptTemplate;
 
-  const toolLines = generateToolDescriptions(tools, disallowedTools)
+  const toolLines = generateToolDescriptions(tools, disallowedTools);
   const finalContent = buildSystemPromptContent(
     template,
     toolLines,
-    additionalInstructions,
-  )
+    additionalInstructions
+  );
 
-  return new SystemMessage({ content: finalContent })
+  return new SystemMessage({ content: finalContent });
 }

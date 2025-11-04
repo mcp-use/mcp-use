@@ -12,7 +12,7 @@ Action Input: the input to the action
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 Thought: I now know the final answer
-Final Answer: the final answer to the original input question`
+Final Answer: the final answer to the original input question`;
 
 export const SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE = `You are a helpful assistant designed to interact with MCP
  (Model Context Protocol) servers. You can manage connections to different servers and use the tools
@@ -37,4 +37,4 @@ You can then use these server-specific tools in subsequent steps.
 Here are the tools *currently* available to you (this list includes server management tools and will
  change when you connect to a server):
 {tool_descriptions}
-`
+`;

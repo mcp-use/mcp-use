@@ -1,17 +1,17 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js'
-import { Play, Save } from 'lucide-react'
-import { Button } from '@/client/components/ui/button'
-import { Spinner } from '@/client/components/ui/spinner'
-import { ToolInputForm } from './ToolInputForm'
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { Play, Save } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
+import { Spinner } from "@/client/components/ui/spinner";
+import { ToolInputForm } from "./ToolInputForm";
 
 interface ToolExecutionPanelProps {
-  selectedTool: Tool | null
-  toolArgs: Record<string, unknown>
-  isExecuting: boolean
-  isConnected: boolean
-  onArgChange: (key: string, value: string) => void
-  onExecute: () => void
-  onSave: () => void
+  selectedTool: Tool | null;
+  toolArgs: Record<string, unknown>;
+  isExecuting: boolean;
+  isConnected: boolean;
+  onArgChange: (key: string, value: string) => void;
+  onExecute: () => void;
+  onSave: () => void;
 }
 
 export function ToolExecutionPanel({
@@ -33,7 +33,7 @@ export function ToolExecutionPanel({
           Choose a tool from the list to view its details and execute it
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -47,19 +47,17 @@ export function ToolExecutionPanel({
                 onClick={onExecute}
                 disabled={isExecuting || !isConnected}
               >
-                {isExecuting
-                  ? (
-                      <>
-                        <Spinner className="mr-2" />
-                        Executing...
-                      </>
-                    )
-                  : (
-                      <>
-                        <Play className="h-4 w-4 mr-2" />
-                        Execute
-                      </>
-                    )}
+                {isExecuting ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    Executing...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Execute
+                  </>
+                )}
               </Button>
               <Button
                 variant="outline"
@@ -88,5 +86,5 @@ export function ToolExecutionPanel({
         />
       </div>
     </div>
-  )
+  );
 }

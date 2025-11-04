@@ -1,32 +1,40 @@
-import { Brush, Clock, Code, Copy, Download, Maximize, Zap } from 'lucide-react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { Badge } from '@/client/components/ui/badge'
-import { Button } from '@/client/components/ui/button'
-import { usePrismTheme } from '@/client/hooks/usePrismTheme'
-import { isMcpUIResource, McpUIRenderer } from '../McpUIRenderer'
-import { OpenAIComponentRenderer } from '../OpenAIComponentRenderer'
-import { Spinner } from '../ui/spinner'
+import {
+  Brush,
+  Clock,
+  Code,
+  Copy,
+  Download,
+  Maximize,
+  Zap,
+} from "lucide-react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import { usePrismTheme } from "@/client/hooks/usePrismTheme";
+import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
+import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
+import { Spinner } from "../ui/spinner";
 
 export interface ResourceResult {
-  uri: string
-  result: any
-  error?: string
-  timestamp: number
+  uri: string;
+  result: any;
+  error?: string;
+  timestamp: number;
   // Resource metadata from definition (includes openai/outputTemplate in annotations)
-  resourceAnnotations?: Record<string, any>
+  resourceAnnotations?: Record<string, any>;
 }
 
 interface ResourceResultDisplayProps {
-  result: ResourceResult | null
-  isLoading: boolean
-  previewMode: boolean
-  serverId?: string
-  readResource?: (uri: string) => Promise<any>
-  onTogglePreview: () => void
-  onCopy: () => void
-  onDownload: () => void
-  onFullscreen: () => void
-  onUIAction?: (action: any) => void
+  result: ResourceResult | null;
+  isLoading: boolean;
+  previewMode: boolean;
+  serverId?: string;
+  readResource?: (uri: string) => Promise<any>;
+  onTogglePreview: () => void;
+  onCopy: () => void;
+  onDownload: () => void;
+  onFullscreen: () => void;
+  onUIAction?: (action: any) => void;
 }
 
 export function ResourceResultDisplay({
@@ -40,52 +48,62 @@ export function ResourceResultDisplay({
   onDownload,
   onFullscreen,
 }: ResourceResultDisplayProps) {
-  const { prismStyle } = usePrismTheme()
+  const { prismStyle } = usePrismTheme();
 
   // Check for OpenAI Apps SDK component
   // OpenAI metadata can be in:
   // 1. Resource annotations from the resource list (resourceAnnotations)
   // 2. _meta field in the resource contents when read
-  let openaiAnnotations: string[] = []
-  let openaiOutputTemplate: string | undefined
+  let openaiAnnotations: string[] = [];
+  let openaiOutputTemplate: string | undefined;
 
   // Check resource annotations first
   if (result?.resourceAnnotations) {
-    openaiAnnotations = Object.keys(result.resourceAnnotations).filter(key => key.startsWith('openai/'))
-    openaiOutputTemplate = result.resourceAnnotations['openai/outputTemplate'] as string
+    openaiAnnotations = Object.keys(result.resourceAnnotations).filter((key) =>
+      key.startsWith("openai/")
+    );
+    openaiOutputTemplate = result.resourceAnnotations[
+      "openai/outputTemplate"
+    ] as string;
   }
 
   // Also check _meta in contents (this is where OpenAI metadata often appears)
   if (result?.result?.contents?.[0]?._meta) {
-    const contentMeta = result.result.contents[0]._meta
-    const metaKeys = Object.keys(contentMeta).filter(key => key.startsWith('openai/'))
+    const contentMeta = result.result.contents[0]._meta;
+    const metaKeys = Object.keys(contentMeta).filter((key) =>
+      key.startsWith("openai/")
+    );
     if (metaKeys.length > 0) {
-      openaiAnnotations = [...openaiAnnotations, ...metaKeys]
+      openaiAnnotations = [...openaiAnnotations, ...metaKeys];
     }
     // If we don't have outputTemplate yet, check in _meta
-    if (!openaiOutputTemplate && contentMeta['openai/outputTemplate']) {
-      openaiOutputTemplate = contentMeta['openai/outputTemplate'] as string
+    if (!openaiOutputTemplate && contentMeta["openai/outputTemplate"]) {
+      openaiOutputTemplate = contentMeta["openai/outputTemplate"] as string;
     }
     // For resources, the URI itself might be the widget location
-    if (!openaiOutputTemplate && result.uri && result.uri.startsWith('ui://widget/')) {
-      openaiOutputTemplate = result.uri
+    if (
+      !openaiOutputTemplate &&
+      result.uri &&
+      result.uri.startsWith("ui://widget/")
+    ) {
+      openaiOutputTemplate = result.uri;
     }
   }
 
   const hasOpenAIComponent = !!(
-    openaiAnnotations.length > 0
-    && openaiOutputTemplate
-    && typeof openaiOutputTemplate === 'string'
-    && serverId
-    && readResource
-  )
+    openaiAnnotations.length > 0 &&
+    openaiOutputTemplate &&
+    typeof openaiOutputTemplate === "string" &&
+    serverId &&
+    readResource
+  );
 
   if (isLoading) {
     return (
       <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
         <Spinner className="size-5" />
       </div>
-    )
+    );
   }
 
   if (!result) {
@@ -98,7 +116,7 @@ export function ResourceResultDisplay({
           Choose a resource from the list to see its data
         </p>
       </div>
-    )
+    );
   }
 
   if (result.error) {
@@ -111,22 +129,22 @@ export function ResourceResultDisplay({
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   // Check if we have MCP UI resources
-  const hasMcpUIResources
-    = result?.result?.contents
-      && Array.isArray(result.result.contents)
-      && result.result.contents.some(
-        (item: any) => item.mimeType && isMcpUIResource(item),
-      )
+  const hasMcpUIResources =
+    result?.result?.contents &&
+    Array.isArray(result.result.contents) &&
+    result.result.contents.some(
+      (item: any) => item.mimeType && isMcpUIResource(item)
+    );
 
   const mcpUIResources = hasMcpUIResources
     ? result.result.contents.filter(
-        (item: any) => item.mimeType && isMcpUIResource(item),
+        (item: any) => item.mimeType && isMcpUIResource(item)
       )
-    : []
+    : [];
 
   return (
     <div className="flex flex-col h-full">
@@ -139,20 +157,19 @@ export function ResourceResultDisplay({
             </span>
           </div>
           {(() => {
-            const durationMs = (result as any)?.duration
-              ?? (result.result as any)?.duration
-              ?? (result.result as any)?.metrics?.durationMs
-            return durationMs !== undefined
-              ? (
-                  <div className="flex items-center gap-1">
-                    <Zap className="h-3 w-3 text-gray-400" />
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {durationMs}
-                      ms
-                    </span>
-                  </div>
-                )
-              : null
+            const durationMs =
+              (result as any)?.duration ??
+              (result.result as any)?.duration ??
+              (result.result as any)?.metrics?.durationMs;
+            return durationMs !== undefined ? (
+              <div className="flex items-center gap-1">
+                <Zap className="h-3 w-3 text-gray-400" />
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {durationMs}
+                  ms
+                </span>
+              </div>
+            ) : null;
           })()}
           {hasMcpUIResources && (
             <Badge
@@ -178,11 +195,19 @@ export function ResourceResultDisplay({
               size="sm"
               onClick={onTogglePreview}
               className={
-                !previewMode ? 'text-purple-600 dark:text-purple-400' : ''
+                !previewMode ? "text-purple-600 dark:text-purple-400" : ""
               }
             >
-              {previewMode ? <Code className="h-4 w-4 mr-1" /> : <Brush className="h-4 w-4 mr-1" />}
-              {previewMode ? 'JSON' : hasOpenAIComponent ? 'Component' : 'Preview'}
+              {previewMode ? (
+                <Code className="h-4 w-4 mr-1" />
+              ) : (
+                <Brush className="h-4 w-4 mr-1" />
+              )}
+              {previewMode
+                ? "JSON"
+                : hasOpenAIComponent
+                  ? "Component"
+                  : "Preview"}
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onCopy}>
@@ -200,7 +225,12 @@ export function ResourceResultDisplay({
       <div className="flex-1 overflow-y-auto">
         {(() => {
           // Handle OpenAI Apps SDK components
-          if (hasOpenAIComponent && serverId && readResource && openaiOutputTemplate) {
+          if (
+            hasOpenAIComponent &&
+            serverId &&
+            readResource &&
+            openaiOutputTemplate
+          ) {
             if (previewMode) {
               // OpenAI Apps SDK Component mode
               return (
@@ -215,9 +245,8 @@ export function ResourceResultDisplay({
                     className="w-full h-full relative flex p-4"
                   />
                 </div>
-              )
-            }
-            else {
+              );
+            } else {
               // JSON mode for Apps SDK resources
               return (
                 <div className="px-4 pt-4">
@@ -227,17 +256,17 @@ export function ResourceResultDisplay({
                     customStyle={{
                       margin: 0,
                       padding: 0,
-                      border: 'none',
+                      border: "none",
                       borderRadius: 0,
-                      fontSize: '1rem',
-                      background: 'transparent',
+                      fontSize: "1rem",
+                      background: "transparent",
                     }}
                     className="text-gray-900 dark:text-gray-100"
                   >
                     {JSON.stringify(result.result, null, 2)}
                   </SyntaxHighlighter>
                 </div>
-              )
+              );
             }
           }
 
@@ -248,8 +277,8 @@ export function ResourceResultDisplay({
                   {mcpUIResources.map((resource: any, _idx: number) => (
                     <div
                       key={`mcp-ui-${
-                        resource.uri
-                        || `resource-${Date.now()}-${Math.random()}`
+                        resource.uri ||
+                        `resource-${Date.now()}-${Math.random()}`
                       }`}
                       className="mx-0 size-full"
                     >
@@ -265,12 +294,12 @@ export function ResourceResultDisplay({
                   {/* Show JSON for non-UI content */}
                   {(() => {
                     if (
-                      result.result.contents
-                      && Array.isArray(result.result.contents)
+                      result.result.contents &&
+                      Array.isArray(result.result.contents)
                     ) {
                       const nonUIResources = result.result.contents.filter(
-                        (item: any) => !(item.mimeType && isMcpUIResource(item)),
-                      )
+                        (item: any) => !(item.mimeType && isMcpUIResource(item))
+                      );
                       if (nonUIResources.length > 0) {
                         return (
                           <div className="px-4">
@@ -280,25 +309,24 @@ export function ResourceResultDisplay({
                               customStyle={{
                                 margin: 0,
                                 padding: 0,
-                                border: 'none',
+                                border: "none",
                                 borderRadius: 0,
-                                fontSize: '1rem',
-                                background: 'transparent',
+                                fontSize: "1rem",
+                                background: "transparent",
                               }}
                               className="text-gray-900 dark:text-gray-100"
                             >
                               {JSON.stringify(nonUIResources, null, 2)}
                             </SyntaxHighlighter>
                           </div>
-                        )
+                        );
                       }
                     }
-                    return null
+                    return null;
                   })()}
                 </div>
-              )
-            }
-            else {
+              );
+            } else {
               // JSON mode for MCP UI resources
               return (
                 <div className="px-4 pt-4">
@@ -308,17 +336,17 @@ export function ResourceResultDisplay({
                     customStyle={{
                       margin: 0,
                       padding: 0,
-                      border: 'none',
+                      border: "none",
                       borderRadius: 0,
-                      fontSize: '1rem',
-                      background: 'transparent',
+                      fontSize: "1rem",
+                      background: "transparent",
                     }}
                     className="text-gray-900 dark:text-gray-100"
                   >
                     {JSON.stringify(result.result, null, 2)}
                   </SyntaxHighlighter>
                 </div>
-              )
+              );
             }
           }
 
@@ -331,19 +359,19 @@ export function ResourceResultDisplay({
                 customStyle={{
                   margin: 0,
                   padding: 0,
-                  border: 'none',
+                  border: "none",
                   borderRadius: 0,
-                  fontSize: '1rem',
-                  background: 'transparent',
+                  fontSize: "1rem",
+                  background: "transparent",
                 }}
                 className="text-gray-900 dark:text-gray-100"
               >
                 {JSON.stringify(result.result, null, 2)}
               </SyntaxHighlighter>
             </div>
-          )
+          );
         })()}
       </div>
     </div>
-  )
+  );
 }
