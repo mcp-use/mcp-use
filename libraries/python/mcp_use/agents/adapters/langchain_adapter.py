@@ -101,7 +101,7 @@ class LangChainAdapter(BaseAdapter):
                 try:
                     found, cfg_name = schema_has_runnable_config(self.args_schema)
                     if found and config is not None:
-                        kwargs[cfg_name] = RunnableConfig(config["metadata"])
+                        kwargs[cfg_name] = {"metadata": config["metadata"]}
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     try:
                         # Use the helper function to parse the result

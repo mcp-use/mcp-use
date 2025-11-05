@@ -30,7 +30,7 @@ def is_runnable_config_type(tp: Any) -> bool:
     # Optional[X] / Union[X, Y, ...]
     if origin is Union:
         return any(is_runnable_config_type(arg) for arg in get_args(tp))
-    if tp.__name__ in ["RunnableConfig","DynamicModel"]:
+    if tp.__name__ in ["RunnableConfig", "DynamicModel"]:
         return True
 
     # Direct match
