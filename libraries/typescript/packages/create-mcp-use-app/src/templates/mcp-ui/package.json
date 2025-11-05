@@ -1,8 +1,8 @@
 {
-  "name": "mcp-uiresource-server",
+  "name": "mcp-use server",
   "type": "module",
   "version": "1.0.0",
-  "description": "MCP server with UIResource widget integration",
+  "description": "MCP server with MCP-UI integration",
   "author": "",
   "license": "MIT",
   "keywords": [

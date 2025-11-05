@@ -1,11 +1,11 @@
 interface UserMessageProps {
-  content: string
-  timestamp?: Date | number
+  content: string;
+  timestamp?: Date | number;
 }
 
 export function UserMessage({ content, timestamp }: UserMessageProps) {
   if (!content || content.length === 0) {
-    return null
+    return null;
   }
 
   return (
@@ -24,5 +24,5 @@ export function UserMessage({ content, timestamp }: UserMessageProps) {
         )}
       </div>
     </div>
-  )
+  );
 }

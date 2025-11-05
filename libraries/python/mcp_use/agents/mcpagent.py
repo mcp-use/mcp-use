@@ -21,7 +21,13 @@ from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain_core.agents import AgentAction
 from langchain_core.globals import set_debug
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
@@ -33,7 +39,10 @@ from mcp_use.agents.managers.server_manager import ServerManager
 # Import observability manager
 from mcp_use.agents.observability import ObservabilityManager
 from mcp_use.agents.prompts.system_prompt_builder import create_system_message
-from mcp_use.agents.prompts.templates import DEFAULT_SYSTEM_PROMPT_TEMPLATE, SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE
+from mcp_use.agents.prompts.templates import (
+    DEFAULT_SYSTEM_PROMPT_TEMPLATE,
+    SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE,
+)
 from mcp_use.agents.remote import RemoteAgent
 from mcp_use.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
@@ -63,7 +72,7 @@ class MCPAgent:
         auto_initialize: bool = False,
         memory_enabled: bool = True,
         system_prompt: str | None = None,
-        system_prompt_template: str | None = None,  # User can still override the template
+        system_prompt_template: (str | None) = None,  # User can still override the template
         additional_instructions: str | None = None,
         disallowed_tools: list[str] | None = None,
         tools_used_names: list[str] | None = None,
@@ -120,6 +129,8 @@ class MCPAgent:
         self.client = client
         self.connectors = connectors or []
         self.max_steps = max_steps
+        # Recursion limit for langchain
+        self.recursion_limit = self.max_steps * 2
         self.auto_initialize = auto_initialize
         self.memory_enabled = memory_enabled
         self._initialized = False
@@ -308,8 +319,12 @@ class MCPAgent:
 
         # Use the standard create_agent with middleware
         agent = create_agent(
-            model=self.llm, tools=self._tools, system_prompt=system_content, middleware=middleware, debug=self.verbose
-        )
+            model=self.llm,
+            tools=self._tools,
+            system_prompt=system_content,
+            middleware=middleware,
+            debug=self.verbose,
+        ).with_config({"recursion_limit": self.recursion_limit})
 
         logger.debug(
             f"Created agent with max_steps={self.max_steps} (via ModelCallLimitMiddleware) "
@@ -459,7 +474,12 @@ class MCPAgent:
         start_time = time.time()
 
         generator = self.stream(
-            query, max_steps, manage_connector, external_history, track_execution=False, output_schema=output_schema
+            query,
+            max_steps,
+            manage_connector,
+            external_history,
+            track_execution=False,
+            output_schema=output_schema,
         )
         error = None
         result = None
@@ -479,7 +499,7 @@ class MCPAgent:
                 success=success,
                 model_provider=self._model_provider,
                 model_name=self._model_name,
-                server_count=len(self.client.get_all_active_sessions()) if self.client else len(self.connectors),
+                server_count=(len(self.client.get_all_active_sessions()) if self.client else len(self.connectors)),
                 server_identifiers=[connector.public_identifier for connector in self.connectors],
                 total_tools_available=len(self._tools) if self._tools else 0,
                 tools_available_names=[tool.name for tool in self._tools],
@@ -500,7 +520,11 @@ class MCPAgent:
         return result
 
     async def _attempt_structured_output(
-        self, raw_result: str, structured_llm, output_schema: type[T], schema_description: str
+        self,
+        raw_result: str,
+        structured_llm,
+        output_schema: type[T],
+        schema_description: str,
     ) -> T:
         """Attempt to create structured output from raw result with validation."""
         format_prompt = f"""
@@ -704,7 +728,7 @@ class MCPAgent:
                                         elif isinstance(message.content, list):
                                             # Extract text blocks from content array
                                             text_parts = [
-                                                block.get("text", "") if isinstance(block, dict) else str(block)
+                                                (block.get("text", "") if isinstance(block, dict) else str(block))
                                                 for block in message.content
                                                 if isinstance(block, dict) and block.get("type") == "text"
                                             ]
@@ -715,7 +739,11 @@ class MCPAgent:
                                         tool_input = tool_call.get("args", {})
                                         tool_call_id = tool_call.get("id")
 
-                                        action = AgentAction(tool=tool_name, tool_input=tool_input, log=log_text)
+                                        action = AgentAction(
+                                            tool=tool_name,
+                                            tool_input=tool_input,
+                                            log=log_text,
+                                        )
                                         if tool_call_id:
                                             pending_tool_calls[tool_call_id] = action
 

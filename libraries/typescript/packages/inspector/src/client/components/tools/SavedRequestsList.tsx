@@ -1,28 +1,28 @@
-import { Database, History, Trash2 } from 'lucide-react'
-import { ListItem } from '@/client/components/shared'
-import { Button } from '@/client/components/ui/button'
+import { Database, History, Trash2 } from "lucide-react";
+import { ListItem } from "@/client/components/shared";
+import { Button } from "@/client/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/client/components/ui/tooltip'
+} from "@/client/components/ui/tooltip";
 
 export interface SavedRequest {
-  id: string
-  name: string
-  toolName: string
-  args: Record<string, unknown>
-  savedAt: number
-  serverId?: string
-  serverName?: string
+  id: string;
+  name: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  savedAt: number;
+  serverId?: string;
+  serverName?: string;
 }
 
 interface SavedRequestsListProps {
-  savedRequests: SavedRequest[]
-  selectedRequest: SavedRequest | null
-  onLoadRequest: (request: SavedRequest) => void
-  onDeleteRequest: (id: string) => void
-  focusedIndex: number
+  savedRequests: SavedRequest[];
+  selectedRequest: SavedRequest | null;
+  onLoadRequest: (request: SavedRequest) => void;
+  onDeleteRequest: (id: string) => void;
+  focusedIndex: number;
 }
 
 export function SavedRequestsList({
@@ -43,13 +43,13 @@ export function SavedRequestsList({
           Execute a tool and click Save to store requests
         </p>
       </div>
-    )
+    );
   }
 
   const handleActionClick = (e: React.MouseEvent, action: () => void) => {
-    e.stopPropagation()
-    action()
-  }
+    e.stopPropagation();
+    action();
+  };
 
   return (
     <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
@@ -77,7 +77,9 @@ export function SavedRequestsList({
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={e => handleActionClick(e, () => onDeleteRequest(request.id))}
+                  onClick={(e) =>
+                    handleActionClick(e, () => onDeleteRequest(request.id))
+                  }
                   className="h-8 w-8 p-0"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -91,5 +93,5 @@ export function SavedRequestsList({
         </div>
       ))}
     </div>
-  )
+  );
 }

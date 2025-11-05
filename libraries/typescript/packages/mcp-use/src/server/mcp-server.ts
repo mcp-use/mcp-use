@@ -8,32 +8,37 @@ import type {
   WidgetProps,
   InputDefinition,
   UIResourceContent,
-} from './types/index.js'
-import { McpServer as OfficialMcpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { z } from 'zod'
-import express, { type Express } from 'express'
-import cors from 'cors'
-import { existsSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
-import { readFileSync } from 'node:fs'
-import { requestLogger } from './logging.js'
-import { createUIResourceFromDefinition, type UrlConfig } from './adapters/mcp-ui-adapter.js'
-import type { GetPromptResult } from '@modelcontextprotocol/sdk/types.js'
-import {createServer} from "vite"
+} from "./types/index.js";
+import {
+  McpServer as OfficialMcpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import express, { type Express } from "express";
+import cors from "cors";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { requestLogger } from "./logging.js";
+import {
+  createUIResourceFromDefinition,
+  type UrlConfig,
+} from "./adapters/mcp-ui-adapter.js";
+import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import { createServer } from "vite";
+import type { WidgetMetadata } from "./types/widget.js";
 
-
-const TMP_MCP_USE_DIR = '.mcp-use'
-
+const TMP_MCP_USE_DIR = ".mcp-use";
 
 export class McpServer {
-  private server: OfficialMcpServer
-  private config: ServerConfig
-  private app: Express
-  private mcpMounted = false
-  private inspectorMounted = false
-  private serverPort?: number
-  private serverHost: string
-  private serverBaseUrl?: string
+  private server: OfficialMcpServer;
+  private config: ServerConfig;
+  private app: Express;
+  private mcpMounted = false;
+  private inspectorMounted = false;
+  private serverPort?: number;
+  private serverHost: string;
+  private serverBaseUrl?: string;
 
   /**
    * Creates a new MCP server instance with Express integration
@@ -46,38 +51,48 @@ export class McpServer {
    * @returns A proxied McpServer instance that supports both MCP and Express methods
    */
   constructor(config: ServerConfig) {
-    this.config = config
-    this.serverHost = config.host || 'localhost'
+    this.config = config;
+    this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
     this.server = new OfficialMcpServer({
       name: config.name,
       version: config.version,
-    })
-    this.app = express()
+    });
+    this.app = express();
 
     // Parse JSON bodies
-    this.app.use(express.json())
+    this.app.use(express.json());
 
     // Enable CORS by default
-    this.app.use(cors({
-      origin: '*',
-      methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'mcp-protocol-version', 'mcp-session-id', 'X-Proxy-Token', 'X-Target-URL'],
-    }))
+    this.app.use(
+      cors({
+        origin: "*",
+        methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: [
+          "Content-Type",
+          "Accept",
+          "Authorization",
+          "mcp-protocol-version",
+          "mcp-session-id",
+          "X-Proxy-Token",
+          "X-Target-URL",
+        ],
+      })
+    );
 
     // Request logging middleware
-    this.app.use(requestLogger)
+    this.app.use(requestLogger);
 
     // Proxy all Express methods to the underlying app
     return new Proxy(this, {
       get(target, prop) {
         if (prop in target) {
-          return (target as any)[prop]
+          return (target as any)[prop];
         }
-        const value = (target.app as any)[prop]
-        return typeof value === 'function' ? value.bind(target.app) : value
-      }
-    }) as McpServer
+        const value = (target.app as any)[prop];
+        return typeof value === "function" ? value.bind(target.app) : value;
+      },
+    }) as McpServer;
   }
 
   /**
@@ -132,10 +147,10 @@ export class McpServer {
         _meta: resourceDefinition._meta,
       },
       async () => {
-        return await resourceDefinition.readCallback()
-      },
-    )
-    return this
+        return await resourceDefinition.readCallback();
+      }
+    );
+    return this;
   }
 
   /**
@@ -170,32 +185,39 @@ export class McpServer {
    * })
    * ```
    */
-  resourceTemplate(resourceTemplateDefinition: ResourceTemplateDefinition): this {
+  resourceTemplate(
+    resourceTemplateDefinition: ResourceTemplateDefinition
+  ): this {
     // Create ResourceTemplate instance from SDK
     const template = new ResourceTemplate(
       resourceTemplateDefinition.resourceTemplate.uriTemplate,
       {
         list: undefined, // Optional: callback to list all matching resources
-        complete: undefined // Optional: callback for auto-completion
+        complete: undefined, // Optional: callback for auto-completion
       }
-    )
+    );
 
     // Create metadata object with optional fields
-    const metadata: any = {}
+    const metadata: any = {};
     if (resourceTemplateDefinition.resourceTemplate.name) {
-      metadata.name = resourceTemplateDefinition.resourceTemplate.name
+      metadata.name = resourceTemplateDefinition.resourceTemplate.name;
     }
     if (resourceTemplateDefinition.title) {
-      metadata.title = resourceTemplateDefinition.title
+      metadata.title = resourceTemplateDefinition.title;
     }
-    if (resourceTemplateDefinition.description || resourceTemplateDefinition.resourceTemplate.description) {
-      metadata.description = resourceTemplateDefinition.description || resourceTemplateDefinition.resourceTemplate.description
+    if (
+      resourceTemplateDefinition.description ||
+      resourceTemplateDefinition.resourceTemplate.description
+    ) {
+      metadata.description =
+        resourceTemplateDefinition.description ||
+        resourceTemplateDefinition.resourceTemplate.description;
     }
     if (resourceTemplateDefinition.resourceTemplate.mimeType) {
-      metadata.mimeType = resourceTemplateDefinition.resourceTemplate.mimeType
+      metadata.mimeType = resourceTemplateDefinition.resourceTemplate.mimeType;
     }
     if (resourceTemplateDefinition.annotations) {
-      metadata.annotations = resourceTemplateDefinition.annotations
+      metadata.annotations = resourceTemplateDefinition.annotations;
     }
 
     this.server.registerResource(
@@ -207,11 +229,11 @@ export class McpServer {
         const params = this.parseTemplateUri(
           resourceTemplateDefinition.resourceTemplate.uriTemplate,
           uri.toString()
-        )
-        return await resourceTemplateDefinition.readCallback(uri, params)
-      },
-    )
-    return this
+        );
+        return await resourceTemplateDefinition.readCallback(uri, params);
+      }
+    );
+    return this;
   }
 
   /**
@@ -253,7 +275,7 @@ export class McpServer {
    * ```
    */
   tool(toolDefinition: ToolDefinition): this {
-    const inputSchema = this.createParamsSchema(toolDefinition.inputs || [])
+    const inputSchema = this.createParamsSchema(toolDefinition.inputs || []);
 
     this.server.registerTool(
       toolDefinition.name,
@@ -262,13 +284,13 @@ export class McpServer {
         description: toolDefinition.description ?? "",
         inputSchema,
         annotations: toolDefinition.annotations,
-        _meta: toolDefinition._meta
+        _meta: toolDefinition._meta,
       },
       async (params: any) => {
-        return await toolDefinition.cb(params)
-      },
-    )
-    return this
+        return await toolDefinition.cb(params);
+      }
+    );
+    return this;
   }
 
   /**
@@ -306,7 +328,7 @@ export class McpServer {
    * ```
    */
   prompt(promptDefinition: PromptDefinition): this {
-    const argsSchema = this.createParamsSchema(promptDefinition.args || [])
+    const argsSchema = this.createParamsSchema(promptDefinition.args || []);
     this.server.registerPrompt(
       promptDefinition.name,
       {
@@ -315,12 +337,11 @@ export class McpServer {
         argsSchema,
       },
       async (params: any): Promise<GetPromptResult> => {
-        return await promptDefinition.cb(params)
-      },
-    )
-    return this
+        return await promptDefinition.cb(params);
+      }
+    );
+    return this;
   }
-
 
   /**
    * Register a UI widget as both a tool and a resource
@@ -350,7 +371,7 @@ export class McpServer {
    * ```typescript
    * // Simple usage - auto-loads from generated schema
    * server.uiResource('display-weather')
-   * 
+   *
    * // Legacy MCP-UI widget
    * server.uiResource({
    *   type: 'externalUrl',
@@ -390,31 +411,33 @@ export class McpServer {
    * ```
    */
   uiResource(definition: UIResourceDefinition): this {
-    const displayName = definition.title || definition.name
+    const displayName = definition.title || definition.name;
 
     // Determine resource URI and mimeType based on type
-    let resourceUri: string
-    let mimeType: string
+    let resourceUri: string;
+    let mimeType: string;
 
     switch (definition.type) {
-      case 'externalUrl':
-        resourceUri = `ui://widget/${definition.widget}`
-        mimeType = 'text/uri-list'
-        break
-      case 'rawHtml':
-        resourceUri = `ui://widget/${definition.name}`
-        mimeType = 'text/html'
-        break
-      case 'remoteDom':
-        resourceUri = `ui://widget/${definition.name}`
-        mimeType = 'application/vnd.mcp-ui.remote-dom+javascript'
-        break
-      case 'appsSdk':
-        resourceUri = `ui://widget/${definition.name}.html`
-        mimeType = 'text/html+skybridge'
-        break
+      case "externalUrl":
+        resourceUri = `ui://widget/${definition.widget}`;
+        mimeType = "text/uri-list";
+        break;
+      case "rawHtml":
+        resourceUri = `ui://widget/${definition.name}`;
+        mimeType = "text/html";
+        break;
+      case "remoteDom":
+        resourceUri = `ui://widget/${definition.name}`;
+        mimeType = "application/vnd.mcp-ui.remote-dom+javascript";
+        break;
+      case "appsSdk":
+        resourceUri = `ui://widget/${definition.name}.html`;
+        mimeType = "text/html+skybridge";
+        break;
       default:
-        throw new Error(`Unsupported UI resource type. Must be one of: externalUrl, rawHtml, remoteDom, appsSdk`)
+        throw new Error(
+          `Unsupported UI resource type. Must be one of: externalUrl, rawHtml, remoteDom, appsSdk`
+        );
     }
 
     // Register the resource
@@ -428,27 +451,28 @@ export class McpServer {
       annotations: definition.annotations,
       readCallback: async () => {
         // For externalUrl type, use default props. For others, use empty params
-        const params = definition.type === 'externalUrl'
-          ? this.applyDefaultProps(definition.props)
-          : {}
+        const params =
+          definition.type === "externalUrl"
+            ? this.applyDefaultProps(definition.props)
+            : {};
 
-        const uiResource = this.createWidgetUIResource(definition, params)
+        const uiResource = this.createWidgetUIResource(definition, params);
 
         return {
-          contents: [uiResource.resource]
-        }
-      }
-    })
+          contents: [uiResource.resource],
+        };
+      },
+    });
 
     // For Apps SDK, also register a resource template to handle dynamic URIs with random IDs
-    if (definition.type === 'appsSdk') {
+    if (definition.type === "appsSdk") {
       this.resourceTemplate({
         name: `${definition.name}-dynamic`,
         resourceTemplate: {
           uriTemplate: `ui://widget/${definition.name}-{id}.html`,
           name: definition.title || definition.name,
           description: definition.description,
-          mimeType
+          mimeType,
         },
         _meta: definition._meta,
         title: definition.title,
@@ -456,34 +480,34 @@ export class McpServer {
         annotations: definition.annotations,
         readCallback: async (uri, params) => {
           // Use empty params for Apps SDK since structuredContent is passed separately
-          const uiResource = this.createWidgetUIResource(definition, {})
-          
+          const uiResource = this.createWidgetUIResource(definition, {});
+
           return {
-            contents: [uiResource.resource]
-          }
-        }
-      })
+            contents: [uiResource.resource],
+          };
+        },
+      });
     }
 
     // Register the tool - returns UIResource with parameters
     // For Apps SDK, include the outputTemplate metadata
-    const toolMetadata: Record<string, unknown> = definition._meta || {}
+    const toolMetadata: Record<string, unknown> = definition._meta || {};
 
-    if (definition.type === 'appsSdk' && definition.appsSdkMetadata) {
+    if (definition.type === "appsSdk" && definition.appsSdkMetadata) {
       // Add Apps SDK tool metadata
-      toolMetadata['openai/outputTemplate'] = resourceUri
+      toolMetadata["openai/outputTemplate"] = resourceUri;
 
       // Copy over tool-relevant metadata fields from appsSdkMetadata
       const toolMetadataFields = [
-        'openai/toolInvocation/invoking',
-        'openai/toolInvocation/invoked',
-        'openai/widgetAccessible',
-        'openai/resultCanProduceWidget'
-      ] as const
+        "openai/toolInvocation/invoking",
+        "openai/toolInvocation/invoked",
+        "openai/widgetAccessible",
+        "openai/resultCanProduceWidget",
+      ] as const;
 
       for (const field of toolMetadataFields) {
         if (definition.appsSdkMetadata[field] !== undefined) {
-          toolMetadata[field] = definition.appsSdkMetadata[field]
+          toolMetadata[field] = definition.appsSdkMetadata[field];
         }
       }
     }
@@ -496,45 +520,48 @@ export class McpServer {
       _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
       cb: async (params) => {
         // Create the UIResource with user-provided params
-        const uiResource = this.createWidgetUIResource(definition, params)
+        const uiResource = this.createWidgetUIResource(definition, params);
 
         // For Apps SDK, return _meta at top level with only text in content
-        if (definition.type === 'appsSdk') {
+        if (definition.type === "appsSdk") {
           // Generate a unique URI with random ID for each invocation
-          const randomId = Math.random().toString(36).substring(2, 15)
-          const uniqueUri = `ui://widget/${definition.name}-${randomId}.html`
-          
+          const randomId = Math.random().toString(36).substring(2, 15);
+          const uniqueUri = `ui://widget/${definition.name}-${randomId}.html`;
+
           // Update toolMetadata with the unique URI
-          const uniqueToolMetadata = { ...toolMetadata, 'openai/outputTemplate': uniqueUri }
-          
+          const uniqueToolMetadata = {
+            ...toolMetadata,
+            "openai/outputTemplate": uniqueUri,
+          };
+
           return {
             _meta: uniqueToolMetadata,
             content: [
               {
-                type: 'text',
-                text: `Displaying ${displayName}`
-              }
+                type: "text",
+                text: `Displaying ${displayName}`,
+              },
             ],
             // structuredContent will be injected as window.openai.toolOutput by Apps SDK
-            structuredContent: params
-          }
+            structuredContent: params,
+          };
         }
 
         // For other types, return standard response
         return {
           content: [
             {
-              type: 'text',
+              type: "text",
               text: `Displaying ${displayName}`,
-              description: `Show MCP-UI widget for ${displayName}`
+              description: `Show MCP-UI widget for ${displayName}`,
             },
-            uiResource
-          ]
-        }
-      }
-    })
+            uiResource,
+          ],
+        };
+      },
+    });
 
-    return this
+    return this;
   }
 
   /**
@@ -554,26 +581,26 @@ export class McpServer {
     params: Record<string, any>
   ): UIResourceContent {
     // If baseUrl is set, parse it to extract protocol, host, and port
-    let configBaseUrl = `http://${this.serverHost}`
-    let configPort: number | string = this.serverPort || 3001
-    
+    let configBaseUrl = `http://${this.serverHost}`;
+    let configPort: number | string = this.serverPort || 3001;
+
     if (this.serverBaseUrl) {
       try {
-        const url = new URL(this.serverBaseUrl)
-        configBaseUrl = `${url.protocol}//${url.hostname}`
-        configPort = url.port || (url.protocol === 'https:' ? 443 : 80)
+        const url = new URL(this.serverBaseUrl);
+        configBaseUrl = `${url.protocol}//${url.hostname}`;
+        configPort = url.port || (url.protocol === "https:" ? 443 : 80);
       } catch (e) {
         // Fall back to host:port if baseUrl parsing fails
-        console.warn('Failed to parse baseUrl, falling back to host:port', e)
+        console.warn("Failed to parse baseUrl, falling back to host:port", e);
       }
     }
-    
+
     const urlConfig: UrlConfig = {
       baseUrl: configBaseUrl,
-      port: configPort
-    }
+      port: configPort,
+    };
 
-    return createUIResourceFromDefinition(definition, params, urlConfig)
+    return createUIResourceFromDefinition(definition, params, urlConfig);
   }
 
   /**
@@ -589,25 +616,25 @@ export class McpServer {
    * @returns Complete URL with encoded parameters
    */
   private buildWidgetUrl(widget: string, params: Record<string, any>): string {
-    const baseUrl = `http://${this.serverHost}:${this.serverPort}/mcp-use/widgets/${widget}`
+    const baseUrl = `http://${this.serverHost}:${this.serverPort}/mcp-use/widgets/${widget}`;
 
     if (Object.keys(params).length === 0) {
-      return baseUrl
+      return baseUrl;
     }
 
-    const queryParams = new URLSearchParams()
+    const queryParams = new URLSearchParams();
 
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null) {
-        if (typeof value === 'object') {
-          queryParams.append(key, JSON.stringify(value))
+        if (typeof value === "object") {
+          queryParams.append(key, JSON.stringify(value));
         } else {
-          queryParams.append(key, String(value))
+          queryParams.append(key, String(value));
         }
       }
     }
 
-    return `${baseUrl}?${queryParams.toString()}`
+    return `${baseUrl}?${queryParams.toString()}`;
   }
 
   /**
@@ -621,15 +648,15 @@ export class McpServer {
    * @returns Array of InputDefinition objects for tool registration
    */
   private convertPropsToInputs(props?: WidgetProps): InputDefinition[] {
-    if (!props) return []
+    if (!props) return [];
 
     return Object.entries(props).map(([name, prop]) => ({
       name,
       type: prop.type,
       description: prop.description,
       required: prop.required,
-      default: prop.default
-    }))
+      default: prop.default,
+    }));
   }
 
   /**
@@ -643,21 +670,20 @@ export class McpServer {
    * @returns Object with default values for each prop
    */
   private applyDefaultProps(props?: WidgetProps): Record<string, any> {
-    if (!props) return {}
+    if (!props) return {};
 
-    const defaults: Record<string, any> = {}
+    const defaults: Record<string, any> = {};
     for (const [key, prop] of Object.entries(props)) {
       if (prop.default !== undefined) {
-        defaults[key] = prop.default
+        defaults[key] = prop.default;
       }
     }
-    return defaults
+    return defaults;
   }
-
 
   /**
    * Check if server is running in production mode
-   * 
+   *
    * @private
    * @returns true if in production mode, false otherwise
    */
@@ -665,22 +691,30 @@ export class McpServer {
     // Only check NODE_ENV - CLI commands set this explicitly
     // 'mcp-use dev' sets NODE_ENV=development
     // 'mcp-use start' sets NODE_ENV=production
-    return process.env.NODE_ENV === 'production'
+    return process.env.NODE_ENV === "production";
   }
 
   /**
    * Read build manifest file
-   * 
+   *
    * @private
    * @returns Build manifest or null if not found
    */
-  private readBuildManifest(): { includeInspector: boolean; widgets: string[]; buildTime?: string } | null {
+  private readBuildManifest(): {
+    includeInspector: boolean;
+    widgets: string[];
+    buildTime?: string;
+  } | null {
     try {
-      const manifestPath = join(process.cwd(), 'dist', '.mcp-use-manifest.json')
-      const content = readFileSync(manifestPath, 'utf8')
-      return JSON.parse(content)
+      const manifestPath = join(
+        process.cwd(),
+        "dist",
+        ".mcp-use-manifest.json"
+      );
+      const content = readFileSync(manifestPath, "utf8");
+      return JSON.parse(content);
     } catch {
-      return null
+      return null;
     }
   }
 
@@ -696,13 +730,13 @@ export class McpServer {
    * @returns Promise that resolves when all widgets are mounted
    */
   async mountWidgets(options?: {
-    baseRoute?: string
-    resourcesDir?: string
+    baseRoute?: string;
+    resourcesDir?: string;
   }): Promise<void> {
     if (this.isProductionMode()) {
-      await this.mountWidgetsProduction(options)
+      await this.mountWidgetsProduction(options);
     } else {
-      await this.mountWidgetsDev(options)
+      await this.mountWidgetsDev(options);
     }
   }
 
@@ -720,75 +754,83 @@ export class McpServer {
    * @returns Promise that resolves when all widgets are mounted
    */
   private async mountWidgetsDev(options?: {
-    baseRoute?: string
-    resourcesDir?: string
+    baseRoute?: string;
+    resourcesDir?: string;
   }): Promise<void> {
-    const { promises: fs } = await import('node:fs')
-    const baseRoute = options?.baseRoute || '/mcp-use/widgets'
-    const resourcesDir = options?.resourcesDir || 'resources'
-    const srcDir = join(process.cwd(), resourcesDir)
-    
+    const { promises: fs } = await import("node:fs");
+    const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+    const resourcesDir = options?.resourcesDir || "resources";
+    const srcDir = join(process.cwd(), resourcesDir);
+
     // Check if resources directory exists
     try {
-      await fs.access(srcDir)
+      await fs.access(srcDir);
     } catch (error) {
-      console.log(`[WIDGETS] No ${resourcesDir}/ directory found - skipping widget serving`)
-      return
+      console.log(
+        `[WIDGETS] No ${resourcesDir}/ directory found - skipping widget serving`
+      );
+      return;
     }
-    
+
     // Find all TSX widget files
-    let entries: string[] = []
+    let entries: string[] = [];
     try {
-      const files = await fs.readdir(srcDir)
+      const files = await fs.readdir(srcDir);
       entries = files
-        .filter(f => f.endsWith('.tsx') || f.endsWith('.ts'))
-        .map(f => join(srcDir, f))
+        .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
+        .map((f) => join(srcDir, f));
     } catch (error) {
-      console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`)
-      return
+      console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`);
+      return;
     }
-    
+
     if (entries.length === 0) {
-      console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`)
-      return
+      console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`);
+      return;
     }
-    
+
     // Create a temp directory for widget entry files
-    const tempDir = join(process.cwd(), TMP_MCP_USE_DIR)
-    await fs.mkdir(tempDir, { recursive: true }).catch(() => {})
-    
-    const react = (await import('@vitejs/plugin-react')).default
-    const tailwindcss = (await import('@tailwindcss/vite')).default
-    console.log(react, tailwindcss)
+    const tempDir = join(process.cwd(), TMP_MCP_USE_DIR);
+    await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
+    const react = (await import("@vitejs/plugin-react")).default;
+    const tailwindcss = (await import("@tailwindcss/vite")).default;
+    console.log(react, tailwindcss);
 
-    const widgets = entries.map(entry => {
-      const baseName = entry.split('/').pop()?.replace(/\.tsx?$/, '') || 'widget'
-      const widgetName = baseName
+    const widgets = entries.map((entry) => {
+      const baseName =
+        entry
+          .split("/")
+          .pop()
+          ?.replace(/\.tsx?$/, "") || "widget";
+      const widgetName = baseName;
       return {
         name: widgetName,
         description: `Widget: ${widgetName}`,
-        entry: entry
-      }
-    })
-    
+        entry: entry,
+      };
+    });
+
     // Create entry files for each widget
     for (const widget of widgets) {
       // Create temp entry and HTML files for this widget
-      const widgetTempDir = join(tempDir, widget.name)
-      await fs.mkdir(widgetTempDir, { recursive: true })
-      
+      const widgetTempDir = join(tempDir, widget.name);
+      await fs.mkdir(widgetTempDir, { recursive: true });
+
       // Create a CSS file with Tailwind and @source directives to scan resources
-      const resourcesPath = join(process.cwd(), resourcesDir)
-      const { relative } = await import('node:path')
-      const relativeResourcesPath = relative(widgetTempDir, resourcesPath).replace(/\\/g, '/')
+      const resourcesPath = join(process.cwd(), resourcesDir);
+      const { relative } = await import("node:path");
+      const relativeResourcesPath = relative(
+        widgetTempDir,
+        resourcesPath
+      ).replace(/\\/g, "/");
       const cssContent = `@import "tailwindcss";
 
 /* Configure Tailwind to scan the resources directory */
 @source "${relativeResourcesPath}";
-`
-      await fs.writeFile(join(widgetTempDir, 'styles.css'), cssContent, 'utf8')
-      
+`;
+      await fs.writeFile(join(widgetTempDir, "styles.css"), cssContent, "utf8");
+
       const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
@@ -799,8 +841,8 @@ if (container && Component) {
   const root = createRoot(container)
   root.render(<Component />)
 }
-`
-   
+`;
+
       const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -812,132 +854,166 @@ if (container && Component) {
     <div id="widget-root"></div>
     <script type="module" src="${baseRoute}/${widget.name}/entry.tsx"></script>
   </body>
-</html>`
-      
-      await fs.writeFile(join(widgetTempDir, 'entry.tsx'), entryContent, 'utf8')
-      await fs.writeFile(join(widgetTempDir, 'index.html'), htmlContent, 'utf8')
+</html>`;
+
+      await fs.writeFile(
+        join(widgetTempDir, "entry.tsx"),
+        entryContent,
+        "utf8"
+      );
+      await fs.writeFile(
+        join(widgetTempDir, "index.html"),
+        htmlContent,
+        "utf8"
+      );
     }
-    
+
     // Build the server origin URL
-    const serverOrigin = this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort}`
-    
+    const serverOrigin =
+      this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort}`;
+
     // Create a single shared Vite dev server for all widgets
-    console.log(`[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`)
-    
+    console.log(
+      `[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`
+    );
+
     const viteServer = await createServer({
       root: tempDir,
-      base: baseRoute + '/',
+      base: baseRoute + "/",
       plugins: [tailwindcss(), react()],
       resolve: {
         alias: {
-          '@': join(process.cwd(), resourcesDir),
+          "@": join(process.cwd(), resourcesDir),
         },
       },
       server: {
         middlewareMode: true,
         origin: serverOrigin,
       },
-    })
-    
+    });
+
     // Custom middleware to handle widget-specific paths
     this.app.use(baseRoute, (req, res, next) => {
-      const urlPath = req.url || ''
-      const [pathname, queryString] = urlPath.split('?')
-      const widgetMatch = pathname.match(/^\/([^/]+)/)
-      
+      const urlPath = req.url || "";
+      const [pathname, queryString] = urlPath.split("?");
+      const widgetMatch = pathname.match(/^\/([^/]+)/);
+
       if (widgetMatch) {
-        const widgetName = widgetMatch[1]
-        const widget = widgets.find(w => w.name === widgetName)
-        
+        const widgetName = widgetMatch[1];
+        const widget = widgets.find((w) => w.name === widgetName);
+
         if (widget) {
           // If requesting the root of a widget, serve its index.html
           if (pathname === `/${widgetName}` || pathname === `/${widgetName}/`) {
-            req.url = `/${widgetName}/index.html${queryString ? '?' + queryString : ''}`
+            req.url = `/${widgetName}/index.html${queryString ? "?" + queryString : ""}`;
           }
           // For assets, keep the original URL but Vite will handle it from the widget's directory
         }
       }
-      
-      next()
-    })
-    
+
+      next();
+    });
+
     // Mount the single Vite server for all widgets
-    this.app.use(baseRoute, viteServer.middlewares)
-    
-    widgets.forEach(widget => {
-      console.log(`[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`)
-    })
+    this.app.use(baseRoute, viteServer.middlewares);
 
-
+    widgets.forEach((widget) => {
+      console.log(
+        `[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`
+      );
+    });
 
     // register a tool and resource for each widget
     for (const widget of widgets) {
-
       // for now expose all widgets as appsSdk
-      const type = 'appsSdk'
-      
+      const type = "appsSdk";
+
       // Extract metadata from the widget file using Vite SSR
-      let widgetMetadata: any = {}
-      let props = {}
-      let description = widget.description
-      
+      let metadata: WidgetMetadata = {};
+      let props = {};
+      let description = widget.description;
+
       try {
-        const mod = await viteServer.ssrLoadModule(widget.entry)
+        const mod = await viteServer.ssrLoadModule(widget.entry);
         if (mod.widgetMetadata) {
-          widgetMetadata = mod.widgetMetadata
-          description = widgetMetadata.description || widget.description
-          
+          metadata = mod.widgetMetadata;
+          description = metadata.description || widget.description;
+
           // Convert Zod schema to JSON schema for props if available
-          if (widgetMetadata.inputs) {
+          if (metadata.inputs) {
             // The inputs is a Zod schema, we can use zodToJsonSchema or extract shape
             try {
               // For now, store the zod schema info
-              props = widgetMetadata.inputs.shape || {}
+              props = metadata.inputs.shape || {};
             } catch (error) {
-              console.warn(`[WIDGET] Failed to extract props schema for ${widget.name}:`, error)
+              console.warn(
+                `[WIDGET] Failed to extract props schema for ${widget.name}:`,
+                error
+              );
             }
           }
         }
       } catch (error) {
-        console.warn(`[WIDGET] Failed to load metadata for ${widget.name}:`, error)
+        console.warn(
+          `[WIDGET] Failed to load metadata for ${widget.name}:`,
+          error
+        );
       }
 
-      let html = '';
+      console.log("[WIDGET dev] Metadata:", metadata);
+
+      let html = "";
       try {
-        html = readFileSync(join(tempDir, widget.name, 'index.html'), 'utf8')
+        html = readFileSync(join(tempDir, widget.name, "index.html"), "utf8");
         // Inject or replace base tag with MCP_URL
-        const mcpUrl = process.env.MCP_URL || '/';
+        const mcpUrl = process.env.MCP_URL || "/";
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
-          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
-          
+          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
+
           // Try to replace existing base tag (only if not in comments)
           const baseTagRegex = /<base\s+[^>]*\/?>/i;
           if (baseTagRegex.test(htmlWithoutComments)) {
             // Find and replace the actual base tag in the original HTML
             const actualBaseTagMatch = html.match(/<base\s+[^>]*\/?>/i);
             if (actualBaseTagMatch) {
-              html = html.replace(actualBaseTagMatch[0], `<base href="${mcpUrl}" />`);
+              html = html.replace(
+                actualBaseTagMatch[0],
+                `<base href="${mcpUrl}" />`
+              );
             }
           } else {
             // Inject base tag in head if it doesn't exist
             const headTagRegex = /<head[^>]*>/i;
             if (headTagRegex.test(html)) {
-              html = html.replace(headTagRegex, (match) => `${match}\n    <base href="${mcpUrl}" />`);
+              html = html.replace(
+                headTagRegex,
+                (match) => `${match}\n    <base href="${mcpUrl}" />`
+              );
             }
           }
         }
 
-        // replace relative path that starts with /mcp-use script and css with absolute  
-        html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
-        html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+        // replace relative path that starts with /mcp-use script and css with absolute
+        html = html.replace(
+          /src="\/mcp-use\/widgets\/([^"]+)"/g,
+          `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+        );
+        html = html.replace(
+          /href="\/mcp-use\/widgets\/([^"]+)"/g,
+          `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+        );
 
         // add window.__getFile to head
-        html = html.replace(/<head[^>]*>/i, `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widget.name}/"+filename }</script>`)
-
-
+        html = html.replace(
+          /<head[^>]*>/i,
+          `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widget.name}/"+filename }</script>`
+        );
       } catch (error) {
-        console.error(`Failed to read html template for widget ${widget.name}`, error)
+        console.error(
+          `Failed to read html template for widget ${widget.name}`,
+          error
+        );
       }
 
       // // html template is the content of the vite built html
@@ -948,45 +1024,49 @@ if (container && Component) {
 
       this.uiResource({
         name: widget.name,
-        title: widgetMetadata.title || widget.name,
+        title: metadata.title || widget.name,
         description: description,
         type: type,
         props: props,
         _meta: {
-          'mcp-use/widget': {
+          "mcp-use/widget": {
             name: widget.name,
-            title: widgetMetadata.title || widget.name,
+            title: metadata.title || widget.name,
             description: description,
             type: type,
             props: props,
             html: html,
             dev: true,
           },
-          ...(widgetMetadata._meta || {}),
+          ...(metadata._meta || {}),
         },
         htmlTemplate: html,
         appsSdkMetadata: {
-          'openai/widgetDescription': description,
-          'openai/toolInvocation/invoking': 'Hand-tossing a map',
-          'openai/toolInvocation/invoked': 'Served a fresh map',
-          'openai/widgetAccessible': true,
-          'openai/resultCanProduceWidget': true,
-          'openai/widgetCSP': {
+          "openai/widgetDescription": description,
+          "openai/toolInvocation/invoking": `Loading ${widget.name}...`,
+          "openai/toolInvocation/invoked": `${widget.name} ready`,
+          "openai/widgetAccessible": true,
+          "openai/resultCanProduceWidget": true,
+          ...(metadata.appsSdkMetadata || {}),
+          "openai/widgetCSP": {
             connect_domains: [
-              ...(widgetMetadata.appsSdkMetadata?.connect_domains || []),
-            ],
-            resource_domains: [
-              'https://*.oaistatic.com',
-              'https://*.oaiusercontent.com',
               // always also add the base url of the server
               ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
-            ]
-          }
+              ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
+                ?.connect_domains || []),
+            ],
+            resource_domains: [
+              "https://*.oaistatic.com",
+              "https://*.oaiusercontent.com",
+              // always also add the base url of the server
+              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
+                ?.resource_domains || []),
+            ],
+          },
         },
-        ...(widgetMetadata.appsSdkMetadata || {}),
-      })
+      });
     }
-
   }
 
   /**
@@ -1002,111 +1082,135 @@ if (container && Component) {
    * @returns Promise that resolves when all widgets are mounted
    */
   private async mountWidgetsProduction(options?: {
-    baseRoute?: string
-    resourcesDir?: string
+    baseRoute?: string;
+    resourcesDir?: string;
   }): Promise<void> {
-    const baseRoute = options?.baseRoute || '/mcp-use/widgets'
-    const widgetsDir = join(process.cwd(), 'dist', 'resources', 'widgets')
-    
+    const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+    const widgetsDir = join(process.cwd(), "dist", "resources", "widgets");
+
     // Check if widgets directory exists
     if (!existsSync(widgetsDir)) {
-      console.log('[WIDGETS] No dist/resources/widgets/ directory found - skipping widget serving')
-      return
+      console.log(
+        "[WIDGETS] No dist/resources/widgets/ directory found - skipping widget serving"
+      );
+      return;
     }
-    
+
     // Setup static file serving routes
-    this.setupWidgetRoutes()
-    
+    this.setupWidgetRoutes();
+
     // Discover built widgets
-    const widgets = readdirSync(widgetsDir).filter(name => {
-      const widgetPath = join(widgetsDir, name)
-      const indexPath = join(widgetPath, 'index.html')
-      return existsSync(indexPath)
-    })
-    
+    const widgets = readdirSync(widgetsDir).filter((name) => {
+      const widgetPath = join(widgetsDir, name);
+      const indexPath = join(widgetPath, "index.html");
+      return existsSync(indexPath);
+    });
+
     if (widgets.length === 0) {
-      console.log('[WIDGETS] No built widgets found in dist/resources/widgets/')
-      return
+      console.log(
+        "[WIDGETS] No built widgets found in dist/resources/widgets/"
+      );
+      return;
     }
-    
-    console.log(`[WIDGETS] Serving ${widgets.length} pre-built widget(s) from dist/resources/widgets/`)
-    
+
+    console.log(
+      `[WIDGETS] Serving ${widgets.length} pre-built widget(s) from dist/resources/widgets/`
+    );
+
     // Register tools and resources for each widget
     for (const widgetName of widgets) {
-      const widgetPath = join(widgetsDir, widgetName)
-      const indexPath = join(widgetPath, 'index.html')
-      const metadataPath = join(widgetPath, 'metadata.json')
-      
+      const widgetPath = join(widgetsDir, widgetName);
+      const indexPath = join(widgetPath, "index.html");
+      const metadataPath = join(widgetPath, "metadata.json");
+
       // Read the HTML template
-      let html = ''
+      let html = "";
       try {
-        html = readFileSync(indexPath, 'utf8')
+        html = readFileSync(indexPath, "utf8");
         // Inject or replace base tag with MCP_URL
-        const mcpUrl = process.env.MCP_URL || '/';
+        const mcpUrl = process.env.MCP_URL || "/";
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
-          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
-          
+          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
+
           // Try to replace existing base tag (only if not in comments)
           const baseTagRegex = /<base\s+[^>]*\/?>/i;
           if (baseTagRegex.test(htmlWithoutComments)) {
             // Find and replace the actual base tag in the original HTML
             const actualBaseTagMatch = html.match(/<base\s+[^>]*\/?>/i);
             if (actualBaseTagMatch) {
-              html = html.replace(actualBaseTagMatch[0], `<base href="${mcpUrl}" />`);
+              html = html.replace(
+                actualBaseTagMatch[0],
+                `<base href="${mcpUrl}" />`
+              );
             }
           } else {
             // Inject base tag in head if it doesn't exist
             const headTagRegex = /<head[^>]*>/i;
             if (headTagRegex.test(html)) {
-              html = html.replace(headTagRegex, (match) => `${match}\n    <base href="${mcpUrl}" />`);
+              html = html.replace(
+                headTagRegex,
+                (match) => `${match}\n    <base href="${mcpUrl}" />`
+              );
             }
           }
 
-          // replace relative path that starts with /mcp-use script and css with absolute  
-          html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
-          html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+          // replace relative path that starts with /mcp-use script and css with absolute
+          html = html.replace(
+            /src="\/mcp-use\/widgets\/([^"]+)"/g,
+            `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+          );
+          html = html.replace(
+            /href="\/mcp-use\/widgets\/([^"]+)"/g,
+            `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+          );
 
           // add window.__getFile to head
-          html = html.replace(/<head[^>]*>/i, `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widgetName}/"+filename }</script>`)
-
-
+          html = html.replace(
+            /<head[^>]*>/i,
+            `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widgetName}/"+filename }</script>`
+          );
         }
       } catch (error) {
-        console.error(`[WIDGET] Failed to read ${widgetName}/index.html:`, error)
-        continue
+        console.error(
+          `[WIDGET] Failed to read ${widgetName}/index.html:`,
+          error
+        );
+        continue;
       }
-      
+
       // Read the metadata file if it exists
-      let metadata: any = {}
-      let props = {}
-      let description = `Widget: ${widgetName}`
-      
+      let metadata: WidgetMetadata = {};
+      let props = {};
+      let description = `Widget: ${widgetName}`;
+
       try {
-        const metadataContent = readFileSync(metadataPath, 'utf8')
-        metadata = JSON.parse(metadataContent)
+        const metadataContent = readFileSync(metadataPath, "utf8");
+        metadata = JSON.parse(metadataContent);
         if (metadata.description) {
-          description = metadata.description
+          description = metadata.description;
         }
         if (metadata.inputs) {
-          props = metadata.inputs
+          props = metadata.inputs;
         }
       } catch (error) {
         // Metadata file doesn't exist or couldn't be read - use defaults
-        console.log(`[WIDGET] No metadata found for ${widgetName}, using defaults`)
+        console.log(
+          `[WIDGET] No metadata found for ${widgetName}, using defaults`
+        );
       }
-      
+
       this.uiResource({
         name: widgetName,
         title: metadata.title || widgetName,
         description: description,
-        type: 'appsSdk',
+        type: "appsSdk",
         props: props,
         _meta: {
-          'mcp-use/widget': {
+          "mcp-use/widget": {
             name: widgetName,
             description: description,
-            type: 'appsSdk',
+            type: "appsSdk",
             props: props,
             html: html,
             dev: false,
@@ -1115,28 +1219,34 @@ if (container && Component) {
         },
         htmlTemplate: html,
         appsSdkMetadata: {
-          'openai/widgetDescription': description,
-          'openai/toolInvocation/invoking': `Loading ${widgetName}...`,
-          'openai/toolInvocation/invoked': `${widgetName} ready`,
-          'openai/widgetAccessible': true,
-          'openai/resultCanProduceWidget': true,
+          "openai/widgetDescription": description,
+          "openai/toolInvocation/invoking": `Loading ${widgetName}...`,
+          "openai/toolInvocation/invoked": `${widgetName} ready`,
+          "openai/widgetAccessible": true,
+          "openai/resultCanProduceWidget": true,
           ...(metadata.appsSdkMetadata || {}),
-          'openai/widgetCSP': {
+          "openai/widgetCSP": {
             connect_domains: [
-              ...(metadata.appsSdkMetadata?.connect_domains || []),
-            ],
-            resource_domains: [
-              'https://*.oaistatic.com',
-              'https://*.oaiusercontent.com',
               // always also add the base url of the server
               ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
-              ...(metadata.appsSdkMetadata?.resource_domains || []),
-            ]
-          }
-        }
-      })
-      
-      console.log(`[WIDGET] ${widgetName} mounted at ${baseRoute}/${widgetName}`)
+              ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
+                ?.connect_domains || []),
+            ],
+            resource_domains: [
+              "https://*.oaistatic.com",
+              "https://*.oaiusercontent.com",
+              // always also add the base url of the server
+              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
+                ?.resource_domains || []),
+            ],
+          },
+        },
+      });
+
+      console.log(
+        `[WIDGET] ${widgetName} mounted at ${baseRoute}/${widgetName}`
+      );
     }
   }
 
@@ -1161,60 +1271,62 @@ if (container && Component) {
    * - DELETE /mcp - Session cleanup endpoint
    */
   private async mountMcp(): Promise<void> {
-    if (this.mcpMounted) return
+    if (this.mcpMounted) return;
 
-    const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js')
+    const { StreamableHTTPServerTransport } = await import(
+      "@modelcontextprotocol/sdk/server/streamableHttp.js"
+    );
 
-    const endpoint = '/mcp'
+    const endpoint = "/mcp";
 
     // POST endpoint for messages
     // Create a new transport for each request to support multiple concurrent clients
     this.app.post(endpoint, express.json(), async (req, res) => {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
-        enableJsonResponse: true
-      })
+        enableJsonResponse: true,
+      });
 
-      res.on('close', () => {
-        transport.close()
-      })
+      res.on("close", () => {
+        transport.close();
+      });
 
-      await this.server.connect(transport)
-      await transport.handleRequest(req, res, req.body)
-    })
+      await this.server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    });
 
     // GET endpoint for SSE streaming
     this.app.get(endpoint, async (req, res) => {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
-        enableJsonResponse: true
-      })
+        enableJsonResponse: true,
+      });
 
-      res.on('close', () => {
-        transport.close()
-      })
+      res.on("close", () => {
+        transport.close();
+      });
 
-      await this.server.connect(transport)
-      await transport.handleRequest(req, res)
-    })
+      await this.server.connect(transport);
+      await transport.handleRequest(req, res);
+    });
 
     // DELETE endpoint for session cleanup
     this.app.delete(endpoint, async (req, res) => {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
-        enableJsonResponse: true
-      })
+        enableJsonResponse: true,
+      });
 
-      res.on('close', () => {
-        transport.close()
-      })
+      res.on("close", () => {
+        transport.close();
+      });
 
-      await this.server.connect(transport)
-      await transport.handleRequest(req, res)
-    })
+      await this.server.connect(transport);
+      await transport.handleRequest(req, res);
+    });
 
-    this.mcpMounted = true
-    console.log(`[MCP] Server mounted at ${endpoint}`)
+    this.mcpMounted = true;
+    console.log(`[MCP] Server mounted at ${endpoint}`);
   }
 
   /**
@@ -1240,27 +1352,31 @@ if (container && Component) {
    */
   async listen(port?: number): Promise<void> {
     // Priority: parameter > PORT env var > default (3001)
-    this.serverPort = port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3001)
-    
+    this.serverPort =
+      port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3001);
+
     // Update host from HOST env var if set
     if (process.env.HOST) {
-      this.serverHost = process.env.HOST
+      this.serverHost = process.env.HOST;
     }
 
     await this.mountWidgets({
-      baseRoute: '/mcp-use/widgets',
-      resourcesDir: 'resources'
-    })
-    await this.mountMcp()
-    
+      baseRoute: "/mcp-use/widgets",
+      resourcesDir: "resources",
+    });
+    await this.mountMcp();
 
     // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
-    this.mountInspector()
+    this.mountInspector();
 
     this.app.listen(this.serverPort, () => {
-      console.log(`[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`)
-      console.log(`[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp`)
-    })
+      console.log(
+        `[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`
+      );
+      console.log(
+        `[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp`
+      );
+    });
   }
 
   /**
@@ -1286,14 +1402,16 @@ if (container && Component) {
    * - No inspector UI available
    */
   private mountInspector(): void {
-    if (this.inspectorMounted) return
+    if (this.inspectorMounted) return;
 
     // In production, only mount if build manifest says so
     if (this.isProductionMode()) {
-      const manifest = this.readBuildManifest()
+      const manifest = this.readBuildManifest();
       if (!manifest?.includeInspector) {
-        console.log('[INSPECTOR] Skipped in production (use --with-inspector flag during build)')
-        return
+        console.log(
+          "[INSPECTOR] Skipped in production (use --with-inspector flag during build)"
+        );
+        return;
       }
     }
 
@@ -1301,17 +1419,19 @@ if (container && Component) {
     // Using dynamic import makes it truly optional - won't fail if not installed
 
     // @ts-ignore - Optional peer dependency, may not be installed during build
-    import('@mcp-use/inspector')
+    import("@mcp-use/inspector")
       .then(({ mountInspector }) => {
         // Auto-connect to the local MCP server at /mcp
-        mountInspector(this.app)
-        this.inspectorMounted = true
-        console.log(`[INSPECTOR] UI available at http://${this.serverHost}:${this.serverPort}/inspector`)
+        mountInspector(this.app);
+        this.inspectorMounted = true;
+        console.log(
+          `[INSPECTOR] UI available at http://${this.serverHost}:${this.serverPort}/inspector`
+        );
       })
       .catch(() => {
         // Inspector package not installed, skip mounting silently
         // This allows the server to work without the inspector in production
-      })
+      });
   }
 
   /**
@@ -1337,49 +1457,72 @@ if (container && Component) {
    */
   private setupWidgetRoutes(): void {
     // Serve static assets (JS, CSS) from the assets directory
-    this.app.get('/mcp-use/widgets/:widget/assets/*', (req, res, next) => {
-      const widget = req.params.widget
-      const assetFile = (req.params as any)[0]
-      const assetPath = join(process.cwd(), 'dist', 'resources', 'widgets', widget, 'assets', assetFile)
-      res.sendFile(assetPath, err => (err ? next() : undefined))
-    })
+    this.app.get("/mcp-use/widgets/:widget/assets/*", (req, res, next) => {
+      const widget = req.params.widget;
+      const assetFile = (req.params as any)[0];
+      const assetPath = join(
+        process.cwd(),
+        "dist",
+        "resources",
+        "widgets",
+        widget,
+        "assets",
+        assetFile
+      );
+      res.sendFile(assetPath, (err) => (err ? next() : undefined));
+    });
 
     // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
-    this.app.get('/mcp-use/widgets/assets/*', (req, res, next) => {
-      const assetFile = (req.params as any)[0]
+    this.app.get("/mcp-use/widgets/assets/*", (req, res, next) => {
+      const assetFile = (req.params as any)[0];
       // Try to find which widget this asset belongs to by checking all widget directories
-      const widgetsDir = join(process.cwd(), 'dist', 'resources', 'widgets')
+      const widgetsDir = join(process.cwd(), "dist", "resources", "widgets");
 
       try {
-        const widgets = readdirSync(widgetsDir)
+        const widgets = readdirSync(widgetsDir);
         for (const widget of widgets) {
-          const assetPath = join(widgetsDir, widget, 'assets', assetFile)
+          const assetPath = join(widgetsDir, widget, "assets", assetFile);
           if (existsSync(assetPath)) {
-            return res.sendFile(assetPath)
+            return res.sendFile(assetPath);
           }
         }
-        next()
+        next();
+      } catch {
+        next();
       }
-      catch {
-        next()
-      }
-    })
+    });
 
     // Serve each widget's index.html at its route
     // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
-    this.app.get('/mcp-use/widgets/:widget', (req, res, next) => {
-      const filePath = join(process.cwd(), 'dist', 'resources', 'widgets', req.params.widget, 'index.html')
+    this.app.get("/mcp-use/widgets/:widget", (req, res, next) => {
+      const filePath = join(
+        process.cwd(),
+        "dist",
+        "resources",
+        "widgets",
+        req.params.widget,
+        "index.html"
+      );
 
-      let html = readFileSync(filePath, 'utf8')
-      // replace relative path that starts with /mcp-use script and css with absolute  
-      html = html.replace(/src="\/mcp-use\/widgets\/([^"]+)"/g, `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
-      html = html.replace(/href="\/mcp-use\/widgets\/([^"]+)"/g, `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`)
+      let html = readFileSync(filePath, "utf8");
+      // replace relative path that starts with /mcp-use script and css with absolute
+      html = html.replace(
+        /src="\/mcp-use\/widgets\/([^"]+)"/g,
+        `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+      );
+      html = html.replace(
+        /href="\/mcp-use\/widgets\/([^"]+)"/g,
+        `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+      );
 
       // add window.__getFile to head
-      html = html.replace(/<head[^>]*>/i, `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${req.params.widget}/"+filename }</script>`)
+      html = html.replace(
+        /<head[^>]*>/i,
+        `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${req.params.widget}/"+filename }</script>`
+      );
 
-      res.send(html)
-    })
+      res.send(html);
+    });
   }
 
   /**
@@ -1399,14 +1542,14 @@ if (container && Component) {
    * ```
    */
   private createInputSchema(uriTemplate: string): Record<string, z.ZodSchema> {
-    const params = this.extractTemplateParams(uriTemplate)
-    const schema: Record<string, z.ZodSchema> = {}
+    const params = this.extractTemplateParams(uriTemplate);
+    const schema: Record<string, z.ZodSchema> = {};
 
     params.forEach((param) => {
-      schema[param] = z.string()
-    })
+      schema[param] = z.string();
+    });
 
-    return schema
+    return schema;
   }
 
   /**
@@ -1428,44 +1571,51 @@ if (container && Component) {
    * // Returns: { query: z.string().describe('Search query'), limit: z.number().optional() }
    * ```
    */
-  private createParamsSchema(inputs: Array<{ name: string, type: string, required?: boolean, description?: string }>): Record<string, z.ZodSchema> {
-    const schema: Record<string, z.ZodSchema> = {}
+  private createParamsSchema(
+    inputs: Array<{
+      name: string;
+      type: string;
+      required?: boolean;
+      description?: string;
+    }>
+  ): Record<string, z.ZodSchema> {
+    const schema: Record<string, z.ZodSchema> = {};
 
     inputs.forEach((input) => {
-      let zodType: z.ZodSchema
+      let zodType: z.ZodSchema;
       switch (input.type) {
-        case 'string':
-          zodType = z.string()
-          break
-        case 'number':
-          zodType = z.number()
-          break
-        case 'boolean':
-          zodType = z.boolean()
-          break
-        case 'object':
-          zodType = z.object({})
-          break
-        case 'array':
-          zodType = z.array(z.any())
-          break
+        case "string":
+          zodType = z.string();
+          break;
+        case "number":
+          zodType = z.number();
+          break;
+        case "boolean":
+          zodType = z.boolean();
+          break;
+        case "object":
+          zodType = z.object({});
+          break;
+        case "array":
+          zodType = z.array(z.any());
+          break;
         default:
-          zodType = z.any()
+          zodType = z.any();
       }
 
       // Add description if provided
       if (input.description) {
-        zodType = zodType.describe(input.description)
+        zodType = zodType.describe(input.description);
       }
 
       if (!input.required) {
-        zodType = zodType.optional()
+        zodType = zodType.optional();
       }
 
-      schema[input.name] = zodType
-    })
+      schema[input.name] = zodType;
+    });
 
-    return schema
+    return schema;
   }
 
   /**
@@ -1487,39 +1637,41 @@ if (container && Component) {
    * // Returns: { topic: z.string(), style: z.string().optional() }
    * ```
    */
-  private createPromptArgsSchema(inputs: Array<{ name: string, type: string, required?: boolean }>): Record<string, z.ZodSchema> {
-    const schema: Record<string, z.ZodSchema> = {}
+  private createPromptArgsSchema(
+    inputs: Array<{ name: string; type: string; required?: boolean }>
+  ): Record<string, z.ZodSchema> {
+    const schema: Record<string, z.ZodSchema> = {};
 
     inputs.forEach((input) => {
-      let zodType: z.ZodSchema
+      let zodType: z.ZodSchema;
       switch (input.type) {
-        case 'string':
-          zodType = z.string()
-          break
-        case 'number':
-          zodType = z.number()
-          break
-        case 'boolean':
-          zodType = z.boolean()
-          break
-        case 'object':
-          zodType = z.object({})
-          break
-        case 'array':
-          zodType = z.array(z.any())
-          break
+        case "string":
+          zodType = z.string();
+          break;
+        case "number":
+          zodType = z.number();
+          break;
+        case "boolean":
+          zodType = z.boolean();
+          break;
+        case "object":
+          zodType = z.object({});
+          break;
+        case "array":
+          zodType = z.array(z.any());
+          break;
         default:
-          zodType = z.any()
+          zodType = z.any();
       }
 
       if (!input.required) {
-        zodType = zodType.optional()
+        zodType = zodType.optional();
       }
 
-      schema[input.name] = zodType
-    })
+      schema[input.name] = zodType;
+    });
 
-    return schema
+    return schema;
   }
 
   /**
@@ -1539,8 +1691,8 @@ if (container && Component) {
    * ```
    */
   private extractTemplateParams(uriTemplate: string): string[] {
-    const matches = uriTemplate.match(/\{([^}]+)\}/g)
-    return matches ? matches.map(match => match.slice(1, -1)) : []
+    const matches = uriTemplate.match(/\{([^}]+)\}/g);
+    return matches ? matches.map((match) => match.slice(1, -1)) : [];
   }
 
   /**
@@ -1559,74 +1711,80 @@ if (container && Component) {
    * // Returns: { userId: "123", postId: "456" }
    * ```
    */
-  private parseTemplateUri(template: string, uri: string): Record<string, string> {
-    const params: Record<string, string> = {}
+  private parseTemplateUri(
+    template: string,
+    uri: string
+  ): Record<string, string> {
+    const params: Record<string, string> = {};
 
     // Convert template to a regex pattern
     // Escape special regex characters except {}
-    let regexPattern = template.replace(/[.*+?^$()[\]\\|]/g, '\\$&')
+    let regexPattern = template.replace(/[.*+?^$()[\]\\|]/g, "\\$&");
 
     // Replace {param} with named capture groups
-    const paramNames: string[] = []
+    const paramNames: string[] = [];
     regexPattern = regexPattern.replace(/\\\{([^}]+)\\\}/g, (_, paramName) => {
-      paramNames.push(paramName)
-      return '([^/]+)'
-    })
+      paramNames.push(paramName);
+      return "([^/]+)";
+    });
 
-    const regex = new RegExp(`^${regexPattern}$`)
-    const match = uri.match(regex)
+    const regex = new RegExp(`^${regexPattern}$`);
+    const match = uri.match(regex);
 
     if (match) {
       paramNames.forEach((paramName, index) => {
-        params[paramName] = match[index + 1]
-      })
+        params[paramName] = match[index + 1];
+      });
     }
 
-    return params
+    return params;
   }
 }
 
-export type McpServerInstance = Omit<McpServer, keyof Express> & Express
+export type McpServerInstance = Omit<McpServer, keyof Express> & Express;
 
 /**
  * Create a new MCP server instance
- * 
+ *
  * @param name - Server name
-   * @param config - Optional server configuration
-   * @param config.version - Server version (defaults to '1.0.0')
-   * @param config.description - Server description
-   * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
-   * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
-   * @returns McpServerInstance with both MCP and Express methods
-   * 
-   * @example
-   * ```typescript
-   * // Basic usage
-   * const server = createMCPServer('my-server', {
-   *   version: '1.0.0',
-   *   description: 'My MCP server'
-   * })
-   * 
-   * // With custom host (e.g., for Docker or remote access)
-   * const server = createMCPServer('my-server', {
-   *   version: '1.0.0',
-   *   host: '0.0.0.0' // or 'myserver.com'
-   * })
-   * 
-   * // With full base URL (e.g., behind a proxy or custom domain)
-   * const server = createMCPServer('my-server', {
-   *   version: '1.0.0',
-   *   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
-   * })
-   * ```
+ * @param config - Optional server configuration
+ * @param config.version - Server version (defaults to '1.0.0')
+ * @param config.description - Server description
+ * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
+ * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
+ * @returns McpServerInstance with both MCP and Express methods
+ *
+ * @example
+ * ```typescript
+ * // Basic usage
+ * const server = createMCPServer('my-server', {
+ *   version: '1.0.0',
+ *   description: 'My MCP server'
+ * })
+ *
+ * // With custom host (e.g., for Docker or remote access)
+ * const server = createMCPServer('my-server', {
+ *   version: '1.0.0',
+ *   host: '0.0.0.0' // or 'myserver.com'
+ * })
+ *
+ * // With full base URL (e.g., behind a proxy or custom domain)
+ * const server = createMCPServer('my-server', {
+ *   version: '1.0.0',
+ *   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
+ * })
+ * ```
  */
-export function createMCPServer(name: string, config: Partial<ServerConfig> = {}): McpServerInstance {
+export function createMCPServer(
+  name: string,
+  config: Partial<ServerConfig> = {}
+): McpServerInstance {
   const instance = new McpServer({
     name,
-    version: config.version || '1.0.0',
+    version: config.version || "1.0.0",
     description: config.description,
     host: config.host,
     baseUrl: config.baseUrl,
-  })
-  return instance as unknown as McpServerInstance
+  });
+  return instance as unknown as McpServerInstance;
 }

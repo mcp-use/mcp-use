@@ -1,16 +1,14 @@
-import { createMCPServer } from 'mcp-use/server'
-import type {
-  RawHtmlUIResource,
-  RemoteDomUIResource
-} from 'mcp-use/server'
+import { createMCPServer } from "mcp-use/server";
+import type { RawHtmlUIResource, RemoteDomUIResource } from "mcp-use/server";
 
 // Create an MCP server with MCP-UI UIResource support
-const server = createMCPServer('uiresource-mcp-server', {
-  version: '1.0.0',
-  description: 'MCP server demonstrating all UIResource types',
-})
+const server = createMCPServer("uiresource-mcp-server", {
+  version: "1.0.0",
+  description: "MCP server demonstrating all UIResource types",
+  baseUrl: process.env.MCP_URL, // Full base URL (e.g., https://myserver.com)
+});
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3000;
 
 /**
  * ════════════════════════════════════════════════════════════════════
@@ -26,7 +24,6 @@ const PORT = process.env.PORT || 3000
  * 3. Serves the widget from dist/resources/mcp-use/widgets/kanban-board/
  */
 
-
 /**
  * ════════════════════════════════════════════════════════════════════
  * Type 2: Raw HTML
@@ -39,10 +36,10 @@ const PORT = process.env.PORT || 3000
  * - Resource: ui://widget/welcome-card
  */
 server.uiResource({
-  type: 'rawHtml',
-  name: 'welcome-card',
-  title: 'Welcome Message',
-  description: 'A welcoming card with server information',
+  type: "rawHtml",
+  name: "welcome-card",
+  title: "Welcome Message",
+  description: "A welcoming card with server information",
   htmlContent: `
     <!DOCTYPE html>
     <html>
@@ -121,9 +118,9 @@ server.uiResource({
     </body>
     </html>
   `,
-  encoding: 'text',
-  size: ['600px', '400px']
-} satisfies RawHtmlUIResource)
+  encoding: "text",
+  size: ["600px", "400px"],
+} satisfies RawHtmlUIResource);
 
 /**
  * ════════════════════════════════════════════════════════════════════
@@ -137,17 +134,17 @@ server.uiResource({
  * - Resource: ui://widget/quick-poll
  */
 server.uiResource({
-  type: 'remoteDom',
-  name: 'quick-poll',
-  title: 'Quick Poll',
-  description: 'Create instant polls with interactive voting',
+  type: "remoteDom",
+  name: "quick-poll",
+  title: "Quick Poll",
+  description: "Create instant polls with interactive voting",
   script: `
 // Remote DOM script for quick-poll widget
 // Note: Remote DOM only supports registered MCP-UI components like ui-stack, ui-text, ui-button
 // Standard HTML elements (div, h2, p, etc.) are NOT available
 
 // Get props (passed from tool parameters)
-const props = ${JSON.stringify({ question: 'What is your favorite framework?', options: ['React', 'Vue', 'Svelte', 'Angular'] })};
+const props = ${JSON.stringify({ question: "What is your favorite framework?", options: ["React", "Vue", "Svelte", "Angular"] })};
 
 // Create main container stack (vertical layout)
 const container = document.createElement('ui-stack');
@@ -234,22 +231,22 @@ container.appendChild(resultsTitle);
 // Append to root
 root.appendChild(container);
   `,
-  framework: 'react',
-  encoding: 'text',
-  size: ['500px', '450px'],
+  framework: "react",
+  encoding: "text",
+  size: ["500px", "450px"],
   props: {
     question: {
-      type: 'string',
-      description: 'The poll question',
-      default: 'What is your favorite framework?'
+      type: "string",
+      description: "The poll question",
+      default: "What is your favorite framework?",
     },
     options: {
-      type: 'array',
-      description: 'Poll options',
-      default: ['React', 'Vue', 'Svelte']
-    }
-  }
-} satisfies RemoteDomUIResource)
+      type: "array",
+      description: "Poll options",
+      default: ["React", "Vue", "Svelte"],
+    },
+  },
+} satisfies RemoteDomUIResource);
 
 /**
  * ════════════════════════════════════════════════════════════════════
@@ -260,83 +257,95 @@ root.appendChild(container);
  */
 
 server.tool({
-  name: 'get-widget-info',
-  description: 'Get information about available UI widgets',
+  name: "get-widget-info",
+  description: "Get information about available UI widgets",
   cb: async () => {
     const widgets = [
       {
-        name: 'kanban-board',
-        type: 'externalUrl',
-        tool: 'kanban-board',
-        resource: 'ui://widget/kanban-board',
-        url: `http://localhost:${PORT}/mcp-use/widgets/kanban-board`
+        name: "kanban-board",
+        type: "externalUrl",
+        tool: "kanban-board",
+        resource: "ui://widget/kanban-board",
+        url: `http://localhost:${PORT}/mcp-use/widgets/kanban-board`,
       },
       {
-        name: 'welcome-card',
-        type: 'rawHtml',
-        tool: 'welcome-card',
-        resource: 'ui://widget/welcome-card'
+        name: "welcome-card",
+        type: "rawHtml",
+        tool: "welcome-card",
+        resource: "ui://widget/welcome-card",
       },
       {
-        name: 'quick-poll',
-        type: 'remoteDom',
-        tool: 'quick-poll',
-        resource: 'ui://widget/quick-poll'
-      }
-    ]
+        name: "quick-poll",
+        type: "remoteDom",
+        tool: "quick-poll",
+        resource: "ui://widget/quick-poll",
+      },
+    ];
 
     return {
-      content: [{
-        type: 'text',
-        text: `Available UI Widgets:\n\n${widgets.map(w =>
-          `📦 ${w.name} (${w.type})\n` +
-          `  Tool: ${w.tool}\n` +
-          `  Resource: ${w.resource}\n` +
-          (w.url ? `  Browser: ${w.url}\n` : '')
-        ).join('\n')}\n` +
-          `\nTypes Explained:\n` +
-          `• externalUrl: Iframe widget from filesystem\n` +
-          `• rawHtml: Direct HTML rendering\n` +
-          `• remoteDom: React/Web Components scripting`
-      }]
-    }
-  }
-})
+      content: [
+        {
+          type: "text",
+          text:
+            `Available UI Widgets:\n\n${widgets
+              .map(
+                (w) =>
+                  `📦 ${w.name} (${w.type})\n` +
+                  `  Tool: ${w.tool}\n` +
+                  `  Resource: ${w.resource}\n` +
+                  (w.url ? `  Browser: ${w.url}\n` : "")
+              )
+              .join("\n")}\n` +
+            `\nTypes Explained:\n` +
+            `• externalUrl: Iframe widget from filesystem\n` +
+            `• rawHtml: Direct HTML rendering\n` +
+            `• remoteDom: React/Web Components scripting`,
+        },
+      ],
+    };
+  },
+});
 
 server.resource({
-  name: 'server-config',
-  uri: 'config://server',
-  title: 'Server Configuration',
-  description: 'Current server configuration and status',
-  mimeType: 'application/json',
+  name: "server-config",
+  uri: "config://server",
+  title: "Server Configuration",
+  description: "Current server configuration and status",
+  mimeType: "application/json",
   readCallback: async () => ({
-    contents: [{
-      uri: 'config://server',
-      mimeType: 'application/json',
-      text: JSON.stringify({
-        port: PORT,
-        version: '1.0.0',
-        widgets: {
-          total: 3,
-          types: {
-            externalUrl: ['kanban-board'],
-            rawHtml: ['welcome-card'],
-            remoteDom: ['quick-poll']
+    contents: [
+      {
+        uri: "config://server",
+        mimeType: "application/json",
+        text: JSON.stringify(
+          {
+            port: PORT,
+            version: "1.0.0",
+            widgets: {
+              total: 3,
+              types: {
+                externalUrl: ["kanban-board"],
+                rawHtml: ["welcome-card"],
+                remoteDom: ["quick-poll"],
+              },
+              baseUrl: `http://localhost:${PORT}/mcp-use/widgets/`,
+            },
+            endpoints: {
+              mcp: `http://localhost:${PORT}/mcp`,
+              inspector: `http://localhost:${PORT}/inspector`,
+              widgets: `http://localhost:${PORT}/mcp-use/widgets/`,
+            },
           },
-          baseUrl: `http://localhost:${PORT}/mcp-use/widgets/`
-        },
-        endpoints: {
-          mcp: `http://localhost:${PORT}/mcp`,
-          inspector: `http://localhost:${PORT}/inspector`,
-          widgets: `http://localhost:${PORT}/mcp-use/widgets/`
-        }
-      }, null, 2)
-    }]
-  })
-})
+          null,
+          2
+        ),
+      },
+    ],
+  }),
+});
 
 // Start the server
-server.listen(PORT)
+server.listen(PORT);
 
 // Display helpful startup message
 console.log(`
@@ -387,12 +396,12 @@ Server is running on port ${PORT}
    })
 
 💡 Tip: Open the Inspector UI to test all widget types interactively!
-`)
+`);
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n\nShutting down server...')
-  process.exit(0)
-})
+process.on("SIGINT", () => {
+  console.log("\n\nShutting down server...");
+  process.exit(0);
+});
 
-export default server
+export default server;

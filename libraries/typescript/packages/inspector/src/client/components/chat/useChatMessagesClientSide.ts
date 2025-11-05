@@ -1,578 +1,457 @@
-import type { AuthConfig, LLMConfig, MCPConfig, MCPServerConfig, Message } from './types'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { MCPChatMessageEvent, Telemetry } from '@/client/telemetry'
-import { hashString } from './utils'
+import type { LLMConfig, Message } from "./types";
+import type { MCPConnection } from "@/client/context/McpContext";
+import { useCallback, useRef, useState } from "react";
+import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
 
 interface UseChatMessagesClientSideProps {
-  // Legacy single-server support
-  mcpServerUrl?: string
-  authConfig?: AuthConfig | null
-  // New multi-server support
-  mcpConfig?: MCPConfig
-  llmConfig: LLMConfig | null
-  isConnected: boolean
-  // Function to read resources from the MCP server
-  readResource?: (uri: string) => Promise<any>
+  connection: MCPConnection;
+  llmConfig: LLMConfig | null;
+  isConnected: boolean;
+  readResource?: (uri: string) => Promise<any>;
 }
 
 export function useChatMessagesClientSide({
-  mcpServerUrl,
-  authConfig,
-  mcpConfig,
+  connection,
   llmConfig,
   isConnected,
   readResource,
 }: UseChatMessagesClientSideProps) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const agentRef = useRef<any>(null)
-  const clientRef = useRef<any>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const toolsMetadataRef = useRef<Map<string, any>>(new Map())
-
-  // Cleanup agent and client on unmount or when config changes
-  useEffect(() => {
-    return () => {
-      if (clientRef.current) {
-        clientRef.current.closeAllSessions().catch(console.error)
-      }
-    }
-  }, [mcpConfig, mcpServerUrl, llmConfig?.provider, llmConfig?.model])
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const agentRef = useRef<any>(null);
+  const llmRef = useRef<any>(null);
 
   const sendMessage = useCallback(
     async (userInput: string) => {
       if (!userInput.trim() || !llmConfig || !isConnected) {
-        return
+        return;
       }
 
       const userMessage: Message = {
         id: `user-${Date.now()}`,
-        role: 'user',
+        role: "user",
         content: userInput.trim(),
         timestamp: Date.now(),
-      }
+      };
 
-      setMessages(prev => [...prev, userMessage])
-      setIsLoading(true)
+      setMessages((prev) => [...prev, userMessage]);
+      setIsLoading(true);
 
       // Create abort controller for cancellation
-      abortControllerRef.current = new AbortController()
+      abortControllerRef.current = new AbortController();
 
       // Track telemetry
-      const startTime = Date.now()
-      let toolCallsCount = 0
+      const startTime = Date.now();
+      let toolCallsCount = 0;
 
       try {
-        // Dynamically import mcp-use browser bundle
-        const { MCPAgent, MCPClient } = await import('mcp-use/browser')
-
-        // Helper function to resolve OAuth tokens
-        const resolveOAuthTokens = async (serverUrl: string, authCfg?: AuthConfig) => {
-          if (authCfg?.type === 'oauth') {
-            try {
-              const storageKeyPrefix = 'mcp:auth'
-              const serverUrlHash = hashString(serverUrl)
-              const storageKey = `${storageKeyPrefix}_${serverUrlHash}_tokens`
-              const tokensStr = localStorage.getItem(storageKey)
-              if (tokensStr) {
-                const tokens = JSON.parse(tokensStr)
-                return {
-                  ...authCfg,
-                  oauthTokens: tokens,
-                }
-              }
-            }
-            catch (error) {
-              console.warn('Failed to retrieve OAuth tokens:', error)
-            }
-          }
-          return authCfg
-        }
-
-        // Helper function to add auth headers to server config
-        const addAuthHeaders = (serverCfg: MCPServerConfig, authCfg?: AuthConfig): MCPServerConfig => {
-          if (!authCfg || authCfg.type === 'none') {
-            return serverCfg
-          }
-
-          const headers = { ...serverCfg.headers }
-
-          if (authCfg.type === 'basic' && authCfg.username && authCfg.password) {
-            const auth = btoa(`${authCfg.username}:${authCfg.password}`)
-            headers.Authorization = `Basic ${auth}`
-          }
-          else if (authCfg.type === 'bearer' && authCfg.token) {
-            headers.Authorization = `Bearer ${authCfg.token}`
-          }
-          else if (authCfg.type === 'oauth' && authCfg.oauthTokens?.access_token) {
-            const tokenType = authCfg.oauthTokens.token_type
-              ? authCfg.oauthTokens.token_type.charAt(0).toUpperCase() + authCfg.oauthTokens.token_type.slice(1)
-              : 'Bearer'
-            headers.Authorization = `${tokenType} ${authCfg.oauthTokens.access_token}`
-          }
-
-          return { ...serverCfg, headers }
-        }
-
-        // Create MCP client
-        let client: any
-
-        if (mcpConfig) {
-          // Multi-server config mode
-          const configWithAuth: MCPConfig = { mcpServers: {} }
-
-          // Process each server and add OAuth tokens if needed
-          for (const [serverName, serverCfg] of Object.entries(mcpConfig.mcpServers)) {
-            const serverUrl = serverCfg.url || serverCfg.ws_url || ''
-            const authConfigResolved = await resolveOAuthTokens(serverUrl, authConfig || undefined)
-            configWithAuth.mcpServers[serverName] = addAuthHeaders(serverCfg, authConfigResolved)
-          }
-
-          client = new MCPClient(configWithAuth)
-        }
-        else if (mcpServerUrl) {
-          // Legacy single-server mode
-          client = new MCPClient()
-
-          const authConfigResolved = await resolveOAuthTokens(mcpServerUrl, authConfig || undefined)
-          const serverConfig: MCPServerConfig = { url: mcpServerUrl }
-          const serverConfigWithAuth = addAuthHeaders(serverConfig, authConfigResolved)
-
-          const serverName = `inspector-${Date.now()}`
-          client.addServer(serverName, serverConfigWithAuth)
-        }
-        else {
-          throw new Error('Either mcpConfig or mcpServerUrl must be provided')
-        }
-
-        clientRef.current = client
-
-        // Create LLM instance based on provider
-        let llm: any
-        if (llmConfig.provider === 'openai') {
-          const { ChatOpenAI } = await import('@langchain/openai')
-          llm = new ChatOpenAI({
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature,
-          })
-        }
-        else if (llmConfig.provider === 'anthropic') {
-          const { ChatAnthropic } = await import('@langchain/anthropic')
-          llm = new ChatAnthropic({
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature,
-          })
-        }
-        else if (llmConfig.provider === 'google') {
-          const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai')
-          llm = new ChatGoogleGenerativeAI({
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature,
-          })
-        }
-        else {
-          throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`)
-        }
-
-        // Create agent with the client
-        const agent = new MCPAgent({
-          llm,
-          client,
-          maxSteps: 10,
-          memoryEnabled: true,
-          systemPrompt: 'You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.',
-        })
-        agentRef.current = agent
-
-        // Initialize agent (connects to server)
-        await agent.initialize()
-
-        // Store tools metadata for later reference
-        try {
-          // Access the client's internal tool definitions
-          // The client should have the raw MCP tools stored
-          const clientInternal = client as any
-
-          // Try to get tools from the client's sessions
-          if (clientInternal.sessions) {
-            const sessionIds = Object.keys(clientInternal.sessions)
-            if (sessionIds.length > 0) {
-              const session = clientInternal.sessions[sessionIds[0]]
-              if (session?.tools) {
-                const tools = Object.values(session.tools) as any[]
-                toolsMetadataRef.current = new Map(
-                  tools.map((tool: any) => [
-                    tool.name,
-                    tool._meta || tool.metadata || {},
-                  ]),
-                )
-                console.log('[useChatMessagesClientSide] Stored metadata for tools:', Array.from(toolsMetadataRef.current.keys()), 'sample:', tools[0])
-              }
-            }
-          }
-
-          // Fallback: access from agent's tools
-          if (toolsMetadataRef.current.size === 0 && agent.client) {
-            const agentClient = agent.client as any
-            if (agentClient.sessions) {
-              const sessionIds = Object.keys(agentClient.sessions)
-              if (sessionIds.length > 0) {
-                const session = agentClient.sessions[sessionIds[0]]
-                if (session?.tools) {
-                  const tools = Object.values(session.tools) as any[]
-                  toolsMetadataRef.current = new Map(
-                    tools.map((tool: any) => [
-                      tool.name,
-                      tool._meta || tool.metadata || {},
-                    ]),
-                  )
-                  console.log('[useChatMessagesClientSide] Stored metadata from agent for tools:', Array.from(toolsMetadataRef.current.keys()))
-                }
-              }
-            }
-          }
-        }
-        catch (error) {
-          console.warn('[useChatMessagesClientSide] Failed to load tools metadata:', error)
-        }
-
         // Create assistant message that will be updated with streaming content
-        const assistantMessageId = `assistant-${Date.now()}`
-        let currentTextPart = ''
+        const assistantMessageId = `assistant-${Date.now()}`;
+        let currentTextPart = "";
         const parts: Array<{
-          type: 'text' | 'tool-invocation'
-          text?: string
+          type: "text" | "tool-invocation";
+          text?: string;
           toolInvocation?: {
-            toolName: string
-            args: Record<string, unknown>
-            result?: any
-            state?: string
-          }
-        }> = []
+            toolName: string;
+            args: Record<string, unknown>;
+            result?: any;
+            state?: "pending" | "result" | "error";
+          };
+        }> = [];
 
         // Add empty assistant message to start
-        setMessages(prev => [
+        setMessages((prev) => [
           ...prev,
           {
             id: assistantMessageId,
-            role: 'assistant',
-            content: '',
+            role: "assistant",
+            content: "",
             timestamp: Date.now(),
             parts: [],
           },
-        ])
+        ]);
 
-        // Stream events from the agent
-        for await (const event of agent.streamEvents(userInput)) {
+        // Create LLM instance from config (reuse if config hasn't changed)
+        if (
+          !llmRef.current ||
+          llmRef.current.provider !== llmConfig.provider ||
+          llmRef.current.model !== llmConfig.model ||
+          llmRef.current.apiKey !== llmConfig.apiKey
+        ) {
+          let llm: any;
+          if (llmConfig.provider === "openai") {
+            const { ChatOpenAI } = await import("@langchain/openai");
+            llm = new ChatOpenAI({
+              model: llmConfig.model,
+              apiKey: llmConfig.apiKey,
+              temperature: llmConfig.temperature ?? 0.7,
+            });
+          } else if (llmConfig.provider === "anthropic") {
+            const { ChatAnthropic } = await import("@langchain/anthropic");
+            llm = new ChatAnthropic({
+              model: llmConfig.model,
+              apiKey: llmConfig.apiKey,
+              temperature: llmConfig.temperature ?? 0.7,
+            });
+          } else if (llmConfig.provider === "google") {
+            const { ChatGoogleGenerativeAI } = await import(
+              "@langchain/google-genai"
+            );
+            llm = new ChatGoogleGenerativeAI({
+              model: llmConfig.model,
+              apiKey: llmConfig.apiKey,
+              temperature: llmConfig.temperature ?? 0.7,
+            });
+          } else {
+            throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
+          }
+
+          llmRef.current = {
+            instance: llm,
+            provider: llmConfig.provider,
+            model: llmConfig.model,
+            apiKey: llmConfig.apiKey,
+          };
+        }
+
+        // Create or reuse agent
+        if (
+          !agentRef.current ||
+          agentRef.current.llm !== llmRef.current.instance
+        ) {
+          // Dynamic import from browser export to avoid bundling server-side code
+          const { MCPAgent } = await import("mcp-use/browser");
+
+          agentRef.current = new MCPAgent({
+            llm: llmRef.current.instance,
+            client: connection.client,
+            memoryEnabled: true,
+            systemPrompt:
+              "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
+          });
+          await agentRef.current.initialize();
+        } else {
+          console.log(
+            "[useChatMessagesClientSide] Reusing existing agent. History length:",
+            agentRef.current.conversationHistory?.length
+          );
+        }
+
+        // Stream events from agent
+        for await (const event of agentRef.current.streamEvents(
+          userInput,
+          10, // maxSteps
+          false, // manageConnector - don't manage, already connected
+          undefined // externalHistory - agent maintains its own with memoryEnabled
+        )) {
           // Check for abort
           if (abortControllerRef.current?.signal.aborted) {
-            break
+            break;
           }
 
           // Handle text streaming
-          if (event.event === 'on_chat_model_stream' && event.data?.chunk?.text) {
-            const text = event.data.chunk.text
-            if (typeof text === 'string' && text.length > 0) {
-              currentTextPart += text
+          if (
+            event.event === "on_chat_model_stream" &&
+            event.data?.chunk?.text
+          ) {
+            const text = event.data.chunk.text;
+            if (typeof text === "string" && text.length > 0) {
+              currentTextPart += text;
 
               // Update or add text part
-              const lastPart = parts[parts.length - 1]
-              if (lastPart && lastPart.type === 'text') {
-                lastPart.text = currentTextPart
-              }
-              else {
+              const lastPart = parts[parts.length - 1];
+              if (lastPart && lastPart.type === "text") {
+                lastPart.text = currentTextPart;
+              } else {
                 parts.push({
-                  type: 'text',
+                  type: "text",
                   text: currentTextPart,
-                })
+                });
               }
 
-              setMessages(prev =>
-                prev.map(msg =>
+              setMessages((prev) =>
+                prev.map((msg) =>
                   msg.id === assistantMessageId
                     ? { ...msg, parts: [...parts] }
-                    : msg,
-                ),
-              )
+                    : msg
+                )
+              );
             }
           }
           // Handle tool start
-          else if (event.event === 'on_tool_start') {
+          else if (event.event === "on_tool_start") {
             if (currentTextPart) {
-              currentTextPart = ''
+              currentTextPart = "";
             }
 
             // Extract args from event data - check multiple possible locations
-            let args = {}
+            let args = {};
             if (event.data?.input) {
-              args = event.data.input
-            }
-            else if (event.data?.tool_input) {
-              args = event.data.tool_input
-            }
-            else if (event.data) {
+              args = event.data.input;
+            } else if (event.data?.tool_input) {
+              args = event.data.tool_input;
+            } else if (event.data) {
               // Sometimes the args are directly in data
-              args = event.data
+              args = event.data;
             }
 
-            console.log('[useChatMessagesClientSide] on_tool_start:', {
+            console.log("[useChatMessagesClientSide] on_tool_start:", {
               toolName: event.name,
               eventData: event.data,
               extractedArgs: args,
-            })
+            });
             // Count tool calls for telemetry
-            toolCallsCount++
+            toolCallsCount++;
 
             parts.push({
-              type: 'tool-invocation',
+              type: "tool-invocation",
               toolInvocation: {
-                toolName: event.name || 'unknown',
+                toolName: event.name || "unknown",
                 args,
-                state: 'pending',
+                state: "pending",
               },
-            })
+            });
 
-            setMessages(prev =>
-              prev.map(msg =>
+            setMessages((prev) =>
+              prev.map((msg) =>
                 msg.id === assistantMessageId
                   ? { ...msg, parts: [...parts] }
-                  : msg,
-              ),
-            )
+                  : msg
+              )
+            );
           }
           // Handle tool end
-          else if (event.event === 'on_tool_end') {
+          else if (event.event === "on_tool_end") {
             const toolPart = parts.find(
-              p =>
-                p.type === 'tool-invocation'
-                && p.toolInvocation?.toolName === event.name
-                && !p.toolInvocation?.result,
-            )
+              (p) =>
+                p.type === "tool-invocation" &&
+                p.toolInvocation?.toolName === event.name &&
+                !p.toolInvocation?.result
+            );
 
-            console.log('[useChatMessagesClientSide] on_tool_end event:', {
+            console.log("[useChatMessagesClientSide] on_tool_end event:", {
               toolName: event.name,
               hasToolPart: !!toolPart,
               output: event.data?.output,
-            })
+            });
 
             if (toolPart && toolPart.toolInvocation) {
-              const result = event.data?.output
-              toolPart.toolInvocation.result = result
-              toolPart.toolInvocation.state = 'result'
+              let result = event.data?.output;
 
-              // Parse result to check for Apps SDK component in the result's _meta field
-              let parsedResult = result
-              if (typeof result === 'string') {
+              // Unwrap LangChain ToolMessage wrapper: kwargs.content contains the actual output
+              if (
+                result?.kwargs?.content &&
+                typeof result.kwargs.content === "string"
+              ) {
                 try {
-                  parsedResult = JSON.parse(result)
-                }
-                catch (error) {
-                  console.warn('[useChatMessagesClientSide] Failed to parse result:', error)
+                  result = JSON.parse(result.kwargs.content);
+                } catch (error) {
+                  console.warn(
+                    "[useChatMessagesClientSide] Failed to parse kwargs.content:",
+                    error
+                  );
+                  result = result.kwargs.content;
                 }
               }
+              // Fallback: try parsing result.content if it's a string
+              else if (result?.content && typeof result.content === "string") {
+                try {
+                  result = JSON.parse(result.content);
+                } catch (error) {
+                  result = result.content;
+                }
+              }
+
+              // Store the unwrapped result
+              toolPart.toolInvocation.result = result;
+              toolPart.toolInvocation.state = "result";
 
               // Check result's _meta field for Apps SDK component
-              const appsSdkUri = parsedResult?._meta?.['openai/outputTemplate']
+              const appsSdkUri = result?._meta?.["openai/outputTemplate"];
 
-              console.log('[useChatMessagesClientSide] Apps SDK check:', {
+              console.log("[useChatMessagesClientSide] Tool result:", {
                 toolName: event.name,
-                hasParsedResult: !!parsedResult,
-                hasMeta: !!parsedResult?._meta,
+                hasMeta: !!result?._meta,
+                hasStructuredContent: !!result?.structuredContent,
                 appsSdkUri,
-              })
+              });
 
-              if (appsSdkUri && typeof appsSdkUri === 'string' && readResource) {
-                // Fetch the resource in the background
-                console.log('[useChatMessagesClientSide] Detected Apps SDK component, fetching resource:', appsSdkUri)
-                ; (async () => {
-                  try {
-                    // Use the readResource function passed from the inspector connection
-                    const resourceData = await readResource(appsSdkUri)
+              if (
+                appsSdkUri &&
+                typeof appsSdkUri === "string" &&
+                readResource
+              ) {
+                // Fetch the resource now (await instead of IIFE)
+                console.log(
+                  "[useChatMessagesClientSide] Detected Apps SDK component, fetching resource:",
+                  appsSdkUri
+                );
+                try {
+                  // Use the readResource function passed from the inspector connection
+                  const resourceData = await readResource(appsSdkUri);
 
-                    console.log('[useChatMessagesClientSide] Resource fetched:', resourceData)
+                  console.log(
+                    "[useChatMessagesClientSide] Resource fetched:",
+                    resourceData
+                  );
 
-                    // Extract structured content from parsed result
-                    let structuredContent = null
-                    if (parsedResult?.structuredContent) {
-                      structuredContent = parsedResult.structuredContent
-                    }
-                    else if (Array.isArray(parsedResult) && parsedResult[0]) {
-                      const firstResult = parsedResult[0]
-                      if (firstResult.output?.value?.structuredContent) {
-                        structuredContent = firstResult.output.value.structuredContent
-                      }
-                      else if (firstResult.structuredContent) {
-                        structuredContent = firstResult.structuredContent
-                      }
-                      else if (firstResult.output?.value) {
-                        structuredContent = firstResult.output.value
-                      }
-                    }
+                  // Extract structured content from result
+                  const structuredContent = result?.structuredContent || null;
 
-                    // Fallback to entire parsed result
-                    if (!structuredContent) {
-                      structuredContent = parsedResult
-                    }
-
-                    // Add the fetched resource contents to the result's content array
-                    if (resourceData?.contents && Array.isArray(resourceData.contents)) {
-                      // Convert resource contents to MCP resource format
-                      const mcpResources = resourceData.contents.map((content: any) => ({
-                        type: 'resource',
+                  // Add the fetched resource contents to the result's content array
+                  if (
+                    resourceData?.contents &&
+                    Array.isArray(resourceData.contents)
+                  ) {
+                    // Convert resource contents to MCP resource format
+                    const mcpResources = resourceData.contents.map(
+                      (content: any) => ({
+                        type: "resource",
                         resource: content,
-                      }))
+                      })
+                    );
 
-                      console.log('[useChatMessagesClientSide] Created MCP resources:', mcpResources)
+                    console.log(
+                      "[useChatMessagesClientSide] Created MCP resources:",
+                      mcpResources
+                    );
 
-                      // Update the tool result with the fetched resources
-                      if (toolPart.toolInvocation) {
-                        const updatedResult = {
-                          ...parsedResult,
-                          content: [
-                            ...(parsedResult.content || []),
-                            ...mcpResources,
-                          ],
-                          structuredContent,
-                        }
+                    // Update the tool result with the fetched resources
+                    const updatedResult = {
+                      ...result,
+                      content: [...(result.content || []), ...mcpResources],
+                      structuredContent,
+                    };
 
-                        console.log('[useChatMessagesClientSide] Updated result:', updatedResult)
-                        // Store as JSON string to match the format
-                        toolPart.toolInvocation.result = JSON.stringify(updatedResult)
-
-                        setMessages(prev =>
-                          prev.map(msg =>
-                            msg.id === assistantMessageId
-                              ? { ...msg, parts: [...parts] }
-                              : msg,
-                          ),
-                        )
-
-                        console.log('[useChatMessagesClientSide] Messages state updated with resource')
-                      }
-                    }
-                    else {
-                      console.warn('[useChatMessagesClientSide] No contents in resourceData:', resourceData)
-                    }
+                    toolPart.toolInvocation.result = updatedResult;
+                    console.log(
+                      "[useChatMessagesClientSide] Updated result with resources"
+                    );
+                  } else {
+                    console.warn(
+                      "[useChatMessagesClientSide] No contents in resourceData:",
+                      resourceData
+                    );
                   }
-                  catch (error) {
-                    console.error('Failed to fetch Apps SDK resource:', error)
-                  }
-                })()
+                } catch (error) {
+                  console.error("Failed to fetch Apps SDK resource:", error);
+                }
               }
 
-              setMessages(prev =>
-                prev.map(msg =>
+              setMessages((prev) =>
+                prev.map((msg) =>
                   msg.id === assistantMessageId
                     ? { ...msg, parts: [...parts] }
-                    : msg,
-                ),
-              )
+                    : msg
+                )
+              );
             }
           }
         }
 
         // Final update
-        setMessages(prev =>
-          prev.map(msg =>
+        setMessages((prev) =>
+          prev.map((msg) =>
             msg.id === assistantMessageId
               ? {
                   ...msg,
                   parts: [...parts],
-                  content: '',
+                  content: "",
                 }
-              : msg,
-          ),
-        )
+              : msg
+          )
+        );
 
         // Track successful chat message
         if (llmConfig) {
-          const telemetry = Telemetry.getInstance()
+          const telemetry = Telemetry.getInstance();
           telemetry
             .capture(
               new MCPChatMessageEvent({
-                serverId: mcpServerUrl,
+                serverId: connection.url,
                 provider: llmConfig.provider,
                 model: llmConfig.model,
                 messageCount: messages.length + 1,
                 toolCallsCount,
                 success: true,
-                executionMode: 'client-side',
+                executionMode: "client-side",
                 duration: Date.now() - startTime,
-              }),
+              })
             )
             .catch(() => {
               // Silently fail - telemetry should not break the application
-            })
+            });
         }
+      } catch (error) {
+        console.error("Client-side agent error:", error);
 
-        // Cleanup
-        await client.closeAllSessions()
-      }
-      catch (error) {
-        console.error('Client-side agent error:', error)
+        // Extract detailed error message
+        let errorDetail = "Unknown error occurred";
+        if (error instanceof Error) {
+          errorDetail = error.message;
+          // Check if error has HTTP status info
+          const errorAny = error as any;
+          if (errorAny.status) {
+            errorDetail = `HTTP ${errorAny.status}: ${errorDetail}`;
+          }
+          if (
+            errorAny.code === 401 ||
+            errorDetail.includes("401") ||
+            errorDetail.includes("Unauthorized")
+          ) {
+            errorDetail = `Authentication failed (401). Check your Authorization header in the connection settings.`;
+          }
+        }
 
         // Track failed chat message
         if (llmConfig) {
-          const telemetry = Telemetry.getInstance()
+          const telemetry = Telemetry.getInstance();
           telemetry
             .capture(
               new MCPChatMessageEvent({
-                serverId: mcpServerUrl,
+                serverId: connection.url,
                 provider: llmConfig.provider,
                 model: llmConfig.model,
                 messageCount: messages.length + 1,
                 toolCallsCount,
                 success: false,
-                executionMode: 'client-side',
+                executionMode: "client-side",
                 duration: Date.now() - startTime,
-                error: error instanceof Error ? error.message : 'Unknown error occurred',
-              }),
+                error: errorDetail,
+              })
             )
             .catch(() => {
               // Silently fail - telemetry should not break the application
-            })
+            });
         }
 
         const errorMessage: Message = {
           id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'
-          }`,
+          role: "assistant",
+          content: `Error: ${errorDetail}`,
           timestamp: Date.now(),
-        }
-        setMessages(prev => [...prev, errorMessage])
-
-        // Cleanup on error
-        if (clientRef.current) {
-          try {
-            await clientRef.current.closeAllSessions()
-          }
-          catch (e) {
-            console.error('Error closing sessions:', e)
-          }
-        }
-      }
-      finally {
-        setIsLoading(false)
-        agentRef.current = null
-        clientRef.current = null
-        abortControllerRef.current = null
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+        abortControllerRef.current = null;
       }
     },
-    [llmConfig, isConnected, mcpConfig, mcpServerUrl, authConfig, readResource],
-  )
+    [connection, llmConfig, isConnected, messages, readResource]
+  );
 
   const clearMessages = useCallback(() => {
-    setMessages([])
-  }, [])
+    setMessages([]);
+    if (agentRef.current) {
+      agentRef.current.clearConversationHistory();
+    }
+  }, []);
 
   return {
     messages,
     isLoading,
     sendMessage,
     clearMessages,
-  }
+  };
 }

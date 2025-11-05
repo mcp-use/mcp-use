@@ -1,5 +1,152 @@
 # @mcp-use/inspector
 
+## 0.4.11
+
+### Patch Changes
+
+- ceed51b: Standardize code formatting with ESLint + Prettier integration
+  - Add Prettier for consistent code formatting across the monorepo
+  - Integrate Prettier with ESLint via `eslint-config-prettier` to prevent conflicts
+  - Configure pre-commit hooks with `lint-staged` to auto-format staged files
+  - Add Prettier format checks to CI pipeline
+  - Remove `@antfu/eslint-config` in favor of unified root ESLint configuration
+  - Enforce semicolons and consistent code style with `.prettierrc.json`
+  - Exclude markdown and JSON files from formatting via `.prettierignore`
+
+- ceed51b: Several major updates:
+  - `useMCP` now uses `BrowserMCPClient` (previously it relied on the unofficial SDK).
+  - Chat functionality works in the Inspector using client-side message handling (LangChain agents run client-side, not in `useMcp` due to browser compatibility limitations).
+  - Chat and Inspector tabs share the same connection.
+  - The agent in Chat now has memory (previously, it didn't retain context from the ongoing conversation).
+  - The client now uses the advertised capability array from the server to determine which functions to call.
+    Previously, it would call functions like `list_resource` regardless of whether the server supported them.
+  - Added PostHog integration in the docs.
+  - Improved error handling throughout the Chat tab and connection process.
+  - Fixed Apps SDK widget rendering with proper parameter passing.
+
+- Updated dependencies [ceed51b]
+- Updated dependencies [ceed51b]
+  - mcp-use@1.2.2
+
+## 0.4.11-canary.1
+
+### Patch Changes
+
+- 3f992c3: Standardize code formatting with ESLint + Prettier integration
+  - Add Prettier for consistent code formatting across the monorepo
+  - Integrate Prettier with ESLint via `eslint-config-prettier` to prevent conflicts
+  - Configure pre-commit hooks with `lint-staged` to auto-format staged files
+  - Add Prettier format checks to CI pipeline
+  - Remove `@antfu/eslint-config` in favor of unified root ESLint configuration
+  - Enforce semicolons and consistent code style with `.prettierrc.json`
+  - Exclude markdown and JSON files from formatting via `.prettierignore`
+
+- Updated dependencies [3f992c3]
+  - mcp-use@1.2.2-canary.1
+
+## 0.4.11-canary.0
+
+### Patch Changes
+
+- 38d3c3c: Several major updates:
+  - `useMCP` now uses `BrowserMCPClient` (previously it relied on the unofficial SDK).
+  - Chat functionality works in the Inspector using client-side message handling (LangChain agents run client-side, not in `useMcp` due to browser compatibility limitations).
+  - Chat and Inspector tabs share the same connection.
+  - The agent in Chat now has memory (previously, it didn't retain context from the ongoing conversation).
+  - The client now uses the advertised capability array from the server to determine which functions to call.
+    Previously, it would call functions like `list_resource` regardless of whether the server supported them.
+  - Added PostHog integration in the docs.
+  - Improved error handling throughout the Chat tab and connection process.
+  - Fixed Apps SDK widget rendering with proper parameter passing.
+
+- Updated dependencies [38d3c3c]
+  - mcp-use@1.2.2-canary.0
+
+## 0.4.10
+
+### Patch Changes
+
+- 9e555ef: fix: inspector deps
+  - mcp-use@1.2.1
+
+## 0.4.10-canary.0
+
+### Patch Changes
+
+- a5a6919: fix: inspector deps
+  - mcp-use@1.2.1-canary.0
+
+## 0.4.9
+
+### Patch Changes
+
+- 708cc5b: fix: enhance widget CSP handling and security headers
+- 708cc5b: chore: update langchain dependencies
+- 708cc5b: fix: apps sdk metadata setup from widget build
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+  - mcp-use@1.2.0
+
+## 0.4.9-canary.7
+
+### Patch Changes
+
+- a8e5b65: fix: apps sdk metadata setup from widget build
+- Updated dependencies [a8e5b65]
+  - mcp-use@1.2.0-canary.6
+
+## 0.4.9-canary.6
+
+### Patch Changes
+
+- Updated dependencies [940d727]
+  - mcp-use@1.2.0-canary.5
+
+## 0.4.9-canary.5
+
+### Patch Changes
+
+- b9b739b: chore: update langchain dependencies
+  - mcp-use@1.2.0-canary.4
+
+## 0.4.9-canary.4
+
+### Patch Changes
+
+- Updated dependencies [da6e7ed]
+  - mcp-use@1.2.0-canary.3
+
+## 0.4.9-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3f2d2e9]
+  - mcp-use@1.2.0-canary.2
+
+## 0.4.9-canary.2
+
+### Patch Changes
+
+- Updated dependencies [5dd503f]
+  - mcp-use@1.2.0-canary.1
+
+## 0.4.9-canary.1
+
+### Patch Changes
+
+- 3b72cde: fix: enhance widget CSP handling and security headers
+
+## 0.4.9-canary.0
+
+### Patch Changes
+
+- Updated dependencies [b24a213]
+  - mcp-use@1.2.0-canary.0
+
 ## 0.4.8
 
 ### Patch Changes

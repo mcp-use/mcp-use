@@ -1,5 +1,57 @@
 # create-mcp-use-app
 
+## 0.4.9
+
+### Patch Changes
+
+- ceed51b: Standardize code formatting with ESLint + Prettier integration
+  - Add Prettier for consistent code formatting across the monorepo
+  - Integrate Prettier with ESLint via `eslint-config-prettier` to prevent conflicts
+  - Configure pre-commit hooks with `lint-staged` to auto-format staged files
+  - Add Prettier format checks to CI pipeline
+  - Remove `@antfu/eslint-config` in favor of unified root ESLint configuration
+  - Enforce semicolons and consistent code style with `.prettierrc.json`
+  - Exclude markdown and JSON files from formatting via `.prettierignore`
+
+## 0.4.9-canary.0
+
+### Patch Changes
+
+- 3f992c3: Standardize code formatting with ESLint + Prettier integration
+  - Add Prettier for consistent code formatting across the monorepo
+  - Integrate Prettier with ESLint via `eslint-config-prettier` to prevent conflicts
+  - Configure pre-commit hooks with `lint-staged` to auto-format staged files
+  - Add Prettier format checks to CI pipeline
+  - Remove `@antfu/eslint-config` in favor of unified root ESLint configuration
+  - Enforce semicolons and consistent code style with `.prettierrc.json`
+  - Exclude markdown and JSON files from formatting via `.prettierignore`
+
+## 0.4.8
+
+### Patch Changes
+
+- 708cc5b: update package.json
+- 708cc5b: chore: set again cli and inspector as dependencies
+- 708cc5b: fix: apps sdk metadata setup from widget build
+
+## 0.4.8-canary.2
+
+### Patch Changes
+
+- a8e5b65: fix: apps sdk metadata setup from widget build
+
+## 0.4.8-canary.1
+
+### Patch Changes
+
+- c8a89fc: chore: set again cli and inspector as dependencies
+
+## 0.4.8-canary.0
+
+### Patch Changes
+
+- 507eb04: update package.json
+
 ## 0.4.7
 
 ### Patch Changes

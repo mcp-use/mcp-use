@@ -41,7 +41,7 @@ async def main():
     }
 
     client = MCPClient(config=config)
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatOpenAI(model="gpt-5")
     agent = MCPAgent(llm=llm, client=client, max_steps=50)
 
     result: CityInfo = await agent.run(

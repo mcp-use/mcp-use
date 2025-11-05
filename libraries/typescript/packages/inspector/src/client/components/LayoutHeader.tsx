@@ -1,39 +1,52 @@
-import type { TabType } from '@/client/context/InspectorContext'
-import type { MCPConnection } from '@/client/context/McpContext'
-import { Check, Command, Copy, FolderOpen, MessageCircle, MessageSquare, Wrench, Zap } from 'lucide-react'
-import { useState } from 'react'
-import { toast } from 'sonner'
-import { Button } from '@/client/components/ui/button'
-import { GithubIcon } from '@/client/components/ui/github-icon'
-import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
-import { Tabs, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
+import type { TabType } from "@/client/context/InspectorContext";
+import type { MCPConnection } from "@/client/context/McpContext";
+import {
+  Check,
+  Command,
+  Copy,
+  FolderOpen,
+  MessageCircle,
+  MessageSquare,
+  Wrench,
+  Zap,
+} from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/client/components/ui/button";
+import { GithubIcon } from "@/client/components/ui/github-icon";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/client/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/client/components/ui/tooltip'
-import { useInspector } from '@/client/context/InspectorContext'
-import { cn } from '@/client/lib/utils'
-import { AnimatedThemeToggler } from './AnimatedThemeToggler'
-import LogoAnimated from './LogoAnimated'
-import { ServerDropdown } from './ServerDropdown'
+} from "@/client/components/ui/tooltip";
+import { useInspector } from "@/client/context/InspectorContext";
+import { cn } from "@/client/lib/utils";
+import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
+import LogoAnimated from "./LogoAnimated";
+import { ServerDropdown } from "./ServerDropdown";
 
 interface LayoutHeaderProps {
-  connections: MCPConnection[]
-  selectedServer: MCPConnection | undefined
-  activeTab: string
-  onServerSelect: (serverId: string) => void
-  onTabChange: (tab: TabType) => void
-  onCommandPaletteOpen: () => void
-  onOpenConnectionOptions: (connectionId: string | null) => void
+  connections: MCPConnection[];
+  selectedServer: MCPConnection | undefined;
+  activeTab: string;
+  onServerSelect: (serverId: string) => void;
+  onTabChange: (tab: TabType) => void;
+  onCommandPaletteOpen: () => void;
+  onOpenConnectionOptions: (connectionId: string | null) => void;
 }
 
 const tabs = [
-  { id: 'tools', label: 'Tools', icon: Wrench },
-  { id: 'prompts', label: 'Prompts', icon: MessageSquare },
-  { id: 'resources', label: 'Resources', icon: FolderOpen },
-  { id: 'chat', label: 'Chat', icon: MessageCircle },
-]
+  { id: "tools", label: "Tools", icon: Wrench },
+  { id: "prompts", label: "Prompts", icon: MessageSquare },
+  { id: "resources", label: "Resources", icon: FolderOpen },
+  { id: "chat", label: "Chat", icon: MessageCircle },
+];
 
 export function LayoutHeader({
   connections,
@@ -44,24 +57,22 @@ export function LayoutHeader({
   onCommandPaletteOpen,
   onOpenConnectionOptions,
 }: LayoutHeaderProps) {
-  const { tunnelUrl } = useInspector()
-  const showTunnelBadge = selectedServer && tunnelUrl
-  const [copied, setCopied] = useState(false)
+  const { tunnelUrl } = useInspector();
+  const showTunnelBadge = selectedServer && tunnelUrl;
+  const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    if (!tunnelUrl)
-      return
+    if (!tunnelUrl) return;
 
     try {
-      await navigator.clipboard.writeText(`${tunnelUrl}/mcp`)
-      setCopied(true)
-      toast.success('Tunnel URL copied to clipboard')
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(`${tunnelUrl}/mcp`);
+      setCopied(true);
+      toast.success("Tunnel URL copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy URL");
     }
-    catch {
-      toast.error('Failed to copy URL')
-    }
-  }
+  };
 
   return (
     <header className="w-full mx-auto">
@@ -78,19 +89,20 @@ export function LayoutHeader({
 
           {/* Tabs */}
           {selectedServer && (
-            <Tabs value={activeTab} onValueChange={tab => onTabChange(tab as TabType)}>
+            <Tabs
+              value={activeTab}
+              onValueChange={(tab) => onTabChange(tab as TabType)}
+            >
               <TabsList>
                 {tabs.map((tab) => {
                   // Get count for the current tab
-                  let count = 0
-                  if (tab.id === 'tools') {
-                    count = selectedServer.tools.length
-                  }
-                  else if (tab.id === 'prompts') {
-                    count = selectedServer.prompts.length
-                  }
-                  else if (tab.id === 'resources') {
-                    count = selectedServer.resources.length
+                  let count = 0;
+                  if (tab.id === "tools") {
+                    count = selectedServer.tools.length;
+                  } else if (tab.id === "prompts") {
+                    count = selectedServer.prompts.length;
+                  } else if (tab.id === "resources") {
+                    count = selectedServer.resources.length;
                   }
 
                   return (
@@ -103,16 +115,20 @@ export function LayoutHeader({
                       <div className="items-center gap-2 hidden lg:flex">
                         {tab.label}
                         {count > 0 && (
-                          <span className={
-                            cn(activeTab === tab.id ? ' dark:bg-black ' : 'dark:bg-zinc-700', 'bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium')
-                          }
+                          <span
+                            className={cn(
+                              activeTab === tab.id
+                                ? " dark:bg-black "
+                                : "dark:bg-zinc-700",
+                              "bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium"
+                            )}
                           >
                             {count}
                           </span>
                         )}
                       </div>
                     </TabsTrigger>
-                  )
+                  );
                 })}
               </TabsList>
             </Tabs>
@@ -147,9 +163,11 @@ export function LayoutHeader({
                         className="h-7 px-2"
                         onClick={handleCopy}
                       >
-                        {copied
-                          ? <Check className="size-3.5 text-green-600" />
-                          : <Copy className="size-3.5" />}
+                        {copied ? (
+                          <Check className="size-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -160,29 +178,36 @@ export function LayoutHeader({
                     </h5>
                     <ol className="space-y-2 text-xs text-muted-foreground">
                       <li className="flex gap-2">
-                        <span className="font-semibold text-foreground">1.</span>
+                        <span className="font-semibold text-foreground">
+                          1.
+                        </span>
                         <span>
-                          Enable
-                          {' '}
-                          <span className="font-medium text-foreground">dev mode</span>
-                          {' '}
+                          Enable{" "}
+                          <span className="font-medium text-foreground">
+                            dev mode
+                          </span>{" "}
                           from settings
                         </span>
                       </li>
                       <li className="flex gap-2">
-                        <span className="font-semibold text-foreground">2.</span>
+                        <span className="font-semibold text-foreground">
+                          2.
+                        </span>
                         <span>
-                          In
-                          {' '}
-                          <span className="font-medium text-foreground">App & Connectors</span>
-                          {' '}
-                          click on
-                          {' '}
-                          <span className="font-medium text-foreground">create</span>
+                          In{" "}
+                          <span className="font-medium text-foreground">
+                            App & Connectors
+                          </span>{" "}
+                          click on{" "}
+                          <span className="font-medium text-foreground">
+                            create
+                          </span>
                         </span>
                       </li>
                       <li className="flex gap-2">
-                        <span className="font-semibold text-foreground">3.</span>
+                        <span className="font-semibold text-foreground">
+                          3.
+                        </span>
                         <span>Use the tunnel URL in the input</span>
                       </li>
                     </ol>
@@ -241,5 +266,5 @@ export function LayoutHeader({
         </div>
       </div>
     </header>
-  )
+  );
 }

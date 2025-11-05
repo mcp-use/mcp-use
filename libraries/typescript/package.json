@@ -24,6 +24,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:strict": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "dev": "pnpm run -r --parallel dev",
     "prepare": "husky",
     "changeset": "changeset",
@@ -41,16 +43,19 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.28.0",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
+    "prettier": "^3.6.2",
     "tsup": "^8.5.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.20.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
+      "prettier --write",
       "eslint --fix"
     ]
   },
@@ -62,6 +67,10 @@
       "@mcp-use/inspector": "workspace:*",
       "@mcp-use/cli": "workspace:*",
       "create-mcp-use-app": "workspace:*",
+      "@langchain/core": "^1.0.1",
+      "@langchain/anthropic": "^1.0.0",
+      "@langchain/openai": "^1.0.0",
+      "langchain": "^1.0.1",
       "react": "^19.2.0",
       "react-dom": "^19.2.0",
       "jsondiffpatch": ">=0.7.2",

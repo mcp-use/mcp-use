@@ -1,5 +1,165 @@
 # mcp-use
 
+## 1.2.2
+
+### Patch Changes
+
+- ceed51b: Standardize code formatting with ESLint + Prettier integration
+  - Add Prettier for consistent code formatting across the monorepo
+  - Integrate Prettier with ESLint via `eslint-config-prettier` to prevent conflicts
+  - Configure pre-commit hooks with `lint-staged` to auto-format staged files
+  - Add Prettier format checks to CI pipeline
+  - Remove `@antfu/eslint-config` in favor of unified root ESLint configuration
+  - Enforce semicolons and consistent code style with `.prettierrc.json`
+  - Exclude markdown and JSON files from formatting via `.prettierignore`
+
+- ceed51b: Several major updates:
+  - `useMCP` now uses `BrowserMCPClient` (previously it relied on the unofficial SDK).
+  - Chat functionality works in the Inspector using client-side message handling (LangChain agents run client-side, not in `useMcp` due to browser compatibility limitations).
+  - Chat and Inspector tabs share the same connection.
+  - The agent in Chat now has memory (previously, it didn't retain context from the ongoing conversation).
+  - The client now uses the advertised capability array from the server to determine which functions to call.
+    Previously, it would call functions like `list_resource` regardless of whether the server supported them.
+  - Added PostHog integration in the docs.
+  - Improved error handling throughout the Chat tab and connection process.
+  - Fixed Apps SDK widget rendering with proper parameter passing.
+
+- Updated dependencies [ceed51b]
+- Updated dependencies [ceed51b]
+  - @mcp-use/inspector@0.4.11
+  - @mcp-use/cli@2.1.23
+
+## 1.2.2-canary.1
+
+### Patch Changes
+
+- 3f992c3: Standardize code formatting with ESLint + Prettier integration
+  - Add Prettier for consistent code formatting across the monorepo
+  - Integrate Prettier with ESLint via `eslint-config-prettier` to prevent conflicts
+  - Configure pre-commit hooks with `lint-staged` to auto-format staged files
+  - Add Prettier format checks to CI pipeline
+  - Remove `@antfu/eslint-config` in favor of unified root ESLint configuration
+  - Enforce semicolons and consistent code style with `.prettierrc.json`
+  - Exclude markdown and JSON files from formatting via `.prettierignore`
+
+- Updated dependencies [3f992c3]
+  - @mcp-use/inspector@0.4.11-canary.1
+  - @mcp-use/cli@2.1.23-canary.1
+
+## 1.2.2-canary.0
+
+### Patch Changes
+
+- 38d3c3c: Several major updates:
+  - `useMCP` now uses `BrowserMCPClient` (previously it relied on the unofficial SDK).
+  - Chat functionality works in the Inspector using client-side message handling (LangChain agents run client-side, not in `useMcp` due to browser compatibility limitations).
+  - Chat and Inspector tabs share the same connection.
+  - The agent in Chat now has memory (previously, it didn't retain context from the ongoing conversation).
+  - The client now uses the advertised capability array from the server to determine which functions to call.
+    Previously, it would call functions like `list_resource` regardless of whether the server supported them.
+  - Added PostHog integration in the docs.
+  - Improved error handling throughout the Chat tab and connection process.
+  - Fixed Apps SDK widget rendering with proper parameter passing.
+
+- Updated dependencies [38d3c3c]
+  - @mcp-use/inspector@0.4.11-canary.0
+  - @mcp-use/cli@2.1.23-canary.0
+
+## 1.2.1
+
+### Patch Changes
+
+- Updated dependencies [9e555ef]
+  - @mcp-use/inspector@0.4.10
+  - @mcp-use/cli@2.1.22
+
+## 1.2.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a5a6919]
+  - @mcp-use/inspector@0.4.10-canary.0
+  - @mcp-use/cli@2.1.22-canary.0
+
+## 1.2.0
+
+### Minor Changes
+
+- 708cc5b: Support Langchain 1.0.0
+
+### Patch Changes
+
+- 708cc5b: fix: mdoel type for langchain 1.0.0
+- 708cc5b: chore: set again cli and inspector as dependencies
+- 708cc5b: chore: lint
+- 708cc5b: Removed useless logs
+- 708cc5b: fix: apps sdk metadata setup from widget build
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+- Updated dependencies [708cc5b]
+  - @mcp-use/inspector@0.4.9
+  - @mcp-use/cli@2.1.21
+
+## 1.2.0-canary.6
+
+### Patch Changes
+
+- a8e5b65: fix: apps sdk metadata setup from widget build
+- Updated dependencies [a8e5b65]
+  - @mcp-use/inspector@0.4.9-canary.7
+  - @mcp-use/cli@2.1.21-canary.7
+
+## 1.2.0-canary.5
+
+### Patch Changes
+
+- 940d727: chore: lint
+  - @mcp-use/cli@2.1.21-canary.6
+  - @mcp-use/inspector@0.4.9-canary.6
+
+## 1.2.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [b9b739b]
+  - @mcp-use/inspector@0.4.9-canary.5
+  - @mcp-use/cli@2.1.21-canary.5
+
+## 1.2.0-canary.3
+
+### Patch Changes
+
+- da6e7ed: chore: set again cli and inspector as dependencies
+  - @mcp-use/cli@2.1.21-canary.4
+  - @mcp-use/inspector@0.4.9-canary.4
+
+## 1.2.0-canary.2
+
+### Patch Changes
+
+- 3f2d2e9: Removed useless logs
+  - @mcp-use/cli@2.1.21-canary.3
+  - @mcp-use/inspector@0.4.9-canary.3
+
+## 1.2.0-canary.1
+
+### Patch Changes
+
+- 5dd503f: fix: mdoel type for langchain 1.0.0
+  - @mcp-use/cli@2.1.21-canary.2
+  - @mcp-use/inspector@0.4.9-canary.2
+
+## 1.2.0-canary.0
+
+### Minor Changes
+
+- b24a213: Support Langchain 1.0.0
+
+### Patch Changes
+
+- @mcp-use/cli@2.1.21-canary.0
+- @mcp-use/inspector@0.4.9-canary.0
+
 ## 1.1.8
 
 ### Patch Changes

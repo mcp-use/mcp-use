@@ -1,4 +1,4 @@
-import type { Resource } from '@modelcontextprotocol/sdk/types.js'
+import type { Resource } from "@modelcontextprotocol/sdk/types.js";
 import {
   Database,
   File,
@@ -6,40 +6,39 @@ import {
   FileImage,
   FileText,
   Globe,
-} from 'lucide-react'
-import { ListItem } from '@/client/components/shared'
+} from "lucide-react";
+import { ListItem } from "@/client/components/shared";
 
 interface ResourcesListProps {
-  resources: Resource[]
-  selectedResource: Resource | null
-  onResourceSelect: (resource: Resource) => void
-  focusedIndex: number
+  resources: Resource[];
+  selectedResource: Resource | null;
+  onResourceSelect: (resource: Resource) => void;
+  focusedIndex: number;
 }
 
 function getResourceIcon(mimeType?: string, uri?: string) {
-  if (!mimeType && !uri)
-    return <File className="h-5 w-5" />
+  if (!mimeType && !uri) return <File className="h-5 w-5" />;
 
-  const type = (mimeType || uri || '').toLowerCase()
+  const type = (mimeType || uri || "").toLowerCase();
 
-  if (type.includes('image')) {
-    return <FileImage className="h-5 w-5" />
+  if (type.includes("image")) {
+    return <FileImage className="h-5 w-5" />;
   }
   if (
-    type.includes('json')
-    || type.includes('javascript')
-    || type.includes('typescript')
+    type.includes("json") ||
+    type.includes("javascript") ||
+    type.includes("typescript")
   ) {
-    return <FileCode className="h-5 w-5" />
+    return <FileCode className="h-5 w-5" />;
   }
-  if (type.includes('html') || type.includes('xml')) {
-    return <Globe className="h-5 w-5" />
+  if (type.includes("html") || type.includes("xml")) {
+    return <Globe className="h-5 w-5" />;
   }
-  if (type.includes('database') || type.includes('sql')) {
-    return <Database className="h-5 w-5" />
+  if (type.includes("database") || type.includes("sql")) {
+    return <Database className="h-5 w-5" />;
   }
 
-  return <FileText className="h-5 w-5" />
+  return <FileText className="h-5 w-5" />;
 }
 
 export function ResourcesList({
@@ -56,13 +55,13 @@ export function ResourcesList({
           No resources available
         </p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
       {resources.map((resource, index) => {
-        const icon = getResourceIcon(resource.mimeType, resource.uri)
+        const icon = getResourceIcon(resource.mimeType, resource.uri);
         const description = [
           resource.description,
           resource.mimeType && (
@@ -70,7 +69,7 @@ export function ResourcesList({
               {resource.mimeType}
             </span>
           ),
-        ].filter(Boolean)
+        ].filter(Boolean);
 
         return (
           <ListItem
@@ -81,23 +80,21 @@ export function ResourcesList({
             icon={icon}
             title={resource.name}
             description={
-              description.length > 0
-                ? (
-                    <span className="flex flex-col gap-1">
-                      {resource.description && <span>{resource.description}</span>}
-                      {resource.mimeType && (
-                        <span className="text-xs text-gray-500 dark:text-gray-500 font-mono">
-                          {resource.mimeType}
-                        </span>
-                      )}
+              description.length > 0 ? (
+                <span className="flex flex-col gap-1">
+                  {resource.description && <span>{resource.description}</span>}
+                  {resource.mimeType && (
+                    <span className="text-xs text-gray-500 dark:text-gray-500 font-mono">
+                      {resource.mimeType}
                     </span>
-                  )
-                : undefined
+                  )}
+                </span>
+              ) : undefined
             }
             onClick={() => onResourceSelect(resource)}
           />
-        )
+        );
       })}
     </div>
-  )
+  );
 }

@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.4.8",
+  "version": "0.4.11",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -48,10 +48,10 @@
     "lint:pnpm": "pnpm lint:fix"
   },
   "peerDependencies": {
-    "@langchain/anthropic": "^0.3.26",
-    "@langchain/core": "^0.3.72",
-    "@langchain/google-genai": "^0.2.18",
-    "@langchain/openai": "^0.6.9",
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/core": "^1.0.0",
+    "@langchain/google-genai": "^1.0.0",
+    "@langchain/openai": "^1.0.0",
     "express": "^4.21.2"
   },
   "dependencies": {
@@ -98,10 +98,10 @@
   "devDependencies": {
     "@antfu/eslint-config": "^5.4.1",
     "@eslint-react/eslint-plugin": "^1.38.4",
-    "@langchain/anthropic": "^0.3.26",
-    "@langchain/core": "^0.3.72",
-    "@langchain/google-genai": "^0.2.18",
-    "@langchain/openai": "^0.6.9",
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/core": "^1.0.0",
+    "@langchain/google-genai": "^1.0.0",
+    "@langchain/openai": "^1.0.0",
     "@radix-ui/react-slot": "^1.2.3",
     "@types/express": "^4.17.0",
     "@types/node": "^24.7.0",
