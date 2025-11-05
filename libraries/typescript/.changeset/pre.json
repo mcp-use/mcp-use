@@ -8,6 +8,7 @@
     "mcp-use": "1.2.2"
   },
   "changesets": [
-    "itchy-animals-kiss"
+    "itchy-animals-kiss",
+    "sweet-mangos-matter"
   ]
 }
