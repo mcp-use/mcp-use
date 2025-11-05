@@ -1094,8 +1094,7 @@ class MCPAgent:
 
             if not (name and mime and data_b64):
                 raise ValueError(
-                    "prompt_files items require name, mime_type, and data "
-                    "(via path, data, or data_base64)"
+                    "prompt_files items require name, mime_type, and data (via path, data, or data_base64)"
                 )
 
             return name, mime, data_b64
@@ -1110,24 +1109,30 @@ class MCPAgent:
                 continue
 
             if mime.startswith("image/"):
-                parts.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime};base64,{b64}"},
-                })
+                parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime};base64,{b64}"},
+                    }
+                )
             elif mime.startswith("audio/"):
                 # Some providers expect {type: input_audio, audio: {data, format}}
-                fmt = (name.split(".")[-1].lower() if "." in name else "")
-                parts.append({
-                    "type": "input_audio",
-                    "audio": {"data": b64, "format": fmt or mime.split("/")[-1]},
-                })
+                fmt = name.split(".")[-1].lower() if "." in name else ""
+                parts.append(
+                    {
+                        "type": "input_audio",
+                        "audio": {"data": b64, "format": fmt or mime.split("/")[-1]},
+                    }
+                )
             else:
                 # Fallback: include as text so model can access the raw content if needed
                 preview = b64[:2048]
-                parts.append({
-                    "type": "text",
-                    "text": f"[Attached file: {name} ({mime}) base64]\n{preview}...",
-                })
+                parts.append(
+                    {
+                        "type": "text",
+                        "text": f"[Attached file: {name} ({mime}) base64]\n{preview}...",
+                    }
+                )
 
         return HumanMessage(content=parts)
 

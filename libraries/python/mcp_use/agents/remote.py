@@ -255,8 +255,7 @@ class RemoteAgent:
 
                 if not (name and mime and data_b64):
                     raise ValueError(
-                        "prompt_files items require name, mime_type, and data "
-                        "(via path, data, or data_base64)"
+                        "prompt_files items require name, mime_type, and data (via path, data, or data_base64)"
                     )
                 return {"name": name, "mime_type": mime, "data_base64": data_b64}
 
