@@ -8,6 +8,7 @@
     "mcp-use": "1.2.2"
   },
   "changesets": [
+    "frank-ears-float",
     "itchy-animals-kiss",
     "sweet-mangos-matter"
   ]
