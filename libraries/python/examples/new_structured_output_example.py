@@ -24,8 +24,10 @@ async def main():
     client = MCPClient(config=config)
     llm = ChatOpenAI(model="gpt-5")
 
-    agent = MCPAgent(llm=llm, client=client)
-    result = await agent.run("Please tell me the cheapest hotel for two people in Trapani.", output_schema=StructuredResult)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    result = await agent.run("Find me a nice place to stay in Trapani for 2 adults "
+        "for a week in August (choose a random week). I prefer places with a pool and "
+        "good reviews. Show me the first option.", output_schema=StructuredResult)
 
     print(result)
 

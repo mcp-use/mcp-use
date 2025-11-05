@@ -179,11 +179,41 @@ class MCPAgent:
     @wrap_model_call
     async def dynamic_structured_output(request: ModelRequest, handler):
         # Get the format from the context
-        format_model = request.runtime.context.get("response_format")
+        schema = request.runtime.context.get("response_format")
+        if not schema:
+            return await handler(request)
 
-        # TODO: Do some checks to trigger strucured only on final step
-        if format_model:
-            request = request.override(response_format=AutoStrategy(schema=format_model))
+        messages = request.messages
+
+        def _message_type(msg):
+            if isinstance(msg, dict):
+                return msg.get("type")
+            return getattr(msg, "type", None)
+
+        def _tool_calls(msg):
+            if isinstance(msg, dict):
+                return msg.get("tool_calls") or []
+            return getattr(msg, "tool_calls", []) or []
+
+        # Check if has tool messages
+        has_tool_messages = any(_message_type(msg) == "tool" for msg in messages)
+
+        # Find the most recent AI message
+        last_ai_message = next(
+            (msg for msg in reversed(messages) if _message_type(msg) == "ai"),
+            None,
+        )
+
+        last_ai_tool_calls = _tool_calls(last_ai_message) if last_ai_message else []
+
+        # Check if we're in the last step
+        should_force_structured = (
+            last_ai_message is not None
+            and (has_tool_messages or not last_ai_tool_calls)
+        )
+
+        if should_force_structured:
+            request = request.override(response_format=AutoStrategy(schema=schema))
 
         return await handler(request)
 
@@ -700,6 +730,7 @@ class MCPAgent:
             accumulated_messages = list(langchain_history) + [HumanMessage(content=query)]
             pending_tool_calls = {}  # Map tool_call_id -> AgentAction
 
+            structured_response: dict | None = None
             while restart_count <= max_restarts:
                 # Update inputs with accumulated messages
                 inputs = {"messages": accumulated_messages}
@@ -842,15 +873,21 @@ class MCPAgent:
             # 5. Handle structured output if requested
             if output_schema and final_output:
                 try:
+                    # Here we use default response_format of LangChain
                     logger.info("🔧 Attempting structured output...")
-                    structured_response = structured_response["structured_response"]
+                    if structured_response and structured_response.get("structured_response") is not None:
+                        result = structured_response["structured_response"]
+                    else:
+                        # For cases where the middleware can't be executed
+                        logger.info("🔧 Reformatting final answer via structured output formatter...")
+                        result = await self.llm.with_structured_output(output_schema).ainvoke(final_output)
 
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_response}"))
+                        self.add_to_history(AIMessage(content=f"Structured result: {result}"))
 
                     logger.info("✅ Structured output successful")
                     success = True
-                    yield structured_response
+                    yield result
                     return
                 except Exception as e:
                     logger.error(f"❌ Structured output failed: {e}")
