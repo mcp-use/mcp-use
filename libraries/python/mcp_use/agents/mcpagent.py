@@ -566,45 +566,6 @@ class MCPAgent:
             )
         return result
 
-    async def _attempt_structured_output(
-        self,
-        raw_result: str,
-        structured_llm,
-        output_schema: type[T],
-        schema_description: str,
-    ) -> T:
-        """Attempt to create structured output from raw result with validation."""
-        format_prompt = f"""
-        Please format the following information according to the specified schema.
-        Extract and structure the relevant information from the content below.
-
-        Required schema fields:
-        {schema_description}
-
-        Content to format:
-        {raw_result}
-
-        Please provide the information in the requested structured format.
-        If any required information is missing, you must indicate this clearly.
-        """
-
-        structured_result = await structured_llm.ainvoke(format_prompt)
-
-        try:
-            for field_name, field_info in output_schema.model_fields.items():
-                required = not hasattr(field_info, "default") or field_info.default is None
-                if required:
-                    value = getattr(structured_result, field_name, None)
-                    if value is None or (isinstance(value, str) and not value.strip()):
-                        raise ValueError(f"Required field '{field_name}' is missing or empty")
-                    if isinstance(value, list) and len(value) == 0:
-                        raise ValueError(f"Required field '{field_name}' is an empty list")
-        except Exception as e:
-            logger.debug(f"Validation details: {e}")
-            raise  # Re-raise to trigger retry logic
-
-        return structured_result
-
     def _enhance_query_with_schema(self, query: str, output_schema: type[T]) -> str:
         """Enhance the query with schema information to make the agent aware of required fields."""
         schema_fields = []
