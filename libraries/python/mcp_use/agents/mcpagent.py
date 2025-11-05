@@ -206,11 +206,8 @@ class MCPAgent:
 
         last_ai_tool_calls = _tool_calls(last_ai_message) if last_ai_message else []
 
-        # Check if we're in the last step
-        should_force_structured = (
-            last_ai_message is not None
-            and (has_tool_messages or not last_ai_tool_calls)
-        )
+        # Check if we're in the last step
+        should_force_structured = last_ai_message is not None and (has_tool_messages or not last_ai_tool_calls)
 
         if should_force_structured:
             request = request.override(response_format=AutoStrategy(schema=schema))
