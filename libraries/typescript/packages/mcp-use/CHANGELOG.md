@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.2.3-canary.0
+
+### Patch Changes
+
+- d5ed5ba: fix: MCPAgent runtime fails with ERR_PACKAGE_PATH_NOT_EXPORTED in Node.js - package.json file didn't include an export path for ./agent, even though the agent code existed in src/agents/. Additionally, the build configuration (tsup.config.ts) wasn't building the agents as a separate entry point.
+  - @mcp-use/cli@2.1.24-canary.0
+  - @mcp-use/inspector@0.4.12-canary.0
+
 ## 1.2.2
 
 ### Patch Changes
