@@ -23,6 +23,7 @@ let winston: typeof import("winston") | null = null;
 function loadWinstonSync() {
   if (typeof require !== "undefined") {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       winston = require("winston");
     } catch {
       // Winston not available, will use SimpleConsoleLogger
