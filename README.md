@@ -11,31 +11,50 @@
 
 <h1 align="center" style="border:0; font-style:italic; font-weight:300;">Full-Stack MCP Framework</h1>
 <p align="center" style="max-width:600px; margin-bottom:40px">
-  <b>MCP-Use</b> provides everything you need to build with the <a href="https://modelcontextprotocol.io">Model Context Protocol</a> <br/> from AI agents to servers, in both <b>Python</b> and <b>TypeScript</b>.</p>
+  <b>mcp-use</b> provides everything you need to build with <a href="https://modelcontextprotocol.io">Model Context Protocol</a> <br/> MCP servers, MCP clients and AI agents in 6 lines of code, in both <b>Python</b> and <b>TypeScript</b>.</p>
 
 <p align="center">
     <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/mcp-use/mcp-use?style=social" /></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
-        <img src="https://static.pepy.tech/badge/mcp-use" /></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
-        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
-    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
-        <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
-    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Version">
-        <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
     <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
     <a href="https://docs.mcp-use.com" alt="Documentation">
-        <img src="https://img.shields.io/badge/docs-mcp--use.com-blue" /></a>
+        <img src="https://img.shields.io/badge/mcp--use-docs-red" /></a>
+    <a href="https://mcp-use.com" alt="Website">
+        <img src="https://img.shields.io/badge/cloud-mcp--use.com-blue" /></a>
+    <a href="https://x.com/mcpuse" alt="X follow mcp-use">
+        <img src="https://img.shields.io/twitter/follow/mcp-use?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
+    <br/>
+    <a href="https://github.com/mcp-use/mcp-use/tree/main/libraries/python" alt="Python repository">
+        <img src="https://img.shields.io/badge/pyhton-repo-grey?labelColor=white&logo=python" alt="Badge"></a>
+    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
+        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
+    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
+        <img src="https://static.pepy.tech/badge/mcp-use" /></a>
+    <a href="https://docs.mcp-use.com/python" alt="Python Documentation">
+        <img src="https://img.shields.io/badge/python-docs-red" /></a>
+    <br/>
+    <a href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript" alt="Typescript Documentation">
+        <img src="https://img.shields.io/badge/typescript-repo-grey?labelColor=white&logo=typescript" alt="Badge"></a>
+    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Version">
+        <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
+    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
+        <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
+    <a href="https://docs.mcp-use.com/typescript" alt="Typescript Documentation">
+        <img src="https://img.shields.io/badge/typescript-docs-red" /></a>
+    <br/>
+    <a href="https://inspector.mcp-use.com" alt="MCP Inspector Online">
+      <img src="https://img.shields.io/badge/MCP%20Inspector-black" /></a>
+    <a href="https://mcp-use.com" alt="MCP Deploy">
+      <img src="https://img.shields.io/badge/Deploy%20MCP-black" /></a>
 </p>
 </div>
 
 ---
 
-### 🏗️ Stack
+## Stack
 
 - **🤖 MCP Agents** - AI agents that can use tools and reason across steps
 - **🔌 MCP Clients** - Connect any LLM to any MCP server
