@@ -178,6 +178,9 @@ class MCPAgent:
 
     @wrap_model_call
     async def dynamic_structured_output(request: ModelRequest, handler):
+        if not request.runtime.context:
+            return await handler(request)
+
         # Get the format from the context
         schema = request.runtime.context.get("response_format")
         if not schema:
