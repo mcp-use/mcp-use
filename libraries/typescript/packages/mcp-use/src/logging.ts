@@ -1,5 +1,4 @@
 import type { Logger as WinstonLogger } from "winston";
-import { createLogger, format, transports } from "winston";
 
 // Conditional imports for Node.js-only modules
 async function getNodeModules() {
@@ -16,7 +15,14 @@ async function getNodeModules() {
   return { fs: null, path: null };
 }
 
-const { combine, timestamp, label, printf, colorize, splat } = format;
+// Lazy-load winston only in Node.js environments
+let winston: typeof import("winston") | null = null;
+async function getWinston() {
+  if (!winston) {
+    winston = await import("winston");
+  }
+  return winston;
+}
 
 export type LogLevel =
   | "error"
@@ -61,10 +67,7 @@ function isNodeJSEnvironment(): boolean {
       typeof process.platform !== "undefined" &&
       typeof __dirname !== "undefined";
 
-    // Check for Node.js modules
-    const hasNodeModules = typeof createLogger === "function";
-
-    return hasNodeGlobals && hasNodeModules;
+    return hasNodeGlobals;
   } catch {
     return false;
   }
@@ -167,18 +170,6 @@ function resolveLevel(env: string | undefined): LogLevel {
   }
 }
 
-const minimalFormatter = printf(({ level, message, label, timestamp }) => {
-  return `${timestamp} [${label}] ${level}: ${message}`;
-});
-
-const detailedFormatter = printf(({ level, message, label, timestamp }) => {
-  return `${timestamp} [${label}] ${level.toUpperCase()}: ${message}`;
-});
-
-const emojiFormatter = printf(({ level, message, label, timestamp }) => {
-  return `${timestamp} [${label}] ${level.toUpperCase()}: ${message}`;
-});
-
 export class Logger {
   private static instances: Record<
     string,
@@ -205,6 +196,12 @@ export class Logger {
 
     // Use Winston logger in Node.js environments
     if (!this.instances[name]) {
+      if (!winston) {
+        throw new Error("Winston not loaded - call Logger.configure() first");
+      }
+      const { createLogger, format } = winston;
+      const { combine, timestamp, label, printf, colorize, splat } = format;
+
       this.instances[name] = createLogger({
         level: resolveLevel(process.env.DEBUG),
         format: combine(
@@ -222,6 +219,24 @@ export class Logger {
   }
 
   private static getFormatter() {
+    if (!winston) {
+      throw new Error("Winston not loaded");
+    }
+    const { format } = winston;
+    const { printf } = format;
+
+    const minimalFormatter = printf(({ level, message, label, timestamp }) => {
+      return `${timestamp} [${label}] ${level}: ${message}`;
+    });
+
+    const detailedFormatter = printf(({ level, message, label, timestamp }) => {
+      return `${timestamp} [${label}] ${level.toUpperCase()}: ${message}`;
+    });
+
+    const emojiFormatter = printf(({ level, message, label, timestamp }) => {
+      return `${timestamp} [${label}] ${level.toUpperCase()}: ${message}`;
+    });
+
     switch (this.currentFormat) {
       case "minimal":
         return minimalFormatter;
@@ -241,12 +256,6 @@ export class Logger {
     const resolvedLevel = level ?? resolveLevel(debugEnv);
 
     this.currentFormat = format;
-    const root = this.get();
-
-    root.level = resolvedLevel;
-
-    // Winston-specific configuration for Node.js environments
-    const winstonRoot = root as WinstonLogger;
 
     // For non-Node.js environments, just update the level
     if (!isNodeJSEnvironment()) {
@@ -256,10 +265,23 @@ export class Logger {
 
       return;
     }
+
+    // Load winston for Node.js environments
+    await getWinston();
+    if (!winston) {
+      throw new Error("Failed to load winston");
+    }
+
+    const root = this.get();
+
+    root.level = resolvedLevel;
+
+    // Winston-specific configuration for Node.js environments
+    const winstonRoot = root as WinstonLogger;
     winstonRoot.clear();
 
     if (console) {
-      winstonRoot.add(new transports.Console());
+      winstonRoot.add(new winston.transports.Console());
     }
 
     if (file) {
@@ -269,11 +291,14 @@ export class Logger {
         if (!nodeFs.existsSync(dir)) {
           nodeFs.mkdirSync(dir, { recursive: true });
         }
-        winstonRoot.add(new transports.File({ filename: file }));
+        winstonRoot.add(new winston.transports.File({ filename: file }));
       }
     }
 
     // Update all existing Winston loggers with new format
+    const { format: winstonFormat } = winston;
+    const { combine, timestamp, label, colorize, splat } = winstonFormat;
+
     Object.values(this.instances).forEach((logger) => {
       if (logger && "format" in logger) {
         logger.level = resolvedLevel;
@@ -322,11 +347,13 @@ export class Logger {
 }
 
 // Only configure Winston features if in Node.js environment
-if (isNodeJSEnvironment()) {
-  Logger.configure();
-} else {
-  // For non-Node.js environments, just initialize with defaults
-  Logger.configure({ console: true });
-}
+(async () => {
+  if (isNodeJSEnvironment()) {
+    await Logger.configure();
+  } else {
+    // For non-Node.js environments, just initialize with defaults
+    await Logger.configure({ console: true });
+  }
+})();
 
 export const logger = Logger.get();
