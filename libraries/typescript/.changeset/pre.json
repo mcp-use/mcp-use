@@ -1,0 +1,15 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.1.23",
+    "create-mcp-use-app": "0.4.9",
+    "@mcp-use/inspector": "0.4.11",
+    "mcp-use": "1.2.2"
+  },
+  "changesets": [
+    "frank-ears-float",
+    "itchy-animals-kiss",
+    "sweet-mangos-matter"
+  ]
+}

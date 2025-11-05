@@ -273,7 +273,7 @@ program
   .description("Create a new MCP server project")
   .version(packageJson.version)
   .argument("[project-name]", "Name of the MCP server project")
-  .option("-t, --template <template>", "Template to use", "simple")
+  .option("-t, --template <template>", "Template to use", "starter")
   .option("--no-install", "Skip installing dependencies")
   .option("--no-git", "Skip initializing a git repository")
   .option("--dev", "Use workspace dependencies for development")
@@ -757,7 +757,7 @@ async function promptForTemplate(): Promise<string> {
       type: "list",
       name: "template",
       message: "Select a template:",
-      default: "simple",
+      default: "starter",
       choices: availableTemplates.map((template) => ({
         name: `${template} - ${templateDescriptions[template] || "MCP server template"}`,
         value: template,
