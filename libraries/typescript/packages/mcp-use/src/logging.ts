@@ -200,7 +200,7 @@ export class Logger {
         throw new Error("Winston not loaded - call Logger.configure() first");
       }
       const { createLogger, format } = winston;
-      const { combine, timestamp, label, printf, colorize, splat } = format;
+      const { combine, timestamp, label, colorize, splat } = format;
 
       this.instances[name] = createLogger({
         level: resolveLevel(process.env.DEBUG),
