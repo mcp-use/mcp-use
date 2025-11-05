@@ -59,7 +59,7 @@ class Logger:
 
         Args:
             level: Log level (default: DEBUG if MCP_USE_DEBUG is 2,
-            INFO if MCP_USE_DEBUG is 1,
+            INFO if MCP_USE_DEBUG is 1, CRITICAL+1 if MCP_USE_DEBUG < 0,
             otherwise WARNING)
             format_str: Log format string (default: DEFAULT_FORMAT)
             log_to_console: Whether to log to console (default: True)
@@ -73,6 +73,8 @@ class Logger:
                 level = logging.DEBUG
             elif MCP_USE_DEBUG == 1:
                 level = logging.INFO
+            elif MCP_USE_DEBUG < 0:
+                level = logging.CRITICAL + 1
             else:
                 level = logging.WARNING
         elif isinstance(level, str):
@@ -114,7 +116,7 @@ class Logger:
         """Set the debug flag and update the log level accordingly.
 
         Args:
-            debug_level: Debug level (0=off, 1=info, 2=debug)
+            debug_level: Debug level (-1=silent, 0=warning, 1=info, 2=debug)
         """
         global MCP_USE_DEBUG
         MCP_USE_DEBUG = debug_level
@@ -125,6 +127,9 @@ class Logger:
             langchain_set_debug(True)
         elif debug_level == 1:
             target_level = logging.INFO
+            langchain_set_debug(False)
+        elif debug_level < 0:
+            target_level = logging.CRITICAL + 1
             langchain_set_debug(False)
         else:
             target_level = logging.WARNING
@@ -151,6 +156,8 @@ if debug_env == "2":
     MCP_USE_DEBUG = 2
 elif debug_env == "1":
     MCP_USE_DEBUG = 1
+elif debug_env == "-1":
+    MCP_USE_DEBUG = -1
 
 # Configure default logger
 Logger.configure()
