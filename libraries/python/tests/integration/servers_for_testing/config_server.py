@@ -3,15 +3,19 @@ import argparse
 from fastmcp import FastMCP
 from langchain_core.runnables import RunnableConfig
 
+from mcp_use.logging import logger
+
 mcp = FastMCP()
 
 
 @mcp.tool()
 def check_config(config: RunnableConfig | None = None):
     "check the config and return the values"
+    logger.info(f" the config = {config}")
     a = config["metadata"]["a"]
     b = config["metadata"]["b"]
-    return f" values of a is {a} and  b is {b}"
+    sum = a + b
+    return sum
 
 
 if __name__ == "__main__":
