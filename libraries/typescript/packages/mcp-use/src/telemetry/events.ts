@@ -1,49 +1,49 @@
 export abstract class BaseTelemetryEvent {
-  abstract get name(): string
-  abstract get properties(): Record<string, any>
+  abstract get name(): string;
+  abstract get properties(): Record<string, any>;
 }
 
 export interface MCPAgentExecutionEventData {
   // Execution method and context
-  executionMethod: string // "run" or "astream"
-  query: string // The actual user query
-  success: boolean
+  executionMethod: string; // "run" or "astream"
+  query: string; // The actual user query
+  success: boolean;
 
   // Agent configuration
-  modelProvider: string
-  modelName: string
-  serverCount: number
-  serverIdentifiers: Array<Record<string, string>>
-  totalToolsAvailable: number
-  toolsAvailableNames: string[]
-  maxStepsConfigured: number
-  memoryEnabled: boolean
-  useServerManager: boolean
+  modelProvider: string;
+  modelName: string;
+  serverCount: number;
+  serverIdentifiers: Array<Record<string, string>>;
+  totalToolsAvailable: number;
+  toolsAvailableNames: string[];
+  maxStepsConfigured: number;
+  memoryEnabled: boolean;
+  useServerManager: boolean;
 
   // Execution PARAMETERS
-  maxStepsUsed: number | null
-  manageConnector: boolean
-  externalHistoryUsed: boolean
+  maxStepsUsed: number | null;
+  manageConnector: boolean;
+  externalHistoryUsed: boolean;
 
   // Execution results
-  stepsTaken?: number | null
-  toolsUsedCount?: number | null
-  toolsUsedNames?: string[] | null
-  response?: string | null // The actual response
-  executionTimeMs?: number | null
-  errorType?: string | null
+  stepsTaken?: number | null;
+  toolsUsedCount?: number | null;
+  toolsUsedNames?: string[] | null;
+  response?: string | null; // The actual response
+  executionTimeMs?: number | null;
+  errorType?: string | null;
 
   // Context
-  conversationHistoryLength?: number | null
+  conversationHistoryLength?: number | null;
 }
 
 export class MCPAgentExecutionEvent extends BaseTelemetryEvent {
   constructor(private data: MCPAgentExecutionEventData) {
-    super()
+    super();
   }
 
   get name(): string {
-    return 'mcp_agent_execution'
+    return "mcp_agent_execution";
   }
 
   get properties(): Record<string, any> {
@@ -76,6 +76,6 @@ export class MCPAgentExecutionEvent extends BaseTelemetryEvent {
       execution_time_ms: this.data.executionTimeMs ?? null,
       error_type: this.data.errorType ?? null,
       conversation_history_length: this.data.conversationHistoryLength ?? null,
-    }
+    };
   }
 }

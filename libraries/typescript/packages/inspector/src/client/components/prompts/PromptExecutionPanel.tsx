@@ -1,17 +1,17 @@
-import type { Prompt } from '@modelcontextprotocol/sdk/types.js'
-import { Play, Save } from 'lucide-react'
-import { Button } from '@/client/components/ui/button'
-import { Spinner } from '@/client/components/ui/spinner'
-import { PromptInputForm } from './PromptInputForm'
+import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import { Play, Save } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
+import { Spinner } from "@/client/components/ui/spinner";
+import { PromptInputForm } from "./PromptInputForm";
 
 interface PromptExecutionPanelProps {
-  selectedPrompt: Prompt | null
-  promptArgs: Record<string, unknown>
-  isExecuting: boolean
-  isConnected: boolean
-  onArgChange: (key: string, value: any) => void
-  onExecute: () => void
-  onSave: () => void
+  selectedPrompt: Prompt | null;
+  promptArgs: Record<string, unknown>;
+  isExecuting: boolean;
+  isConnected: boolean;
+  onArgChange: (key: string, value: any) => void;
+  onExecute: () => void;
+  onSave: () => void;
 }
 
 export function PromptExecutionPanel({
@@ -33,7 +33,7 @@ export function PromptExecutionPanel({
           Choose a prompt from the list to view its details and execute it
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -41,25 +41,25 @@ export function PromptExecutionPanel({
       <div className="flex-shrink-0 p-6 pt-3 pb-4 pr-3">
         <div>
           <div className="flex items-center justify-between mb-0">
-            <h3 className="text-lg font-semibold mb-2">{selectedPrompt.name}</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              {selectedPrompt.name}
+            </h3>
             <div className="flex gap-2">
               <Button
                 onClick={onExecute}
                 disabled={isExecuting || !isConnected}
               >
-                {isExecuting
-                  ? (
-                      <>
-                        <Spinner className="mr-2" />
-                        Executing...
-                      </>
-                    )
-                  : (
-                      <>
-                        <Play className="h-4 w-4 mr-2" />
-                        Execute
-                      </>
-                    )}
+                {isExecuting ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    Executing...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Execute
+                  </>
+                )}
               </Button>
               <Button
                 variant="outline"
@@ -88,5 +88,5 @@ export function PromptExecutionPanel({
         />
       </div>
     </div>
-  )
+  );
 }

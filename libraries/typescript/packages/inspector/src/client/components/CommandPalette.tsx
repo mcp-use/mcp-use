@@ -1,6 +1,10 @@
-import type { Prompt, Resource, Tool } from '@modelcontextprotocol/sdk/types.js'
-import type { SavedRequest } from './tools'
-import { Command } from 'cmdk'
+import type {
+  Prompt,
+  Resource,
+  Tool,
+} from "@modelcontextprotocol/sdk/types.js";
+import type { SavedRequest } from "./tools";
+import { Command } from "cmdk";
 import {
   ExternalLink,
   FileText,
@@ -9,12 +13,12 @@ import {
   Plus,
   Search,
   Wrench,
-} from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { McpUseLogo } from './McpUseLogo'
-import { ServerIcon } from './ServerIcon'
+import { McpUseLogo } from "./McpUseLogo";
+import { ServerIcon } from "./ServerIcon";
 
 // Discord Icon Component
 function DiscordIcon({ className }: { className?: string }) {
@@ -30,33 +34,33 @@ function DiscordIcon({ className }: { className?: string }) {
         fillRule="nonzero"
       />
     </svg>
-  )
+  );
 }
 
 interface CommandPaletteProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  tools: Tool[]
-  prompts: Prompt[]
-  resources: Resource[]
-  savedRequests: SavedRequest[]
-  connections: any[]
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  tools: Tool[];
+  prompts: Prompt[];
+  resources: Resource[];
+  savedRequests: SavedRequest[];
+  connections: any[];
   onNavigate: (
-    tab: 'tools' | 'prompts' | 'resources',
+    tab: "tools" | "prompts" | "resources",
     itemName?: string,
     serverId?: string
-  ) => void
-  onServerSelect: (serverId: string) => void
+  ) => void;
+  onServerSelect: (serverId: string) => void;
 }
 
 interface CommandItem {
-  id: string
-  name: string
-  description?: string
-  type: 'tool' | 'prompt' | 'resource' | 'saved-request' | 'global'
-  category: string
-  metadata?: any
-  action?: () => void
+  id: string;
+  name: string;
+  description?: string;
+  type: "tool" | "prompt" | "resource" | "saved-request" | "global";
+  category: string;
+  metadata?: any;
+  action?: () => void;
 }
 
 export function CommandPalette({
@@ -70,109 +74,109 @@ export function CommandPalette({
   onNavigate,
   onServerSelect,
 }: CommandPaletteProps) {
-  const [search, setSearch] = useState('')
-  const listRef = useRef<HTMLDivElement>(null)
-  const navigate = useNavigate()
+  const [search, setSearch] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Create global command items
   const globalItems: CommandItem[] = [
     {
-      id: 'connect-server',
-      name: 'Connect Server',
-      description: 'Add a new MCP server connection',
-      type: 'global',
-      category: 'Navigation',
-      action: () => navigate('/'),
+      id: "connect-server",
+      name: "Connect Server",
+      description: "Add a new MCP server connection",
+      type: "global",
+      category: "Navigation",
+      action: () => navigate("/"),
     },
     {
-      id: 'mcp-use-website',
-      name: 'MCP Use Website',
-      description: 'Visit mcp-use.com for tools and resources',
-      type: 'global',
-      category: 'Documentation',
-      action: () => window.open('https://mcp-use.com', '_blank'),
+      id: "mcp-use-website",
+      name: "MCP Use Website",
+      description: "Visit mcp-use.com for tools and resources",
+      type: "global",
+      category: "Documentation",
+      action: () => window.open("https://mcp-use.com", "_blank"),
     },
     {
-      id: 'mcp-use-docs',
-      name: 'How to Create an MCP Server',
-      description: 'Step-by-step guide to building MCP servers',
-      type: 'global',
-      category: 'Documentation',
-      action: () => window.open('https://docs.mcp-use.com', '_blank'),
+      id: "mcp-use-docs",
+      name: "How to Create an MCP Server",
+      description: "Step-by-step guide to building MCP servers",
+      type: "global",
+      category: "Documentation",
+      action: () => window.open("https://docs.mcp-use.com", "_blank"),
     },
     {
-      id: 'mcp-docs',
-      name: 'MCP Official Documentation',
-      description: 'Learn about the Model Context Protocol',
-      type: 'global',
-      category: 'Documentation',
+      id: "mcp-docs",
+      name: "MCP Official Documentation",
+      description: "Learn about the Model Context Protocol",
+      type: "global",
+      category: "Documentation",
       action: () =>
         window.open(
-          'https://modelcontextprotocol.io/docs/getting-started/intro',
-          '_blank',
+          "https://modelcontextprotocol.io/docs/getting-started/intro",
+          "_blank"
         ),
     },
     {
-      id: 'discord',
-      name: 'Join Discord Community',
-      description: 'Connect with the MCP community',
-      type: 'global',
-      category: 'Community',
-      action: () => window.open('https://discord.gg/XkNkSkMz3V', '_blank'),
+      id: "discord",
+      name: "Join Discord Community",
+      description: "Connect with the MCP community",
+      type: "global",
+      category: "Community",
+      action: () => window.open("https://discord.gg/XkNkSkMz3V", "_blank"),
     },
-  ]
+  ];
 
   // Create server selection items
-  const serverItems: CommandItem[] = connections.map(connection => ({
+  const serverItems: CommandItem[] = connections.map((connection) => ({
     id: `server-${connection.id}`,
     name: connection.name,
     description: `Connected server (${connection.state})`,
-    type: 'global',
-    category: 'Connected Servers',
+    type: "global",
+    category: "Connected Servers",
     metadata: { serverId: connection.id, state: connection.state },
     action: () => onServerSelect(connection.id),
-  }))
+  }));
 
   // Create unified command items
   const commandItems: CommandItem[] = [
     ...globalItems,
     ...serverItems,
-    ...tools.map(tool => ({
+    ...tools.map((tool) => ({
       id: `tool-${tool.name}`,
       name: tool.name,
       description: tool.description,
-      type: 'tool' as const,
+      type: "tool" as const,
       category: (tool as any)._serverName
         ? `Tools - ${(tool as any)._serverName}`
-        : 'Tools',
+        : "Tools",
       metadata: {
         inputSchema: tool.inputSchema,
         serverId: (tool as any)._serverId,
         serverName: (tool as any)._serverName,
       },
     })),
-    ...prompts.map(prompt => ({
+    ...prompts.map((prompt) => ({
       id: `prompt-${prompt.name}`,
       name: prompt.name,
       description: prompt.description,
-      type: 'prompt' as const,
+      type: "prompt" as const,
       category: (prompt as any)._serverName
         ? `Prompts - ${(prompt as any)._serverName}`
-        : 'Prompts',
+        : "Prompts",
       metadata: {
         arguments: prompt.arguments,
         serverId: (prompt as any)._serverId,
         serverName: (prompt as any)._serverName,
       },
     })),
-    ...resources.map(resource => ({
+    ...resources.map((resource) => ({
       id: `resource-${resource.uri}`,
       name: resource.name,
       description: resource.description,
-      type: 'resource' as const,
+      type: "resource" as const,
       category: (resource as any)._serverName
         ? `Resources - ${(resource as any)._serverName}`
-        : 'Resources',
+        : "Resources",
       metadata: {
         uri: resource.uri,
         mimeType: resource.mimeType,
@@ -180,12 +184,12 @@ export function CommandPalette({
         serverName: (resource as any)._serverName,
       },
     })),
-    ...savedRequests.map(request => ({
+    ...savedRequests.map((request) => ({
       id: `saved-${request.id}`,
       name: request.name,
       description: `Saved request for ${request.toolName}`,
-      type: 'saved-request' as const,
-      category: 'Saved Requests',
+      type: "saved-request" as const,
+      category: "Saved Requests",
       metadata: {
         toolName: request.toolName,
         args: request.args,
@@ -194,98 +198,96 @@ export function CommandPalette({
         serverName: request.serverName,
       },
     })),
-  ]
+  ];
 
   const handleSelect = useCallback(
     (item: CommandItem) => {
-      console.warn('[CommandPalette] Item selected:', {
+      console.warn("[CommandPalette] Item selected:", {
         itemType: item.type,
         itemName: item.name,
         itemId: item.id,
         metadata: item.metadata,
-      })
+      });
 
       if (item.action) {
-        console.warn('[CommandPalette] Executing action for global item')
-        item.action()
-        onOpenChange(false)
-      }
-      else if (item.type === 'global') {
+        console.warn("[CommandPalette] Executing action for global item");
+        item.action();
+        onOpenChange(false);
+      } else if (item.type === "global") {
         // Handle server selection
         if (item.metadata?.serverId) {
           console.warn(
-            '[CommandPalette] Selecting server:',
-            item.metadata.serverId,
-          )
-          onServerSelect(item.metadata.serverId)
-          onOpenChange(false)
+            "[CommandPalette] Selecting server:",
+            item.metadata.serverId
+          );
+          onServerSelect(item.metadata.serverId);
+          onOpenChange(false);
         }
-      }
-      else {
+      } else {
         // Navigate to the item's tab and server in one atomic operation
         // For resources, use URI instead of name
-        const itemIdentifier
-          = item.type === 'resource' ? item.metadata?.uri : item.name
+        const itemIdentifier =
+          item.type === "resource" ? item.metadata?.uri : item.name;
 
         // Convert singular type to plural tab name
-        const tabName
-          = item.type === 'tool'
-            ? 'tools'
-            : item.type === 'prompt'
-              ? 'prompts'
-              : item.type === 'saved-request'
-                ? 'tools' // Navigate to tools tab for saved requests
-                : ('resources' as const)
+        const tabName =
+          item.type === "tool"
+            ? "tools"
+            : item.type === "prompt"
+              ? "prompts"
+              : item.type === "saved-request"
+                ? "tools" // Navigate to tools tab for saved requests
+                : ("resources" as const);
 
-        console.warn('[CommandPalette] Navigating to item:', {
+        console.warn("[CommandPalette] Navigating to item:", {
           tab: tabName,
           itemIdentifier,
           serverId: item.metadata?.serverId,
-        })
-        onNavigate(tabName, itemIdentifier, item.metadata?.serverId)
-        onOpenChange(false)
+        });
+        onNavigate(tabName, itemIdentifier, item.metadata?.serverId);
+        onOpenChange(false);
       }
     },
-    [onNavigate, onOpenChange, onServerSelect],
-  )
+    [onNavigate, onOpenChange, onServerSelect]
+  );
 
   const getIcon = (type: string, category?: string, itemName?: string) => {
     switch (type) {
-      case 'tool':
+      case "tool":
         return (
           <div className="bg-blue-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
             <Wrench className="h-4 w-4 text-blue-500" />
           </div>
-        )
-      case 'prompt':
+        );
+      case "prompt":
         return (
           <div className="bg-purple-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
             <MessageSquare className="h-4 w-4 text-purple-500" />
           </div>
-        )
-      case 'resource':
+        );
+      case "resource":
         return (
           <div className="bg-green-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
             <FileText className="h-4 w-4 text-green-500" />
           </div>
-        )
-      case 'saved-request':
+        );
+      case "saved-request":
         return (
           <div className="bg-orange-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
             <History className="h-4 w-4 text-orange-500" />
           </div>
-        )
-      case 'global':
-        if (category === 'Navigation') {
+        );
+      case "global":
+        if (category === "Navigation") {
           return (
             <div className="bg-gray-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
               <Plus className="h-4 w-4 text-gray-600 dark:text-gray-300" />
             </div>
-          )
+          );
         }
-        if (category === 'Documentation') {
+        if (category === "Documentation") {
           // Use MCP Use logo for MCP Use related documentation items
-          if (itemName?.includes('MCP Use') || itemName?.includes('mcp-use')) {
+          if (itemName?.includes("MCP Use") || itemName?.includes("mcp-use")) {
             return (
               <div className="bg-black/10 dark:bg-white/10 rounded-full p-2 flex items-center justify-center shrink-0">
                 <McpUseLogo
@@ -293,22 +295,22 @@ export function CommandPalette({
                   size="sm"
                 />
               </div>
-            )
+            );
           }
           return (
             <div className="bg-orange-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
               <ExternalLink className="h-4 w-4 text-orange-500" />
             </div>
-          )
+          );
         }
-        if (category === 'Community') {
+        if (category === "Community") {
           return (
             <div className="bg-purple-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
               <DiscordIcon className="h-4 w-4 text-purple-500" />
             </div>
-          )
+          );
         }
-        if (category === 'Connected Servers') {
+        if (category === "Connected Servers") {
           return (
             <div className="bg-cyan-500/20 rounded-full p-0 flex items-center justify-center shrink-0">
               <ServerIcon
@@ -317,35 +319,35 @@ export function CommandPalette({
                 size="md"
               />
             </div>
-          )
+          );
         }
         return (
           <div className="bg-gray-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
             <ExternalLink className="h-4 w-4 text-gray-500" />
           </div>
-        )
+        );
       default:
         return (
           <div className="bg-gray-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
             <Search className="h-4 w-4 text-gray-500" />
           </div>
-        )
+        );
     }
-  }
+  };
 
   // Reset search when dialog opens/closes
   useEffect(() => {
     if (isOpen) {
-      setSearch('')
+      setSearch("");
     }
-  }, [isOpen, setSearch])
+  }, [isOpen, setSearch]);
 
   // Scroll to top when search changes
   useEffect(() => {
     if (listRef.current) {
-      listRef.current.scrollTop = 0
+      listRef.current.scrollTop = 0;
     }
-  }, [search])
+  }, [search]);
 
   return (
     <Command.Dialog
@@ -368,10 +370,10 @@ export function CommandPalette({
         <Command.Empty className="text-sm flex items-center justify-center h-12 whitespace-pre-wrap text-muted-foreground">
           No results found.
         </Command.Empty>
-        {commandItems.map(item => (
+        {commandItems.map((item) => (
           <Command.Item
             key={item.id}
-            value={`${item.name} ${item.description || ''} ${item.category}`}
+            value={`${item.name} ${item.description || ""} ${item.category}`}
             onSelect={() => handleSelect(item)}
             className="[content-visibility:auto] cursor-pointer h-12 rounded-lg text-sm flex items-center gap-3 px-4 text-foreground select-none will-change-[background,color] transition-all duration-150 data-[selected=true]:bg-accent data-[selected=true]:text-foreground data-[disabled=true]:text-muted-foreground/50 data-[disabled=true]:cursor-not-allowed active:bg-accent/80 mt-1 first:mt-0"
           >
@@ -379,19 +381,19 @@ export function CommandPalette({
             <span className="font-medium truncate flex-1 min-w-0">
               {item.name}
             </span>
-            {(item.metadata?.serverName || item.metadata?.serverId)
-              && item.category !== 'Connected Servers' && (
-              <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
-                <ServerIcon
-                  serverUrl={item.metadata?.serverId}
-                  serverName={item.metadata?.serverName}
-                  size="sm"
-                />
-                <span className="text-xs font-base text-muted-foreground">
-                  {item.metadata?.serverName || item.metadata?.serverId}
-                </span>
-              </div>
-            )}
+            {(item.metadata?.serverName || item.metadata?.serverId) &&
+              item.category !== "Connected Servers" && (
+                <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
+                  <ServerIcon
+                    serverUrl={item.metadata?.serverId}
+                    serverName={item.metadata?.serverName}
+                    size="sm"
+                  />
+                  <span className="text-xs font-base text-muted-foreground">
+                    {item.metadata?.serverName || item.metadata?.serverId}
+                  </span>
+                </div>
+              )}
           </Command.Item>
         ))}
       </Command.List>
@@ -440,5 +442,5 @@ export function CommandPalette({
         </div>
       </div>
     </Command.Dialog>
-  )
+  );
 }

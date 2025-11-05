@@ -1,36 +1,36 @@
 export interface BaseTelemetryEvent {
-  name: string
-  properties: Record<string, any>
+  name: string;
+  properties: Record<string, any>;
 }
 
 export interface MCPInspectorOpenEventData {
-  serverUrl?: string
-  connectionCount?: number
+  serverUrl?: string;
+  connectionCount?: number;
 }
 
 export class MCPInspectorOpenEvent implements BaseTelemetryEvent {
-  name = 'mcp_inspector_open'
-  properties: Record<string, any>
+  name = "mcp_inspector_open";
+  properties: Record<string, any>;
 
   constructor(data: MCPInspectorOpenEventData) {
     this.properties = {
       server_url: data.serverUrl,
       connection_count: data.connectionCount,
-    }
+    };
   }
 }
 
 export interface MCPToolExecutionEventData {
-  toolName: string
-  serverId?: string
-  success: boolean
-  duration?: number
-  error?: string
+  toolName: string;
+  serverId?: string;
+  success: boolean;
+  duration?: number;
+  error?: string;
 }
 
 export class MCPToolExecutionEvent implements BaseTelemetryEvent {
-  name = 'mcp_tool_execution'
-  properties: Record<string, any>
+  name = "mcp_tool_execution";
+  properties: Record<string, any>;
 
   constructor(data: MCPToolExecutionEventData) {
     this.properties = {
@@ -39,20 +39,20 @@ export class MCPToolExecutionEvent implements BaseTelemetryEvent {
       success: data.success,
       duration: data.duration,
       error: data.error,
-    }
+    };
   }
 }
 
 export interface MCPResourceReadEventData {
-  resourceUri: string
-  serverId?: string
-  success: boolean
-  error?: string
+  resourceUri: string;
+  serverId?: string;
+  success: boolean;
+  error?: string;
 }
 
 export class MCPResourceReadEvent implements BaseTelemetryEvent {
-  name = 'mcp_resource_read'
-  properties: Record<string, any>
+  name = "mcp_resource_read";
+  properties: Record<string, any>;
 
   constructor(data: MCPResourceReadEventData) {
     this.properties = {
@@ -60,20 +60,20 @@ export class MCPResourceReadEvent implements BaseTelemetryEvent {
       server_id: data.serverId,
       success: data.success,
       error: data.error,
-    }
+    };
   }
 }
 
 export interface MCPPromptCallEventData {
-  promptName: string
-  serverId?: string
-  success: boolean
-  error?: string
+  promptName: string;
+  serverId?: string;
+  success: boolean;
+  error?: string;
 }
 
 export class MCPPromptCallEvent implements BaseTelemetryEvent {
-  name = 'mcp_prompt_call'
-  properties: Record<string, any>
+  name = "mcp_prompt_call";
+  properties: Record<string, any>;
 
   constructor(data: MCPPromptCallEventData) {
     this.properties = {
@@ -81,21 +81,21 @@ export class MCPPromptCallEvent implements BaseTelemetryEvent {
       server_id: data.serverId,
       success: data.success,
       error: data.error,
-    }
+    };
   }
 }
 
 export interface MCPServerConnectionEventData {
-  serverId: string
-  serverUrl: string
-  success: boolean
-  connectionType?: 'http' | 'sse' | 'websocket'
-  error?: string
+  serverId: string;
+  serverUrl: string;
+  success: boolean;
+  connectionType?: "http" | "sse" | "websocket";
+  error?: string;
 }
 
 export class MCPServerConnectionEvent implements BaseTelemetryEvent {
-  name = 'mcp_server_connection'
-  properties: Record<string, any>
+  name = "mcp_server_connection";
+  properties: Record<string, any>;
 
   constructor(data: MCPServerConnectionEventData) {
     this.properties = {
@@ -104,25 +104,25 @@ export class MCPServerConnectionEvent implements BaseTelemetryEvent {
       success: data.success,
       connection_type: data.connectionType,
       error: data.error,
-    }
+    };
   }
 }
 
 export interface MCPChatMessageEventData {
-  serverId?: string
-  provider: 'openai' | 'anthropic' | 'google'
-  model: string
-  messageCount: number
-  toolCallsCount?: number
-  success: boolean
-  executionMode: 'client-side' | 'server-side'
-  duration?: number
-  error?: string
+  serverId?: string;
+  provider: "openai" | "anthropic" | "google";
+  model: string;
+  messageCount: number;
+  toolCallsCount?: number;
+  success: boolean;
+  executionMode: "client-side" | "server-side";
+  duration?: number;
+  error?: string;
 }
 
 export class MCPChatMessageEvent implements BaseTelemetryEvent {
-  name = 'mcp_chat_message'
-  properties: Record<string, any>
+  name = "mcp_chat_message";
+  properties: Record<string, any>;
 
   constructor(data: MCPChatMessageEventData) {
     this.properties = {
@@ -135,20 +135,20 @@ export class MCPChatMessageEvent implements BaseTelemetryEvent {
       execution_mode: data.executionMode,
       duration: data.duration,
       error: data.error,
-    }
+    };
   }
 }
 
 export interface MCPServerAddedEventData {
-  serverId: string
-  serverUrl: string
-  connectionType?: 'http' | 'sse'
-  viaProxy?: boolean
+  serverId: string;
+  serverUrl: string;
+  connectionType?: "http" | "sse";
+  viaProxy?: boolean;
 }
 
 export class MCPServerAddedEvent implements BaseTelemetryEvent {
-  name = 'mcp_server_added'
-  properties: Record<string, any>
+  name = "mcp_server_added";
+  properties: Record<string, any>;
 
   constructor(data: MCPServerAddedEventData) {
     this.properties = {
@@ -156,53 +156,53 @@ export class MCPServerAddedEvent implements BaseTelemetryEvent {
       server_url: data.serverUrl,
       connection_type: data.connectionType,
       via_proxy: data.viaProxy,
-    }
+    };
   }
 }
 
 export interface MCPServerRemovedEventData {
-  serverId: string
+  serverId: string;
 }
 
 export class MCPServerRemovedEvent implements BaseTelemetryEvent {
-  name = 'mcp_server_removed'
-  properties: Record<string, any>
+  name = "mcp_server_removed";
+  properties: Record<string, any>;
 
   constructor(data: MCPServerRemovedEventData) {
     this.properties = {
       server_id: data.serverId,
-    }
+    };
   }
 }
 
 export interface MCPCommandPaletteOpenEventData {
-  trigger: 'keyboard' | 'button'
+  trigger: "keyboard" | "button";
 }
 
 export class MCPCommandPaletteOpenEvent implements BaseTelemetryEvent {
-  name = 'mcp_command_palette_open'
-  properties: Record<string, any>
+  name = "mcp_command_palette_open";
+  properties: Record<string, any>;
 
   constructor(data: MCPCommandPaletteOpenEventData) {
     this.properties = {
       trigger: data.trigger,
-    }
+    };
   }
 }
 
 export interface MCPToolSavedEventData {
-  toolName: string
-  serverId?: string
+  toolName: string;
+  serverId?: string;
 }
 
 export class MCPToolSavedEvent implements BaseTelemetryEvent {
-  name = 'mcp_tool_saved'
-  properties: Record<string, any>
+  name = "mcp_tool_saved";
+  properties: Record<string, any>;
 
   constructor(data: MCPToolSavedEventData) {
     this.properties = {
       tool_name: data.toolName,
       server_id: data.serverId,
-    }
+    };
   }
 }

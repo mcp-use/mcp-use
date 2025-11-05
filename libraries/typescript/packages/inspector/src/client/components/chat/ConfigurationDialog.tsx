@@ -1,37 +1,37 @@
-import { Key } from 'lucide-react'
-import React from 'react'
+import { Key } from "lucide-react";
+import React from "react";
 
-import { Button } from '@/client/components/ui/button'
+import { Button } from "@/client/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/client/components/ui/dialog'
-import { Input } from '@/client/components/ui/input'
-import { Label } from '@/client/components/ui/label'
+} from "@/client/components/ui/dialog";
+import { Input } from "@/client/components/ui/input";
+import { Label } from "@/client/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/client/components/ui/select'
+} from "@/client/components/ui/select";
 
 interface ConfigurationDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  tempProvider: 'openai' | 'anthropic' | 'google'
-  tempModel: string
-  tempApiKey: string
-  onProviderChange: (provider: 'openai' | 'anthropic' | 'google') => void
-  onModelChange: (model: string) => void
-  onApiKeyChange: (apiKey: string) => void
-  onSave: () => void
-  onClear?: () => void
-  showClearButton?: boolean
-  buttonLabel?: string
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tempProvider: "openai" | "anthropic" | "google";
+  tempModel: string;
+  tempApiKey: string;
+  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  onModelChange: (model: string) => void;
+  onApiKeyChange: (apiKey: string) => void;
+  onSave: () => void;
+  onClear?: () => void;
+  showClearButton?: boolean;
+  buttonLabel?: string;
 }
 
 export function ConfigurationDialog({
@@ -46,7 +46,7 @@ export function ConfigurationDialog({
   onSave,
   onClear,
   showClearButton = false,
-  buttonLabel = 'Configure API Key',
+  buttonLabel = "Configure API Key",
 }: ConfigurationDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,8 +54,8 @@ export function ConfigurationDialog({
         <DialogHeader>
           <DialogTitle>LLM Provider Configuration</DialogTitle>
           <DialogDescription>
-            Configure your LLM provider and API key to start chatting with
-            the MCP server
+            Configure your LLM provider and API key to start chatting with the
+            MCP server
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -80,7 +80,7 @@ export function ConfigurationDialog({
             <Label>Model</Label>
             <Input
               value={tempModel}
-              onChange={e => onModelChange(e.target.value)}
+              onChange={(e) => onModelChange(e.target.value)}
               placeholder="e.g., gpt-4o"
             />
           </div>
@@ -91,7 +91,7 @@ export function ConfigurationDialog({
               <Input
                 type="password"
                 value={tempApiKey}
-                onChange={e => onApiKeyChange(e.target.value)}
+                onChange={(e) => onApiKeyChange(e.target.value)}
                 placeholder="Enter your API key"
               />
             </div>
@@ -109,7 +109,7 @@ export function ConfigurationDialog({
             <Button
               onClick={onSave}
               disabled={!tempApiKey.trim()}
-              className={showClearButton ? 'ml-auto' : ''}
+              className={showClearButton ? "ml-auto" : ""}
             >
               <Key className="h-4 w-4 mr-2" />
               Save Configuration
@@ -118,5 +118,5 @@ export function ConfigurationDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

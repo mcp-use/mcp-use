@@ -1,20 +1,26 @@
-import { Check, Copy } from 'lucide-react'
-import Markdown from 'markdown-to-jsx'
-import { useState } from 'react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { usePrismTheme } from '@/client/hooks/usePrismTheme'
+import { Check, Copy } from "lucide-react";
+import Markdown from "markdown-to-jsx";
+import { useState } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 
 // Custom code block component for syntax highlighting
-function CodeBlock({ children, className }: { children: string, className?: string }) {
-  const { prismStyle } = usePrismTheme()
-  const language = className?.replace('lang-', '') || 'text'
-  const [isCopied, setIsCopied] = useState(false)
+function CodeBlock({
+  children,
+  className,
+}: {
+  children: string;
+  className?: string;
+}) {
+  const { prismStyle } = usePrismTheme();
+  const language = className?.replace("lang-", "") || "text";
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(children)
-    setIsCopied(true)
-    setTimeout(() => setIsCopied(false), 2000)
-  }
+    await navigator.clipboard.writeText(children);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
 
   return (
     <div className="my-4 relative group/code">
@@ -28,13 +34,11 @@ function CodeBlock({ children, className }: { children: string, className?: stri
           onClick={handleCopy}
           title="Copy code"
         >
-          {isCopied
-            ? (
-                <Check className="h-3.5 w-3.5" />
-              )
-            : (
-                <Copy className="h-3.5 w-3.5" />
-              )}
+          {isCopied ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
         </button>
       </div>
 
@@ -43,18 +47,18 @@ function CodeBlock({ children, className }: { children: string, className?: stri
         style={prismStyle}
         customStyle={{
           margin: 0,
-          padding: '1rem',
-          paddingTop: '2rem',
-          borderRadius: '0.5rem',
-          fontSize: '0.875rem',
-          background: 'var(--muted)',
+          padding: "1rem",
+          paddingTop: "2rem",
+          borderRadius: "0.5rem",
+          fontSize: "0.875rem",
+          background: "var(--muted)",
         }}
         className="text-sm"
       >
         {children}
       </SyntaxHighlighter>
     </div>
-  )
+  );
 }
 
 // Custom inline code component
@@ -63,7 +67,7 @@ function InlineCode({ children }: { children: string }) {
     <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">
       {children}
     </code>
-  )
+  );
 }
 
 // Markdown renderer component using markdown-to-jsx
@@ -76,22 +80,34 @@ function MarkdownRenderer({ content }: { content: string }) {
           pre: ({ children }: { children: React.ReactNode }) => <>{children}</>,
           inlineCode: InlineCode,
           h1: ({ children }: { children: React.ReactNode }) => (
-            <h1 className="text-xl font-bold text-foreground mb-2 mt-4">{children}</h1>
+            <h1 className="text-xl font-bold text-foreground mb-2 mt-4">
+              {children}
+            </h1>
           ),
           h2: ({ children }: { children: React.ReactNode }) => (
-            <h2 className="text-lg font-bold text-foreground mb-2 mt-4">{children}</h2>
+            <h2 className="text-lg font-bold text-foreground mb-2 mt-4">
+              {children}
+            </h2>
           ),
           h3: ({ children }: { children: React.ReactNode }) => (
-            <h3 className="text-base font-bold text-foreground mb-2 mt-4">{children}</h3>
+            <h3 className="text-base font-bold text-foreground mb-2 mt-4">
+              {children}
+            </h3>
           ),
           h4: ({ children }: { children: React.ReactNode }) => (
-            <h4 className="text-sm font-bold text-foreground mb-2 mt-4">{children}</h4>
+            <h4 className="text-sm font-bold text-foreground mb-2 mt-4">
+              {children}
+            </h4>
           ),
           h5: ({ children }: { children: React.ReactNode }) => (
-            <h5 className="text-sm font-bold text-foreground mb-2 mt-4">{children}</h5>
+            <h5 className="text-sm font-bold text-foreground mb-2 mt-4">
+              {children}
+            </h5>
           ),
           h6: ({ children }: { children: React.ReactNode }) => (
-            <h6 className="text-sm font-bold text-foreground mb-2 mt-4">{children}</h6>
+            <h6 className="text-sm font-bold text-foreground mb-2 mt-4">
+              {children}
+            </h6>
           ),
           p: ({ children }: { children: React.ReactNode }) => (
             <p className="text-foreground mb-2 leading-relaxed">{children}</p>
@@ -100,7 +116,9 @@ function MarkdownRenderer({ content }: { content: string }) {
             <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>
           ),
           ol: ({ children }: { children: React.ReactNode }) => (
-            <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>
+            <ol className="list-decimal list-inside mb-3 space-y-1">
+              {children}
+            </ol>
           ),
           li: ({ children }: { children: React.ReactNode }) => (
             <li className="text-foreground">{children}</li>
@@ -110,7 +128,13 @@ function MarkdownRenderer({ content }: { content: string }) {
               {children}
             </blockquote>
           ),
-          a: ({ children, href }: { children: React.ReactNode, href?: string }) => (
+          a: ({
+            children,
+            href,
+          }: {
+            children: React.ReactNode;
+            href?: string;
+          }) => (
             <a
               href={href}
               className="text-primary hover:underline"
@@ -121,7 +145,9 @@ function MarkdownRenderer({ content }: { content: string }) {
             </a>
           ),
           strong: ({ children }: { children: React.ReactNode }) => (
-            <strong className="font-semibold text-foreground">{children}</strong>
+            <strong className="font-semibold text-foreground">
+              {children}
+            </strong>
           ),
           em: ({ children }: { children: React.ReactNode }) => (
             <em className="italic text-foreground">{children}</em>
@@ -131,17 +157,17 @@ function MarkdownRenderer({ content }: { content: string }) {
     >
       {content}
     </Markdown>
-  )
+  );
 }
 
 function CopyButton({ text }: { text: string }) {
-  const [isCopied, setIsCopied] = useState(false)
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(text)
-    setIsCopied(true)
-    setTimeout(() => setIsCopied(false), 2000)
-  }
+    await navigator.clipboard.writeText(text);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
 
   return (
     <button
@@ -149,20 +175,18 @@ function CopyButton({ text }: { text: string }) {
       onClick={handleCopy}
       title="Copy message content"
     >
-      {isCopied
-        ? (
-            <Check className="h-3.5 w-3.5" />
-          )
-        : (
-            <Copy className="h-3.5 w-3.5" />
-          )}
+      {isCopied ? (
+        <Check className="h-3.5 w-3.5" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
     </button>
-  )
+  );
 }
 
 interface AssistantMessageProps {
-  content: string
-  timestamp?: Date | number
+  content: string;
+  timestamp?: Date | number;
 }
 
 export function AssistantMessage({
@@ -170,7 +194,7 @@ export function AssistantMessage({
   timestamp,
 }: AssistantMessageProps) {
   if (!content || content.length === 0) {
-    return null
+    return null;
   }
 
   return (
@@ -193,5 +217,5 @@ export function AssistantMessage({
         )}
       </div>
     </div>
-  )
+  );
 }

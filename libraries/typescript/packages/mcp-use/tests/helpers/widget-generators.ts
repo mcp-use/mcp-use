@@ -5,7 +5,7 @@
  * They are not part of the core UIResource creation flow.
  */
 
-import type { UIResourceDefinition } from 'mcp-use/server'
+import type { UIResourceDefinition } from "mcp-use/server";
 
 /**
  * Generate HTML content for a widget (utility function for tests)
@@ -15,10 +15,13 @@ import type { UIResourceDefinition } from 'mcp-use/server'
  * @returns Generated HTML string
  */
 export function generateWidgetHtml(
-  definition: Pick<UIResourceDefinition, 'name' | 'title' | 'description' | 'size'>,
+  definition: Pick<
+    UIResourceDefinition,
+    "name" | "title" | "description" | "size"
+  >,
   props?: Record<string, any>
 ): string {
-  const propsJson = props ? JSON.stringify(props) : '{}'
+  const propsJson = props ? JSON.stringify(props) : "{}";
 
   return `<!DOCTYPE html>
 <html>
@@ -29,7 +32,7 @@ export function generateWidgetHtml(
 <body>
   <div class="widget-container">
     <div class="widget-title">${definition.title || definition.name}</div>
-    ${definition.description ? `<div class="widget-description">${definition.description}</div>` : ''}
+    ${definition.description ? `<div class="widget-description">${definition.description}</div>` : ""}
     <div id="widget-root"></div>
   </div>
   <script>
@@ -53,7 +56,7 @@ export function generateWidgetHtml(
     }
   </script>
 </body>
-</html>`
+</html>`;
 }
 
 /**
@@ -64,7 +67,7 @@ export function generateWidgetHtml(
  * @returns Generated JavaScript string
  */
 export function generateRemoteDomScript(
-  definition: Pick<UIResourceDefinition, 'name' | 'title' | 'description'>,
+  definition: Pick<UIResourceDefinition, "name" | "title" | "description">,
   props?: Record<string, any>
 ): string {
   return `
@@ -77,13 +80,17 @@ const title = document.createElement('h2');
 title.textContent = '${definition.title || definition.name}';
 container.appendChild(title);
 
-${definition.description ? `
+${
+  definition.description
+    ? `
 // Add description
 const description = document.createElement('p');
 description.textContent = '${definition.description}';
 description.style.color = '#666';
 container.appendChild(description);
-` : ''}
+`
+    : ""
+}
 
 // Widget props
 const props = ${JSON.stringify(props || {})};
@@ -106,6 +113,5 @@ container.appendChild(button);
 console.log('Remote DOM widget ${definition.name} initialized with props:', props);
 
 // Append to root
-root.appendChild(container);`
+root.appendChild(container);`;
 }
-

@@ -11,5 +11,5 @@ export function DiscordIcon({ className }: { className?: string }) {
         fillRule="nonzero"
       />
     </svg>
-  )
+  );
 }
