@@ -29,8 +29,7 @@ async def main():
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
     result = await agent.run(
         "Find me a nice place to stay in Trapani for 2 adults "
-        "for a week in August (choose a random week). I prefer places with a pool and "
-        "good reviews. Show me the first option.",
+        "for a week in August (choose a random week). Show me the first option.",
         output_schema=StructuredResult,
     )
 

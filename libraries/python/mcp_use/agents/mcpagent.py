@@ -740,12 +740,14 @@ class MCPAgent:
                 inputs = {"messages": accumulated_messages}
                 should_restart = False
 
-                async for chunk in self._agent_executor.astream(
-                    inputs,
-                    stream_mode="updates",  # Get updates as they happen
-                    config={"callbacks": self.callbacks},
-                    context={"response_format": output_schema},
-                ):
+                astream_kwargs = {
+                    "stream_mode": "updates",
+                    "config": {"callbacks": self.callbacks},
+                }
+                if output_schema:
+                    astream_kwargs["context"] = {"response_format": output_schema}
+
+                async for chunk in self._agent_executor.astream(inputs, **astream_kwargs):
                     # chunk is a dict with node names as keys
                     # The agent node will have 'messages' with the AI response
                     # The tools node will have 'messages' with tool calls and results
