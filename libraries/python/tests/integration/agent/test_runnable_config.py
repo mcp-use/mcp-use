@@ -1,4 +1,5 @@
 """
+
 End-to-end integration test for agent structured output.
 
 Tests the agent returning structured output using Pydantic models.
