@@ -72,6 +72,7 @@ Executes the agent and returns the final result.
 ><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   List of items </ParamField>
 ><ParamField body="output_schema" type="type[~T] | None" default="None" >   Parameter value </ParamField>
+><ParamField body="prompt_files" type="list[dict] | None" default="None" >   List of items </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="str | mcp_use.agents.remote.T" />
@@ -82,7 +83,8 @@ def run(
 query: str,
     max_steps: int | None = None,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
-    output_schema: type[~T] | None = None
+    output_schema: type[~T] | None = None,
+    prompt_files: list[dict] | None = None
 ):
 ```
 
@@ -99,6 +101,7 @@ Stream the execution of a query on the remote agent using HTTP streaming.
 ><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   List of items </ParamField>
 ><ParamField body="output_schema" type="type[~T] | None" default="None" >   Parameter value </ParamField>
+><ParamField body="prompt_files" type="list[dict] | None" default="None" >   List of items </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="AsyncGenerator" />
@@ -109,7 +112,8 @@ def stream(
 query: str,
     max_steps: int | None = None,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
-    output_schema: type[~T] | None = None
+    output_schema: type[~T] | None = None,
+    prompt_files: list[dict] | None = None
 ):
 ```
 

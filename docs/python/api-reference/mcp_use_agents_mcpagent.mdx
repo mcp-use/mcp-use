@@ -212,6 +212,7 @@ Run a query using LangChain 1.0.0's agent and return the final result.
 ><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
 ><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
+><ParamField body="prompt_files" type="list[dict] | None" default="None" >   List of items </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="str | mcp_use.agents.mcpagent.T" >The result of running the query as a string, or if output_schema is provided, an instance of the specified Pydantic model.</ResponseField>
@@ -223,7 +224,8 @@ query: str,
     max_steps: int | None = None,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
-    output_schema: type[~T] | None = None
+    output_schema: type[~T] | None = None,
+    prompt_files: list[dict] | None = None
 ):
 ```
 
@@ -299,6 +301,7 @@ Async generator using LangChain 1.0.0's create_agent and astream.
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
 ><ParamField body="track_execution" type="bool" default="True" >   Boolean flag </ParamField>
 ><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
+><ParamField body="prompt_files" type="list[dict] | None" default="None" >   List of items </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="AsyncGenerator" />
@@ -311,7 +314,8 @@ query: str,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
     track_execution: bool = True,
-    output_schema: type[~T] | None = None
+    output_schema: type[~T] | None = None,
+    prompt_files: list[dict] | None = None
 ):
 ```
 
