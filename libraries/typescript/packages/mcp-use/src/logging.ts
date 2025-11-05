@@ -17,6 +17,19 @@ async function getNodeModules() {
 
 // Lazy-load winston only in Node.js environments
 let winston: typeof import("winston") | null = null;
+
+// Synchronously load winston in Node.js (for module initialization)
+// Dynamic import only used for async contexts
+function loadWinstonSync() {
+  if (typeof require !== "undefined") {
+    try {
+      winston = require("winston");
+    } catch {
+      // Winston not available, will use SimpleConsoleLogger
+    }
+  }
+}
+
 async function getWinston() {
   if (!winston) {
     winston = await import("winston");
@@ -346,14 +359,13 @@ export class Logger {
   }
 }
 
-// Only configure Winston features if in Node.js environment
-(async () => {
-  if (isNodeJSEnvironment()) {
-    await Logger.configure();
-  } else {
-    // For non-Node.js environments, just initialize with defaults
-    await Logger.configure({ console: true });
+// Initialize logger at module load time
+if (isNodeJSEnvironment()) {
+  // Synchronously load winston for Node.js environments
+  loadWinstonSync();
+  if (winston) {
+    Logger.configure();
   }
-})();
+}
 
 export const logger = Logger.get();
