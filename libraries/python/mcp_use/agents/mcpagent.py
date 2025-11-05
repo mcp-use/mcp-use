@@ -22,7 +22,7 @@ from langchain.agents.middleware import (
     ModelRequest,
     wrap_model_call,
 )
-from langchain.agents.structured_output import AutoStrategy
+from langchain.agents.structured_output import AutoStrategy, ProviderStrategy
 from langchain_core.agents import AgentAction
 from langchain_core.globals import set_debug
 from langchain_core.language_models import BaseLanguageModel
@@ -210,7 +210,14 @@ class MCPAgent:
         should_force_structured = last_ai_message is not None and (has_tool_messages or not last_ai_tool_calls)
 
         if should_force_structured:
-            request = request.override(response_format=AutoStrategy(schema=schema))
+            if hasattr(request.model, "with_structured_output"):
+                # OpenAI, Anthropic, etc. support native schema enforcement
+                response_format = ProviderStrategy(schema=schema)
+            else:
+                # Other providers will still fall back to tool-based
+                response_format = AutoStrategy(schema=schema)
+
+            request = request.override(response_format=response_format)
 
         return await handler(request)
 
