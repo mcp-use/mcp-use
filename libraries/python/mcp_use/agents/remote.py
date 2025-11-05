@@ -254,7 +254,10 @@ class RemoteAgent:
                     data_b64 = base64.b64encode(raw).decode("ascii")
 
                 if not (name and mime and data_b64):
-                    raise ValueError("prompt_files items require name, mime_type, and data (via path, data, or data_base64)")
+                    raise ValueError(
+                        "prompt_files items require name, mime_type, and data "
+                        "(via path, data, or data_base64)"
+                    )
                 return {"name": name, "mime_type": mime, "data_base64": data_b64}
 
             normalized = []
@@ -322,7 +325,13 @@ class RemoteAgent:
 
         try:
             # Consume the ENTIRE stream to ensure proper execution
-            async for event in self.stream(query, max_steps, external_history, output_schema, prompt_files=prompt_files):
+            async for event in self.stream(
+                query,
+                max_steps,
+                external_history,
+                output_schema,
+                prompt_files=prompt_files,
+            ):
                 logger.debug(f"[{self.chat_id}] Processing stream event: {event}...")
 
                 # Parse AI SDK format events to extract final result

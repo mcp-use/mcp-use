@@ -626,7 +626,13 @@ class MCPAgent:
         """
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
-            async for item in self._remote_agent.stream(query, max_steps, external_history, output_schema, prompt_files=prompt_files):
+            async for item in self._remote_agent.stream(
+                query,
+                max_steps,
+                external_history,
+                output_schema,
+                prompt_files=prompt_files,
+            ):
                 yield item
             return
 
@@ -1087,7 +1093,10 @@ class MCPAgent:
                 data_b64 = base64.b64encode(raw).decode("ascii")
 
             if not (name and mime and data_b64):
-                raise ValueError("prompt_files items require name, mime_type, and data (via path, data, or data_base64)")
+                raise ValueError(
+                    "prompt_files items require name, mime_type, and data "
+                    "(via path, data, or data_base64)"
+                )
 
             return name, mime, data_b64
 
