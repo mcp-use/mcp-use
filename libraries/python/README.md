@@ -224,6 +224,26 @@ async for chunk in agent.stream("Find the best restaurant in San Francisco"):
     print(chunk["messages"], end="", flush=True)
 ```
 
+Attach files to the prompt (images/audio or generic base64) using `prompt_files`:
+
+```python
+from pathlib import Path
+import base64
+
+img_b64 = base64.b64encode(Path("/path/to/image.png").read_bytes()).decode("ascii")
+files = [
+  {"name": "image.png", "mime_type": "image/png", "data_base64": img_b64},
+  # Or provide a path and let the library detect type and encode
+  {"path": "/path/to/readme.txt", "name": "readme.txt"},
+]
+
+async for chunk in agent.stream(
+    "Describe the attached image and summarize the text file",
+    prompt_files=files,
+):
+    print(chunk)
+```
+
 Each chunk is a dictionary containing keys such as `actions`, `steps`, `messages`, and (on the last chunk) `output`. This enables you to build responsive UIs or log agent progress in real time.
 
 #### Example: Streaming in Practice

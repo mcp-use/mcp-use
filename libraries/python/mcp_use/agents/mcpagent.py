@@ -426,6 +426,7 @@ class MCPAgent:
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
+        prompt_files: list[dict] | None = None,
     ) -> str | T:
         """Run a query using LangChain 1.0.0's agent and return the final result.
 
@@ -474,6 +475,7 @@ class MCPAgent:
             external_history,
             track_execution=False,
             output_schema=output_schema,
+            prompt_files=prompt_files,
         )
         error = None
         result = None
@@ -590,6 +592,7 @@ class MCPAgent:
         external_history: list[BaseMessage] | None = None,
         track_execution: bool = True,
         output_schema: type[T] | None = None,
+        prompt_files: list[dict] | None = None,
     ) -> AsyncGenerator[tuple[AgentAction, str] | str | T, None]:
         """Async generator using LangChain 1.0.0's create_agent and astream.
 
@@ -623,7 +626,7 @@ class MCPAgent:
         """
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
-            async for item in self._remote_agent.stream(query, max_steps, external_history, output_schema):
+            async for item in self._remote_agent.stream(query, max_steps, external_history, output_schema, prompt_files=prompt_files):
                 yield item
             return
 
@@ -670,7 +673,9 @@ class MCPAgent:
                 if isinstance(msg, HumanMessage | AIMessage):
                     langchain_history.append(msg)
 
-            inputs = {"messages": [*langchain_history, HumanMessage(content=query)]}
+            # Build the human message, optionally including attached files
+            human_message = self._build_human_message(query, prompt_files)
+            inputs = {"messages": [*langchain_history, human_message]}
 
             display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
             logger.info(f"💬 Received query: '{display_query}'")
@@ -681,7 +686,7 @@ class MCPAgent:
             # With dynamic tool reload: if tools change mid-execution, we interrupt and restart
             max_restarts = 3  # Prevent infinite restart loops
             restart_count = 0
-            accumulated_messages = list(langchain_history) + [HumanMessage(content=query)]
+            accumulated_messages = list(langchain_history) + [human_message]
             pending_tool_calls = {}  # Map tool_call_id -> AgentAction
 
             while restart_count <= max_restarts:
@@ -1031,6 +1036,91 @@ class MCPAgent:
                 error_type=None if success else "streaming_error",
                 conversation_history_length=conversation_history_length,
             )
+
+    def _build_human_message(self, query: str, prompt_files: list[dict] | None) -> HumanMessage:
+        """Build a HumanMessage that can include multimodal file attachments.
+
+        Supported prompt_files item shapes:
+        - {"path": "/abs/or/relative/path", "name": str|None, "mime_type": str|None}
+        - {"data_base64": str, "name": str, "mime_type": str}
+        - {"data": bytes|str, "name": str, "mime_type": str}
+
+        For image/* MIME types, will embed a data URL block recognized by OpenAI-compatible models.
+        For audio/*, will include an input_audio block when possible, otherwise fallback to text.
+        For other types, embeds a text block with base64 content so the model can access the data.
+        """
+        import base64
+        import mimetypes
+        from pathlib import Path
+
+        if not prompt_files:
+            return HumanMessage(content=query)
+
+        def normalize_file(item: dict) -> tuple[str, str, str]:
+            # Returns (name, mime, b64)
+            if not isinstance(item, dict):
+                raise ValueError("prompt_files items must be dicts")
+
+            name = item.get("name")
+            mime = item.get("mime_type")
+            data_b64 = item.get("data_base64")
+
+            if "path" in item and item.get("path"):
+                p = Path(item["path"]).expanduser()
+                raw = p.read_bytes()
+                if not name:
+                    name = p.name
+                if not mime:
+                    guessed, _ = mimetypes.guess_type(str(p))
+                    mime = guessed or "application/octet-stream"
+                data_b64 = base64.b64encode(raw).decode("ascii")
+            elif data_b64 is None and "data" in item:
+                raw = item["data"]
+                if isinstance(raw, str):
+                    raw = raw.encode("utf-8")
+                if not isinstance(raw, (bytes, bytearray)):
+                    raise ValueError("prompt_files.data must be bytes or str")
+                if not mime:
+                    mime = "application/octet-stream"
+                if not name:
+                    name = "attachment"
+                data_b64 = base64.b64encode(raw).decode("ascii")
+
+            if not (name and mime and data_b64):
+                raise ValueError("prompt_files items require name, mime_type, and data (via path, data, or data_base64)")
+
+            return name, mime, data_b64
+
+        parts: list[dict] = [{"type": "text", "text": query}]
+        for item in prompt_files:
+            try:
+                name, mime, b64 = normalize_file(item)
+            except Exception as e:
+                # If normalization fails, include a notice block rather than raising
+                parts.append({"type": "text", "text": f"[Attachment error: {e}]"})
+                continue
+
+            if mime.startswith("image/"):
+                parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime};base64,{b64}"},
+                })
+            elif mime.startswith("audio/"):
+                # Some providers expect {type: input_audio, audio: {data, format}}
+                fmt = (name.split(".")[-1].lower() if "." in name else "")
+                parts.append({
+                    "type": "input_audio",
+                    "audio": {"data": b64, "format": fmt or mime.split("/")[-1]},
+                })
+            else:
+                # Fallback: include as text so model can access the raw content if needed
+                preview = b64[:2048]
+                parts.append({
+                    "type": "text",
+                    "text": f"[Attached file: {name} ({mime}) base64]\n{preview}...",
+                })
+
+        return HumanMessage(content=parts)
 
     async def close(self) -> None:
         """Close the MCP connection with improved error handling."""

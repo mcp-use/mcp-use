@@ -202,6 +202,7 @@ class RemoteAgent:
         max_steps: int | None = None,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
+        prompt_files: list[dict] | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream the execution of a query on the remote agent using HTTP streaming."""
         if external_history is not None:
@@ -219,6 +220,52 @@ class RemoteAgent:
         request_payload = {"messages": [{"role": "user", "content": query}], "max_steps": max_steps or 30}
         if output_schema is not None:
             request_payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
+
+        # Attach prompt files if provided (normalized to name, mime_type, data_base64)
+        if prompt_files:
+            import base64
+            import mimetypes
+            from pathlib import Path
+
+            def normalize_file(item: dict) -> dict:
+                name = item.get("name")
+                mime = item.get("mime_type")
+                data_b64 = item.get("data_base64")
+
+                if "path" in item and item.get("path"):
+                    p = Path(item["path"]).expanduser()
+                    raw = p.read_bytes()
+                    if not name:
+                        name = p.name
+                    if not mime:
+                        guessed, _ = mimetypes.guess_type(str(p))
+                        mime = guessed or "application/octet-stream"
+                    data_b64 = base64.b64encode(raw).decode("ascii")
+                elif data_b64 is None and "data" in item:
+                    raw = item["data"]
+                    if isinstance(raw, str):
+                        raw = raw.encode("utf-8")
+                    if not isinstance(raw, (bytes, bytearray)):
+                        raise ValueError("prompt_files.data must be bytes or str")
+                    if not mime:
+                        mime = "application/octet-stream"
+                    if not name:
+                        name = "attachment"
+                    data_b64 = base64.b64encode(raw).decode("ascii")
+
+                if not (name and mime and data_b64):
+                    raise ValueError("prompt_files items require name, mime_type, and data (via path, data, or data_base64)")
+                return {"name": name, "mime_type": mime, "data_base64": data_b64}
+
+            normalized = []
+            for it in prompt_files:
+                try:
+                    normalized.append(normalize_file(it))
+                except Exception as e:
+                    # Skip invalid attachments but continue
+                    logger.warning(f"Skipping invalid prompt_file: {e}")
+            if normalized:
+                request_payload["prompt_files"] = normalized
 
         headers = {"Content-Type": "application/json", "x-api-key": self.api_key, "Accept": "text/event-stream"}
 
@@ -262,6 +309,7 @@ class RemoteAgent:
         max_steps: int | None = None,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
+        prompt_files: list[dict] | None = None,
     ) -> str | T:
         """
         Executes the agent and returns the final result.
@@ -274,7 +322,7 @@ class RemoteAgent:
 
         try:
             # Consume the ENTIRE stream to ensure proper execution
-            async for event in self.stream(query, max_steps, external_history, output_schema):
+            async for event in self.stream(query, max_steps, external_history, output_schema, prompt_files=prompt_files):
                 logger.debug(f"[{self.chat_id}] Processing stream event: {event}...")
 
                 # Parse AI SDK format events to extract final result
