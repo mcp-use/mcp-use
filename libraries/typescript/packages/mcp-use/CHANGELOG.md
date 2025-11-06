@@ -1,5 +1,15 @@
 # mcp-use
 
+## 1.2.4
+
+### Patch Changes
+
+- 9209e99: fix: prevent OOM errors by avoiding re-exports of @langchain/core types
+- 9209e99: fix: inspector dependencies
+- Updated dependencies [9209e99]
+  - @mcp-use/inspector@0.4.13
+  - @mcp-use/cli@2.1.25
+
 ## 1.2.4-canary.1
 
 ### Patch Changes

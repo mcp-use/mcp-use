@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 0.4.13
+
+### Patch Changes
+
+- 9209e99: fix: inspector dependencies
+- Updated dependencies [9209e99]
+- Updated dependencies [9209e99]
+  - mcp-use@1.2.4
+
 ## 0.4.13-canary.1
 
 ### Patch Changes
