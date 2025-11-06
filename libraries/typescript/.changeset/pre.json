@@ -8,6 +8,7 @@
     "mcp-use": "1.2.3"
   },
   "changesets": [
+    "clean-spiders-love",
     "fine-breads-dig"
   ]
 }
