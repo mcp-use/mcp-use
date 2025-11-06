@@ -39,7 +39,7 @@ jobs:
             const headRef = pr.data.head.ref;
             const author  = pr.data.user.login;
 
-            let branch = `fork/${author}/${headRef}`.replace(/[^A-Za-z0-9._/@-]/g, '-').replace(/\/+\/g, '/').slice(0, 240);
+            let branch = `fork/${author}/${headRef}`.replace(/[^A-Za-z0-9._/@-]/g, '-').replace(/\/+/g, '/').slice(0, 240);
             const ref = `heads/${branch}`;
 
             try {
