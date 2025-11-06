@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.4.12",
+  "version": "0.4.13-canary.1",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -48,13 +48,18 @@
     "lint:pnpm": "pnpm lint:fix"
   },
   "peerDependencies": {
+    "express": "^4.21.2"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    }
+  },
+  "dependencies": {
     "@langchain/anthropic": "^1.0.0",
     "@langchain/core": "^1.0.0",
     "@langchain/google-genai": "^1.0.0",
     "@langchain/openai": "^1.0.0",
-    "express": "^4.21.2"
-  },
-  "dependencies": {
     "@ai-sdk/react": "^1.0.20",
     "@hono/node-server": "^1.19.5",
     "@mcp-ui/client": "^5.12.1",

@@ -1,5 +1,20 @@
 # @mcp-use/inspector
 
+## 0.4.13-canary.1
+
+### Patch Changes
+
+- Updated dependencies [8194ad2]
+  - mcp-use@1.2.4-canary.1
+
+## 0.4.13-canary.0
+
+### Patch Changes
+
+- 8e2210a: fix: inspector dependencies
+- Updated dependencies [8e2210a]
+  - mcp-use@1.2.4-canary.0
+
 ## 0.4.12
 
 ### Patch Changes

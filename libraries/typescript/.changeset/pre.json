@@ -1,0 +1,14 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.1.24",
+    "create-mcp-use-app": "0.4.10",
+    "@mcp-use/inspector": "0.4.12",
+    "mcp-use": "1.2.3"
+  },
+  "changesets": [
+    "clean-spiders-love",
+    "fine-breads-dig"
+  ]
+}
