@@ -1,0 +1,99 @@
+name: Approve fork PR CI (promote + call CI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: "PR number to test"
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: approve-fork-${{ github.event.inputs.pull_number }}
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.promote.outputs.sha }}
+      branch: ${{ steps.promote.outputs.branch }}
+      python: ${{ steps.changed.outputs.python }}
+      typescript: ${{ steps.changed.outputs.typescript }}
+      create_mcp_use_app: ${{ steps.changed.outputs.create_mcp_use_app }}
+    steps:
+      - name: Promote PR head into base-repo branch
+        id: promote
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = Number(core.getInput('pull_number'));
+            const { owner, repo } = context.repo;
+            const pr = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+
+            const headSha = pr.data.head.sha;
+            const headRef = pr.data.head.ref;
+            const author  = pr.data.user.login;
+
+            let branch = `fork/${author}/${headRef}`.replace(/[^A-Za-z0-9._/@-]/g, '-').replace(/\/+\/g, '/').slice(0, 240);
+            const ref = `heads/${branch}`;
+
+            try {
+              await github.rest.git.getRef({ owner, repo, ref });
+              await github.rest.git.updateRef({ owner, repo, ref, sha: headSha, force: true });
+            } catch {
+              await github.rest.git.createRef({ owner, repo, ref: `refs/${ref}`, sha: headSha });
+            }
+
+            core.setOutput('sha', headSha);
+            core.setOutput('branch', branch);
+
+      - name: Detect changed areas from PR files
+        id: changed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = Number(core.getInput('pull_number'));
+            const { owner, repo } = context.repo;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner, repo, pull_number: prNumber, per_page: 100
+            });
+            const paths = files.map(f => f.filename);
+
+            const python = paths.some(p => p.startsWith('libraries/python/'));
+            const typescript = paths.some(p => p.startsWith('libraries/typescript/'));
+            const create_mcp_use_app = paths.some(p => p.startsWith('libraries/typescript/packages/create-mcp-use-app/'));
+
+            core.setOutput('python', String(python));
+            core.setOutput('typescript', String(typescript));
+            core.setOutput('create_mcp_use_app', String(create_mcp_use_app));
+
+      - name: Comment on PR with promoted branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = Number(core.getInput('pull_number'));
+            const branch = "${{ steps.promote.outputs.branch }}";
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `Approved CI for fork PR.\nPromoted head to \`${branch}\`.\nRunning CI now.\n\nWorkflow: ${runUrl}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body
+            });
+
+  run-ci:
+    needs: promote
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.promote.outputs.sha }}
+      python: ${{ needs.promote.outputs.python == 'true' }}
+      typescript: ${{ needs.promote.outputs.typescript == 'true' }}
+      create_mcp_use_app: ${{ needs.promote.outputs.create_mcp_use_app == 'true' }}
+      run_changeset_check: false
+    secrets: inherit
