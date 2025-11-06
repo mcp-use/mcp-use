@@ -592,7 +592,7 @@ jobs:
           esac
 
           # Verify creation
-          [ - d "test-app" ] || exit 1
-          [ - f "test-app/package.json" ] || exit 1
-          [ - f "test-app/index.ts" ] || exit 1
+          [ -d "test-app" ] || exit 1
+          [ -f "test-app/package.json" ] || exit 1
+          [ -f "test-app/index.ts" ] || exit 1
           echo "✅ Project created successfully"
