@@ -61,17 +61,11 @@ export type { StoredState } from "./src/auth/types.js";
 // Export React hooks
 export * from "./src/react/index.js";
 
-// Re-export message classes to ensure a single constructor instance is shared by consumers
-export {
-  AIMessage,
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-  ToolMessage,
-} from "@langchain/core/messages";
-
-// Re-export StreamEvent type from LangChain for convenience
-export type { StreamEvent } from "@langchain/core/tracers/log_stream";
+// !!! NEVER EXPORT @langchain/core types it causes OOM errors when building the package
+// Note: Message classes (AIMessage, BaseMessage, etc.) are not re-exported to avoid
+// forcing TypeScript to deeply analyze @langchain/core types.
+// Import them directly from "@langchain/core/messages" if needed.
+// Same for StreamEvent - import from "@langchain/core/tracers/log_stream"
 
 export {
   BaseConnector,
