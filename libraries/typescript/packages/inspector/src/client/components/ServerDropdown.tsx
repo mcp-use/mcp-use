@@ -1,5 +1,4 @@
 import type { MCPConnection } from "@/client/context/McpContext";
-import { Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/client/components/ui/button";
