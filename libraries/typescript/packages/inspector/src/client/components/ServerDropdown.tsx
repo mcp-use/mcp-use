@@ -142,7 +142,7 @@ export function ServerDropdown({
                     onOpenConnectionOptions(connection.id);
                   }}
                 >
-                  <Settings className="h-3 w-3" />
+                  {/* <Settings className="h-3 w-3" /> This does nothing yet. */}
                 </Button>
               </DropdownMenuItem>
             ))

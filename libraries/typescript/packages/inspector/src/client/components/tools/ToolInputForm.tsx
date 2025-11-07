@@ -43,7 +43,7 @@ export function ToolInputForm({
           if (typeof currentValue === "string") {
             stringValue = currentValue;
           } else {
-            stringValue = JSON.stringify(currentValue, null, 2);
+            stringValue = JSON.stringify(currentValue, null);
           }
         }
 
