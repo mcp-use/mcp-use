@@ -68,6 +68,8 @@ Initialize a new MCPAgent instance.
 ><ParamField body="chat_id" type="str | None" default="None" >   String value </ParamField>
 ><ParamField body="retry_on_error" type="bool" default="True" >   Whether to retry tool calls that fail due to validation errors. </ParamField>
 ><ParamField body="max_retries_per_step" type="int" default="2" >   Maximum number of retries for validation errors per step. </ParamField>
+><ParamField body="metadata" type="dict[str]" default="None" > Specific data to be passed to tools without passing through llm. </ParamField>
+><ParamField body="message_id" type="str" default="None" > Unique Id to be passed to each message in a chat. </ParamField>
 
 **Signature**
 ```python wrap

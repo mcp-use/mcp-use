@@ -86,6 +86,8 @@ class MCPAgent:
         chat_id: str | None = None,
         retry_on_error: bool = True,
         max_retries_per_step: int = 2,
+        metadata: dict[str] | None = None,
+        message_id: str | None = None,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -107,6 +109,8 @@ class MCPAgent:
             callbacks: List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler.
             retry_on_error: Whether to retry tool calls that fail due to validation errors.
             max_retries_per_step: Maximum number of retries for validation errors per step.
+            metadata: Specific data to be passed to tools without passing through llm.
+            message_id: Unique Id to be passed to each message in a chat.
         """
         # Handle remote execution
         if agent_id is not None:
@@ -167,6 +171,8 @@ class MCPAgent:
         self._agent_executor = None
         self._system_message: SystemMessage | None = None
         self._tools: list[BaseTool] = []
+        self.metadata = metadata if metadata else {}
+        self.message_id = message_id if message_id else None
 
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
@@ -692,7 +698,7 @@ class MCPAgent:
                 async for chunk in self._agent_executor.astream(
                     inputs,
                     stream_mode="updates",  # Get updates as they happen
-                    config={"callbacks": self.callbacks},
+                    config={"callbacks": self.callbacks, "metadata": self.metadata},
                 ):
                     # chunk is a dict with node names as keys
                     # The agent node will have 'messages' with the AI response
@@ -815,9 +821,9 @@ class MCPAgent:
 
             # 4. Update conversation history
             if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
+                self.add_to_history(HumanMessage(content=query, id=self.message_id))
                 if final_output:
-                    self.add_to_history(AIMessage(content=final_output))
+                    self.add_to_history(AIMessage(content=final_output, id=self.message_id))
 
             # 5. Handle structured output if requested
             if output_schema and final_output:
@@ -840,7 +846,9 @@ class MCPAgent:
                     )
 
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                        self.add_to_history(
+                            AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                        )
 
                     logger.info("✅ Structured output successful")
                     success = True
@@ -952,6 +960,11 @@ class MCPAgent:
                         # Filter out ToolMessage (equivalent to old ToolAgentAction)
                         # to avoid adding intermediate tool execution details to history
                         if isinstance(message, BaseMessage) and not isinstance(message, ToolMessage):
+                            if self.message_id:
+                                try:
+                                    message.id = self.message_id
+                                except (AttributeError, TypeError):
+                                    message["id"] = self.message_id
                             self.add_to_history(message)
             yield event
 
