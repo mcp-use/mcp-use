@@ -1,5 +1,4 @@
 import type { MCPConnection } from "@/client/context/McpContext";
-import { Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/client/components/ui/button";
@@ -142,7 +141,7 @@ export function ServerDropdown({
                     onOpenConnectionOptions(connection.id);
                   }}
                 >
-                  <Settings className="h-3 w-3" />
+                  {/* <Settings className="h-3 w-3" /> This does nothing yet. */}
                 </Button>
               </DropdownMenuItem>
             ))

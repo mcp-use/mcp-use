@@ -11,31 +11,50 @@
 
 <h1 align="center" style="border:0; font-style:italic; font-weight:300;">Full-Stack MCP Framework</h1>
 <p align="center" style="max-width:600px; margin-bottom:40px">
-  <b>MCP-Use</b> provides everything you need to build with the <a href="https://modelcontextprotocol.io">Model Context Protocol</a> <br/> from AI agents to servers, in both <b>Python</b> and <b>TypeScript</b>.</p>
+  <b>mcp-use</b> provides everything you need to build with <a href="https://modelcontextprotocol.io">Model Context Protocol</a> <br/> MCP servers, MCP clients and AI agents in 6 lines of code, in both <b>Python</b> and <b>TypeScript</b>.</p>
 
 <p align="center">
     <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/mcp-use/mcp-use?style=social" /></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
-        <img src="https://static.pepy.tech/badge/mcp-use" /></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
-        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
-    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
-        <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
-    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Version">
-        <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
     <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
     <a href="https://docs.mcp-use.com" alt="Documentation">
-        <img src="https://img.shields.io/badge/docs-mcp--use.com-blue" /></a>
+        <img src="https://img.shields.io/badge/mcp--use-docs-red" /></a>
+    <a href="https://mcp-use.com" alt="Website">
+        <img src="https://img.shields.io/badge/cloud-mcp--use.com-blue" /></a>
+    <a href="https://x.com/mcpuse" alt="X follow mcp-use">
+        <img src="https://img.shields.io/twitter/follow/mcp-use?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
+    <br/>
+    <a href="https://github.com/mcp-use/mcp-use/tree/main/libraries/python" alt="Python repository">
+        <img src="https://img.shields.io/badge/pyhton-repo-grey?labelColor=white&logo=python" alt="Badge"></a>
+    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
+        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
+    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
+        <img src="https://static.pepy.tech/badge/mcp-use" /></a>
+    <a href="https://docs.mcp-use.com/python" alt="Python Documentation">
+        <img src="https://img.shields.io/badge/python-docs-red" /></a>
+    <br/>
+    <a href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript" alt="Typescript Documentation">
+        <img src="https://img.shields.io/badge/typescript-repo-grey?labelColor=white&logo=typescript" alt="Badge"></a>
+    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Version">
+        <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
+    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
+        <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
+    <a href="https://docs.mcp-use.com/typescript" alt="Typescript Documentation">
+        <img src="https://img.shields.io/badge/typescript-docs-red" /></a>
+    <br/>
+    <a href="https://inspector.mcp-use.com" alt="MCP Inspector Online">
+      <img src="https://img.shields.io/badge/MCP%20Inspector-black" /></a>
+    <a href="https://mcp-use.com" alt="MCP Deploy">
+      <img src="https://img.shields.io/badge/Deploy%20MCP-black" /></a>
 </p>
 </div>
 
 ---
 
-### 🏗️ Stack
+## Stack
 
 - **🤖 MCP Agents** - AI agents that can use tools and reason across steps
 - **🔌 MCP Clients** - Connect any LLM to any MCP server
@@ -54,8 +73,8 @@
       <p>Create intelligent agents that can use tools, browse the web, manage files, and more.</p>
       <p>
         <a href="#build-an-ai-agent">Quick Start ↓</a> | 
-        <a href="./libraries/python/README.md#quick-start">Python Docs</a> | 
-        <a href="./libraries/typescript/README.md#-quick-start">TypeScript Docs</a>
+        <a href="https://docs.mcp-use.com/python/agent/agent-configuration">Python Docs</a> | 
+        <a href="https://docs.mcp-use.com/typescript/agent/agent-configuration">TypeScript Docs</a>
       </p>
     </td>
     <td width="50%" valign="top">
@@ -63,8 +82,8 @@
       <p>Connect directly to MCP servers and call tools programmatically without an agent.</p>
       <p>
         <a href="#use-mcp-client">Quick Start ↓</a> | 
-        <a href="./libraries/python/README.md#direct-tool-calls-without-llm">Python Docs</a> | 
-        <a href="./libraries/typescript/README.md#basic-usage">TypeScript Docs</a>
+        <a href="https://docs.mcp-use.com/python/client/client-configuration">Python Docs</a> | 
+        <a href="https://docs.mcp-use.com/typescript/client/client-configuration">TypeScript Docs</a>
       </p>
     </td>
   </tr>
@@ -74,7 +93,7 @@
       <p>Build your own MCP servers with tools, resources, and prompts.</p>
       <p>
         <a href="#create-an-mcp-server">Quick Start ↓</a> | 
-        <a href="./libraries/typescript/README.md#%EF%B8%8F-mcp-server-framework">TypeScript Docs</a>
+        <a href="https://docs.mcp-use.com/typescript/server/getting-started">TypeScript Docs</a>
       </p>
     </td>
     <td width="50%" valign="top">
@@ -82,7 +101,8 @@
       <p>Test, debug, and explore your MCP servers interactively.</p>
       <p>
         <a href="#use-the-inspector">Quick Start ↓</a> | 
-        <a href="./libraries/typescript/packages/inspector/README.md">Inspector Docs</a>
+        <a href="https://docs.mcp-use.com/inspector/index">Inspector Docs</a> | 
+        <a href="https://inspector.mcp-use.com">MCP Inspector online</a>
       </p>
     </td>
   </tr>
@@ -91,16 +111,16 @@
       <h3>🎨 Build ChatGPT Apps</h3>
       <p>Create interactive UIs with mcp-ui, react and live reload.</p>
       <p>
-        <a href="./libraries/typescript/README.md#mcp-ui-resources">Quick Start</a> | 
-        <a href="./libraries/typescript/packages/create-mcp-use-app/README.md">Templates</a>
+        <a href="https://docs.mcp-use.com/typescript/server/mcp-ui-resources">Quick Start</a> | 
+        <a href="https://docs.mcp-use.com/typescript/server/templates">Templates</a>
       </p>
     </td>
     <td width="50%" valign="top">
       <h3>☁️ Deploy to MCP Cloud</h3>
       <p>Deploy and manage your MCP agents and servers in the cloud.</p>
       <p>
-        <a href="./libraries/typescript/README.md#mcp-ui-resources">Quick Start</a> | 
-        <a href="./libraries/typescript/packages/create-mcp-use-app/README.md">Cloud ↗</a>
+        <a href="https://docs.mcp-use.com/home/mcp101">Quick Start</a> | 
+        <a href="https://mcp-use.com">Cloud ↗</a>
       </p>
     </td>
   </tr>
@@ -110,7 +130,7 @@
 
 <h2 style="border:0; margin-top:30px;">📦 Quick Start</h2>
 
-### 🤖 Build an AI Agent
+### Build an AI Agent
 
 Create an AI agent that can use MCP tools to accomplish complex tasks.
 
@@ -184,7 +204,7 @@ main();
 
 ---
 
-### 🔌 Use MCP Client
+### Use MCP Client
 
 Connect to MCP servers directly without an AI agent for programmatic tool access.
 
@@ -250,7 +270,7 @@ main();
 
 ---
 
-### 🛠️ Create an MCP Server
+### Create an MCP Server
 
 Build your own MCP server with custom tools, resources, and prompts.
 
@@ -295,7 +315,7 @@ server.listen(3000);
 
 ---
 
-### 🔍 Use the Inspector
+### Use the Inspector
 
 Debug and test your MCP servers with the interactive web-based inspector.
 

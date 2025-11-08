@@ -1,5 +1,17 @@
 # create-mcp-use-app
 
+## 0.4.10
+
+### Patch Changes
+
+- 410c67c: fix: defaults to starter rather than simple
+
+## 0.4.10-canary.0
+
+### Patch Changes
+
+- 0b773d0: fix: defaults to starter rather than simple
+
 ## 0.4.9
 
 ### Patch Changes

@@ -1,5 +1,57 @@
 # mcp-use
 
+## 1.2.4
+
+### Patch Changes
+
+- 9209e99: fix: prevent OOM errors by avoiding re-exports of @langchain/core types
+- 9209e99: fix: inspector dependencies
+- Updated dependencies [9209e99]
+  - @mcp-use/inspector@0.4.13
+  - @mcp-use/cli@2.1.25
+
+## 1.2.4-canary.1
+
+### Patch Changes
+
+- 8194ad2: fix: prevent OOM errors by avoiding re-exports of @langchain/core types
+  - @mcp-use/cli@2.1.25-canary.1
+  - @mcp-use/inspector@0.4.13-canary.1
+
+## 1.2.4-canary.0
+
+### Patch Changes
+
+- 8e2210a: fix: inspector dependencies
+- Updated dependencies [8e2210a]
+  - @mcp-use/inspector@0.4.13-canary.0
+  - @mcp-use/cli@2.1.25-canary.0
+
+## 1.2.3
+
+### Patch Changes
+
+- 410c67c: Winston is dynamically imported and not bundled
+- 410c67c: fix: MCPAgent runtime fails with ERR_PACKAGE_PATH_NOT_EXPORTED in Node.js - package.json file didn't include an export path for ./agent, even though the agent code existed in src/agents/. Additionally, the build configuration (tsup.config.ts) wasn't building the agents as a separate entry point.
+  - @mcp-use/cli@2.1.24
+  - @mcp-use/inspector@0.4.12
+
+## 1.2.3-canary.1
+
+### Patch Changes
+
+- 7d0f904: Winston is dynamically imported and not bundled
+  - @mcp-use/cli@2.1.24-canary.1
+  - @mcp-use/inspector@0.4.12-canary.1
+
+## 1.2.3-canary.0
+
+### Patch Changes
+
+- d5ed5ba: fix: MCPAgent runtime fails with ERR_PACKAGE_PATH_NOT_EXPORTED in Node.js - package.json file didn't include an export path for ./agent, even though the agent code existed in src/agents/. Additionally, the build configuration (tsup.config.ts) wasn't building the agents as a separate entry point.
+  - @mcp-use/cli@2.1.24-canary.0
+  - @mcp-use/inspector@0.4.12-canary.0
+
 ## 1.2.2
 
 ### Patch Changes
