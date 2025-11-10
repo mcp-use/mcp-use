@@ -1,39 +1,129 @@
+import {
+  McpServer as OfficialMcpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
+import { cors } from "hono/cors";
+import { z } from "zod";
+import {
+  createUIResourceFromDefinition,
+  type UrlConfig,
+} from "./adapters/mcp-ui-adapter.js";
+import { requestLogger } from "./logging.js";
 import type {
+  InputDefinition,
   PromptDefinition,
   ResourceDefinition,
   ResourceTemplateDefinition,
   ServerConfig,
   ToolDefinition,
+  UIResourceContent,
   UIResourceDefinition,
   WidgetProps,
-  InputDefinition,
-  UIResourceContent,
 } from "./types/index.js";
-import {
-  McpServer as OfficialMcpServer,
-  ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import express, { type Express } from "express";
-import cors from "cors";
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-import { readFileSync } from "node:fs";
-import { requestLogger } from "./logging.js";
-import {
-  createUIResourceFromDefinition,
-  type UrlConfig,
-} from "./adapters/mcp-ui-adapter.js";
-import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
-import { createServer } from "vite";
 import type { WidgetMetadata } from "./types/widget.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
 
+// Runtime detection
+const isDeno = typeof (globalThis as any).Deno !== "undefined";
+
+// Helper to get environment variable
+function getEnv(key: string): string | undefined {
+  if (isDeno) {
+    return (globalThis as any).Deno.env.get(key);
+  }
+  return process.env[key];
+}
+
+// Helper to get current working directory
+function getCwd(): string {
+  if (isDeno) {
+    return (globalThis as any).Deno.cwd();
+  }
+  return process.cwd();
+}
+
+// Runtime-aware file system helpers
+const fsHelpers = {
+  async readFileSync(path: string, encoding: string = "utf8"): Promise<string> {
+    if (isDeno) {
+      return await (globalThis as any).Deno.readTextFile(path);
+    }
+    const { readFileSync } = await import("node:fs");
+    const result = readFileSync(path, encoding as any);
+    return typeof result === "string" ? result : result.toString(encoding as any);
+  },
+  
+  async readFile(path: string): Promise<ArrayBuffer> {
+    if (isDeno) {
+      const data = await (globalThis as any).Deno.readFile(path);
+      return data.buffer;
+    }
+    const { readFileSync } = await import("node:fs");
+    const buffer = readFileSync(path);
+    return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  },
+  
+  async existsSync(path: string): Promise<boolean> {
+    if (isDeno) {
+      try {
+        await (globalThis as any).Deno.stat(path);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    const { existsSync } = await import("node:fs");
+    return existsSync(path);
+  },
+  
+  async readdirSync(path: string): Promise<string[]> {
+    if (isDeno) {
+      const entries = [];
+      for await (const entry of (globalThis as any).Deno.readDir(path)) {
+        entries.push(entry.name);
+      }
+      return entries;
+    }
+    const { readdirSync } = await import("node:fs");
+    return readdirSync(path);
+  },
+};
+
+// Runtime-aware path helpers
+const pathHelpers = {
+  join(...paths: string[]): string {
+    if (isDeno) {
+      // Use simple path joining for Deno (web-standard approach)
+      return paths.join("/").replace(/\/+/g, "/");
+    }
+    // For Node, we need to use the sync version or cache the import
+    // We'll use a simple implementation that works for both
+    return paths.join("/").replace(/\/+/g, "/");
+  },
+  
+  relative(from: string, to: string): string {
+    // Simple relative path calculation
+    const fromParts = from.split("/").filter(p => p);
+    const toParts = to.split("/").filter(p => p);
+    
+    let i = 0;
+    while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) {
+      i++;
+    }
+    
+    const upCount = fromParts.length - i;
+    const relativeParts = [...Array(upCount).fill(".."), ...toParts.slice(i)];
+    return relativeParts.join("/");
+  },
+};
+
 export class McpServer {
   private server: OfficialMcpServer;
   private config: ServerConfig;
-  private app: Express;
+  private app: HonoType;
   private mcpMounted = false;
   private inspectorMounted = false;
   private serverPort?: number;
@@ -41,14 +131,14 @@ export class McpServer {
   private serverBaseUrl?: string;
 
   /**
-   * Creates a new MCP server instance with Express integration
+   * Creates a new MCP server instance with Hono integration
    *
    * Initializes the server with the provided configuration, sets up CORS headers,
    * configures widget serving routes, and creates a proxy that allows direct
-   * access to Express methods while preserving MCP server functionality.
+   * access to Hono methods while preserving MCP server functionality.
    *
    * @param config - Server configuration including name, version, and description
-   * @returns A proxied McpServer instance that supports both MCP and Express methods
+   * @returns A proxied McpServer instance that supports both MCP and Hono methods
    */
   constructor(config: ServerConfig) {
     this.config = config;
@@ -58,17 +148,15 @@ export class McpServer {
       name: config.name,
       version: config.version,
     });
-    this.app = express();
-
-    // Parse JSON bodies
-    this.app.use(express.json());
+    this.app = new Hono();
 
     // Enable CORS by default
     this.app.use(
+      "*",
       cors({
         origin: "*",
-        methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: [
+        allowMethods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowHeaders: [
           "Content-Type",
           "Accept",
           "Authorization",
@@ -81,9 +169,9 @@ export class McpServer {
     );
 
     // Request logging middleware
-    this.app.use(requestLogger);
+    this.app.use("*", requestLogger);
 
-    // Proxy all Express methods to the underlying app
+    // Proxy all Hono methods to the underlying app
     return new Proxy(this, {
       get(target, prop) {
         if (prop in target) {
@@ -691,7 +779,7 @@ export class McpServer {
     // Only check NODE_ENV - CLI commands set this explicitly
     // 'mcp-use dev' sets NODE_ENV=development
     // 'mcp-use start' sets NODE_ENV=production
-    return process.env.NODE_ENV === "production";
+    return getEnv("NODE_ENV") === "production";
   }
 
   /**
@@ -700,18 +788,18 @@ export class McpServer {
    * @private
    * @returns Build manifest or null if not found
    */
-  private readBuildManifest(): {
+  private async readBuildManifest(): Promise<{
     includeInspector: boolean;
     widgets: string[];
     buildTime?: string;
-  } | null {
+  } | null> {
     try {
-      const manifestPath = join(
-        process.cwd(),
+      const manifestPath = pathHelpers.join(
+        getCwd(),
         "dist",
         ".mcp-use-manifest.json"
       );
-      const content = readFileSync(manifestPath, "utf8");
+      const content = await fsHelpers.readFileSync(manifestPath, "utf8");
       return JSON.parse(content);
     } catch {
       return null;
@@ -736,6 +824,11 @@ export class McpServer {
     if (this.isProductionMode()) {
       await this.mountWidgetsProduction(options);
     } else {
+      // Skip dev mode in Deno (no Vite support)
+      if (isDeno) {
+        console.log("[WIDGETS] Skipping dev mode widget mounting in Deno runtime (use production build)");
+        return;
+      }
       await this.mountWidgetsDev(options);
     }
   }
@@ -760,7 +853,7 @@ export class McpServer {
     const { promises: fs } = await import("node:fs");
     const baseRoute = options?.baseRoute || "/mcp-use/widgets";
     const resourcesDir = options?.resourcesDir || "resources";
-    const srcDir = join(process.cwd(), resourcesDir);
+    const srcDir = pathHelpers.join(getCwd(), resourcesDir);
 
     // Check if resources directory exists
     try {
@@ -778,7 +871,7 @@ export class McpServer {
       const files = await fs.readdir(srcDir);
       entries = files
         .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
-        .map((f) => join(srcDir, f));
+        .map((f) => pathHelpers.join(srcDir, f));
     } catch (error) {
       console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`);
       return;
@@ -790,9 +883,10 @@ export class McpServer {
     }
 
     // Create a temp directory for widget entry files
-    const tempDir = join(process.cwd(), TMP_MCP_USE_DIR);
+    const tempDir = pathHelpers.join(getCwd(), TMP_MCP_USE_DIR);
     await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
+    const { createServer } = await import("vite");
     const react = (await import("@vitejs/plugin-react")).default;
     const tailwindcss = (await import("@tailwindcss/vite")).default;
     console.log(react, tailwindcss);
@@ -814,13 +908,12 @@ export class McpServer {
     // Create entry files for each widget
     for (const widget of widgets) {
       // Create temp entry and HTML files for this widget
-      const widgetTempDir = join(tempDir, widget.name);
+      const widgetTempDir = pathHelpers.join(tempDir, widget.name);
       await fs.mkdir(widgetTempDir, { recursive: true });
 
       // Create a CSS file with Tailwind and @source directives to scan resources
-      const resourcesPath = join(process.cwd(), resourcesDir);
-      const { relative } = await import("node:path");
-      const relativeResourcesPath = relative(
+      const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
+      const relativeResourcesPath = pathHelpers.relative(
         widgetTempDir,
         resourcesPath
       ).replace(/\\/g, "/");
@@ -829,7 +922,7 @@ export class McpServer {
 /* Configure Tailwind to scan the resources directory */
 @source "${relativeResourcesPath}";
 `;
-      await fs.writeFile(join(widgetTempDir, "styles.css"), cssContent, "utf8");
+      await fs.writeFile(pathHelpers.join(widgetTempDir, "styles.css"), cssContent, "utf8");
 
       const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
@@ -857,12 +950,12 @@ if (container && Component) {
 </html>`;
 
       await fs.writeFile(
-        join(widgetTempDir, "entry.tsx"),
+        pathHelpers.join(widgetTempDir, "entry.tsx"),
         entryContent,
         "utf8"
       );
       await fs.writeFile(
-        join(widgetTempDir, "index.html"),
+        pathHelpers.join(widgetTempDir, "index.html"),
         htmlContent,
         "utf8"
       );
@@ -883,7 +976,7 @@ if (container && Component) {
       plugins: [tailwindcss(), react()],
       resolve: {
         alias: {
-          "@": join(process.cwd(), resourcesDir),
+          "@": pathHelpers.join(getCwd(), resourcesDir),
         },
       },
       server: {
@@ -892,11 +985,80 @@ if (container && Component) {
       },
     });
 
+    // Helper function to adapt Express middleware to Hono
+    const adaptExpressMiddleware = (middleware: any) => {
+      return async (c: Context, next: Next) => {
+        const req = c.req.raw;
+        let handled = false;
+        const responseBody: Uint8Array[] = [];
+        let statusCode = 200;
+        const headers: Record<string, string> = {};
+
+        // Create Express-like response object
+        const res: any = {
+          statusCode: 200,
+          status: (code: number) => {
+            statusCode = code;
+            res.statusCode = code;
+            return res;
+          },
+          setHeader: (name: string, value: string) => {
+            headers[name] = value;
+          },
+          getHeader: (name: string) => headers[name],
+          write: (chunk: any) => {
+            responseBody.push(typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk);
+          },
+          end: (chunk?: any) => {
+            if (chunk) {
+              responseBody.push(typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk);
+            }
+            handled = true;
+          },
+          on: () => {},
+          once: () => {},
+          removeListener: () => {},
+        };
+
+        // Create Express-like request object
+        const expressReq: any = {
+          ...req,
+          url: new URL(req.url).pathname + new URL(req.url).search,
+          originalUrl: req.url,
+          baseUrl: "",
+          path: new URL(req.url).pathname,
+          query: Object.fromEntries(new URL(req.url).searchParams),
+          params: {},
+          body: {},
+          headers: Object.fromEntries(req.headers.entries()),
+        };
+
+        // Call Express middleware
+        await new Promise<void>((resolve, reject) => {
+          middleware(expressReq, res, (err?: any) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+
+        if (handled) {
+          // Return the response from Vite
+          const body = Buffer.concat(responseBody);
+          return new Response(body, {
+            status: statusCode,
+            headers: headers,
+          });
+        }
+
+        return next();
+      };
+    };
+
     // Custom middleware to handle widget-specific paths
-    this.app.use(baseRoute, (req, res, next) => {
-      const urlPath = req.url || "";
-      const [pathname, queryString] = urlPath.split("?");
-      const widgetMatch = pathname.match(/^\/([^/]+)/);
+    this.app.use(`${baseRoute}/*`, async (c: Context, next: Next) => {
+      const url = new URL(c.req.url);
+      const pathname = url.pathname;
+      const widgetMatch = pathname.replace(baseRoute, "").match(/^\/([^/]+)/);
 
       if (widgetMatch) {
         const widgetName = widgetMatch[1];
@@ -904,18 +1066,32 @@ if (container && Component) {
 
         if (widget) {
           // If requesting the root of a widget, serve its index.html
-          if (pathname === `/${widgetName}` || pathname === `/${widgetName}/`) {
-            req.url = `/${widgetName}/index.html${queryString ? "?" + queryString : ""}`;
+          const relativePath = pathname.replace(baseRoute, "");
+          if (relativePath === `/${widgetName}` || relativePath === `/${widgetName}/`) {
+            // Rewrite the URL for Vite by creating a new request with modified URL
+            const newUrl = new URL(c.req.url);
+            newUrl.pathname = `${baseRoute}/${widgetName}/index.html`;
+            // Create a new request with modified URL and update the context
+            const newRequest = new Request(newUrl.toString(), c.req.raw);
+            // Update the request in the context by creating a new context-like object
+            Object.defineProperty(c, 'req', {
+              value: {
+                ...c.req,
+                url: newUrl.toString(),
+                raw: newRequest,
+              },
+              writable: false,
+              configurable: true,
+            });
           }
-          // For assets, keep the original URL but Vite will handle it from the widget's directory
         }
       }
 
-      next();
+      await next();
     });
 
-    // Mount the single Vite server for all widgets
-    this.app.use(baseRoute, viteServer.middlewares);
+    // Mount the single Vite server for all widgets using adapter
+    this.app.use(`${baseRoute}/*`, adaptExpressMiddleware(viteServer.middlewares));
 
     widgets.forEach((widget) => {
       console.log(
@@ -964,9 +1140,12 @@ if (container && Component) {
 
       let html = "";
       try {
-        html = readFileSync(join(tempDir, widget.name, "index.html"), "utf8");
+        html = await fsHelpers.readFileSync(
+          pathHelpers.join(tempDir, widget.name, "index.html"),
+          "utf8"
+        );
         // Inject or replace base tag with MCP_URL
-        const mcpUrl = process.env.MCP_URL || "/";
+        const mcpUrl = getEnv("MCP_URL") || "/";
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
           const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
@@ -1086,10 +1265,10 @@ if (container && Component) {
     resourcesDir?: string;
   }): Promise<void> {
     const baseRoute = options?.baseRoute || "/mcp-use/widgets";
-    const widgetsDir = join(process.cwd(), "dist", "resources", "widgets");
+    const widgetsDir = pathHelpers.join(getCwd(), "dist", "resources", "widgets");
 
     // Check if widgets directory exists
-    if (!existsSync(widgetsDir)) {
+    if (!(await fsHelpers.existsSync(widgetsDir))) {
       console.log(
         "[WIDGETS] No dist/resources/widgets/ directory found - skipping widget serving"
       );
@@ -1100,11 +1279,15 @@ if (container && Component) {
     this.setupWidgetRoutes();
 
     // Discover built widgets
-    const widgets = readdirSync(widgetsDir).filter((name) => {
-      const widgetPath = join(widgetsDir, name);
-      const indexPath = join(widgetPath, "index.html");
-      return existsSync(indexPath);
-    });
+    const allEntries = await fsHelpers.readdirSync(widgetsDir);
+    const widgets: string[] = [];
+    for (const name of allEntries) {
+      const widgetPath = pathHelpers.join(widgetsDir, name);
+      const indexPath = pathHelpers.join(widgetPath, "index.html");
+      if (await fsHelpers.existsSync(indexPath)) {
+        widgets.push(name);
+      }
+    }
 
     if (widgets.length === 0) {
       console.log(
@@ -1119,16 +1302,17 @@ if (container && Component) {
 
     // Register tools and resources for each widget
     for (const widgetName of widgets) {
-      const widgetPath = join(widgetsDir, widgetName);
-      const indexPath = join(widgetPath, "index.html");
-      const metadataPath = join(widgetPath, "metadata.json");
+      const widgetPath = pathHelpers.join(widgetsDir, widgetName);
+      const indexPath = pathHelpers.join(widgetPath, "index.html");
+      const metadataPath = pathHelpers.join(widgetPath, "metadata.json");
 
       // Read the HTML template
       let html = "";
       try {
-        html = readFileSync(indexPath, "utf8");
+        html = await fsHelpers.readFileSync(indexPath, "utf8");
+
         // Inject or replace base tag with MCP_URL
-        const mcpUrl = process.env.MCP_URL || "/";
+        const mcpUrl = getEnv("MCP_URL") || "/";
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
           const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
@@ -1185,7 +1369,7 @@ if (container && Component) {
       let description = `Widget: ${widgetName}`;
 
       try {
-        const metadataContent = readFileSync(metadataPath, "utf8");
+        const metadataContent = await fsHelpers.readFileSync(metadataPath, "utf8");
         metadata = JSON.parse(metadataContent);
         if (metadata.description) {
           description = metadata.description;
@@ -1279,50 +1463,221 @@ if (container && Component) {
 
     const endpoint = "/mcp";
 
+    // Helper to create Express-like req/res from Hono context for MCP SDK
+    const createExpressLikeObjects = (c: Context) => {
+      const req = c.req.raw;
+      const responseBody: Uint8Array[] = [];
+      let statusCode = 200;
+      const headers: Record<string, string> = {};
+      let ended = false;
+      let headersSent = false;
+
+      const expressReq: any = {
+        ...req,
+        url: new URL(req.url).pathname + new URL(req.url).search,
+        originalUrl: req.url,
+        baseUrl: "",
+        path: new URL(req.url).pathname,
+        query: Object.fromEntries(new URL(req.url).searchParams),
+        params: {},
+        body: {},
+        headers: Object.fromEntries(req.headers.entries()),
+        method: req.method,
+      };
+
+      const expressRes: any = {
+        statusCode: 200,
+        headersSent: false,
+        status: (code: number) => {
+          statusCode = code;
+          expressRes.statusCode = code;
+          return expressRes;
+        },
+        setHeader: (name: string, value: string | string[]) => {
+          if (!headersSent) {
+            headers[name] = Array.isArray(value) ? value.join(", ") : value;
+          }
+        },
+        getHeader: (name: string) => headers[name],
+        write: (chunk: any, encoding?: any, callback?: any) => {
+          if (!ended) {
+            const data = typeof chunk === "string"
+              ? new TextEncoder().encode(chunk)
+              : chunk instanceof Uint8Array
+                ? chunk
+                : Buffer.from(chunk);
+            responseBody.push(data);
+          }
+          if (typeof encoding === "function") {
+            encoding();
+          } else if (callback) {
+            callback();
+          }
+          return true;
+        },
+        end: (chunk?: any, encoding?: any, callback?: any) => {
+          if (chunk && !ended) {
+            const data = typeof chunk === "string"
+              ? new TextEncoder().encode(chunk)
+              : chunk instanceof Uint8Array
+                ? chunk
+                : Buffer.from(chunk);
+            responseBody.push(data);
+          }
+          ended = true;
+          if (typeof encoding === "function") {
+            encoding();
+          } else if (callback) {
+            callback();
+          }
+        },
+        on: (event: string, handler: any) => {
+          if (event === "close") {
+            expressRes._closeHandler = handler;
+          }
+        },
+        once: () => {},
+        removeListener: () => {},
+        writeHead: (code: number, _headers?: any) => {
+          statusCode = code;
+          expressRes.statusCode = code;
+          headersSent = true;
+          if (_headers) {
+            Object.assign(headers, _headers);
+          }
+          return expressRes;
+        },
+        flushHeaders: () => {
+          headersSent = true;
+          // For SSE streaming, this is a no-op in our adapter
+          // The headers will be sent when the response is returned
+        },
+        send: (body: any) => {
+          if (!ended) {
+            expressRes.write(body);
+            expressRes.end();
+          }
+        },
+      };
+
+      return { expressReq, expressRes, getResponse: () => {
+        if (ended) {
+          if (responseBody.length > 0) {
+            const body = isDeno 
+              ? Buffer.concat(responseBody)
+              : Buffer.concat(responseBody);
+            return new Response(body, {
+              status: statusCode,
+              headers: headers,
+            });
+          } else {
+            return new Response(null, {
+              status: statusCode,
+              headers: headers,
+            });
+          }
+        }
+        return null;
+      }};
+    };
+
     // POST endpoint for messages
     // Create a new transport for each request to support multiple concurrent clients
-    this.app.post(endpoint, express.json(), async (req, res) => {
+    this.app.post(endpoint, async (c: Context) => {
+      const { expressReq, expressRes, getResponse } = createExpressLikeObjects(c);
+      
+      // Get request body
+      try {
+        expressReq.body = await c.req.json();
+      } catch {
+        expressReq.body = {};
+      }
+
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,
       });
 
-      res.on("close", () => {
-        transport.close();
-      });
+      // Handle close event
+      if (expressRes._closeHandler) {
+        // Note: In web-standard Request/Response, we use AbortController
+        // For now, we'll call close when response is done
+        c.req.raw.signal?.addEventListener("abort", () => {
+          transport.close();
+        });
+      }
 
       await this.server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
+      
+      // Wait for handleRequest to complete and for response to be written
+      await transport.handleRequest(expressReq, expressRes, expressReq.body);
+      
+      // Wait a tiny bit for async writes to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      const response = getResponse();
+      if (response) {
+        return response;
+      }
+
+      // If no response was written, return empty response
+      return c.text("", 200);
     });
 
     // GET endpoint for SSE streaming
-    this.app.get(endpoint, async (req, res) => {
+    this.app.get(endpoint, async (c: Context) => {
+      const { expressReq, expressRes, getResponse } = createExpressLikeObjects(c);
+
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,
       });
 
-      res.on("close", () => {
+      // Handle close event
+      c.req.raw.signal?.addEventListener("abort", () => {
         transport.close();
       });
 
       await this.server.connect(transport);
-      await transport.handleRequest(req, res);
+      await transport.handleRequest(expressReq, expressRes);
+      
+      // Wait a tiny bit for async writes to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      const response = getResponse();
+      if (response) {
+        return response;
+      }
+
+      return c.text("", 200);
     });
 
     // DELETE endpoint for session cleanup
-    this.app.delete(endpoint, async (req, res) => {
+    this.app.delete(endpoint, async (c: Context) => {
+      const { expressReq, expressRes, getResponse } = createExpressLikeObjects(c);
+
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,
       });
 
-      res.on("close", () => {
+      // Handle close event
+      c.req.raw.signal?.addEventListener("abort", () => {
         transport.close();
       });
 
       await this.server.connect(transport);
-      await transport.handleRequest(req, res);
+      await transport.handleRequest(expressReq, expressRes);
+      
+      // Wait a tiny bit for async writes to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      const response = getResponse();
+      if (response) {
+        return response;
+      }
+
+      return c.text("", 200);
     });
 
     this.mcpMounted = true;
@@ -1330,10 +1685,10 @@ if (container && Component) {
   }
 
   /**
-   * Start the Express server with MCP endpoints
+   * Start the Hono server with MCP endpoints
    *
    * Initiates the server startup process by mounting MCP endpoints, configuring
-   * the inspector UI (if available), and starting the Express server to listen
+   * the inspector UI (if available), and starting the server to listen
    * for incoming connections. This is the main entry point for running the server.
    *
    * The server will be accessible at the specified port with MCP endpoints at /mcp
@@ -1352,12 +1707,14 @@ if (container && Component) {
    */
   async listen(port?: number): Promise<void> {
     // Priority: parameter > PORT env var > default (3001)
+    const portEnv = getEnv("PORT");
     this.serverPort =
-      port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3001);
+      port || (portEnv ? parseInt(portEnv, 10) : 3001);
 
     // Update host from HOST env var if set
-    if (process.env.HOST) {
-      this.serverHost = process.env.HOST;
+    const hostEnv = getEnv("HOST");
+    if (hostEnv) {
+      this.serverHost = hostEnv;
     }
 
     await this.mountWidgets({
@@ -1367,16 +1724,38 @@ if (container && Component) {
     await this.mountMcp();
 
     // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
-    this.mountInspector();
+    await this.mountInspector();
 
-    this.app.listen(this.serverPort, () => {
+    // Start server based on runtime
+    if (isDeno) {
+      (globalThis as any).Deno.serve(
+        { port: this.serverPort, hostname: this.serverHost },
+        this.app.fetch
+      );
       console.log(
         `[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`
       );
       console.log(
         `[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp`
       );
-    });
+    } else {
+      const { serve } = await import("@hono/node-server");
+      serve(
+        {
+          fetch: this.app.fetch,
+          port: this.serverPort,
+          hostname: this.serverHost,
+        },
+        (_info: any) => {
+          console.log(
+            `[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`
+          );
+          console.log(
+            `[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp`
+          );
+        }
+      );
+    }
   }
 
   /**
@@ -1401,12 +1780,12 @@ if (container && Component) {
    * - Server continues to function normally
    * - No inspector UI available
    */
-  private mountInspector(): void {
+  private async mountInspector(): Promise<void> {
     if (this.inspectorMounted) return;
 
     // In production, only mount if build manifest says so
     if (this.isProductionMode()) {
-      const manifest = this.readBuildManifest();
+      const manifest = await this.readBuildManifest();
       if (!manifest?.includeInspector) {
         console.log(
           "[INSPECTOR] Skipped in production (use --with-inspector flag during build)"
@@ -1418,26 +1797,25 @@ if (container && Component) {
     // Try to dynamically import the inspector package
     // Using dynamic import makes it truly optional - won't fail if not installed
 
-    // @ts-ignore - Optional peer dependency, may not be installed during build
-    import("@mcp-use/inspector")
-      .then(({ mountInspector }) => {
-        // Auto-connect to the local MCP server at /mcp
-        mountInspector(this.app);
-        this.inspectorMounted = true;
-        console.log(
-          `[INSPECTOR] UI available at http://${this.serverHost}:${this.serverPort}/inspector`
-        );
-      })
-      .catch(() => {
-        // Inspector package not installed, skip mounting silently
-        // This allows the server to work without the inspector in production
-      });
+    try {
+      // @ts-ignore - Optional peer dependency, may not be installed during build
+      const { mountInspector } = await import("@mcp-use/inspector");
+      // Auto-connect to the local MCP server at /mcp
+      mountInspector(this.app);
+      this.inspectorMounted = true;
+      console.log(
+        `[INSPECTOR] UI available at http://${this.serverHost}:${this.serverPort}/inspector`
+      );
+    } catch {
+      // Inspector package not installed, skip mounting silently
+      // This allows the server to work without the inspector in production
+    }
   }
 
   /**
    * Setup default widget serving routes
    *
-   * Configures Express routes to serve MCP UI widgets and their static assets.
+   * Configures Hono routes to serve MCP UI widgets and their static assets.
    * Widgets are served from the dist/resources/widgets directory and can
    * be accessed via HTTP endpoints for embedding in web applications.
    *
@@ -1457,11 +1835,11 @@ if (container && Component) {
    */
   private setupWidgetRoutes(): void {
     // Serve static assets (JS, CSS) from the assets directory
-    this.app.get("/mcp-use/widgets/:widget/assets/*", (req, res, next) => {
-      const widget = req.params.widget;
-      const assetFile = (req.params as any)[0];
-      const assetPath = join(
-        process.cwd(),
+    this.app.get("/mcp-use/widgets/:widget/assets/*", async (c: Context) => {
+      const widget = c.req.param("widget");
+      const assetFile = c.req.path.split("/assets/")[1];
+      const assetPath = pathHelpers.join(
+        getCwd(),
         "dist",
         "resources",
         "widgets",
@@ -1469,59 +1847,107 @@ if (container && Component) {
         "assets",
         assetFile
       );
-      res.sendFile(assetPath, (err) => (err ? next() : undefined));
+
+      try {
+        if (await fsHelpers.existsSync(assetPath)) {
+          const content = await fsHelpers.readFile(assetPath);
+          // Determine content type based on file extension
+          const ext = assetFile.split(".").pop()?.toLowerCase();
+          const contentType =
+            ext === "js"
+              ? "application/javascript"
+              : ext === "css"
+                ? "text/css"
+                : ext === "png"
+                  ? "image/png"
+                  : ext === "jpg" || ext === "jpeg"
+                    ? "image/jpeg"
+                    : ext === "svg"
+                      ? "image/svg+xml"
+                      : "application/octet-stream";
+          return new Response(content, {
+            status: 200,
+            headers: { "Content-Type": contentType },
+          });
+        }
+        return c.notFound();
+      } catch {
+        return c.notFound();
+      }
     });
 
     // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
-    this.app.get("/mcp-use/widgets/assets/*", (req, res, next) => {
-      const assetFile = (req.params as any)[0];
+    this.app.get("/mcp-use/widgets/assets/*", async (c: Context) => {
+      const assetFile = c.req.path.split("/assets/")[1];
       // Try to find which widget this asset belongs to by checking all widget directories
-      const widgetsDir = join(process.cwd(), "dist", "resources", "widgets");
+      const widgetsDir = pathHelpers.join(getCwd(), "dist", "resources", "widgets");
 
       try {
-        const widgets = readdirSync(widgetsDir);
+        const widgets = await fsHelpers.readdirSync(widgetsDir);
         for (const widget of widgets) {
-          const assetPath = join(widgetsDir, widget, "assets", assetFile);
-          if (existsSync(assetPath)) {
-            return res.sendFile(assetPath);
+          const assetPath = pathHelpers.join(widgetsDir, widget, "assets", assetFile);
+          if (await fsHelpers.existsSync(assetPath)) {
+            const content = await fsHelpers.readFile(assetPath);
+            const ext = assetFile.split(".").pop()?.toLowerCase();
+            const contentType =
+              ext === "js"
+                ? "application/javascript"
+                : ext === "css"
+                  ? "text/css"
+                  : ext === "png"
+                    ? "image/png"
+                    : ext === "jpg" || ext === "jpeg"
+                      ? "image/jpeg"
+                        : ext === "svg"
+                        ? "image/svg+xml"
+                        : "application/octet-stream";
+            return new Response(content, {
+              status: 200,
+              headers: { "Content-Type": contentType },
+            });
           }
         }
-        next();
+        return c.notFound();
       } catch {
-        next();
+        return c.notFound();
       }
     });
 
     // Serve each widget's index.html at its route
     // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
-    this.app.get("/mcp-use/widgets/:widget", (req, res, next) => {
-      const filePath = join(
-        process.cwd(),
+    this.app.get("/mcp-use/widgets/:widget", async (c: Context) => {
+      const widget = c.req.param("widget");
+      const filePath = pathHelpers.join(
+        getCwd(),
         "dist",
         "resources",
         "widgets",
-        req.params.widget,
+        widget,
         "index.html"
       );
 
-      let html = readFileSync(filePath, "utf8");
-      // replace relative path that starts with /mcp-use script and css with absolute
-      html = html.replace(
-        /src="\/mcp-use\/widgets\/([^"]+)"/g,
-        `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`
-      );
-      html = html.replace(
-        /href="\/mcp-use\/widgets\/([^"]+)"/g,
-        `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`
-      );
+      try {
+        let html = await fsHelpers.readFileSync(filePath, "utf8");
+        // replace relative path that starts with /mcp-use script and css with absolute
+        html = html.replace(
+          /src="\/mcp-use\/widgets\/([^"]+)"/g,
+          `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+        );
+        html = html.replace(
+          /href="\/mcp-use\/widgets\/([^"]+)"/g,
+          `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+        );
 
-      // add window.__getFile to head
-      html = html.replace(
-        /<head[^>]*>/i,
-        `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${req.params.widget}/"+filename }</script>`
-      );
+        // add window.__getFile to head
+        html = html.replace(
+          /<head[^>]*>/i,
+          `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widget}/"+filename }</script>`
+        );
 
-      res.send(html);
+        return c.html(html);
+      } catch {
+        return c.notFound();
+      }
     });
   }
 
@@ -1741,7 +2167,7 @@ if (container && Component) {
   }
 }
 
-export type McpServerInstance = Omit<McpServer, keyof Express> & Express;
+export type McpServerInstance = Omit<McpServer, keyof HonoType> & HonoType;
 
 /**
  * Create a new MCP server instance
@@ -1752,7 +2178,7 @@ export type McpServerInstance = Omit<McpServer, keyof Express> & Express;
  * @param config.description - Server description
  * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
  * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
- * @returns McpServerInstance with both MCP and Express methods
+ * @returns McpServerInstance with both MCP and Hono methods
  *
  * @example
  * ```typescript

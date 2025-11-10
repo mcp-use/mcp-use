@@ -26,4 +26,8 @@ export default defineConfig({
     "langchain",
     "@langfuse/langchain",
   ],
+  esbuildOptions(options) {
+    // Preserve node: prefix for Deno compatibility
+    options.platform = "neutral";
+  },
 });
