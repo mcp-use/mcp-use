@@ -886,10 +886,25 @@ export class McpServer {
     const tempDir = pathHelpers.join(getCwd(), TMP_MCP_USE_DIR);
     await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
-    const { createServer } = await import("vite");
-    const react = (await import("@vitejs/plugin-react")).default;
-    const tailwindcss = (await import("@tailwindcss/vite")).default;
-    console.log(react, tailwindcss);
+    // Import dev dependencies - these are optional and only needed for dev mode
+    // Using dynamic string-based imports to prevent static analysis by bundlers
+    let createServer: any;
+    let react: any;
+    let tailwindcss: any;
+    
+    try {
+      // Use Function constructor to create truly dynamic imports that can't be statically analyzed
+      const viteModule = await new Function('return import("vite")')();
+      createServer = viteModule.createServer;
+      const reactModule = await new Function('return import("@vitejs/plugin-react")')();
+      react = reactModule.default;
+      const tailwindModule = await new Function('return import("@tailwindcss/vite")')();
+      tailwindcss = tailwindModule.default;
+    } catch (error) {
+      console.error("[WIDGETS] Dev dependencies not available. Install vite, @vitejs/plugin-react, and @tailwindcss/vite for widget development.");
+      console.error("[WIDGETS] For production, use 'mcp-use build' to pre-build widgets.");
+      return;
+    }
 
     const widgets = entries.map((entry) => {
       const baseName =
@@ -1759,6 +1774,97 @@ if (container && Component) {
   }
 
   /**
+   * Get the fetch handler for the server after mounting all endpoints
+   *
+   * This method prepares the server by mounting MCP endpoints, widgets, and inspector
+   * (if available), then returns the fetch handler. This is useful for integrating
+   * with external server frameworks like Supabase Edge Functions, Cloudflare Workers,
+   * or other platforms that handle the server lifecycle themselves.
+   *
+   * Unlike `listen()`, this method does not start a server - it only prepares the
+   * routes and returns the handler function that can be used with external servers.
+   *
+   * @param options - Optional configuration for the handler
+   * @param options.provider - Platform provider (e.g., 'supabase') to handle platform-specific path rewriting
+   * @returns Promise that resolves to the fetch handler function
+   *
+   * @example
+   * ```typescript
+   * // For Supabase Edge Functions (handles path rewriting automatically)
+   * const server = createMCPServer('my-server');
+   * server.tool({ ... });
+   * const handler = await server.getHandler({ provider: 'supabase' });
+   * Deno.serve(handler);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // For Cloudflare Workers
+   * const server = createMCPServer('my-server');
+   * server.tool({ ... });
+   * const handler = await server.getHandler();
+   * export default { fetch: handler };
+   * ```
+   */
+  async getHandler(options?: { provider?: 'supabase' | 'cloudflare' | 'deno-deploy' }): Promise<(req: Request) => Promise<Response>> {
+    await this.mountWidgets({
+      baseRoute: "/mcp-use/widgets",
+      resourcesDir: "resources",
+    });
+    await this.mountMcp();
+    await this.mountInspector();
+
+    // Wrap the fetch handler to ensure it always returns a Promise<Response>
+    const fetchHandler = this.app.fetch.bind(this.app);
+    
+    // Handle platform-specific path rewriting
+    if (options?.provider === 'supabase') {
+      return async (req: Request) => {
+        const url = new URL(req.url);
+        const pathname = url.pathname;
+        
+        // Supabase includes the function name in the path (e.g., /functions/v1/mcp-server/mcp or /mcp-server/mcp)
+        // Use regex to detect and strip the function name prefix before /functions or after the function name
+        // Pattern: /functions/v1/{function-name}/... or /{function-name}/...
+        let newPathname = pathname;
+        
+        // Match /functions/v1/{anything}/... and strip up to the function name
+        const functionsMatch = pathname.match(/^\/functions\/v1\/[^/]+(\/.*)?$/);
+        if (functionsMatch) {
+          // Extract everything after the function name
+          newPathname = functionsMatch[1] || '/';
+        } else {
+          // Match /{function-name}/... pattern (when function name is in path but not /functions)
+          // This handles cases where Supabase might pass /mcp-server/mcp
+          const functionNameMatch = pathname.match(/^\/([^/]+)(\/.*)?$/);
+          if (functionNameMatch && functionNameMatch[2]) {
+            // If there's a path after the function name, use it
+            // Otherwise, if the path is just /{function-name}, default to /
+            newPathname = functionNameMatch[2] || '/';
+          }
+        }
+        
+        // Create a new request with the corrected path
+        const newUrl = new URL(newPathname + url.search, url.origin);
+        const newReq = new Request(newUrl, {
+          method: req.method,
+          headers: req.headers,
+          body: req.body,
+          redirect: req.redirect,
+        });
+        
+        const result = await fetchHandler(newReq);
+        return result;
+      };
+    }
+    
+    return async (req: Request) => {
+      const result = await fetchHandler(req);
+      return result;
+    };
+  }
+
+  /**
    * Mount MCP Inspector UI at /inspector
    *
    * Dynamically loads and mounts the MCP Inspector UI package if available, providing
@@ -2167,7 +2273,9 @@ if (container && Component) {
   }
 }
 
-export type McpServerInstance = Omit<McpServer, keyof HonoType> & HonoType;
+export type McpServerInstance = Omit<McpServer, keyof HonoType> & HonoType & {
+  getHandler: (options?: { provider?: 'supabase' | 'cloudflare' | 'deno-deploy' }) => Promise<(req: Request) => Promise<Response>>;
+};
 
 /**
  * Create a new MCP server instance

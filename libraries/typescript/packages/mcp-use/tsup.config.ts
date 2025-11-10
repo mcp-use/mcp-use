@@ -17,7 +17,8 @@ export default defineConfig({
     "tailwindcss",
     "@tailwindcss/vite",
     "@tailwindcss/oxide",
-    // Keep Vite React plugin external (optional peer dependency)
+    // Keep Vite and React plugin external (optional peer dependencies)
+    "vite",
     "@vitejs/plugin-react",
     // Keep Langchain packages external to reduce memory usage during build
     "@langchain/core",
