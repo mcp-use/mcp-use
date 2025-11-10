@@ -517,8 +517,6 @@ program
         console.log("");
         console.log(chalk.bold("📁 Project structure:"));
         console.log(`   ${sanitizedProjectName}/`);
-        console.log("   ├── src/");
-        console.log("   │   └── server.ts");
         if (validatedTemplate === "apps-sdk") {
           console.log("   ├── resources/");
           console.log("   │   └── display-weather.tsx");
