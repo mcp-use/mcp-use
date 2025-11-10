@@ -20,6 +20,7 @@ import { createMCPServer } from 'mcp-use/server'
 const server = createMCPServer('my-server', {
   version: '1.0.0',              // Semantic version
   description: 'Server purpose'   // Human-readable description
+  baseUrl: process.env.MCP_URL || "http://localhost:3000" // MCP Server production URL (needed for UI Widgets to work correctly)
 })
 ```
 
@@ -34,7 +35,7 @@ NODE_ENV=production
 LOG_LEVEL=info
 DATABASE_URL=postgresql://user:pass@localhost:5432/db
 API_KEY=your-secret-api-key
-BASE_URL=https://api.example.com
+MCP_URL=https://api.example.com
 
 // In your server
 import dotenv from 'dotenv'
@@ -46,7 +47,7 @@ const config = {
   logLevel: process.env.LOG_LEVEL || 'info',
   database: process.env.DATABASE_URL,
   apiKey: process.env.API_KEY,
-  baseUrl: process.env.BASE_URL
+  baseUrl: process.env.MCP_URL
 }
 
 const server = createMCPServer('configured-server', {

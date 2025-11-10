@@ -3,20 +3,20 @@ title: "Quickstart"
 description: "Get started with mcp-use in minutes"
 icon: "rocket"
 ---
-
-<Info>
-This guide will get you started with mcp-use in **under 5 minutes**. We'll cover installation, basic configuration, and running your first agent.
-</Info>
-
 ## Overview
+mcp-use is an MCP server framework and an SDK to build MCP Clients & AI Agents connected to MCP servers.
 
 | Section | Description |
 |---------|-------------|
 | [MCP Server](#mcp-server) | Set up MCP servers standalone or in an existing Express server |
-| [MCP Agent](#mcp-agent-installation) | Install and initialize the MCP Agent component |
+| [MCP Agent](#mcp-agent-installation) | Install and initialize and AI Agent with MCP Client |
 
 ## MCP Server
+**mcp-use** is the complete MCP server framework for TypeScript. 
+It combines the official Model Context Protocol SDK with Express.js and React to enable both MCP protocol communication and HTTP endpoints for UI widgets and custom routes.
+You can expose UI components to chat clients like ChatGPT, Claude, and MCP-UI compatible ones.
 
+### Installation
 The fastest way to scaffold a new MCP server is to use the `create-mcp-use-app` command.
 
 <CodeGroup>
@@ -29,7 +29,7 @@ npm run dev
 ```bash pnpm
 pnpm create mcp-use-app@latest my-mcp-server
 cd my-mcp-server
-pnpm run dev
+pnpm dev
 ```
 
 ```bash yarn
@@ -40,17 +40,12 @@ yarn dev
 </CodeGroup>
 
 This command will create a new MCP server with:
-- A complete TypeScript project structure
-- Pre-configured build tools and dev server
-- Example tools and resources to get you started
-- All necessary dependencies installed
-
-<Tip>
-To explore available templates and options, run:
-```bash
-npx create-mcp-use-app --help
-```
-</Tip>
+- A complete TypeScript MCP server project structure.
+- Example MCP Tools and Resources to get you started.
+- Example UI Widgets React components in `resources/` folder exposed as tools and resources in Apps SDK for ChatGPT and MCP-UI format.
+- Pre-configured build tools and dev server.
+- All necessary dependencies installed.
+- MCP Inspector to test your server.
 
 ### Project Structure
 
@@ -58,31 +53,57 @@ After creation, your project will have this structure:
 
 ```
 my-mcp-server/
-├── src/
-│   ├── index.ts          # Main server entry point
-│   └── tools/            # Your custom tools
+├── resources/
+│   └── component.ts # MCP-UI / OpenAI Apps SDK example
+├── index.ts   # MCP server entry point
 ├── package.json
 ├── tsconfig.json
 └── README.md
 ```
 
-### Running Your Server
+### Running Your MCP Server
 
-Start the development server:
+Commands:
 
-```bash
-npm run dev
+<CodeGroup>
+```bash npm
+npm run dev   # start the development server
+npm run build # build the server
+npm run start # start the production server
 ```
 
-Your MCP server will be available and ready to accept connections from MCP clients.
+```bash pnpm
+pnpm dev   # start the development server
+pnpm build # build the server
+pnpm start # start the production server
+```
+
+```bash yarn
+yarn dev   # start the development server
+yarn build # build the server
+yarn start # start the production server
+```
+</CodeGroup>
+
+When you run your MCP server, it will be available at:
+- **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
+- **MCP Inspector**: `http://localhost:3000/inspector` - It will automatically launch an [MCP Inspector](/inspector) for you to test you MCP server.
+
+
+### Deploy Your MCP Server
+You can deploy your MCP server on any platform. Build your MCP server with `npm run build` and start the production server with `npm run start`.
+Or you can deploy it on [mcp-use Cloud](https://mcp-use.com).
 
 ### Next Steps
 
-- **Add Tools**: Create new tools in the `src/tools/` directory
-- **Configure Resources**: Set up resources that your server exposes
-- **Deploy**: Follow deployment guides for your hosting platform
+- [Core features](/typescript/server/tools): Learn how to create MCP tools, prompts and resources.
+- [UI Widgets](/typescript/server/ui-widgets): Expose UI components to chat clients compatible with ChatGPT Apps SDK and MCP-UI.
+- [Configuration](/typescript/server/configuration): Advanced configuration and deployment options.
+
+---
 
 ## MCP Agent
+
 
 ### Installing LangChain Providers
 
