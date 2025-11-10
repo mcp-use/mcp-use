@@ -669,6 +669,80 @@ export class MCPAgent {
     }
   }
 
+  /**
+   * Check if a message is AI/assistant-like regardless of whether it's a class instance.
+   * Handles version mismatches, serialization boundaries, and different message formats.
+   */
+  private _isAIMessageLike(
+    message: unknown
+  ): message is
+    | AIMessage
+    | {
+        type: "ai" | "assistant";
+        content: unknown;
+        tool_calls?: unknown;
+      }
+    | {
+        role: "ai" | "assistant";
+        content: unknown;
+        tool_calls?: unknown;
+      } {
+    // Fast path: check if it's an actual AIMessage instance
+    if (message instanceof AIMessage) {
+      return true;
+    }
+
+    // Check if it's an object with content
+    if (
+      typeof message !== "object" ||
+      message === null ||
+      !("content" in message)
+    ) {
+      return false;
+    }
+
+    // Check for type/role properties that indicate an assistant message
+    // Support multiple formats from different LangChain versions
+    const msg = message as any;
+    
+    // Try methods first (for partially deserialized objects)
+    if (typeof msg.getType === "function") {
+      const type = msg.getType();
+      return type === "ai" || type === "assistant";
+    }
+    if (typeof msg._getType === "function") {
+      const type = msg._getType();
+      return type === "ai" || type === "assistant";
+    }
+    
+    // Check direct properties
+    if ("type" in msg) {
+      return msg.type === "ai" || msg.type === "assistant";
+    }
+    if ("role" in msg) {
+      return msg.role === "ai" || msg.role === "assistant";
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a message has tool calls, handling both class instances and plain objects.
+   * Safely checks for tool_calls array presence.
+   */
+  private _messageHasToolCalls(message: unknown): boolean {
+    if (
+      typeof message === "object" &&
+      message !== null &&
+      "tool_calls" in message &&
+      Array.isArray((message as { tool_calls?: unknown }).tool_calls)
+    ) {
+      return (message as { tool_calls: unknown[] }).tool_calls.length > 0;
+    }
+
+    return false;
+  }
+
   private async _consumeAndReturn<T>(
     generator: AsyncGenerator<AgentStep, string | T, void>
   ): Promise<string | T> {
@@ -953,14 +1027,14 @@ export class MCPAgent {
 
                 // Track final AI message (without tool calls = final response)
                 if (
-                  message instanceof AIMessage &&
-                  !(
-                    "tool_calls" in message &&
-                    Array.isArray(message.tool_calls) &&
-                    message.tool_calls.length > 0
-                  )
+                  this._isAIMessageLike(message) &&
+                  !this._messageHasToolCalls(message)
                 ) {
-                  finalOutput = this._normalizeOutput(message.content);
+                  const content =
+                    message instanceof AIMessage
+                      ? message.content
+                      : (message as { content: unknown }).content;
+                  finalOutput = this._normalizeOutput(content);
                   logger.info("✅ Agent finished with output");
                 }
               }
