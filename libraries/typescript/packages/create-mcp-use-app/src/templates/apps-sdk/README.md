@@ -55,6 +55,10 @@ npm run build
 npm start
 ```
 
+### Deploy to Supabase
+
+See [DEPLOY_SUPABASE.md](./DEPLOY_SUPABASE.md) for a complete guide on deploying your MCP server with widgets to Supabase Edge Functions.
+
 ## Project Structure
 
 ```

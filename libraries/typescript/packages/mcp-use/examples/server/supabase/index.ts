@@ -9,7 +9,7 @@
 // 5. Deploy: supabase functions deploy mcp-server
 //
 // For local development with the package:
-import { createMCPServer } from "mcp-use/server";
+import { createMCPServer } from "https://esm.sh/mcp-use@1.2.5-dev.4/server";
 
 // Create the MCP server instance
 // CORS is enabled by default with origin: "*" to allow all origins
