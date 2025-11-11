@@ -152,7 +152,9 @@
   "optionalDependencies": {
     "@tailwindcss/vite": "^4.1.15",
     "@vitejs/plugin-react": "^5.0.4",
-    "vite": ">=5.4.21"
+    "vite": ">=5.4.21",
+    "connect": "^3.7.0",
+    "node-mocks-http": "^1.16.2"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.13.2",

@@ -10,6 +10,7 @@ import {
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./adapters/mcp-ui-adapter.js";
+import { adaptConnectMiddleware } from "./connect-adapter.js";
 import { requestLogger } from "./logging.js";
 import type {
   InputDefinition,
@@ -1000,74 +1001,6 @@ if (container && Component) {
       },
     });
 
-    // Helper function to adapt Express middleware to Hono
-    const adaptExpressMiddleware = (middleware: any) => {
-      return async (c: Context, next: Next) => {
-        const req = c.req.raw;
-        let handled = false;
-        const responseBody: Uint8Array[] = [];
-        let statusCode = 200;
-        const headers: Record<string, string> = {};
-
-        // Create Express-like response object
-        const res: any = {
-          statusCode: 200,
-          status: (code: number) => {
-            statusCode = code;
-            res.statusCode = code;
-            return res;
-          },
-          setHeader: (name: string, value: string) => {
-            headers[name] = value;
-          },
-          getHeader: (name: string) => headers[name],
-          write: (chunk: any) => {
-            responseBody.push(typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk);
-          },
-          end: (chunk?: any) => {
-            if (chunk) {
-              responseBody.push(typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk);
-            }
-            handled = true;
-          },
-          on: () => {},
-          once: () => {},
-          removeListener: () => {},
-        };
-
-        // Create Express-like request object
-        const expressReq: any = {
-          ...req,
-          url: new URL(req.url).pathname + new URL(req.url).search,
-          originalUrl: req.url,
-          baseUrl: "",
-          path: new URL(req.url).pathname,
-          query: Object.fromEntries(new URL(req.url).searchParams),
-          params: {},
-          body: {},
-          headers: Object.fromEntries(req.headers.entries()),
-        };
-
-        // Call Express middleware
-        await new Promise<void>((resolve, reject) => {
-          middleware(expressReq, res, (err?: any) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-
-        if (handled) {
-          // Return the response from Vite
-          const body = Buffer.concat(responseBody);
-          return new Response(body, {
-            status: statusCode,
-            headers: headers,
-          });
-        }
-
-        return next();
-      };
-    };
 
     // Custom middleware to handle widget-specific paths
     this.app.use(`${baseRoute}/*`, async (c: Context, next: Next) => {
@@ -1106,7 +1039,8 @@ if (container && Component) {
     });
 
     // Mount the single Vite server for all widgets using adapter
-    this.app.use(`${baseRoute}/*`, adaptExpressMiddleware(viteServer.middlewares));
+    const viteMiddleware = await adaptConnectMiddleware(viteServer.middlewares, `${baseRoute}/*`);
+    this.app.use(`${baseRoute}/*`, viteMiddleware);
 
     widgets.forEach((widget) => {
       console.log(
