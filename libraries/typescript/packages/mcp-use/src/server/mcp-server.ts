@@ -10,7 +10,7 @@ import {
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./adapters/mcp-ui-adapter.js";
-import { adaptConnectMiddleware } from "./connect-adapter.js";
+import { adaptConnectMiddleware, isExpressMiddleware } from "./connect-adapter.js";
 import { requestLogger } from "./logging.js";
 import type {
   InputDefinition,
@@ -172,9 +172,67 @@ export class McpServer {
     // Request logging middleware
     this.app.use("*", requestLogger);
 
-    // Proxy all Hono methods to the underlying app
+    // Proxy all Hono methods to the underlying app with special handling for 'use'
     return new Proxy(this, {
       get(target, prop) {
+        // Special handling for 'use' method to auto-detect and adapt Express middleware
+        if (prop === "use") {
+          return (...args: any[]) => {
+            // Hono's use signature: use(path?, ...handlers)
+            // Check if the first arg is a path (string) or a handler (function)
+            const hasPath = typeof args[0] === "string";
+            const path = hasPath ? args[0] : "*";
+            const handlers = hasPath ? args.slice(1) : args;
+
+            // Adapt each handler if it's Express middleware
+            const adaptedHandlers = handlers.map((handler: any) => {
+              if (isExpressMiddleware(handler)) {
+                // Return a promise-wrapped adapter since adaptConnectMiddleware is async
+                // We'll handle this in the actual app.use call
+                return { __isExpressMiddleware: true, handler, path };
+              }
+              return handler;
+            });
+
+            // Check if we have any Express middleware to adapt
+            const hasExpressMiddleware = adaptedHandlers.some(
+              (h: any) => h.__isExpressMiddleware
+            );
+
+            if (hasExpressMiddleware) {
+              // We need to handle async adaptation
+              // Create a wrapper that adapts middleware on first call
+              Promise.all(
+                adaptedHandlers.map(async (h: any) => {
+                  if (h.__isExpressMiddleware) {
+                    const adapted = await adaptConnectMiddleware(h.handler, h.path);
+                    // Call app.use with the adapted middleware
+                    if (hasPath) {
+                      (target.app as any).use(path, adapted);
+                    } else {
+                      (target.app as any).use(adapted);
+                    }
+                  } else {
+                    // Regular Hono middleware
+                    if (hasPath) {
+                      (target.app as any).use(path, h);
+                    } else {
+                      (target.app as any).use(h);
+                    }
+                  }
+                })
+              ).catch(err => {
+                console.error("[MIDDLEWARE] Failed to adapt Express middleware:", err);
+              });
+
+              return target;
+            }
+
+            // No Express middleware, call normally
+            return (target.app as any).use(...args);
+          };
+        }
+
         if (prop in target) {
           return (target as any)[prop];
         }
