@@ -109,7 +109,7 @@ const corsHeaders = {
 const handler = await server.getHandler({ provider: "supabase" });
 
 // Export the handler for Supabase Edge Functions
-(globalThis as any).Deno.serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -131,21 +131,6 @@ const handler = await server.getHandler({ provider: "supabase" });
   });
 });
 ```
-
-### 4. Configure Imports (Optional)
-
-You can create an `import_map.json` file in your function directory:
-
-```json
-// supabase/functions/mcp-server/import_map.json
-{
-  "imports": {
-    "mcp-use/server": "https://esm.sh/mcp-use@latest/server"
-  }
-}
-```
-
-However, using direct ESM imports (as shown in the example above) is recommended for Supabase.
 
 ## Local Development
 
@@ -283,34 +268,58 @@ const mcpUrl = `https://${projectId}.supabase.co/functions/v1/mcp-server/mcp`;
 
 ### Connecting from an MCP Client
 
-```typescript
-import { createMCPUseClient } from "mcp-use";
+#### Browser/Client-Side Usage
 
-const client = createMCPUseClient({
-  url: `https://${projectId}.supabase.co/functions/v1/mcp-server/mcp`,
-  headers: {
-    Authorization: `Bearer ${anonKey}`,
-    "Content-Type": "application/json",
-    Accept: "application/json, text/event-stream",
+```typescript
+import { BrowserMCPClient } from "mcp-use";
+
+const client = new BrowserMCPClient({
+  mcpServers: {
+    supabase: {
+      url: `https://${projectId}.supabase.co/functions/v1/mcp-server/mcp`,
+      transport: "http",
+      headers: {
+        Authorization: `Bearer ${anonKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+    },
   },
 });
 
-// Now use the client to call tools, access resources, etc.
-const response = await client.callTool("greet", { name: "World" });
+// Create a session and initialize
+const session = await client.createSession("supabase");
+await session.initialize();
+
+// Now use the session to call tools, access resources, etc.
+const response = await session.connector.callTool("greet", { name: "World" });
 ```
 
-## Environment Variables
-
-You can set environment variables for your function:
-
-```bash
-supabase secrets set MY_SECRET_KEY=my_secret_value
-```
-
-Access them in your function:
+#### Node.js Usage
 
 ```typescript
-const secret = Deno.env.get("MY_SECRET_KEY");
+import { MCPClient } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    supabase: {
+      url: `https://${projectId}.supabase.co/functions/v1/mcp-server/mcp`,
+      transport: "http",
+      headers: {
+        Authorization: `Bearer ${anonKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+    },
+  },
+});
+
+// Create a session and initialize
+const session = await client.createSession("supabase");
+await session.initialize();
+
+// Now use the session to call tools, access resources, etc.
+const response = await session.connector.callTool("greet", { name: "World" });
 ```
 
 ## Key Differences from Node.js
@@ -333,7 +342,7 @@ Deno provides browser-compatible APIs like `fetch`, `Request`, `Response`, etc.,
 
 ### Widgets in Production
 
-If you're using MCP UI Widgets, they will work in production mode. The widgets are bundled and served from `dist/resources/widgets/`. Set `NODE_ENV=production` (which is automatic in Supabase) to use only built widgets without dev dependencies.
+If you're using MCP UI Widgets, they will work in production mode. The widgets are bundled and served from `dist/resources/widgets/`.
 
 ## Provider Configuration
 
@@ -366,7 +375,7 @@ This configuration:
 
 - Make sure you're using the correct import URL for `mcp-use`
 - Check that Deno can access the ESM module
-- Consider using an `import_map.json` file
+- Verify the ESM URL is correct: `https://esm.sh/mcp-use@latest/server`
 
 ### CORS Issues
 
