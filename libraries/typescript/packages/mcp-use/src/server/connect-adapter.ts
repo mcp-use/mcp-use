@@ -2,10 +2,10 @@ import type { Context, MiddlewareHandler, Next } from "hono";
 
 /**
  * Detects if a middleware is Express/Connect style or Hono style
- * 
+ *
  * Express/Connect middleware: (req, res, next) => void or (err, req, res, next) => void
  * Hono middleware: (c, next) => Promise<Response | void> or (c, next) => Response | void
- * 
+ *
  * @param middleware - The middleware function to check
  * @returns true if it's Express/Connect middleware, false if it's Hono middleware
  */
@@ -28,7 +28,7 @@ export function isExpressMiddleware(middleware: any): boolean {
   if (paramCount === 2) {
     // Additional heuristic: check if the middleware uses Express-specific patterns
     const fnString = middleware.toString();
-    
+
     // Look for Express-specific patterns in the function body
     // Common Express patterns: res.send, res.json, res.status, req.body, req.params, etc.
     const expressPatterns = [
@@ -38,7 +38,9 @@ export function isExpressMiddleware(middleware: any): boolean {
       /\bres\.set\s*\(/,
     ];
 
-    const hasExpressPattern = expressPatterns.some((pattern) => pattern.test(fnString));
+    const hasExpressPattern = expressPatterns.some((pattern) =>
+      pattern.test(fnString)
+    );
     if (hasExpressPattern) {
       return true;
     }
@@ -55,7 +57,7 @@ export function isExpressMiddleware(middleware: any): boolean {
  * Automatically adapts middleware to work with Hono
  * Detects if the middleware is Express/Connect style and adapts it accordingly
  * If it's already Hono-compatible middleware, returns it as-is
- * 
+ *
  * @param middleware - The middleware function (Express/Connect or Hono)
  * @param middlewarePath - The path pattern the middleware is mounted at (optional, only used for Express/Connect middleware)
  * @returns A Hono middleware function
@@ -76,7 +78,7 @@ export async function adaptMiddleware(
 /**
  * Adapts Connect/Express middleware to work with Hono
  * Based on @hono/connect approach using node-mocks-http
- * 
+ *
  * @param connectMiddleware - The Connect middleware handler
  * @param middlewarePath - The path pattern the middleware is mounted at (e.g., "/mcp-use/widgets/*")
  * @returns A Hono middleware function
@@ -203,7 +205,10 @@ export async function adaptConnectMiddleware(
           const connectHeaders = mockResponse.getHeaders();
           for (const [key, value] of Object.entries(connectHeaders)) {
             if (value !== undefined) {
-              c.header(key, Array.isArray(value) ? value.join(", ") : String(value));
+              c.header(
+                key,
+                Array.isArray(value) ? value.join(", ") : String(value)
+              );
             }
           }
 
@@ -231,4 +236,3 @@ export async function adaptConnectMiddleware(
 
   return honoMiddleware;
 }
-

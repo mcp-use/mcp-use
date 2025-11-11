@@ -145,7 +145,7 @@ npm start
 
 ### Deploy to Supabase
 
-See [DEPLOY_SUPABASE.md](./DEPLOY_SUPABASE.md) for a complete guide on deploying your MCP server with widgets to Supabase Edge Functions.
+See the [Deploying to Supabase documentation](https://docs.mcp-use.io/typescript/server/deployment-supabase) for a complete guide on deploying your MCP server to Supabase Edge Functions.
 
 ## Project Structure
 

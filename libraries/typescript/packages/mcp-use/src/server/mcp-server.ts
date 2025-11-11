@@ -10,7 +10,10 @@ import {
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./adapters/mcp-ui-adapter.js";
-import { adaptConnectMiddleware, isExpressMiddleware } from "./connect-adapter.js";
+import {
+  adaptConnectMiddleware,
+  isExpressMiddleware,
+} from "./connect-adapter.js";
 import { requestLogger } from "./logging.js";
 import type {
   InputDefinition,
@@ -54,9 +57,11 @@ const fsHelpers = {
     }
     const { readFileSync } = await import("node:fs");
     const result = readFileSync(path, encoding as any);
-    return typeof result === "string" ? result : result.toString(encoding as any);
+    return typeof result === "string"
+      ? result
+      : result.toString(encoding as any);
   },
-  
+
   async readFile(path: string): Promise<ArrayBuffer> {
     if (isDeno) {
       const data = await (globalThis as any).Deno.readFile(path);
@@ -64,9 +69,12 @@ const fsHelpers = {
     }
     const { readFileSync } = await import("node:fs");
     const buffer = readFileSync(path);
-    return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    return buffer.buffer.slice(
+      buffer.byteOffset,
+      buffer.byteOffset + buffer.byteLength
+    );
   },
-  
+
   async existsSync(path: string): Promise<boolean> {
     if (isDeno) {
       try {
@@ -79,7 +87,7 @@ const fsHelpers = {
     const { existsSync } = await import("node:fs");
     return existsSync(path);
   },
-  
+
   async readdirSync(path: string): Promise<string[]> {
     if (isDeno) {
       const entries = [];
@@ -104,17 +112,21 @@ const pathHelpers = {
     // We'll use a simple implementation that works for both
     return paths.join("/").replace(/\/+/g, "/");
   },
-  
+
   relative(from: string, to: string): string {
     // Simple relative path calculation
-    const fromParts = from.split("/").filter(p => p);
-    const toParts = to.split("/").filter(p => p);
-    
+    const fromParts = from.split("/").filter((p) => p);
+    const toParts = to.split("/").filter((p) => p);
+
     let i = 0;
-    while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) {
+    while (
+      i < fromParts.length &&
+      i < toParts.length &&
+      fromParts[i] === toParts[i]
+    ) {
       i++;
     }
-    
+
     const upCount = fromParts.length - i;
     const relativeParts = [...Array(upCount).fill(".."), ...toParts.slice(i)];
     return relativeParts.join("/");
@@ -205,7 +217,10 @@ export class McpServer {
               Promise.all(
                 adaptedHandlers.map(async (h: any) => {
                   if (h.__isExpressMiddleware) {
-                    const adapted = await adaptConnectMiddleware(h.handler, h.path);
+                    const adapted = await adaptConnectMiddleware(
+                      h.handler,
+                      h.path
+                    );
                     // Call app.use with the adapted middleware
                     if (hasPath) {
                       (target.app as any).use(path, adapted);
@@ -221,8 +236,11 @@ export class McpServer {
                     }
                   }
                 })
-              ).catch(err => {
-                console.error("[MIDDLEWARE] Failed to adapt Express middleware:", err);
+              ).catch((err) => {
+                console.error(
+                  "[MIDDLEWARE] Failed to adapt Express middleware:",
+                  err
+                );
               });
 
               return target;
@@ -885,7 +903,9 @@ export class McpServer {
     } else {
       // Skip dev mode in Deno (no Vite support)
       if (isDeno) {
-        console.log("[WIDGETS] Skipping dev mode widget mounting in Deno runtime (use production build)");
+        console.log(
+          "[WIDGETS] Skipping dev mode widget mounting in Deno runtime (use production build)"
+        );
         return;
       }
       await this.mountWidgetsDev(options);
@@ -950,18 +970,29 @@ export class McpServer {
     let createServer: any;
     let react: any;
     let tailwindcss: any;
-    
+
     try {
       // Use Function constructor to create truly dynamic imports that can't be statically analyzed
+      // eslint-disable-next-line no-new-func
       const viteModule = await new Function('return import("vite")')();
       createServer = viteModule.createServer;
-      const reactModule = await new Function('return import("@vitejs/plugin-react")')();
+      // eslint-disable-next-line no-new-func
+      const reactModule = await new Function(
+        'return import("@vitejs/plugin-react")'
+      )();
       react = reactModule.default;
-      const tailwindModule = await new Function('return import("@tailwindcss/vite")')();
+      // eslint-disable-next-line no-new-func
+      const tailwindModule = await new Function(
+        'return import("@tailwindcss/vite")'
+      )();
       tailwindcss = tailwindModule.default;
     } catch (error) {
-      console.error("[WIDGETS] Dev dependencies not available. Install vite, @vitejs/plugin-react, and @tailwindcss/vite for widget development.");
-      console.error("[WIDGETS] For production, use 'mcp-use build' to pre-build widgets.");
+      console.error(
+        "[WIDGETS] Dev dependencies not available. Install vite, @vitejs/plugin-react, and @tailwindcss/vite for widget development."
+      );
+      console.error(
+        "[WIDGETS] For production, use 'mcp-use build' to pre-build widgets."
+      );
       return;
     }
 
@@ -987,16 +1018,19 @@ export class McpServer {
 
       // Create a CSS file with Tailwind and @source directives to scan resources
       const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
-      const relativeResourcesPath = pathHelpers.relative(
-        widgetTempDir,
-        resourcesPath
-      ).replace(/\\/g, "/");
+      const relativeResourcesPath = pathHelpers
+        .relative(widgetTempDir, resourcesPath)
+        .replace(/\\/g, "/");
       const cssContent = `@import "tailwindcss";
 
 /* Configure Tailwind to scan the resources directory */
 @source "${relativeResourcesPath}";
 `;
-      await fs.writeFile(pathHelpers.join(widgetTempDir, "styles.css"), cssContent, "utf8");
+      await fs.writeFile(
+        pathHelpers.join(widgetTempDir, "styles.css"),
+        cssContent,
+        "utf8"
+      );
 
       const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
@@ -1059,7 +1093,6 @@ if (container && Component) {
       },
     });
 
-
     // Custom middleware to handle widget-specific paths
     this.app.use(`${baseRoute}/*`, async (c: Context, next: Next) => {
       const url = new URL(c.req.url);
@@ -1073,14 +1106,17 @@ if (container && Component) {
         if (widget) {
           // If requesting the root of a widget, serve its index.html
           const relativePath = pathname.replace(baseRoute, "");
-          if (relativePath === `/${widgetName}` || relativePath === `/${widgetName}/`) {
+          if (
+            relativePath === `/${widgetName}` ||
+            relativePath === `/${widgetName}/`
+          ) {
             // Rewrite the URL for Vite by creating a new request with modified URL
             const newUrl = new URL(c.req.url);
             newUrl.pathname = `${baseRoute}/${widgetName}/index.html`;
             // Create a new request with modified URL and update the context
             const newRequest = new Request(newUrl.toString(), c.req.raw);
             // Update the request in the context by creating a new context-like object
-            Object.defineProperty(c, 'req', {
+            Object.defineProperty(c, "req", {
               value: {
                 ...c.req,
                 url: newUrl.toString(),
@@ -1097,7 +1133,10 @@ if (container && Component) {
     });
 
     // Mount the single Vite server for all widgets using adapter
-    const viteMiddleware = await adaptConnectMiddleware(viteServer.middlewares, `${baseRoute}/*`);
+    const viteMiddleware = await adaptConnectMiddleware(
+      viteServer.middlewares,
+      `${baseRoute}/*`
+    );
     this.app.use(`${baseRoute}/*`, viteMiddleware);
 
     widgets.forEach((widget) => {
@@ -1272,7 +1311,12 @@ if (container && Component) {
     resourcesDir?: string;
   }): Promise<void> {
     const baseRoute = options?.baseRoute || "/mcp-use/widgets";
-    const widgetsDir = pathHelpers.join(getCwd(), "dist", "resources", "widgets");
+    const widgetsDir = pathHelpers.join(
+      getCwd(),
+      "dist",
+      "resources",
+      "widgets"
+    );
 
     // Check if widgets directory exists
     if (!(await fsHelpers.existsSync(widgetsDir))) {
@@ -1376,7 +1420,10 @@ if (container && Component) {
       let description = `Widget: ${widgetName}`;
 
       try {
-        const metadataContent = await fsHelpers.readFileSync(metadataPath, "utf8");
+        const metadataContent = await fsHelpers.readFileSync(
+          metadataPath,
+          "utf8"
+        );
         metadata = JSON.parse(metadataContent);
         if (metadata.description) {
           description = metadata.description;
@@ -1508,11 +1555,12 @@ if (container && Component) {
         getHeader: (name: string) => headers[name],
         write: (chunk: any, encoding?: any, callback?: any) => {
           if (!ended) {
-            const data = typeof chunk === "string"
-              ? new TextEncoder().encode(chunk)
-              : chunk instanceof Uint8Array
-                ? chunk
-                : Buffer.from(chunk);
+            const data =
+              typeof chunk === "string"
+                ? new TextEncoder().encode(chunk)
+                : chunk instanceof Uint8Array
+                  ? chunk
+                  : Buffer.from(chunk);
             responseBody.push(data);
           }
           if (typeof encoding === "function") {
@@ -1524,11 +1572,12 @@ if (container && Component) {
         },
         end: (chunk?: any, encoding?: any, callback?: any) => {
           if (chunk && !ended) {
-            const data = typeof chunk === "string"
-              ? new TextEncoder().encode(chunk)
-              : chunk instanceof Uint8Array
-                ? chunk
-                : Buffer.from(chunk);
+            const data =
+              typeof chunk === "string"
+                ? new TextEncoder().encode(chunk)
+                : chunk instanceof Uint8Array
+                  ? chunk
+                  : Buffer.from(chunk);
             responseBody.push(data);
           }
           ended = true;
@@ -1567,32 +1616,37 @@ if (container && Component) {
         },
       };
 
-      return { expressReq, expressRes, getResponse: () => {
-        if (ended) {
-          if (responseBody.length > 0) {
-            const body = isDeno 
-              ? Buffer.concat(responseBody)
-              : Buffer.concat(responseBody);
-            return new Response(body, {
-              status: statusCode,
-              headers: headers,
-            });
-          } else {
-            return new Response(null, {
-              status: statusCode,
-              headers: headers,
-            });
+      return {
+        expressReq,
+        expressRes,
+        getResponse: () => {
+          if (ended) {
+            if (responseBody.length > 0) {
+              const body = isDeno
+                ? Buffer.concat(responseBody)
+                : Buffer.concat(responseBody);
+              return new Response(body, {
+                status: statusCode,
+                headers: headers,
+              });
+            } else {
+              return new Response(null, {
+                status: statusCode,
+                headers: headers,
+              });
+            }
           }
-        }
-        return null;
-      }};
+          return null;
+        },
+      };
     };
 
     // POST endpoint for messages
     // Create a new transport for each request to support multiple concurrent clients
     this.app.post(endpoint, async (c: Context) => {
-      const { expressReq, expressRes, getResponse } = createExpressLikeObjects(c);
-      
+      const { expressReq, expressRes, getResponse } =
+        createExpressLikeObjects(c);
+
       // Get request body
       try {
         expressReq.body = await c.req.json();
@@ -1615,12 +1669,12 @@ if (container && Component) {
       }
 
       await this.server.connect(transport);
-      
+
       // Wait for handleRequest to complete and for response to be written
       await transport.handleRequest(expressReq, expressRes, expressReq.body);
-      
+
       // Wait a tiny bit for async writes to complete
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       const response = getResponse();
       if (response) {
@@ -1633,7 +1687,8 @@ if (container && Component) {
 
     // GET endpoint for SSE streaming
     this.app.get(endpoint, async (c: Context) => {
-      const { expressReq, expressRes, getResponse } = createExpressLikeObjects(c);
+      const { expressReq, expressRes, getResponse } =
+        createExpressLikeObjects(c);
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
@@ -1647,9 +1702,9 @@ if (container && Component) {
 
       await this.server.connect(transport);
       await transport.handleRequest(expressReq, expressRes);
-      
+
       // Wait a tiny bit for async writes to complete
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       const response = getResponse();
       if (response) {
@@ -1661,7 +1716,8 @@ if (container && Component) {
 
     // DELETE endpoint for session cleanup
     this.app.delete(endpoint, async (c: Context) => {
-      const { expressReq, expressRes, getResponse } = createExpressLikeObjects(c);
+      const { expressReq, expressRes, getResponse } =
+        createExpressLikeObjects(c);
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
@@ -1675,9 +1731,9 @@ if (container && Component) {
 
       await this.server.connect(transport);
       await transport.handleRequest(expressReq, expressRes);
-      
+
       // Wait a tiny bit for async writes to complete
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       const response = getResponse();
       if (response) {
@@ -1715,8 +1771,7 @@ if (container && Component) {
   async listen(port?: number): Promise<void> {
     // Priority: parameter > PORT env var > default (3001)
     const portEnv = getEnv("PORT");
-    this.serverPort =
-      port || (portEnv ? parseInt(portEnv, 10) : 3001);
+    this.serverPort = port || (portEnv ? parseInt(portEnv, 10) : 3001);
 
     // Update host from HOST env var if set
     const hostEnv = getEnv("HOST");
@@ -1798,7 +1853,9 @@ if (container && Component) {
    * export default { fetch: handler };
    * ```
    */
-  async getHandler(options?: { provider?: 'supabase' | 'cloudflare' | 'deno-deploy' }): Promise<(req: Request) => Promise<Response>> {
+  async getHandler(options?: {
+    provider?: "supabase" | "cloudflare" | "deno-deploy";
+  }): Promise<(req: Request) => Promise<Response>> {
     await this.mountWidgets({
       baseRoute: "/mcp-use/widgets",
       resourcesDir: "resources",
@@ -1808,23 +1865,25 @@ if (container && Component) {
 
     // Wrap the fetch handler to ensure it always returns a Promise<Response>
     const fetchHandler = this.app.fetch.bind(this.app);
-    
+
     // Handle platform-specific path rewriting
-    if (options?.provider === 'supabase') {
+    if (options?.provider === "supabase") {
       return async (req: Request) => {
         const url = new URL(req.url);
         const pathname = url.pathname;
-        
+
         // Supabase includes the function name in the path (e.g., /functions/v1/mcp-server/mcp or /mcp-server/mcp)
         // Use regex to detect and strip the function name prefix before /functions or after the function name
         // Pattern: /functions/v1/{function-name}/... or /{function-name}/...
         let newPathname = pathname;
-        
+
         // Match /functions/v1/{anything}/... and strip up to the function name
-        const functionsMatch = pathname.match(/^\/functions\/v1\/[^/]+(\/.*)?$/);
+        const functionsMatch = pathname.match(
+          /^\/functions\/v1\/[^/]+(\/.*)?$/
+        );
         if (functionsMatch) {
           // Extract everything after the function name
-          newPathname = functionsMatch[1] || '/';
+          newPathname = functionsMatch[1] || "/";
         } else {
           // Match /{function-name}/... pattern (when function name is in path but not /functions)
           // This handles cases where Supabase might pass /mcp-server/mcp
@@ -1832,10 +1891,10 @@ if (container && Component) {
           if (functionNameMatch && functionNameMatch[2]) {
             // If there's a path after the function name, use it
             // Otherwise, if the path is just /{function-name}, default to /
-            newPathname = functionNameMatch[2] || '/';
+            newPathname = functionNameMatch[2] || "/";
           }
         }
-        
+
         // Create a new request with the corrected path
         const newUrl = new URL(newPathname + url.search, url.origin);
         const newReq = new Request(newUrl, {
@@ -1844,12 +1903,12 @@ if (container && Component) {
           body: req.body,
           redirect: req.redirect,
         });
-        
+
         const result = await fetchHandler(newReq);
         return result;
       };
     }
-    
+
     return async (req: Request) => {
       const result = await fetchHandler(req);
       return result;
@@ -1978,12 +2037,22 @@ if (container && Component) {
     this.app.get("/mcp-use/widgets/assets/*", async (c: Context) => {
       const assetFile = c.req.path.split("/assets/")[1];
       // Try to find which widget this asset belongs to by checking all widget directories
-      const widgetsDir = pathHelpers.join(getCwd(), "dist", "resources", "widgets");
+      const widgetsDir = pathHelpers.join(
+        getCwd(),
+        "dist",
+        "resources",
+        "widgets"
+      );
 
       try {
         const widgets = await fsHelpers.readdirSync(widgetsDir);
         for (const widget of widgets) {
-          const assetPath = pathHelpers.join(widgetsDir, widget, "assets", assetFile);
+          const assetPath = pathHelpers.join(
+            widgetsDir,
+            widget,
+            "assets",
+            assetFile
+          );
           if (await fsHelpers.existsSync(assetPath)) {
             const content = await fsHelpers.readFile(assetPath);
             const ext = assetFile.split(".").pop()?.toLowerCase();
@@ -1996,7 +2065,7 @@ if (container && Component) {
                     ? "image/png"
                     : ext === "jpg" || ext === "jpeg"
                       ? "image/jpeg"
-                        : ext === "svg"
+                      : ext === "svg"
                         ? "image/svg+xml"
                         : "application/octet-stream";
             return new Response(content, {
@@ -2265,9 +2334,12 @@ if (container && Component) {
   }
 }
 
-export type McpServerInstance = Omit<McpServer, keyof HonoType> & HonoType & {
-  getHandler: (options?: { provider?: 'supabase' | 'cloudflare' | 'deno-deploy' }) => Promise<(req: Request) => Promise<Response>>;
-};
+export type McpServerInstance = Omit<McpServer, keyof HonoType> &
+  HonoType & {
+    getHandler: (options?: {
+      provider?: "supabase" | "cloudflare" | "deno-deploy";
+    }) => Promise<(req: Request) => Promise<Response>>;
+  };
 
 /**
  * Create a new MCP server instance

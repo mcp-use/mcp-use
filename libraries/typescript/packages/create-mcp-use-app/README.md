@@ -447,17 +447,14 @@ See our [contributing guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRI
 
 ### Deploy to Supabase
 
-All templates include a comprehensive guide for deploying to Supabase Edge Functions:
-
-- **Starter Template**: See `DEPLOY_SUPABASE.md` in your project
-- **Apps SDK Template**: See `DEPLOY_SUPABASE.md` in your project
-- **MCP-UI Template**: See `DEPLOY_SUPABASE.md` in your project
+For comprehensive deployment instructions to Supabase Edge Functions, see our [Deploying to Supabase documentation](https://docs.mcp-use.io/typescript/server/deployment-supabase).
 
 The guide covers:
-- Building widgets for production
+- Building your MCP server for production
 - Converting Node.js entry point to Supabase format
 - Deploying to Supabase Edge Functions
 - Testing and troubleshooting
+- Using widgets with Supabase
 
 ---
 
