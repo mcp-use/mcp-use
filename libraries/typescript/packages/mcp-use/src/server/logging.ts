@@ -18,10 +18,14 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   const url = c.req.url;
 
   // Get request body for MCP method logging (only for POST /mcp)
+  // Clone the request before reading to avoid consuming the body stream
+  // This allows subsequent handlers to read the body again
   let body: any = null;
   if (method === "POST" && url.includes("/mcp")) {
     try {
-      body = await c.req.json().catch(() => null);
+      // Clone the request to avoid consuming the original body stream
+      const clonedRequest = c.req.raw.clone();
+      body = await clonedRequest.json().catch(() => null);
     } catch {
       // Ignore JSON parse errors
     }
