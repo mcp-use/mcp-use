@@ -3,15 +3,13 @@ title: Deploying to Supabase
 description: Deploy your MCP server on Supabase Edge Functions
 ---
 
-# Deploying MCP Servers on Supabase Edge Functions
-
 This guide demonstrates how to deploy an MCP server on [Supabase Edge Functions](https://supabase.com/docs/guides/functions), which runs on Deno and provides a serverless environment for your MCP applications.
 
 ## Prerequisites
 
 1. **Supabase CLI**: Install from [Supabase CLI Installation Guide](https://supabase.com/docs/guides/cli)
-2. **Supabase Account**: Create a project at [database.new](https://database.new)
-3. **Docker** (optional, for local development): Required if you want to test locally
+2. **Supabase Account**
+3. **Docker** Required to solve bug https://github.com/orgs/supabase/discussions/32815
 4. **Node.js/Bun**: For building your MCP server
 
 ## Setting Up Your MCP Server for Supabase
@@ -32,21 +30,19 @@ supabase functions new mcp-server
 
 This creates a new function at `supabase/functions/mcp-server/`.
 
-### 3. Define Your MCP Server
+### 3. Adapt your MCP Server to use Deno (required for Supabase Edge Functions)
 
-Create your MCP server code. Here's the recommended setup that includes automatic UI widget registration and proper CORS handling:
+Widgets in the resources folder are automatically registered. Additional widgets can be registered manually. (see [UI Widgets](/typescript/server/ui-widgets))
 
 ```typescript
 // supabase/functions/mcp-server/index.ts
 
 import { createMCPServer } from "https://esm.sh/mcp-use@latest/server";
 
-// Get environment variables for the MCP server
 const PROJECT_REF = Deno.env.get("SUPABASE_PROJECT_REF") || "your-project-ref";
 const BASE_URL = Deno.env.get("MCP_URL") || `https://${PROJECT_REF}.supabase.co/functions/v1/mcp-server`;
 
-// Create the MCP server instance
-// UI widgets are automatically registered from the dist folder
+// Create the mcp-use MCP server instance
 const server = createMCPServer("test-app", {
   version: "1.0.0",
   description: "MCP server with automatic UI widget registration deployed on Supabase",
@@ -76,11 +72,8 @@ const handler = await server.getHandler({ provider: 'supabase' });
 // Export the handler for Supabase Edge Functions
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === 'OPTIONS')
     return new Response('ok', { headers: corsHeaders });
-  }
-
-  // Call the handler and ensure CORS headers are included in the response
   const response = await handler(req);
   
   // Add CORS headers to the response
@@ -97,143 +90,60 @@ Deno.serve(async (req: Request) => {
 });
 ```
 
-## Local Development
+### 4. Widgets assets
 
-### Start Supabase Services
+Widget assets should be served from a CDN, for example Supabase Storage.
+Upload the <ins>**content**</ins> of the dist folder to Supabase Storage and set the MCP_URL environment variable to the URL of the dist folder.
 
-```bash
-supabase start
-```
-
-This starts all Supabase services locally, including the Edge Functions runtime.
-
-### Serve the Function Locally
+E.g if you created a bucket called "widgets" in Supabase Storage, you can set the MCP_URL environment variable to the URL of the widgets bucket.
 
 ```bash
-supabase functions serve mcp-server
+export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets" 
 ```
 
-The function will be available at `http://localhost:54321/functions/v1/mcp-server`.
-
-### Test the Function Locally
-
-Get your local anon key:
+### 5. Build the mcp-use app
 
 ```bash
-supabase status
+echo $MCP_URL
+# should output: https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets
+pnpm build
 ```
 
-Test with curl (note the required Accept header):
+### 6. Copy the dist folder to the function directory
 
 ```bash
-curl -i --location --request POST 'http://localhost:54321/functions/v1/mcp-server/mcp' \
-  --header 'Authorization: Bearer YOUR_ANON_KEY' \
-  --header 'Content-Type: application/json' \
-  --header 'Accept: application/json, text/event-stream' \
-  --data '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/list",
-    "params": {}
-  }'
+cp -r dist supabase/functions/mcp-server/
 ```
 
-## Deployment
+### 7. Configure the function in config.toml  
 
-### 1. Login to Supabase
+```toml
+[functions.mcp-server]
+...
+static_files = [ "./functions/mcp-server/dist/**/*.html", "./functions/mcp-server/dist/mcp-use.json" ]
+...
+```
+
+### 8. Deploy the Function
 
 ```bash
-supabase login
-```
-
-### 2. Link Your Project
-
-```bash
-supabase link --project-ref YOUR_PROJECT_ID
-```
-
-You can find your project ID in the Supabase dashboard or by running:
-
-```bash
-supabase projects list
-```
-
-### 3. Deploy the Function
-
-```bash
-supabase functions deploy mcp-server
-```
-
-If Docker is not available, you can use API-based deployment:
-
-```bash
-supabase functions deploy mcp-server --use-api
-```
-
-### 4. Test the Deployed Function
-
-After deployment, test your function:
-
-```bash
-curl --request POST 'https://YOUR_PROJECT_ID.supabase.co/functions/v1/mcp-server/mcp' \
-  --header 'Authorization: Bearer YOUR_ANON_KEY' \
-  --header 'Content-Type: application/json' \
-  --header 'Accept: application/json, text/event-stream' \
-  --data '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/list",
-    "params": {}
-  }'
-```
-
-**Expected response:**
-
-```json
-{
-  "result": {
-    "tools": [
-      {
-        "name": "greet",
-        "description": "A tool that greets a person by name",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string",
-              "description": "The name of the person to greet"
-            }
-          },
-          "required": ["name"]
-        }
-      }
-    ]
-  },
-  "jsonrpc": "2.0",
-  "id": 1
-}
+supabase functions deploy mcp-server --use-docker
 ```
 
 ## Using the MCP Server
 
-### Getting the Endpoint
+You can connect to the MCP Server from any MCP client. Below are examples for browser and Node.js using the `mcp-use` library.
+
+### The MCP Server URL
 
 ```typescript
 // From your application
-const projectId = "YOUR_PROJECT_ID";
-const anonKey = "YOUR_ANON_KEY";
-const mcpUrl = `https://${projectId}.supabase.co/functions/v1/mcp-server/mcp`;
+//const mcpUrl = `https://YOUR_PROJECT_ID.supabase.co/functions/v1/FUNCTION_NAME/mcp`;
+// e.g. if your function name is "mcp-server" as above
+const mcpUrl = `https://YOUR_PROJECT_ID.supabase.co/functions/v1/mcp-server/mcp`;
 ```
 
-### Available Endpoints
-
-- **POST /mcp**: Main MCP protocol endpoint for message handling
-- **GET /mcp**: SSE streaming endpoint for real-time communication
-- **DELETE /mcp**: Session cleanup endpoint
-
-### Connecting from an MCP Client
-
-#### Browser/Client-Side Usage
+### Browser/Client-Side Usage
 
 ```typescript
 import { BrowserMCPClient } from "mcp-use";
@@ -241,10 +151,10 @@ import { BrowserMCPClient } from "mcp-use";
 const client = new BrowserMCPClient({
   mcpServers: {
     supabase: {
-      url: `https://${projectId}.supabase.co/functions/v1/mcp-server/mcp`,
+      url: `https://YOUR_PROJECT_ID.supabase.co/functions/v1/mcp-server/mcp`,
       transport: "http",
       headers: {
-        Authorization: `Bearer ${anonKey}`,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         "Content-Type": "application/json",
         Accept: "application/json, text/event-stream",
       },
@@ -268,10 +178,10 @@ import { MCPClient } from "mcp-use";
 const client = new MCPClient({
   mcpServers: {
     supabase: {
-      url: `https://${projectId}.supabase.co/functions/v1/mcp-server/mcp`,
+      url: `https://YOUR_PROJECT_ID.supabase.co/functions/v1/mcp-server/mcp`,
       transport: "http",
       headers: {
-        Authorization: `Bearer ${anonKey}`,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         "Content-Type": "application/json",
         Accept: "application/json, text/event-stream",
       },
@@ -287,170 +197,22 @@ await session.initialize();
 const response = await session.connector.callTool("greet", { name: "World" });
 ```
 
-## Key Differences from Node.js
-
-When deploying to Supabase Edge Functions (Deno runtime), note these differences:
-
-### ESM Imports Only
-
-Supabase uses Deno, which only supports ES modules. Make sure all your imports use the ES module syntax.
-
-### No Node.js APIs
-
-- No `fs` module (use Deno APIs instead)
-- No `process` object (use `Deno.env` instead)
-- No CommonJS modules
-
-### Browser-Compatible APIs
-
-Deno provides browser-compatible APIs like `fetch`, `Request`, `Response`, etc., which are already available globally.
-
-### Widgets in Production
-
-If you're using MCP UI Widgets, they will work in production mode. The widgets are bundled and served from `dist/resources/widgets/`.
-
-## Provider Configuration
-
-When calling `server.getHandler()`, use the `supabase` provider:
-
-```typescript
-const handler = await server.getHandler({ provider: "supabase" });
-```
-
-This configuration:
-
-- Handles path rewriting automatically for Supabase's routing
-- Enables CORS support
-- Optimizes for Deno's runtime environment
-
-## Deploying MCP Widgets with Supabase
-
-MCP UI widgets are automatically registered and discovered when you bundle them with your Supabase Edge Function. This requires minimal configuration compared to manual registration.
-
-### 1. Build and Copy Dist Files
-
-Build your MCP server and copy the dist folder to your function directory:
-
-```bash
-# Build your MCP server with widgets
-pnpm build
-
-# Copy the dist folder to your function directory
-cp -r dist supabase/functions/mcp-server/
-```
-
-This copies all widget HTML files and the metadata JSON to the function directory for bundling.
-
-### 2. Configure Static Files in config.toml
-
-Configure `supabase/config.toml` to bundle the widget files and metadata:
-
-```toml
-[functions.mcp-server]
-enabled = true
-verify_jwt = false
-entrypoint = "./functions/mcp-server/index.ts"
-# Bundle widget HTML and metadata files for automatic registration
-static_files = [ "./functions/mcp-server/dist/**/*.html", "./functions/mcp-server/dist/mcp-use.json" ]
-```
-
-The server automatically discovers and registers widgets from the bundled dist folder.
 
 <Warning>
 **Important: Docker Required for Static Files**
 
 Static files configured in `static_files` are **only bundled when Docker is running** during deployment. This applies to both local development and production deployment.
 
-When deploying with `supabase functions deploy`, use one of these approaches:
+When deploying with `supabase functions deploy`, use the --use-docker flag.
 
-**Option 1: Docker-based deployment (recommended)**
 ```bash
 docker info  # Verify Docker is running
-supabase functions deploy mcp-server
+supabase functions deploy mcp-server --use-docker
 ```
-
-**Option 2: API-based deployment without Docker**
-If Docker is not available, use the `--use-api` flag (widgets will NOT be bundled):
-```bash
-supabase functions deploy mcp-server --use-api
-```
-
-**Important**: Without the `--use-api` flag and without Docker running, the deployment will fail if Docker is not available.
 
 See the [Supabase static files documentation](https://github.com/orgs/supabase/discussions/32815) for more details.
 </Warning>
 
-### 3. Deploy the Function
-
-Ensure Docker is running (required for static files):
-
-```bash
-docker info
-```
-
-Deploy your function:
-
-```bash
-supabase functions deploy mcp-server
-```
-
-### 4. Test the Deployed Function
-
-After deployment, test your MCP server:
-
-```bash
-curl --request POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/mcp-server/mcp' \
-  --header 'Authorization: Bearer YOUR_ANON_KEY' \
-  --header 'Content-Type: application/json' \
-  --header 'Accept: application/json, text/event-stream' \
-  --data '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/list",
-    "params": {}
-  }'
-```
-
-### How Automatic Widget Registration Works
-
-1. **Build time**: When you run `pnpm build`, widgets are compiled to the `dist/resources/widgets/` directory
-2. **Bundling**: The `static_files` configuration bundles all HTML and JSON metadata files
-3. **Runtime discovery**: The MCP server automatically discovers and registers widgets from the bundled files
-4. **Client access**: Clients can discover and use widgets through the standard MCP protocol
-
-### Key Points for Widget Deployment
-
-1. **Automatic registration**: No manual code needed, widgets are auto-discovered from dist
-2. **Simple configuration**: Just configure `static_files` in `config.toml`
-3. **No external dependencies**: Everything is bundled together, no external storage needed
-4. **Docker required**: Static files only work when Docker is running during deployment
-5. **Works with all MCP clients**: Automatically compatible with OpenAI, Claude, and other MCP-compatible clients
-
-### Why This Approach?
-
-- **Simplicity**: Minimal code, no manual registration needed
-- **Performance**: Everything is bundled and served from the Edge Function
-- **Reliability**: No external dependencies or network calls at runtime
-- **Maintainability**: Just add widgets to `.mcp-use/` and rebuild
-
-## Troubleshooting
-
-### Function Not Starting Locally
-
-- Make sure Docker is running
-- Run `supabase stop` then `supabase start` to restart services
-- Check what's running with `supabase status`
-
-### Port Already in Use
-
-- Check what's running with `supabase status`
-- Stop other Supabase instances with `supabase stop`
-
-### Import Errors
-
-- Make sure you're using the correct import URL for `mcp-use`
-- Check that Deno can access the ESM module
-- Verify the ESM URL is correct: `https://esm.sh/mcp-use@latest/server`
 
 ### CORS Issues
 
