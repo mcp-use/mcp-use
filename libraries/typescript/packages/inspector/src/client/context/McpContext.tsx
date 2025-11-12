@@ -154,9 +154,12 @@ function McpConnectionWrapper({
       queueMicrotask(() => {
         // Debug: Log serverInfo to console
         if (mcpHook.state === "ready" && mcpHook.serverInfo) {
-          console.log("[McpContext] Server info available:", mcpHook.serverInfo);
+          console.log(
+            "[McpContext] Server info available:",
+            mcpHook.serverInfo
+          );
         }
-        
+
         const connection: MCPConnection = {
           id: url,
           url,
@@ -338,12 +341,15 @@ export function McpProvider({ children }: { children: ReactNode }) {
       new Map(prev).set(connection.id, connection)
     );
     setConnectionVersion((v) => v + 1);
-    
+
     // If the connection has serverInfo with a name, update the saved connection name
     if (connection.serverInfo?.name && connection.state === "ready") {
       setSavedConnections((prev) => {
         const existingConnection = prev.find((c) => c.id === connection.id);
-        if (existingConnection && existingConnection.name !== connection.serverInfo!.name) {
+        if (
+          existingConnection &&
+          existingConnection.name !== connection.serverInfo!.name
+        ) {
           const updated = prev.map((c) =>
             c.id === connection.id
               ? { ...c, name: connection.serverInfo!.name }

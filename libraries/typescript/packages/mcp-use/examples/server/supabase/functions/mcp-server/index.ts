@@ -3,7 +3,8 @@ import { createMCPServer } from "https://esm.sh/mcp-use@1.2.5-canary.4/server";
 
 const server = createMCPServer("test-app", {
   version: "1.0.0",
-  description: "Test MCP server with automatic UI widget registration deployed on Supabase",
+  description:
+    "Test MCP server with automatic UI widget registration deployed on Supabase",
 });
 
 // Register tools from the original index.ts

@@ -81,7 +81,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ResourceTemplate[]
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [serverInfo, setServerInfo] = useState<{ name: string; version?: string }>();
+  const [serverInfo, setServerInfo] = useState<{
+    name: string;
+    version?: string;
+  }>();
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
@@ -294,9 +297,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         addLog("info", "✅ Successfully connected to MCP server");
         addLog("info", "Server info:", session.connector.serverInfo);
-        addLog("info", "Server capabilities:", session.connector.serverCapabilities);
+        addLog(
+          "info",
+          "Server capabilities:",
+          session.connector.serverCapabilities
+        );
         console.log("[useMcp] Server info:", session.connector.serverInfo);
-        console.log("[useMcp] Server capabilities:", session.connector.serverCapabilities);
+        console.log(
+          "[useMcp] Server capabilities:",
+          session.connector.serverCapabilities
+        );
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
 
@@ -310,12 +320,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Get serverInfo and capabilities from the connector (populated during initialize)
         const serverInfo = session.connector.serverInfo;
         const capabilities = session.connector.serverCapabilities;
-        
+
         if (serverInfo) {
           console.log("[useMcp] Server info:", serverInfo);
           setServerInfo(serverInfo);
         }
-        
+
         if (capabilities) {
           console.log("[useMcp] Server capabilities:", capabilities);
           setCapabilities(capabilities);

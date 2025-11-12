@@ -1801,16 +1801,17 @@ if (container && Component) {
     if (isDeno) {
       // Define CORS headers for Deno
       const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers":
+          "authorization, x-client-info, apikey, content-type",
       };
 
       (globalThis as any).Deno.serve(
         { port: this.serverPort, hostname: this.serverHost },
         async (req: Request) => {
           // Handle CORS preflight requests
-          if (req.method === 'OPTIONS') {
-            return new Response('ok', { headers: corsHeaders });
+          if (req.method === "OPTIONS") {
+            return new Response("ok", { headers: corsHeaders });
           }
 
           // Handle Supabase path rewriting
@@ -1820,7 +1821,9 @@ if (container && Component) {
           let newPathname = pathname;
 
           // Match /functions/v1/{anything}/... and strip up to the function name
-          const functionsMatch = pathname.match(/^\/functions\/v1\/[^/]+(\/.*)?$/);
+          const functionsMatch = pathname.match(
+            /^\/functions\/v1\/[^/]+(\/.*)?$/
+          );
           if (functionsMatch) {
             newPathname = functionsMatch[1] || "/";
           } else {
@@ -1845,7 +1848,7 @@ if (container && Component) {
 
           // Call the app handler
           const response = await this.app.fetch(finalReq);
-          
+
           // Add CORS headers to the response
           const newHeaders = new Headers(response.headers);
           Object.entries(corsHeaders).forEach(([key, value]) => {
@@ -1859,9 +1862,7 @@ if (container && Component) {
           });
         }
       );
-      console.log(
-        `[SERVER] Listening`
-      );
+      console.log(`[SERVER] Listening`);
     } else {
       const { serve } = await import("@hono/node-server");
       serve(

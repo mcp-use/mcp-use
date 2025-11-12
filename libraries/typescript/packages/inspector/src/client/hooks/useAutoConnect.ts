@@ -40,14 +40,15 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
   try {
     // Try to parse as JSON first
     const parsed = JSON.parse(param);
-    
+
     // Validate it has required fields
     if (parsed.url && typeof parsed.url === "string") {
       return {
         url: parsed.url,
         name: parsed.name || "Auto-connected Server",
         transportType: parsed.transportType === "sse" ? "sse" : "http",
-        connectionType: parsed.connectionType === "Via Proxy" ? "Via Proxy" : "Direct",
+        connectionType:
+          parsed.connectionType === "Via Proxy" ? "Via Proxy" : "Direct",
         customHeaders: parsed.customHeaders || {},
         requestTimeout: parsed.requestTimeout,
         resetTimeoutOnProgress: parsed.resetTimeoutOnProgress,
@@ -63,7 +64,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
       connectionType: "Direct",
     };
   }
-  
+
   return null;
 }
 
@@ -74,7 +75,8 @@ export function useAutoConnect({
 }: UseAutoConnectOptions): AutoConnectState {
   const navigate = useNavigate();
   const [isAutoConnecting, setIsAutoConnecting] = useState(false);
-  const [autoConnectConfig, setAutoConnectConfig] = useState<ConnectionConfig | null>(null);
+  const [autoConnectConfig, setAutoConnectConfig] =
+    useState<ConnectionConfig | null>(null);
   const [hasTriedBothModes, setHasTriedBothModes] = useState(false);
   const [autoSwitch, setAutoSwitch] = useState(true);
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -91,8 +93,9 @@ export function useAutoConnect({
   // Unified connection attempt function
   const attemptConnection = useCallback(
     (config: ConnectionConfig) => {
-      const { url, name, transportType, connectionType, customHeaders } = config;
-      
+      const { url, name, transportType, connectionType, customHeaders } =
+        config;
+
       // Prepare proxy configuration if using proxy
       const proxyConfig =
         connectionType === "Via Proxy"
@@ -124,7 +127,7 @@ export function useAutoConnect({
 
     if (queryAutoConnectParam) {
       const config = parseAutoConnectParam(queryAutoConnectParam);
-      
+
       if (config) {
         const existing = connections.find((c) => c.url === config.url);
         if (!existing) {
@@ -134,7 +137,7 @@ export function useAutoConnect({
           attemptConnection(config);
         }
       }
-      
+
       setConfigLoaded(true);
       return;
     }
@@ -146,7 +149,7 @@ export function useAutoConnect({
         setConfigLoaded(true);
         if (configData.autoConnectUrl) {
           const config = parseAutoConnectParam(configData.autoConnectUrl);
-          
+
           if (config) {
             const existing = connections.find((c) => c.url === config.url);
             if (!existing) {
@@ -218,21 +221,21 @@ export function useAutoConnect({
         // Defer state updates to avoid updating during render
         queueMicrotask(() => {
           removeConnection(connection.id);
-          
+
           setTimeout(() => {
             console.warn("[useAutoConnect] Retrying with proxy");
-            
+
             // Create new config with proxy
             const retryConfig: ConnectionConfig = {
               ...autoConnectConfig,
               connectionType: alternateConnectionType,
             };
-            
+
             // Update the config to track the retry attempt
             setAutoConnectConfig(retryConfig);
             setIsAutoConnecting(true);
             retryScheduledRef.current = false;
-            
+
             attemptConnection(retryConfig);
           }, 1000);
         });
@@ -240,7 +243,7 @@ export function useAutoConnect({
         // Both modes failed - clear loading and reset state
         toast.error("Proxy connection also failed");
         setHasTriedBothModes(true);
-        
+
         // Defer state updates to avoid updating during render
         queueMicrotask(() => {
           removeConnection(connection.id);
