@@ -358,6 +358,208 @@ This configuration:
 - Enables CORS support
 - Optimizes for Deno's runtime environment
 
+## Deploying MCP Widgets with Supabase
+
+Automatic widget discovery doesn't work in Supabase Edge Functions because everything is bundled into a single JavaScript file at deployment time. The recommended approach is to:
+
+1. **Bundle widget HTML** as static files with your Edge Function
+2. **Host widget assets** (CSS, JS) on Supabase Storage CDN
+3. **Register widgets** using the Apps SDK format
+
+This hybrid approach provides the best performance and reliability.
+
+### 1. Create a Public Storage Bucket for Assets
+
+In your Supabase dashboard:
+1. Navigate to **Storage**
+2. Create a new bucket called `widgets`
+3. Make it **public** so widget assets can be accessed via URL
+
+### 2. Build Widgets with Correct Base URL
+
+Build your widgets with the `MCP_URL` environment variable pointing to your Supabase Storage bucket:
+
+```bash
+MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets" pnpm build
+```
+
+This ensures all asset paths (CSS, JS) in the built HTML are absolute URLs pointing to Supabase Storage CDN.
+
+### 3. Upload Widget Assets to Supabase Storage
+
+Upload the widget assets (CSS, JS) to Supabase Storage. You can upload just the assets folder or the entire widget folder:
+
+```
+dist/resources/widgets/display-weather/
+└── assets/
+    ├── index-[hash].js
+    ├── index-[hash].css
+    └── ... (other assets)
+```
+
+Upload to: `Storage > widgets > display-weather/assets/`
+
+### 4. Bundle Widget HTML as Static Files
+
+Copy the widget HTML file to your function directory:
+
+```bash
+cp dist/resources/widgets/display-weather/index.html supabase/functions/mcp-server/display-weather.html
+```
+
+Configure `supabase/config.toml` to bundle the HTML files:
+
+```toml
+[functions.mcp-server]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/mcp-server/index.ts"
+# Bundle widget HTML files as static files
+static_files = [ "./functions/mcp-server/*.html" ]
+```
+
+<Note>
+**Docker Required**: Static files are only bundled when Docker is running during deployment. See the [Supabase static files documentation](https://github.com/orgs/supabase/discussions/32815) for more details.
+</Note>
+
+### 5. Register Widgets in Your MCP Server
+
+In your `supabase/functions/mcp-server/index.ts`, read the bundled HTML and register as an Apps SDK widget:
+
+```typescript
+// supabase/functions/mcp-server/index.ts
+import { createMCPServer } from "https://esm.sh/mcp-use@latest/server";
+
+const PROJECT_REF = Deno.env.get("SUPABASE_PROJECT_REF") || "your-project-ref";
+const BASE_URL = `https://${PROJECT_REF}.supabase.co/functions/v1/mcp-server`;
+const STORAGE_BASE_URL = `https://${PROJECT_REF}.supabase.co/storage/v1/object/public/widgets`;
+
+const server = createMCPServer("supabase-mcp-server", {
+  version: "1.0.0",
+  description: "MCP server with widgets on Supabase",
+  baseUrl: BASE_URL,
+});
+
+// Read the widget HTML from bundled static file
+const widgetHtml = await Deno.readTextFile("./display-weather.html");
+
+// Register as Apps SDK widget
+server.uiResource({
+  type: "appsSdk",
+  name: "display-weather",
+  title: "Weather Display",
+  description: "Display weather for a city with temperature and conditions",
+  htmlTemplate: widgetHtml,
+  props: {
+    city: {
+      type: "string",
+      description: "The city to display weather for",
+      required: true,
+    },
+    weather: {
+      type: "string",
+      description: "Weather condition (sunny, rain, snow, cloudy)",
+      required: true,
+    },
+    temperature: {
+      type: "number",
+      description: "Temperature in Celsius",
+      required: true,
+    },
+  },
+  appsSdkMetadata: {
+    "openai/widgetDescription": "Displays current weather with temperature and conditions",
+    "openai/toolInvocation/invoking": "Loading weather widget...",
+    "openai/toolInvocation/invoked": "Weather widget ready",
+    "openai/widgetAccessible": true,
+    "openai/resultCanProduceWidget": true,
+    "openai/widgetCSP": {
+      connect_domains: [],
+      resource_domains: [STORAGE_BASE_URL],
+    },
+  },
+});
+
+// CORS configuration
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept, mcp-protocol-version, mcp-session-id',
+};
+
+const handler = await server.getHandler({ provider: 'supabase' });
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  const response = await handler(req);
+  const newHeaders = new Headers(response.headers);
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    newHeaders.set(key, value);
+  });
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders,
+  });
+});
+```
+
+### 6. Deploy and Test
+
+Ensure Docker is running (required for static files):
+
+```bash
+docker info
+```
+
+Deploy your function:
+
+```bash
+supabase functions deploy mcp-server --no-verify-jwt
+```
+
+Test the widget tool:
+
+```bash
+curl --request POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/mcp-server/mcp' \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json, text/event-stream' \
+  --header 'apikey: YOUR_SUPABASE_ANON_KEY' \
+  --data '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "display-weather",
+      "arguments": {
+        "city": "Tokyo",
+        "weather": "rain",
+        "temperature": 18
+      }
+    }
+  }'
+```
+
+### Key Points for Widget Deployment
+
+1. **Hybrid approach**: Bundle HTML with the function, host assets on Storage CDN
+2. **Apps SDK format**: Use `type: "appsSdk"` for OpenAI ChatGPT compatibility
+3. **Static files**: Configure `static_files` in `config.toml` to bundle HTML
+4. **Docker required**: Static files only work when Docker is running during deployment
+5. **Build with absolute URLs**: Set `MCP_URL` to point to Supabase Storage for assets
+6. **CSP metadata**: Declare allowed resource domains in `appsSdkMetadata`
+7. **Authentication**: Pass `apikey` header for all requests to Supabase Edge Functions
+
+### Why This Approach?
+
+- **Performance**: HTML is bundled (no runtime fetch), assets served from CDN
+- **Reliability**: No dependency on external fetch calls at runtime
+- **Scalability**: Assets cached and distributed via Supabase Storage CDN
+- **Compatibility**: Apps SDK format works with OpenAI ChatGPT and other clients
+
 ## Troubleshooting
 
 ### Function Not Starting Locally

@@ -183,7 +183,9 @@ async function findServerFile(projectPath: string): Promise<string> {
   throw new Error("No server file found");
 }
 
-async function buildWidgets(projectPath: string): Promise<string[]> {
+async function buildWidgets(
+  projectPath: string
+): Promise<Array<{ name: string; metadata: any }>> {
   const { promises: fs } = await import("node:fs");
   const { build } = await import("vite");
   const resourcesDir = path.join(projectPath, "resources");
@@ -236,7 +238,7 @@ async function buildWidgets(projectPath: string): Promise<string[]> {
   // @ts-ignore - @tailwindcss/vite may not have type declarations
   const tailwindcss = (await import("@tailwindcss/vite")).default;
 
-  const builtWidgets: string[] = [];
+  const builtWidgets: Array<{ name: string; metadata: any }> = [];
 
   for (const entry of entries) {
     const baseName = path.basename(entry).replace(/\.tsx?$/, "");
@@ -295,7 +297,9 @@ if (container && Component) {
     );
 
     // Set base URL: use MCP_URL if set, otherwise relative path
-    const baseUrl = `/mcp-use/widgets/${widgetName}/`;
+    const baseUrl = mcpUrl
+      ? `${mcpUrl}/${widgetName}/`
+      : `/mcp-use/widgets/${widgetName}/`;
 
     // Extract metadata from widget before building
     let widgetMetadata: any = {};
@@ -393,15 +397,10 @@ if (container && Component) {
         },
       });
 
-      // Save metadata to a JSON file alongside the built widget
-      const metadataPath = path.join(outDir, "metadata.json");
-      await fs.writeFile(
-        metadataPath,
-        JSON.stringify(widgetMetadata, null, 2),
-        "utf8"
-      );
-
-      builtWidgets.push(widgetName);
+      builtWidgets.push({
+        name: widgetName,
+        metadata: widgetMetadata,
+      });
       console.log(chalk.green(`    ✓ Built ${widgetName}`));
     } catch (error) {
       console.error(chalk.red(`    ✗ Failed to build ${widgetName}:`), error);
@@ -435,12 +434,19 @@ program
       const manifestPath = path.join(
         projectPath,
         "dist",
-        ".mcp-use-manifest.json"
+        "mcp-use.json"
       );
+      
+      // Transform builtWidgets array into widgets object with metadata
+      const widgetsData: Record<string, any> = {};
+      for (const widget of builtWidgets) {
+        widgetsData[widget.name] = widget.metadata;
+      }
+      
       const manifest = {
         includeInspector: options.withInspector || false,
         buildTime: new Date().toISOString(),
-        widgets: builtWidgets,
+        widgets: widgetsData,
       };
 
       await fs.mkdir(path.dirname(manifestPath), { recursive: true });

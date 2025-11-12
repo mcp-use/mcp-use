@@ -872,9 +872,9 @@ export class McpServer {
   } | null> {
     try {
       const manifestPath = pathHelpers.join(
-        getCwd(),
+        isDeno ? "." : getCwd(),
         "dist",
-        ".mcp-use-manifest.json"
+        "mcp-use.json"
       );
       const content = await fsHelpers.readFileSync(manifestPath, "utf8");
       return JSON.parse(content);
@@ -898,16 +898,11 @@ export class McpServer {
     baseRoute?: string;
     resourcesDir?: string;
   }): Promise<void> {
-    if (this.isProductionMode()) {
+    if (this.isProductionMode() || isDeno) {
+      console.log("[WIDGETS] Mounting widgets in production mode");
       await this.mountWidgetsProduction(options);
     } else {
-      // Skip dev mode in Deno (no Vite support)
-      if (isDeno) {
-        console.log(
-          "[WIDGETS] Skipping dev mode widget mounting in Deno runtime (use production build)"
-        );
-        return;
-      }
+      console.log("[WIDGETS] Mounting widgets in development mode");
       await this.mountWidgetsDev(options);
     }
   }
@@ -1312,37 +1307,63 @@ if (container && Component) {
   }): Promise<void> {
     const baseRoute = options?.baseRoute || "/mcp-use/widgets";
     const widgetsDir = pathHelpers.join(
-      getCwd(),
+      isDeno ? "." : getCwd(),
       "dist",
       "resources",
       "widgets"
     );
 
-    // Check if widgets directory exists
-    if (!(await fsHelpers.existsSync(widgetsDir))) {
-      console.log(
-        "[WIDGETS] No dist/resources/widgets/ directory found - skipping widget serving"
-      );
-      return;
-    }
+    console.log("widgetsDir", widgetsDir);
+
 
     // Setup static file serving routes
     this.setupWidgetRoutes();
 
-    // Discover built widgets
-    const allEntries = await fsHelpers.readdirSync(widgetsDir);
-    const widgets: string[] = [];
-    for (const name of allEntries) {
-      const widgetPath = pathHelpers.join(widgetsDir, name);
-      const indexPath = pathHelpers.join(widgetPath, "index.html");
-      if (await fsHelpers.existsSync(indexPath)) {
-        widgets.push(name);
+    // Discover built widgets from manifest
+    const manifestPath = './dist/mcp-use.json';
+    let widgets: string[] = [];
+    let widgetsMetadata: Record<string, any> = {};
+
+    try {
+      const manifestContent = await fsHelpers.readFileSync(manifestPath, "utf8");
+      const manifest = JSON.parse(manifestContent);
+      
+      if (manifest.widgets && typeof manifest.widgets === 'object' && !Array.isArray(manifest.widgets)) {
+        // New format: widgets is an object with widget names as keys and metadata as values
+        widgets = Object.keys(manifest.widgets);
+        widgetsMetadata = manifest.widgets;
+        console.log(`[WIDGETS] Loaded ${widgets.length} widget(s) from manifest`);
+      } else if (manifest.widgets && Array.isArray(manifest.widgets)) {
+        // Legacy format: widgets is an array of strings
+        widgets = manifest.widgets;
+        console.log(`[WIDGETS] Loaded ${widgets.length} widget(s) from manifest (legacy format)`);
+      } else {
+        console.log("[WIDGETS] No widgets found in manifest");
+      }
+    } catch (error) {
+      console.log(
+        "[WIDGETS] Could not read manifest file, falling back to directory listing:",
+        error
+      );
+      
+      // Fallback to directory listing if manifest doesn't exist
+      try {
+        const allEntries = await fsHelpers.readdirSync(widgetsDir);
+        for (const name of allEntries) {
+          const widgetPath = pathHelpers.join(widgetsDir, name);
+          const indexPath = pathHelpers.join(widgetPath, "index.html");
+          if (await fsHelpers.existsSync(indexPath)) {
+            widgets.push(name);
+          }
+        }
+      } catch (dirError) {
+        console.log("[WIDGETS] Directory listing also failed:", dirError);
       }
     }
 
     if (widgets.length === 0) {
       console.log(
-        "[WIDGETS] No built widgets found in dist/resources/widgets/"
+        "[WIDGETS] No built widgets found"
       );
       return;
     }
@@ -1355,7 +1376,6 @@ if (container && Component) {
     for (const widgetName of widgets) {
       const widgetPath = pathHelpers.join(widgetsDir, widgetName);
       const indexPath = pathHelpers.join(widgetPath, "index.html");
-      const metadataPath = pathHelpers.join(widgetPath, "metadata.json");
 
       // Read the HTML template
       let html = "";
@@ -1414,28 +1434,16 @@ if (container && Component) {
         continue;
       }
 
-      // Read the metadata file if it exists
-      let metadata: WidgetMetadata = {};
+      // Get metadata from manifest
+      const metadata: WidgetMetadata = widgetsMetadata[widgetName] || {};
       let props = {};
       let description = `Widget: ${widgetName}`;
 
-      try {
-        const metadataContent = await fsHelpers.readFileSync(
-          metadataPath,
-          "utf8"
-        );
-        metadata = JSON.parse(metadataContent);
-        if (metadata.description) {
-          description = metadata.description;
-        }
-        if (metadata.inputs) {
-          props = metadata.inputs;
-        }
-      } catch (error) {
-        // Metadata file doesn't exist or couldn't be read - use defaults
-        console.log(
-          `[WIDGET] No metadata found for ${widgetName}, using defaults`
-        );
+      if (metadata.description) {
+        description = metadata.description;
+      }
+      if (metadata.inputs) {
+        props = metadata.inputs;
       }
 
       this.uiResource({
@@ -1856,12 +1864,17 @@ if (container && Component) {
   async getHandler(options?: {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
+    console.log("[MCP] Mounting widgets");
     await this.mountWidgets({
       baseRoute: "/mcp-use/widgets",
       resourcesDir: "resources",
     });
+    console.log("[MCP] Mounted widgets");
     await this.mountMcp();
+    console.log("[MCP] Mounted MCP");
+    console.log("[MCP] Mounting inspector");
     await this.mountInspector();
+    console.log("[MCP] Mounted inspector");
 
     // Wrap the fetch handler to ensure it always returns a Promise<Response>
     const fetchHandler = this.app.fetch.bind(this.app);
