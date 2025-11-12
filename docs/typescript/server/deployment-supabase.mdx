@@ -356,9 +356,29 @@ static_files = [ "./functions/mcp-server/dist/**/*.html", "./functions/mcp-serve
 
 The server automatically discovers and registers widgets from the bundled dist folder.
 
-<Note>
-**Docker Required**: Static files are only bundled when Docker is running during deployment. See the [Supabase static files documentation](https://github.com/orgs/supabase/discussions/32815) for more details.
-</Note>
+<Warning>
+**Important: Docker Required for Static Files**
+
+Static files configured in `static_files` are **only bundled when Docker is running** during deployment. This applies to both local development and production deployment.
+
+When deploying with `supabase functions deploy`, use one of these approaches:
+
+**Option 1: Docker-based deployment (recommended)**
+```bash
+docker info  # Verify Docker is running
+supabase functions deploy mcp-server
+```
+
+**Option 2: API-based deployment without Docker**
+If Docker is not available, use the `--use-api` flag (widgets will NOT be bundled):
+```bash
+supabase functions deploy mcp-server --use-api
+```
+
+**Important**: Without the `--use-api` flag and without Docker running, the deployment will fail if Docker is not available.
+
+See the [Supabase static files documentation](https://github.com/orgs/supabase/discussions/32815) for more details.
+</Warning>
 
 ### 3. Deploy the Function
 
