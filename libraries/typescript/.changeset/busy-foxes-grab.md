@@ -1,5 +1,6 @@
 ---
 "mcp-use": minor
+"@mcp-use/cli": minor
 "create-mcp-use-app": patch
 ---
 
