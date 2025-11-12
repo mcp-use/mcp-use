@@ -108,37 +108,7 @@ server.tool({
     return { content: [{ type: "text", text: `My city is San Francisco` }] };
   },
 });
-
-// Configure CORS headers for Supabase Edge Functions
-// See: https://supabase.com/docs/guides/functions/cors
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept, mcp-protocol-version, mcp-session-id',
-};
-
-// Get the fetch handler from the server
-// The 'supabase' provider handles path rewriting automatically
-const handler = await server.getHandler({ provider: 'supabase' });
-
-// Export the handler for Supabase Edge Functions
-Deno.serve(async (req: Request) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS')
-    return new Response('ok', { headers: corsHeaders });
-  const response = await handler(req);
-  
-  // Add CORS headers to the response
-  const newHeaders = new Headers(response.headers);
-  Object.entries(corsHeaders).forEach(([key, value]) => {
-    newHeaders.set(key, value);
-  });
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: newHeaders,
-  });
-});
+await server.listen();
 ```
 
 ### 4. Widgets assets
