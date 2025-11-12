@@ -237,8 +237,13 @@ function processTemplateFile(
       '"@mcp-use/inspector": "workspace:*"'
     );
   } else if (useCanary) {
+    // Replace both workspace:* and any existing caret versions with canary
     processedContent = processedContent.replace(
       /"mcp-use": "workspace:\*"/,
+      `"mcp-use": "canary"`
+    );
+    processedContent = processedContent.replace(
+      /"mcp-use": "\^[^"]+"/,
       `"mcp-use": "canary"`
     );
     processedContent = processedContent.replace(
@@ -246,7 +251,15 @@ function processTemplateFile(
       `"@mcp-use/cli": "canary"`
     );
     processedContent = processedContent.replace(
+      /"@mcp-use\/cli": "\^[^"]+"/,
+      `"@mcp-use/cli": "canary"`
+    );
+    processedContent = processedContent.replace(
       /"@mcp-use\/inspector": "workspace:\*"/,
+      `"@mcp-use/inspector": "canary"`
+    );
+    processedContent = processedContent.replace(
+      /"@mcp-use\/inspector": "\^[^"]+"/,
       `"@mcp-use/inspector": "canary"`
     );
   } else {
