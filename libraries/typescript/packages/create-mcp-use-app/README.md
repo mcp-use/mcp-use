@@ -443,21 +443,6 @@ See our [contributing guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRI
 
 ---
 
-## 🚀 Deployment
-
-### Deploy to Supabase
-
-For comprehensive deployment instructions to Supabase Edge Functions, see our [Deploying to Supabase documentation](https://docs.mcp-use.io/typescript/server/deployment-supabase).
-
-The guide covers:
-- Building your MCP server for production
-- Converting Node.js entry point to Supabase format
-- Deploying to Supabase Edge Functions
-- Testing and troubleshooting
-- Using widgets with Supabase
-
----
-
 ## 📚 Learn More
 
 - [mcp-use Documentation](https://github.com/mcp-use/mcp-use)
