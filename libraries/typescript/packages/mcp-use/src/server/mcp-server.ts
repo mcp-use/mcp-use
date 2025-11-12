@@ -1172,8 +1172,6 @@ if (container && Component) {
         );
       }
 
-      console.log("[WIDGET dev] Metadata:", metadata);
-
       let html = "";
       try {
         html = await fsHelpers.readFileSync(
@@ -1801,15 +1799,68 @@ if (container && Component) {
 
     // Start server based on runtime
     if (isDeno) {
+      // Define CORS headers for Deno
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      };
+
       (globalThis as any).Deno.serve(
         { port: this.serverPort, hostname: this.serverHost },
-        this.app.fetch
+        async (req: Request) => {
+          // Handle CORS preflight requests
+          if (req.method === 'OPTIONS') {
+            return new Response('ok', { headers: corsHeaders });
+          }
+
+          // Handle Supabase path rewriting
+          // Supabase includes the function name in the path (e.g., /functions/v1/mcp-server/mcp or /mcp-server/mcp)
+          const url = new URL(req.url);
+          const pathname = url.pathname;
+          let newPathname = pathname;
+
+          // Match /functions/v1/{anything}/... and strip up to the function name
+          const functionsMatch = pathname.match(/^\/functions\/v1\/[^/]+(\/.*)?$/);
+          if (functionsMatch) {
+            newPathname = functionsMatch[1] || "/";
+          } else {
+            // Match /{function-name}/... pattern
+            const functionNameMatch = pathname.match(/^\/([^/]+)(\/.*)?$/);
+            if (functionNameMatch && functionNameMatch[2]) {
+              newPathname = functionNameMatch[2] || "/";
+            }
+          }
+
+          // Create a new request with the corrected path if needed
+          let finalReq = req;
+          if (newPathname !== pathname) {
+            const newUrl = new URL(newPathname + url.search, url.origin);
+            finalReq = new Request(newUrl, {
+              method: req.method,
+              headers: req.headers,
+              body: req.body,
+              redirect: req.redirect,
+            });
+          }
+
+          // Call the app handler
+          const response = await this.app.fetch(finalReq);
+          
+          // Add CORS headers to the response
+          const newHeaders = new Headers(response.headers);
+          Object.entries(corsHeaders).forEach(([key, value]) => {
+            newHeaders.set(key, value);
+          });
+
+          return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: newHeaders,
+          });
+        }
       );
       console.log(
-        `[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`
-      );
-      console.log(
-        `[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp`
+        `[SERVER] Listening`
       );
     } else {
       const { serve } = await import("@hono/node-server");

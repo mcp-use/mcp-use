@@ -12,7 +12,52 @@ This guide demonstrates how to deploy an MCP server on [Supabase Edge Functions]
 3. **Docker** Required to solve bug https://github.com/orgs/supabase/discussions/32815
 4. **Node.js/Bun**: For building your MCP server
 
-## Setting Up Your MCP Server for Supabase
+## Quick Deployment
+
+Deploy your MCP server to Supabase in one command using our automated deployment script:
+
+```bash
+# Download and run the deployment script
+curl -fsSL https://raw.githubusercontent.com/mcp-use/mcp-use/main/examples/typescript/server/supabase/deploy.sh | bash -s -- YOUR_PROJECT_ID
+```
+
+Or download the script first to review it:
+
+```bash
+# Download the script
+curl -fsSL https://raw.githubusercontent.com/mcp-use/mcp-use/main/examples/typescript/server/supabase/deploy.sh -o deploy.sh
+chmod +x deploy.sh
+
+# Run with your project ID
+./deploy.sh YOUR_PROJECT_ID
+
+# Optional: specify custom function name and bucket name
+./deploy.sh YOUR_PROJECT_ID my-function-name my-bucket-name
+```
+
+### What the script does
+
+The deployment script automatically:
+1. ✅ Validates Supabase CLI installation and authentication
+2. ✅ Checks if the project is initialized and linked
+3. ✅ Patches `config.toml` with your project ID
+4. ✅ Builds your MCP application with the correct `MCP_URL`
+5. ✅ Copies build artifacts to the function directory
+6. ✅ Deploys the function to Supabase Edge Functions
+7. ✅ Uploads widgets to the storage bucket
+
+<Note>
+**Prerequisites for the script**
+- Supabase CLI installed (`npm install -g supabase`)
+- Logged in to Supabase (`supabase login`)
+- Docker running (for deployment)
+</Note>
+
+For manual deployment or to understand each step in detail, continue reading below.
+
+## Manual Deployment
+
+### Setting Up Your MCP Server for Supabase
 
 ### 1. Initialize a Supabase Project
 
@@ -99,9 +144,15 @@ Deno.serve(async (req: Request) => {
 ### 4. Widgets assets
 
 Widget assets should be served from a CDN, for example Supabase Storage.
-Upload the <ins>**content**</ins> of the dist folder to Supabase Storage and set the MCP_URL environment variable to the URL of the dist folder.
+Upload the <ins>**content**</ins> of the dist/resources/widgets folder to Supabase Storage and set the MCP_URL environment variable to the URL of the dist folder.
 
-E.g if you created a bucket called "widgets" in Supabase Storage, you can set the MCP_URL environment variable to the URL of the widgets bucket.
+E.g if you created a bucket called "widgets" in Supabase Storage:
+
+```bash 
+# UPLOAD
+supabase storage cp -r dist/resources/widgets ss://widgets/ --experimental
+```
+and then set the MCP_URL environment variable to the URL of the widgets bucket.
 
 ```bash
 export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets" 
