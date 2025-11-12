@@ -450,6 +450,7 @@ See our [contributing guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRI
 - [Creating MCP Tools](https://github.com/mcp-use/mcp-use/tree/main/packages/mcp-use#-mcp-server-framework)
 - [Building UI Widgets](https://github.com/mcp-use/mcp-use/tree/main/packages/cli#-creating-ui-widgets)
 - [Using the Inspector](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)
+- [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
 
 ---
 

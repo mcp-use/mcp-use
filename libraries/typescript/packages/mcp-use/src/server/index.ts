@@ -12,23 +12,30 @@ export {
   type UrlConfig,
 } from "./adapters/mcp-ui-adapter.js";
 
+// Middleware adapter utility functions
+export {
+  adaptConnectMiddleware,
+  adaptMiddleware,
+  isExpressMiddleware,
+} from "./connect-adapter.js";
+
 export type {
+  DiscoverWidgetsOptions,
+  ExternalUrlUIResource,
   InputDefinition,
-  PromptDefinition,
   PromptCallback,
-  ResourceDefinition,
+  PromptDefinition,
+  RawHtmlUIResource,
   ReadResourceCallback,
   ReadResourceTemplateCallback,
+  RemoteDomUIResource,
+  ResourceDefinition,
   ServerConfig,
-  ToolDefinition,
   ToolCallback,
+  ToolDefinition,
   // UIResource specific types
   UIResourceDefinition,
-  ExternalUrlUIResource,
-  RawHtmlUIResource,
-  RemoteDomUIResource,
-  WidgetProps,
   WidgetConfig,
   WidgetManifest,
-  DiscoverWidgetsOptions,
+  WidgetProps,
 } from "./types/index.js";
