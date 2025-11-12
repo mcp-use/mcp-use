@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.5.0-canary.1
+
+### Patch Changes
+
+- 9388edd: Fixed canary flag not properly replacing package versions when using published templates. The `--canary` flag now correctly replaces both `workspace:*` patterns (in local development) and caret versions (in published packages) with `"canary"` versions of `mcp-use`, `@mcp-use/cli`, and `@mcp-use/inspector`.
+
 ## 0.5.0-canary.0
 
 ### Minor Changes
