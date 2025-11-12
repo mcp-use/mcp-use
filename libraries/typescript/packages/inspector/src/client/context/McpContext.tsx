@@ -22,6 +22,25 @@ export interface MCPConnection {
   error: string | null;
   authUrl: string | null;
   customHeaders?: Record<string, string>;
+  serverInfo?: {
+    name: string;
+    version?: string;
+  };
+  capabilities?: {
+    tools?: {
+      listChanged?: boolean;
+    };
+    resources?: {
+      subscribe?: boolean;
+      listChanged?: boolean;
+    };
+    prompts?: {
+      listChanged?: boolean;
+    };
+    logging?: Record<string, any>;
+    completions?: Record<string, any>;
+    [key: string]: any;
+  };
   callTool: (toolName: string, args: any) => Promise<any>;
   readResource: (uri: string) => Promise<any>;
   listPrompts: (serverName?: string) => Promise<void>;
@@ -133,10 +152,15 @@ function McpConnectionWrapper({
     // about updating one component while rendering another
     if (typeof queueMicrotask !== "undefined") {
       queueMicrotask(() => {
+        // Debug: Log serverInfo to console
+        if (mcpHook.state === "ready" && mcpHook.serverInfo) {
+          console.log("[McpContext] Server info available:", mcpHook.serverInfo);
+        }
+        
         const connection: MCPConnection = {
           id: url,
           url,
-          name,
+          name: mcpHook.serverInfo?.name || name, // Use server-provided name if available
           state: mcpHook.state,
           tools: mcpHook.tools,
           resources: mcpHook.resources,
@@ -144,6 +168,8 @@ function McpConnectionWrapper({
           error: mcpHook.error ?? null,
           authUrl: mcpHook.authUrl ?? null,
           customHeaders,
+          serverInfo: mcpHook.serverInfo,
+          capabilities: mcpHook.capabilities,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
@@ -161,6 +187,7 @@ function McpConnectionWrapper({
           prev.state !== connection.state ||
           prev.error !== connection.error ||
           prev.authUrl !== connection.authUrl ||
+          prev.name !== connection.name ||
           prev.tools.length !== connection.tools.length ||
           prev.resources.length !== connection.resources.length ||
           prev.prompts.length !== connection.prompts.length ||
@@ -175,7 +202,7 @@ function McpConnectionWrapper({
       const connection: MCPConnection = {
         id: url,
         url,
-        name,
+        name: mcpHook.serverInfo?.name || name, // Use server-provided name if available
         state: mcpHook.state,
         tools: mcpHook.tools,
         resources: mcpHook.resources,
@@ -183,6 +210,8 @@ function McpConnectionWrapper({
         error: mcpHook.error ?? null,
         authUrl: mcpHook.authUrl ?? null,
         customHeaders,
+        serverInfo: mcpHook.serverInfo,
+        capabilities: mcpHook.capabilities,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
@@ -200,6 +229,7 @@ function McpConnectionWrapper({
         prev.state !== connection.state ||
         prev.error !== connection.error ||
         prev.authUrl !== connection.authUrl ||
+        prev.name !== connection.name ||
         prev.tools.length !== connection.tools.length ||
         prev.resources.length !== connection.resources.length ||
         prev.prompts.length !== connection.prompts.length ||
@@ -218,6 +248,8 @@ function McpConnectionWrapper({
     mcpHook.prompts,
     mcpHook.error,
     mcpHook.authUrl,
+    mcpHook.serverInfo,
+    mcpHook.capabilities,
     mcpHook.client,
   ]);
 
@@ -306,6 +338,26 @@ export function McpProvider({ children }: { children: ReactNode }) {
       new Map(prev).set(connection.id, connection)
     );
     setConnectionVersion((v) => v + 1);
+    
+    // If the connection has serverInfo with a name, update the saved connection name
+    if (connection.serverInfo?.name && connection.state === "ready") {
+      setSavedConnections((prev) => {
+        const existingConnection = prev.find((c) => c.id === connection.id);
+        if (existingConnection && existingConnection.name !== connection.serverInfo!.name) {
+          const updated = prev.map((c) =>
+            c.id === connection.id
+              ? { ...c, name: connection.serverInfo!.name }
+              : c
+          );
+          localStorage.setItem(
+            "mcp-inspector-connections",
+            JSON.stringify(updated)
+          );
+          return updated;
+        }
+        return prev;
+      });
+    }
   }, []);
 
   const addConnection = useCallback(

@@ -81,6 +81,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ResourceTemplate[]
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [serverInfo, setServerInfo] = useState<{ name: string; version?: string }>();
+  const [capabilities, setCapabilities] = useState<Record<string, any>>();
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
@@ -291,6 +293,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         await session.initialize();
 
         addLog("info", "✅ Successfully connected to MCP server");
+        addLog("info", "Server info:", session.connector.serverInfo);
+        addLog("info", "Server capabilities:", session.connector.serverCapabilities);
+        console.log("[useMcp] Server info:", session.connector.serverInfo);
+        console.log("[useMcp] Server capabilities:", session.connector.serverCapabilities);
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
 
@@ -300,6 +306,20 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setResources(resourcesResult.resources || []);
         const promptsResult = await session.connector.listPrompts();
         setPrompts(promptsResult.prompts || []);
+
+        // Get serverInfo and capabilities from the connector (populated during initialize)
+        const serverInfo = session.connector.serverInfo;
+        const capabilities = session.connector.serverCapabilities;
+        
+        if (serverInfo) {
+          console.log("[useMcp] Server info:", serverInfo);
+          setServerInfo(serverInfo);
+        }
+        
+        if (capabilities) {
+          console.log("[useMcp] Server capabilities:", capabilities);
+          setCapabilities(capabilities);
+        }
 
         return "success";
       } catch (err: any) {
@@ -851,6 +871,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     resources,
     resourceTemplates,
     prompts,
+    serverInfo,
+    capabilities,
     error,
     log,
     authUrl,
