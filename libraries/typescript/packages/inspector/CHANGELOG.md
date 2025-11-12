@@ -1,5 +1,19 @@
 # @mcp-use/inspector
 
+## 0.5.0-canary.0
+
+### Minor Changes
+
+- 3db425d: Migrated mcp-use server from Express to Hono framework to enable edge runtime support (Cloudflare Workers, Deno Deploy, Supabase Edge Functions). Added runtime detection for Deno/Node.js environments, Connect middleware adapter for compatibility, and `getHandler()` method for edge deployment. Updated dependencies: added `hono` and `@hono/node-server`, moved `connect` and `node-mocks-http` to optional dependencies, removed `express` and `cors` from peer dependencies.
+
+  Added Supabase deployment documentation and example templates to create-mcp-use-app for easier edge runtime deployment.
+
+### Patch Changes
+
+- f25018a: Removed non functional setting button and removed tool input formatting that made it annoying to type arrays
+- Updated dependencies [3db425d]
+  - mcp-use@1.3.0-canary.0
+
 ## 0.4.13
 
 ### Patch Changes
