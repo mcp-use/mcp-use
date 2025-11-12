@@ -1315,28 +1315,38 @@ if (container && Component) {
 
     console.log("widgetsDir", widgetsDir);
 
-
     // Setup static file serving routes
     this.setupWidgetRoutes();
 
     // Discover built widgets from manifest
-    const manifestPath = './dist/mcp-use.json';
+    const manifestPath = "./dist/mcp-use.json";
     let widgets: string[] = [];
     let widgetsMetadata: Record<string, any> = {};
 
     try {
-      const manifestContent = await fsHelpers.readFileSync(manifestPath, "utf8");
+      const manifestContent = await fsHelpers.readFileSync(
+        manifestPath,
+        "utf8"
+      );
       const manifest = JSON.parse(manifestContent);
-      
-      if (manifest.widgets && typeof manifest.widgets === 'object' && !Array.isArray(manifest.widgets)) {
+
+      if (
+        manifest.widgets &&
+        typeof manifest.widgets === "object" &&
+        !Array.isArray(manifest.widgets)
+      ) {
         // New format: widgets is an object with widget names as keys and metadata as values
         widgets = Object.keys(manifest.widgets);
         widgetsMetadata = manifest.widgets;
-        console.log(`[WIDGETS] Loaded ${widgets.length} widget(s) from manifest`);
+        console.log(
+          `[WIDGETS] Loaded ${widgets.length} widget(s) from manifest`
+        );
       } else if (manifest.widgets && Array.isArray(manifest.widgets)) {
         // Legacy format: widgets is an array of strings
         widgets = manifest.widgets;
-        console.log(`[WIDGETS] Loaded ${widgets.length} widget(s) from manifest (legacy format)`);
+        console.log(
+          `[WIDGETS] Loaded ${widgets.length} widget(s) from manifest (legacy format)`
+        );
       } else {
         console.log("[WIDGETS] No widgets found in manifest");
       }
@@ -1345,7 +1355,7 @@ if (container && Component) {
         "[WIDGETS] Could not read manifest file, falling back to directory listing:",
         error
       );
-      
+
       // Fallback to directory listing if manifest doesn't exist
       try {
         const allEntries = await fsHelpers.readdirSync(widgetsDir);
@@ -1362,9 +1372,7 @@ if (container && Component) {
     }
 
     if (widgets.length === 0) {
-      console.log(
-        "[WIDGETS] No built widgets found"
-      );
+      console.log("[WIDGETS] No built widgets found");
       return;
     }
 

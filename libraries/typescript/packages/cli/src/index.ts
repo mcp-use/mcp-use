@@ -431,18 +431,14 @@ program
       console.log(chalk.green("✓ TypeScript build complete!"));
 
       // Create build manifest
-      const manifestPath = path.join(
-        projectPath,
-        "dist",
-        "mcp-use.json"
-      );
-      
+      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+
       // Transform builtWidgets array into widgets object with metadata
       const widgetsData: Record<string, any> = {};
       for (const widget of builtWidgets) {
         widgetsData[widget.name] = widget.metadata;
       }
-      
+
       const manifest = {
         includeInspector: options.withInspector || false,
         buildTime: new Date().toISOString(),
