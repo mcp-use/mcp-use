@@ -189,7 +189,7 @@ export class McpServer {
       get(target, prop) {
         // Special handling for 'use' method to auto-detect and adapt Express middleware
         if (prop === "use") {
-          return (...args: any[]) => {
+          return async (...args: any[]) => {
             // Hono's use signature: use(path?, ...handlers)
             // Check if the first arg is a path (string) or a handler (function)
             const hasPath = typeof args[0] === "string";
@@ -213,8 +213,8 @@ export class McpServer {
 
             if (hasExpressMiddleware) {
               // We need to handle async adaptation
-              // Create a wrapper that adapts middleware on first call
-              Promise.all(
+              // Await the adaptation to ensure middleware is registered before proceeding
+              await Promise.all(
                 adaptedHandlers.map(async (h: any) => {
                   if (h.__isExpressMiddleware) {
                     const adapted = await adaptConnectMiddleware(
@@ -236,12 +236,7 @@ export class McpServer {
                     }
                   }
                 })
-              ).catch((err) => {
-                console.error(
-                  "[MIDDLEWARE] Failed to adapt Express middleware:",
-                  err
-                );
-              });
+              );
 
               return target;
             }
