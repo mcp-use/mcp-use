@@ -63,6 +63,13 @@ export type UseMcpResult = {
   resourceTemplates: ResourceTemplate[];
   /** List of prompts available from the connected MCP server */
   prompts: Prompt[];
+  /** Server information from the initialize response */
+  serverInfo?: {
+    name: string;
+    version?: string;
+  };
+  /** Server capabilities from the initialize response */
+  capabilities?: Record<string, any>;
   /**
    * The current state of the MCP connection:
    * - 'discovering': Checking server existence and capabilities (including auth requirements).
