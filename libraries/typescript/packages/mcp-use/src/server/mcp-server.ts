@@ -256,6 +256,14 @@ export class McpServer {
   }
 
   /**
+   * Gets the server base URL with fallback to host:port if not configured
+   * @returns The complete base URL for the server
+   */
+  private getServerBaseUrl(): string {
+    return this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort}`;
+  }
+
+  /**
    * Define a static resource that can be accessed by clients
    *
    * Registers a resource with the MCP server that clients can access via HTTP.
@@ -1060,8 +1068,7 @@ if (container && Component) {
     }
 
     // Build the server origin URL
-    const serverOrigin =
-      this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort}`;
+    const serverOrigin = this.getServerBaseUrl();
 
     // Create a single shared Vite dev server for all widgets
     console.log(
@@ -1207,20 +1214,23 @@ if (container && Component) {
           }
         }
 
+        // Get the base URL with fallback
+        const baseUrl = this.getServerBaseUrl();
+        
         // replace relative path that starts with /mcp-use script and css with absolute
         html = html.replace(
           /src="\/mcp-use\/widgets\/([^"]+)"/g,
-          `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+          `src="${baseUrl}/mcp-use/widgets/$1"`
         );
         html = html.replace(
           /href="\/mcp-use\/widgets\/([^"]+)"/g,
-          `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+          `href="${baseUrl}/mcp-use/widgets/$1"`
         );
 
         // add window.__getFile to head
         html = html.replace(
           /<head[^>]*>/i,
-          `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widget.name}/"+filename }</script>`
+          `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widget.name}/"+filename }</script>`
         );
       } catch (error) {
         console.error(
@@ -1411,20 +1421,23 @@ if (container && Component) {
             }
           }
 
+          // Get the base URL with fallback
+          const baseUrl = this.getServerBaseUrl();
+          
           // replace relative path that starts with /mcp-use script and css with absolute
           html = html.replace(
             /src="\/mcp-use\/widgets\/([^"]+)"/g,
-            `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+            `src="${baseUrl}/mcp-use/widgets/$1"`
           );
           html = html.replace(
             /href="\/mcp-use\/widgets\/([^"]+)"/g,
-            `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+            `href="${baseUrl}/mcp-use/widgets/$1"`
           );
 
           // add window.__getFile to head
           html = html.replace(
             /<head[^>]*>/i,
-            `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widgetName}/"+filename }</script>`
+            `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widgetName}/"+filename }</script>`
           );
         }
       } catch (error) {
@@ -2163,20 +2176,24 @@ if (container && Component) {
 
       try {
         let html = await fsHelpers.readFileSync(filePath, "utf8");
+        
+        // Get the base URL with fallback
+        const baseUrl = this.getServerBaseUrl();
+        
         // replace relative path that starts with /mcp-use script and css with absolute
         html = html.replace(
           /src="\/mcp-use\/widgets\/([^"]+)"/g,
-          `src="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+          `src="${baseUrl}/mcp-use/widgets/$1"`
         );
         html = html.replace(
           /href="\/mcp-use\/widgets\/([^"]+)"/g,
-          `href="${this.serverBaseUrl}/mcp-use/widgets/$1"`
+          `href="${baseUrl}/mcp-use/widgets/$1"`
         );
 
         // add window.__getFile to head
         html = html.replace(
           /<head[^>]*>/i,
-          `<head>\n    <script>window.__getFile = (filename) => { return "${this.serverBaseUrl}/mcp-use/widgets/${widget}/"+filename }</script>`
+          `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widget}/"+filename }</script>`
         );
 
         return c.html(html);
