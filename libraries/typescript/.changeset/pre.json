@@ -9,6 +9,7 @@
   },
   "changesets": [
     "busy-foxes-grab",
-    "few-insects-sing"
+    "few-insects-sing",
+    "fix-canary-version-replacement"
   ]
 }
