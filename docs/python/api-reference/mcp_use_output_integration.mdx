@@ -1,0 +1,187 @@
+---
+title: "Integration"
+description: "Integration helpers for connecting output formatting with MCPAgent API Documentation"
+icon: "link-2"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/integration.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/integration.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/output/integration.py</a>
+</Callout>
+
+Integration helpers for connecting output formatting with MCPAgent.
+
+This module provides helper functions and decorators to seamlessly
+integrate pretty printing into agent run() and stream() methods.
+
+## OutputCapture
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> OutputCapture</div>
+
+Context manager for capturing agent execution metadata.
+
+    This can be used to track execution time and collect steps.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.output.integration import OutputCapture
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize output capture.
+
+**Signature**
+```python wrap
+def __init__():
+```
+
+</Card>
+<Card type="info">
+### `method` add_step
+
+Add a reasoning step.
+
+
+**Parameters**
+><ParamField body="step" type="dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
+
+**Signature**
+```python wrap
+def add_step(step: dict[str, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_execution_time_ms
+
+Get execution time in milliseconds.
+
+
+**Returns**
+><ResponseField name="returns" type="int | None" />
+
+**Signature**
+```python wrap
+def get_execution_time_ms():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_steps
+
+Get collected steps.
+
+
+**Returns**
+><ResponseField name="returns" type="list[dict[str, Any]]" />
+
+**Signature**
+```python wrap
+def get_steps():
+```
+
+</Card>
+
+</div>
+
+
+## format_and_print_result
+<Card type="info">
+### `function` format_and_print_result
+
+Format and print query and result in clean panels (for run()).
+
+
+```python
+from mcp_use.output.integration import format_and_print_result
+```
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   User's query/message </ParamField>
+><ParamField body="result" type="Any" required="True" >   Agent's result </ParamField>
+><ParamField body="execution_time_ms" type="int | None" default="None" >   Execution time in milliseconds </ParamField>
+><ParamField body="steps" type="list[dict[str, typing.Any]] | None" default="None" >   Optional reasoning steps </ParamField>
+><ParamField body="config" type="mcp_use.output.config.OutputConfig | None" default="None" >   Output configuration </ParamField>
+
+**Signature**
+```python wrap
+def format_and_print_result(
+query: str,
+    result: Any,
+    execution_time_ms: int | None = None,
+    steps: list[dict[str,
+    typing.Any]] | None = None,
+    config: mcp_use.output.config.OutputConfig | None = None
+):
+```
+
+</Card>
+
+
+## format_error
+<Card type="info">
+### `function` format_error
+
+Format and print error in a panel.
+
+
+```python
+from mcp_use.output.integration import format_error
+```
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   User's query that caused the error </ParamField>
+><ParamField body="error" type="str" required="True" >   Error message </ParamField>
+><ParamField body="config" type="mcp_use.output.config.OutputConfig | None" default="None" >   Output configuration </ParamField>
+
+**Signature**
+```python wrap
+def format_error(query: str, error: str, config: mcp_use.output.config.OutputConfig | None = None):
+```
+
+</Card>
+
+
+## format_stream_with_panels
+<Card type="info">
+### `function` format_stream_with_panels
+
+Format agent stream with live panel updates (for stream()).
+
+    Yields:
+        Original stream items (passthrough for backward compatibility)
+
+```python
+from mcp_use.output.integration import format_stream_with_panels
+```
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   User's query/message </ParamField>
+><ParamField body="stream" type="AsyncGenerator" required="True" >   Agent's stream generator </ParamField>
+><ParamField body="config" type="mcp_use.output.config.OutputConfig | None" default="None" >   Output configuration </ParamField>
+><ParamField body="stream_intermediate_steps" type="bool" default="False" >   Whether to show steps during streaming </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="AsyncGenerator" />
+
+**Signature**
+```python wrap
+def format_stream_with_panels(
+query: str,
+    stream: AsyncGenerator,
+    config: mcp_use.output.config.OutputConfig | None = None,
+    stream_intermediate_steps: bool = False
+):
+```
+
+</Card>
