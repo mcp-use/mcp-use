@@ -190,6 +190,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.2
         version: 19.2.3(@types/react@19.2.3)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
 
   packages/create-mcp-use-app/src/templates/mcp-ui:
     dependencies:
@@ -221,6 +224,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.2
         version: 19.2.3(@types/react@19.2.3)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
 
   packages/create-mcp-use-app/src/templates/starter:
     dependencies:
@@ -252,6 +258,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.2
         version: 19.2.3(@types/react@19.2.3)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
 
   packages/inspector:
     dependencies:
