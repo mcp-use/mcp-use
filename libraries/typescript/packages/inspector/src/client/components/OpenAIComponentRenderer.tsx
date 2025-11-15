@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { cn } from "@/client/lib/utils";
+import { useEffect, useRef, useState } from "react";
 import { useMcpContext } from "../context/McpContext";
 import { Spinner } from "./ui/spinner";
 
@@ -85,6 +85,9 @@ export function OpenAIComponentRenderer({
           toolName,
           toolArgs,
           toolResult: JSON.stringify(toolResult).substring(0, 200),
+          toolResultKeys: toolResult ? Object.keys(toolResult) : [],
+          hasToolResultMeta: !!toolResult?._meta,
+          hasToolResultContents: !!toolResult?.contents,
         });
 
         // Extract structured content from tool result (the actual tool parameters)
@@ -98,6 +101,17 @@ export function OpenAIComponentRenderer({
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await readResource(componentUrl);
 
+        console.log("[OpenAIComponentRenderer] Resource data:", {
+          hasContents: !!resourceData?.contents,
+          firstContentKeys: resourceData?.contents?.[0]
+            ? Object.keys(resourceData.contents[0])
+            : [],
+          hasMeta: !!resourceData?.contents?.[0]?._meta,
+          metaKeys: resourceData?.contents?.[0]?._meta
+            ? Object.keys(resourceData.contents[0]._meta)
+            : [],
+        });
+
         // For Apps SDK widgets, use structuredContent as toolInput (the actual tool parameters)
         // toolArgs might be empty or from the initial invocation, structuredContent has the real data
         const widgetToolInput = structuredContent || toolArgs;
@@ -109,9 +123,12 @@ export function OpenAIComponentRenderer({
         });
 
         // Extract CSP metadata from tool result
+        // Check both toolResult._meta (for tool calls) and toolResult.contents?.[0]?._meta (for resources)
         let widgetCSP = null;
-        if (toolResult?._meta?.["openai/widgetCSP"]) {
-          widgetCSP = toolResult._meta["openai/widgetCSP"];
+        const metaSource =
+          toolResult?._meta || toolResult?.contents?.[0]?._meta;
+        if (metaSource?.["openai/widgetCSP"]) {
+          widgetCSP = metaSource["openai/widgetCSP"];
         }
 
         console.log("[OpenAIComponentRenderer] Widget CSP:", widgetCSP);
@@ -145,11 +162,7 @@ export function OpenAIComponentRenderer({
           );
         }
 
-        // if the url is the same means we are in dev mode so set widget URL directly to content endpoint (skip container page)
-        // to enable hrm show vite instead
-        // use the mcp server base url
-
-        // pass props as url params (toolInpu, toolOutput)
+        // pass props as url params (toolInput, toolOutput)
         const urlParams = new URLSearchParams();
         const params = {
           toolInput: widgetToolInput,
@@ -158,17 +171,38 @@ export function OpenAIComponentRenderer({
         };
         urlParams.set("mcpUseParams", JSON.stringify(params));
 
-        if (
-          toolResult?._meta?.["mcp-use/widget"]?.html &&
-          toolResult?._meta?.["mcp-use/widget"]?.dev
-        ) {
-          setWidgetUrl(
-            `${new URL(serverBaseUrl || "").origin}/mcp-use/widgets/${toolResult?._meta?.["mcp-use/widget"]?.name}?${urlParams.toString()}`
-          );
+        // Check for dev mode widget - check both _meta locations
+        const metaForWidget =
+          toolResult?._meta || toolResult?.contents?.[0]?._meta;
+
+        console.log("[OpenAIComponentRenderer] Checking for dev mode widget:", {
+          hasMeta: !!metaForWidget,
+          metaKeys: metaForWidget ? Object.keys(metaForWidget) : [],
+          hasWidgetMeta: !!metaForWidget?.["mcp-use/widget"],
+          widgetMeta: metaForWidget?.["mcp-use/widget"],
+          checkedFromToolResultMeta: !!toolResult?._meta,
+          checkedFromContentsMeta: !!toolResult?.contents?.[0]?._meta,
+          serverBaseUrl,
+        });
+
+        // Use dev mode if metadata says so
+        const useDevMode =
+          metaForWidget?.["mcp-use/widget"]?.html &&
+          metaForWidget?.["mcp-use/widget"]?.dev;
+
+        const widgetName = metaForWidget?.["mcp-use/widget"]?.name;
+
+        if (useDevMode && widgetName && serverBaseUrl) {
+          const devUrl = `${new URL(serverBaseUrl).origin}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
+          console.log("[OpenAIComponentRenderer] Using DEV mode URL:", devUrl);
+          setWidgetUrl(devUrl);
         } else {
-          setWidgetUrl(
-            `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`
+          const prodUrl = `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`;
+          console.log(
+            "[OpenAIComponentRenderer] Using PROD mode URL:",
+            prodUrl
           );
+          setWidgetUrl(prodUrl);
         }
       } catch (error) {
         console.error("Error storing widget data:", error);
@@ -179,7 +213,15 @@ export function OpenAIComponentRenderer({
     };
 
     storeAndSetUrl();
-  }, [componentUrl, serverId, toolArgs, toolResult, toolId, readResource]);
+  }, [
+    componentUrl,
+    serverId,
+    toolArgs,
+    toolResult,
+    toolId,
+    readResource,
+    serverBaseUrl,
+  ]);
 
   // Handle postMessage communication with iframe
   useEffect(() => {
@@ -334,7 +376,7 @@ export function OpenAIComponentRenderer({
       <div
         ref={containerRef}
         className={cn(
-          "w-full h-full flex justify-center",
+          "w-full h-full flex justify-center items-center",
           centerVertically && "items-center"
         )}
       >

@@ -769,16 +769,16 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   let modifiedHtml;
   if (htmlContent.includes("<html>") && htmlContent.includes("<head>")) {
     // If it's a full HTML document, inject at the beginning of head
+    // Preserve any existing base tag instead of commenting it out
     modifiedHtml = htmlContent.replace(
       "<head>",
-      `<head><!-- <base href="/"> -->${apiScript}`
+      `<head>${apiScript}`
     );
   } else {
     // Widget HTML is just fragments, wrap it properly
     modifiedHtml = `<!DOCTYPE html>
 <html>
 <head>
-  <!-- <base href="/"> -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   ${apiScript}

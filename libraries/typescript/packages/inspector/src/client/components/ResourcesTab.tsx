@@ -1,5 +1,4 @@
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
-import type { ResourceResult } from "./resources";
 import {
   useCallback,
   useEffect,
@@ -8,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { ResourceResult } from "./resources";
 
 import {
   ResizableHandle,
@@ -55,6 +55,7 @@ export function ResourcesTab({
   const [previewMode, setPreviewMode] = useState(true);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const [isCopied, setIsCopied] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const resourceDisplayRef = useRef<HTMLDivElement>(null);
 
@@ -253,6 +254,8 @@ export function ResourcesTab({
       await navigator.clipboard.writeText(
         JSON.stringify(currentResult.result, null, 2)
       );
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
     } catch (error) {
       console.error("[ResourcesTab] Failed to copy result:", error);
     }
@@ -336,6 +339,7 @@ export function ResourcesTab({
             onCopy={handleCopy}
             onDownload={handleDownload}
             onFullscreen={handleFullscreen}
+            isCopied={isCopied}
           />
         </div>
       </ResizablePanel>

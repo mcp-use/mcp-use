@@ -1,30 +1,30 @@
 import {
-  McpServer as OfficialMcpServer,
-  ResourceTemplate,
+    McpServer as OfficialMcpServer,
+    ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
 import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import {
-  createUIResourceFromDefinition,
-  type UrlConfig,
+    createUIResourceFromDefinition,
+    type UrlConfig,
 } from "./adapters/mcp-ui-adapter.js";
 import {
-  adaptConnectMiddleware,
-  isExpressMiddleware,
+    adaptConnectMiddleware,
+    isExpressMiddleware,
 } from "./connect-adapter.js";
 import { requestLogger } from "./logging.js";
 import type {
-  InputDefinition,
-  PromptDefinition,
-  ResourceDefinition,
-  ResourceTemplateDefinition,
-  ServerConfig,
-  ToolDefinition,
-  UIResourceContent,
-  UIResourceDefinition,
-  WidgetProps,
+    InputDefinition,
+    PromptDefinition,
+    ResourceDefinition,
+    ResourceTemplateDefinition,
+    ServerConfig,
+    ToolDefinition,
+    UIResourceContent,
+    UIResourceDefinition,
+    WidgetProps,
 } from "./types/index.js";
 import type { WidgetMetadata } from "./types/widget.js";
 
@@ -768,7 +768,18 @@ export class McpServer {
       port: configPort,
     };
 
-    return createUIResourceFromDefinition(definition, params, urlConfig);
+    const uiResource = createUIResourceFromDefinition(definition, params, urlConfig);
+
+    // Merge definition._meta into the resource's _meta
+    // This includes mcp-use/widget metadata alongside appsSdkMetadata
+    if (definition._meta && Object.keys(definition._meta).length > 0) {
+      uiResource.resource._meta = {
+        ...uiResource.resource._meta,
+        ...definition._meta,
+      };
+    }
+
+    return uiResource;
   }
 
   /**
@@ -1185,8 +1196,8 @@ if (container && Component) {
           pathHelpers.join(tempDir, widget.name, "index.html"),
           "utf8"
         );
-        // Inject or replace base tag with MCP_URL
-        const mcpUrl = getEnv("MCP_URL") || "/";
+        // Inject or replace base tag with server base URL
+        const mcpUrl = this.getServerBaseUrl();
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
           const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
@@ -1391,10 +1402,10 @@ if (container && Component) {
       // Read the HTML template
       let html = "";
       try {
-        html = await fsHelpers.readFileSync(indexPath, "utf8");
+        html = await fsHelpers.readFileSync(indexPath, "utf8"        );
 
-        // Inject or replace base tag with MCP_URL
-        const mcpUrl = getEnv("MCP_URL") || "/";
+        // Inject or replace base tag with server base URL
+        const mcpUrl = this.getServerBaseUrl();
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
           const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
@@ -1421,7 +1432,7 @@ if (container && Component) {
             }
           }
 
-          // Get the base URL with fallback
+          // Get the base URL with fallback (same as mcpUrl, but keeping for clarity)
           const baseUrl = this.getServerBaseUrl();
           
           // replace relative path that starts with /mcp-use script and css with absolute

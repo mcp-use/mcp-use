@@ -194,6 +194,8 @@ function McpConnectionWrapper({
           prev.tools.length !== connection.tools.length ||
           prev.resources.length !== connection.resources.length ||
           prev.prompts.length !== connection.prompts.length ||
+          prev.serverInfo !== connection.serverInfo ||
+          prev.capabilities !== connection.capabilities ||
           !prev.client
         ) {
           prevConnectionRef.current = connection;
@@ -236,6 +238,8 @@ function McpConnectionWrapper({
         prev.tools.length !== connection.tools.length ||
         prev.resources.length !== connection.resources.length ||
         prev.prompts.length !== connection.prompts.length ||
+        prev.serverInfo !== connection.serverInfo ||
+        prev.capabilities !== connection.capabilities ||
         !prev.client
       ) {
         prevConnectionRef.current = connection;
