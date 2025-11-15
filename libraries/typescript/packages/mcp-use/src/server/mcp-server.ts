@@ -260,7 +260,17 @@ export class McpServer {
    * @returns The complete base URL for the server
    */
   private getServerBaseUrl(): string {
-    return this.serverBaseUrl || `http://${this.serverHost}:${this.serverPort}`;
+    // First check if baseUrl was explicitly set in config
+    if (this.serverBaseUrl) {
+      return this.serverBaseUrl;
+    }
+    // Then check MCP_URL environment variable
+    const mcpUrl = getEnv("MCP_URL");
+    if (mcpUrl) {
+      return mcpUrl;
+    }
+    // Finally fall back to host:port
+    return `http://${this.serverHost}:${this.serverPort}`;
   }
 
   /**
