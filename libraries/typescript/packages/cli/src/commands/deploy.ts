@@ -1,16 +1,22 @@
 import chalk from "chalk";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { McpUseAPI, CreateDeploymentRequest, Deployment } from "../utils/api.js";
 import { isLoggedIn } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import open from "open";
+
+const execAsync = promisify(exec);
 
 interface DeployOptions {
   open?: boolean;
   name?: string;
   port?: number;
   runtime?: "node" | "python";
+  fromSource?: boolean;
 }
 
 /**
@@ -154,73 +160,234 @@ async function prompt(question: string): Promise<boolean> {
 }
 
 /**
- * Display deployment progress
+ * Create a tarball of the project, excluding common build artifacts and dependencies
+ */
+async function createTarball(cwd: string): Promise<string> {
+  const tmpDir = os.tmpdir();
+  const tarballPath = path.join(tmpDir, `mcp-deploy-${Date.now()}.tar.gz`);
+
+  // Common patterns to exclude
+  const excludePatterns = [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    ".next",
+    ".venv",
+    "__pycache__",
+    "*.pyc",
+    ".DS_Store",
+    ".env",
+    ".env.local",
+    "*.log",
+  ];
+
+  // Build tar exclude flags
+  const excludeFlags = excludePatterns
+    .map((pattern) => `--exclude='${pattern}'`)
+    .join(" ");
+
+  // Create tarball
+  const command = `tar ${excludeFlags} -czf "${tarballPath}" -C "${cwd}" .`;
+
+  try {
+    await execAsync(command);
+    return tarballPath;
+  } catch (error) {
+    throw new Error(
+      `Failed to create tarball: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}
+
+/**
+ * Get file size in human-readable format
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+/**
+ * Display deployment progress with spinner
  */
 async function displayDeploymentProgress(
   api: McpUseAPI,
   deployment: Deployment
 ): Promise<void> {
-  console.log(chalk.gray("\nStreaming deployment logs...\n"));
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let frameIndex = 0;
+  let spinnerInterval: NodeJS.Timeout | null = null;
+  let lastStep = "";
+  
+  const startSpinner = (message: string) => {
+    if (spinnerInterval) {
+      clearInterval(spinnerInterval);
+    }
+    
+    // Clear the line
+    process.stdout.write("\r\x1b[K");
+    
+    spinnerInterval = setInterval(() => {
+      const frame = frames[frameIndex];
+      frameIndex = (frameIndex + 1) % frames.length;
+      process.stdout.write(
+        "\r" + chalk.cyan(frame) + " " + chalk.gray(message)
+      );
+    }, 80);
+  };
+
+  const stopSpinner = () => {
+    if (spinnerInterval) {
+      clearInterval(spinnerInterval);
+      spinnerInterval = null;
+      process.stdout.write("\r\x1b[K");
+    }
+  };
+
+  console.log();
+  startSpinner("Deploying...");
+
+  let lastLogLength = 0;
+  let previousBuildLogs = "";
 
   try {
     for await (const log of api.streamDeploymentLogs(deployment.id)) {
-      // Parse structured logs if they're JSON
       try {
         const logData = JSON.parse(log);
-        if (logData.step) {
-          console.log(chalk.cyan(`[${logData.step}]`), logData.message || "");
-        } else if (logData.message) {
-          console.log(chalk.gray(logData.message));
-        } else {
-          console.log(chalk.gray(log));
+        if (logData.step && logData.step !== lastStep) {
+          lastStep = logData.step;
+          const stepMessages: Record<string, string> = {
+            clone: "Preparing source code...",
+            analyze: "Analyzing project...",
+            build: "Building container image...",
+            deploy: "Deploying to cloud...",
+          };
+          const message = stepMessages[logData.step] || "Deploying...";
+          startSpinner(message);
+        }
+        
+        // Display the log line
+        if (logData.line) {
+          stopSpinner();
+          const levelColor = logData.level === "error" ? chalk.red : 
+                            logData.level === "warn" ? chalk.yellow : chalk.gray;
+          const stepPrefix = logData.step ? chalk.cyan(`[${logData.step}]`) + " " : "";
+          console.log(stepPrefix + levelColor(logData.line));
         }
       } catch {
-        // Not JSON, just print as-is
-        console.log(chalk.gray(log));
+        // Ignore non-JSON logs
       }
     }
   } catch (error) {
-    console.log(
-      chalk.yellow(
-        "\n⚠️  Log streaming ended. Checking final deployment status..."
-      )
-    );
+    // Stream ended or error occurred
+    stopSpinner();
   }
 
-  // Check final status
-  const finalDeployment = await api.getDeployment(deployment.id);
-
-  console.log();
-  if (finalDeployment.status === "running") {
-    console.log(chalk.green.bold("✓ Deployment successful!"));
-    console.log();
-    console.log(
-      chalk.white("Deployment URL: ") +
-        chalk.cyan(`https://${finalDeployment.domain}`)
-    );
-    if (finalDeployment.customDomain) {
+  // Poll for final status with exponential backoff
+  let checkCount = 0;
+  const maxChecks = 60; // Max 60 checks
+  let delay = 3000; // Start with 3 seconds
+  const maxDelay = 10000; // Max 10 seconds between checks
+  let lastDisplayedLogLength = 0;
+  
+  while (checkCount < maxChecks) {
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    const finalDeployment = await api.getDeployment(deployment.id);
+    
+    // Display new build logs if available
+    if (finalDeployment.buildLogs && finalDeployment.buildLogs.length > lastDisplayedLogLength) {
+      const newLogs = finalDeployment.buildLogs.substring(lastDisplayedLogLength);
+      const logLines = newLogs.split('\n').filter(l => l.trim());
+      
+      for (const line of logLines) {
+        try {
+          const logData = JSON.parse(line);
+          if (logData.line) {
+            stopSpinner();
+            const levelColor = logData.level === "error" ? chalk.red : 
+                              logData.level === "warn" ? chalk.yellow : chalk.gray;
+            const stepPrefix = logData.step ? chalk.cyan(`[${logData.step}]`) + " " : "";
+            console.log(stepPrefix + levelColor(logData.line));
+          }
+        } catch {
+          // Skip invalid JSON
+        }
+      }
+      
+      lastDisplayedLogLength = finalDeployment.buildLogs.length;
+    }
+    
+    if (finalDeployment.status === "running") {
+      const mcpUrl = `https://${finalDeployment.domain}/mcp`;
+      const inspectorUrl = `https://inspector.mcp-use.com/inspect?autoConnect=${encodeURIComponent(mcpUrl)}`;
+      
+      console.log(chalk.green.bold("✓ Deployment successful!\n"));
+      console.log(chalk.white("🌐 MCP Server URL:"));
+      console.log(chalk.cyan.bold(`   ${mcpUrl}\n`));
+      
+      console.log(chalk.white("🔍 Inspector URL:"));
+      console.log(chalk.cyan.bold(`   ${inspectorUrl}\n`));
+      
+      if (finalDeployment.customDomain) {
+        const customMcpUrl = `https://${finalDeployment.customDomain}/mcp`;
+        const customInspectorUrl = `https://inspector.mcp-use.com/inspect?autoConnect=${encodeURIComponent(customMcpUrl)}`;
+        
+        console.log(chalk.white("🔗 Custom Domain:"));
+        console.log(chalk.cyan.bold(`   ${customMcpUrl}\n`));
+        console.log(chalk.white("🔍 Custom Inspector:"));
+        console.log(chalk.cyan.bold(`   ${customInspectorUrl}\n`));
+      }
+      
+      console.log(chalk.gray("Deployment ID: ") + chalk.white(finalDeployment.id));
+      return;
+    } else if (finalDeployment.status === "failed") {
+      console.log(chalk.red.bold("✗ Deployment failed\n"));
+      if (finalDeployment.error) {
+        console.log(chalk.red("Error: ") + finalDeployment.error);
+      }
+      if (finalDeployment.buildLogs) {
+        console.log(chalk.gray("\nBuild logs:"));
+        // Parse and display build logs nicely
+        try {
+          const logs = finalDeployment.buildLogs.split('\n').filter(l => l.trim());
+          for (const log of logs) {
+            try {
+              const logData = JSON.parse(log);
+              if (logData.line) {
+                console.log(chalk.gray(`  ${logData.line}`));
+              }
+            } catch {
+              console.log(chalk.gray(`  ${log}`));
+            }
+          }
+        } catch {
+          console.log(chalk.gray(finalDeployment.buildLogs));
+        }
+      }
+      process.exit(1);
+    } else if (finalDeployment.status === "building") {
+      // Still building, wait and check again with exponential backoff
+      startSpinner("Building and deploying...");
+      checkCount++;
+      // Exponential backoff: increase delay up to maxDelay
+      delay = Math.min(delay * 1.2, maxDelay);
+    } else {
       console.log(
-        chalk.white("Custom Domain:  ") +
-          chalk.cyan(`https://${finalDeployment.customDomain}`)
+        chalk.yellow("⚠️  Deployment status: ") + finalDeployment.status
       );
+      return;
     }
-    console.log(
-      chalk.white("Status:         ") + chalk.green(finalDeployment.status)
-    );
-    console.log(
-      chalk.white("Deployment ID:  ") + chalk.gray(finalDeployment.id)
-    );
-  } else if (finalDeployment.status === "failed") {
-    console.log(chalk.red.bold("✗ Deployment failed"));
-    if (finalDeployment.error) {
-      console.log(chalk.red("\nError: ") + finalDeployment.error);
-    }
-    process.exit(1);
-  } else {
-    console.log(
-      chalk.yellow("⚠️  Deployment status: ") + finalDeployment.status
-    );
   }
+  
+  // Timeout
+  stopSpinner();
+  console.log(chalk.yellow("⚠️  Deployment is taking longer than expected."));
+  console.log(chalk.gray("Check status with: ") + chalk.white(`mcp-use status ${deployment.id}`));
 }
 
 /**
@@ -262,7 +429,12 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     // Get git info
     const gitInfo = await getGitInfo(cwd);
 
-    if (gitInfo.isGitRepo && gitInfo.remoteUrl && isGitHubUrl(gitInfo.remoteUrl)) {
+    if (
+      !options.fromSource &&
+      gitInfo.isGitRepo &&
+      gitInfo.remoteUrl &&
+      isGitHubUrl(gitInfo.remoteUrl)
+    ) {
       // GitHub repo detected
       if (!gitInfo.owner || !gitInfo.repo) {
         console.log(
@@ -366,38 +538,107 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         await open(`https://${deployment.domain}`);
       }
     } else {
-      // Not a GitHub repo
-      console.log(
-        chalk.yellow(
-          "⚠️  This is not a GitHub repository or no remote is configured."
-        )
+      // Not a GitHub repo or --from-source flag - deploy from source upload
+      if (options.fromSource) {
+        console.log(
+          chalk.white("📦 Deploying from local source code (--from-source)...")
+        );
+      } else {
+        console.log(
+          chalk.yellow(
+            "⚠️  This is not a GitHub repository or no remote is configured."
+          )
+        );
+        console.log(
+          chalk.white("Deploying from local source code instead...")
+        );
+      }
+      console.log();
+
+      // Detect project settings
+      const projectName = options.name || (await getProjectName(cwd));
+      const runtime = options.runtime || (await detectRuntime(cwd));
+      const port = options.port || 3000;
+      const buildCommand = await detectBuildCommand(cwd);
+      const startCommand = await detectStartCommand(cwd);
+
+      console.log(chalk.white("Deployment configuration:"));
+      console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
+      console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
+      console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
+      if (buildCommand) {
+        console.log(
+          chalk.gray(`  Build command: `) + chalk.cyan(buildCommand)
+        );
+      }
+      if (startCommand) {
+        console.log(
+          chalk.gray(`  Start command: `) + chalk.cyan(startCommand)
+        );
+      }
+      console.log();
+
+      // Confirm deployment
+      const shouldDeploy = await prompt(
+        chalk.white("Deploy from local source? (y/n): ")
       );
+
+      if (!shouldDeploy) {
+        console.log(chalk.gray("Deployment cancelled."));
+        process.exit(0);
+      }
+
+      // Create tarball
       console.log();
+      console.log(chalk.gray("Packaging source code..."));
+      const tarballPath = await createTarball(cwd);
+      const stats = await fs.stat(tarballPath);
       console.log(
-        chalk.white(
-          "To deploy to mcp-use cloud, you need to push your code to GitHub first:"
-        )
+        chalk.green("✓ Packaged: ") + chalk.gray(formatFileSize(stats.size))
       );
-      console.log();
-      console.log(chalk.gray("  1. Initialize a git repository:"));
-      console.log(chalk.cyan("     git init"));
-      console.log();
-      console.log(chalk.gray("  2. Create a repository on GitHub"));
-      console.log();
-      console.log(chalk.gray("  3. Add the remote and push:"));
-      console.log(chalk.cyan("     git remote add origin <your-repo-url>"));
-      console.log(chalk.cyan("     git add ."));
-      console.log(chalk.cyan('     git commit -m "Initial commit"'));
-      console.log(chalk.cyan("     git push -u origin main"));
-      console.log();
-      console.log(chalk.gray("  4. Run mcp-use deploy again"));
-      console.log();
+
+      // Upload source
+      console.log(chalk.gray("Uploading source code..."));
+      const api = await McpUseAPI.create();
+      const uploadResponse = await api.uploadSource(tarballPath);
       console.log(
-        chalk.gray(
-          "Note: Direct artifact upload is not yet supported. All deployments must come from GitHub repositories."
-        )
+        chalk.green("✓ Uploaded: ") + chalk.gray(uploadResponse.uploadId)
       );
-      process.exit(1);
+
+      // Clean up tarball
+      await fs.unlink(tarballPath);
+
+      // Create deployment request
+      const deploymentRequest: CreateDeploymentRequest = {
+        name: projectName,
+        source: {
+          type: "upload",
+          uploadId: uploadResponse.uploadId,
+          runtime,
+          port,
+          buildCommand,
+          startCommand,
+        },
+        healthCheckPath: "/healthz",
+      };
+
+      // Create deployment
+      console.log(chalk.gray("Creating deployment..."));
+      const deployment = await api.createDeployment(deploymentRequest);
+
+      console.log(
+        chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
+      );
+
+      // Display progress
+      await displayDeploymentProgress(api, deployment);
+
+      // Open in browser if requested
+      if (options.open && deployment.domain) {
+        console.log();
+        console.log(chalk.gray("Opening deployment in browser..."));
+        await open(`https://${deployment.domain}`);
+      }
     }
   } catch (error) {
     console.error(

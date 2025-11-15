@@ -28,9 +28,22 @@ export interface GitHubSource {
   githubCheckRunId?: number;
 }
 
+export interface UploadSource {
+  type: "upload";
+  uploadId: string;
+  startCommand?: string;
+  runtime?: "node" | "python";
+  port?: number;
+  env?: Record<string, string>;
+  buildCommand?: string;
+  baseImage?: string;
+}
+
+export type DeploymentSource = GitHubSource | UploadSource;
+
 export interface CreateDeploymentRequest {
   name: string;
-  source: GitHubSource;
+  source: DeploymentSource;
   customDomain?: string;
   healthCheckPath?: string;
 }
@@ -39,7 +52,7 @@ export interface Deployment {
   id: string;
   userId: string;
   name: string;
-  source: GitHubSource;
+  source: DeploymentSource;
   domain?: string;
   customDomain?: string;
   port: number;
@@ -56,6 +69,12 @@ export interface Deployment {
   gitCommitSha?: string;
   gitBranch?: string;
   gitCommitMessage?: string;
+}
+
+export interface UploadResponse {
+  uploadId: string;
+  size: number;
+  filename: string;
 }
 
 /**
@@ -215,6 +234,41 @@ export class McpUseAPI {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  /**
+   * Upload source code tarball
+   */
+  async uploadSource(filePath: string): Promise<UploadResponse> {
+    const { readFile } = await import("node:fs/promises");
+    const { basename } = await import("node:path");
+    
+    const fileBuffer = await readFile(filePath);
+    const filename = basename(filePath);
+    
+    const formData = new FormData();
+    const blob = new Blob([fileBuffer], { type: "application/gzip" });
+    formData.append("file", blob, filename);
+
+    const url = `${this.baseUrl}/uploads`;
+    const headers: Record<string, string> = {};
+    
+    if (this.apiKey) {
+      headers["x-api-key"] = this.apiKey;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Upload failed: ${error}`);
+    }
+
+    return response.json() as Promise<UploadResponse>;
   }
 }
 
