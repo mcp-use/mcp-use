@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.5.1
+
+### Patch Changes
+
+- 91fdcee: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 91fdcee: chore: update dependencies
+- Updated dependencies [91fdcee]
+- Updated dependencies [91fdcee]
+  - mcp-use@1.3.1
+
 ## 0.5.1-canary.0
 
 ### Patch Changes
