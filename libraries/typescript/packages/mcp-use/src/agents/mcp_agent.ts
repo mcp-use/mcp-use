@@ -672,33 +672,31 @@ export class MCPAgent {
   /**
    * Check if a message is AI/assistant-like regardless of whether it's a class instance.
    * Handles version mismatches, serialization boundaries, and different message formats.
-   * 
+   *
    * This method solves the issue where messages from LangChain agents may be plain JavaScript
    * objects (e.g., `{ type: 'ai', content: '...' }`) instead of AIMessage instances due to
    * serialization/deserialization across module boundaries or version mismatches.
-   * 
+   *
    * @example
    * // Real AIMessage instance (standard case)
    * _isAIMessageLike(new AIMessage("hello")) // => true
-   * 
+   *
    * @example
    * // Plain object after serialization (fixes issue #446)
    * _isAIMessageLike({ type: "ai", content: "hello" }) // => true
-   * 
+   *
    * @example
    * // OpenAI-style format with role
    * _isAIMessageLike({ role: "assistant", content: "hello" }) // => true
-   * 
+   *
    * @example
    * // Object with getType() method
    * _isAIMessageLike({ getType: () => "ai", content: "hello" }) // => true
-   * 
+   *
    * @param message - The message object to check
    * @returns true if the message represents an AI/assistant message
    */
-  private _isAIMessageLike(
-    message: unknown
-  ): message is
+  private _isAIMessageLike(message: unknown): message is
     | AIMessage
     | {
         type: "ai" | "assistant";
@@ -723,7 +721,7 @@ export class MCPAgent {
     // Check for type/role properties that indicate an assistant message
     // Support multiple formats from different LangChain versions
     const msg = message as any;
-    
+
     // Try methods first (for partially deserialized objects)
     if (typeof msg.getType === "function") {
       try {
@@ -747,7 +745,7 @@ export class MCPAgent {
         // Note: Silent failure here to avoid performance impact in hot path
       }
     }
-    
+
     // Check direct properties
     if ("type" in msg) {
       return msg.type === "ai" || msg.type === "assistant";
@@ -755,27 +753,27 @@ export class MCPAgent {
     if ("role" in msg) {
       return msg.role === "ai" || msg.role === "assistant";
     }
-    
+
     return false;
   }
 
   /**
    * Check if a message has tool calls, handling both class instances and plain objects.
    * Safely checks for tool_calls array presence.
-   * 
+   *
    * @example
    * // AIMessage with tool calls
    * const msg = new AIMessage({ content: "", tool_calls: [{ name: "add", args: {} }] });
    * _messageHasToolCalls(msg) // => true
-   * 
+   *
    * @example
    * // Plain object with tool calls
    * _messageHasToolCalls({ type: "ai", tool_calls: [{ name: "add" }] }) // => true
-   * 
+   *
    * @example
    * // Message without tool calls
    * _messageHasToolCalls({ type: "ai", content: "hello" }) // => false
-   * 
+   *
    * @param message - The message object to check
    * @returns true if the message has non-empty tool_calls array
    */
@@ -795,11 +793,11 @@ export class MCPAgent {
   /**
    * Check if a message is a HumanMessage-like object.
    * Handles both class instances and plain objects from serialization.
-   * 
+   *
    * @example
    * _isHumanMessageLike(new HumanMessage("hello")) // => true
    * _isHumanMessageLike({ type: "human", content: "hello" }) // => true
-   * 
+   *
    * @param message - The message object to check
    * @returns true if the message represents a human message
    */
@@ -811,7 +809,7 @@ export class MCPAgent {
       return false;
     }
     const msg = message as any;
-    
+
     // Try methods first
     if (typeof msg.getType === "function") {
       try {
@@ -823,7 +821,7 @@ export class MCPAgent {
         // Silent failure for performance
       }
     }
-    
+
     // Check direct properties
     if ("type" in msg && (msg.type === "human" || msg.type === "user")) {
       return true;
@@ -831,18 +829,18 @@ export class MCPAgent {
     if ("role" in msg && (msg.role === "human" || msg.role === "user")) {
       return true;
     }
-    
+
     return false;
   }
 
   /**
    * Check if a message is a ToolMessage-like object.
    * Handles both class instances and plain objects from serialization.
-   * 
+   *
    * @example
    * _isToolMessageLike(new ToolMessage({ content: "result", tool_call_id: "123" })) // => true
    * _isToolMessageLike({ type: "tool", content: "result" }) // => true
-   * 
+   *
    * @param message - The message object to check
    * @returns true if the message represents a tool message
    */
@@ -854,7 +852,7 @@ export class MCPAgent {
       return false;
     }
     const msg = message as any;
-    
+
     // Try methods first
     if (typeof msg.getType === "function") {
       try {
@@ -866,26 +864,26 @@ export class MCPAgent {
         // Silent failure for performance
       }
     }
-    
+
     // Check direct properties
     if ("type" in msg && msg.type === "tool") {
       return true;
     }
-    
+
     return false;
   }
 
   /**
    * Extract content from a message, handling both AIMessage instances and plain objects.
-   * 
+   *
    * @example
    * // From AIMessage instance
    * _getMessageContent(new AIMessage("hello")) // => "hello"
-   * 
+   *
    * @example
    * // From plain object
    * _getMessageContent({ type: "ai", content: "hello" }) // => "hello"
-   * 
+   *
    * @param message - The message object to extract content from
    * @returns The content of the message, or undefined if not present
    */
@@ -1029,10 +1027,7 @@ export class MCPAgent {
       // Convert messages to format expected by LangChain agent
       const langchainHistory: BaseMessage[] = [];
       for (const msg of historyToUse) {
-        if (
-          this._isHumanMessageLike(msg) ||
-          this._isAIMessageLike(msg)
-        ) {
+        if (this._isHumanMessageLike(msg) || this._isAIMessageLike(msg)) {
           langchainHistory.push(msg);
         }
       }
@@ -1435,7 +1430,9 @@ export class MCPAgent {
         ) {
           langchainHistory.push(msg);
         } else {
-          logger.info(`⚠️ Skipped message of type: ${msg.constructor?.name || typeof msg}`);
+          logger.info(
+            `⚠️ Skipped message of type: ${msg.constructor?.name || typeof msg}`
+          );
         }
       }
 

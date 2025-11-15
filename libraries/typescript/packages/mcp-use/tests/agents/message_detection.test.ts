@@ -301,7 +301,9 @@ describe("MCPAgent Message Detection Methods", () => {
         { type: "text", text: " world" },
       ];
       const message = { type: "ai", content: complexContent };
-      expect((agent as any)._getMessageContent(message)).toEqual(complexContent);
+      expect((agent as any)._getMessageContent(message)).toEqual(
+        complexContent
+      );
     });
   });
 
@@ -344,4 +346,3 @@ describe("MCPAgent Message Detection Methods", () => {
     });
   });
 });
-
