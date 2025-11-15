@@ -31,6 +31,7 @@ export abstract class BaseConnector {
   protected connectionManager: ConnectionManager<any> | null = null;
   protected toolsCache: Tool[] | null = null;
   protected capabilitiesCache: any = null;
+  protected serverInfoCache: { name: string; version?: string } | null = null;
   protected connected = false;
   protected readonly opts: ConnectorInitOptions;
 
@@ -83,6 +84,10 @@ export abstract class BaseConnector {
     const capabilities = this.client.getServerCapabilities();
     this.capabilitiesCache = capabilities;
 
+    // Cache server info from the initialize response
+    const serverInfo = this.client.getServerVersion();
+    this.serverInfoCache = serverInfo || null;
+
     // Fetch and cache tools
     const listToolsRes = await this.client.listTools(
       undefined,
@@ -92,6 +97,7 @@ export abstract class BaseConnector {
 
     logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
     logger.debug("Server capabilities:", capabilities);
+    logger.debug("Server info:", serverInfo);
     return capabilities;
   }
 
@@ -101,6 +107,16 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not initialized; call initialize() first");
     }
     return this.toolsCache;
+  }
+
+  /** Expose cached server capabilities. */
+  get serverCapabilities(): any {
+    return this.capabilitiesCache;
+  }
+
+  /** Expose cached server info. */
+  get serverInfo(): { name: string; version?: string } | null {
+    return this.serverInfoCache;
   }
 
   /** Call a tool on the server. */

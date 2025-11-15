@@ -442,6 +442,13 @@
                       "typescript/server/configuration",
                       "typescript/server/examples"
                     ]
+                  },
+                  {
+                    "group": "Deployment",
+                    "icon": "rocket",
+                    "pages": [
+                      "typescript/server/deployment-supabase"
+                    ]
                   }
                 ]
               },
