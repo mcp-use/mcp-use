@@ -25,10 +25,14 @@ import {
   type UrlConfig,
 } from "./adapters/mcp-ui-adapter.js";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createServer } from "vite";
 import type { WidgetMetadata } from "./types/widget.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
+
+// AsyncLocalStorage for request context
+const requestContext = new AsyncLocalStorage<{ req: any; res: any }>();
 
 export class McpServer {
   private server: OfficialMcpServer;
@@ -39,6 +43,8 @@ export class McpServer {
   private serverPort?: number;
   private serverHost: string;
   private serverBaseUrl?: string;
+  private excludedMiddlewareRoutes = ["/inspector"];
+  private toolMiddleware: Map<string, any> = new Map();
 
   /**
    * Creates a new MCP server instance with Express integration
@@ -86,9 +92,37 @@ export class McpServer {
     // Proxy all Express methods to the underlying app
     return new Proxy(this, {
       get(target, prop) {
+        // McpServer methods - bind to McpServer instance
         if (prop in target) {
-          return (target as any)[prop];
+          const value = (target as any)[prop];
+          return typeof value === "function" ? value.bind(target) : value;
         }
+
+        // Express methods - intercept 'use' to wrap middleware
+        if (prop === "use") {
+          return function (...args: any[]) {
+            // If the last argument is a middleware function (not a string path)
+            const lastArg = args[args.length - 1];
+            if (typeof lastArg === "function" && typeof args[0] !== "string") {
+              const originalMiddleware = lastArg;
+              const wrappedMiddleware = (req: any, res: any, next: any) => {
+                // Skip middleware for excluded framework routes
+                if (
+                  target.excludedMiddlewareRoutes.some((route) =>
+                    req.path.startsWith(route)
+                  )
+                ) {
+                  return next();
+                }
+                return originalMiddleware(req, res, next);
+              };
+              args[args.length - 1] = wrappedMiddleware;
+            }
+            return target.app.use(...args);
+          };
+        }
+
+        // Other Express methods
         const value = (target.app as any)[prop];
         return typeof value === "function" ? value.bind(target.app) : value;
       },
@@ -251,10 +285,12 @@ export class McpServer {
    * @param toolDefinition.inputs - Array of input parameter definitions with types and validation
    * @param toolDefinition.cb - Async callback function that executes the tool logic with provided parameters
    * @param toolDefinition._meta - Optional metadata for the tool (e.g. Apps SDK metadata)
+   * @param middleware - Optional Express middleware for tool-specific authentication/authorization
    * @returns The server instance for method chaining
    *
    * @example
    * ```typescript
+   * // Basic tool
    * server.tool({
    *   name: 'calculate',
    *   description: 'Performs mathematical calculations',
@@ -272,6 +308,17 @@ export class McpServer {
    *     'openai/toolInvocation/invoked': 'Calculation complete'
    *   }
    * })
+   *
+   * // Tool with authentication middleware
+   * server.tool({
+   *   name: 'delete-user',
+   *   description: 'Delete a user (requires authentication)',
+   *   inputs: [{ name: 'userId', type: 'string', required: true }],
+   *   cb: async ({ userId }) => {
+   *     // This only runs if authentication passes
+   *     return { deleted: userId }
+   *   }
+   * }, passport.authenticate('bearer'))
    * ```
    */
   tool(toolDefinition: ToolDefinition): this {
@@ -287,7 +334,8 @@ export class McpServer {
         _meta: toolDefinition._meta,
       },
       async (params: any) => {
-        return await toolDefinition.cb(params);
+        const context = requestContext.getStore();
+        return await toolDefinition.cb(params, context);
       }
     );
     return this;
@@ -795,7 +843,6 @@ export class McpServer {
 
     const react = (await import("@vitejs/plugin-react")).default;
     const tailwindcss = (await import("@tailwindcss/vite")).default;
-    console.log(react, tailwindcss);
 
     const widgets = entries.map((entry) => {
       const baseName =
@@ -916,6 +963,12 @@ if (container && Component) {
 
     // Mount the single Vite server for all widgets
     this.app.use(baseRoute, viteServer.middlewares);
+
+    widgets.forEach((widget) => {
+      console.log(
+        `[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`
+      );
+    });
 
     widgets.forEach((widget) => {
       console.log(
@@ -1282,47 +1335,53 @@ if (container && Component) {
     // POST endpoint for messages
     // Create a new transport for each request to support multiple concurrent clients
     this.app.post(endpoint, express.json(), async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
+      return requestContext.run({ req, res }, async () => {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true,
+        });
 
-      res.on("close", () => {
-        transport.close();
-      });
+        res.on("close", () => {
+          transport.close();
+        });
 
-      await this.server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
+        await this.server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+      });
     });
 
     // GET endpoint for SSE streaming
     this.app.get(endpoint, async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
+      return requestContext.run({ req, res }, async () => {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true,
+        });
 
-      res.on("close", () => {
-        transport.close();
-      });
+        res.on("close", () => {
+          transport.close();
+        });
 
-      await this.server.connect(transport);
-      await transport.handleRequest(req, res);
+        await this.server.connect(transport);
+        await transport.handleRequest(req, res);
+      });
     });
 
     // DELETE endpoint for session cleanup
     this.app.delete(endpoint, async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
+      return requestContext.run({ req, res }, async () => {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true,
+        });
 
-      res.on("close", () => {
-        transport.close();
-      });
+        res.on("close", () => {
+          transport.close();
+        });
 
-      await this.server.connect(transport);
-      await transport.handleRequest(req, res);
+        await this.server.connect(transport);
+        await transport.handleRequest(req, res);
+      });
     });
 
     this.mcpMounted = true;
@@ -1597,7 +1656,7 @@ if (container && Component) {
           zodType = z.object({});
           break;
         case "array":
-          zodType = z.array(z.any());
+          zodType = z.array(z.string());
           break;
         default:
           zodType = z.any();
