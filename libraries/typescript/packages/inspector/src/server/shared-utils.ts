@@ -770,10 +770,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   if (htmlContent.includes("<html>") && htmlContent.includes("<head>")) {
     // If it's a full HTML document, inject at the beginning of head
     // Preserve any existing base tag instead of commenting it out
-    modifiedHtml = htmlContent.replace(
-      "<head>",
-      `<head>${apiScript}`
-    );
+    modifiedHtml = htmlContent.replace("<head>", `<head>${apiScript}`);
   } else {
     // Widget HTML is just fragments, wrap it properly
     modifiedHtml = `<!DOCTYPE html>
