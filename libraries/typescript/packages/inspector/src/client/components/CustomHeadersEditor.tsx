@@ -1,7 +1,7 @@
 "use client";
 
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
@@ -31,28 +31,48 @@ export function CustomHeadersEditor({
   title = "Custom Headers",
   description = "Headers with both name and value will be sent",
   maxHeaders = 50,
-}: CustomHeadersEditorProps) {
-  const [showValues, setShowValues] = useState<Record<string, boolean>>({});
+  }: CustomHeadersEditorProps) {
+    const [showValues, setShowValues] = useState<Record<string, boolean>>({});
+    const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+    const nameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Generate unique ID for new headers
   const generateId = () => Math.random().toString(36).slice(2, 11);
 
   // Add new header
-  const addHeader = () => {
+    const addHeader = (
+      initial?: Partial<Pick<CustomHeader, "name" | "value">>
+    ) => {
     if (headers.length >= maxHeaders) return;
 
     const newHeader: CustomHeader = {
       id: generateId(),
-      name: "",
-      value: "",
+        name: initial?.name ?? "",
+        value: initial?.value ?? "",
     };
-    onChange([...headers, newHeader]);
+      setPendingFocusId(newHeader.id);
+      onChange([...headers, newHeader]);
   };
 
   // Remove header
   const removeHeader = (id: string) => {
     onChange(headers.filter((h) => h.id !== id));
-  };
+    };
+
+    useEffect(() => {
+      if (!pendingFocusId) return;
+      const input = nameInputRefs.current[pendingFocusId];
+      if (input) {
+        input.focus();
+        const length = input.value.length;
+        try {
+          input.setSelectionRange(length, length);
+        } catch {
+          // Some input types (e.g. password) may not support setSelectionRange
+        }
+      }
+      setPendingFocusId(null);
+    }, [pendingFocusId]);
 
   // Update header
   const updateHeader = (id: string, field: "name" | "value", value: string) => {
@@ -86,23 +106,17 @@ export function CustomHeadersEditor({
         {/* Headers */}
         {headers.length === 0 ? (
           <div className="grid grid-cols-[1fr_1fr] gap-4 items-center">
-            <Input
-              placeholder="Authorization"
-              value=""
-              onChange={(e) => {
-                // Create a new header when user starts typing
-                if (e.target.value.trim()) {
-                  const newHeader: CustomHeader = {
-                    id: generateId(),
-                    name: e.target.value,
-                    value: "",
-                  };
-                  onChange([newHeader]);
-                }
-              }}
-              className="text-sm"
-              autoComplete="off"
-            />
+              <Input
+                placeholder="Authorization"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value.trim()) {
+                    addHeader({ name: e.target.value });
+                  }
+                }}
+                className="text-sm"
+                autoComplete="off"
+              />
             <div className="flex items-center gap-2">
               <Input
                 placeholder="Bearer token..."
@@ -139,12 +153,19 @@ export function CustomHeadersEditor({
               key={header.id}
               className="grid grid-cols-[1fr_1fr] gap-4 items-center"
             >
-              <Input
+                <Input
                 placeholder="Authorization"
                 value={header.name}
                 onChange={(e) =>
                   updateHeader(header.id, "name", e.target.value)
                 }
+                  ref={(el) => {
+                    if (el) {
+                      nameInputRefs.current[header.id] = el;
+                    } else {
+                      delete nameInputRefs.current[header.id];
+                    }
+                  }}
                 className="text-sm"
                 autoComplete="off"
               />
