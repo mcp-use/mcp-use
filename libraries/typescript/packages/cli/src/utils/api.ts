@@ -246,7 +246,6 @@ export class McpUseAPI {
   async uploadSource(filePath: string): Promise<UploadResponse> {
     const { readFile } = await import("node:fs/promises");
     const { basename } = await import("node:path");
-    const { FormData, Blob } = await import("node:stream/web");
 
     const fileBuffer = await readFile(filePath);
     const filename = basename(filePath);
