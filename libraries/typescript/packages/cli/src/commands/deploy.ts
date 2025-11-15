@@ -4,7 +4,8 @@ import path from "node:path";
 import os from "node:os";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { McpUseAPI, CreateDeploymentRequest, Deployment } from "../utils/api.js";
+import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
+import { McpUseAPI } from "../utils/api.js";
 import { isLoggedIn } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import open from "open";
@@ -222,15 +223,15 @@ async function displayDeploymentProgress(
   let frameIndex = 0;
   let spinnerInterval: NodeJS.Timeout | null = null;
   let lastStep = "";
-  
+
   const startSpinner = (message: string) => {
     if (spinnerInterval) {
       clearInterval(spinnerInterval);
     }
-    
+
     // Clear the line
     process.stdout.write("\r\x1b[K");
-    
+
     spinnerInterval = setInterval(() => {
       const frame = frames[frameIndex];
       frameIndex = (frameIndex + 1) % frames.length;
@@ -251,9 +252,6 @@ async function displayDeploymentProgress(
   console.log();
   startSpinner("Deploying...");
 
-  let lastLogLength = 0;
-  let previousBuildLogs = "";
-
   try {
     for await (const log of api.streamDeploymentLogs(deployment.id)) {
       try {
@@ -269,13 +267,19 @@ async function displayDeploymentProgress(
           const message = stepMessages[logData.step] || "Deploying...";
           startSpinner(message);
         }
-        
+
         // Display the log line
         if (logData.line) {
           stopSpinner();
-          const levelColor = logData.level === "error" ? chalk.red : 
-                            logData.level === "warn" ? chalk.yellow : chalk.gray;
-          const stepPrefix = logData.step ? chalk.cyan(`[${logData.step}]`) + " " : "";
+          const levelColor =
+            logData.level === "error"
+              ? chalk.red
+              : logData.level === "warn"
+                ? chalk.yellow
+                : chalk.gray;
+          const stepPrefix = logData.step
+            ? chalk.cyan(`[${logData.step}]`) + " "
+            : "";
           console.log(stepPrefix + levelColor(logData.line));
         }
       } catch {
@@ -293,57 +297,71 @@ async function displayDeploymentProgress(
   let delay = 3000; // Start with 3 seconds
   const maxDelay = 10000; // Max 10 seconds between checks
   let lastDisplayedLogLength = 0;
-  
+
   while (checkCount < maxChecks) {
-    await new Promise(resolve => setTimeout(resolve, delay));
-    
+    const currentDelay = delay;
+    await new Promise((resolve) => setTimeout(resolve, currentDelay));
+
     const finalDeployment = await api.getDeployment(deployment.id);
-    
+
     // Display new build logs if available
-    if (finalDeployment.buildLogs && finalDeployment.buildLogs.length > lastDisplayedLogLength) {
-      const newLogs = finalDeployment.buildLogs.substring(lastDisplayedLogLength);
-      const logLines = newLogs.split('\n').filter(l => l.trim());
-      
+    if (
+      finalDeployment.buildLogs &&
+      finalDeployment.buildLogs.length > lastDisplayedLogLength
+    ) {
+      const newLogs = finalDeployment.buildLogs.substring(
+        lastDisplayedLogLength
+      );
+      const logLines = newLogs.split("\n").filter((l) => l.trim());
+
       for (const line of logLines) {
         try {
           const logData = JSON.parse(line);
           if (logData.line) {
             stopSpinner();
-            const levelColor = logData.level === "error" ? chalk.red : 
-                              logData.level === "warn" ? chalk.yellow : chalk.gray;
-            const stepPrefix = logData.step ? chalk.cyan(`[${logData.step}]`) + " " : "";
+            const levelColor =
+              logData.level === "error"
+                ? chalk.red
+                : logData.level === "warn"
+                  ? chalk.yellow
+                  : chalk.gray;
+            const stepPrefix = logData.step
+              ? chalk.cyan(`[${logData.step}]`) + " "
+              : "";
             console.log(stepPrefix + levelColor(logData.line));
           }
         } catch {
           // Skip invalid JSON
         }
       }
-      
+
       lastDisplayedLogLength = finalDeployment.buildLogs.length;
     }
-    
+
     if (finalDeployment.status === "running") {
       const mcpUrl = `https://${finalDeployment.domain}/mcp`;
       const inspectorUrl = `https://inspector.mcp-use.com/inspect?autoConnect=${encodeURIComponent(mcpUrl)}`;
-      
+
       console.log(chalk.green.bold("✓ Deployment successful!\n"));
       console.log(chalk.white("🌐 MCP Server URL:"));
       console.log(chalk.cyan.bold(`   ${mcpUrl}\n`));
-      
+
       console.log(chalk.white("🔍 Inspector URL:"));
       console.log(chalk.cyan.bold(`   ${inspectorUrl}\n`));
-      
+
       if (finalDeployment.customDomain) {
         const customMcpUrl = `https://${finalDeployment.customDomain}/mcp`;
         const customInspectorUrl = `https://inspector.mcp-use.com/inspect?autoConnect=${encodeURIComponent(customMcpUrl)}`;
-        
+
         console.log(chalk.white("🔗 Custom Domain:"));
         console.log(chalk.cyan.bold(`   ${customMcpUrl}\n`));
         console.log(chalk.white("🔍 Custom Inspector:"));
         console.log(chalk.cyan.bold(`   ${customInspectorUrl}\n`));
       }
-      
-      console.log(chalk.gray("Deployment ID: ") + chalk.white(finalDeployment.id));
+
+      console.log(
+        chalk.gray("Deployment ID: ") + chalk.white(finalDeployment.id)
+      );
       return;
     } else if (finalDeployment.status === "failed") {
       console.log(chalk.red.bold("✗ Deployment failed\n"));
@@ -354,7 +372,9 @@ async function displayDeploymentProgress(
         console.log(chalk.gray("\nBuild logs:"));
         // Parse and display build logs nicely
         try {
-          const logs = finalDeployment.buildLogs.split('\n').filter(l => l.trim());
+          const logs = finalDeployment.buildLogs
+            .split("\n")
+            .filter((l) => l.trim());
           for (const log of logs) {
             try {
               const logData = JSON.parse(log);
@@ -383,11 +403,14 @@ async function displayDeploymentProgress(
       return;
     }
   }
-  
+
   // Timeout
   stopSpinner();
   console.log(chalk.yellow("⚠️  Deployment is taking longer than expected."));
-  console.log(chalk.gray("Check status with: ") + chalk.white(`mcp-use status ${deployment.id}`));
+  console.log(
+    chalk.gray("Check status with: ") +
+      chalk.white(`mcp-use status ${deployment.id}`)
+  );
 }
 
 /**
@@ -480,8 +503,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
 
       // Detect project settings
-      const projectName =
-        options.name || (await getProjectName(cwd));
+      const projectName = options.name || (await getProjectName(cwd));
       const runtime = options.runtime || (await detectRuntime(cwd));
       const port = options.port || 3000;
       const buildCommand = await detectBuildCommand(cwd);
@@ -493,14 +515,10 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
       console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
       if (buildCommand) {
-        console.log(
-          chalk.gray(`  Build command: `) + chalk.cyan(buildCommand)
-        );
+        console.log(chalk.gray(`  Build command: `) + chalk.cyan(buildCommand));
       }
       if (startCommand) {
-        console.log(
-          chalk.gray(`  Start command: `) + chalk.cyan(startCommand)
-        );
+        console.log(chalk.gray(`  Start command: `) + chalk.cyan(startCommand));
       }
       console.log();
 
@@ -549,9 +567,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
             "⚠️  This is not a GitHub repository or no remote is configured."
           )
         );
-        console.log(
-          chalk.white("Deploying from local source code instead...")
-        );
+        console.log(chalk.white("Deploying from local source code instead..."));
       }
       console.log();
 
@@ -567,14 +583,10 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
       console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
       if (buildCommand) {
-        console.log(
-          chalk.gray(`  Build command: `) + chalk.cyan(buildCommand)
-        );
+        console.log(chalk.gray(`  Build command: `) + chalk.cyan(buildCommand));
       }
       if (startCommand) {
-        console.log(
-          chalk.gray(`  Start command: `) + chalk.cyan(startCommand)
-        );
+        console.log(chalk.gray(`  Start command: `) + chalk.cyan(startCommand));
       }
       console.log();
 
@@ -643,11 +655,8 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
   } catch (error) {
     console.error(
       chalk.red.bold("\n✗ Deployment failed:"),
-      chalk.red(
-        error instanceof Error ? error.message : "Unknown error"
-      )
+      chalk.red(error instanceof Error ? error.message : "Unknown error")
     );
     process.exit(1);
   }
 }
-

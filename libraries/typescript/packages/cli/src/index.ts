@@ -751,7 +751,10 @@ program
   .option("--name <name>", "Custom deployment name")
   .option("--port <port>", "Server port", "3000")
   .option("--runtime <runtime>", "Runtime (node or python)")
-  .option("--from-source", "Deploy from local source code (even for GitHub repos)")
+  .option(
+    "--from-source",
+    "Deploy from local source code (even for GitHub repos)"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,

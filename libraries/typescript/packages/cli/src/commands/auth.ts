@@ -1,5 +1,9 @@
 import chalk from "chalk";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import open from "open";
 import { McpUseAPI } from "../utils/api.js";
 import {
@@ -47,16 +51,15 @@ async function startCallbackServer(
       tokenResolver = res;
     });
 
-    const server = createServer(
-      (req: IncomingMessage, res: ServerResponse) => {
-        if (req.url?.startsWith("/callback")) {
-          const url = new URL(req.url, `http://localhost:${port}`);
-          const token = url.searchParams.get("token");
+    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      if (req.url?.startsWith("/callback")) {
+        const url = new URL(req.url, `http://localhost:${port}`);
+        const token = url.searchParams.get("token");
 
-          if (token && tokenResolver) {
-            // Send success response
-            res.writeHead(200, { "Content-Type": "text/html" });
-            res.end(`
+        if (token && tokenResolver) {
+          // Send success response
+          res.writeHead(200, { "Content-Type": "text/html" });
+          res.end(`
               <!DOCTYPE html>
               <html>
                 <head>
@@ -155,10 +158,10 @@ async function startCallbackServer(
                 </body>
               </html>
             `);
-            tokenResolver(token);
-          } else {
-            res.writeHead(400, { "Content-Type": "text/html" });
-            res.end(`
+          tokenResolver(token);
+        } else {
+          res.writeHead(400, { "Content-Type": "text/html" });
+          res.end(`
               <!DOCTYPE html>
               <html>
                 <head>
@@ -234,10 +237,9 @@ async function startCallbackServer(
                 </body>
               </html>
             `);
-          }
         }
       }
-    );
+    });
 
     server.listen(port, () => {
       resolve({ server, token: tokenPromise });
@@ -255,7 +257,9 @@ export async function loginCommand(): Promise<void> {
     // Check if already logged in
     if (await isLoggedIn()) {
       console.log(
-        chalk.yellow("⚠️  You are already logged in. Run 'mcp-use logout' first if you want to login with a different account.")
+        chalk.yellow(
+          "⚠️  You are already logged in. Run 'mcp-use logout' first if you want to login with a different account."
+        )
       );
       return;
     }
@@ -304,7 +308,9 @@ export async function loginCommand(): Promise<void> {
     // Close server
     server.close();
 
-    console.log(chalk.gray("Received authentication token, creating API key..."));
+    console.log(
+      chalk.gray("Received authentication token, creating API key...")
+    );
 
     // Create API key using JWT token
     const api = await McpUseAPI.create();
@@ -322,17 +328,18 @@ export async function loginCommand(): Promise<void> {
       )
     );
     console.log(
-      chalk.gray("You can now deploy your MCP servers with " + chalk.white("mcp-use deploy"))
+      chalk.gray(
+        "You can now deploy your MCP servers with " +
+          chalk.white("mcp-use deploy")
+      )
     );
-    
+
     // Exit successfully
     process.exit(0);
   } catch (error) {
     console.error(
       chalk.red.bold("\n✗ Login failed:"),
-      chalk.red(
-        error instanceof Error ? error.message : "Unknown error"
-      )
+      chalk.red(error instanceof Error ? error.message : "Unknown error")
     );
     process.exit(1);
   }
@@ -367,9 +374,7 @@ export async function logoutCommand(): Promise<void> {
   } catch (error) {
     console.error(
       chalk.red.bold("\n✗ Logout failed:"),
-      chalk.red(
-        error instanceof Error ? error.message : "Unknown error"
-      )
+      chalk.red(error instanceof Error ? error.message : "Unknown error")
     );
     process.exit(1);
   }
@@ -401,19 +406,14 @@ export async function whoamiCommand(): Promise<void> {
     if (apiKey) {
       // Show first and last 4 characters
       const masked =
-        apiKey.substring(0, 8) +
-        "..." +
-        apiKey.substring(apiKey.length - 4);
+        apiKey.substring(0, 8) + "..." + apiKey.substring(apiKey.length - 4);
       console.log(chalk.white("API Key: ") + chalk.gray(masked));
     }
   } catch (error) {
     console.error(
       chalk.red.bold("\n✗ Failed to get user info:"),
-      chalk.red(
-        error instanceof Error ? error.message : "Unknown error"
-      )
+      chalk.red(error instanceof Error ? error.message : "Unknown error")
     );
     process.exit(1);
   }
 }
-

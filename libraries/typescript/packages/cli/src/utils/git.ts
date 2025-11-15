@@ -55,7 +55,9 @@ export function parseGitHubUrl(
   // SSH: git@github.com:owner/repo.git
   // HTTPS: https://github.com/owner/repo.git
   const sshMatch = url.match(/git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
-  const httpsMatch = url.match(/https:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/);
+  const httpsMatch = url.match(
+    /https:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/
+  );
 
   const match = sshMatch || httpsMatch;
   if (!match) return null;
@@ -138,4 +140,3 @@ export async function getGitInfo(
 export function isGitHubUrl(url: string): boolean {
   return url.includes("github.com");
 }
-

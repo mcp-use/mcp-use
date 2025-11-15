@@ -452,7 +452,7 @@ program
           console.log("");
           console.log(chalk.cyan("📦 Installing dependencies..."));
           console.log("");
-          
+
           // Yarn and npm show their own progress, so we don't need a spinner for them
           const showSpinner =
             usedPackageManager !== "yarn" && usedPackageManager !== "npm";
@@ -479,7 +479,9 @@ program
                 );
               } else {
                 console.log("");
-                console.log(chalk.green("✅ Dependencies installed successfully!"));
+                console.log(
+                  chalk.green("✅ Dependencies installed successfully!")
+                );
                 console.log("");
               }
             } else {
@@ -487,30 +489,50 @@ program
               if (spinner)
                 spinner.text = "Installing packages (trying yarn)...";
               try {
-                await runPackageManager("yarn", getInstallArgs("yarn"), projectPath);
+                await runPackageManager(
+                  "yarn",
+                  getInstallArgs("yarn"),
+                  projectPath
+                );
                 usedPackageManager = "yarn";
                 if (spinner) {
                   spinner.succeed("Packages installed successfully with yarn");
                 } else {
                   console.log("");
-                  console.log(chalk.green("✅ Dependencies installed successfully with yarn!"));
+                  console.log(
+                    chalk.green(
+                      "✅ Dependencies installed successfully with yarn!"
+                    )
+                  );
                   console.log("");
                 }
               } catch {
                 if (spinner) spinner.text = "yarn not found, trying npm...";
                 try {
-                  await runPackageManager("npm", getInstallArgs("npm"), projectPath);
+                  await runPackageManager(
+                    "npm",
+                    getInstallArgs("npm"),
+                    projectPath
+                  );
                   usedPackageManager = "npm";
                   if (spinner) {
                     spinner.succeed("Packages installed successfully with npm");
                   } else {
                     console.log("");
-                    console.log(chalk.green("✅ Dependencies installed successfully with npm!"));
+                    console.log(
+                      chalk.green(
+                        "✅ Dependencies installed successfully with npm!"
+                      )
+                    );
                     console.log("");
                   }
                 } catch {
                   if (spinner) spinner.text = "npm not found, trying pnpm...";
-                  await runPackageManager("pnpm", getInstallArgs("pnpm"), projectPath);
+                  await runPackageManager(
+                    "pnpm",
+                    getInstallArgs("pnpm"),
+                    projectPath
+                  );
                   usedPackageManager = "pnpm";
                   if (spinner) {
                     spinner.succeed(
@@ -518,7 +540,11 @@ program
                     );
                   } else {
                     console.log("");
-                    console.log(chalk.green("✅ Dependencies installed successfully with pnpm!"));
+                    console.log(
+                      chalk.green(
+                        "✅ Dependencies installed successfully with pnpm!"
+                      )
+                    );
                     console.log("");
                   }
                 }

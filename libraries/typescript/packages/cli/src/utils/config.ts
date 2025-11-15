@@ -11,12 +11,12 @@ const CONFIG_DIR = path.join(os.homedir(), ".mcp-use");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 
 // Backend API URL (where /api/v1 endpoints are)
-const DEFAULT_API_URL = process.env.MCP_API_URL 
-  ? process.env.MCP_API_URL.replace(/\/api\/v1$/, "") + "/api/v1"  // Ensure /api/v1 suffix
+const DEFAULT_API_URL = process.env.MCP_API_URL
+  ? process.env.MCP_API_URL.replace(/\/api\/v1$/, "") + "/api/v1" // Ensure /api/v1 suffix
   : "https://cloud.mcp-use.com/api/v1";
 
 // Frontend/Web URL (where /auth/cli page is)
-const DEFAULT_WEB_URL = process.env.MCP_WEB_URL 
+const DEFAULT_WEB_URL = process.env.MCP_WEB_URL
   ? process.env.MCP_WEB_URL
   : "https://mcp-use.com";
 
@@ -94,4 +94,3 @@ export async function isLoggedIn(): Promise<boolean> {
 export async function getWebUrl(): Promise<string> {
   return DEFAULT_WEB_URL;
 }
-

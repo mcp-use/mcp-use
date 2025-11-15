@@ -103,7 +103,11 @@ export class McpUseAPI {
    */
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: {
+      method?: string;
+      headers?: Record<string, string>;
+      body?: string;
+    } = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers: Record<string, string> = {
@@ -242,17 +246,18 @@ export class McpUseAPI {
   async uploadSource(filePath: string): Promise<UploadResponse> {
     const { readFile } = await import("node:fs/promises");
     const { basename } = await import("node:path");
-    
+    const { FormData, Blob } = await import("node:stream/web");
+
     const fileBuffer = await readFile(filePath);
     const filename = basename(filePath);
-    
+
     const formData = new FormData();
     const blob = new Blob([fileBuffer], { type: "application/gzip" });
     formData.append("file", blob, filename);
 
     const url = `${this.baseUrl}/uploads`;
     const headers: Record<string, string> = {};
-    
+
     if (this.apiKey) {
       headers["x-api-key"] = this.apiKey;
     }
@@ -271,4 +276,3 @@ export class McpUseAPI {
     return response.json() as Promise<UploadResponse>;
   }
 }
-
