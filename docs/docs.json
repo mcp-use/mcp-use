@@ -447,6 +447,7 @@
                     "group": "Deployment",
                     "icon": "rocket",
                     "pages": [
+                      "typescript/server/deployment-mcp-use",
                       "typescript/server/deployment-supabase"
                     ]
                   }
