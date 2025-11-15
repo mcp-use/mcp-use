@@ -1,0 +1,316 @@
+---
+title: Deploying to mcp-use Cloud
+description: Deploy your MCP server to mcp-use cloud with one command
+---
+
+This guide demonstrates how to deploy your MCP server to **mcp-use cloud**, the recommended deployment platform for mcp-use servers. With a single command, you can deploy your server and get a production-ready URL.
+
+<Note>
+**Recommended Deployment Method**
+
+mcp-use cloud is the easiest and fastest way to deploy your MCP servers. It automatically handles:
+- ✅ Container building and deployment
+- ✅ Environment variable configuration
+- ✅ Automatic MCP_URL setup
+- ✅ HTTPS and custom domains
+- ✅ Health checks and monitoring
+- ✅ Zero configuration required
+</Note>
+
+## Prerequisites
+
+1. **Node.js/Bun**: For building your MCP server
+2. **mcp-use CLI**: Install the CLI package
+3. **mcp-use Account**: Sign up at [mcp-use.com](https://mcp-use.com) or login via CLI
+
+## Quick Deployment
+
+Deploy your MCP server in one command:
+
+```bash
+# Install the CLI (if not already installed)
+npm install -g @mcp-use/cli
+
+# Login to mcp-use cloud
+mcp-use login
+
+# Deploy your server
+mcp-use deploy
+```
+
+That's it! Your server will be built and deployed automatically.
+
+### What happens during deployment
+
+The deployment process automatically:
+1. ✅ Detects your project type (Node.js or Python)
+2. ✅ Packages your source code
+3. ✅ Builds your application
+4. ✅ Configures environment variables (including `MCP_URL`)
+5. ✅ Deploys to cloud infrastructure
+6. ✅ Provides a production URL
+
+## Deployment Options
+
+### Basic Deployment
+
+```bash
+# Deploy with default settings
+mcp-use deploy
+```
+
+### Custom Deployment Name
+
+```bash
+# Deploy with a custom name
+mcp-use deploy --name my-weather-server
+```
+
+### Custom Port
+
+```bash
+# Deploy with custom port (default: 3000)
+mcp-use deploy --port 8000
+```
+
+### Custom Runtime
+
+```bash
+# Specify runtime explicitly (node or python)
+mcp-use deploy --runtime node
+```
+
+### Open in Browser
+
+```bash
+# Automatically open deployment URL after success
+mcp-use deploy --open
+```
+
+### Deploy from Local Source
+
+```bash
+# Force deployment from local source (even if GitHub repo detected)
+mcp-use deploy --from-source
+```
+
+## GitHub Repository Deployment
+
+If your project is a GitHub repository, `mcp-use deploy` will automatically detect it and offer to deploy from GitHub:
+
+```bash
+mcp-use deploy
+```
+
+You'll see:
+```
+GitHub repository detected:
+  Repository: your-org/your-repo
+  Branch:     main
+  Commit:     abc1234
+
+Deploy from GitHub repository your-org/your-repo? (y/n):
+```
+
+This approach:
+- ✅ Deploys directly from your GitHub repository
+- ✅ Automatically detects build and start commands
+- ✅ Uses the latest commit from your branch
+- ✅ No need to upload source code manually
+
+## Local Source Deployment
+
+If your project is not a GitHub repository, or you want to deploy from local source:
+
+```bash
+mcp-use deploy --from-source
+```
+
+The CLI will:
+1. Package your local source code (excluding `node_modules`, `.git`, etc.)
+2. Upload it to mcp-use cloud
+3. Build and deploy your server
+
+## Environment Variables
+
+The `MCP_URL` environment variable is automatically set during deployment to your server's production URL. This ensures your widgets and resources use the correct base URL.
+
+### Automatic MCP_URL Configuration
+
+When you deploy, mcp-use cloud automatically:
+- Sets `MCP_URL` to your deployment URL (e.g., `https://your-deployment-id.deploy.mcp-use.com`)
+- Configures your server to use this URL for widget assets
+- Ensures all widget HTML uses the correct base URL
+
+### Custom Environment Variables
+
+You can set custom environment variables through the mcp-use cloud dashboard or by including them in your deployment configuration.
+
+## Deployment Configuration
+
+The CLI automatically detects your project configuration:
+
+### Detected Settings
+
+- **Runtime**: Detected from `package.json` (Node.js) or `requirements.txt`/`pyproject.toml` (Python)
+- **Port**: Defaults to 3000, can be overridden with `--port`
+- **Build Command**: Detected from `package.json` scripts
+- **Start Command**: Detected from `package.json` scripts or entry point
+
+### Example Project Structure
+
+```
+my-mcp-server/
+├── package.json          # Detects build/start commands
+├── src/
+│   └── index.ts         # Server entry point
+├── resources/           # UI widgets (auto-registered)
+│   └── weather.tsx
+└── dist/               # Build output (excluded from upload)
+```
+
+## After Deployment
+
+Once deployment completes, you'll receive:
+
+### Deployment URLs
+
+```
+✓ Deployment successful!
+
+🌐 MCP Server URL:
+   https://your-deployment-id.deploy.mcp-use.com/mcp
+
+🔍 Inspector URL:
+   https://inspector.mcp-use.com/inspect?autoConnect=https://your-deployment-id.deploy.mcp-use.com/mcp
+```
+
+### Using Your Deployed Server
+
+#### Connect from MCP Clients
+
+Configure your MCP client to connect to your deployment:
+
+```typescript
+// Browser client
+import { BrowserMCPClient } from "mcp-use";
+
+const client = new BrowserMCPClient({
+  mcpServers: {
+    myServer: {
+      url: "https://your-deployment-id.deploy.mcp-use.com/mcp",
+      transport: "http",
+    },
+  },
+});
+```
+
+#### Claude Desktop Configuration
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "url": "https://your-deployment-id.deploy.mcp-use.com/mcp"
+    }
+  }
+}
+```
+
+## Monitoring and Management
+
+### View Deployment Status
+
+```bash
+# Check deployment status
+mcp-use status <deployment-id>
+```
+
+### View Deployment Logs
+
+Logs are automatically streamed during deployment. You can also view them in the mcp-use cloud dashboard.
+
+### Update Deployment
+
+To update your deployment, simply run `mcp-use deploy` again. The CLI will:
+- Detect if you have an existing deployment
+- Update it with your latest code
+- Preserve your deployment URL
+
+## Custom Domains
+
+You can configure custom domains for your deployment through the mcp-use cloud dashboard. Once configured, your server will be accessible at your custom domain.
+
+## Troubleshooting
+
+### Deployment Fails
+
+If deployment fails, check:
+1. **Build Errors**: Review the build logs shown during deployment
+2. **Missing Dependencies**: Ensure all dependencies are in `package.json` or `requirements.txt`
+3. **Port Conflicts**: Verify your port configuration matches your server code
+4. **Environment Variables**: Check that required environment variables are set
+
+### Widgets Not Loading
+
+If widgets aren't loading correctly:
+1. **MCP_URL**: Verify `MCP_URL` is set correctly (automatically set during deployment)
+2. **Base URL**: Check that your server code uses `process.env.MCP_URL` or passes `baseUrl` to `createMCPServer`
+3. **Asset Paths**: Ensure widget assets are built and included in your deployment
+
+### Health Check Failures
+
+Your server should expose a health check endpoint. The default is `/healthz`, but you can configure it:
+
+```typescript
+// Add health check endpoint
+server.get('/healthz', (req, res) => {
+  res.json({ status: 'healthy' });
+});
+```
+
+## Best Practices
+
+### 1. Use GitHub Deployment
+
+Deploying from GitHub repositories is recommended because:
+- ✅ Automatic updates on push
+- ✅ Version control integration
+- ✅ No manual source uploads
+- ✅ Better CI/CD integration
+
+### 2. Set MCP_URL in Server Code
+
+Even though `MCP_URL` is automatically set, explicitly use it in your server:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server';
+
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  description: 'My MCP server',
+  baseUrl: process.env.MCP_URL, // Use environment variable
+});
+```
+
+### 3. Test Locally First
+
+Before deploying, test your server locally:
+
+```bash
+# Build and test locally
+mcp-use build
+mcp-use start
+```
+
+### 4. Monitor Your Deployments
+
+Regularly check your deployment status and logs to ensure everything is running smoothly.
+
+## Next Steps
+
+- [Deploying to Supabase](./deployment-supabase) - Alternative deployment option
+- [Configuration Guide](./configuration) - Advanced server configuration
+- [UI Widgets](./ui-widgets) - Building interactive widgets
+- [API Reference](./api-reference) - Complete API documentation
+
