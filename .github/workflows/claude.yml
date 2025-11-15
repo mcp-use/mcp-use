@@ -28,7 +28,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+
+      - name: Checkout PR branch (if PR comment)
+        if: github.event.issue.pull_request
+        run: |
+          PR_NUMBER=${{ github.event.issue.number }}
+          echo "Fetching PR #$PR_NUMBER..."
+          git fetch origin pull/$PR_NUMBER/head:pr-$PR_NUMBER
+          git checkout pr-$PR_NUMBER
+          echo "Successfully checked out PR branch"
 
       - name: Run Claude Code
         id: claude
