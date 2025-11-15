@@ -131,7 +131,7 @@
     "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/sdk": "1.20.0",
     "@scarf/scarf": "^1.4.0",
-    "ai": "^4.3.19",
+    "ai": "^5.0.52",
     "commander": "^14.0.1",
     "dotenv": "^16.5.0",
     "esbuild": ">=0.25.0",
