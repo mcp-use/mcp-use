@@ -43,7 +43,7 @@
     "chokidar": "^4.0.0",
     "commander": "^11.0.0",
     "dotenv": "^16.5.0",
-    "esbuild": "^0.19.0",
+    "esbuild": "^0.25.0",
     "globby": "^14.0.0",
     "mcp-use": "workspace:*",
     "open": "^10.0.0",
