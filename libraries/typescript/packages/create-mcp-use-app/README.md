@@ -109,55 +109,55 @@ npx create-mcp-use-app my-project
 
 ```bash
 # Use a specific template
-npx create-mcp-use-app my-project --template advanced
+npx create-mcp-use-app my-project --template apps-sdk
+npx create-mcp-use-app my-project --template mcp-ui
 
 # Use a specific package manager
-npx create-mcp-use-app my-project --use-npm
-npx create-mcp-use-app my-project --use-yarn
-npx create-mcp-use-app my-project --use-pnpm
+npx create-mcp-use-app my-project --npm
+npx create-mcp-use-app my-project --yarn
+npx create-mcp-use-app my-project --pnpm
 
 # Skip dependency installation
-npx create-mcp-use-app my-project --skip-install
+npx create-mcp-use-app my-project --no-install
 ```
 
 ---
 
 ## 🎨 Available Templates
 
-### Basic Template (Default)
+### Starter Template (Default)
 
-The basic template includes:
+The starter template includes:
 
-- Simple MCP server setup
+- Comprehensive MCP server setup with all features
 - Example tool, resource, and prompt
-- Basic UI widget example
-- Essential configuration files
+- Both MCP-UI and OpenAI Apps SDK widget examples
+- Full TypeScript configuration
+- Development and production scripts
 
-Perfect for getting started quickly or building simple MCP servers.
+Perfect for getting started with all available features or building full-featured MCP servers.
 
-### Advanced Template
+### Apps SDK Template
 
-The advanced template includes everything from basic plus:
+The apps-sdk template includes:
 
-- Multiple tools with complex schemas
-- OAuth authentication example
-- Database integration patterns
-- Advanced UI widgets with state management
-- Observability setup with Langfuse
-- Docker configuration
-- CI/CD workflows
+- MCP server setup focused on OpenAI Apps SDK integration
+- OpenAI Apps SDK compatible widgets
+- Example display-weather widget
+- Optimized for OpenAI assistant integration
 
-Ideal for production applications or complex integrations.
+Ideal for building MCP servers that integrate with OpenAI's Apps SDK.
 
-### Minimal Template
+### MCP-UI Template
 
-The minimal template includes:
+The mcp-ui template includes:
 
-- Bare-bones MCP server
-- No example tools or widgets
-- Essential configuration only
+- MCP server setup focused on MCP-UI resources
+- Interactive UI components example
+- Kanban board widget demonstration
+- Clean, focused setup for UI-first applications
 
-Best for experienced developers who want full control.
+Best for building MCP servers with rich interactive UI components.
 
 ---
 
@@ -177,11 +177,11 @@ The scaffolded project includes these dependencies:
 - `tsx` - TypeScript executor for development
 - `@types/node` - Node.js type definitions
 
-### Optional Dependencies (Advanced Template)
+### Template-Specific Dependencies
 
-- Database drivers (PostgreSQL, SQLite)
-- Authentication libraries
-- Monitoring tools
+Different templates may include additional dependencies based on their features:
+- UI libraries (React, styling frameworks)
+- Widget-specific utilities
 
 ---
 
