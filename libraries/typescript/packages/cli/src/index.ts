@@ -414,7 +414,7 @@ program
   .command("build")
   .description("Build TypeScript and MCP UI widgets")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
-  .option("--with-inspector", "Include inspector in production build", false)
+  .option("--with-inspector", "Include inspector in production build")
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -439,8 +439,11 @@ program
         widgetsData[widget.name] = widget.metadata;
       }
 
+      // Convert to boolean: true if flag is present, false otherwise
+      const includeInspector = !!options.withInspector;
+
       const manifest = {
-        includeInspector: options.withInspector || false,
+        includeInspector,
         buildTime: new Date().toISOString(),
         widgets: widgetsData,
       };
