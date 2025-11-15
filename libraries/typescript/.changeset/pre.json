@@ -10,6 +10,7 @@
   "changesets": [
     "busy-foxes-grab",
     "few-insects-sing",
-    "fix-canary-version-replacement"
+    "fix-canary-version-replacement",
+    "many-spoons-greet"
   ]
 }
