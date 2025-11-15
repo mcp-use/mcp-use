@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 2.2.2-canary.0
+
+### Patch Changes
+
+- 2ebe233: fix with-inspector param
+- 2ebe233: chore: update dependencies
+- Updated dependencies [2ebe233]
+- Updated dependencies [2ebe233]
+  - @mcp-use/inspector@0.5.2-canary.0
+  - mcp-use@1.3.2-canary.0
+
 ## 2.2.1
 
 ### Patch Changes
