@@ -3,9 +3,9 @@
  * Tests the robustness of handling different message formats (issue #446)
  */
 
-import { describe, expect, it, beforeEach } from "vitest";
-import { MCPAgent } from "../../src/agents/mcp_agent.js";
 import { AIMessage, HumanMessage, ToolMessage } from "langchain";
+import { beforeEach, describe, expect, it } from "vitest";
+import { MCPAgent } from "../../src/agents/mcp_agent.js";
 
 describe("MCPAgent Message Detection Methods", () => {
   let agent: MCPAgent;
