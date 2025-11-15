@@ -1,5 +1,37 @@
 # create-mcp-use-app
 
+## 0.5.0
+
+### Minor Changes
+
+- 26e1162: Migrated mcp-use server from Express to Hono framework to enable edge runtime support (Cloudflare Workers, Deno Deploy, Supabase Edge Functions). Added runtime detection for Deno/Node.js environments, Connect middleware adapter for compatibility, and `getHandler()` method for edge deployment. Updated dependencies: added `hono` and `@hono/node-server`, moved `connect` and `node-mocks-http` to optional dependencies, removed `express` and `cors` from peer dependencies.
+
+  Added Supabase deployment documentation and example templates to create-mcp-use-app for easier edge runtime deployment.
+
+- 26e1162: ### MCPAgent Message Detection Improvements (fix #446)
+
+  Fixed issue where `agent.run()` returned "No output generated" even when valid output was produced, caused by messages not being AIMessage instances after serialization/deserialization across module boundaries. Added robust message detection helpers (`_isAIMessageLike`, `_isHumanMessageLike`, `_isToolMessageLike`) that handle multiple message formats (class instances, plain objects with `type`/`role` properties, objects with `getType()` methods) to support version mismatches and different LangChain message formats. Includes comprehensive test coverage for message detection edge cases.
+
+  ### Server Base URL Fix
+
+  Fixed server base URL handling to ensure proper connection and routing in edge runtime environments, resolving issues with URL construction and path resolution.
+
+  ### Inspector Enhancements
+
+  Improved auto-connection logic with better error handling and retry mechanisms. Enhanced resource display components and OpenAI component renderer for better reliability and user experience. Updated connection context management for more robust multi-server support.
+
+  ### Supabase Deployment Example
+
+  Added complete Supabase deployment example with Deno-compatible server implementation, deployment scripts, and configuration templates to `create-mcp-use-app` for easier edge runtime deployment.
+
+  ### React Hook and CLI Improvements
+
+  Enhanced `useMcp` hook with better error handling and connection state management for browser-based MCP clients. Updated CLI with improved server URL handling and connection management.
+
+### Patch Changes
+
+- 26e1162: Fixed canary flag not properly replacing package versions when using published templates. The `--canary` flag now correctly replaces both `workspace:*` patterns (in local development) and caret versions (in published packages) with `"canary"` versions of `mcp-use`, `@mcp-use/cli`, and `@mcp-use/inspector`.
+
 ## 0.5.0-canary.2
 
 ### Minor Changes
