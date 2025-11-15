@@ -8,8 +8,9 @@ that ensures proper task isolation and resource cleanup.
 import sys
 from typing import Any, TextIO
 
+import mcp
 from mcp import StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp.client.stdio import PROCESS_TERMINATION_TIMEOUT, stdio_client
 
 from mcp_use.client.task_managers.base import ConnectionManager
 from mcp_use.logging import logger
@@ -27,17 +28,22 @@ class StdioConnectionManager(ConnectionManager[tuple[Any, Any]]):
         self,
         server_params: StdioServerParameters,
         errlog: TextIO = sys.stderr,
+        timeout: float = PROCESS_TERMINATION_TIMEOUT,
     ):
         """Initialize a new stdio connection manager.
 
         Args:
             server_params: The parameters for the stdio server
             errlog: The error log stream
+            timeout: The timeout for the stdio connection
         """
         super().__init__()
         self.server_params = server_params
         self.errlog = errlog
         self._stdio_ctx = None
+        # Override the global PROCESS_TERMINATION_TIMEOUT
+        self.timeout = timeout
+        mcp.client.stdio.PROCESS_TERMINATION_TIMEOUT = timeout
 
     async def _establish_connection(self) -> tuple[Any, Any]:
         """Establish a stdio connection.
