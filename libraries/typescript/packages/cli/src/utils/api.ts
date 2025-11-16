@@ -70,7 +70,6 @@ export interface Deployment {
   gitCommitMessage?: string;
 }
 
-
 /**
  * API client for mcp-use cloud
  */
@@ -244,24 +243,26 @@ export class McpUseAPI {
     const { readFile } = await import("node:fs/promises");
     const { basename } = await import("node:path");
     const { stat } = await import("node:fs/promises");
-    
+
     // Check file size (2MB max)
     const stats = await stat(filePath);
     const maxSize = 2 * 1024 * 1024; // 2MB
     if (stats.size > maxSize) {
-      throw new Error(`File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`);
+      throw new Error(
+        `File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`
+      );
     }
-    
+
     const fileBuffer = await readFile(filePath);
     const filename = basename(filePath);
-    
+
     // Build form data with deployment request and file
     const formData = new FormData();
     const blob = new Blob([fileBuffer], { type: "application/gzip" });
     formData.append("source_file", blob, filename);
     formData.append("name", request.name);
     formData.append("source_type", "upload");
-    
+
     if (request.source.type === "upload") {
       formData.append("runtime", request.source.runtime || "node");
       formData.append("port", String(request.source.port || 3000));
@@ -275,7 +276,7 @@ export class McpUseAPI {
         formData.append("env", JSON.stringify(request.source.env));
       }
     }
-    
+
     if (request.customDomain) {
       formData.append("customDomain", request.customDomain);
     }
@@ -285,7 +286,7 @@ export class McpUseAPI {
 
     const url = `${this.baseUrl}/deployments`;
     const headers: Record<string, string> = {};
-    
+
     if (this.apiKey) {
       headers["x-api-key"] = this.apiKey;
     }
