@@ -1,0 +1,15 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.2.1",
+    "create-mcp-use-app": "0.5.0",
+    "@mcp-use/inspector": "0.5.1",
+    "mcp-use": "1.3.1"
+  },
+  "changesets": [
+    "breezy-moons-shine",
+    "honest-gifts-buy",
+    "icy-pigs-refuse"
+  ]
+}

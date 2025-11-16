@@ -1,5 +1,41 @@
 # mcp-use
 
+## 1.3.2-canary.0
+
+### Patch Changes
+
+- 2ebe233: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 2ebe233: chore: update dependencies
+- Updated dependencies [2ebe233]
+- Updated dependencies [2ebe233]
+- Updated dependencies [2ebe233]
+  - @mcp-use/cli@2.2.2-canary.0
+  - @mcp-use/inspector@0.5.2-canary.0
+
+## 1.3.1
+
+### Patch Changes
+
+- 91fdcee: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 91fdcee: chore: update dependencies
+- Updated dependencies [91fdcee]
+- Updated dependencies [91fdcee]
+- Updated dependencies [91fdcee]
+  - @mcp-use/cli@2.2.1
+  - @mcp-use/inspector@0.5.1
+
+## 1.3.1-canary.0
+
+### Patch Changes
+
+- 9ece7fe: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 9ece7fe: chore: update dependencies
+- Updated dependencies [9ece7fe]
+- Updated dependencies [9ece7fe]
+- Updated dependencies [9ece7fe]
+  - @mcp-use/cli@2.2.1-canary.0
+  - @mcp-use/inspector@0.5.1-canary.0
+
 ## 1.3.0
 
 ### Minor Changes
