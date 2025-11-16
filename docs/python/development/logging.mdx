@@ -62,9 +62,10 @@ Programmatic control is useful for debugging specific parts of your application 
 import mcp_use
 
 # Different debug levels
+mcp_use.set_debug(-1)  # Silent mode (no logs)
+mcp_use.set_debug(0)  # WARNING level only
 mcp_use.set_debug(1)  # INFO level
 mcp_use.set_debug(2)  # DEBUG level (full verbose output)
-mcp_use.set_debug(0)  # Turn off debug (WARNING level)
 ```
 </CodeGroup>
 
@@ -84,7 +85,15 @@ if os.getenv("ENVIRONMENT") == "development":
 
 ## Debug Levels
 
-<CardGroup cols={3}>
+<CardGroup cols={4}>
+  <Card title="Level -1 - Silent" icon="volume-xmark">
+    **No Output**
+
+    Suppresses all log messages from mcp-use
+
+    `DEBUG=-1` or `set_debug(-1)`
+  </Card>
+
   <Card title="Level 0 - Normal" icon="volume-off">
     **Minimal Output**
 
