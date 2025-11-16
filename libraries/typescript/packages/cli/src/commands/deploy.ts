@@ -609,23 +609,23 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         chalk.green("✓ Packaged: ") + chalk.gray(formatFileSize(stats.size))
       );
 
-      // Upload source
-      console.log(chalk.gray("Uploading source code..."));
-      const api = await McpUseAPI.create();
-      const uploadResponse = await api.uploadSource(tarballPath);
-      console.log(
-        chalk.green("✓ Uploaded: ") + chalk.gray(uploadResponse.uploadId)
-      );
-
-      // Clean up tarball
-      await fs.unlink(tarballPath);
+      // Check file size (2MB max)
+      const maxSize = 2 * 1024 * 1024; // 2MB
+      if (stats.size > maxSize) {
+        console.log(
+          chalk.red(
+            `✗ File size (${formatFileSize(stats.size)}) exceeds maximum of 2MB`
+          )
+        );
+        await fs.unlink(tarballPath);
+        process.exit(1);
+      }
 
       // Create deployment request
       const deploymentRequest: CreateDeploymentRequest = {
         name: projectName,
         source: {
           type: "upload",
-          uploadId: uploadResponse.uploadId,
           runtime,
           port,
           buildCommand,
@@ -634,9 +634,16 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         healthCheckPath: "/healthz",
       };
 
-      // Create deployment
+      // Create deployment with file upload
       console.log(chalk.gray("Creating deployment..."));
-      const deployment = await api.createDeployment(deploymentRequest);
+      const api = await McpUseAPI.create();
+      const deployment = await api.createDeploymentWithUpload(
+        deploymentRequest,
+        tarballPath
+      );
+
+      // Clean up tarball
+      await fs.unlink(tarballPath);
 
       console.log(
         chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)

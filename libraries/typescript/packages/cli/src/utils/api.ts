@@ -30,7 +30,6 @@ export interface GitHubSource {
 
 export interface UploadSource {
   type: "upload";
-  uploadId: string;
   startCommand?: string;
   runtime?: "node" | "python";
   port?: number;
@@ -71,11 +70,6 @@ export interface Deployment {
   gitCommitMessage?: string;
 }
 
-export interface UploadResponse {
-  uploadId: string;
-  size: number;
-  filename: string;
-}
 
 /**
  * API client for mcp-use cloud
@@ -241,22 +235,57 @@ export class McpUseAPI {
   }
 
   /**
-   * Upload source code tarball
+   * Create deployment with source code upload
    */
-  async uploadSource(filePath: string): Promise<UploadResponse> {
+  async createDeploymentWithUpload(
+    request: CreateDeploymentRequest,
+    filePath: string
+  ): Promise<Deployment> {
     const { readFile } = await import("node:fs/promises");
     const { basename } = await import("node:path");
-
+    const { stat } = await import("node:fs/promises");
+    
+    // Check file size (2MB max)
+    const stats = await stat(filePath);
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    if (stats.size > maxSize) {
+      throw new Error(`File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`);
+    }
+    
     const fileBuffer = await readFile(filePath);
     const filename = basename(filePath);
-
+    
+    // Build form data with deployment request and file
     const formData = new FormData();
     const blob = new Blob([fileBuffer], { type: "application/gzip" });
-    formData.append("file", blob, filename);
+    formData.append("source_file", blob, filename);
+    formData.append("name", request.name);
+    formData.append("source_type", "upload");
+    
+    if (request.source.type === "upload") {
+      formData.append("runtime", request.source.runtime || "node");
+      formData.append("port", String(request.source.port || 3000));
+      if (request.source.startCommand) {
+        formData.append("startCommand", request.source.startCommand);
+      }
+      if (request.source.buildCommand) {
+        formData.append("buildCommand", request.source.buildCommand);
+      }
+      if (request.source.env && Object.keys(request.source.env).length > 0) {
+        formData.append("env", JSON.stringify(request.source.env));
+      }
+    }
+    
+    if (request.customDomain) {
+      formData.append("customDomain", request.customDomain);
+    }
+    if (request.healthCheckPath) {
+      formData.append("healthCheckPath", request.healthCheckPath);
+    }
 
-    const url = `${this.baseUrl}/uploads`;
+    const url = `${this.baseUrl}/deployments`;
     const headers: Record<string, string> = {};
-
+    
     if (this.apiKey) {
       headers["x-api-key"] = this.apiKey;
     }
@@ -269,9 +298,9 @@ export class McpUseAPI {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Upload failed: ${error}`);
+      throw new Error(`Deployment failed: ${error}`);
     }
 
-    return response.json() as Promise<UploadResponse>;
+    return response.json() as Promise<Deployment>;
   }
 }
