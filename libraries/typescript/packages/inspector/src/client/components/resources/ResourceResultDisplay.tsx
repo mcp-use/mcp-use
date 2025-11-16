@@ -1,5 +1,6 @@
 import {
   Brush,
+  Check,
   Clock,
   Code,
   Copy,
@@ -35,6 +36,7 @@ interface ResourceResultDisplayProps {
   onDownload: () => void;
   onFullscreen: () => void;
   onUIAction?: (action: any) => void;
+  isCopied?: boolean;
 }
 
 export function ResourceResultDisplay({
@@ -47,6 +49,7 @@ export function ResourceResultDisplay({
   onCopy,
   onDownload,
   onFullscreen,
+  isCopied = false,
 }: ResourceResultDisplayProps) {
   const { prismStyle } = usePrismTheme();
 
@@ -211,7 +214,11 @@ export function ResourceResultDisplay({
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onCopy}>
-            <Copy className="h-4 w-4" />
+            {isCopied ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
           </Button>
           <Button variant="ghost" size="sm" onClick={onDownload}>
             <Download className="h-4 w-4" />
