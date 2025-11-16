@@ -17,7 +17,12 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TypeVar
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import ModelCallLimitMiddleware
+from langchain.agents.middleware import (
+    ModelCallLimitMiddleware,
+    ModelRequest,
+    wrap_model_call,
+)
+from langchain.agents.structured_output import AutoStrategy, ProviderStrategy
 from langchain_core.agents import AgentAction
 from langchain_core.globals import set_debug
 from langchain_core.language_models import BaseLanguageModel
@@ -171,6 +176,54 @@ class MCPAgent:
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
 
+    @wrap_model_call
+    async def dynamic_structured_output(request: ModelRequest, handler):
+        if not request.runtime.context:
+            return await handler(request)
+
+        # Get the format from the context
+        schema = request.runtime.context.get("response_format")
+        if not schema:
+            return await handler(request)
+
+        messages = request.messages
+
+        def _message_type(msg):
+            if isinstance(msg, dict):
+                return msg.get("type")
+            return getattr(msg, "type", None)
+
+        def _tool_calls(msg):
+            if isinstance(msg, dict):
+                return msg.get("tool_calls") or []
+            return getattr(msg, "tool_calls", []) or []
+
+        # Check if has tool messages
+        has_tool_messages = any(_message_type(msg) == "tool" for msg in messages)
+
+        # Find the most recent AI message
+        last_ai_message = next(
+            (msg for msg in reversed(messages) if _message_type(msg) == "ai"),
+            None,
+        )
+
+        last_ai_tool_calls = _tool_calls(last_ai_message) if last_ai_message else []
+
+        # Check if we're in the last step
+        should_force_structured = last_ai_message is not None and (has_tool_messages or not last_ai_tool_calls)
+
+        if should_force_structured:
+            if hasattr(request.model, "with_structured_output"):
+                # OpenAI, Anthropic, etc. support native schema enforcement
+                response_format = ProviderStrategy(schema=schema)
+            else:
+                # Other providers will still fall back to tool-based
+                response_format = AutoStrategy(schema=schema)
+
+            request = request.override(response_format=response_format)
+
+        return await handler(request)
+
     async def initialize(self) -> None:
         """Initialize the MCP client and agent."""
         logger.info("🚀 Initializing MCP agent and connecting to services...")
@@ -309,7 +362,7 @@ class MCPAgent:
 
         # Create middleware to enforce max_steps
         # ModelCallLimitMiddleware limits the number of model calls, which corresponds to agent steps
-        middleware = [ModelCallLimitMiddleware(run_limit=self.max_steps)]
+        middleware = [ModelCallLimitMiddleware(run_limit=self.max_steps), self.dynamic_structured_output]
 
         # Use the standard create_agent with middleware
         agent = create_agent(
@@ -513,45 +566,6 @@ class MCPAgent:
             )
         return result
 
-    async def _attempt_structured_output(
-        self,
-        raw_result: str,
-        structured_llm,
-        output_schema: type[T],
-        schema_description: str,
-    ) -> T:
-        """Attempt to create structured output from raw result with validation."""
-        format_prompt = f"""
-        Please format the following information according to the specified schema.
-        Extract and structure the relevant information from the content below.
-
-        Required schema fields:
-        {schema_description}
-
-        Content to format:
-        {raw_result}
-
-        Please provide the information in the requested structured format.
-        If any required information is missing, you must indicate this clearly.
-        """
-
-        structured_result = await structured_llm.ainvoke(format_prompt)
-
-        try:
-            for field_name, field_info in output_schema.model_fields.items():
-                required = not hasattr(field_info, "default") or field_info.default is None
-                if required:
-                    value = getattr(structured_result, field_name, None)
-                    if value is None or (isinstance(value, str) and not value.strip()):
-                        raise ValueError(f"Required field '{field_name}' is missing or empty")
-                    if isinstance(value, list) and len(value) == 0:
-                        raise ValueError(f"Required field '{field_name}' is an empty list")
-        except Exception as e:
-            logger.debug(f"Validation details: {e}")
-            raise  # Re-raise to trigger retry logic
-
-        return structured_result
-
     def _enhance_query_with_schema(self, query: str, output_schema: type[T]) -> str:
         """Enhance the query with schema information to make the agent aware of required fields."""
         schema_fields = []
@@ -684,22 +698,29 @@ class MCPAgent:
             accumulated_messages = list(langchain_history) + [HumanMessage(content=query)]
             pending_tool_calls = {}  # Map tool_call_id -> AgentAction
 
+            structured_response: dict | None = None
             while restart_count <= max_restarts:
                 # Update inputs with accumulated messages
                 inputs = {"messages": accumulated_messages}
                 should_restart = False
 
-                async for chunk in self._agent_executor.astream(
-                    inputs,
-                    stream_mode="updates",  # Get updates as they happen
-                    config={"callbacks": self.callbacks},
-                ):
+                astream_kwargs = {
+                    "stream_mode": "updates",
+                    "config": {"callbacks": self.callbacks},
+                }
+                if output_schema:
+                    astream_kwargs["context"] = {"response_format": output_schema}
+
+                async for chunk in self._agent_executor.astream(inputs, **astream_kwargs):
                     # chunk is a dict with node names as keys
                     # The agent node will have 'messages' with the AI response
                     # The tools node will have 'messages' with tool calls and results
 
                     for node_name, node_output in chunk.items():
                         logger.debug(f"📦 Node '{node_name}' output: {node_output}")
+
+                        if node_output and "structured_response" in node_output:
+                            structured_response = node_output
 
                         # Extract messages from the node output and accumulate them
                         if node_output is not None and "messages" in node_output:
@@ -822,29 +843,21 @@ class MCPAgent:
             # 5. Handle structured output if requested
             if output_schema and final_output:
                 try:
+                    # Here we use default response_format of LangChain
                     logger.info("🔧 Attempting structured output...")
-                    structured_llm = self.llm.with_structured_output(output_schema)
-
-                    # Get schema description
-                    schema_fields = []
-                    for field_name, field_info in output_schema.model_fields.items():
-                        description = getattr(field_info, "description", "") or field_name
-                        required = not hasattr(field_info, "default") or field_info.default is None
-                        schema_fields.append(
-                            f"- {field_name}: {description} " + ("(required)" if required else "(optional)")
-                        )
-                    schema_description = "\n".join(schema_fields)
-
-                    structured_result = await self._attempt_structured_output(
-                        final_output, structured_llm, output_schema, schema_description
-                    )
+                    if structured_response and structured_response.get("structured_response") is not None:
+                        result = structured_response["structured_response"]
+                    else:
+                        # For cases where the middleware can't be executed
+                        logger.info("🔧 Reformatting final answer via structured output formatter...")
+                        result = await self.llm.with_structured_output(output_schema).ainvoke(final_output)
 
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                        self.add_to_history(AIMessage(content=f"Structured result: {result}"))
 
                     logger.info("✅ Structured output successful")
                     success = True
-                    yield structured_result
+                    yield result
                     return
                 except Exception as e:
                     logger.error(f"❌ Structured output failed: {e}")
