@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.5.3-canary.0
+
+### Patch Changes
+
+- d4c246a: Add support for displaying console logs of widgets in the inspector preview panel
+  - mcp-use@1.3.3-canary.0
+
 ## 0.5.2
 
 ### Patch Changes
