@@ -1,5 +1,56 @@
 # @mcp-use/cli
 
+## 2.2.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [d9e3ae2]
+  - mcp-use@1.3.2-canary.5
+  - @mcp-use/inspector@0.5.2-canary.5
+
+## 2.2.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [9db6706]
+  - @mcp-use/inspector@0.5.2-canary.4
+  - mcp-use@1.3.2-canary.4
+
+## 2.2.2-canary.3
+
+### Patch Changes
+
+- 6133446: make installation disabled by default and add deploy command to template package
+  - mcp-use@1.3.2-canary.3
+  - @mcp-use/inspector@0.5.2-canary.3
+
+## 2.2.2-canary.2
+
+### Patch Changes
+
+- 6e3278b: fix inspector generated url
+  - mcp-use@1.3.2-canary.2
+  - @mcp-use/inspector@0.5.2-canary.2
+
+## 2.2.2-canary.1
+
+### Patch Changes
+
+- ecfa449: fix upload source
+  - mcp-use@1.3.2-canary.1
+  - @mcp-use/inspector@0.5.2-canary.1
+
+## 2.2.2-canary.0
+
+### Patch Changes
+
+- 2ebe233: fix with-inspector param
+- 2ebe233: chore: update dependencies
+- Updated dependencies [2ebe233]
+- Updated dependencies [2ebe233]
+  - @mcp-use/inspector@0.5.2-canary.0
+  - mcp-use@1.3.2-canary.0
+
 ## 2.2.1
 
 ### Patch Changes
