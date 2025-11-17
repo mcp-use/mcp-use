@@ -44,7 +44,6 @@ export function ToolResultDisplay({
   onCopy,
   onTogglePreview,
 }: ToolResultDisplayProps) {
-
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
       <div className="flex-1 overflow-y-auto h-full">

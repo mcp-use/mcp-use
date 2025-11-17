@@ -50,7 +50,6 @@ export function ResourceResultDisplay({
   onFullscreen,
   isCopied = false,
 }: ResourceResultDisplayProps) {
-
   // Check for OpenAI Apps SDK component
   // OpenAI metadata can be in:
   // 1. Resource annotations from the resource list (resourceAnnotations)

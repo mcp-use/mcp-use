@@ -23,7 +23,6 @@ export function PromptResultDisplay({
   copiedResult,
   onCopy,
 }: PromptResultDisplayProps) {
-
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
       <div className="flex-1 overflow-y-auto h-full">
