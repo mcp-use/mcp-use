@@ -24,6 +24,7 @@ export {
   useWidgetTheme,
   useWidgetState,
 } from "./useWidget.js";
+export { WidgetFullscreenWrapper } from "./WidgetFullscreenWrapper.js";
 export type {
   UseWidgetResult,
   OpenAiGlobals,
