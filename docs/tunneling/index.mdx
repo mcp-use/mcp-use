@@ -32,6 +32,10 @@ Tunneling is perfect for:
 ## Quick Start
 
 <Tip>
+This guide references mcp-use server, but you can use tunneling with any MCP server as long as they are served on the `/mcp` path.
+</Tip>
+
+<Tip>
 If you're using `mcp-use start`, you can pass the `--tunnel` flag to automatically create a tunnel without running a separate command:
 ```bash
 mcp-use start --port 3000 --tunnel
@@ -42,25 +46,7 @@ mcp-use start --port 3000 --tunnel
 <Step title="Define Your Server">
 Create your MCP server with tools and resources:
 
-<CodeGroup>
-```python Python
-from mcp_use.server import MCPServer
-
-server = MCPServer(
-    name="My Server",
-    version="1.0.0"
-)
-
-@server.tool()
-def echo(message: str) -> str:
-    """Echo back the provided message."""
-    return f"Echo: {message}"
-
-if __name__ == "__main__":
-    server.run(transport="streamable-http", host="127.0.0.1", port=3000)
-```
-
-```typescript TypeScript
+```typescript
 import { createMCPServer } from 'mcp-use/server'
 
 const server = createMCPServer('my-server', {
@@ -83,23 +69,16 @@ server.tool({
 
 server.listen(3000)
 ```
-</CodeGroup>
 
-For more details, see the [Python Server documentation](/python/server/index) or [TypeScript Server documentation](/typescript/server/index).
+For more details, see the [TypeScript Server documentation](/typescript/server/index).
 </Step>
 
 <Step title="Start Your Local MCP Server">
 Start your MCP server on a local port (e.g., port 3000):
 
-<CodeGroup>
-```bash Python
-python my_server.py
-```
-
-```bash TypeScript (mcp-use)
+```bash
 mcp-use start --port 3000
 ```
-</CodeGroup>
 
 </Step>
 
