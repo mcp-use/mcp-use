@@ -1,5 +1,23 @@
 # create-mcp-use-app
 
+## 0.5.1-canary.2
+
+### Patch Changes
+
+- 6133446: make installation disabled by default and add deploy command to template package
+
+## 0.5.1-canary.1
+
+### Patch Changes
+
+- bb270b1: add node types
+
+## 0.5.1-canary.0
+
+### Patch Changes
+
+- dcdb472: fix templates deps
+
 ## 0.5.0
 
 ### Minor Changes
