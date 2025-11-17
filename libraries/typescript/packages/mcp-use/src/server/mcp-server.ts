@@ -142,6 +142,9 @@ export class McpServer {
   private serverPort?: number;
   private serverHost: string;
   private serverBaseUrl?: string;
+  private registeredTools: string[] = [];
+  private registeredPrompts: string[] = [];
+  private registeredResources: string[] = [];
 
   /**
    * Creates a new MCP server instance with Hono integration
@@ -328,6 +331,7 @@ export class McpServer {
         return await resourceDefinition.readCallback();
       }
     );
+    this.registeredResources.push(resourceDefinition.name);
     return this;
   }
 
@@ -411,6 +415,7 @@ export class McpServer {
         return await resourceTemplateDefinition.readCallback(uri, params);
       }
     );
+    this.registeredResources.push(resourceTemplateDefinition.name);
     return this;
   }
 
@@ -468,6 +473,7 @@ export class McpServer {
         return await toolDefinition.cb(params);
       }
     );
+    this.registeredTools.push(toolDefinition.name);
     return this;
   }
 
@@ -518,6 +524,7 @@ export class McpServer {
         return await promptDefinition.cb(params);
       }
     );
+    this.registeredPrompts.push(promptDefinition.name);
     return this;
   }
 
@@ -1815,6 +1822,32 @@ if (container && Component) {
    * // Inspector UI: http://localhost:8080/inspector
    * ```
    */
+  /**
+   * Log registered tools, prompts, and resources to console
+   */
+  private logRegisteredItems(): void {
+    console.log("\n📋 Registered Server Items:");
+    console.log(`   Tools: ${this.registeredTools.length}`);
+    if (this.registeredTools.length > 0) {
+      this.registeredTools.forEach((name) => {
+        console.log(`      - ${name}`);
+      });
+    }
+    console.log(`   Prompts: ${this.registeredPrompts.length}`);
+    if (this.registeredPrompts.length > 0) {
+      this.registeredPrompts.forEach((name) => {
+        console.log(`      - ${name}`);
+      });
+    }
+    console.log(`   Resources: ${this.registeredResources.length}`);
+    if (this.registeredResources.length > 0) {
+      this.registeredResources.forEach((name) => {
+        console.log(`      - ${name}`);
+      });
+    }
+    console.log("");
+  }
+
   async listen(port?: number): Promise<void> {
     // Priority: parameter > PORT env var > default (3001)
     const portEnv = getEnv("PORT");
@@ -1834,6 +1867,9 @@ if (container && Component) {
 
     // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
     await this.mountInspector();
+
+    // Log registered items before starting server
+    this.logRegisteredItems();
 
     // Start server based on runtime
     if (isDeno) {
