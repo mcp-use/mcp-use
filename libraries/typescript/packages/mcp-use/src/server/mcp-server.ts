@@ -1826,7 +1826,7 @@ if (container && Component) {
    * Log registered tools, prompts, and resources to console
    */
   private logRegisteredItems(): void {
-    console.log("\n📋 Registered Server Items:");
+    console.log("\n📋 Server exposes:");
     console.log(`   Tools: ${this.registeredTools.length}`);
     if (this.registeredTools.length > 0) {
       this.registeredTools.forEach((name) => {
