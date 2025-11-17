@@ -64,6 +64,7 @@ export function OpenAIComponentRenderer({
   const [iframeHeight, setIframeHeight] = useState<number>(400);
   const lastMeasuredHeightRef = useRef<number>(0);
   const [centerVertically, setCenterVertically] = useState<boolean>(false);
+  const [isSameOrigin, setIsSameOrigin] = useState<boolean>(false);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -198,6 +199,13 @@ export function OpenAIComponentRenderer({
           const devUrl = `${new URL(serverBaseUrl).origin}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
           console.log("[OpenAIComponentRenderer] Using DEV mode URL:", devUrl);
           setWidgetUrl(devUrl);
+          // Check if dev URL is same-origin
+          try {
+            const devUrlObj = new URL(devUrl);
+            setIsSameOrigin(devUrlObj.origin === window.location.origin);
+          } catch {
+            setIsSameOrigin(false);
+          }
         } else {
           const prodUrl = `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`;
           console.log(
@@ -205,6 +213,8 @@ export function OpenAIComponentRenderer({
             prodUrl
           );
           setWidgetUrl(prodUrl);
+          // Relative URLs are always same-origin
+          setIsSameOrigin(true);
         }
       } catch (error) {
         console.error("Error storing widget data:", error);
@@ -282,9 +292,21 @@ export function OpenAIComponentRenderer({
     const handleLoad = () => {
       setIsReady(true);
       setError(null);
-      // Inject console interceptor after iframe loads
+      // Inject console interceptor after iframe loads (only for same-origin)
       if (iframeRef.current) {
-        injectConsoleInterceptor(iframeRef.current);
+        // Double-check same-origin by trying to access contentDocument
+        try {
+          const canAccess = !!iframeRef.current.contentDocument;
+          if (canAccess && isSameOrigin) {
+            injectConsoleInterceptor(iframeRef.current);
+          } else if (!canAccess) {
+            // Cross-origin iframe detected - update state
+            setIsSameOrigin(false);
+          }
+        } catch (e) {
+          // Cross-origin iframe - cannot access
+          setIsSameOrigin(false);
+        }
       }
     };
 
@@ -296,8 +318,8 @@ export function OpenAIComponentRenderer({
     iframe?.addEventListener("load", handleLoad);
     iframe?.addEventListener("error", handleError as any);
     
-    // Also try to inject immediately if iframe is already loaded
-    if (iframe && iframe.contentDocument?.readyState === 'complete') {
+    // Also try to inject immediately if iframe is already loaded (only for same-origin)
+    if (iframe && isSameOrigin && iframe.contentDocument?.readyState === 'complete') {
       injectConsoleInterceptor(iframe);
     }
 
@@ -306,7 +328,7 @@ export function OpenAIComponentRenderer({
       iframe?.removeEventListener("load", handleLoad);
       iframe?.removeEventListener("error", handleError as any);
     };
-  }, [widgetUrl]);
+  }, [widgetUrl, isSameOrigin]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {
@@ -396,9 +418,11 @@ export function OpenAIComponentRenderer({
           centerVertically && "items-center"
         )}
       >
-        <div className="absolute top-2 right-2 z-10">
-          <IframeConsole iframeId={toolId} enabled={true} />
-        </div>
+        {isSameOrigin && (
+          <div className="absolute top-2 right-2 z-10">
+            <IframeConsole iframeId={toolId} enabled={true} />
+          </div>
+        )}
         <iframe
           ref={iframeRef}
           src={widgetUrl}
