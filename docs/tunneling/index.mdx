@@ -46,7 +46,12 @@ mcp-use start --port 3000 --tunnel
 <Step title="Define Your Server">
 Create your MCP server with tools and resources:
 
-```typescript
+<CodeGroup>
+```bash via cli
+npx create-mcp-use-app my-mcp-server
+```
+
+```typescript manual
 import { createMCPServer } from 'mcp-use/server'
 
 const server = createMCPServer('my-server', {
@@ -69,6 +74,7 @@ server.tool({
 
 server.listen(3000)
 ```
+</CodeGroup>
 
 For more details, see the [TypeScript Server documentation](/typescript/server/index).
 </Step>
