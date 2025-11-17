@@ -1,4 +1,4 @@
-import { TerminalIcon, XIcon, TrashIcon } from 'lucide-react';
+import { TerminalIcon, TrashIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { cn } from '@/client/lib/utils';
 import { Button } from './ui/button';
@@ -23,7 +23,7 @@ function LogLevelBadge({ level }: { level: ConsoleLogEntry['level'] }) {
   return (
     <span
       className={cn(
-        'px-1.5 py-0.5 text-xs font-mono font-semibold rounded text-white',
+        'px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full text-white',
         colors[level]
       )}
     >
@@ -136,20 +136,20 @@ export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) 
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2">
               <TerminalIcon className="size-4" />
-              Iframe Console
+              Widget Console Logs
               {logs.length > 0 && (
                 <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
                   ({logs.length} {logs.length === 1 ? 'log' : 'logs'})
                 </span>
               )}
             </SheetTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pr-4">
               {logs.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={clearLogs}
-                  className="h-8"
+                  className='-my-2'
                 >
                   <TrashIcon className="size-4 mr-1" />
                   Clear
