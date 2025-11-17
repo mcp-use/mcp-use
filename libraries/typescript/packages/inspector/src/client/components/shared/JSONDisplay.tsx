@@ -22,14 +22,14 @@ export function JSONDisplay({ data, filename, className }: JSONDisplayProps) {
     return (
       <div className={className}>
         <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex-1">
               <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
                 JSON is too large ({jsonInfo.sizeFormatted})
               </p>
               <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                Showing preview only. Download the full JSON file to inspect it
-                completely.
+                Showing full structure with truncated values. Download the full
+                JSON file to see complete values.
               </p>
             </div>
             <Button
@@ -43,10 +43,7 @@ export function JSONDisplay({ data, filename, className }: JSONDisplayProps) {
             </Button>
           </div>
         </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-          Preview (first {formatBytes(jsonInfo.preview.length)} of{" "}
-          {jsonInfo.sizeFormatted}):
-        </div>
+
         <SyntaxHighlighter
           language="json"
           style={prismStyle}
@@ -60,7 +57,7 @@ export function JSONDisplay({ data, filename, className }: JSONDisplayProps) {
           }}
           className="text-gray-900 dark:text-gray-100"
         >
-          {jsonInfo.preview + "\n\n... (truncated)"}
+          {jsonInfo.preview}
         </SyntaxHighlighter>
       </div>
     );

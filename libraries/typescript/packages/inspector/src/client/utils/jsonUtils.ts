@@ -5,8 +5,8 @@
 // Size threshold in bytes (100KB)
 const LARGE_JSON_THRESHOLD = 100 * 1024;
 
-// Preview length for large JSON (first 50KB)
-const PREVIEW_LENGTH = 50 * 1024;
+// Maximum length for individual property values in preview (20KB)
+const MAX_VALUE_LENGTH = 1024 * 20;
 
 export interface LargeJSONInfo {
   isLarge: boolean;
@@ -17,15 +17,55 @@ export interface LargeJSONInfo {
 }
 
 /**
+ * Recursively truncate string values in an object/array while preserving structure
+ */
+function truncatePropertyValues(obj: any, maxLength: number): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "string") {
+    if (obj.length > maxLength) {
+      return obj.substring(0, maxLength) + "... (truncated)";
+    }
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => truncatePropertyValues(item, maxLength));
+  }
+
+  if (typeof obj === "object") {
+    const truncated: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        truncated[key] = truncatePropertyValues(obj[key], maxLength);
+      }
+    }
+    return truncated;
+  }
+
+  // For numbers, booleans, etc., return as-is
+  return obj;
+}
+
+/**
  * Check if a JSON object is too large and get preview information
  */
 export function analyzeJSON(data: any): LargeJSONInfo {
   const full = JSON.stringify(data, null, 2);
-  const size = new Blob([full]).size;
+  // Use TextEncoder for accurate byte size calculation
+  const size = new TextEncoder().encode(full).length;
   const isLarge = size > LARGE_JSON_THRESHOLD;
 
-  // Get preview (first N characters)
-  const preview = isLarge ? full.substring(0, PREVIEW_LENGTH) : full;
+  // Get preview by truncating property values instead of the entire JSON
+  let preview: string;
+  if (isLarge) {
+    const truncatedData = truncatePropertyValues(data, MAX_VALUE_LENGTH);
+    preview = JSON.stringify(truncatedData, null, 2);
+  } else {
+    preview = full;
+  }
 
   // Format size
   const sizeFormatted = formatBytes(size);
@@ -56,7 +96,9 @@ function formatBytes(bytes: number): string {
 export function downloadJSON(data: any, filename?: string): void {
   try {
     const jsonString = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonString], {
+    // Blob is available in browser environments
+    const BlobConstructor = (globalThis as any).Blob as any;
+    const blob = new BlobConstructor([jsonString], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
