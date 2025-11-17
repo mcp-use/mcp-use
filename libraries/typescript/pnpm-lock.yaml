@@ -184,6 +184,9 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.25
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.3
@@ -193,6 +196,9 @@ importers:
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
   packages/create-mcp-use-app/src/templates/mcp-ui:
     dependencies:
@@ -218,6 +224,9 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.25
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.3
@@ -227,6 +236,9 @@ importers:
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
   packages/create-mcp-use-app/src/templates/starter:
     dependencies:
@@ -252,6 +264,9 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.25
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.3
@@ -261,6 +276,9 @@ importers:
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
   packages/inspector:
     dependencies:

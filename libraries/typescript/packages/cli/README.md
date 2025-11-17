@@ -117,6 +117,43 @@ mcp-use start [options]
 - `-p, --path <path>` - Project directory (default: current directory)
 - `--port <port>` - Server port (default: 3000)
 
+### Cloud Deployment
+
+Deploy your MCP server to mcp-use cloud:
+
+```bash
+# Login to mcp-use cloud
+mcp-use login
+
+# Check authentication status
+mcp-use whoami
+
+# Deploy your MCP server
+mcp-use deploy [options]
+
+# Logout
+mcp-use logout
+```
+
+**Deploy Options:**
+
+- `--name <name>` - Custom deployment name
+- `--port <port>` - Server port (default: 3000)
+- `--runtime <runtime>` - Runtime environment: "node" or "python"
+- `--open` - Open deployment in browser after success
+
+**Example:**
+
+```bash
+# Basic deployment
+mcp-use deploy
+
+# Deploy with custom options
+mcp-use deploy --name my-server --port 8000 --open
+```
+
+See [ENVIRONMENT.md](./ENVIRONMENT.md) for configuration options.
+
 ---
 
 ## 💡 Examples
@@ -321,13 +358,38 @@ Add these scripts for convenience:
 
 ### Environment Variables
 
+#### Development & Build
+
 ```bash
 # Custom port via environment variable
 PORT=8080 mcp-use dev
 
 # Production build with custom output
 BUILD_DIR=./build mcp-use build
+
+# Custom MCP URL for widget asset paths
+MCP_URL=https://myserver.com mcp-use build
 ```
+
+#### Deployment & Cloud
+
+For deploying to mcp-use cloud, see [ENVIRONMENT.md](./ENVIRONMENT.md) for detailed configuration:
+
+```bash
+# Frontend URL (where /auth/cli page is)
+MCP_WEB_URL=https://mcp-use.com
+
+# Backend API URL (where /api/v1 endpoints are)
+MCP_API_URL=https://cloud.mcp-use.com
+
+# Example: Local development
+export MCP_WEB_URL=http://localhost:3000
+export MCP_API_URL=http://localhost:8000
+mcp-use login
+mcp-use deploy
+```
+
+See [ENVIRONMENT.md](./ENVIRONMENT.md) for more examples and configuration options.
 
 ### Docker Deployment
 

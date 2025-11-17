@@ -7,6 +7,9 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import open from "open";
 import chalk from "chalk";
+import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
+import { deployCommand } from "./commands/deploy.js";
+
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -716,6 +719,50 @@ program
       console.error("Start failed:", error);
       process.exit(1);
     }
+  });
+
+// Authentication commands
+program
+  .command("login")
+  .description("Login to mcp-use cloud")
+  .action(async () => {
+    await loginCommand();
+  });
+
+program
+  .command("logout")
+  .description("Logout from mcp-use cloud")
+  .action(async () => {
+    await logoutCommand();
+  });
+
+program
+  .command("whoami")
+  .description("Show current user information")
+  .action(async () => {
+    await whoamiCommand();
+  });
+
+// Deployment command
+program
+  .command("deploy")
+  .description("Deploy MCP server to mcp-use cloud")
+  .option("--open", "Open deployment in browser after successful deploy")
+  .option("--name <name>", "Custom deployment name")
+  .option("--port <port>", "Server port", "3000")
+  .option("--runtime <runtime>", "Runtime (node or python)")
+  .option(
+    "--from-source",
+    "Deploy from local source code (even for GitHub repos)"
+  )
+  .action(async (options) => {
+    await deployCommand({
+      open: options.open,
+      name: options.name,
+      port: options.port ? parseInt(options.port, 10) : undefined,
+      runtime: options.runtime,
+      fromSource: options.fromSource,
+    });
   });
 
 program.parse();
