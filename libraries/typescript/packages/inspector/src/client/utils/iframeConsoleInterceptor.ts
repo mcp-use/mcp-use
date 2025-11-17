@@ -143,24 +143,28 @@ export function injectConsoleInterceptor(iframe: HTMLIFrameElement): void {
       }
 
       // Check if already injected
-      if (iframeDoc.querySelector('script[data-console-interceptor]')) {
+      if (iframeDoc.querySelector("script[data-console-interceptor]")) {
         return;
       }
 
-      const script = iframeDoc.createElement('script');
-      script.setAttribute('data-console-interceptor', 'true');
+      const script = iframeDoc.createElement("script");
+      script.setAttribute("data-console-interceptor", "true");
       script.textContent = IFRAME_CONSOLE_INTERCEPTOR_SCRIPT;
-      
+
       // Inject at the beginning of the head or body
-      const target = iframeDoc.head || iframeDoc.body || iframeDoc.documentElement;
+      const target =
+        iframeDoc.head || iframeDoc.body || iframeDoc.documentElement;
       if (target) {
         target.insertBefore(script, target.firstChild);
       }
     } catch (error) {
       // Cross-origin restrictions - cannot inject script
       // This is expected for cross-origin iframes and is not an error
-      if (error instanceof Error && error.name !== 'SecurityError') {
-        console.warn('[IframeConsole] Failed to inject console interceptor:', error);
+      if (error instanceof Error && error.name !== "SecurityError") {
+        console.warn(
+          "[IframeConsole] Failed to inject console interceptor:",
+          error
+        );
       }
     }
   };
@@ -168,21 +172,26 @@ export function injectConsoleInterceptor(iframe: HTMLIFrameElement): void {
   try {
     // Try to inject immediately if document is ready
     const iframeDoc = iframe.contentDocument;
-    if (iframeDoc?.readyState === 'complete' || iframeDoc?.readyState === 'interactive') {
+    if (
+      iframeDoc?.readyState === "complete" ||
+      iframeDoc?.readyState === "interactive"
+    ) {
       injectScript();
     } else {
       // Wait for load event
       const handleLoad = () => {
         injectScript();
-        iframe.removeEventListener('load', handleLoad);
+        iframe.removeEventListener("load", handleLoad);
       };
-      iframe.addEventListener('load', handleLoad, { once: true });
-      
+      iframe.addEventListener("load", handleLoad, { once: true });
+
       // Also try after a short delay in case load event already fired
       setTimeout(() => {
         try {
-          if (iframe.contentDocument?.readyState === 'complete' || 
-              iframe.contentDocument?.readyState === 'interactive') {
+          if (
+            iframe.contentDocument?.readyState === "complete" ||
+            iframe.contentDocument?.readyState === "interactive"
+          ) {
             injectScript();
           }
         } catch {

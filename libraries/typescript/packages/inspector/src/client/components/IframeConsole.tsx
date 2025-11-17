@@ -1,29 +1,38 @@
-import { TerminalIcon, TrashIcon } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
-import { cn } from '@/client/lib/utils';
-import { Button } from './ui/button';
-import { useIframeConsole, type ConsoleLogEntry } from '../hooks/useIframeConsole';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { TerminalIcon, TrashIcon } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+import { cn } from "@/client/lib/utils";
+import { Button } from "./ui/button";
+import {
+  useIframeConsole,
+  type ConsoleLogEntry,
+} from "../hooks/useIframeConsole";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./ui/sheet";
 
 interface IframeConsoleProps {
   iframeId?: string;
   enabled?: boolean;
 }
 
-function LogLevelBadge({ level }: { level: ConsoleLogEntry['level'] }) {
+function LogLevelBadge({ level }: { level: ConsoleLogEntry["level"] }) {
   const colors = {
-    log: 'bg-zinc-500',
-    info: 'bg-blue-500',
-    warn: 'bg-yellow-500',
-    error: 'bg-red-500',
-    debug: 'bg-purple-500',
-    trace: 'bg-gray-500',
+    log: "bg-zinc-500",
+    info: "bg-blue-500",
+    warn: "bg-yellow-500",
+    error: "bg-red-500",
+    debug: "bg-purple-500",
+    trace: "bg-gray-500",
   };
 
   return (
     <span
       className={cn(
-        'px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full text-white',
+        "px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full text-white",
         colors[level]
       )}
     >
@@ -38,15 +47,15 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
       const date = new Date(log.timestamp);
       return date.toLocaleTimeString();
     } catch {
-      return '';
+      return "";
     }
   }, [log.timestamp]);
 
   const formatArg = (arg: any): string => {
-    if (arg === null) return 'null';
-    if (arg === undefined) return 'undefined';
-    if (typeof arg === 'string') return arg;
-    if (typeof arg === 'object') {
+    if (arg === null) return "null";
+    if (arg === undefined) return "undefined";
+    if (typeof arg === "string") return arg;
+    if (typeof arg === "object") {
       try {
         return JSON.stringify(arg, null, 2);
       } catch {
@@ -59,9 +68,9 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
   return (
     <div
       className={cn(
-        'font-mono text-xs p-2 border-b border-zinc-200 dark:border-zinc-800',
-        log.level === 'error' && 'bg-red-50/30 dark:bg-red-950/10',
-        log.level === 'warn' && 'bg-yellow-50/30 dark:bg-yellow-950/10'
+        "font-mono text-xs p-2 border-b border-zinc-200 dark:border-zinc-800",
+        log.level === "error" && "bg-red-50/30 dark:bg-red-950/10",
+        log.level === "warn" && "bg-yellow-50/30 dark:bg-yellow-950/10"
       )}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -86,9 +95,9 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
           <pre
             key={idx}
             className={cn(
-              'whitespace-pre-wrap break-words',
-              log.level === 'error' && 'text-red-700 dark:text-red-400',
-              log.level === 'warn' && 'text-yellow-700 dark:text-yellow-400'
+              "whitespace-pre-wrap break-words",
+              log.level === "error" && "text-red-700 dark:text-red-400",
+              log.level === "warn" && "text-yellow-700 dark:text-yellow-400"
             )}
           >
             {formatArg(arg)}
@@ -99,25 +108,29 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
   );
 }
 
-export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) {
+export function IframeConsole({
+  iframeId,
+  enabled = true,
+}: IframeConsoleProps) {
   const { logs, clearLogs, isOpen, setIsOpen } = useIframeConsole({
     enabled,
   });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const errorCount = useMemo(
-    () => logs.filter((log) => log.level === 'error').length,
+    () => logs.filter((log) => log.level === "error").length,
     [logs]
   );
   const warnCount = useMemo(
-    () => logs.filter((log) => log.level === 'warn').length,
+    () => logs.filter((log) => log.level === "warn").length,
     [logs]
   );
 
   // Auto-scroll to bottom when logs change or console opens
   useEffect(() => {
     if (isOpen && scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      scrollContainerRef.current.scrollTop =
+        scrollContainerRef.current.scrollHeight;
     }
   }, [logs, isOpen]);
 
@@ -147,7 +160,7 @@ export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) 
               Widget Console Logs
               {logs.length > 0 && (
                 <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                  ({logs.length} {logs.length === 1 ? 'log' : 'logs'})
+                  ({logs.length} {logs.length === 1 ? "log" : "logs"})
                 </span>
               )}
             </SheetTitle>
@@ -157,7 +170,7 @@ export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) 
                   variant="ghost"
                   size="sm"
                   onClick={clearLogs}
-                  className='-my-2'
+                  className="-my-2"
                 >
                   <TrashIcon className="size-4 mr-1" />
                   Clear
@@ -166,7 +179,10 @@ export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) 
             </div>
           </div>
         </SheetHeader>
-        <div ref={scrollContainerRef} className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-950">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-950"
+        >
           {logs.length === 0 ? (
             <div className="flex items-center justify-center h-full text-zinc-500 dark:text-zinc-400">
               <div className="text-center">

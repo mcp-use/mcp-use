@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface ConsoleLogEntry {
   id: string;
-  level: 'log' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
+  level: "log" | "error" | "warn" | "info" | "debug" | "trace";
   args: any[];
   timestamp: string;
   url?: string;
@@ -23,7 +23,7 @@ export function useIframeConsole(options: UseIframeConsoleOptions = {}) {
   const logIdCounterRef = useRef(0);
 
   const addLog = useCallback(
-    (entry: Omit<ConsoleLogEntry, 'id'>) => {
+    (entry: Omit<ConsoleLogEntry, "id">) => {
       if (!enabled) return;
 
       const newLog: ConsoleLogEntry = {
@@ -53,7 +53,7 @@ export function useIframeConsole(options: UseIframeConsoleOptions = {}) {
       // Verify message structure
       if (
         event.data &&
-        event.data.type === 'iframe-console-log' &&
+        event.data.type === "iframe-console-log" &&
         event.data.level &&
         Array.isArray(event.data.args)
       ) {
@@ -66,9 +66,9 @@ export function useIframeConsole(options: UseIframeConsoleOptions = {}) {
       }
     };
 
-    window.addEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
     return () => {
-      window.removeEventListener('message', handleMessage);
+      window.removeEventListener("message", handleMessage);
     };
   }, [enabled, addLog]);
 

@@ -249,7 +249,7 @@ export function OpenAIComponentRenderer({
       }
 
       // Let console log messages pass through (handled by useIframeConsole hook)
-      if (event.data?.type === 'iframe-console-log') {
+      if (event.data?.type === "iframe-console-log") {
         return;
       }
 
@@ -317,9 +317,13 @@ export function OpenAIComponentRenderer({
     const iframe = iframeRef.current;
     iframe?.addEventListener("load", handleLoad);
     iframe?.addEventListener("error", handleError as any);
-    
+
     // Also try to inject immediately if iframe is already loaded (only for same-origin)
-    if (iframe && isSameOrigin && iframe.contentDocument?.readyState === 'complete') {
+    if (
+      iframe &&
+      isSameOrigin &&
+      iframe.contentDocument?.readyState === "complete"
+    ) {
       injectConsoleInterceptor(iframe);
     }
 
