@@ -55,7 +55,8 @@
             "pages": [
               "home/redirects/python",
               "home/redirects/typescript",
-              "home/redirects/inspector"
+              "home/redirects/inspector",
+              "home/redirects/tunneling"
             ]
           },
           {
@@ -202,7 +203,8 @@
                   "python/development/development",
                   "python/development/logging",
                   "python/development/security",
-                  "python/development/telemetry"
+                  "python/development/telemetry",
+                  "tunneling/index"
                 ]
               }
             ]
@@ -523,7 +525,8 @@
                 "icon": "sparkle",
                 "pages": [
                   "typescript/development/logging",
-                  "typescript/development/security"
+                  "typescript/development/security",
+                  "tunneling/index"
                 ]
               }
             ]
@@ -581,6 +584,14 @@
         "pages": [
           "inspector/index",
           "inspector/self-hosting"
+        ]
+      },
+      {
+        "product": "Tunneling",
+        "description": "Test your local MCP server with external clients",
+        "icon": "train-front-tunnel",
+        "pages": [
+          "tunneling/index"
         ]
       }
     ]
