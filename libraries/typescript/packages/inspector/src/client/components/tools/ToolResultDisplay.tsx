@@ -1,10 +1,9 @@
 import { Check, Clock, Copy, Zap } from "lucide-react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { Button } from "@/client/components/ui/button";
-import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { NotFound } from "../ui/not-found";
+import { JSONDisplay } from "../shared/JSONDisplay";
 
 export interface ToolResult {
   toolName: string;
@@ -45,7 +44,6 @@ export function ToolResultDisplay({
   onCopy,
   onTogglePreview,
 }: ToolResultDisplayProps) {
-  const { prismStyle } = usePrismTheme();
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
@@ -225,21 +223,10 @@ export function ToolResultDisplay({
                           // JSON mode for Apps SDK resources
                           return (
                             <div className="px-4 pt-4">
-                              <SyntaxHighlighter
-                                language="json"
-                                style={prismStyle}
-                                customStyle={{
-                                  margin: 0,
-                                  padding: 0,
-                                  border: "none",
-                                  borderRadius: 0,
-                                  fontSize: "1rem",
-                                  background: "transparent",
-                                }}
-                                className="text-gray-900 dark:text-gray-100"
-                              >
-                                {JSON.stringify(result.result, null, 2)}
-                              </SyntaxHighlighter>
+                              <JSONDisplay
+                                data={result.result}
+                                filename={`tool-result-${result.toolName}-${Date.now()}.json`}
+                              />
                             </div>
                           );
                         }
@@ -269,31 +256,16 @@ export function ToolResultDisplay({
                                   )
                               ).length > 0 && (
                                 <div className="px-4">
-                                  <SyntaxHighlighter
-                                    language="json"
-                                    style={prismStyle}
-                                    customStyle={{
-                                      margin: 0,
-                                      padding: 0,
-                                      border: "none",
-                                      borderRadius: 0,
-                                      fontSize: "1rem",
-                                      background: "transparent",
-                                    }}
-                                    className="text-gray-900 dark:text-gray-100"
-                                  >
-                                    {JSON.stringify(
-                                      content.filter(
-                                        (item: any) =>
-                                          !(
-                                            item.type === "resource" &&
-                                            isMcpUIResource(item.resource)
-                                          )
-                                      ),
-                                      null,
-                                      2
+                                  <JSONDisplay
+                                    data={content.filter(
+                                      (item: any) =>
+                                        !(
+                                          item.type === "resource" &&
+                                          isMcpUIResource(item.resource)
+                                        )
                                     )}
-                                  </SyntaxHighlighter>
+                                    filename={`tool-result-${result.toolName}-non-ui-${Date.now()}.json`}
+                                  />
                                 </div>
                               )}
                             </div>
@@ -302,21 +274,10 @@ export function ToolResultDisplay({
                           // JSON mode for MCP UI resources
                           return (
                             <div className="px-4 pt-4">
-                              <SyntaxHighlighter
-                                language="json"
-                                style={prismStyle}
-                                customStyle={{
-                                  margin: 0,
-                                  padding: 0,
-                                  border: "none",
-                                  borderRadius: 0,
-                                  fontSize: "1rem",
-                                  background: "transparent",
-                                }}
-                                className="text-gray-900 dark:text-gray-100"
-                              >
-                                {JSON.stringify(result.result, null, 2)}
-                              </SyntaxHighlighter>
+                              <JSONDisplay
+                                data={result.result}
+                                filename={`tool-result-${result.toolName}-mcp-ui-${Date.now()}.json`}
+                              />
                             </div>
                           );
                         }
@@ -325,21 +286,10 @@ export function ToolResultDisplay({
                       // Default: show JSON for non-MCP UI resources
                       return (
                         <div className="px-4 pt-4">
-                          <SyntaxHighlighter
-                            language="json"
-                            style={prismStyle}
-                            customStyle={{
-                              margin: 0,
-                              padding: 0,
-                              border: "none",
-                              borderRadius: 0,
-                              fontSize: "1rem",
-                              background: "transparent",
-                            }}
-                            className="text-gray-900 dark:text-gray-100"
-                          >
-                            {JSON.stringify(result.result, null, 2)}
-                          </SyntaxHighlighter>
+                          <JSONDisplay
+                            data={result.result}
+                            filename={`tool-result-${result.toolName}-${Date.now()}.json`}
+                          />
                         </div>
                       );
                     })()

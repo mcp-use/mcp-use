@@ -8,13 +8,12 @@ import {
   Maximize,
   Zap,
 } from "lucide-react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
-import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { Spinner } from "../ui/spinner";
+import { JSONDisplay } from "../shared/JSONDisplay";
 
 export interface ResourceResult {
   uri: string;
@@ -51,7 +50,6 @@ export function ResourceResultDisplay({
   onFullscreen,
   isCopied = false,
 }: ResourceResultDisplayProps) {
-  const { prismStyle } = usePrismTheme();
 
   // Check for OpenAI Apps SDK component
   // OpenAI metadata can be in:
@@ -257,21 +255,10 @@ export function ResourceResultDisplay({
               // JSON mode for Apps SDK resources
               return (
                 <div className="px-4 pt-4">
-                  <SyntaxHighlighter
-                    language="json"
-                    style={prismStyle}
-                    customStyle={{
-                      margin: 0,
-                      padding: 0,
-                      border: "none",
-                      borderRadius: 0,
-                      fontSize: "1rem",
-                      background: "transparent",
-                    }}
-                    className="text-gray-900 dark:text-gray-100"
-                  >
-                    {JSON.stringify(result.result, null, 2)}
-                  </SyntaxHighlighter>
+                  <JSONDisplay
+                    data={result.result}
+                    filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}
+                  />
                 </div>
               );
             }
@@ -310,21 +297,10 @@ export function ResourceResultDisplay({
                       if (nonUIResources.length > 0) {
                         return (
                           <div className="px-4">
-                            <SyntaxHighlighter
-                              language="json"
-                              style={prismStyle}
-                              customStyle={{
-                                margin: 0,
-                                padding: 0,
-                                border: "none",
-                                borderRadius: 0,
-                                fontSize: "1rem",
-                                background: "transparent",
-                              }}
-                              className="text-gray-900 dark:text-gray-100"
-                            >
-                              {JSON.stringify(nonUIResources, null, 2)}
-                            </SyntaxHighlighter>
+                            <JSONDisplay
+                              data={nonUIResources}
+                              filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-non-ui-${Date.now()}.json`}
+                            />
                           </div>
                         );
                       }
@@ -337,21 +313,10 @@ export function ResourceResultDisplay({
               // JSON mode for MCP UI resources
               return (
                 <div className="px-4 pt-4">
-                  <SyntaxHighlighter
-                    language="json"
-                    style={prismStyle}
-                    customStyle={{
-                      margin: 0,
-                      padding: 0,
-                      border: "none",
-                      borderRadius: 0,
-                      fontSize: "1rem",
-                      background: "transparent",
-                    }}
-                    className="text-gray-900 dark:text-gray-100"
-                  >
-                    {JSON.stringify(result.result, null, 2)}
-                  </SyntaxHighlighter>
+                  <JSONDisplay
+                    data={result.result}
+                    filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-mcp-ui-${Date.now()}.json`}
+                  />
                 </div>
               );
             }
@@ -360,21 +325,10 @@ export function ResourceResultDisplay({
           // Default: show JSON for non-MCP UI resources
           return (
             <div className="px-4 pt-4">
-              <SyntaxHighlighter
-                language="json"
-                style={prismStyle}
-                customStyle={{
-                  margin: 0,
-                  padding: 0,
-                  border: "none",
-                  borderRadius: 0,
-                  fontSize: "1rem",
-                  background: "transparent",
-                }}
-                className="text-gray-900 dark:text-gray-100"
-              >
-                {JSON.stringify(result.result, null, 2)}
-              </SyntaxHighlighter>
+              <JSONDisplay
+                data={result.result}
+                filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}
+              />
             </div>
           );
         })()}

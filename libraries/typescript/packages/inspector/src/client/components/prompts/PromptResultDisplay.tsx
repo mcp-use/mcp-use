@@ -1,8 +1,7 @@
 import { Check, Clock, Copy, Zap } from "lucide-react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { Button } from "@/client/components/ui/button";
-import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import { NotFound } from "../ui/not-found";
+import { JSONDisplay } from "../shared/JSONDisplay";
 
 export interface PromptResult {
   promptName: string;
@@ -24,7 +23,6 @@ export function PromptResultDisplay({
   copiedResult,
   onCopy,
 }: PromptResultDisplayProps) {
-  const { prismStyle } = usePrismTheme();
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
@@ -80,21 +78,10 @@ export function PromptResultDisplay({
                   </div>
                 ) : (
                   <div className="px-4 pt-4">
-                    <SyntaxHighlighter
-                      language="json"
-                      style={prismStyle}
-                      customStyle={{
-                        margin: 0,
-                        padding: 0,
-                        border: "none",
-                        borderRadius: 0,
-                        fontSize: "1rem",
-                        background: "transparent",
-                      }}
-                      className="text-gray-900 dark:text-gray-100"
-                    >
-                      {JSON.stringify(result.result, null, 2)}
-                    </SyntaxHighlighter>
+                    <JSONDisplay
+                      data={result.result}
+                      filename={`prompt-result-${result.promptName}-${Date.now()}.json`}
+                    />
                   </div>
                 )}
               </div>
