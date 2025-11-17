@@ -1,5 +1,21 @@
 # @mcp-use/cli
 
+## 2.2.2
+
+### Patch Changes
+
+- 835d367: fix inspector generated url
+- 835d367: fix with-inspector param
+- 835d367: make installation disabled by default and add deploy command to template package
+- 835d367: chore: update dependencies
+- 835d367: fix upload source
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+  - @mcp-use/inspector@0.5.2
+  - mcp-use@1.3.2
+
 ## 2.2.2-canary.5
 
 ### Patch Changes

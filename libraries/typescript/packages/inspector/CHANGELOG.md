@@ -1,5 +1,17 @@
 # @mcp-use/inspector
 
+## 0.5.2
+
+### Patch Changes
+
+- 835d367: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 835d367: Hanlde large json responses by showing a preview and a download button
+- 835d367: chore: update dependencies
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+  - mcp-use@1.3.2
+
 ## 0.5.2-canary.5
 
 ### Patch Changes

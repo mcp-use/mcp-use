@@ -1,5 +1,23 @@
 # mcp-use
 
+## 1.3.2
+
+### Patch Changes
+
+- 835d367: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 835d367: chore: update dependencies
+- 835d367: Add entities list preview in cli logs
+  https://linear.app/mcp-use/issue/MCP-411/server-create-a-mini-inspector-in-the-server-cli
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+  - @mcp-use/cli@2.2.2
+  - @mcp-use/inspector@0.5.2
+
 ## 1.3.2-canary.5
 
 ### Patch Changes
