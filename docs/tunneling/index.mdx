@@ -1,0 +1,156 @@
+---
+title: "Tunneling"
+description: "Test your local MCP server with ChatGPT and other clients before deploying"
+icon: "train-front-tunnel"
+---
+
+
+The tunnel creates a secure connection between ChatGPT (or other MCP clients) and your local MCP server:
+
+```mermaid
+sequenceDiagram
+    participant ChatGPT as ChatGPT
+    participant TunnelServer as mcp-use Cloud
+    participant LocalServer as Local MCP Server
+
+    ChatGPT->>TunnelServer: HTTPS request
+    TunnelServer->>LocalServer: Forward request
+    LocalServer->>TunnelServer: MCP response
+    TunnelServer->>ChatGPT: Forward response
+```
+
+## Use Case
+
+Tunneling is perfect for:
+
+- **Testing before deployment**: Verify your MCP server works with real clients
+- **Development workflow**: Iterate quickly without deploying each change
+- **Client integration**: Test with ChatGPT, Claude, or other MCP clients
+- **Debugging**: Troubleshoot connection issues in a production-like environment
+
+
+## Quick Start
+
+<Tip>
+If you're using `mcp-use start`, you can pass the `--tunnel` flag to automatically create a tunnel without running a separate command:
+```bash
+mcp-use start --port 3000 --tunnel
+```
+</Tip>
+
+<Steps>
+<Step title="Define Your Server">
+Create your MCP server with tools and resources:
+
+<CodeGroup>
+```python Python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="My Server",
+    version="1.0.0"
+)
+
+@server.tool()
+def echo(message: str) -> str:
+    """Echo back the provided message."""
+    return f"Echo: {message}"
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", host="127.0.0.1", port=3000)
+```
+
+```typescript TypeScript
+import { createMCPServer } from 'mcp-use/server'
+
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  description: 'My MCP server'
+})
+
+server.tool({
+  name: 'echo',
+  description: 'Echo back the provided message',
+  inputs: [
+    { name: 'message', type: 'string', required: true }
+  ],
+  cb: async ({ message }) => {
+    return {
+      content: [{ type: 'text', text: `Echo: ${message}` }]
+    }
+  }
+})
+
+server.listen(3000)
+```
+</CodeGroup>
+
+For more details, see the [Python Server documentation](/python/server/index) or [TypeScript Server documentation](/typescript/server/index).
+</Step>
+
+<Step title="Start Your Local MCP Server">
+Start your MCP server on a local port (e.g., port 3000):
+
+<CodeGroup>
+```bash Python
+python my_server.py
+```
+
+```bash TypeScript (mcp-use)
+mcp-use start --port 3000
+```
+</CodeGroup>
+
+</Step>
+
+<Step title="Create a Tunnel">
+Use the tunnel command to expose your local server:
+
+```bash
+npx @mcp-use/tunnel 3000
+```
+
+This will create a public URL that forwards to your local server.
+</Step>
+
+<Step title="Use the Public URL">
+The command will output a public URL like:
+
+```
+╭────────────────────────────╮
+│  🎉 Tunnel Created Successfully!           │
+╰────────────────────────────╯
+
+  🌐 Public URL:
+     https://happy-blue-cat.local.mcp-use.run/mcp
+
+  📍 Subdomain: happy-blue-cat
+  🔌 Local Port: 3000
+```
+
+Use this URL to connect your MCP client (ChatGPT, Claude, etc.) to your local server.
+</Step>
+</Steps>
+
+
+
+
+<Info>
+**Time Limits:**
+- Tunnels automatically expire after **24 hours** of creation
+- Inactive tunnels are cleaned up after **1 hour** of no activity
+
+**Rate Limiting:**
+- Maximum **10 tunnel creations per IP per hour**
+- Maximum **5 active tunnels per IP** at any time
+- These limits help ensure fair usage and prevent abuse
+</Info>
+
+<Warning>
+The tunnel is active only while the command is running. Press `Ctrl+C` to close the tunnel when you're done testing.
+</Warning>
+
+<Tip>
+Keep the terminal window open while testing. The tunnel closes when you stop the command.
+</Tip>
+
