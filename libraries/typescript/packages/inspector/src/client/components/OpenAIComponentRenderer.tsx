@@ -2,6 +2,8 @@ import { cn } from "@/client/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { useMcpContext } from "../context/McpContext";
 import { Spinner } from "./ui/spinner";
+import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
+import { IframeConsole } from "./IframeConsole";
 
 interface OpenAIComponentRendererProps {
   componentUrl: string;
@@ -236,6 +238,11 @@ export function OpenAIComponentRenderer({
         return;
       }
 
+      // Let console log messages pass through (handled by useIframeConsole hook)
+      if (event.data?.type === 'iframe-console-log') {
+        return;
+      }
+
       switch (event.data.type) {
         case "openai:setWidgetState":
           try {
@@ -275,6 +282,10 @@ export function OpenAIComponentRenderer({
     const handleLoad = () => {
       setIsReady(true);
       setError(null);
+      // Inject console interceptor after iframe loads
+      if (iframeRef.current) {
+        injectConsoleInterceptor(iframeRef.current);
+      }
     };
 
     const handleError = () => {
@@ -284,6 +295,11 @@ export function OpenAIComponentRenderer({
     const iframe = iframeRef.current;
     iframe?.addEventListener("load", handleLoad);
     iframe?.addEventListener("error", handleError as any);
+    
+    // Also try to inject immediately if iframe is already loaded
+    if (iframe && iframe.contentDocument?.readyState === 'complete') {
+      injectConsoleInterceptor(iframe);
+    }
 
     return () => {
       window.removeEventListener("message", handleMessage);
@@ -376,10 +392,13 @@ export function OpenAIComponentRenderer({
       <div
         ref={containerRef}
         className={cn(
-          "w-full h-full flex justify-center items-center",
+          "w-full h-full flex flex-col justify-center items-center relative",
           centerVertically && "items-center"
         )}
       >
+        <div className="absolute top-2 right-2 z-10">
+          <IframeConsole iframeId={toolId} enabled={true} />
+        </div>
         <iframe
           ref={iframeRef}
           src={widgetUrl}

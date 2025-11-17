@@ -1,0 +1,183 @@
+import { TerminalIcon, XIcon, TrashIcon } from 'lucide-react';
+import { useMemo } from 'react';
+import { cn } from '@/client/lib/utils';
+import { Button } from './ui/button';
+import { useIframeConsole, type ConsoleLogEntry } from '../hooks/useIframeConsole';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+
+interface IframeConsoleProps {
+  iframeId?: string;
+  enabled?: boolean;
+}
+
+function LogLevelBadge({ level }: { level: ConsoleLogEntry['level'] }) {
+  const colors = {
+    log: 'bg-zinc-500',
+    info: 'bg-blue-500',
+    warn: 'bg-yellow-500',
+    error: 'bg-red-500',
+    debug: 'bg-purple-500',
+    trace: 'bg-gray-500',
+  };
+
+  return (
+    <span
+      className={cn(
+        'px-1.5 py-0.5 text-xs font-mono font-semibold rounded text-white',
+        colors[level]
+      )}
+    >
+      {level.toUpperCase()}
+    </span>
+  );
+}
+
+function LogEntry({ log }: { log: ConsoleLogEntry }) {
+  const formattedTime = useMemo(() => {
+    try {
+      const date = new Date(log.timestamp);
+      return date.toLocaleTimeString();
+    } catch {
+      return '';
+    }
+  }, [log.timestamp]);
+
+  const formatArg = (arg: any): string => {
+    if (arg === null) return 'null';
+    if (arg === undefined) return 'undefined';
+    if (typeof arg === 'string') return arg;
+    if (typeof arg === 'object') {
+      try {
+        return JSON.stringify(arg, null, 2);
+      } catch {
+        return String(arg);
+      }
+    }
+    return String(arg);
+  };
+
+  return (
+    <div
+      className={cn(
+        'font-mono text-xs p-2 border-b border-zinc-200 dark:border-zinc-800',
+        log.level === 'error' && 'bg-red-50/30 dark:bg-red-950/10',
+        log.level === 'warn' && 'bg-yellow-50/30 dark:bg-yellow-950/10'
+      )}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <LogLevelBadge level={log.level} />
+        <span className="text-zinc-500 dark:text-zinc-400 text-[10px]">
+          {formattedTime}
+        </span>
+        {log.url && (
+          <span className="text-zinc-400 dark:text-zinc-500 text-[10px] truncate flex-1">
+            {(() => {
+              try {
+                return new URL(log.url).pathname;
+              } catch {
+                return log.url;
+              }
+            })()}
+          </span>
+        )}
+      </div>
+      <div className="pl-1">
+        {log.args.map((arg, idx) => (
+          <pre
+            key={idx}
+            className={cn(
+              'whitespace-pre-wrap break-words',
+              log.level === 'error' && 'text-red-700 dark:text-red-400',
+              log.level === 'warn' && 'text-yellow-700 dark:text-yellow-400'
+            )}
+          >
+            {formatArg(arg)}
+          </pre>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) {
+  const { logs, clearLogs, isOpen, setIsOpen } = useIframeConsole({
+    enabled,
+  });
+
+  const errorCount = useMemo(
+    () => logs.filter((log) => log.level === 'error').length,
+    [logs]
+  );
+  const warnCount = useMemo(
+    () => logs.filter((log) => log.level === 'warn').length,
+    [logs]
+  );
+
+  return (
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+          onClick={() => setIsOpen(true)}
+        >
+          <TerminalIcon className="size-4 mr-2" />
+          <span className="hidden sm:inline">Console</span>
+          {(errorCount > 0 || warnCount > 0) && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-red-500 text-white font-semibold">
+              {errorCount + warnCount}
+            </span>
+          )}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="bottom" className="h-[400px] flex flex-col p-0">
+        <SheetHeader className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center justify-between">
+            <SheetTitle className="flex items-center gap-2">
+              <TerminalIcon className="size-4" />
+              Iframe Console
+              {logs.length > 0 && (
+                <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                  ({logs.length} {logs.length === 1 ? 'log' : 'logs'})
+                </span>
+              )}
+            </SheetTitle>
+            <div className="flex items-center gap-2">
+              {logs.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearLogs}
+                  className="h-8"
+                >
+                  <TrashIcon className="size-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        </SheetHeader>
+        <div className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-950">
+          {logs.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-zinc-500 dark:text-zinc-400">
+              <div className="text-center">
+                <TerminalIcon className="size-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No console logs yet</p>
+                <p className="text-xs mt-1">
+                  Logs from iframes will appear here
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {logs.map((log) => (
+                <LogEntry key={log.id} log={log} />
+              ))}
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
