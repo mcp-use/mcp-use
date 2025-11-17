@@ -1,5 +1,5 @@
 import { TerminalIcon, TrashIcon } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/client/lib/utils';
 import { Button } from './ui/button';
 import { useIframeConsole, type ConsoleLogEntry } from '../hooks/useIframeConsole';
@@ -103,6 +103,7 @@ export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) 
   const { logs, clearLogs, isOpen, setIsOpen } = useIframeConsole({
     enabled,
   });
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const errorCount = useMemo(
     () => logs.filter((log) => log.level === 'error').length,
@@ -112,6 +113,13 @@ export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) 
     () => logs.filter((log) => log.level === 'warn').length,
     [logs]
   );
+
+  // Auto-scroll to bottom when logs change or console opens
+  useEffect(() => {
+    if (isOpen && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [logs, isOpen]);
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -158,7 +166,7 @@ export function IframeConsole({ iframeId, enabled = true }: IframeConsoleProps) 
             </div>
           </div>
         </SheetHeader>
-        <div className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-950">
+        <div ref={scrollContainerRef} className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-950">
           {logs.length === 0 ? (
             <div className="flex items-center justify-center h-full text-zinc-500 dark:text-zinc-400">
               <div className="text-center">
