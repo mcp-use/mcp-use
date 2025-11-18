@@ -285,13 +285,18 @@ export function registerInspectorRoutes(
 
       // Rewrite asset paths to go through proxy
       const proxyBase = `/inspector/api/dev-widget/${toolId}/assets`;
-      
+
       // Extract widget name from devWidgetUrl if available
-      const widgetNameMatch = widgetData.devWidgetUrl?.match(/\/mcp-use\/widgets\/([^/?]+)/);
+      const widgetNameMatch = widgetData.devWidgetUrl?.match(
+        /\/mcp-use\/widgets\/([^/?]+)/
+      );
       const widgetName = widgetNameMatch ? widgetNameMatch[1] : "widget";
-      
+
       // Replace absolute paths to dev server with proxy paths
-      const escapedBaseUrl = widgetData.devServerBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapedBaseUrl = widgetData.devServerBaseUrl.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+      );
       html = html.replace(
         new RegExp(
           `(src|href)="(${escapedBaseUrl}/mcp-use/widgets/[^"]+)"`,
@@ -309,31 +314,29 @@ export function registerInspectorRoutes(
         /(src|href)="\/mcp-use\/widgets\//g,
         `$1="${proxyBase}/mcp-use/widgets/`
       );
-      
+
       // Handle Vite's asset imports (e.g., import.meta.url, __VITE_ASSET__)
       // These are typically handled by Vite's dev server, but we rewrite base paths
-      html = html.replace(
-        /(src|href)="\.\/([^"]+)"/g,
-        (match, attr, path) => {
-          // Only rewrite if it's in a script context or if it looks like an asset
-          if (path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/i)) {
-            return `${attr}="${proxyBase}/mcp-use/widgets/${widgetName}/${path}"`;
-          }
-          return match;
+      html = html.replace(/(src|href)="\.\/([^"]+)"/g, (match, attr, path) => {
+        // Only rewrite if it's in a script context or if it looks like an asset
+        if (
+          path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/i)
+        ) {
+          return `${attr}="${proxyBase}/mcp-use/widgets/${widgetName}/${path}"`;
         }
-      );
+        return match;
+      });
 
       // Rewrite Vite HMR WebSocket URL to go through proxy
       const host = c.req.header("host") || "localhost:3000";
-      const protocol = c.req.header("x-forwarded-proto") || (c.req.url.startsWith("https") ? "https" : "http");
+      const protocol =
+        c.req.header("x-forwarded-proto") ||
+        (c.req.url.startsWith("https") ? "https" : "http");
       const wsProtocol = protocol === "https" ? "wss" : "ws";
-      html = html.replace(
-        /__vite_ws__:\s*["']([^"']+)["']/g,
-        () => {
-          const proxyWsUrl = `${wsProtocol}://${host}/inspector/api/dev-widget/${toolId}/__vite_hmr`;
-          return `__vite_ws__: "${proxyWsUrl}"`;
-        }
-      );
+      html = html.replace(/__vite_ws__:\s*["']([^"']+)["']/g, () => {
+        const proxyWsUrl = `${wsProtocol}://${host}/inspector/api/dev-widget/${toolId}/__vite_hmr`;
+        return `__vite_ws__: "${proxyWsUrl}"`;
+      });
 
       // Set security headers
       const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
@@ -379,7 +382,8 @@ export function registerInspectorRoutes(
       }
 
       // Forward response with appropriate headers
-      const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+      const contentType =
+        response.headers.get("Content-Type") || "application/octet-stream";
       const headers: Record<string, string> = {
         "Content-Type": contentType,
       };
