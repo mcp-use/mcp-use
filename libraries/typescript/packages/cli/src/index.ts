@@ -140,8 +140,9 @@ async function startTunnel(
     proc.stdout?.on("data", (data) => {
       const text = data.toString();
       // Filter out shutdown messages from tunnel package
-      const isShutdownMessage = text.includes("Shutting down") || text.includes("🛑");
-      
+      const isShutdownMessage =
+        text.includes("Shutting down") || text.includes("🛑");
+
       // Suppress tunnel output during shutdown or if it's a shutdown message
       if (!isShuttingDown && !isShutdownMessage) {
         process.stdout.write(text);
@@ -753,7 +754,10 @@ program
         console.log(chalk.gray("\n\nShutting down..."));
 
         // Mark tunnel as shutting down to suppress output
-        if (tunnelProcess && typeof (tunnelProcess as any).markShutdown === "function") {
+        if (
+          tunnelProcess &&
+          typeof (tunnelProcess as any).markShutdown === "function"
+        ) {
           (tunnelProcess as any).markShutdown();
         }
 
