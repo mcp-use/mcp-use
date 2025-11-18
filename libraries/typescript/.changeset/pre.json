@@ -8,6 +8,7 @@
     "mcp-use": "1.3.2"
   },
   "changesets": [
+    "clear-wombats-juggle",
     "fast-ears-build"
   ]
 }
