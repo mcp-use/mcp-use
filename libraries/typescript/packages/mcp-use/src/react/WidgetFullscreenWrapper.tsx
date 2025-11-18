@@ -14,7 +14,7 @@ interface WidgetFullscreenWrapperProps {
 
 /**
  * Wrapper component that adds a close button when in fullscreen mode.
- * 
+ *
  * @example
  * ```tsx
  * const MyWidget: React.FC = () => {
@@ -44,9 +44,7 @@ export function WidgetFullscreenWrapper({
 
   // Theme-aware styling
   const isDark = theme === "dark";
-  const buttonBg = isDark
-    ? "rgba(255, 255, 255, 0.1)"
-    : "rgba(0, 0, 0, 0.7)";
+  const buttonBg = isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.7)";
   const buttonBgHover = isDark
     ? "rgba(255, 255, 255, 0.2)"
     : "rgba(0, 0, 0, 0.9)";
@@ -63,7 +61,7 @@ export function WidgetFullscreenWrapper({
       className={className}
       style={{ position: "relative", width: "100%", height: "100%" }}
     >
-      {isFullscreen && (
+      {isFullscreen ? (
         <button
           onClick={handleClose}
           style={{
@@ -113,6 +111,36 @@ export function WidgetFullscreenWrapper({
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
           Close
+        </button>
+      ) : (
+        <button
+          style={{
+            position: "absolute",
+            top: topOffset,
+            right: rightOffset,
+            zIndex: 1000,
+            padding: "8px 12px",
+            backgroundColor: buttonBg,
+            color: buttonColor,
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            transition: "background-color 0.2s, opacity 0.2s",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            boxShadow: isDark
+              ? "0 2px 8px rgba(0, 0, 0, 0.3)"
+              : "0 2px 8px rgba(0, 0, 0, 0.2)",
+          }}
+          onClick={() => requestDisplayMode("fullscreen")}
+          aria-label="Go fullscreen"
+        >
+          Fullscreen
         </button>
       )}
       {children}

@@ -62,6 +62,9 @@ export function OpenAIComponentRenderer({
   const [iframeHeight, setIframeHeight] = useState<number>(400);
   const lastMeasuredHeightRef = useRef<number>(0);
   const [centerVertically, setCenterVertically] = useState<boolean>(false);
+  const [displayMode, setDisplayMode] = useState<
+    "inline" | "pip" | "fullscreen"
+  >("inline");
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -250,21 +253,164 @@ export function OpenAIComponentRenderer({
           break;
 
         case "openai:callTool":
-          // For now, just respond with error - in a full implementation this would call the tool
-          iframeRef.current?.contentWindow?.postMessage(
-            {
-              type: "openai:callTool:response",
-              requestId: event.data.requestId,
-              error:
-                "Tool calls from widgets not yet supported in this inspector",
-            },
-            "*"
-          );
+          try {
+            if (!server) {
+              throw new Error("Server connection not available");
+            }
+
+            const { toolName, params, requestId } = event.data;
+            console.log(
+              "[OpenAIComponentRenderer] Calling tool:",
+              toolName,
+              params
+            );
+
+            // Call the tool via the MCP connection
+            const result = await server.callTool(toolName, params || {});
+
+            // Format the result to match OpenAI's expected format
+            // MCP tools return { contents: [...] }, we need to convert to OpenAI format
+            let formattedResult: any;
+            if (result && typeof result === "object") {
+              if (Array.isArray(result.contents)) {
+                formattedResult = {
+                  content: result.contents.map((content: any) => {
+                    if (typeof content === "string") {
+                      return { type: "text", text: content };
+                    }
+                    if (content.type === "text" && content.text) {
+                      return { type: "text", text: content.text };
+                    }
+                    if (content.type === "image" && content.data) {
+                      return {
+                        type: "image",
+                        image_url: { url: content.data },
+                      };
+                    }
+                    return { type: "text", text: JSON.stringify(content) };
+                  }),
+                };
+              } else {
+                // If it's already in the right format or a simple object
+                formattedResult = {
+                  content: [
+                    {
+                      type: "text",
+                      text:
+                        typeof result === "string"
+                          ? result
+                          : JSON.stringify(result),
+                    },
+                  ],
+                };
+              }
+            } else {
+              formattedResult = {
+                content: [
+                  {
+                    type: "text",
+                    text: String(result),
+                  },
+                ],
+              };
+            }
+
+            // Send success response back to iframe
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: "openai:callTool:response",
+                requestId,
+                result: formattedResult,
+              },
+              "*"
+            );
+          } catch (err: any) {
+            console.error("[OpenAIComponentRenderer] Tool call error:", err);
+            // Send error response back to iframe
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: "openai:callTool:response",
+                requestId: event.data.requestId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              "*"
+            );
+          }
           break;
 
         case "openai:sendFollowup":
-          // Followup messages not yet supported
+          try {
+            const { message } = event.data;
+            const prompt =
+              typeof message === "string"
+                ? message
+                : message?.prompt || message;
+
+            if (!prompt) {
+              console.warn(
+                "[OpenAIComponentRenderer] No prompt in followup message"
+              );
+              return;
+            }
+
+            console.log(
+              "[OpenAIComponentRenderer] Sending follow-up message:",
+              prompt
+            );
+
+            // Dispatch a custom event that the chat component can listen to
+            const followUpEvent = new CustomEvent(
+              "mcp-inspector:widget-followup",
+              {
+                detail: { prompt, serverId },
+              }
+            );
+            window.dispatchEvent(followUpEvent);
+
+            // Also try to store in localStorage as a fallback
+            // The chat component can check for this
+            try {
+              const followUpMessages = JSON.parse(
+                localStorage.getItem("mcp-inspector-pending-followups") || "[]"
+              );
+              followUpMessages.push({
+                prompt,
+                serverId,
+                timestamp: Date.now(),
+              });
+              localStorage.setItem(
+                "mcp-inspector-pending-followups",
+                JSON.stringify(followUpMessages.slice(-10)) // Keep last 10
+              );
+            } catch (e) {
+              // Ignore localStorage errors
+            }
+          } catch (err) {
+            console.error(
+              "[OpenAIComponentRenderer] Failed to send followup:",
+              err
+            );
+          }
           break;
+
+        case "openai:requestDisplayMode":
+          try {
+            const { mode } = event.data;
+            if (mode && ["inline", "pip", "fullscreen"].includes(mode)) {
+              setDisplayMode(mode);
+              console.log(
+                "[OpenAIComponentRenderer] Display mode changed to:",
+                mode
+              );
+            }
+          } catch (err) {
+            console.error(
+              "[OpenAIComponentRenderer] Failed to change display mode:",
+              err
+            );
+          }
+          break;
+
         default:
           break;
       }
@@ -290,7 +436,7 @@ export function OpenAIComponentRenderer({
       iframe?.removeEventListener("load", handleLoad);
       iframe?.removeEventListener("error", handleError as any);
     };
-  }, [widgetUrl]);
+  }, [widgetUrl, server, serverId]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {
@@ -377,14 +523,35 @@ export function OpenAIComponentRenderer({
         ref={containerRef}
         className={cn(
           "w-full h-full flex justify-center items-center",
-          centerVertically && "items-center"
+          centerVertically && "items-center",
+          displayMode === "fullscreen" && "fixed inset-0 z-50 bg-background",
+          displayMode === "pip" &&
+            "fixed bottom-4 right-4 z-50 w-96 h-96 shadow-2xl"
         )}
       >
+        {displayMode === "fullscreen" && (
+          <button
+            onClick={() => setDisplayMode("inline")}
+            className="absolute top-4 right-4 z-10 px-4 py-2 bg-background border rounded-lg hover:bg-muted"
+          >
+            Close
+          </button>
+        )}
         <iframe
           ref={iframeRef}
           src={widgetUrl}
-          className={cn("w-full max-w-[768px]  rounded-3xl")}
-          style={{ height: `${iframeHeight}px` }}
+          className={cn(
+            "rounded-3xl",
+            displayMode === "fullscreen" && "w-full h-full",
+            displayMode === "pip" && "w-full h-full",
+            displayMode === "inline" && "w-full max-w-[768px]"
+          )}
+          style={{
+            height:
+              displayMode === "fullscreen" || displayMode === "pip"
+                ? "100%"
+                : `${iframeHeight}px`,
+          }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
           title={`OpenAI Component: ${toolName}`}
           allow="web-share"
