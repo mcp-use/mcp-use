@@ -129,8 +129,6 @@ async function startTunnel(
       tunnelArgs.push("--subdomain", subdomain);
     }
 
-    console.log(tunnelArgs);
-
     const proc = spawn("npx", tunnelArgs, {
       stdio: ["ignore", "pipe", "pipe"],
       shell: false,
