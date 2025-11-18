@@ -1306,7 +1306,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -1314,7 +1314,7 @@ if (container && Component) {
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
@@ -1520,7 +1520,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -1528,7 +1528,7 @@ if (container && Component) {
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
