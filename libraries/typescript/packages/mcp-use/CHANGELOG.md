@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.3.3-canary.3
+
+### Patch Changes
+
+- d4dc001: hotfix: Wrap all handle request calls in wait function
+  - @mcp-use/cli@2.2.3-canary.3
+  - @mcp-use/inspector@0.5.3-canary.3
+
 ## 1.3.3-canary.2
 
 ### Patch Changes
