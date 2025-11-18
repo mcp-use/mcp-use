@@ -123,12 +123,13 @@ async function startTunnel(
     console.log(chalk.gray(`Starting tunnel for port ${port}...`));
 
     const tunnelArgs = ["--yes", "@mcp-use/tunnel", String(port)];
-
+    
     // Pass subdomain as CLI flag if provided
-    // Use -- to separate npx flags from command arguments
     if (subdomain) {
-      tunnelArgs.push("--", "--subdomain", subdomain);
+      tunnelArgs.push("--subdomain", subdomain);
     }
+
+    console.log(tunnelArgs);
 
     const proc = spawn("npx", tunnelArgs, {
       stdio: ["ignore", "pipe", "pipe"],
