@@ -117,110 +117,139 @@ export function useChatMessages({
           throw new Error("No response body");
         }
 
+        // Add timeout to detect hung streams (5 minutes)
+        const TIMEOUT_MS = 5 * 60 * 1000;
+        let timeoutError: Error | null = null;
+        const timeoutId = setTimeout(() => {
+          timeoutError = new Error("Stream timeout: No response received for 5 minutes");
+          reader.cancel();
+        }, TIMEOUT_MS);
+
         let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
+        let lastDataTime = Date.now();
+        let streamClosed = false;
+        let receivedDone = false;
 
-          if (done) break;
+        try {
+          while (true) {
+            // Check for timeout error
+            if (timeoutError) {
+              throw timeoutError;
+            }
 
-          // Decode the chunk and add to buffer
-          buffer += decoder.decode(value, { stream: true });
-
-          // Process complete lines from buffer
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-
-            // SSE format: lines start with "data: "
-            if (!line.startsWith("data: ")) continue;
-
-            try {
-              const event = JSON.parse(line.slice(6)); // Remove "data: " prefix
-              console.log(
-                "[Client received event]",
-                event.type,
-                event.toolName || event.content?.slice?.(0, 30)
+            // Check for timeout based on last data received (30 seconds)
+            const timeSinceLastData = Date.now() - lastDataTime;
+            if (timeSinceLastData > 30000 && !streamClosed) {
+              console.warn(
+                "[Stream] No data received for 30 seconds, closing stream"
               );
+              reader.cancel();
+              break;
+            }
 
-              if (event.type === "message") {
-                // Initial assistant message - just log it
-                console.log("[Message started]", event.id);
-              } else if (event.type === "text") {
-                // Streaming text content from LLM
-                currentTextPart += event.content;
+            const { done, value } = await reader.read();
 
-                // Update or add text part
-                const lastPart = parts[parts.length - 1];
-                if (lastPart && lastPart.type === "text") {
-                  // Update existing text part
-                  lastPart.text = currentTextPart;
-                } else {
-                  // Add new text part
-                  parts.push({
-                    type: "text",
-                    text: currentTextPart,
-                  });
+            if (done) {
+              streamClosed = true;
+              // Process any remaining buffer data before breaking
+              if (buffer.trim()) {
+                const lines = buffer.split("\n");
+                for (const line of lines) {
+                  if (!line.trim()) continue;
+                  if (!line.startsWith("data: ")) continue;
+                  try {
+                    const event = JSON.parse(line.slice(6));
+                    if (event.type === "done") {
+                      receivedDone = true;
+                    } else if (event.type === "error") {
+                      throw new Error(event.message || "Streaming error");
+                    }
+                  } catch (parseError) {
+                    console.error(
+                      "[Stream] Failed to parse final buffer:",
+                      parseError
+                    );
+                  }
                 }
+              }
+              break;
+            }
+
+            // Update last data time
+            lastDataTime = Date.now();
+
+            // Decode the chunk and add to buffer
+            buffer += decoder.decode(value, { stream: true });
+
+            // Process complete lines from buffer
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+
+              // SSE format: lines start with "data: "
+              if (!line.startsWith("data: ")) continue;
+
+              try {
+                const event = JSON.parse(line.slice(6)); // Remove "data: " prefix
                 console.log(
-                  "[Parts after text]",
-                  parts.length,
-                  "parts, text length:",
-                  currentTextPart.length
+                  "[Client received event]",
+                  event.type,
+                  event.toolName || event.content?.slice?.(0, 30)
                 );
 
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, parts: [...parts] }
-                      : msg
-                  )
-                );
-              } else if (event.type === "tool-call") {
-                // Tool invocation started - finalize current text and add tool part
-                if (currentTextPart) {
-                  currentTextPart = "";
-                }
+                if (event.type === "message") {
+                  // Initial assistant message - just log it
+                  console.log("[Message started]", event.id);
+                } else if (event.type === "text") {
+                  // Streaming text content from LLM
+                  currentTextPart += event.content;
 
-                parts.push({
-                  type: "tool-invocation",
-                  toolInvocation: {
-                    toolName: event.toolName,
-                    args: event.args,
-                    state: "pending",
-                  },
-                });
-                console.log(
-                  "[Parts after tool-call]",
-                  parts.length,
-                  "parts, tool:",
-                  event.toolName
-                );
-
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, parts: [...parts] }
-                      : msg
-                  )
-                );
-              } else if (event.type === "tool-result") {
-                // Tool invocation completed
-                const toolPart = parts.find(
-                  (p) =>
-                    p.type === "tool-invocation" &&
-                    p.toolInvocation?.toolName === event.toolName &&
-                    !p.toolInvocation?.result
-                );
-
-                if (toolPart && toolPart.toolInvocation) {
-                  toolPart.toolInvocation.result = event.result;
-                  toolPart.toolInvocation.state = "result";
+                  // Update or add text part
+                  const lastPart = parts[parts.length - 1];
+                  if (lastPart && lastPart.type === "text") {
+                    // Update existing text part
+                    lastPart.text = currentTextPart;
+                  } else {
+                    // Add new text part
+                    parts.push({
+                      type: "text",
+                      text: currentTextPart,
+                    });
+                  }
                   console.log(
-                    "[Parts after tool-result]",
+                    "[Parts after text]",
                     parts.length,
-                    "parts, updated:",
+                    "parts, text length:",
+                    currentTextPart.length
+                  );
+
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, parts: [...parts] }
+                        : msg
+                    )
+                  );
+                } else if (event.type === "tool-call") {
+                  // Tool invocation started - finalize current text and add tool part
+                  if (currentTextPart) {
+                    currentTextPart = "";
+                  }
+
+                  parts.push({
+                    type: "tool-invocation",
+                    toolInvocation: {
+                      toolName: event.toolName,
+                      args: event.args,
+                      state: "pending",
+                    },
+                  });
+                  console.log(
+                    "[Parts after tool-call]",
+                    parts.length,
+                    "parts, tool:",
                     event.toolName
                   );
 
@@ -231,36 +260,90 @@ export function useChatMessages({
                         : msg
                     )
                   );
-                } else {
-                  console.warn(
-                    "[tool-result] Could not find matching tool part for",
-                    event.toolName
+                } else if (event.type === "tool-result") {
+                  // Tool invocation completed
+                  const toolPart = parts.find(
+                    (p) =>
+                      p.type === "tool-invocation" &&
+                      p.toolInvocation?.toolName === event.toolName &&
+                      !p.toolInvocation?.result
                   );
+
+                  if (toolPart && toolPart.toolInvocation) {
+                    toolPart.toolInvocation.result = event.result;
+                    toolPart.toolInvocation.state = "result";
+                    console.log(
+                      "[Parts after tool-result]",
+                      parts.length,
+                      "parts, updated:",
+                      event.toolName
+                    );
+
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === assistantMessageId
+                          ? { ...msg, parts: [...parts] }
+                          : msg
+                      )
+                    );
+                  } else {
+                    console.warn(
+                      "[tool-result] Could not find matching tool part for",
+                      event.toolName
+                    );
+                  }
+                } else if (event.type === "done") {
+                  receivedDone = true;
+                  // Final update - use done data if available
+                  console.log("[Done] Final parts:", parts.length);
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            parts: [...parts],
+                            content: "", // Clear content since we're using parts
+                          }
+                        : msg
+                    )
+                  );
+                } else if (event.type === "error") {
+                  throw new Error(event.message || "Streaming error");
                 }
-              } else if (event.type === "done") {
-                // Final update - use done data if available
-                console.log("[Done] Final parts:", parts.length);
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? {
-                          ...msg,
-                          parts: [...parts],
-                          content: "", // Clear content since we're using parts
-                        }
-                      : msg
-                  )
+              } catch (parseError) {
+                console.error(
+                  "Failed to parse streaming event:",
+                  parseError,
+                  line
                 );
-              } else if (event.type === "error") {
-                throw new Error(event.message || "Streaming error");
               }
-            } catch (parseError) {
-              console.error(
-                "Failed to parse streaming event:",
-                parseError,
-                line
-              );
             }
+          }
+
+          // Ensure we finalize the message even if "done" event wasn't received
+          if (!receivedDone && parts.length > 0) {
+            console.warn(
+              "[Stream] Stream closed without 'done' event, finalizing message"
+            );
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? {
+                      ...msg,
+                      parts: [...parts],
+                      content: "",
+                    }
+                  : msg
+              )
+            );
+          }
+        } finally {
+          clearTimeout(timeoutId);
+          // Ensure reader is released
+          try {
+            reader.releaseLock();
+          } catch (e) {
+            // Reader may already be released
           }
         }
       } catch (error) {

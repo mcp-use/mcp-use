@@ -138,207 +138,91 @@ export function useChatMessagesClientSide({
           );
         }
 
-        // Stream events from agent
-        for await (const event of agentRef.current.streamEvents(
-          userInput,
-          10, // maxSteps
-          false, // manageConnector - don't manage, already connected
-          undefined // externalHistory - agent maintains its own with memoryEnabled
-        )) {
-          // Check for abort
-          if (abortControllerRef.current?.signal.aborted) {
-            break;
+        // Add timeout to detect hung streams (5 minutes)
+        const TIMEOUT_MS = 5 * 60 * 1000;
+        const timeoutId = setTimeout(() => {
+          if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+            abortControllerRef.current.abort();
           }
+        }, TIMEOUT_MS);
 
-          // Handle text streaming
-          if (
-            event.event === "on_chat_model_stream" &&
-            event.data?.chunk?.text
-          ) {
-            const text = event.data.chunk.text;
-            if (typeof text === "string" && text.length > 0) {
-              currentTextPart += text;
-
-              // Update or add text part
-              const lastPart = parts[parts.length - 1];
-              if (lastPart && lastPart.type === "text") {
-                lastPart.text = currentTextPart;
-              } else {
-                parts.push({
-                  type: "text",
-                  text: currentTextPart,
-                });
-              }
-
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, parts: [...parts] }
-                    : msg
-                )
-              );
-            }
-          }
-          // Handle tool start
-          else if (event.event === "on_tool_start") {
-            if (currentTextPart) {
-              currentTextPart = "";
+        try {
+          // Stream events from agent
+          for await (const event of agentRef.current.streamEvents(
+            userInput,
+            10, // maxSteps
+            false, // manageConnector - don't manage, already connected
+            undefined // externalHistory - agent maintains its own with memoryEnabled
+          )) {
+            // Check for abort
+            if (abortControllerRef.current?.signal.aborted) {
+              console.log("[Client-side stream] Aborted by user");
+              break;
             }
 
-            // Extract args from event data - check multiple possible locations
-            let args = {};
-            if (event.data?.input) {
-              args = event.data.input;
-            } else if (event.data?.tool_input) {
-              args = event.data.tool_input;
-            } else if (event.data) {
-              // Sometimes the args are directly in data
-              args = event.data;
-            }
+            // Handle text streaming
+            if (
+              event.event === "on_chat_model_stream" &&
+              event.data?.chunk?.text
+            ) {
+              const text = event.data.chunk.text;
+              if (typeof text === "string" && text.length > 0) {
+                currentTextPart += text;
 
-            console.log("[useChatMessagesClientSide] on_tool_start:", {
-              toolName: event.name,
-              eventData: event.data,
-              extractedArgs: args,
-            });
-            // Count tool calls for telemetry
-            toolCallsCount++;
-
-            parts.push({
-              type: "tool-invocation",
-              toolInvocation: {
-                toolName: event.name || "unknown",
-                args,
-                state: "pending",
-              },
-            });
-
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMessageId
-                  ? { ...msg, parts: [...parts] }
-                  : msg
-              )
-            );
-          }
-          // Handle tool end
-          else if (event.event === "on_tool_end") {
-            const toolPart = parts.find(
-              (p) =>
-                p.type === "tool-invocation" &&
-                p.toolInvocation?.toolName === event.name &&
-                !p.toolInvocation?.result
-            );
-
-            console.log("[useChatMessagesClientSide] on_tool_end event:", {
-              toolName: event.name,
-              hasToolPart: !!toolPart,
-              output: event.data?.output,
-            });
-
-            if (toolPart && toolPart.toolInvocation) {
-              let result = event.data?.output;
-
-              // Unwrap LangChain ToolMessage wrapper: kwargs.content contains the actual output
-              if (
-                result?.kwargs?.content &&
-                typeof result.kwargs.content === "string"
-              ) {
-                try {
-                  result = JSON.parse(result.kwargs.content);
-                } catch (error) {
-                  console.warn(
-                    "[useChatMessagesClientSide] Failed to parse kwargs.content:",
-                    error
-                  );
-                  result = result.kwargs.content;
+                // Update or add text part
+                const lastPart = parts[parts.length - 1];
+                if (lastPart && lastPart.type === "text") {
+                  lastPart.text = currentTextPart;
+                } else {
+                  parts.push({
+                    type: "text",
+                    text: currentTextPart,
+                  });
                 }
+
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, parts: [...parts] }
+                      : msg
+                  )
+                );
               }
-              // Fallback: try parsing result.content if it's a string
-              else if (result?.content && typeof result.content === "string") {
-                try {
-                  result = JSON.parse(result.content);
-                } catch (error) {
-                  result = result.content;
-                }
+            }
+            // Handle tool start
+            else if (event.event === "on_tool_start") {
+              if (currentTextPart) {
+                currentTextPart = "";
               }
 
-              // Store the unwrapped result
-              toolPart.toolInvocation.result = result;
-              toolPart.toolInvocation.state = "result";
+              // Extract args from event data - check multiple possible locations
+              let args = {};
+              if (event.data?.input) {
+                args = event.data.input;
+              } else if (event.data?.tool_input) {
+                args = event.data.tool_input;
+              } else if (event.data) {
+                // Sometimes the args are directly in data
+                args = event.data;
+              }
 
-              // Check result's _meta field for Apps SDK component
-              const appsSdkUri = result?._meta?.["openai/outputTemplate"];
-
-              console.log("[useChatMessagesClientSide] Tool result:", {
+              console.log("[useChatMessagesClientSide] on_tool_start:", {
                 toolName: event.name,
-                hasMeta: !!result?._meta,
-                hasStructuredContent: !!result?.structuredContent,
-                appsSdkUri,
+                eventData: event.data,
+                extractedArgs: args,
+              });
+              // Count tool calls for telemetry
+              toolCallsCount++;
+
+              parts.push({
+                type: "tool-invocation",
+                toolInvocation: {
+                  toolName: event.name || "unknown",
+                  args,
+                  state: "pending",
+                },
               });
 
-              if (
-                appsSdkUri &&
-                typeof appsSdkUri === "string" &&
-                readResource
-              ) {
-                // Fetch the resource now (await instead of IIFE)
-                console.log(
-                  "[useChatMessagesClientSide] Detected Apps SDK component, fetching resource:",
-                  appsSdkUri
-                );
-                try {
-                  // Use the readResource function passed from the inspector connection
-                  const resourceData = await readResource(appsSdkUri);
-
-                  console.log(
-                    "[useChatMessagesClientSide] Resource fetched:",
-                    resourceData
-                  );
-
-                  // Extract structured content from result
-                  const structuredContent = result?.structuredContent || null;
-
-                  // Add the fetched resource contents to the result's content array
-                  if (
-                    resourceData?.contents &&
-                    Array.isArray(resourceData.contents)
-                  ) {
-                    // Convert resource contents to MCP resource format
-                    const mcpResources = resourceData.contents.map(
-                      (content: any) => ({
-                        type: "resource",
-                        resource: content,
-                      })
-                    );
-
-                    console.log(
-                      "[useChatMessagesClientSide] Created MCP resources:",
-                      mcpResources
-                    );
-
-                    // Update the tool result with the fetched resources
-                    const updatedResult = {
-                      ...result,
-                      content: [...(result.content || []), ...mcpResources],
-                      structuredContent,
-                    };
-
-                    toolPart.toolInvocation.result = updatedResult;
-                    console.log(
-                      "[useChatMessagesClientSide] Updated result with resources"
-                    );
-                  } else {
-                    console.warn(
-                      "[useChatMessagesClientSide] No contents in resourceData:",
-                      resourceData
-                    );
-                  }
-                } catch (error) {
-                  console.error("Failed to fetch Apps SDK resource:", error);
-                }
-              }
-
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === assistantMessageId
@@ -347,7 +231,143 @@ export function useChatMessagesClientSide({
                 )
               );
             }
+            // Handle tool end
+            else if (event.event === "on_tool_end") {
+              const toolPart = parts.find(
+                (p) =>
+                  p.type === "tool-invocation" &&
+                  p.toolInvocation?.toolName === event.name &&
+                  !p.toolInvocation?.result
+              );
+
+              console.log("[useChatMessagesClientSide] on_tool_end event:", {
+                toolName: event.name,
+                hasToolPart: !!toolPart,
+                output: event.data?.output,
+              });
+
+              if (toolPart && toolPart.toolInvocation) {
+                let result = event.data?.output;
+
+                // Unwrap LangChain ToolMessage wrapper: kwargs.content contains the actual output
+                if (
+                  result?.kwargs?.content &&
+                  typeof result.kwargs.content === "string"
+                ) {
+                  try {
+                    result = JSON.parse(result.kwargs.content);
+                  } catch (error) {
+                    console.warn(
+                      "[useChatMessagesClientSide] Failed to parse kwargs.content:",
+                      error
+                    );
+                    result = result.kwargs.content;
+                  }
+                }
+                // Fallback: try parsing result.content if it's a string
+                else if (result?.content && typeof result.content === "string") {
+                  try {
+                    result = JSON.parse(result.content);
+                  } catch (error) {
+                    result = result.content;
+                  }
+                }
+
+                // Store the unwrapped result
+                toolPart.toolInvocation.result = result;
+                toolPart.toolInvocation.state = "result";
+
+                // Check result's _meta field for Apps SDK component
+                const appsSdkUri = result?._meta?.["openai/outputTemplate"];
+
+                console.log("[useChatMessagesClientSide] Tool result:", {
+                  toolName: event.name,
+                  hasMeta: !!result?._meta,
+                  hasStructuredContent: !!result?.structuredContent,
+                  appsSdkUri,
+                });
+
+                if (
+                  appsSdkUri &&
+                  typeof appsSdkUri === "string" &&
+                  readResource
+                ) {
+                  // Fetch the resource now (await instead of IIFE)
+                  console.log(
+                    "[useChatMessagesClientSide] Detected Apps SDK component, fetching resource:",
+                    appsSdkUri
+                  );
+                  try {
+                    // Use the readResource function passed from the inspector connection
+                    const resourceData = await readResource(appsSdkUri);
+
+                    console.log(
+                      "[useChatMessagesClientSide] Resource fetched:",
+                      resourceData
+                    );
+
+                    // Extract structured content from result
+                    const structuredContent = result?.structuredContent || null;
+
+                    // Add the fetched resource contents to the result's content array
+                    if (
+                      resourceData?.contents &&
+                      Array.isArray(resourceData.contents)
+                    ) {
+                      // Convert resource contents to MCP resource format
+                      const mcpResources = resourceData.contents.map(
+                        (content: any) => ({
+                          type: "resource",
+                          resource: content,
+                        })
+                      );
+
+                      console.log(
+                        "[useChatMessagesClientSide] Created MCP resources:",
+                        mcpResources
+                      );
+
+                      // Update the tool result with the fetched resources
+                      const updatedResult = {
+                        ...result,
+                        content: [...(result.content || []), ...mcpResources],
+                        structuredContent,
+                      };
+
+                      toolPart.toolInvocation.result = updatedResult;
+                      console.log(
+                        "[useChatMessagesClientSide] Updated result with resources"
+                      );
+                    } else {
+                      console.warn(
+                        "[useChatMessagesClientSide] No contents in resourceData:",
+                        resourceData
+                      );
+                    }
+                  } catch (error) {
+                    console.error("Failed to fetch Apps SDK resource:", error);
+                  }
+                }
+
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, parts: [...parts] }
+                      : msg
+                  )
+                );
+              }
+            }
           }
+        } catch (streamError) {
+          // If the stream throws an error, handle it
+          if (streamError instanceof Error && streamError.message.includes('timeout')) {
+            console.warn("[Client-side stream] Stream timeout detected");
+          } else {
+            throw streamError; // Re-throw other errors
+          }
+        } finally {
+          clearTimeout(timeoutId);
         }
 
         // Final update
