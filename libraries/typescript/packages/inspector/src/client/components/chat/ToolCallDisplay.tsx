@@ -10,6 +10,8 @@ import {
   SheetTrigger,
 } from "@/client/components/ui/sheet";
 import { cn } from "@/client/lib/utils";
+import { JSONDisplay } from "../shared/JSONDisplay";
+import { analyzeJSON } from "@/client/utils/jsonUtils";
 
 interface ToolCallDisplayProps {
   toolName: string;
@@ -66,7 +68,8 @@ export function ToolCallDisplay({
 
   const formatContent = (content: any): string => {
     if (typeof content === "object") {
-      return JSON.stringify(content, null, 2);
+      const jsonInfo = analyzeJSON(content);
+      return jsonInfo.preview;
     }
     return String(content);
   };
@@ -148,16 +151,16 @@ export function ToolCallDisplay({
             <div>
               <h3 className="text-sm font-medium mb-2">Result</h3>
               <div className="relative">
-                <div
-                  className={cn(
-                    "p-3 rounded-lg border text-sm leading-relaxed max-h-48 overflow-x-auto whitespace-pre-wrap break-words max-w-full",
-                    state === "error"
-                      ? "bg-destructive/10 border-destructive/20 text-destructive-foreground"
-                      : "bg-muted/30 border-border"
-                  )}
-                >
-                  {typeof result === "string" ? (
-                    result.startsWith("Error") ? (
+                {typeof result === "string" ? (
+                  <div
+                    className={cn(
+                      "p-3 rounded-lg border text-sm leading-relaxed max-h-48 overflow-x-auto whitespace-pre-wrap break-words max-w-full",
+                      state === "error"
+                        ? "bg-destructive/10 border-destructive/20 text-destructive-foreground"
+                        : "bg-muted/30 border-border"
+                    )}
+                  >
+                    {result.startsWith("Error") ? (
                       <div className="font-mono">
                         <div className="font-semibold text-destructive mb-1">
                           Error:
@@ -170,28 +173,43 @@ export function ToolCallDisplay({
                       <div className="whitespace-pre-wrap font-mono break-words">
                         {result}
                       </div>
-                    )
-                  ) : (
-                    <pre className="font-mono text-xs overflow-x-auto max-h-48 whitespace-pre-wrap break-words max-w-full">
-                      {JSON.stringify(result, null, 2)}
-                    </pre>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    copyToClipboard(
-                      typeof result === "string"
-                        ? result
-                        : JSON.stringify(result, null, 2)
-                    )
-                  }
-                  className="absolute top-2 right-2 h-6 w-6 p-0 opacity-70 hover:opacity-100"
-                  title="Copy result"
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(result)}
+                      className="absolute top-2 right-2 h-6 w-6 p-0 opacity-70 hover:opacity-100"
+                      title="Copy result"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div
+                    className={cn(
+                      "p-3 rounded-lg border text-sm leading-relaxed max-h-96 overflow-y-auto max-w-full",
+                      state === "error"
+                        ? "bg-destructive/10 border-destructive/20 text-destructive-foreground"
+                        : "bg-muted/30 border-border"
+                    )}
+                  >
+                    <JSONDisplay
+                      data={result}
+                      filename={`tool-call-${toolName}-result-${Date.now()}.json`}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        copyToClipboard(JSON.stringify(result, null, 2))
+                      }
+                      className="absolute top-2 right-2 h-6 w-6 p-0 opacity-70 hover:opacity-100"
+                      title="Copy result"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}
