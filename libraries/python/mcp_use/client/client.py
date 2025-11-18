@@ -488,6 +488,13 @@ class MCPClient:
 
         Returns:
             List of tool information dictionaries.
+        Example:
+            ```python
+            # Search for GitHub-related tools
+            tools = await client.search_tools("github pull")
+            for tool in tools:
+                print(f"{tool['server']}.{tool['name']}: {tool['description']}")
+            ```
         """
         # Ensure all servers are connected if in code mode (lazy connection)
         if self.code_mode:
