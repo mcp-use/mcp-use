@@ -451,6 +451,15 @@ program
       // Create build manifest
       const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
 
+      // Read existing manifest to preserve tunnel subdomain and other fields
+      let existingManifest: any = {};
+      try {
+        const existingContent = await fs.readFile(manifestPath, "utf-8");
+        existingManifest = JSON.parse(existingContent);
+      } catch {
+        // File doesn't exist, that's okay
+      }
+
       // Transform builtWidgets array into widgets object with metadata
       const widgetsData: Record<string, any> = {};
       for (const widget of builtWidgets) {
@@ -460,7 +469,9 @@ program
       // Convert to boolean: true if flag is present, false otherwise
       const includeInspector = !!options.withInspector;
 
+      // Merge with existing manifest, preserving tunnel and other fields
       const manifest = {
+        ...existingManifest, // Preserve existing fields like tunnel
         includeInspector,
         buildTime: new Date().toISOString(),
         widgets: widgetsData,
