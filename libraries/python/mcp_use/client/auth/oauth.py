@@ -71,7 +71,7 @@ class TokenData(BaseModel):
     """OAuth token data.
 
     This is the information received after
-    successfull authentication"""
+    successful authentication"""
 
     access_token: str  # Actual credential used for requests
     token_type: str = "Bearer"
@@ -84,7 +84,7 @@ class ClientRegistrationResponse(BaseModel):
     """Dynamic Client Registration response.
 
     It represents the response from an OAuth server
-    when you dinamically register a new OAuth client."""
+    when you dynamically register a new OAuth client."""
 
     client_id: str
     client_secret: str | None = None
@@ -173,7 +173,7 @@ class OAuth:
 
     - Discovers OAuth server capabilities automatically
     - Registers client dynamically when possible
-    - Manages token storage and refresh automaticlly"""
+    - Manages token storage and refresh automatically"""
 
     def __init__(
         self,
