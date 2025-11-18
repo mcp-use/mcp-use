@@ -31,7 +31,7 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
         timeout: float = 5,
         read_timeout: float = 60 * 5,
         auth: httpx.Auth | None = None,
-        httpx_client_factory: McpHttpClientFactory | None = None
+        httpx_client_factory: McpHttpClientFactory | None = None,
     ):
         """Initialize a new streamable HTTP connection manager.
 
@@ -68,7 +68,7 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
             timeout=self.timeout,
             sse_read_timeout=self.read_timeout,
             auth=self.auth,
-            httpx_client_factory=self.httpx_client_factory
+            httpx_client_factory=self.httpx_client_factory,
         )
 
         # Enter the context manager. Ignoring the session id callback

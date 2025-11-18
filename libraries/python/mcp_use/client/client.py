@@ -133,7 +133,7 @@ class MCPClient:
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
-            verify=verify
+            verify=verify,
         )
 
     @telemetry("client_add_server")

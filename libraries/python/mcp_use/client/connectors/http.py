@@ -5,7 +5,6 @@ This module provides a connector for communicating with MCP implementations
 through HTTP APIs with SSE or Streamable HTTP for transport.
 """
 
-import http
 from typing import Any
 
 import httpx
@@ -158,7 +157,12 @@ class HttpConnector(BaseConnector):
             # First, try the new streamable HTTP transport
             logger.debug(f"Attempting streamable HTTP connection to: {self.base_url}")
             connection_manager = StreamableHttpConnectionManager(
-                self.base_url, self.headers, self.timeout, self.sse_read_timeout, auth=self._auth, httpx_client_factory=httpx_client_factory,
+                self.base_url,
+                self.headers,
+                self.timeout,
+                self.sse_read_timeout,
+                auth=self._auth,
+                httpx_client_factory=httpx_client_factory,
             )
 
             # Test if this is a streamable HTTP server by attempting initialization
@@ -255,7 +259,12 @@ class HttpConnector(BaseConnector):
                     # Fall back to the old SSE transport
                     logger.debug(f"Attempting SSE fallback connection to: {self.base_url}")
                     connection_manager = SseConnectionManager(
-                        self.base_url, self.headers, self.timeout, self.sse_read_timeout, auth=self._auth, httpx_client_factory=httpx_client_factory
+                        self.base_url,
+                        self.headers,
+                        self.timeout,
+                        self.sse_read_timeout,
+                        auth=self._auth,
+                        httpx_client_factory=httpx_client_factory,
                     )
 
                     read_stream, write_stream = await connection_manager.start()
@@ -305,8 +314,9 @@ class HttpConnector(BaseConnector):
     def _build_httpx_factory(self):
         verify = self.verify
 
-        def factory(headers: dict[str, str] | None = None, timeout: httpx.Timeout | None = None,
-            auth: httpx.Auth | None = None) -> httpx.AsyncClient:
+        def factory(
+            headers: dict[str, str] | None = None, timeout: httpx.Timeout | None = None, auth: httpx.Auth | None = None
+        ) -> httpx.AsyncClient:
             return httpx.AsyncClient(
                 headers=headers,
                 timeout=timeout or httpx.Timeout(30.0),
@@ -314,6 +324,7 @@ class HttpConnector(BaseConnector):
                 verify=verify,
                 follow_redirects=True,
             )
+
         return factory
 
     @property
