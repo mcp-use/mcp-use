@@ -1543,6 +1543,31 @@ if (container && Component) {
   }
 
   /**
+   * Helper to wait for transport.handleRequest to complete and response to be written
+   *
+   * Wraps the transport.handleRequest call in a Promise that only resolves when
+   * expressRes.end() is called, ensuring all async operations complete before
+   * we attempt to read the response.
+   *
+   * @private
+   */
+  private waitForRequestComplete(
+    transport: any,
+    expressReq: any,
+    expressRes: any,
+    body?: any
+  ): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const originalEnd = expressRes.end;
+      expressRes.end = (...args: any[]) => {
+        originalEnd.apply(expressRes, args);
+        resolve();
+      };
+      transport.handleRequest(expressReq, expressRes, body);
+    });
+  }
+
+  /**
    * Mount MCP server endpoints at /mcp
    *
    * Sets up the HTTP transport layer for the MCP server, creating endpoints for
@@ -1725,7 +1750,12 @@ if (container && Component) {
       await this.server.connect(transport);
 
       // Wait for handleRequest to complete and for response to be written
-      transport.handleRequest(expressReq, expressRes, expressReq.body);
+      await this.waitForRequestComplete(
+        transport,
+        expressReq,
+        expressRes,
+        expressReq.body
+      );
 
       const response = getResponse();
       if (response) {
@@ -1753,7 +1783,8 @@ if (container && Component) {
 
       await this.server.connect(transport);
 
-      await transport.handleRequest(expressReq, expressRes);
+      // Wait for handleRequest to complete and for response to be written
+      await this.waitForRequestComplete(transport, expressReq, expressRes);
 
       const response = getResponse();
       if (response) {
@@ -1780,7 +1811,8 @@ if (container && Component) {
 
       await this.server.connect(transport);
 
-      await transport.handleRequest(expressReq, expressRes);
+      // Wait for handleRequest to complete and for response to be written
+      await this.waitForRequestComplete(transport, expressReq, expressRes);
 
       const response = getResponse();
       if (response) {
