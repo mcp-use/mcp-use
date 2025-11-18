@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.3.3-canary.2
+
+### Patch Changes
+
+- 9fc286c: Fix async server tool calls
+  - @mcp-use/cli@2.2.3-canary.2
+  - @mcp-use/inspector@0.5.3-canary.2
+
 ## 1.3.3-canary.1
 
 ### Patch Changes

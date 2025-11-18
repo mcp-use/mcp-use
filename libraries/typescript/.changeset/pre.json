@@ -9,6 +9,7 @@
   },
   "changesets": [
     "clear-wombats-juggle",
-    "fast-ears-build"
+    "fast-ears-build",
+    "strict-cows-invite"
   ]
 }
