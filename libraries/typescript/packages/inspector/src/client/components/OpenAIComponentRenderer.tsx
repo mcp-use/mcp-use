@@ -2,6 +2,7 @@ import { cn } from "@/client/lib/utils";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMcpContext } from "../context/McpContext";
+import { useTheme } from "../context/ThemeContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { IframeConsole } from "./IframeConsole";
@@ -83,6 +84,7 @@ export function OpenAIComponentRenderer({
     (connection) => connection.id === serverId
   );
   const serverBaseUrl = server?.url;
+  const { resolvedTheme } = useTheme();
 
   console.log(componentUrl, toolResult);
 
@@ -249,18 +251,43 @@ export function OpenAIComponentRenderer({
     serverBaseUrl,
   ]);
 
-  // Helper to update window.openai.displayMode inside iframe
-  const updateIframeDisplayMode = useCallback(
-    (mode: "inline" | "pip" | "fullscreen") => {
+  // Helper to update window.openai globals inside iframe
+  const updateIframeGlobals = useCallback(
+    (updates: {
+      displayMode?: "inline" | "pip" | "fullscreen";
+      theme?: "light" | "dark";
+      maxHeight?: number;
+      locale?: string;
+      safeArea?: {
+        insets: { top: number; bottom: number; left: number; right: number };
+      };
+      userAgent?: any;
+    }) => {
       if (iframeRef.current?.contentWindow) {
         try {
-          // Update the iframe's window.openai.displayMode
           const iframeWindow = iframeRef.current.contentWindow;
           if (iframeWindow.openai) {
-            iframeWindow.openai.displayMode = mode;
+            // Update all provided properties
+            if (updates.displayMode !== undefined) {
+              iframeWindow.openai.displayMode = updates.displayMode;
+            }
+            if (updates.theme !== undefined) {
+              iframeWindow.openai.theme = updates.theme;
+            }
+            if (updates.maxHeight !== undefined) {
+              iframeWindow.openai.maxHeight = updates.maxHeight;
+            }
+            if (updates.locale !== undefined) {
+              iframeWindow.openai.locale = updates.locale;
+            }
+            if (updates.safeArea !== undefined) {
+              iframeWindow.openai.safeArea = updates.safeArea;
+            }
+            if (updates.userAgent !== undefined) {
+              iframeWindow.openai.userAgent = updates.userAgent;
+            }
 
             // Dispatch the set_globals event to notify React components
-            // Use eval to access iframe's CustomEvent (for same-origin iframes)
             try {
               const globalsEvent = new (iframeWindow as any).CustomEvent(
                 "openai:set_globals",
@@ -268,7 +295,6 @@ export function OpenAIComponentRenderer({
                   detail: {
                     globals: {
                       ...iframeWindow.openai,
-                      displayMode: mode,
                     },
                   },
                 }
@@ -278,8 +304,8 @@ export function OpenAIComponentRenderer({
               // If CustomEvent fails, use postMessage fallback
               iframeWindow.postMessage(
                 {
-                  type: "openai:displayModeChanged",
-                  mode,
+                  type: "openai:globalsChanged",
+                  updates,
                 },
                 "*"
               );
@@ -289,8 +315,8 @@ export function OpenAIComponentRenderer({
           // Cross-origin or other error, use postMessage instead
           iframeRef.current.contentWindow.postMessage(
             {
-              type: "openai:displayModeChanged",
-              mode,
+              type: "openai:globalsChanged",
+              updates,
             },
             "*"
           );
@@ -309,14 +335,14 @@ export function OpenAIComponentRenderer({
           if (document.fullscreenElement) {
             // Already in fullscreen, just update state
             setDisplayMode(mode);
-            updateIframeDisplayMode(mode);
+            updateIframeGlobals({ displayMode: mode });
             return;
           }
 
           if (containerRef.current) {
             await containerRef.current.requestFullscreen();
             setDisplayMode(mode);
-            updateIframeDisplayMode(mode);
+            updateIframeGlobals({ displayMode: mode });
             console.log("[OpenAIComponentRenderer] Entered fullscreen");
           }
         } else {
@@ -325,17 +351,17 @@ export function OpenAIComponentRenderer({
             await document.exitFullscreen();
           }
           setDisplayMode(mode);
-          updateIframeDisplayMode(mode);
+          updateIframeGlobals({ displayMode: mode });
           console.log("[OpenAIComponentRenderer] Exited fullscreen");
         }
       } catch (err) {
         console.error("[OpenAIComponentRenderer] Fullscreen error:", err);
         // Fallback to CSS-based fullscreen if native API fails
         setDisplayMode(mode);
-        updateIframeDisplayMode(mode);
+        updateIframeGlobals({ displayMode: mode });
       }
     },
-    [updateIframeDisplayMode]
+    [updateIframeGlobals]
   );
 
   // Handle postMessage communication with iframe
@@ -633,12 +659,12 @@ export function OpenAIComponentRenderer({
       if (!document.fullscreenElement && displayMode === "fullscreen") {
         // User exited fullscreen via ESC or other means
         setDisplayMode("inline");
-        updateIframeDisplayMode("inline");
+        updateIframeGlobals({ displayMode: "inline" });
         console.log("[OpenAIComponentRenderer] Fullscreen exited by user");
       } else if (document.fullscreenElement && displayMode !== "fullscreen") {
         // Fullscreen was entered externally
         setDisplayMode("fullscreen");
-        updateIframeDisplayMode("fullscreen");
+        updateIframeGlobals({ displayMode: "fullscreen" });
       }
     };
 
@@ -650,7 +676,14 @@ export function OpenAIComponentRenderer({
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
-  }, [displayMode, updateIframeDisplayMode]);
+  }, [displayMode, updateIframeGlobals]);
+
+  // Watch for theme changes and update iframe
+  useEffect(() => {
+    if (widgetUrl && resolvedTheme) {
+      updateIframeGlobals({ theme: resolvedTheme });
+    }
+  }, [resolvedTheme, widgetUrl, updateIframeGlobals]);
 
   if (error) {
     return (

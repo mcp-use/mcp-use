@@ -714,9 +714,74 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           } catch (err) {}
         }, 0);
 
-        // Listen for displayMode changes from parent (for fullscreen exit)
+        // Listen for globals changes from parent (for displayMode, theme, etc.)
         window.addEventListener('message', (event) => {
-          if (event.data?.type === 'openai:displayModeChanged') {
+          // Handle new general globalsChanged message
+          if (event.data?.type === 'openai:globalsChanged') {
+            const updates = event.data.updates || {};
+            let hasChanges = false;
+
+            // Update displayMode
+            if (updates.displayMode && ['inline', 'pip', 'fullscreen'].includes(updates.displayMode)) {
+              openaiAPI.displayMode = updates.displayMode;
+              hasChanges = true;
+            }
+
+            // Update theme
+            if (updates.theme && ['light', 'dark'].includes(updates.theme)) {
+              openaiAPI.theme = updates.theme;
+              hasChanges = true;
+            }
+
+            // Update maxHeight
+            if (updates.maxHeight !== undefined && typeof updates.maxHeight === 'number') {
+              openaiAPI.maxHeight = updates.maxHeight;
+              hasChanges = true;
+            }
+
+            // Update locale
+            if (updates.locale && typeof updates.locale === 'string') {
+              openaiAPI.locale = updates.locale;
+              hasChanges = true;
+            }
+
+            // Update safeArea
+            if (updates.safeArea && typeof updates.safeArea === 'object') {
+              openaiAPI.safeArea = updates.safeArea;
+              hasChanges = true;
+            }
+
+            // Update userAgent
+            if (updates.userAgent !== undefined) {
+              openaiAPI.userAgent = updates.userAgent;
+              hasChanges = true;
+            }
+
+            // Dispatch set_globals event to notify React components if any changes occurred
+            if (hasChanges) {
+              try {
+                const globalsEvent = new CustomEvent('openai:set_globals', {
+                  detail: {
+                    globals: {
+                      toolInput: openaiAPI.toolInput,
+                      toolOutput: openaiAPI.toolOutput,
+                      toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
+                      widgetState: openaiAPI.widgetState,
+                      displayMode: openaiAPI.displayMode,
+                      maxHeight: openaiAPI.maxHeight,
+                      theme: openaiAPI.theme,
+                      locale: openaiAPI.locale,
+                      safeArea: openaiAPI.safeArea,
+                      userAgent: openaiAPI.userAgent
+                    }
+                  }
+                });
+                window.dispatchEvent(globalsEvent);
+              } catch (err) {}
+            }
+          }
+          // Handle legacy displayModeChanged message for backward compatibility
+          else if (event.data?.type === 'openai:displayModeChanged') {
             const newMode = event.data.mode;
             if (newMode && ['inline', 'pip', 'fullscreen'].includes(newMode)) {
               openaiAPI.displayMode = newMode;

@@ -60,7 +60,7 @@ export function WidgetFullscreenWrapper({
   const buttonBgHover = isDark
     ? "rgba(255, 255, 255, 0.2)"
     : "rgba(0, 0, 0, 0.9)";
-  const buttonColor = isDark ? "white" : "white";
+  const buttonColor = "white";
 
   // Calculate position based on position prop and safe area
   const getPositionStyles = (): React.CSSProperties => {
@@ -183,23 +183,23 @@ export function WidgetFullscreenWrapper({
 
     switch (position) {
       case "top-right":
-        // Tooltip at bottom-left
-        return {
-          ...baseStyles,
-          top: "100%",
-          left: "0",
-          marginTop: "8px",
-        };
-      case "top-left":
-        // Tooltip at bottom-right
+        // Tooltip at bottom-right (same horizontal alignment)
         return {
           ...baseStyles,
           top: "100%",
           right: "0",
           marginTop: "8px",
         };
+      case "top-left":
+        // Tooltip at bottom-left (same horizontal alignment)
+        return {
+          ...baseStyles,
+          top: "100%",
+          left: "0",
+          marginTop: "8px",
+        };
       case "top-center":
-        // Tooltip at bottom-center
+        // Tooltip at bottom-center (same horizontal alignment)
         return {
           ...baseStyles,
           top: "100%",
@@ -208,23 +208,23 @@ export function WidgetFullscreenWrapper({
           marginTop: "8px",
         };
       case "bottom-right":
-        // Tooltip at top-left
-        return {
-          ...baseStyles,
-          bottom: "100%",
-          left: "0",
-          marginBottom: "8px",
-        };
-      case "bottom-left":
-        // Tooltip at top-right
+        // Tooltip at top-right (same horizontal alignment)
         return {
           ...baseStyles,
           bottom: "100%",
           right: "0",
           marginBottom: "8px",
         };
+      case "bottom-left":
+        // Tooltip at top-left (same horizontal alignment)
+        return {
+          ...baseStyles,
+          bottom: "100%",
+          left: "0",
+          marginBottom: "8px",
+        };
       case "bottom-center":
-        // Tooltip at top-center
+        // Tooltip at top-center (same horizontal alignment)
         return {
           ...baseStyles,
           bottom: "100%",
@@ -233,7 +233,7 @@ export function WidgetFullscreenWrapper({
           marginBottom: "8px",
         };
       case "center-left":
-        // Tooltip at center-right
+        // Tooltip at center-right (opposite horizontal)
         return {
           ...baseStyles,
           left: "100%",
@@ -242,7 +242,7 @@ export function WidgetFullscreenWrapper({
           marginLeft: "8px",
         };
       case "center-right":
-        // Tooltip at center-left
+        // Tooltip at center-left (opposite horizontal)
         return {
           ...baseStyles,
           right: "100%",
@@ -255,7 +255,7 @@ export function WidgetFullscreenWrapper({
         return {
           ...baseStyles,
           top: "100%",
-          left: "0",
+          right: "0",
           marginTop: "8px",
         };
     }
@@ -340,7 +340,6 @@ export function WidgetFullscreenWrapper({
       className={className}
       style={{
         position: "relative",
-        // width: "fit-content",
         height: "fit-content",
       }}
       onMouseEnter={() => !attachTo && setIsHovered(true)}

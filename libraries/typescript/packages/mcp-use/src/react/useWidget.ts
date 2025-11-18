@@ -15,13 +15,13 @@ import type {
   DisplayMode,
   OpenAiGlobals,
   SafeArea,
+  SetGlobalsEvent,
   Theme,
   UnknownObject,
   UserAgent,
   UseWidgetResult,
 } from "./widget-types.js";
 import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
-import type { SetGlobalsEvent } from "./widget-types.js";
 
 /**
  * Hook to subscribe to a single value from window.openai globals
@@ -86,7 +86,6 @@ export function useWidget<
   TMetadata extends UnknownObject = UnknownObject,
   TState extends UnknownObject = UnknownObject,
 >(defaultProps?: TProps): UseWidgetResult<TProps, TOutput, TMetadata, TState> {
-  console.log(window?.location?.search, window.openai);
   // Check if window.openai is available - use state to allow re-checking after async injection
   const [isOpenAiAvailable, setIsOpenAiAvailable] = useState(
     () => typeof window !== "undefined" && !!window.openai
@@ -157,8 +156,6 @@ export function useWidget<
       toolId: "",
     };
   }, [window?.location?.search]);
-
-  console.log(urlParams);
 
   // Subscribe to globals
   const toolInput =
