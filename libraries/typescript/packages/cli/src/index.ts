@@ -135,10 +135,17 @@ async function startTunnel(
     });
 
     let resolved = false;
+    let isShuttingDown = false;
 
     proc.stdout?.on("data", (data) => {
       const text = data.toString();
-      process.stdout.write(text);
+      // Filter out shutdown messages from tunnel package
+      const isShutdownMessage = text.includes("Shutting down") || text.includes("🛑");
+      
+      // Suppress tunnel output during shutdown or if it's a shutdown message
+      if (!isShuttingDown && !isShutdownMessage) {
+        process.stdout.write(text);
+      }
 
       // Look for the tunnel URL in the output
       // Expected format: https://subdomain.tunnel-domain.com
@@ -159,7 +166,16 @@ async function startTunnel(
     });
 
     proc.stderr?.on("data", (data) => {
-      process.stderr.write(data);
+      const text = data.toString();
+      // Filter out bore debug logs and shutdown messages
+      if (
+        !isShuttingDown &&
+        !text.includes("INFO") &&
+        !text.includes("bore_cli") &&
+        !text.includes("Shutting down")
+      ) {
+        process.stderr.write(data);
+      }
     });
 
     proc.on("error", (error) => {
@@ -175,6 +191,11 @@ async function startTunnel(
         reject(new Error(`Tunnel process exited with code ${code}`));
       }
     });
+
+    // Add method to mark shutdown state
+    (proc as any).markShutdown = () => {
+      isShuttingDown = true;
+    };
 
     // Timeout after 30 seconds - only for initial setup
     const setupTimeout = setTimeout(() => {
@@ -722,8 +743,19 @@ program
       });
 
       // Handle cleanup
+      let cleanupInProgress = false;
       const cleanup = async () => {
-        console.log("\n\nShutting down...");
+        if (cleanupInProgress) {
+          return; // Prevent double cleanup
+        }
+        cleanupInProgress = true;
+
+        console.log(chalk.gray("\n\nShutting down..."));
+
+        // Mark tunnel as shutting down to suppress output
+        if (tunnelProcess && typeof (tunnelProcess as any).markShutdown === "function") {
+          (tunnelProcess as any).markShutdown();
+        }
 
         // Clean up tunnel via API if subdomain is available
         if (tunnelSubdomain) {
@@ -733,7 +765,6 @@ program
             await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
               method: "DELETE",
             });
-            console.log(chalk.gray("✓ Tunnel cleaned up"));
           } catch (err) {
             // Ignore cleanup errors
           }
@@ -756,7 +787,8 @@ program
         // Handle tunnel process if it exists
         if (tunnelProcess && typeof tunnelProcess.kill === "function") {
           tunnelProcess.on("exit", checkAndExit);
-          tunnelProcess.kill("SIGTERM");
+          // Use SIGINT for better cleanup of npx/node processes
+          tunnelProcess.kill("SIGINT");
         } else {
           checkAndExit();
         }
@@ -770,7 +802,7 @@ program
             tunnelProcess.kill("SIGKILL");
           }
           process.exit(0);
-        }, 1000);
+        }, 2000); // Increase timeout to 2 seconds to allow graceful shutdown
       };
 
       process.on("SIGINT", cleanup);
