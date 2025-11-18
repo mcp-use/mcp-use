@@ -43,6 +43,7 @@ class MCPClient:
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
         code_mode: bool = False,
+        verify: bool | None = True,
     ) -> None:
         """Initialize a new MCP client.
 
@@ -72,6 +73,7 @@ class MCPClient:
             self.middleware = default_middleware + middleware
         else:
             self.middleware = default_middleware
+        self.verify = verify
         # Load configuration if provided
         if config is not None:
             if isinstance(config, str):
@@ -94,6 +96,7 @@ class MCPClient:
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         code_mode: bool = False,
+        verify: bool | None = True,
     ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
@@ -114,6 +117,7 @@ class MCPClient:
             message_handler=message_handler,
             logging_callback=logging_callback,
             code_mode=code_mode,
+            verify=verify,
         )
 
     @classmethod
@@ -127,6 +131,7 @@ class MCPClient:
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         code_mode: bool = False,
+        verify: bool | None = True,
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
@@ -147,6 +152,7 @@ class MCPClient:
             message_handler=message_handler,
             logging_callback=logging_callback,
             code_mode=code_mode,
+            verify=verify,
         )
 
     @telemetry("client_add_server")

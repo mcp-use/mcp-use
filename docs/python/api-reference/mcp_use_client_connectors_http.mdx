@@ -51,10 +51,11 @@ Initialize a new HTTP connector.
 ><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
 ><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
 ><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+><ParamField body="verify" type="bool | None" default="True" >   Boolean flag </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(base_url: str, headers: dict[str, str] | None = None, timeout: float = 5, sse_read_timeout: float = 300, auth: str | dict[str, typing.Any] | httpx.Auth | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None):
+def __init__(base_url: str, headers: dict[str, str] | None = None, timeout: float = 5, sse_read_timeout: float = 300, auth: str | dict[str, typing.Any] | httpx.Auth | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, verify: bool | None = True):
 ```
 
 </Card>
