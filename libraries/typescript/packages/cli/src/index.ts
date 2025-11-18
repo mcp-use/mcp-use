@@ -129,7 +129,6 @@ async function startTunnel(
       tunnelArgs.push("--subdomain", subdomain);
     }
 
-    console.log(tunnelArgs);
 
     const proc = spawn("npx", tunnelArgs, {
       stdio: ["ignore", "pipe", "pipe"],
@@ -629,6 +628,7 @@ program
       // Start tunnel if requested
       let mcpUrl: string | undefined;
       let tunnelProcess: any = undefined;
+      let tunnelSubdomain: string | undefined = undefined;
       if (options.tunnel) {
         try {
           // Read existing subdomain from mcp-use.json if available
@@ -652,6 +652,7 @@ program
           mcpUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
           const subdomain = tunnelInfo.subdomain;
+          tunnelSubdomain = subdomain;
 
           // Update mcp-use.json with the subdomain
           try {
@@ -722,8 +723,23 @@ program
       });
 
       // Handle cleanup
-      const cleanup = () => {
+      const cleanup = async () => {
         console.log("\n\nShutting down...");
+        
+        // Clean up tunnel via API if subdomain is available
+        if (tunnelSubdomain) {
+          try {
+            const apiBase =
+              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+              method: "DELETE",
+            });
+            console.log(chalk.gray("✓ Tunnel cleaned up"));
+          } catch (err) {
+            // Ignore cleanup errors
+          }
+        }
+
         const processesToKill = 1 + (tunnelProcess ? 1 : 0);
         let killedCount = 0;
 
