@@ -154,7 +154,8 @@
                       "python/client/logging"
                     ]
                   },
-                  "python/client/authentication"
+                  "python/client/authentication",
+                  "python/client/code-mode"
                 ]
               },
               {

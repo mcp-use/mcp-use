@@ -18,6 +18,11 @@ from mcp_use.client.session import MCPSession
 from mcp_use.logging import logger
 from mcp_use.telemetry.telemetry import telemetry
 
+# Import CodeExecutor only when code_mode is enabled (lazy import to avoid circular dependency)
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from mcp_use.client.code_executor import CodeExecutor
+
 
 class MCPClient:
     """Client for managing MCP servers and sessions.
@@ -37,6 +42,7 @@ class MCPClient:
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
+        code_mode: bool = False,
     ) -> None:
         """Initialize a new MCP client.
 
@@ -46,6 +52,7 @@ class MCPClient:
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
             sampling_callback: Optional sampling callback function.
+            code_mode: Whether to enable code execution mode for tools.
         """
         self.config: dict[str, Any] = {}
         self.allowed_servers: list[str] = allowed_servers
@@ -57,6 +64,8 @@ class MCPClient:
         self.elicitation_callback = elicitation_callback
         self.message_handler = message_handler
         self.logging_callback = logging_callback
+        self.code_mode = code_mode
+        self._code_executor: CodeExecutor | None = None
         # Add default logging middleware if no middleware provided, or prepend it to existing middleware
         default_middleware = [default_logging_middleware]
         if middleware:
@@ -70,6 +79,10 @@ class MCPClient:
             else:
                 self.config = config
 
+        # If code mode is enabled, create internal code mode connector
+        if self.code_mode:
+            self._setup_code_mode_connector()
+
     @classmethod
     def from_dict(
         cls,
@@ -80,6 +93,7 @@ class MCPClient:
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        code_mode: bool = False,
     ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
@@ -89,6 +103,7 @@ class MCPClient:
             sandbox_options: Optional sandbox configuration options.
             sampling_callback: Optional sampling callback function.
             elicitation_callback: Optional elicitation callback function.
+            code_mode: Whether to enable code execution mode for tools.
         """
         return cls(
             config=config,
@@ -98,6 +113,7 @@ class MCPClient:
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            code_mode=code_mode,
         )
 
     @classmethod
@@ -110,6 +126,7 @@ class MCPClient:
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        code_mode: bool = False,
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
@@ -119,6 +136,7 @@ class MCPClient:
             sandbox_options: Optional sandbox configuration options.
             sampling_callback: Optional sampling callback function.
             elicitation_callback: Optional elicitation callback function.
+            code_mode: Whether to enable code execution mode for tools.
         """
         return cls(
             config=load_config_file(filepath),
@@ -128,6 +146,7 @@ class MCPClient:
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            code_mode=code_mode,
         )
 
     @telemetry("client_add_server")
@@ -176,13 +195,36 @@ class MCPClient:
             for session in self.sessions.values():
                 session.connector.middleware_manager.add_middleware(middleware)
 
+    def _setup_code_mode_connector(self) -> None:
+        """Setup internal code mode connector as a meta MCP server.
+
+        This creates a special internal session that provides code execution
+        tools, treating them as if they came from an MCP server.
+        """
+        from mcp_use.client.connectors.code_mode import CodeModeConnector
+
+        # Create code mode connector
+        code_connector = CodeModeConnector(self)
+
+        # Create a session for it
+        code_session = MCPSession(code_connector)
+
+        # Register it as a special internal server
+        # Use valid identifier name (no double underscores)
+        self.sessions["code_mode"] = code_session
+        self.active_sessions.append("code_mode")
+
+        logger.debug("Code mode connector initialized as internal meta server")
+
     def get_server_names(self) -> list[str]:
         """Get the list of configured server names.
 
         Returns:
-            List of server names.
+            List of server names (excludes internal code mode server).
         """
-        return list(self.config.get("mcpServers", {}).keys())
+        servers = list(self.config.get("mcpServers", {}).keys())
+        # Don't expose internal code mode server in server list
+        return servers
 
     def save_config(self, filepath: str) -> None:
         """Save the current configuration to a file.
@@ -354,3 +396,122 @@ class MCPClient:
             logger.error(f"Encountered {len(errors)} errors while closing sessions")
         else:
             logger.debug("All sessions closed successfully")
+
+    async def execute_code(self, code: str, timeout: float = 30.0) -> dict[str, Any]:
+        """Execute Python code with access to MCP tools (code mode).
+
+        This method allows agents to interact with MCP tools through Python code
+        instead of direct tool calls, enabling more efficient context usage and
+        data processing.
+
+        Args:
+            code: Python code to execute with tool access.
+            timeout: Execution timeout in seconds.
+
+        Returns:
+            Dictionary with keys:
+                - result: The return value from the code
+                - logs: List of captured print statements
+                - error: Error message if execution failed (None on success)
+                - execution_time: Time taken to execute in seconds
+
+        Raises:
+            RuntimeError: If code_mode is not enabled.
+
+        Example:
+            ```python
+            client = MCPClient(config="config.json", code_mode=True)
+            await client.create_all_sessions()
+
+            result = await client.execute_code('''
+            tools = await search_tools("github")
+            print(f"Found {len(tools)} tools")
+
+            pr = await github.get_pull_request(
+                owner="facebook",
+                repo="react",
+                number=12345
+            )
+            return {"title": pr["title"]}
+            ''')
+
+            print(result['result'])  # {'title': 'Fix bug in...'}
+            print(result['logs'])    # ['Found 5 tools']
+            ```
+        """
+        if not self.code_mode:
+            raise RuntimeError(
+                "Code execution mode is not enabled. Create the client with code_mode=True to use execute_code()."
+            )
+
+        # Lazy import to avoid circular dependency
+        if self._code_executor is None:
+            from mcp_use.client.code_executor import CodeExecutor
+
+            self._code_executor = CodeExecutor(self)
+
+        return await self._code_executor.execute(code, timeout)
+
+    async def search_tools(self, query: str = "", detail_level: str = "full") -> list[dict[str, Any]]:
+        """Search available MCP tools across all active sessions.
+
+        Args:
+            query: Search query to filter tools by name or description.
+            detail_level: Level of detail to return:
+                - "names": Only tool names and server
+                - "descriptions": Names, server, and descriptions
+                - "full": Complete tool information including schemas
+
+        Returns:
+            List of tool information dictionaries.
+
+        Example:
+            ```python
+            # Search for GitHub-related tools
+            tools = await client.search_tools("github pull")
+            for tool in tools:
+                print(f"{tool['server']}.{tool['name']}: {tool['description']}")
+            ```
+        """
+        all_tools = []
+        query_lower = query.lower()
+
+        for server_name, session in self.sessions.items():
+            try:
+                tools = await session.list_tools()
+
+                for tool in tools:
+                    # Filter by query
+                    if query:
+                        tool_name_match = query_lower in tool.name.lower()
+                        desc_match = hasattr(tool, "description") and query_lower in tool.description.lower()
+
+                        if not (tool_name_match or desc_match):
+                            continue
+
+                    # Build tool info based on detail level
+                    if detail_level == "names":
+                        tool_info = {
+                            "name": tool.name,
+                            "server": server_name,
+                        }
+                    elif detail_level == "descriptions":
+                        tool_info = {
+                            "name": tool.name,
+                            "server": server_name,
+                            "description": getattr(tool, "description", ""),
+                        }
+                    else:  # full
+                        tool_info = {
+                            "name": tool.name,
+                            "server": server_name,
+                            "description": getattr(tool, "description", ""),
+                            "input_schema": getattr(tool, "inputSchema", {}),
+                        }
+
+                    all_tools.append(tool_info)
+
+            except Exception as e:
+                logger.error(f"Failed to list tools for server {server_name}: {e}")
+
+        return all_tools

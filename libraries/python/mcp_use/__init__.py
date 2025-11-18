@@ -15,6 +15,7 @@ from .logging import MCP_USE_DEBUG, Logger, logger  # isort: skip
 from .agents import observability  # noqa: E402
 from .agents.mcpagent import MCPAgent
 from .client import MCPClient
+from .client.prompts import CODE_MODE_AGENT_PROMPT
 from .config import load_config_file
 from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
 from .session import MCPSession
@@ -35,6 +36,7 @@ __all__ = [
     "Logger",
     "set_debug",
     "observability",
+    "CODE_MODE_AGENT_PROMPT",
 ]
 
 

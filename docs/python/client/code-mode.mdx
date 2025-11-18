@@ -1,0 +1,290 @@
+---
+title: "Code Mode"
+description: "Execute MCP tools via code for 98.7% reduction in context overhead"
+icon: "code"
+---
+
+# Code Mode
+
+Code Mode enables AI agents to interact with MCP tools through code execution instead of direct tool calls. Based on research from [Anthropic](https://www.anthropic.com/engineering/code-execution-with-mcp) and [Cloudflare](https://blog.cloudflare.com/building-ai-agents-with-workers-ai-and-cloudflare-workers/), this approach reduces context consumption by up to **98.7%** for complex workflows.
+
+## Quick Start
+
+<CodeGroup>
+```python Client Usage
+from mcp_use import MCPClient
+
+client = MCPClient(config="config.json", code_mode=True)
+await client.create_all_sessions()
+
+result = await client.execute_code("""
+# Discover tools
+tools = await search_tools("github")
+
+# Call tools as functions
+pr = await github.get_pull_request(owner="facebook", repo="react", number=12345)
+
+return {"title": pr["title"]}
+""")
+```
+
+```python Agent Usage
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient, CODE_MODE_AGENT_PROMPT
+
+client = MCPClient(config="config.json", code_mode=True)
+
+agent = MCPAgent(
+    llm=ChatOpenAI(model="gpt-4"),
+    client=client,
+    system_prompt=CODE_MODE_AGENT_PROMPT
+)
+
+result = await agent.run("Analyze React repository")
+```
+</CodeGroup>
+
+## Why Code Mode?
+
+Traditional MCP clients load all tool definitions upfront and pass intermediate results through the model context. This creates two problems:
+
+1. **Tool definitions overload context** - 150+ tools = 150,000+ tokens before processing any request
+2. **Intermediate results consume tokens** - Each tool result flows through the model, even when just passing data between tools
+
+Code Mode solves both by having agents write code that executes in a separate environment.
+
+## Key Advantages
+
+### 1. Progressive Disclosure
+
+Agents load only the tools they need, when they need them:
+
+```python
+result = await client.execute_code("""
+# Search for relevant tools instead of loading all upfront
+github_tools = await search_tools("github pull request")
+
+# Only the 3 PR-related tools are loaded, not all 150+ tools
+pr = await github.get_pull_request(...)
+""")
+```
+
+**Benefit**: 2,000 tokens instead of 150,000 tokens (98.7% reduction)
+
+### 2. Context-Efficient Tool Results
+
+Large datasets are processed in the execution environment before returning to the agent:
+
+```python
+result = await client.execute_code("""
+# Fetch 10,000 rows
+all_issues = await github.list_issues(owner="microsoft", repo="vscode")
+print(f"Processing {len(all_issues)} issues")
+
+# Filter locally (doesn't consume agent context)
+critical = [i for i in all_issues if 'critical' in str(i.get('labels'))]
+
+# Return only summary, not 10,000 rows
+return {
+    "total": len(all_issues),
+    "critical": len(critical),
+    "top_5": critical[:5]
+}
+""")
+```
+
+**Benefit**: Agent sees 5 issues instead of 10,000
+
+### 3. More Powerful Control Flow
+
+Loops, conditionals, and error handling use familiar code patterns instead of chaining individual tool calls:
+
+```python
+result = await client.execute_code("""
+# Poll for deployment notification
+found = False
+attempts = 0
+
+while not found and attempts < 10:
+    messages = await slack.get_channel_history(channel='C123456')
+    found = any('deployment complete' in m.text for m in messages)
+
+    if not found:
+        await asyncio.sleep(5)
+        attempts += 1
+        print(f"Attempt {attempts}: waiting...")
+
+return {"found": found, "attempts": attempts}
+""")
+```
+
+**Benefit**: More efficient than alternating between tool calls and sleep commands through the agent loop
+
+### 4. Privacy-Preserving Operations
+
+Intermediate results stay in the execution environment by default:
+
+```python
+result = await client.execute_code("""
+# Fetch customer data with PII
+customers = await crm.get_customer_list()
+
+# Process PII locally - never enters model context
+for customer in customers:
+    await salesforce.update_record(
+        objectType='Lead',
+        recordId=customer['id'],
+        data={'Email': customer['email'], 'Phone': customer['phone']}
+    )
+    print(f"Updated customer {customer['id']}")
+
+# Return only count, not PII data
+return {"updated": len(customers)}
+""")
+```
+
+**Benefit**: Sensitive data flows through the workflow without entering the model's context
+
+## API Reference
+
+### MCPClient
+
+#### `__init__(code_mode=True)`
+
+```python
+client = MCPClient(
+    config="config.json",
+    code_mode=True  # Enable code execution mode
+)
+```
+
+#### `execute_code(code: str, timeout: float = 30.0)`
+
+Execute Python code with MCP tool access.
+
+**Returns:**
+```python
+{
+    "result": Any,           # Return value
+    "logs": list[str],       # Captured print()
+    "error": str | None,     # Error if failed
+    "execution_time": float  # Seconds
+}
+```
+
+#### `search_tools(query: str = "", detail_level: str = "full")`
+
+Search available tools across all servers.
+
+**Detail levels:** `"names"`, `"descriptions"`, `"full"`
+
+## What's Available in Code
+
+### Functions
+
+- **`search_tools(query, detail_level)`** - Discover tools
+- **`server.tool_name(**kwargs)`** - Call any MCP tool
+- **`__tool_namespaces`** - List of server names
+
+### Builtins
+
+```python
+# Data: list, dict, set, tuple, str, int, float, bool
+# Iteration: range, enumerate, zip, map, filter
+# Aggregation: len, sum, min, max, sorted, any, all
+# Async: asyncio
+# Exceptions: Exception, ValueError, TypeError, etc.
+```
+
+**Restricted:** `import`, `open`, `eval`, file I/O
+
+## Performance
+
+From Anthropic's research:
+
+| Traditional | Code Mode | Improvement |
+|------------|-----------|-------------|
+| 150,000+ tokens (tool defs) | 2,000 tokens | **98.7% reduction** |
+| 16 API iterations | 1 execution | **88% fewer calls** |
+| All results in context | Only summary | **68% fewer tokens** |
+
+## Examples
+
+### Tool Chaining
+
+```python
+result = await client.execute_code("""
+pr = await github.get_pull_request(owner="facebook", repo="react", number=12345)
+
+if pr['state'] == 'open':
+    await slack.post_message(
+        channel="#dev",
+        text=f"PR needs review: {pr['title']}"
+    )
+    return {"notified": True}
+
+return {"notified": False}
+""")
+```
+
+### Data Processing
+
+```python
+result = await client.execute_code("""
+files = await filesystem.list_directory(path="/private/tmp")
+lines = files.strip().split('\\n')
+
+dirs = [l for l in lines if l.startswith('[DIR]')]
+files_only = [l for l in lines if l.startswith('[FILE]')]
+
+return {
+    "total": len(lines),
+    "directories": len(dirs),
+    "files": len(files_only)
+}
+""")
+```
+
+### Error Handling
+
+```python
+result = await client.execute_code("""
+try:
+    data = await api.fetch_data(id="123")
+    return {"success": True, "data": data}
+except Exception as e:
+    print(f"Failed: {e}")
+    return {"success": False, "error": str(e)}
+""")
+```
+
+## Agent Integration
+
+Agents only see 2 tools when `code_mode=True`:
+
+- **`execute_code`** - Execute Python code with tool access
+- **`search_tools`** - Discover available tools
+
+All other MCP tools are accessible within code execution.
+
+```python
+from mcp_use import CODE_MODE_AGENT_PROMPT
+
+system_prompt = f"""
+{CODE_MODE_AGENT_PROMPT}
+
+Additional instructions...
+"""
+```
+
+## References
+
+- [Anthropic: Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
+- [Cloudflare: Building AI Agents](https://blog.cloudflare.com/building-ai-agents-with-workers-ai-and-cloudflare-workers/)
+- [UTCP: Code Mode Library](https://github.com/universal-tool-calling-protocol/code-mode)
+
+## See Also
+
+- [Direct Tool Calls](/python/client/direct-tool-calls) - Traditional tool calling
+- [Tools](/python/client/tools) - Understanding MCP tools
+- [Multi-Server Setup](/python/client/multi-server-setup) - Multiple servers
