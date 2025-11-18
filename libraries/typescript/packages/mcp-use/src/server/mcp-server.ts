@@ -1646,8 +1646,8 @@ if (container && Component) {
             expressRes._closeHandler = handler;
           }
         },
-        once: () => {},
-        removeListener: () => {},
+        once: () => { },
+        removeListener: () => { },
         writeHead: (code: number, _headers?: any) => {
           statusCode = code;
           expressRes.statusCode = code;
@@ -1725,10 +1725,14 @@ if (container && Component) {
       await this.server.connect(transport);
 
       // Wait for handleRequest to complete and for response to be written
-      await transport.handleRequest(expressReq, expressRes, expressReq.body);
-
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise<void>((resolve) => {
+        const originalEnd = expressRes.end;
+        expressRes.end = (...args: any[]) => {
+          originalEnd.apply(expressRes, args);
+          resolve();
+        };
+        transport.handleRequest(expressReq, expressRes, expressReq.body);
+      });
 
       const response = getResponse();
       if (response) {
@@ -1755,10 +1759,10 @@ if (container && Component) {
       });
 
       await this.server.connect(transport);
+
+
       await transport.handleRequest(expressReq, expressRes);
 
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
 
       const response = getResponse();
       if (response) {
@@ -1784,10 +1788,8 @@ if (container && Component) {
       });
 
       await this.server.connect(transport);
-      await transport.handleRequest(expressReq, expressRes);
 
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await transport.handleRequest(expressReq, expressRes);
 
       const response = getResponse();
       if (response) {
