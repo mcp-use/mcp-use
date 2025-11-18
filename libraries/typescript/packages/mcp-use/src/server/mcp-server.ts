@@ -1725,14 +1725,7 @@ if (container && Component) {
       await this.server.connect(transport);
 
       // Wait for handleRequest to complete and for response to be written
-      await new Promise<void>((resolve) => {
-        const originalEnd = expressRes.end;
-        expressRes.end = (...args: any[]) => {
-          originalEnd.apply(expressRes, args);
-          resolve();
-        };
-        transport.handleRequest(expressReq, expressRes, expressReq.body);
-      });
+      transport.handleRequest(expressReq, expressRes, expressReq.body);
 
       const response = getResponse();
       if (response) {
