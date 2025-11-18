@@ -25,6 +25,7 @@ export {
   useWidgetState,
 } from "./useWidget.js";
 export { WidgetFullscreenWrapper } from "./WidgetFullscreenWrapper.js";
+export { WidgetDebugger } from "./WidgetDebugger.js";
 export type {
   UseWidgetResult,
   OpenAiGlobals,
