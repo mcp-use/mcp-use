@@ -1,6 +1,8 @@
 import { cn } from "@/client/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { useMcpContext } from "../context/McpContext";
+import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
+import { IframeConsole } from "./IframeConsole";
 import { Spinner } from "./ui/spinner";
 
 interface OpenAIComponentRendererProps {
@@ -65,6 +67,7 @@ export function OpenAIComponentRenderer({
   const [displayMode, setDisplayMode] = useState<
     "inline" | "pip" | "fullscreen"
   >("inline");
+  const [isSameOrigin, setIsSameOrigin] = useState<boolean>(false);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -199,6 +202,13 @@ export function OpenAIComponentRenderer({
           const devUrl = `${new URL(serverBaseUrl).origin}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
           console.log("[OpenAIComponentRenderer] Using DEV mode URL:", devUrl);
           setWidgetUrl(devUrl);
+          // Check if dev URL is same-origin
+          try {
+            const devUrlObj = new URL(devUrl);
+            setIsSameOrigin(devUrlObj.origin === window.location.origin);
+          } catch {
+            setIsSameOrigin(false);
+          }
         } else {
           const prodUrl = `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`;
           console.log(
@@ -206,6 +216,8 @@ export function OpenAIComponentRenderer({
             prodUrl
           );
           setWidgetUrl(prodUrl);
+          // Relative URLs are always same-origin
+          setIsSameOrigin(true);
         }
       } catch (error) {
         console.error("Error storing widget data:", error);
@@ -236,6 +248,11 @@ export function OpenAIComponentRenderer({
         !iframeRef.current ||
         event.source !== iframeRef.current.contentWindow
       ) {
+        return;
+      }
+
+      // Let console log messages pass through (handled by useIframeConsole hook)
+      if (event.data?.type === "iframe-console-log") {
         return;
       }
 
@@ -359,7 +376,7 @@ export function OpenAIComponentRenderer({
             );
 
             // Dispatch a custom event that the chat component can listen to
-            const followUpEvent = new CustomEvent(
+            const followUpEvent = new window.CustomEvent(
               "mcp-inspector:widget-followup",
               {
                 detail: { prompt, serverId },
@@ -421,6 +438,22 @@ export function OpenAIComponentRenderer({
     const handleLoad = () => {
       setIsReady(true);
       setError(null);
+      // Inject console interceptor after iframe loads (only for same-origin)
+      if (iframeRef.current) {
+        // Double-check same-origin by trying to access contentDocument
+        try {
+          const canAccess = !!iframeRef.current.contentDocument;
+          if (canAccess && isSameOrigin) {
+            injectConsoleInterceptor(iframeRef.current);
+          } else if (!canAccess) {
+            // Cross-origin iframe detected - update state
+            setIsSameOrigin(false);
+          }
+        } catch (e) {
+          // Cross-origin iframe - cannot access
+          setIsSameOrigin(false);
+        }
+      }
     };
 
     const handleError = () => {
@@ -431,12 +464,21 @@ export function OpenAIComponentRenderer({
     iframe?.addEventListener("load", handleLoad);
     iframe?.addEventListener("error", handleError as any);
 
+    // Also try to inject immediately if iframe is already loaded (only for same-origin)
+    if (
+      iframe &&
+      isSameOrigin &&
+      iframe.contentDocument?.readyState === "complete"
+    ) {
+      injectConsoleInterceptor(iframe);
+    }
+
     return () => {
       window.removeEventListener("message", handleMessage);
       iframe?.removeEventListener("load", handleLoad);
       iframe?.removeEventListener("error", handleError as any);
     };
-  }, [widgetUrl, server, serverId]);
+  }, [widgetUrl, isSameOrigin]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {
@@ -536,6 +578,18 @@ export function OpenAIComponentRenderer({
           >
             Close
           </button>
+        )}
+        <div className="w-full h-full flex flex-col justify-center items-center relative">
+          {centerVertically && (
+            <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
+              <Spinner className="size-5" />
+            </div>
+          )}
+        </div>
+        {isSameOrigin && (
+          <div className="absolute top-2 right-2 z-10">
+            <IframeConsole iframeId={toolId} enabled={true} />
+          </div>
         )}
         <iframe
           ref={iframeRef}
