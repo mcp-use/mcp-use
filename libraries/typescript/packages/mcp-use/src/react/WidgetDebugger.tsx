@@ -72,8 +72,12 @@ export function WidgetDebugger({
   const [actionResult, setActionResult] = useState<string>("");
   const [toolName, setToolName] = useState<string>("get-my-city");
   const [toolArgs, setToolArgs] = useState<string>("{}");
-  const [followUpMessage, setFollowUpMessage] = useState<string>("Test follow-up message");
-  const [externalUrl, setExternalUrl] = useState<string>("https://docs.mcp-use.com");
+  const [followUpMessage, setFollowUpMessage] = useState<string>(
+    "Test follow-up message"
+  );
+  const [externalUrl, setExternalUrl] = useState<string>(
+    "https://docs.mcp-use.com"
+  );
   const isFullscreen = displayMode === "fullscreen" && isAvailable;
   const isPip = displayMode === "pip" && isAvailable;
 
@@ -200,10 +204,10 @@ export function WidgetDebugger({
   useEffect(() => {
     if (!isOverlayOpen) return;
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: any) => {
       if (
         overlayRef.current &&
-        !overlayRef.current.contains(event.target as Node)
+        !overlayRef.current.contains(event.target as any)
       ) {
         setIsOverlayOpen(false);
       }
@@ -550,7 +554,9 @@ export function WidgetDebugger({
           </button>
 
           {/* Debug info table */}
-          <div style={{ maxWidth: "1200px", margin: "0 auto", paddingTop: "40px" }}>
+          <div
+            style={{ maxWidth: "1200px", margin: "0 auto", paddingTop: "40px" }}
+          >
             <h1
               style={{
                 fontSize: "18px",
@@ -733,9 +739,7 @@ export function WidgetDebugger({
                   >
                     Safe Area
                   </td>
-                  <td style={{ padding: "8px" }}>
-                    {formatSafeArea(safeArea)}
-                  </td>
+                  <td style={{ padding: "8px" }}>{formatSafeArea(safeArea)}</td>
                 </tr>
                 <tr style={{ borderBottom: "1px solid #333" }}>
                   <td
@@ -786,9 +790,13 @@ export function WidgetDebugger({
               Actions
             </h2>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+            >
               {/* Call Tool */}
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <input
                   type="text"
                   value={toolName}
@@ -839,7 +847,9 @@ export function WidgetDebugger({
               </div>
 
               {/* Send Follow-Up Message */}
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <input
                   type="text"
                   value={followUpMessage}
@@ -874,7 +884,9 @@ export function WidgetDebugger({
               </div>
 
               {/* Open External */}
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <input
                   type="text"
                   value={externalUrl}
@@ -909,7 +921,9 @@ export function WidgetDebugger({
               </div>
 
               {/* Request Display Mode */}
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <span style={{ width: "150px", fontSize: "12px" }}>
                   Display Mode:
                 </span>
@@ -964,7 +978,9 @@ export function WidgetDebugger({
               </div>
 
               {/* Set State */}
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <button
                   onClick={handleSetState}
                   style={{
@@ -1033,4 +1049,3 @@ export function WidgetDebugger({
     </>
   );
 }
-
