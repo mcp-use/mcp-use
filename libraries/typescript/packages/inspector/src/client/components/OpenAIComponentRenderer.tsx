@@ -579,13 +579,7 @@ export function OpenAIComponentRenderer({
             Close
           </button>
         )}
-        <div className="w-full h-full flex flex-col justify-center items-center relative">
-          {centerVertically && (
-            <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
-              <Spinner className="size-5" />
-            </div>
-          )}
-        </div>
+
         {isSameOrigin && (
           <div className="absolute top-2 right-2 z-10">
             <IframeConsole iframeId={toolId} enabled={true} />
