@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import "dotenv/config";
+import chalk from "chalk";
 import { Command } from "commander";
+import "dotenv/config";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import open from "open";
-import chalk from "chalk";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { deployCommand } from "./commands/deploy.js";
 
@@ -116,12 +116,21 @@ function runCommand(
 
 // Helper to start tunnel and get the URL
 async function startTunnel(
-  port: number
+  port: number,
+  subdomain?: string
 ): Promise<{ url: string; subdomain: string; process: any }> {
   return new Promise((resolve, reject) => {
     console.log(chalk.gray(`Starting tunnel for port ${port}...`));
 
-    const proc = spawn("npx", ["--yes", "@mcp-use/tunnel", String(port)], {
+    const tunnelArgs = ["--yes", "@mcp-use/tunnel", String(port)];
+    
+    // Pass subdomain as CLI flag if provided
+    // Use -- to separate npx flags from command arguments
+    if (subdomain) {
+      tunnelArgs.push("--", "--subdomain", subdomain);
+    }
+
+    const proc = spawn("npx", tunnelArgs, {
       stdio: ["ignore", "pipe", "pipe"],
       shell: false,
     });
@@ -137,11 +146,16 @@ async function startTunnel(
       const urlMatch = text.match(/https?:\/\/([a-z0-9-]+\.[a-z0-9.-]+)/i);
       if (urlMatch && !resolved) {
         const url = urlMatch[0];
-        const subdomain = url;
+        // Extract subdomain from URL (e.g., "happy-cat.local.mcp-use.run" -> "happy-cat")
+        const fullDomain = urlMatch[1];
+        const subdomainMatch = fullDomain.match(/^([a-z0-9-]+)\./);
+        const extractedSubdomain = subdomainMatch
+          ? subdomainMatch[1]
+          : fullDomain.split(".")[0];
         resolved = true;
         clearTimeout(setupTimeout);
         console.log(chalk.green.bold(`✓ Tunnel established: ${url}/mcp`));
-        resolve({ url, subdomain, process: proc });
+        resolve({ url, subdomain: extractedSubdomain, process: proc });
       }
     });
 
@@ -496,21 +510,7 @@ program
         port = availablePort;
       }
 
-      // Start tunnel if requested
-      let mcpUrl: string | undefined;
-      // let tunnelProcess: any = undefined;
-      // if (options.tunnel) {
-      //   try {
-      //     const tunnelInfo = await startTunnel(port);
-      //     mcpUrl = tunnelInfo.subdomain;
-      //     tunnelProcess = tunnelInfo.process;
-      //   } catch (error) {
-      //     console.error(chalk.red('Failed to start tunnel:'), error);
-      //     process.exit(1);
-      //   }
-      // }
-
-      // // Find the main source file
+      // Find the main source file
       const serverFile = await findServerFile(projectPath);
 
       // Start all processes concurrently
@@ -522,10 +522,6 @@ program
         NODE_ENV: "development",
       };
 
-      if (mcpUrl) {
-        env.MCP_URL = mcpUrl;
-      }
-
       const serverCommand = runCommand(
         "npx",
         ["tsx", "watch", serverFile],
@@ -535,31 +531,18 @@ program
       );
       processes.push(serverCommand.process);
 
-      // Add tunnel process if it exists
-      // if (tunnelProcess) {
-      //   processes.push(tunnelProcess);
-      // }
-
       // Auto-open inspector if enabled
       if (options.open !== false) {
         const startTime = Date.now();
         const ready = await waitForServer(port, host);
         if (ready) {
           const mcpEndpoint = `http://${host}:${port}/mcp`;
-          let inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
-
-          // Add tunnel URL as query parameter if tunnel is active
-          if (mcpUrl) {
-            inspectorUrl += `&tunnelUrl=${encodeURIComponent(mcpUrl)}`;
-          }
+          const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
           const readyTime = Date.now() - startTime;
           console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
           console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
           console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
-          if (mcpUrl) {
-            console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}`));
-          }
           console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
           console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
           await open(inspectorUrl);
@@ -636,9 +619,63 @@ program
       let tunnelProcess: any = undefined;
       if (options.tunnel) {
         try {
-          const tunnelInfo = await startTunnel(port);
-          mcpUrl = tunnelInfo.subdomain;
+          // Read existing subdomain from mcp-use.json if available
+          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          let existingSubdomain: string | undefined;
+          
+          try {
+            const manifestContent = await readFile(manifestPath, "utf-8");
+            const manifest = JSON.parse(manifestContent);
+            existingSubdomain = manifest.tunnel?.subdomain;
+            if (existingSubdomain) {
+              console.log(
+                chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
+              );
+            }
+          } catch {
+            // Manifest doesn't exist or is invalid, that's okay
+          }
+
+          const tunnelInfo = await startTunnel(port, existingSubdomain);
+          mcpUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
+          const subdomain = tunnelInfo.subdomain;
+
+          // Update mcp-use.json with the subdomain
+          try {
+            let manifest: any = {};
+            try {
+              const manifestContent = await readFile(manifestPath, "utf-8");
+              manifest = JSON.parse(manifestContent);
+            } catch {
+              // File doesn't exist, create new manifest
+            }
+
+            // Update or add tunnel subdomain
+            if (!manifest.tunnel) {
+              manifest.tunnel = {};
+            }
+            manifest.tunnel.subdomain = subdomain;
+
+            // Ensure dist directory exists
+            await mkdir(path.dirname(manifestPath), { recursive: true });
+            
+            // Write updated manifest
+            await writeFile(
+              manifestPath,
+              JSON.stringify(manifest, null, 2),
+              "utf-8"
+            );
+            console.log(
+              chalk.green(`✓ Subdomain saved to mcp-use.json: ${subdomain}`)
+            );
+          } catch (error) {
+            console.warn(
+              chalk.yellow(
+                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+              )
+            );
+          }
         } catch (error) {
           console.error(chalk.red("Failed to start tunnel:"), error);
           process.exit(1);
@@ -663,7 +700,7 @@ program
 
       if (mcpUrl) {
         env.MCP_URL = mcpUrl;
-        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}`));
+        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}/mcp`));
       }
 
       const serverProc = spawn("node", [serverFile], {
