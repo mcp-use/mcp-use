@@ -340,7 +340,7 @@ export function WidgetFullscreenWrapper({
       className={className}
       style={{
         position: "relative",
-        width: "fit-content",
+        // width: "fit-content",
         height: "fit-content",
       }}
       onMouseEnter={() => !attachTo && setIsHovered(true)}

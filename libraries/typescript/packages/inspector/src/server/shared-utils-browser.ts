@@ -392,6 +392,8 @@ export interface WidgetData {
     connect_domains?: string[];
     resource_domains?: string[];
   };
+  devWidgetUrl?: string;
+  devServerBaseUrl?: string;
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -425,6 +427,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     resourceData,
     toolId,
     widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   } = data;
 
   console.log("[Widget Store] Received request for toolId:", toolId);
@@ -435,6 +439,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     hasToolInput: !!toolInput,
     hasToolOutput: !!toolOutput,
     hasWidgetCSP: !!widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   });
 
   if (!serverId || !uri || !toolId || !resourceData) {
@@ -461,6 +467,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     toolId,
     timestamp: Date.now(),
     widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   });
 
   console.log("[Widget Store] Data stored successfully for toolId:", toolId);
@@ -706,6 +714,36 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           } catch (err) {}
         }, 0);
 
+        // Listen for displayMode changes from parent (for fullscreen exit)
+        window.addEventListener('message', (event) => {
+          if (event.data?.type === 'openai:displayModeChanged') {
+            const newMode = event.data.mode;
+            if (newMode && ['inline', 'pip', 'fullscreen'].includes(newMode)) {
+              openaiAPI.displayMode = newMode;
+              // Dispatch set_globals event to notify React components
+              try {
+                const globalsEvent = new CustomEvent('openai:set_globals', {
+                  detail: {
+                    globals: {
+                      toolInput: openaiAPI.toolInput,
+                      toolOutput: openaiAPI.toolOutput,
+                      toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
+                      widgetState: openaiAPI.widgetState,
+                      displayMode: newMode,
+                      maxHeight: openaiAPI.maxHeight,
+                      theme: openaiAPI.theme,
+                      locale: openaiAPI.locale,
+                      safeArea: openaiAPI.safeArea,
+                      userAgent: openaiAPI.userAgent
+                    }
+                  }
+                });
+                window.dispatchEvent(globalsEvent);
+              } catch (err) {}
+            }
+          }
+        });
+
         setTimeout(() => {
           try {
             const stored = localStorage.getItem(${safeWidgetStateKey});
@@ -717,8 +755,6 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
       })();
     </script>
   `;
-
-  console.log("htmlContent", htmlContent);
 
   // Inject script into HTML
   let modifiedHtml;

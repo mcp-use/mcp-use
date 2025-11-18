@@ -87,11 +87,55 @@ export function useWidget<
   TState extends UnknownObject = UnknownObject,
 >(defaultProps?: TProps): UseWidgetResult<TProps, TOutput, TMetadata, TState> {
   console.log(window?.location?.search, window.openai);
-  // Check if window.openai is available
-  const isOpenAiAvailable = useMemo(
-    () => typeof window !== "undefined" && !!window.openai,
-    []
+  // Check if window.openai is available - use state to allow re-checking after async injection
+  const [isOpenAiAvailable, setIsOpenAiAvailable] = useState(
+    () => typeof window !== "undefined" && !!window.openai
   );
+
+  // Re-check for window.openai availability after mount (in case it's injected asynchronously)
+  useEffect(() => {
+    // Initial check
+    if (typeof window !== "undefined" && window.openai) {
+      setIsOpenAiAvailable(true);
+      return;
+    }
+
+    // Poll for window.openai if not immediately available (for async script injection)
+    const checkInterval = setInterval(() => {
+      if (typeof window !== "undefined" && window.openai) {
+        setIsOpenAiAvailable(true);
+        clearInterval(checkInterval);
+      }
+    }, 100);
+
+    // Also listen for the openai:set_globals event which fires when the API is ready
+    const handleSetGlobals = () => {
+      if (typeof window !== "undefined" && window.openai) {
+        setIsOpenAiAvailable(true);
+        clearInterval(checkInterval);
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
+    }
+
+    // Cleanup after 5 seconds max (should be injected by then)
+    const timeout = setTimeout(() => {
+      clearInterval(checkInterval);
+      if (typeof window !== "undefined") {
+        window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(checkInterval);
+      clearTimeout(timeout);
+      if (typeof window !== "undefined") {
+        window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
+      }
+    };
+  }, []);
 
   const provider = useMemo(() => {
     return isOpenAiAvailable ? "openai" : "mcp-ui";

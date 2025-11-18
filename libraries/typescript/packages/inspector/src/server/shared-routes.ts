@@ -11,6 +11,9 @@ import {
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
 
+// WebSocket proxy for Vite HMR - note: requires WebSocket library
+// For now, this is a placeholder that will be implemented when WebSocket support is added
+
 /**
  * Register inspector-specific routes (proxy, chat, config, widget rendering)
  */
@@ -236,6 +239,172 @@ export function registerInspectorRoutes(
       return c.html(`<html><body>Error: ${errorMessage}</body></html>`, 500);
     }
   });
+
+  // Dev widget HTML proxy - fetches from dev server and injects OpenAI wrapper
+  app.get("/inspector/api/dev-widget/:toolId", async (c) => {
+    try {
+      const toolId = c.req.param("toolId");
+      const widgetData = getWidgetData(toolId);
+
+      if (!widgetData?.devWidgetUrl || !widgetData?.devServerBaseUrl) {
+        return c.html(
+          "<html><body>Error: Dev widget data not found or expired</body></html>",
+          404
+        );
+      }
+
+      // Fetch HTML from dev server
+      const response = await fetch(widgetData.devWidgetUrl);
+      if (!response.ok) {
+        const status = response.status as 400 | 404 | 500 | 502 | 503;
+        return c.html(
+          `<html><body>Error: Failed to fetch widget from dev server (${response.status})</body></html>`,
+          status
+        );
+      }
+
+      let html = await response.text();
+
+      // Create a modified widgetData with the fetched HTML as resourceData
+      const modifiedWidgetData = {
+        ...widgetData,
+        resourceData: {
+          contents: [{ text: html }],
+        },
+      };
+
+      // Inject OpenAI wrapper using existing logic
+      const result = generateWidgetContentHtml(modifiedWidgetData);
+
+      if (result.error) {
+        return c.html(`<html><body>Error: ${result.error}</body></html>`, 500);
+      }
+
+      // Use the HTML with injected wrapper for path rewriting
+      html = result.html;
+
+      // Rewrite asset paths to go through proxy
+      const proxyBase = `/inspector/api/dev-widget/${toolId}/assets`;
+      
+      // Extract widget name from devWidgetUrl if available
+      const widgetNameMatch = widgetData.devWidgetUrl?.match(/\/mcp-use\/widgets\/([^/?]+)/);
+      const widgetName = widgetNameMatch ? widgetNameMatch[1] : "widget";
+      
+      // Replace absolute paths to dev server with proxy paths
+      const escapedBaseUrl = widgetData.devServerBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      html = html.replace(
+        new RegExp(
+          `(src|href)="(${escapedBaseUrl}/mcp-use/widgets/[^"]+)"`,
+          "g"
+        ),
+        (_match, attr, url) => {
+          // Extract the path after the base URL
+          const path = url.replace(widgetData.devServerBaseUrl, "");
+          return `${attr}="${proxyBase}${path}"`;
+        }
+      );
+
+      // Also handle relative paths that start with /mcp-use/widgets/
+      html = html.replace(
+        /(src|href)="\/mcp-use\/widgets\//g,
+        `$1="${proxyBase}/mcp-use/widgets/`
+      );
+      
+      // Handle Vite's asset imports (e.g., import.meta.url, __VITE_ASSET__)
+      // These are typically handled by Vite's dev server, but we rewrite base paths
+      html = html.replace(
+        /(src|href)="\.\/([^"]+)"/g,
+        (match, attr, path) => {
+          // Only rewrite if it's in a script context or if it looks like an asset
+          if (path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/i)) {
+            return `${attr}="${proxyBase}/mcp-use/widgets/${widgetName}/${path}"`;
+          }
+          return match;
+        }
+      );
+
+      // Rewrite Vite HMR WebSocket URL to go through proxy
+      const host = c.req.header("host") || "localhost:3000";
+      const protocol = c.req.header("x-forwarded-proto") || (c.req.url.startsWith("https") ? "https" : "http");
+      const wsProtocol = protocol === "https" ? "wss" : "ws";
+      html = html.replace(
+        /__vite_ws__:\s*["']([^"']+)["']/g,
+        () => {
+          const proxyWsUrl = `${wsProtocol}://${host}/inspector/api/dev-widget/${toolId}/__vite_hmr`;
+          return `__vite_ws__: "${proxyWsUrl}"`;
+        }
+      );
+
+      // Set security headers
+      const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
+      Object.entries(headers).forEach(([key, value]) => {
+        c.header(key, value);
+      });
+
+      return c.html(html);
+    } catch (error) {
+      console.error("[Dev Widget Proxy] Error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return c.html(`<html><body>Error: ${errorMessage}</body></html>`, 500);
+    }
+  });
+
+  // Dev widget asset proxy - forwards asset requests to dev server
+  app.get("/inspector/api/dev-widget/:toolId/assets/*", async (c) => {
+    try {
+      const toolId = c.req.param("toolId");
+      const assetPath = c.req.path.replace(
+        `/inspector/api/dev-widget/${toolId}/assets`,
+        ""
+      );
+      const widgetData = getWidgetData(toolId);
+
+      if (!widgetData?.devServerBaseUrl) {
+        return c.notFound();
+      }
+
+      // Construct full URL to dev server asset
+      const devAssetUrl = `${widgetData.devServerBaseUrl}${assetPath}`;
+
+      // Forward request to dev server
+      const response = await fetch(devAssetUrl, {
+        headers: {
+          Accept: c.req.header("Accept") || "*/*",
+        },
+      });
+
+      if (!response.ok) {
+        return c.notFound();
+      }
+
+      // Forward response with appropriate headers
+      const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+      const headers: Record<string, string> = {
+        "Content-Type": contentType,
+      };
+
+      // Forward cache headers if present
+      const cacheControl = response.headers.get("Cache-Control");
+      if (cacheControl) {
+        headers["Cache-Control"] = cacheControl;
+      }
+
+      return new Response(response.body, {
+        status: response.status,
+        headers,
+      });
+    } catch (error) {
+      console.error("[Dev Widget Asset Proxy] Error:", error);
+      return c.notFound();
+    }
+  });
+
+  // WebSocket proxy for Vite HMR - placeholder
+  // Note: WebSocket proxy requires WebSocket library (e.g., 'ws' package)
+  // This endpoint would handle WebSocket upgrades for /inspector/api/dev-widget/:toolId/__vite_hmr
+  // For now, Vite HMR may work directly if the WebSocket URL is rewritten correctly in the HTML
+  // TODO: Implement WebSocket proxy using 'ws' package or similar when needed
 
   // Inspector config endpoint
   app.get("/inspector/config.json", (c) => {
