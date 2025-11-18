@@ -37,6 +37,7 @@ class MCPClient:
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
+        verify: bool | None = True,
     ) -> None:
         """Initialize a new MCP client.
 
@@ -63,6 +64,7 @@ class MCPClient:
             self.middleware = default_middleware + middleware
         else:
             self.middleware = default_middleware
+        self.verify = verify
         # Load configuration if provided
         if config is not None:
             if isinstance(config, str):
@@ -80,6 +82,7 @@ class MCPClient:
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        verify: bool | None = True,
     ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
@@ -98,6 +101,7 @@ class MCPClient:
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            verify=verify,
         )
 
     @classmethod
@@ -110,6 +114,7 @@ class MCPClient:
         elicitation_callback: ElicitationFnT | None = None,
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
+        verify: bool | None = True,
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
@@ -128,6 +133,7 @@ class MCPClient:
             elicitation_callback=elicitation_callback,
             message_handler=message_handler,
             logging_callback=logging_callback,
+            verify=verify,
         )
 
     @telemetry("client_add_server")
