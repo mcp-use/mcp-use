@@ -75,10 +75,10 @@ export function LayoutHeader({
   };
 
   return (
-    <header className="w-full mx-auto">
-      <div className="flex items-center justify-between">
+    <header className="w-full mx-auto overflow-hidden">
+      <div className="flex items-center justify-between min-w-0">
         {/* Left side: Server dropdown + Tabs + Tunnel Badge */}
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-6 min-w-0 flex-1">
           {/* Server Selection Dropdown */}
           <ServerDropdown
             connections={connections}
@@ -92,8 +92,9 @@ export function LayoutHeader({
             <Tabs
               value={activeTab}
               onValueChange={(tab) => onTabChange(tab as TabType)}
+              className="min-w-0 shrink"
             >
-              <TabsList>
+              <TabsList className="min-w-0">
                 {tabs.map((tab) => {
                   // Get count for the current tab
                   let count = 0;
@@ -219,7 +220,7 @@ export function LayoutHeader({
         </div>
 
         {/* Right side: Theme Toggle + Command Palette + Discord Button + Logo */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           <Tooltip>
             <TooltipTrigger>
               <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
