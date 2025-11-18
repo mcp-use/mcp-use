@@ -1646,8 +1646,8 @@ if (container && Component) {
             expressRes._closeHandler = handler;
           }
         },
-        once: () => { },
-        removeListener: () => { },
+        once: () => {},
+        removeListener: () => {},
         writeHead: (code: number, _headers?: any) => {
           statusCode = code;
           expressRes.statusCode = code;
@@ -1760,9 +1760,7 @@ if (container && Component) {
 
       await this.server.connect(transport);
 
-
       await transport.handleRequest(expressReq, expressRes);
-
 
       const response = getResponse();
       if (response) {
