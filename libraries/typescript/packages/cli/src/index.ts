@@ -123,7 +123,7 @@ async function startTunnel(
     console.log(chalk.gray(`Starting tunnel for port ${port}...`));
 
     const tunnelArgs = ["--yes", "@mcp-use/tunnel", String(port)];
-    
+
     // Pass subdomain as CLI flag if provided
     if (subdomain) {
       tunnelArgs.push("--subdomain", subdomain);
