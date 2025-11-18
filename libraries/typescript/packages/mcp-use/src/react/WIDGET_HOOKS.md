@@ -230,36 +230,6 @@ const MapWidget: React.FC = () => {
 };
 ```
 
-### Fullscreen Mode with Close Button
-
-When your widget goes fullscreen, use `WidgetFullscreenWrapper` to automatically add a close button. This ensures users can exit fullscreen without you needing to implement your own close button, which would conflict with ChatGPT's controls when deployed.
-
-```tsx
-import { WidgetFullscreenWrapper, useWidget } from 'mcp-use/react';
-
-const MapWidget: React.FC = () => {
-  const { requestDisplayMode } = useWidget();
-  
-  const goFullscreen = async () => {
-    await requestDisplayMode('fullscreen');
-  };
-  
-  return (
-    <WidgetFullscreenWrapper>
-      <div>
-        <button onClick={goFullscreen}>Go Fullscreen</button>
-        {/* Your widget content */}
-      </div>
-    </WidgetFullscreenWrapper>
-  );
-};
-```
-
-The `WidgetFullscreenWrapper` automatically:
-- Detects when the widget is in fullscreen mode
-- Shows a close button in the top-right corner
-- Calls `requestDisplayMode('inline')` when clicked to exit fullscreen
-
 ### Open External Links
 
 ```tsx
