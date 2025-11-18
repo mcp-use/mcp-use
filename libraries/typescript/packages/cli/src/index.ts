@@ -123,7 +123,7 @@ async function startTunnel(
     console.log(chalk.gray(`Starting tunnel for port ${port}...`));
 
     const tunnelArgs = ["--yes", "@mcp-use/tunnel", String(port)];
-    
+
     // Pass subdomain as CLI flag if provided
     // Use -- to separate npx flags from command arguments
     if (subdomain) {
@@ -622,7 +622,7 @@ program
           // Read existing subdomain from mcp-use.json if available
           const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
           let existingSubdomain: string | undefined;
-          
+
           try {
             const manifestContent = await readFile(manifestPath, "utf-8");
             const manifest = JSON.parse(manifestContent);
@@ -659,7 +659,7 @@ program
 
             // Ensure dist directory exists
             await mkdir(path.dirname(manifestPath), { recursive: true });
-            
+
             // Write updated manifest
             await writeFile(
               manifestPath,
