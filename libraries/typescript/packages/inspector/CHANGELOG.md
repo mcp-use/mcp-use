@@ -1,5 +1,239 @@
 # @mcp-use/inspector
 
+## 0.5.3
+
+### Patch Changes
+
+- e8ec993: Fix formatting of object tool input
+- e8ec993: Add support for displaying console logs of widgets in the inspector preview panel
+- e8ec993: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- e8ec993: Fix connection edit button in inspector
+- e8ec993: Fix button overflow in connect form
+- e8ec993: Dynamically load models for the chat
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+  - mcp-use@1.3.3
+
+## 0.5.3-canary.8
+
+### Patch Changes
+
+- 329ce35: Dynamically load models for the chat
+  - mcp-use@1.3.3-canary.8
+
+## 0.5.3-canary.7
+
+### Patch Changes
+
+- 1ed0ab8: Fix formatting of object tool input
+  - mcp-use@1.3.3-canary.7
+
+## 0.5.3-canary.6
+
+### Patch Changes
+
+- ba654db: Fix button overflow in connect form
+  - mcp-use@1.3.3-canary.6
+
+## 0.5.3-canary.5
+
+### Patch Changes
+
+- f971dd8: Fix connection edit button in inspector
+  - mcp-use@1.3.3-canary.5
+
+## 0.5.3-canary.4
+
+### Patch Changes
+
+- 68d0d4c: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- Updated dependencies [68d0d4c]
+  - mcp-use@1.3.3-canary.4
+
+## 0.5.3-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d4dc001]
+  - mcp-use@1.3.3-canary.3
+
+## 0.5.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [9fc286c]
+  - mcp-use@1.3.3-canary.2
+
+## 0.5.3-canary.1
+
+### Patch Changes
+
+- mcp-use@1.3.3-canary.1
+
+## 0.5.3-canary.0
+
+### Patch Changes
+
+- d4c246a: Add support for displaying console logs of widgets in the inspector preview panel
+  - mcp-use@1.3.3-canary.0
+
+## 0.5.2
+
+### Patch Changes
+
+- 835d367: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 835d367: Hanlde large json responses by showing a preview and a download button
+- 835d367: chore: update dependencies
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+  - mcp-use@1.3.2
+
+## 0.5.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [d9e3ae2]
+  - mcp-use@1.3.2-canary.5
+
+## 0.5.2-canary.4
+
+### Patch Changes
+
+- 9db6706: Hanlde large json responses by showing a preview and a download button
+  - mcp-use@1.3.2-canary.4
+
+## 0.5.2-canary.3
+
+### Patch Changes
+
+- mcp-use@1.3.2-canary.3
+
+## 0.5.2-canary.2
+
+### Patch Changes
+
+- mcp-use@1.3.2-canary.2
+
+## 0.5.2-canary.1
+
+### Patch Changes
+
+- mcp-use@1.3.2-canary.1
+
+## 0.5.2-canary.0
+
+### Patch Changes
+
+- 2ebe233: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 2ebe233: chore: update dependencies
+- Updated dependencies [2ebe233]
+- Updated dependencies [2ebe233]
+  - mcp-use@1.3.2-canary.0
+
+## 0.5.1
+
+### Patch Changes
+
+- 91fdcee: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 91fdcee: chore: update dependencies
+- Updated dependencies [91fdcee]
+- Updated dependencies [91fdcee]
+  - mcp-use@1.3.1
+
+## 0.5.1-canary.0
+
+### Patch Changes
+
+- 9ece7fe: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 9ece7fe: chore: update dependencies
+- Updated dependencies [9ece7fe]
+- Updated dependencies [9ece7fe]
+  - mcp-use@1.3.1-canary.0
+
+## 0.5.0
+
+### Minor Changes
+
+- 26e1162: Migrated mcp-use server from Express to Hono framework to enable edge runtime support (Cloudflare Workers, Deno Deploy, Supabase Edge Functions). Added runtime detection for Deno/Node.js environments, Connect middleware adapter for compatibility, and `getHandler()` method for edge deployment. Updated dependencies: added `hono` and `@hono/node-server`, moved `connect` and `node-mocks-http` to optional dependencies, removed `express` and `cors` from peer dependencies.
+
+  Added Supabase deployment documentation and example templates to create-mcp-use-app for easier edge runtime deployment.
+
+- 26e1162: ### MCPAgent Message Detection Improvements (fix #446)
+
+  Fixed issue where `agent.run()` returned "No output generated" even when valid output was produced, caused by messages not being AIMessage instances after serialization/deserialization across module boundaries. Added robust message detection helpers (`_isAIMessageLike`, `_isHumanMessageLike`, `_isToolMessageLike`) that handle multiple message formats (class instances, plain objects with `type`/`role` properties, objects with `getType()` methods) to support version mismatches and different LangChain message formats. Includes comprehensive test coverage for message detection edge cases.
+
+  ### Server Base URL Fix
+
+  Fixed server base URL handling to ensure proper connection and routing in edge runtime environments, resolving issues with URL construction and path resolution.
+
+  ### Inspector Enhancements
+
+  Improved auto-connection logic with better error handling and retry mechanisms. Enhanced resource display components and OpenAI component renderer for better reliability and user experience. Updated connection context management for more robust multi-server support.
+
+  ### Supabase Deployment Example
+
+  Added complete Supabase deployment example with Deno-compatible server implementation, deployment scripts, and configuration templates to `create-mcp-use-app` for easier edge runtime deployment.
+
+  ### React Hook and CLI Improvements
+
+  Enhanced `useMcp` hook with better error handling and connection state management for browser-based MCP clients. Updated CLI with improved server URL handling and connection management.
+
+### Patch Changes
+
+- f25018a: Removed non functional setting button and removed tool input formatting that made it annoying to type arrays
+- Updated dependencies [26e1162]
+- Updated dependencies [26e1162]
+  - mcp-use@1.3.0
+
+## 0.5.0-canary.1
+
+### Minor Changes
+
+- 9d0be46: ### MCPAgent Message Detection Improvements (fix #446)
+
+  Fixed issue where `agent.run()` returned "No output generated" even when valid output was produced, caused by messages not being AIMessage instances after serialization/deserialization across module boundaries. Added robust message detection helpers (`_isAIMessageLike`, `_isHumanMessageLike`, `_isToolMessageLike`) that handle multiple message formats (class instances, plain objects with `type`/`role` properties, objects with `getType()` methods) to support version mismatches and different LangChain message formats. Includes comprehensive test coverage for message detection edge cases.
+
+  ### Server Base URL Fix
+
+  Fixed server base URL handling to ensure proper connection and routing in edge runtime environments, resolving issues with URL construction and path resolution.
+
+  ### Inspector Enhancements
+
+  Improved auto-connection logic with better error handling and retry mechanisms. Enhanced resource display components and OpenAI component renderer for better reliability and user experience. Updated connection context management for more robust multi-server support.
+
+  ### Supabase Deployment Example
+
+  Added complete Supabase deployment example with Deno-compatible server implementation, deployment scripts, and configuration templates to `create-mcp-use-app` for easier edge runtime deployment.
+
+  ### React Hook and CLI Improvements
+
+  Enhanced `useMcp` hook with better error handling and connection state management for browser-based MCP clients. Updated CLI with improved server URL handling and connection management.
+
+### Patch Changes
+
+- Updated dependencies [9d0be46]
+  - mcp-use@1.3.0-canary.1
+
+## 0.5.0-canary.0
+
+### Minor Changes
+
+- 3db425d: Migrated mcp-use server from Express to Hono framework to enable edge runtime support (Cloudflare Workers, Deno Deploy, Supabase Edge Functions). Added runtime detection for Deno/Node.js environments, Connect middleware adapter for compatibility, and `getHandler()` method for edge deployment. Updated dependencies: added `hono` and `@hono/node-server`, moved `connect` and `node-mocks-http` to optional dependencies, removed `express` and `cors` from peer dependencies.
+
+  Added Supabase deployment documentation and example templates to create-mcp-use-app for easier edge runtime deployment.
+
+### Patch Changes
+
+- f25018a: Removed non functional setting button and removed tool input formatting that made it annoying to type arrays
+- Updated dependencies [3db425d]
+  - mcp-use@1.3.0-canary.0
+
 ## 0.4.13
 
 ### Patch Changes

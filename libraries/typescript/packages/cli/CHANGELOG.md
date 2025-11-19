@@ -1,5 +1,271 @@
 # @mcp-use/cli
 
+## 2.2.3
+
+### Patch Changes
+
+- e8ec993: Add ability to reuse tunnel subdomain when using mcp-use start
+- e8ec993: Remove irrelevant log statement
+- e8ec993: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+  - @mcp-use/inspector@0.5.3
+  - mcp-use@1.3.3
+
+## 2.2.3-canary.8
+
+### Patch Changes
+
+- Updated dependencies [329ce35]
+  - @mcp-use/inspector@0.5.3-canary.8
+  - mcp-use@1.3.3-canary.8
+
+## 2.2.3-canary.7
+
+### Patch Changes
+
+- Updated dependencies [1ed0ab8]
+  - @mcp-use/inspector@0.5.3-canary.7
+  - mcp-use@1.3.3-canary.7
+
+## 2.2.3-canary.6
+
+### Patch Changes
+
+- Updated dependencies [ba654db]
+  - @mcp-use/inspector@0.5.3-canary.6
+  - mcp-use@1.3.3-canary.6
+
+## 2.2.3-canary.5
+
+### Patch Changes
+
+- Updated dependencies [f971dd8]
+  - @mcp-use/inspector@0.5.3-canary.5
+  - mcp-use@1.3.3-canary.5
+
+## 2.2.3-canary.4
+
+### Patch Changes
+
+- 68d0d4c: Remove irrelevant log statement
+- 68d0d4c: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- Updated dependencies [68d0d4c]
+  - @mcp-use/inspector@0.5.3-canary.4
+  - mcp-use@1.3.3-canary.4
+
+## 2.2.3-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d4dc001]
+  - mcp-use@1.3.3-canary.3
+  - @mcp-use/inspector@0.5.3-canary.3
+
+## 2.2.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [9fc286c]
+  - mcp-use@1.3.3-canary.2
+  - @mcp-use/inspector@0.5.3-canary.2
+
+## 2.2.3-canary.1
+
+### Patch Changes
+
+- f7995c0: Add ability to reuse tunnel subdomain when using mcp-use start
+  - mcp-use@1.3.3-canary.1
+  - @mcp-use/inspector@0.5.3-canary.1
+
+## 2.2.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d4c246a]
+  - @mcp-use/inspector@0.5.3-canary.0
+  - mcp-use@1.3.3-canary.0
+
+## 2.2.2
+
+### Patch Changes
+
+- 835d367: fix inspector generated url
+- 835d367: fix with-inspector param
+- 835d367: make installation disabled by default and add deploy command to template package
+- 835d367: chore: update dependencies
+- 835d367: fix upload source
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+  - @mcp-use/inspector@0.5.2
+  - mcp-use@1.3.2
+
+## 2.2.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [d9e3ae2]
+  - mcp-use@1.3.2-canary.5
+  - @mcp-use/inspector@0.5.2-canary.5
+
+## 2.2.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [9db6706]
+  - @mcp-use/inspector@0.5.2-canary.4
+  - mcp-use@1.3.2-canary.4
+
+## 2.2.2-canary.3
+
+### Patch Changes
+
+- 6133446: make installation disabled by default and add deploy command to template package
+  - mcp-use@1.3.2-canary.3
+  - @mcp-use/inspector@0.5.2-canary.3
+
+## 2.2.2-canary.2
+
+### Patch Changes
+
+- 6e3278b: fix inspector generated url
+  - mcp-use@1.3.2-canary.2
+  - @mcp-use/inspector@0.5.2-canary.2
+
+## 2.2.2-canary.1
+
+### Patch Changes
+
+- ecfa449: fix upload source
+  - mcp-use@1.3.2-canary.1
+  - @mcp-use/inspector@0.5.2-canary.1
+
+## 2.2.2-canary.0
+
+### Patch Changes
+
+- 2ebe233: fix with-inspector param
+- 2ebe233: chore: update dependencies
+- Updated dependencies [2ebe233]
+- Updated dependencies [2ebe233]
+  - @mcp-use/inspector@0.5.2-canary.0
+  - mcp-use@1.3.2-canary.0
+
+## 2.2.1
+
+### Patch Changes
+
+- 91fdcee: fix with-inspector param
+- 91fdcee: chore: update dependencies
+- Updated dependencies [91fdcee]
+- Updated dependencies [91fdcee]
+  - @mcp-use/inspector@0.5.1
+  - mcp-use@1.3.1
+
+## 2.2.1-canary.0
+
+### Patch Changes
+
+- 9ece7fe: fix with-inspector param
+- 9ece7fe: chore: update dependencies
+- Updated dependencies [9ece7fe]
+- Updated dependencies [9ece7fe]
+  - @mcp-use/inspector@0.5.1-canary.0
+  - mcp-use@1.3.1-canary.0
+
+## 2.2.0
+
+### Minor Changes
+
+- 26e1162: Migrated mcp-use server from Express to Hono framework to enable edge runtime support (Cloudflare Workers, Deno Deploy, Supabase Edge Functions). Added runtime detection for Deno/Node.js environments, Connect middleware adapter for compatibility, and `getHandler()` method for edge deployment. Updated dependencies: added `hono` and `@hono/node-server`, moved `connect` and `node-mocks-http` to optional dependencies, removed `express` and `cors` from peer dependencies.
+
+  Added Supabase deployment documentation and example templates to create-mcp-use-app for easier edge runtime deployment.
+
+- 26e1162: ### MCPAgent Message Detection Improvements (fix #446)
+
+  Fixed issue where `agent.run()` returned "No output generated" even when valid output was produced, caused by messages not being AIMessage instances after serialization/deserialization across module boundaries. Added robust message detection helpers (`_isAIMessageLike`, `_isHumanMessageLike`, `_isToolMessageLike`) that handle multiple message formats (class instances, plain objects with `type`/`role` properties, objects with `getType()` methods) to support version mismatches and different LangChain message formats. Includes comprehensive test coverage for message detection edge cases.
+
+  ### Server Base URL Fix
+
+  Fixed server base URL handling to ensure proper connection and routing in edge runtime environments, resolving issues with URL construction and path resolution.
+
+  ### Inspector Enhancements
+
+  Improved auto-connection logic with better error handling and retry mechanisms. Enhanced resource display components and OpenAI component renderer for better reliability and user experience. Updated connection context management for more robust multi-server support.
+
+  ### Supabase Deployment Example
+
+  Added complete Supabase deployment example with Deno-compatible server implementation, deployment scripts, and configuration templates to `create-mcp-use-app` for easier edge runtime deployment.
+
+  ### React Hook and CLI Improvements
+
+  Enhanced `useMcp` hook with better error handling and connection state management for browser-based MCP clients. Updated CLI with improved server URL handling and connection management.
+
+### Patch Changes
+
+- Updated dependencies [26e1162]
+- Updated dependencies [f25018a]
+- Updated dependencies [26e1162]
+  - mcp-use@1.3.0
+  - @mcp-use/inspector@0.5.0
+
+## 2.2.0-canary.1
+
+### Minor Changes
+
+- 9d0be46: ### MCPAgent Message Detection Improvements (fix #446)
+
+  Fixed issue where `agent.run()` returned "No output generated" even when valid output was produced, caused by messages not being AIMessage instances after serialization/deserialization across module boundaries. Added robust message detection helpers (`_isAIMessageLike`, `_isHumanMessageLike`, `_isToolMessageLike`) that handle multiple message formats (class instances, plain objects with `type`/`role` properties, objects with `getType()` methods) to support version mismatches and different LangChain message formats. Includes comprehensive test coverage for message detection edge cases.
+
+  ### Server Base URL Fix
+
+  Fixed server base URL handling to ensure proper connection and routing in edge runtime environments, resolving issues with URL construction and path resolution.
+
+  ### Inspector Enhancements
+
+  Improved auto-connection logic with better error handling and retry mechanisms. Enhanced resource display components and OpenAI component renderer for better reliability and user experience. Updated connection context management for more robust multi-server support.
+
+  ### Supabase Deployment Example
+
+  Added complete Supabase deployment example with Deno-compatible server implementation, deployment scripts, and configuration templates to `create-mcp-use-app` for easier edge runtime deployment.
+
+  ### React Hook and CLI Improvements
+
+  Enhanced `useMcp` hook with better error handling and connection state management for browser-based MCP clients. Updated CLI with improved server URL handling and connection management.
+
+### Patch Changes
+
+- Updated dependencies [9d0be46]
+  - @mcp-use/inspector@0.5.0-canary.1
+  - mcp-use@1.3.0-canary.1
+
+## 2.2.0-canary.0
+
+### Minor Changes
+
+- 3db425d: Migrated mcp-use server from Express to Hono framework to enable edge runtime support (Cloudflare Workers, Deno Deploy, Supabase Edge Functions). Added runtime detection for Deno/Node.js environments, Connect middleware adapter for compatibility, and `getHandler()` method for edge deployment. Updated dependencies: added `hono` and `@hono/node-server`, moved `connect` and `node-mocks-http` to optional dependencies, removed `express` and `cors` from peer dependencies.
+
+  Added Supabase deployment documentation and example templates to create-mcp-use-app for easier edge runtime deployment.
+
+### Patch Changes
+
+- Updated dependencies [3db425d]
+- Updated dependencies [f25018a]
+  - mcp-use@1.3.0-canary.0
+  - @mcp-use/inspector@0.5.0-canary.0
+
 ## 2.1.25
 
 ### Patch Changes

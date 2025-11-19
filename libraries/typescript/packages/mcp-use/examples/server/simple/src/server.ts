@@ -16,7 +16,7 @@ console.log(
   Object.getOwnPropertyNames(Object.getPrototypeOf(server))
 );
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Simple tool that returns hello world
 server.tool({
@@ -59,8 +59,7 @@ server.resource({
 });
 
 // Start the server (MCP endpoints auto-mounted at /mcp)
-server.listen(PORT, () => {
-  console.log(`🚀 Simple Example Server running on port ${PORT}`);
-  console.log(`📊 Inspector available at http://localhost:${PORT}/inspector`);
-  console.log(`🔧 MCP endpoint at http://localhost:${PORT}/mcp`);
-});
+await server.listen(PORT);
+console.log(`🚀 Simple Example Server running on port ${PORT}`);
+console.log(`📊 Inspector available at http://localhost:${PORT}/inspector`);
+console.log(`🔧 MCP endpoint at http://localhost:${PORT}/mcp`);

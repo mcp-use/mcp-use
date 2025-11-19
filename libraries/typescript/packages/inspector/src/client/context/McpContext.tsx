@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { MCPServerRemovedEvent, Telemetry } from "@/client/telemetry";
 import { useMcp } from "mcp-use/react";
+import type { ReactNode } from "react";
 import {
   createContext,
   use,
@@ -9,7 +10,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { MCPServerRemovedEvent, Telemetry } from "@/client/telemetry";
 
 export interface MCPConnection {
   id: string;
@@ -22,6 +22,30 @@ export interface MCPConnection {
   error: string | null;
   authUrl: string | null;
   customHeaders?: Record<string, string>;
+  transportType?: "http" | "sse";
+  proxyConfig?: {
+    proxyAddress?: string;
+    customHeaders?: Record<string, string>;
+  };
+  serverInfo?: {
+    name: string;
+    version?: string;
+  };
+  capabilities?: {
+    tools?: {
+      listChanged?: boolean;
+    };
+    resources?: {
+      subscribe?: boolean;
+      listChanged?: boolean;
+    };
+    prompts?: {
+      listChanged?: boolean;
+    };
+    logging?: Record<string, any>;
+    completions?: Record<string, any>;
+    [key: string]: any;
+  };
   callTool: (toolName: string, args: any) => Promise<any>;
   readResource: (uri: string) => Promise<any>;
   listPrompts: (serverName?: string) => Promise<void>;
@@ -49,6 +73,17 @@ interface McpContextType {
   setAutoConnect: (autoConnect: boolean) => void;
   connectServer: (id: string) => void;
   disconnectServer: (id: string) => void;
+  updateConnectionConfig: (
+    id: string,
+    config: {
+      name?: string;
+      proxyConfig?: {
+        proxyAddress?: string;
+        customHeaders?: Record<string, string>;
+      };
+      transportType?: "http" | "sse";
+    }
+  ) => void;
 }
 
 const McpContext = createContext<McpContextType | undefined>(undefined);
@@ -133,10 +168,18 @@ function McpConnectionWrapper({
     // about updating one component while rendering another
     if (typeof queueMicrotask !== "undefined") {
       queueMicrotask(() => {
+        // Debug: Log serverInfo to console
+        if (mcpHook.state === "ready" && mcpHook.serverInfo) {
+          console.log(
+            "[McpContext] Server info available:",
+            mcpHook.serverInfo
+          );
+        }
+
         const connection: MCPConnection = {
           id: url,
           url,
-          name,
+          name: mcpHook.serverInfo?.name || name, // Use server-provided name if available
           state: mcpHook.state,
           tools: mcpHook.tools,
           resources: mcpHook.resources,
@@ -144,6 +187,10 @@ function McpConnectionWrapper({
           error: mcpHook.error ?? null,
           authUrl: mcpHook.authUrl ?? null,
           customHeaders,
+          transportType,
+          proxyConfig,
+          serverInfo: mcpHook.serverInfo,
+          capabilities: mcpHook.capabilities,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
@@ -161,9 +208,12 @@ function McpConnectionWrapper({
           prev.state !== connection.state ||
           prev.error !== connection.error ||
           prev.authUrl !== connection.authUrl ||
+          prev.name !== connection.name ||
           prev.tools.length !== connection.tools.length ||
           prev.resources.length !== connection.resources.length ||
           prev.prompts.length !== connection.prompts.length ||
+          prev.serverInfo !== connection.serverInfo ||
+          prev.capabilities !== connection.capabilities ||
           !prev.client
         ) {
           prevConnectionRef.current = connection;
@@ -175,7 +225,7 @@ function McpConnectionWrapper({
       const connection: MCPConnection = {
         id: url,
         url,
-        name,
+        name: mcpHook.serverInfo?.name || name, // Use server-provided name if available
         state: mcpHook.state,
         tools: mcpHook.tools,
         resources: mcpHook.resources,
@@ -183,6 +233,10 @@ function McpConnectionWrapper({
         error: mcpHook.error ?? null,
         authUrl: mcpHook.authUrl ?? null,
         customHeaders,
+        transportType,
+        proxyConfig,
+        serverInfo: mcpHook.serverInfo,
+        capabilities: mcpHook.capabilities,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
@@ -200,9 +254,12 @@ function McpConnectionWrapper({
         prev.state !== connection.state ||
         prev.error !== connection.error ||
         prev.authUrl !== connection.authUrl ||
+        prev.name !== connection.name ||
         prev.tools.length !== connection.tools.length ||
         prev.resources.length !== connection.resources.length ||
         prev.prompts.length !== connection.prompts.length ||
+        prev.serverInfo !== connection.serverInfo ||
+        prev.capabilities !== connection.capabilities ||
         !prev.client
       ) {
         prevConnectionRef.current = connection;
@@ -212,12 +269,16 @@ function McpConnectionWrapper({
   }, [
     url,
     name,
+    transportType,
+    proxyConfig,
     mcpHook.state,
     mcpHook.tools,
     mcpHook.resources,
     mcpHook.prompts,
     mcpHook.error,
     mcpHook.authUrl,
+    mcpHook.serverInfo,
+    mcpHook.capabilities,
     mcpHook.client,
   ]);
 
@@ -306,6 +367,29 @@ export function McpProvider({ children }: { children: ReactNode }) {
       new Map(prev).set(connection.id, connection)
     );
     setConnectionVersion((v) => v + 1);
+
+    // If the connection has serverInfo with a name, update the saved connection name
+    if (connection.serverInfo?.name && connection.state === "ready") {
+      setSavedConnections((prev) => {
+        const existingConnection = prev.find((c) => c.id === connection.id);
+        if (
+          existingConnection &&
+          existingConnection.name !== connection.serverInfo!.name
+        ) {
+          const updated = prev.map((c) =>
+            c.id === connection.id
+              ? { ...c, name: connection.serverInfo!.name }
+              : c
+          );
+          localStorage.setItem(
+            "mcp-inspector-connections",
+            JSON.stringify(updated)
+          );
+          return updated;
+        }
+        return prev;
+      });
+    }
   }, []);
 
   const addConnection = useCallback(
@@ -403,6 +487,8 @@ export function McpProvider({ children }: { children: ReactNode }) {
           prompts: [],
           error: null,
           authUrl: null,
+          transportType: savedConn.transportType,
+          proxyConfig: savedConn.proxyConfig,
           listPrompts: async (_serverName?: string) => {
             throw new Error("Not connected");
           },
@@ -464,6 +550,40 @@ export function McpProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const updateConnectionConfig = useCallback(
+    (
+      id: string,
+      config: {
+        name?: string;
+        proxyConfig?: {
+          proxyAddress?: string;
+          customHeaders?: Record<string, string>;
+        };
+        transportType?: "http" | "sse";
+      }
+    ) => {
+      setSavedConnections((prev) => {
+        const updated = prev.map((conn) => {
+          if (conn.id === id) {
+            return {
+              ...conn,
+              name: config.name || conn.name,
+              proxyConfig: config.proxyConfig,
+              transportType: config.transportType || conn.transportType,
+            };
+          }
+          return conn;
+        });
+        localStorage.setItem(
+          "mcp-inspector-connections",
+          JSON.stringify(updated)
+        );
+        return updated;
+      });
+    },
+    []
+  );
+
   // Use connectionVersion to force array recreation when connections update
   const connections = useMemo(() => {
     // Maintain order based on savedConnections, not activeConnections
@@ -486,6 +606,8 @@ export function McpProvider({ children }: { children: ReactNode }) {
         prompts: [],
         error: null,
         authUrl: null,
+        transportType: saved.transportType,
+        proxyConfig: saved.proxyConfig,
         callTool: async () => {
           throw new Error("Not connected");
         },
@@ -519,6 +641,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       setAutoConnect,
       connectServer,
       disconnectServer,
+      updateConnectionConfig,
     }),
     [
       connections,
@@ -529,6 +652,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       setAutoConnect,
       connectServer,
       disconnectServer,
+      updateConnectionConfig,
     ]
   );
 
@@ -538,7 +662,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
         .filter((saved) => autoConnect || manualConnections.has(saved.id))
         .map((saved) => (
           <McpConnectionWrapper
-            key={saved.id}
+            key={`${saved.id}-${saved.transportType || "http"}-${
+              saved.proxyConfig?.proxyAddress || ""
+            }`}
             url={saved.url}
             name={saved.name}
             proxyConfig={saved.proxyConfig}

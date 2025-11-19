@@ -1,5 +1,5 @@
-import type { AuthConfig, LLMConfig } from "./types";
 import { useCallback, useEffect, useState } from "react";
+import type { AuthConfig, LLMConfig } from "./types";
 import { DEFAULT_MODELS } from "./types";
 import { hashString } from "./utils";
 
@@ -19,6 +19,25 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
   const [tempApiKey, setTempApiKey] = useState("");
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai);
 
+  // Load API keys per provider from localStorage
+  const getApiKeys = useCallback((): Record<string, string> => {
+    const saved = localStorage.getItem("mcp-inspector-api-keys");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (error) {
+        console.error("Failed to load API keys:", error);
+        return {};
+      }
+    }
+    return {};
+  }, []);
+
+  // Save API keys per provider to localStorage
+  const saveApiKeys = useCallback((apiKeys: Record<string, string>) => {
+    localStorage.setItem("mcp-inspector-api-keys", JSON.stringify(apiKeys));
+  }, []);
+
   // Auth Config form state
   const [tempAuthType, setTempAuthType] = useState<
     "none" | "basic" | "bearer" | "oauth"
@@ -30,18 +49,20 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
   // Load saved LLM config from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("mcp-inspector-llm-config");
+    const apiKeys = getApiKeys();
     if (saved) {
       try {
         const config = JSON.parse(saved);
         setLLMConfig(config);
         setTempProvider(config.provider);
-        setTempApiKey(config.apiKey);
+        // Load API key for the provider from provider-specific storage
+        setTempApiKey(apiKeys[config.provider] || config.apiKey || "");
         setTempModel(config.model);
       } catch (error) {
         console.error("Failed to load LLM config:", error);
       }
     }
-  }, []);
+  }, [getApiKeys]);
 
   // Load auth config from localStorage on mount
   useEffect(() => {
@@ -76,15 +97,23 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     }
   }, [mcpServerUrl]);
 
-  // Update model when provider changes
+  // Update model and load API key when provider changes
   useEffect(() => {
     setTempModel(DEFAULT_MODELS[tempProvider]);
-  }, [tempProvider]);
+    // Load API key for the selected provider
+    const apiKeys = getApiKeys();
+    setTempApiKey(apiKeys[tempProvider] || "");
+  }, [tempProvider, getApiKeys]);
 
   const saveLLMConfig = useCallback(() => {
     if (!tempApiKey.trim()) {
       return;
     }
+
+    // Save API key for the current provider
+    const apiKeys = getApiKeys();
+    apiKeys[tempProvider] = tempApiKey;
+    saveApiKeys(apiKeys);
 
     const newLlmConfig: LLMConfig = {
       provider: tempProvider,
@@ -122,11 +151,17 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     tempUsername,
     tempPassword,
     tempToken,
+    getApiKeys,
+    saveApiKeys,
   ]);
 
   const clearConfig = useCallback(() => {
     setLLMConfig(null);
     setAuthConfig(null);
+    // Clear API key for current provider only
+    const apiKeys = getApiKeys();
+    delete apiKeys[tempProvider];
+    saveApiKeys(apiKeys);
     setTempApiKey("");
     setTempUsername("");
     setTempPassword("");
@@ -134,7 +169,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     setTempAuthType("none");
     localStorage.removeItem("mcp-inspector-llm-config");
     localStorage.removeItem("mcp-inspector-auth-config");
-  }, []);
+  }, [tempProvider, getApiKeys, saveApiKeys]);
 
   return {
     llmConfig,

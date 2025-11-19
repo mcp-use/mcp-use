@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx
 from mcp.client.sse import sse_client
+from mcp.shared._httpx_utils import McpHttpClientFactory
 
 from mcp_use.client.task_managers.base import ConnectionManager
 from mcp_use.logging import logger
@@ -29,6 +30,7 @@ class SseConnectionManager(ConnectionManager[tuple[Any, Any]]):
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
         auth: httpx.Auth | None = None,
+        httpx_client_factory: McpHttpClientFactory | None = None,
     ):
         """Initialize a new SSE connection manager.
 
@@ -38,6 +40,7 @@ class SseConnectionManager(ConnectionManager[tuple[Any, Any]]):
             timeout: Timeout for HTTP operations in seconds
             sse_read_timeout: Timeout for SSE read operations in seconds
             auth: Optional httpx.Auth instance for authentication
+            httpx_client_factory: Custom HTTPX client factory for MCP
         """
         super().__init__()
         self.url = url
@@ -45,6 +48,7 @@ class SseConnectionManager(ConnectionManager[tuple[Any, Any]]):
         self.timeout = timeout
         self.sse_read_timeout = sse_read_timeout
         self.auth = auth
+        self.httpx_client_factory = httpx_client_factory
         self._sse_ctx = None
 
     async def _establish_connection(self) -> tuple[Any, Any]:
@@ -63,6 +67,7 @@ class SseConnectionManager(ConnectionManager[tuple[Any, Any]]):
             timeout=self.timeout,
             sse_read_timeout=self.sse_read_timeout,
             auth=self.auth,
+            httpx_client_factory=self.httpx_client_factory,
         )
 
         # Enter the context manager
