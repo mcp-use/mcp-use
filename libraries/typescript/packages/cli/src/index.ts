@@ -700,9 +700,6 @@ program
               JSON.stringify(manifest, null, 2),
               "utf-8"
             );
-            console.log(
-              chalk.green(`✓ Subdomain saved to mcp-use.json: ${subdomain}`)
-            );
           } catch (error) {
             console.warn(
               chalk.yellow(
