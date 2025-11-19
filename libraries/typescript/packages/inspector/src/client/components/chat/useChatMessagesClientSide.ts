@@ -1,7 +1,7 @@
-import type { LLMConfig, Message } from "./types";
 import type { MCPConnection } from "@/client/context/McpContext";
-import { useCallback, useRef, useState } from "react";
 import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
+import { useCallback, useRef, useState } from "react";
+import type { LLMConfig, Message } from "./types";
 
 interface UseChatMessagesClientSideProps {
   connection: MCPConnection;
@@ -85,14 +85,12 @@ export function useChatMessagesClientSide({
             llm = new ChatOpenAI({
               model: llmConfig.model,
               apiKey: llmConfig.apiKey,
-              temperature: llmConfig.temperature ?? 0.7,
             });
           } else if (llmConfig.provider === "anthropic") {
             const { ChatAnthropic } = await import("@langchain/anthropic");
             llm = new ChatAnthropic({
               model: llmConfig.model,
               apiKey: llmConfig.apiKey,
-              temperature: llmConfig.temperature ?? 0.7,
             });
           } else if (llmConfig.provider === "google") {
             const { ChatGoogleGenerativeAI } = await import(
@@ -101,7 +99,6 @@ export function useChatMessagesClientSide({
             llm = new ChatGoogleGenerativeAI({
               model: llmConfig.model,
               apiKey: llmConfig.apiKey,
-              temperature: llmConfig.temperature ?? 0.7,
             });
           } else {
             throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
