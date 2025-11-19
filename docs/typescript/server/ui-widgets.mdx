@@ -231,7 +231,7 @@ const propSchema = z.object({
 
 ## The useWidget Hook
 
-The `useWidget` hook is the bridge between Apps SDK and React:
+The `useWidget` hook is the bridge between Apps SDK and React, providing type-safe access to all widget capabilities:
 
 ```typescript
 import { useWidget } from 'mcp-use/react';
@@ -240,31 +240,65 @@ const MyWidget: React.FC = () => {
   const {
     // Props from LLM/tool invocation
     props,              // Typed props based on your schema
-    output,             // Tool output data (if any)
-    metadata,           // Response metadata
+    output,             // Tool output data (structuredContent)
+    metadata,           // Response metadata (_meta)
     state,              // Persistent widget state
-    setState,           // Update widget state
+    setState,           // Update widget state (persists to localStorage)
     
     // Layout & theme
-    theme,              // 'light' | 'dark'
-    displayMode,        // 'inline' | 'fullscreen' | 'popup'
-    safeArea,           // Safe area insets
-    maxHeight,          // Max widget height
-    userAgent,          // Device capabilities
-    locale,             // User locale
+    theme,              // 'light' | 'dark' (auto-syncs with ChatGPT)
+    displayMode,        // 'inline' | 'pip' | 'fullscreen'
+    safeArea,           // Safe area insets for mobile
+    maxHeight,          // Max widget height (pixels)
+    userAgent,          // Device capabilities { device, capabilities }
+    locale,             // User locale (e.g., 'en-US')
     
     // Actions
-    callTool,           // Call other MCP tools
-    sendFollowUpMessage,// Send message to chat
-    openExternal,       // Open external URLs
+    callTool,           // Call other MCP tools from widget
+    sendFollowUpMessage,// Send message to ChatGPT conversation
+    openExternal,       // Open external URLs in new tab
     requestDisplayMode, // Request display mode change
     
     // Availability
-    isAvailable,        // Is Apps SDK available
-  } = useWidget<MyPropsType>();
+    isAvailable,        // Is window.openai API available
+  } = useWidget<MyPropsType, MyOutputType, MyMetadataType, MyStateType>();
   
   return <div>...</div>;
 };
+```
+
+### Type Parameters
+
+The `useWidget` hook accepts four optional type parameters:
+
+```typescript
+useWidget<
+  TProps,      // Props type (from toolInput)
+  TOutput,     // Output type (from toolOutput/structuredContent)
+  TMetadata,    // Metadata type (from toolResponseMetadata)
+  TState        // State type (for widgetState)
+>()
+```
+
+### Helper Hooks
+
+For convenience, there are specialized hooks for common use cases:
+
+```typescript
+import { 
+  useWidgetProps,   // Just get props
+  useWidgetTheme,   // Just get theme
+  useWidgetState    // Just get state/setState
+} from 'mcp-use/react';
+
+// Get only props
+const props = useWidgetProps<{ city: string }>();
+
+// Get only theme
+const theme = useWidgetTheme(); // 'light' | 'dark'
+
+// Get state management
+const [favorites, setFavorites] = useWidgetState<string[]>([]);
 ```
 
 ### Key Features
@@ -403,55 +437,122 @@ Once your server is running, you can test in ChatGPT:
 
 ### Accessing Tool Output
 
-Widgets can access the output of their own tool execution:
+Widgets can access the output of their own tool execution via `structuredContent`:
 
 ```typescript
 const { props, output } = useWidget<MyProps, MyOutput>();
 
-// props = tool input parameters
-// output = what the tool returned (if any additional data)
+// props = tool input parameters (from toolInput)
+// output = structuredContent returned by tool (from toolOutput)
+```
+
+**Example:**
+```typescript
+// Tool returns structuredContent
+server.tool({
+  name: 'get-weather',
+  cb: async ({ city }) => {
+    const weather = await fetchWeather(city);
+    return {
+      content: [{ type: 'text', text: `Weather for ${city}` }],
+      structuredContent: weather  // This becomes output
+    };
+  }
+});
+
+// Widget receives it
+const WeatherWidget: React.FC = () => {
+  const { props, output } = useWidget<
+    { city: string },
+    { temperature: number; condition: string }
+  >();
+  
+  // props.city = input parameter
+  // output.temperature = from structuredContent
+  // output.condition = from structuredContent
+};
 ```
 
 ### Persistent Widget State
 
-Widgets can maintain state across interactions:
+Widgets can maintain state across interactions. State is persisted in localStorage and visible to ChatGPT:
 
 ```typescript
 const { state, setState } = useWidget<MyProps, any, any, MyState>();
 
-// Save state
-await setState({ favoriteCity: 'Tokyo' });
+// Save state (persists to localStorage)
+await setState({ favoriteCity: 'Tokyo', filters: { price: '$$' } });
 
-// State persists across widget re-renders
-console.log(state?.favoriteCity);
+// State persists across widget re-renders and page reloads
+console.log(state?.favoriteCity); // 'Tokyo'
+
+// Update state with function (like React useState)
+await setState(prev => ({
+  ...prev,
+  favoriteCity: 'Paris'
+}));
 ```
+
+<Note>
+Widget state is scoped to the widget instance and conversation message. State is sent to ChatGPT and can influence model behavior, so keep it under 4k tokens for performance. See [window.openai API Emulation](/inspector/debugging-chatgpt-apps#windowopenai-api-emulation) for details.
+</Note>
 
 ### Calling Other Tools
 
-Widgets can call other MCP tools:
+Widgets can call other MCP tools directly using `callTool`:
 
 ```typescript
 const { callTool } = useWidget();
 
 const handleSearch = async () => {
-  const result = await callTool('search_cities', { 
-    query: 'tokyo' 
-  });
-  console.log(result);
+  try {
+    const result = await callTool('search_cities', { 
+      query: 'tokyo' 
+    });
+    // result.content contains the tool response
+    console.log(result.content);
+  } catch (error) {
+    console.error('Tool call failed:', error);
+  }
 };
 ```
+
+**Return Format:**
+```typescript
+const result: CallToolResponse = {
+  content: [
+    { type: 'text', text: '...' },
+    // ... other content items
+  ],
+  isError?: boolean
+};
+```
+
+<Warning>
+Tools must be marked as callable by components in your MCP server. The inspector forwards all tool calls to the connected MCP server. See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for testing widget interactions.
+</Warning>
 
 ### Display Mode Control
 
-Request fullscreen or popup display:
+Request different display modes (inline, pip, or fullscreen):
 
 ```typescript
-const { requestDisplayMode } = useWidget();
+const { requestDisplayMode, displayMode } = useWidget();
 
 const handleExpand = async () => {
-  await requestDisplayMode('fullscreen');
+  const result = await requestDisplayMode('fullscreen');
+  // result.mode = 'fullscreen' (may be different if request denied)
+  console.log('Display mode:', result.mode);
 };
+
+// Current display mode
+console.log(displayMode); // 'inline' | 'pip' | 'fullscreen'
 ```
+
+**Display Modes:**
+- `'inline'` - Default embedded view in conversation
+- `'pip'` - Picture-in-Picture floating window
+- `'fullscreen'` - Full browser window (on mobile, PiP coerces to fullscreen)
 
 ## Development Workflow
 
@@ -822,9 +923,31 @@ server.tool({
 - ❌ Prop mapping is manual
 - ❌ No HMR out of the box
 
+## Testing Widgets
+
+### Using the Inspector
+
+The MCP Inspector provides full support for testing widgets during development:
+
+1. **Start your server**: `npm run dev`
+2. **Open Inspector**: `http://localhost:3000/inspector`
+3. **Test widgets**: Execute tools to see widgets render
+4. **Debug interactions**: Use console logs and inspector features
+5. **Test API methods**: Verify `callTool`, `setState`, etc. work correctly
+
+See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for complete testing guide.
+
+### Testing in ChatGPT
+
+1. Configure your MCP server URL in ChatGPT settings
+2. Invoke tools that return widgets
+3. Verify widget rendering and interactions
+4. Test all API methods in production environment
+
 ## Next Steps
 
-- [UI Widgets Guide](./ui-widgets) - General widget development
+- [Apps SDK Resources](./apps-sdk-resources) - Apps SDK primitives and metadata
+- [Creating Apps SDK Server](./creating-apps-sdk-server) - Complete guide
+- [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) - Test widgets with Inspector
 - [Project Templates](./templates) - Explore available templates
-- [Examples](./examples) - Real-world widget examples
 

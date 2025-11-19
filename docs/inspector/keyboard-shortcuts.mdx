@@ -1,0 +1,224 @@
+---
+title: "Keyboard Shortcuts"
+description: "Complete reference for all keyboard shortcuts"
+icon: "keyboard"
+---
+
+The MCP Inspector includes comprehensive keyboard shortcuts for rapid navigation and efficient workflow. All shortcuts work when no input field is focused.
+
+## Quick Reference
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + K` | Open command palette |
+| `Cmd/Ctrl + O` | Start new chat |
+| `Esc` | Close/blur modals and overlays |
+| `t` | Switch to Tools tab |
+| `p` | Switch to Prompts tab |
+| `r` | Switch to Resources tab |
+| `c` | Switch to Chat tab |
+| `h` | Navigate to Home/Dashboard |
+| `f` | Focus search in current tab |
+
+<Note>
+`Cmd/Ctrl + K` works even when input fields are focused. All other shortcuts are disabled when typing in input fields.
+</Note>
+
+## Global Shortcuts
+
+### Command Palette
+
+**`Cmd/Ctrl + K`**
+
+Open the command palette for quick search and navigation.
+
+**Available actions:**
+- Connect to new servers
+- Search and execute tools
+- Navigate to saved requests
+- Switch between servers
+- Access documentation links
+- Jump to tabs
+
+<Note>
+This shortcut works even when input fields are focused, making it always accessible.
+</Note>
+
+### New Chat
+
+**`Cmd/Ctrl + O`**
+
+Start a new chat session in the Chat tab.
+
+**Use cases:**
+- Quick chat initiation
+- Reset conversation context
+- Start fresh debugging session
+
+### Close/Blur
+
+**`Esc`**
+
+Close modals, overlays, and blur focused elements.
+
+**Actions:**
+- Close command palette
+- Close dialogs
+- Blur search inputs
+- Exit fullscreen widgets
+
+## Tab Navigation
+
+Navigate between inspector tabs without using the mouse:
+
+### Tools Tab
+
+**`t`**
+
+Switch to the Tools tab.
+
+**When to use:**
+- Quick tool execution
+- Testing tool functionality
+- Viewing tool results
+
+### Prompts Tab
+
+**`p`**
+
+Switch to the Prompts tab.
+
+**When to use:**
+- Testing prompts
+- Viewing prompt templates
+- Executing prompts with arguments
+
+### Resources Tab
+
+**`r`**
+
+Switch to the Resources tab.
+
+**When to use:**
+- Browsing available resources
+- Reading resource content
+- Testing resource access
+
+### Chat Tab
+
+**`c`**
+
+Switch to the Chat tab.
+
+**When to use:**
+- Starting conversations
+- Testing conversational flows
+- LLM integration testing
+
+### Home/Dashboard
+
+**`h`**
+
+Navigate back to the dashboard/home view.
+
+**When to use:**
+- Return to connection management
+- Add new servers
+- View all connections
+
+## Search Shortcuts
+
+### Focus Search
+
+**`f`**
+
+Focus the search bar in the current tab (Tools, Prompts, or Resources).
+
+**Behavior:**
+- Tools tab: Focus tool search
+- Prompts tab: Focus prompt search
+- Resources tab: Focus resource search
+- Other tabs: No effect
+
+**Use cases:**
+- Quick tool lookup
+- Filtering long lists
+- Finding specific items
+
+## Shortcut Behavior
+
+### Input Field Detection
+
+Shortcuts are automatically disabled when you're typing in:
+- Text inputs
+- Textareas
+- Content-editable elements
+
+**Exception:** `Cmd/Ctrl + K` always works, even in input fields.
+
+### Modifier Keys
+
+Most shortcuts don't require modifier keys, but some do:
+
+- **`Cmd/Ctrl + K`**: Requires modifier
+- **`Cmd/Ctrl + O`**: Requires modifier
+- **`Esc`**: No modifier needed
+- **Single letters** (`t`, `p`, `r`, `c`, `h`, `f`): No modifier needed
+
+### Browser Conflicts
+
+Some shortcuts may conflict with browser defaults:
+
+- **`Cmd/Ctrl + R`**: Browser refresh (not overridden)
+- **`Cmd/Ctrl + W`**: Browser close tab (not overridden)
+- **`Cmd/Ctrl + T`**: Browser new tab (not overridden)
+
+The inspector only handles shortcuts when they don't conflict with browser functionality.
+
+## Usage Tips
+
+### Efficient Workflow
+
+1. **Quick Navigation**: Use `t`, `p`, `r`, `c` to jump between tabs
+2. **Search First**: Press `Cmd/Ctrl + K` to search before navigating
+3. **Focus Search**: Press `f` to quickly filter in current tab
+4. **Escape to Close**: Use `Esc` to dismiss any overlay
+
+### Command Palette Workflow
+
+1. Press `Cmd/Ctrl + K`
+2. Type to search:
+   - Tool names
+   - Server names
+   - Saved request names
+   - Commands
+3. Use arrow keys to navigate
+4. Press `Enter` to select
+5. Press `Esc` to close
+
+### Tab Switching Workflow
+
+1. Use single-letter shortcuts (`t`, `p`, `r`, `c`) for quick tab access
+2. Press `h` to return to dashboard
+3. Use `f` to focus search in current tab
+4. Combine with `Cmd/Ctrl + K` for advanced navigation
+
+## Shortcut Reference Table
+
+| Shortcut | Action | Works in Input? |
+|----------|--------|-----------------|
+| `Cmd/Ctrl + K` | Open command palette | ✅ Yes |
+| `Cmd/Ctrl + O` | Start new chat | ❌ No |
+| `Esc` | Close/blur | ✅ Yes |
+| `t` | Tools tab | ❌ No |
+| `p` | Prompts tab | ❌ No |
+| `r` | Resources tab | ❌ No |
+| `c` | Chat tab | ❌ No |
+| `h` | Home/Dashboard | ❌ No |
+| `f` | Focus search | ❌ No |
+
+## Related Documentation
+
+- [Command Palette](/inspector/command-palette) - Detailed command palette guide
+- [Features](/inspector/features) - Features that use keyboard shortcuts
+

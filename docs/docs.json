@@ -67,7 +67,14 @@
                 "icon": "bug-play",
                 "pages": [
                   "inspector/index",
-                  "inspector/self-hosting"
+                  "inspector/cli",
+                  "inspector/connection-settings",
+                  "inspector/keyboard-shortcuts",
+                  "inspector/command-palette",
+                  "inspector/integration",
+                  "inspector/debugging-chatgpt-apps",
+                  "inspector/self-hosting",
+                  "inspector/development"
                 ]
               },
               "tunneling/index"
@@ -77,7 +84,8 @@
             "group": "Guides",
             "icon": "",
             "pages": [
-              "home/mcp101"
+              "home/mcp101",
+              "typescript/server/creating-apps-sdk-server"
             ]
           }
         ]
