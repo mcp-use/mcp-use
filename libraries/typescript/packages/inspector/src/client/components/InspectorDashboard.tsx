@@ -1,5 +1,11 @@
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/client/components/ui/dropdown-menu";
 import { Label } from "@/client/components/ui/label";
 import { NotFound } from "@/client/components/ui/not-found";
 import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
@@ -11,7 +17,14 @@ import {
 } from "@/client/components/ui/tooltip";
 import { useMcpContext } from "@/client/context/McpContext";
 import { MCPServerAddedEvent, Telemetry } from "@/client/telemetry";
-import { CircleMinus, Copy, Loader2, RotateCcw, Settings } from "lucide-react";
+import {
+  CircleMinus,
+  Copy,
+  Loader2,
+  MoreVertical,
+  RotateCcw,
+  Settings,
+} from "lucide-react";
 import { useMcp } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -510,17 +523,16 @@ export function InspectorDashboard() {
   }, [connections, pendingNavigation, navigate]);
 
   return (
-    <div className="flex items-start justify-start gap-4 h-full relative">
-      <div className="w-full px-6 pt-6 overflow-auto">
-        <div className="flex items-center gap-3 relative z-10">
-          <h2 className="text-2xl font-medium tracking-tight">MCP Inspector</h2>
+    <div className="flex flex-col lg:flex-row items-start justify-start gap-4 h-auto lg:h-full relative">
+      <div className="w-full px-3 pt-6 sm:px-6 sm:pt-3 overflow-visible lg:overflow-auto">
+        <div className="flex mb-3 md:mb-0 flex-col sm:flex-row items-center sm:items-center gap-3 relative z-10">
           <Tooltip>
             <TooltipTrigger asChild>
               <a
                 href="https://github.com/mcp-use/mcp-use"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block"
+                className="inline-block order-1 sm:order-2"
               >
                 <Badge
                   variant="secondary"
@@ -537,15 +549,20 @@ export function InspectorDashboard() {
               <p>Visit GitHub</p>
             </TooltipContent>
           </Tooltip>
+          <h2 className="text-2xl font-medium tracking-tight text-center sm:text-left order-2 sm:order-1">
+            MCP Inspector
+          </h2>
         </div>
-        <p className="text-muted-foreground relative z-10">
+        <p className="text-muted-foreground relative z-10 text-center sm:text-left">
           Inspect and debug MCP (Model Context Protocol) servers
         </p>
 
-        <div className="space-y-4 mt-8">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-medium">Connected Servers</h3>
-            <div className="flex items-center gap-3">
+        <div className="space-y-4 mt-4 sm:mt-8">
+          <div className="flex flex-col sm:flex-row items-center sm:items-center justify-between gap-3">
+            <h3 className="hidden sm:block text-base font-medium text-center sm:text-left">
+              Connected Servers
+            </h3>
+            <div className="hidden sm:flex items-center gap-3 justify-center sm:justify-start">
               <div className="flex items-center gap-2">
                 <Label
                   htmlFor="auto-connect"
@@ -580,8 +597,8 @@ export function InspectorDashboard() {
                   onClick={() => handleServerClick(connection)}
                   className="group rounded-lg bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-4 transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3">
                         <h4 className="font-semibold text-sm">
                           {connection.name}
@@ -648,7 +665,8 @@ export function InspectorDashboard() {
                         </Tooltip>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    {/* Desktop: Show all action buttons */}
+                    <div className="hidden lg:flex items-center gap-1 flex-shrink-0">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -726,6 +744,62 @@ export function InspectorDashboard() {
                         </Tooltip>
                       )}
                     </div>
+                    {/* Mobile: Show 3-dots overflow menu */}
+                    <div className="lg:hidden flex-shrink-0">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyConnectionConfig(connection);
+                            }}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy connection config
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingConnectionId(connection.id);
+                            }}
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Edit connection settings
+                          </DropdownMenuItem>
+                          {connection.state !== "disconnected" && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                connection.retry();
+                              }}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-2" />
+                              Resync connection
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeConnection(connection.id);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <CircleMinus className="h-4 w-4 mr-2" />
+                            Remove connection
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                   {connection.state === "pending_auth" &&
                     connection.authUrl && (
@@ -755,8 +829,8 @@ export function InspectorDashboard() {
         </div>
       </div>
 
-      <div className="w-full relative overflow-hidden h-full p-10 items-center justify-center flex">
-        <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
+      <div className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex">
+        <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
           <ConnectionSettingsForm
             transportType={transportType}
             setTransportType={setTransportType}

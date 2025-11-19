@@ -167,7 +167,7 @@ export function ChatTab({
       />
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 pt-[100px]">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]">
         {!llmConfig ? (
           <ConfigureEmptyState
             onConfigureClick={() => setConfigDialogOpen(true)}

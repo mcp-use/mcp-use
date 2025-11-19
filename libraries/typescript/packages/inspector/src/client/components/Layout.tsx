@@ -358,7 +358,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <TooltipProvider>
-      <div className="h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 py-4 gap-4">
+      <div className="h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4">
         {/* Header */}
         <LayoutHeader
           connections={connections}

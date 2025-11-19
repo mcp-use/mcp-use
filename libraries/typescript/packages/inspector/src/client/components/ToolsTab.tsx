@@ -7,6 +7,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
 import type { SavedRequest, ToolResult } from "./tools";
 
 import {
@@ -70,6 +73,36 @@ export function ToolsTab({
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "detail" | "response">(
+    "list"
+  );
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Handle mobile view transitions
+  useEffect(() => {
+    if (selectedTool) {
+      setMobileView("detail");
+    } else {
+      setMobileView("list");
+    }
+  }, [selectedTool]);
+
+  // Switch to response view when execution finishes (if on mobile)
+  useEffect(() => {
+    if (isMobile && results.length > 0 && !isExecuting) {
+      setMobileView("response");
+    }
+  }, [results, isExecuting, isMobile]);
 
   // Expose focusSearch and blurSearch methods via ref
   useImperativeHandle(ref, () => ({
@@ -604,6 +637,172 @@ export function ToolsTab({
     },
     [savedRequests, saveSavedRequests, selectedSavedRequest]
   );
+
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col overflow-hidden relative bg-background">
+        {/* Breadcrumbs / Header - Only show when not on list view */}
+        {mobileView !== "list" && (
+          <div className="flex items-center gap-2 p-2 border-b shrink-0 bg-background z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (mobileView === "response") {
+                  setMobileView("detail");
+                } else {
+                  setSelectedTool(null);
+                  setMobileView("list");
+                }
+              }}
+              className="p-0 h-8 w-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center text-sm font-medium">
+              <button
+                onClick={() => {
+                  setSelectedTool(null);
+                  setMobileView("list");
+                }}
+                className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+              >
+                Tools
+              </button>
+              {mobileView !== "list" && (
+                <>
+                  <span className="mx-2 text-muted-foreground">/</span>
+                  <button
+                    onClick={() => {
+                      if (mobileView === "response") {
+                        setMobileView("detail");
+                      }
+                    }}
+                    className={
+                      mobileView === "detail"
+                        ? "text-foreground hover:underline"
+                        : mobileView === "response"
+                          ? "text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+                          : "text-muted-foreground"
+                    }
+                  >
+                    Execute
+                  </button>
+                </>
+              )}
+              {mobileView === "response" && (
+                <>
+                  <span className="mx-2 text-muted-foreground">/</span>
+                  <span className="text-foreground">Response</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 relative overflow-hidden">
+          <AnimatePresence initial={false} mode="popLayout">
+            {mobileView === "list" && (
+              <motion.div
+                key="list"
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute inset-0 flex flex-col bg-background z-0"
+              >
+                <ToolsTabHeader
+                  activeTab={activeTab}
+                  isSearchExpanded={isSearchExpanded}
+                  searchQuery={searchQuery}
+                  filteredToolsCount={filteredTools.length}
+                  savedRequestsCount={savedRequests.length}
+                  onSearchExpand={() => setIsSearchExpanded(true)}
+                  onSearchChange={setSearchQuery}
+                  onSearchBlur={handleSearchBlur}
+                  onTabSwitch={() =>
+                    setActiveTab(activeTab === "tools" ? "saved" : "tools")
+                  }
+                  searchInputRef={
+                    searchInputRef as React.RefObject<HTMLInputElement>
+                  }
+                />
+                {activeTab === "tools" ? (
+                  <ToolsList
+                    tools={filteredTools}
+                    selectedTool={selectedTool}
+                    onToolSelect={handleToolSelect}
+                    focusedIndex={focusedIndex}
+                  />
+                ) : (
+                  <SavedRequestsList
+                    savedRequests={savedRequests}
+                    selectedRequest={selectedSavedRequest}
+                    onLoadRequest={loadSavedRequest}
+                    onDeleteRequest={deleteSavedRequest}
+                    focusedIndex={focusedIndex}
+                  />
+                )}
+              </motion.div>
+            )}
+
+            {mobileView === "detail" && (
+              <motion.div
+                key="detail"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute inset-0 bg-background z-10"
+              >
+                <ToolExecutionPanel
+                  selectedTool={selectedTool}
+                  toolArgs={toolArgs}
+                  isExecuting={isExecuting}
+                  isConnected={isConnected}
+                  onArgChange={handleArgChange}
+                  onExecute={executeTool}
+                  onSave={openSaveDialog}
+                />
+              </motion.div>
+            )}
+
+            {mobileView === "response" && (
+              <motion.div
+                key="response"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute inset-0 bg-background z-20"
+              >
+                <ToolResultDisplay
+                  results={results}
+                  copiedResult={copiedResult}
+                  previewMode={previewMode}
+                  serverId={serverId}
+                  readResource={readResource}
+                  onCopy={handleCopyResult}
+                  onDelete={handleDeleteResult}
+                  onFullscreen={handleFullscreen}
+                  onTogglePreview={() => setPreviewMode(!previewMode)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <SaveRequestDialog
+          isOpen={saveDialogOpen}
+          requestName={requestName}
+          defaultPlaceholder={`${selectedTool?.name} - ${new Date().toLocaleString()}`}
+          onRequestNameChange={setRequestName}
+          onSave={saveRequest}
+          onCancel={() => setSaveDialogOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">

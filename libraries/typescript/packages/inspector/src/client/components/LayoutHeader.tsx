@@ -1,17 +1,3 @@
-import type { TabType } from "@/client/context/InspectorContext";
-import type { MCPConnection } from "@/client/context/McpContext";
-import {
-  Check,
-  Command,
-  Copy,
-  FolderOpen,
-  MessageCircle,
-  MessageSquare,
-  Wrench,
-  Zap,
-} from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/client/components/ui/button";
 import { GithubIcon } from "@/client/components/ui/github-icon";
 import {
@@ -25,8 +11,22 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
+import type { MCPConnection } from "@/client/context/McpContext";
 import { cn } from "@/client/lib/utils";
+import {
+  Check,
+  Command,
+  Copy,
+  FolderOpen,
+  MessageCircle,
+  MessageSquare,
+  Wrench,
+  Zap,
+} from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
 import LogoAnimated from "./LogoAnimated";
 import { ServerDropdown } from "./ServerDropdown";
@@ -76,9 +76,103 @@ export function LayoutHeader({
 
   return (
     <header className="w-full mx-auto">
-      <div className="flex items-center justify-between">
+      {/* Mobile Layout */}
+      <div className="flex lg:hidden flex-col gap-3">
+        <div className="flex items-center justify-between w-full">
+          {/* Left: Server Selector (Icon + Chevron) */}
+          <div className="flex-1 flex justify-start">
+            <ServerDropdown
+              connections={connections}
+              selectedServer={selectedServer}
+              onServerSelect={onServerSelect}
+              onOpenConnectionOptions={onOpenConnectionOptions}
+              mobileMode={true}
+            />
+          </div>
+
+          {/* Middle: Logo (centered, no text) */}
+          <div className="flex-shrink-0 flex justify-center">
+            <div className="scale-150">
+              <LogoAnimated state="collapsed" />
+            </div>
+          </div>
+
+          {/* Right: GitHub and Theme Icons */}
+          <div className="flex-1 flex justify-end items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" asChild>
+                  <a
+                    href="https://github.com/mcp-use/mcp-use"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2"
+                    aria-label="GitHub"
+                  >
+                    <GithubIcon className="h-4 w-4" />
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Give us a star ⭐</p>
+              </TooltipContent>
+            </Tooltip>
+            <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
+          </div>
+        </div>
+
+        {/* Mobile Tabs - Icons Only */}
+        {selectedServer && (
+          <div className="w-full">
+            <Tabs
+              value={activeTab}
+              onValueChange={(tab) => onTabChange(tab as TabType)}
+            >
+              <TabsList className="w-full justify-center">
+                {tabs.map((tab) => {
+                  // Get count for the current tab
+                  let count = 0;
+                  if (tab.id === "tools") {
+                    count = selectedServer.tools.length;
+                  } else if (tab.id === "prompts") {
+                    count = selectedServer.prompts.length;
+                  } else if (tab.id === "resources") {
+                    count = selectedServer.resources.length;
+                  }
+
+                  return (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      icon={tab.icon}
+                      className="[&>svg]:mr-0 flex-1 flex-row gap-2"
+                    >
+                      {count > 0 && (
+                        <span
+                          className={cn(
+                            activeTab === tab.id
+                              ? "dark:bg-black"
+                              : "dark:bg-zinc-700",
+                            "bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                          )}
+                        >
+                          {count}
+                        </span>
+                      )}
+                      <span className="sr-only">{tab.label}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden lg:flex items-center justify-between gap-3">
         {/* Left side: Server dropdown + Tabs + Tunnel Badge */}
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center flex-wrap gap-2 md:space-x-6 space-x-2">
           {/* Server Selection Dropdown */}
           <ServerDropdown
             connections={connections}
@@ -93,7 +187,7 @@ export function LayoutHeader({
               value={activeTab}
               onValueChange={(tab) => onTabChange(tab as TabType)}
             >
-              <TabsList>
+              <TabsList className="overflow-x-auto">
                 {tabs.map((tab) => {
                   // Get count for the current tab
                   let count = 0;
@@ -145,7 +239,10 @@ export function LayoutHeader({
                   </span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-96" align="start">
+              <PopoverContent
+                className="w-[calc(100vw-2rem)] sm:w-96"
+                align="start"
+              >
                 <div className="space-y-4">
                   <div>
                     <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
@@ -218,8 +315,8 @@ export function LayoutHeader({
           )}
         </div>
 
-        {/* Right side: Theme Toggle + Command Palette + Discord Button + Logo */}
-        <div className="flex items-center gap-4">
+        {/* Right side: Theme Toggle + Command Palette + GitHub Button + Logo */}
+        <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
           <Tooltip>
             <TooltipTrigger>
               <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
@@ -236,7 +333,7 @@ export function LayoutHeader({
                 onClick={onCommandPaletteOpen}
               >
                 <Command className="size-4" />
-                <span className="text-base font-mono">K</span>
+                <span className="text-base font-mono hidden sm:inline">K</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -253,7 +350,7 @@ export function LayoutHeader({
                   rel="noopener noreferrer"
                 >
                   <GithubIcon className="h-4 w-4" />
-                  Github
+                  <span className="hidden sm:inline">Github</span>
                 </a>
               </Button>
             </TooltipTrigger>
