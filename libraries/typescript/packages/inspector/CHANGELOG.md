@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.5.3-canary.6
+
+### Patch Changes
+
+- ba654db: Fix button overflow in connect form
+  - mcp-use@1.3.3-canary.6
+
 ## 0.5.3-canary.5
 
 ### Patch Changes
