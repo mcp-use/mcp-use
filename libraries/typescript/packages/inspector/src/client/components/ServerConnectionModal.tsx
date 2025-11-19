@@ -68,9 +68,7 @@ export function ServerConnectionModal({
         setProxyAddress(connection.proxyConfig.proxyAddress);
       } else {
         setConnectionType("Direct");
-        setProxyAddress(
-          `${window.location.origin}/inspector/api/proxy`
-        );
+        setProxyAddress(`${window.location.origin}/inspector/api/proxy`);
       }
 
       // Convert customHeaders from Record<string, string> to CustomHeader[]
@@ -171,4 +169,3 @@ export function ServerConnectionModal({
     </Dialog>
   );
 }
-
