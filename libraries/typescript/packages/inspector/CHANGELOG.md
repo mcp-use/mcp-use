@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.6.0-canary.0
+
+### Minor Changes
+
+- 1f4a798: Responsive design for inspector :O
+
+### Patch Changes
+
+- mcp-use@1.3.4-canary.0
+
 ## 0.5.3
 
 ### Patch Changes
