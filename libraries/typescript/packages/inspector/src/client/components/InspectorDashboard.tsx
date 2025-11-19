@@ -1,9 +1,3 @@
-import type { CustomHeader } from "./CustomHeadersEditor";
-import { CircleMinus, Copy, Loader2, RotateCcw } from "lucide-react";
-import { useMcp } from "mcp-use/react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import { Label } from "@/client/components/ui/label";
@@ -17,7 +11,14 @@ import {
 } from "@/client/components/ui/tooltip";
 import { useMcpContext } from "@/client/context/McpContext";
 import { MCPServerAddedEvent, Telemetry } from "@/client/telemetry";
+import { CircleMinus, Copy, Loader2, RotateCcw, Settings } from "lucide-react";
+import { useMcp } from "mcp-use/react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
+import type { CustomHeader } from "./CustomHeadersEditor";
+import { ServerConnectionModal } from "./ServerConnectionModal";
 
 // Temporary connection tester component
 function ConnectionTester({
@@ -111,6 +112,7 @@ export function InspectorDashboard() {
     connections,
     addConnection,
     removeConnection,
+    updateConnectionConfig,
     autoConnect,
     setAutoConnect,
     connectServer,
@@ -122,6 +124,9 @@ export function InspectorDashboard() {
     new Set()
   );
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
+    null
+  );
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
     null
   );
 
@@ -379,6 +384,49 @@ export function InspectorDashboard() {
     action();
   };
 
+  const handleUpdateConnection = useCallback(
+    (config: {
+      url: string;
+      name?: string;
+      transportType: "http" | "sse";
+      proxyConfig?: {
+        proxyAddress?: string;
+        customHeaders?: Record<string, string>;
+      };
+    }) => {
+      if (!editingConnectionId) return;
+
+      // If the URL changed, we need to remove the old one and add a new one
+      if (config.url !== editingConnectionId) {
+        removeConnection(editingConnectionId);
+        addConnection(
+          config.url,
+          config.name,
+          config.proxyConfig,
+          config.transportType
+        );
+      } else {
+        // Otherwise just update the existing connection
+        updateConnectionConfig(editingConnectionId, {
+          name: config.name,
+          proxyConfig: config.proxyConfig,
+          transportType: config.transportType,
+        });
+      }
+
+      // Close the modal
+      setEditingConnectionId(null);
+
+      toast.success("Connection settings updated");
+    },
+    [
+      editingConnectionId,
+      removeConnection,
+      addConnection,
+      updateConnectionConfig,
+    ]
+  );
+
   const handleServerClick = (connection: any) => {
     // If disconnected, connect the server
     if (connection.state === "disconnected") {
@@ -627,6 +675,25 @@ export function InspectorDashboard() {
                             size="sm"
                             onClick={(e) =>
                               handleActionClick(e, () =>
+                                setEditingConnectionId(connection.id)
+                              )
+                            }
+                            className="h-8 w-8 p-0"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Edit connection settings</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) =>
+                              handleActionClick(e, () =>
                                 removeConnection(connection.id)
                               )
                             }
@@ -734,6 +801,22 @@ export function InspectorDashboard() {
           onFailure={handleConnectionFailure}
         />
       )}
+
+      {/* Connection Options Dialog */}
+      <ServerConnectionModal
+        connection={
+          editingConnectionId
+            ? connections.find((c) => c.id === editingConnectionId) || null
+            : null
+        }
+        open={editingConnectionId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingConnectionId(null);
+          }
+        }}
+        onConnect={handleUpdateConnection}
+      />
     </div>
   );
 }

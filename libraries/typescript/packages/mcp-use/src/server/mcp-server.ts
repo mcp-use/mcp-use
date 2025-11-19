@@ -1306,7 +1306,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -1314,7 +1314,7 @@ if (container && Component) {
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
@@ -1520,7 +1520,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -1528,7 +1528,7 @@ if (container && Component) {
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
@@ -1540,6 +1540,31 @@ if (container && Component) {
         `[WIDGET] ${widgetName} mounted at ${baseRoute}/${widgetName}`
       );
     }
+  }
+
+  /**
+   * Helper to wait for transport.handleRequest to complete and response to be written
+   *
+   * Wraps the transport.handleRequest call in a Promise that only resolves when
+   * expressRes.end() is called, ensuring all async operations complete before
+   * we attempt to read the response.
+   *
+   * @private
+   */
+  private waitForRequestComplete(
+    transport: any,
+    expressReq: any,
+    expressRes: any,
+    body?: any
+  ): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const originalEnd = expressRes.end;
+      expressRes.end = (...args: any[]) => {
+        originalEnd.apply(expressRes, args);
+        resolve();
+      };
+      transport.handleRequest(expressReq, expressRes, body);
+    });
   }
 
   /**
@@ -1725,10 +1750,12 @@ if (container && Component) {
       await this.server.connect(transport);
 
       // Wait for handleRequest to complete and for response to be written
-      await transport.handleRequest(expressReq, expressRes, expressReq.body);
-
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await this.waitForRequestComplete(
+        transport,
+        expressReq,
+        expressRes,
+        expressReq.body
+      );
 
       const response = getResponse();
       if (response) {
@@ -1755,10 +1782,9 @@ if (container && Component) {
       });
 
       await this.server.connect(transport);
-      await transport.handleRequest(expressReq, expressRes);
 
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for handleRequest to complete and for response to be written
+      await this.waitForRequestComplete(transport, expressReq, expressRes);
 
       const response = getResponse();
       if (response) {
@@ -1784,10 +1810,9 @@ if (container && Component) {
       });
 
       await this.server.connect(transport);
-      await transport.handleRequest(expressReq, expressRes);
 
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for handleRequest to complete and for response to be written
+      await this.waitForRequestComplete(transport, expressReq, expressRes);
 
       const response = getResponse();
       if (response) {

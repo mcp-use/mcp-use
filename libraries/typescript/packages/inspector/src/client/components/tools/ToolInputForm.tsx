@@ -1,7 +1,7 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { Textarea } from "@/client/components/ui/textarea";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 interface ToolInputFormProps {
   selectedTool: Tool;
@@ -40,19 +40,24 @@ export function ToolInputForm({
         const currentValue = toolArgs[key];
         let stringValue = "";
         if (currentValue !== undefined && currentValue !== null) {
+          // If it's already a string, use it directly (preserves user formatting)
           if (typeof currentValue === "string") {
             stringValue = currentValue;
+          } else if (
+            typeof currentValue === "object" &&
+            currentValue !== null
+          ) {
+            // Stringify objects/arrays for display (only happens on initial load)
+            stringValue = JSON.stringify(currentValue, null, 2);
           } else {
-            stringValue = JSON.stringify(currentValue, null);
+            stringValue = String(currentValue);
           }
         }
 
         // Use textarea for objects/arrays or complex types
-        if (
-          typedProp.type === "object" ||
-          typedProp.type === "array" ||
-          (typeof currentValue === "object" && currentValue !== null)
-        ) {
+        const isObjectOrArray =
+          typedProp.type === "object" || typedProp.type === "array";
+        if (isObjectOrArray) {
           return (
             <div key={key} className="space-y-2">
               <Label htmlFor={key} className="text-sm font-medium">

@@ -86,8 +86,10 @@ export default [
         HTMLDivElement: "readonly",
         HTMLSpanElement: "readonly",
         HTMLTextAreaElement: "readonly",
+        HTMLIFrameElement: "readonly",
         HTMLElement: "readonly",
         // Browser APIs
+        MessageEvent: "readonly",
         MutationObserver: "readonly",
         ResizeObserver: "readonly",
         queueMicrotask: "readonly",

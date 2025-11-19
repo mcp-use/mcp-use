@@ -1,5 +1,4 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { SavedRequest, ToolResult } from "./tools";
 import {
   useCallback,
   useEffect,
@@ -8,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { SavedRequest, ToolResult } from "./tools";
 
 import {
   ResizableHandle,
@@ -140,9 +140,11 @@ export function ToolsTab({
         } else if (typedProp.type === "boolean") {
           initialArgs[key] = false;
         } else if (typedProp.type === "array") {
-          initialArgs[key] = [];
+          // Initialize as empty JSON string to preserve formatting
+          initialArgs[key] = "[]";
         } else if (typedProp.type === "object") {
-          initialArgs[key] = {};
+          // Initialize as empty JSON string to preserve formatting
+          initialArgs[key] = "{}";
         }
       });
     }
@@ -292,9 +294,13 @@ export function ToolsTab({
           const prop = selectedTool.inputSchema.properties[key] as any;
           const expectedType = prop.type;
 
-          if (expectedType === "string") {
+          // Keep object/array types as strings to preserve formatting and cursor position
+          if (expectedType === "object" || expectedType === "array") {
+            newArgs[key] = value;
+          } else if (expectedType === "string") {
             newArgs[key] = value;
           } else {
+            // For other types (number, boolean, etc.), try to parse
             try {
               newArgs[key] = JSON.parse(value);
             } catch {
@@ -302,11 +308,8 @@ export function ToolsTab({
             }
           }
         } else {
-          try {
-            newArgs[key] = JSON.parse(value);
-          } catch {
-            newArgs[key] = value;
-          }
+          // If no schema info, keep as string to be safe
+          newArgs[key] = value;
         }
 
         return newArgs;
@@ -322,7 +325,32 @@ export function ToolsTab({
     const startTime = Date.now();
 
     try {
-      const result = await callTool(selectedTool.name, toolArgs);
+      // Parse JSON strings for object/array types before execution
+      const parsedArgs = { ...toolArgs };
+      if (selectedTool.inputSchema?.properties) {
+        Object.entries(selectedTool.inputSchema.properties).forEach(
+          ([key, prop]) => {
+            const typedProp = prop as any;
+            const expectedType = typedProp.type;
+            const value = parsedArgs[key];
+
+            // Parse JSON strings for object/array types
+            if (
+              (expectedType === "object" || expectedType === "array") &&
+              typeof value === "string"
+            ) {
+              try {
+                parsedArgs[key] = JSON.parse(value);
+              } catch {
+                // If parsing fails, keep the string value
+                // The tool execution will handle the error
+              }
+            }
+          }
+        );
+      }
+
+      const result = await callTool(selectedTool.name, parsedArgs);
       const duration = Date.now() - startTime;
 
       // Track successful tool execution

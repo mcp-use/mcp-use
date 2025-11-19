@@ -1,5 +1,81 @@
 # @mcp-use/cli
 
+## 2.2.3-canary.8
+
+### Patch Changes
+
+- Updated dependencies [329ce35]
+  - @mcp-use/inspector@0.5.3-canary.8
+  - mcp-use@1.3.3-canary.8
+
+## 2.2.3-canary.7
+
+### Patch Changes
+
+- Updated dependencies [1ed0ab8]
+  - @mcp-use/inspector@0.5.3-canary.7
+  - mcp-use@1.3.3-canary.7
+
+## 2.2.3-canary.6
+
+### Patch Changes
+
+- Updated dependencies [ba654db]
+  - @mcp-use/inspector@0.5.3-canary.6
+  - mcp-use@1.3.3-canary.6
+
+## 2.2.3-canary.5
+
+### Patch Changes
+
+- Updated dependencies [f971dd8]
+  - @mcp-use/inspector@0.5.3-canary.5
+  - mcp-use@1.3.3-canary.5
+
+## 2.2.3-canary.4
+
+### Patch Changes
+
+- 68d0d4c: Remove irrelevant log statement
+- 68d0d4c: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- Updated dependencies [68d0d4c]
+  - @mcp-use/inspector@0.5.3-canary.4
+  - mcp-use@1.3.3-canary.4
+
+## 2.2.3-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d4dc001]
+  - mcp-use@1.3.3-canary.3
+  - @mcp-use/inspector@0.5.3-canary.3
+
+## 2.2.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [9fc286c]
+  - mcp-use@1.3.3-canary.2
+  - @mcp-use/inspector@0.5.3-canary.2
+
+## 2.2.3-canary.1
+
+### Patch Changes
+
+- f7995c0: Add ability to reuse tunnel subdomain when using mcp-use start
+  - mcp-use@1.3.3-canary.1
+  - @mcp-use/inspector@0.5.3-canary.1
+
+## 2.2.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d4c246a]
+  - @mcp-use/inspector@0.5.3-canary.0
+  - mcp-use@1.3.3-canary.0
+
 ## 2.2.2
 
 ### Patch Changes
