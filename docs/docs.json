@@ -54,9 +54,23 @@
             "icon": "library",
             "pages": [
               "home/redirects/python",
-              "home/redirects/typescript",
-              "home/redirects/inspector",
-              "home/redirects/tunneling"
+              "home/redirects/typescript"
+            ]
+          },
+          {
+            "group": "Dev Tools",
+            "icon": "wrench",
+            "expanded": false,
+            "pages": [
+              {
+                "group": "Inspector",
+                "icon": "bug-play",
+                "pages": [
+                  "inspector/index",
+                  "inspector/self-hosting"
+                ]
+              },
+              "tunneling/index"
             ]
           },
           {
@@ -574,23 +588,6 @@
               }
             ]
           }
-        ]
-      },
-      {
-        "product": "Inspector",
-        "description": "Inspector",
-        "icon": "monitor",
-        "pages": [
-          "inspector/index",
-          "inspector/self-hosting"
-        ]
-      },
-      {
-        "product": "Tunneling",
-        "description": "Test your local MCP server with external clients",
-        "icon": "train-front-tunnel",
-        "pages": [
-          "tunneling/index"
         ]
       }
     ]
