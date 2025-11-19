@@ -13,6 +13,7 @@ import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
 import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
+import { ServerConnectionModal } from "./ServerConnectionModal";
 
 interface LayoutProps {
   children: ReactNode;
@@ -32,6 +33,9 @@ export function Layout({ children }: LayoutProps) {
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
+    null
+  );
   const savedRequests = useSavedRequests();
 
   // Read tunnelUrl from query parameters and store in context
@@ -95,6 +99,44 @@ export function Layout({ children }: LayoutProps) {
       : `/?server=${encodeURIComponent(serverId)}`;
     navigate(newUrl);
   };
+
+  const handleOpenConnectionOptions = useCallback(
+    (connectionId: string | null) => {
+      setEditingConnectionId(connectionId);
+    },
+    []
+  );
+
+  const handleUpdateConnection = useCallback(
+    (config: {
+      url: string;
+      name?: string;
+      transportType: "http" | "sse";
+      proxyConfig?: {
+        proxyAddress?: string;
+        customHeaders?: Record<string, string>;
+      };
+    }) => {
+      if (!editingConnectionId) return;
+
+      // Remove the old connection
+      removeConnection(editingConnectionId);
+
+      // Add the new connection with updated settings
+      addConnection(
+        config.url,
+        config.name,
+        config.proxyConfig,
+        config.transportType
+      );
+
+      // Close the modal
+      setEditingConnectionId(null);
+
+      toast.success("Connection settings updated");
+    },
+    [editingConnectionId, removeConnection, addConnection]
+  );
 
   const handleCommandPaletteNavigate = (
     tab: "tools" | "prompts" | "resources",
@@ -308,7 +350,7 @@ export function Layout({ children }: LayoutProps) {
           onServerSelect={handleServerSelect}
           onTabChange={setActiveTab}
           onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
-          onOpenConnectionOptions={() => {}}
+          onOpenConnectionOptions={handleOpenConnectionOptions}
         />
 
         {/* Main Content */}
@@ -338,6 +380,20 @@ export function Layout({ children }: LayoutProps) {
         />
 
         {/* Connection Options Dialog */}
+        <ServerConnectionModal
+          connection={
+            editingConnectionId
+              ? connections.find((c) => c.id === editingConnectionId) || null
+              : null
+          }
+          open={editingConnectionId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingConnectionId(null);
+            }
+          }}
+          onConnect={handleUpdateConnection}
+        />
       </div>
     </TooltipProvider>
   );

@@ -22,6 +22,11 @@ export interface MCPConnection {
   error: string | null;
   authUrl: string | null;
   customHeaders?: Record<string, string>;
+  transportType?: "http" | "sse";
+  proxyConfig?: {
+    proxyAddress?: string;
+    customHeaders?: Record<string, string>;
+  };
   serverInfo?: {
     name: string;
     version?: string;
@@ -171,6 +176,8 @@ function McpConnectionWrapper({
           error: mcpHook.error ?? null,
           authUrl: mcpHook.authUrl ?? null,
           customHeaders,
+          transportType,
+          proxyConfig,
           serverInfo: mcpHook.serverInfo,
           capabilities: mcpHook.capabilities,
           callTool: mcpHook.callTool,
@@ -215,6 +222,8 @@ function McpConnectionWrapper({
         error: mcpHook.error ?? null,
         authUrl: mcpHook.authUrl ?? null,
         customHeaders,
+        transportType,
+        proxyConfig,
         serverInfo: mcpHook.serverInfo,
         capabilities: mcpHook.capabilities,
         callTool: mcpHook.callTool,
@@ -249,6 +258,8 @@ function McpConnectionWrapper({
   }, [
     url,
     name,
+    transportType,
+    proxyConfig,
     mcpHook.state,
     mcpHook.tools,
     mcpHook.resources,
@@ -465,6 +476,8 @@ export function McpProvider({ children }: { children: ReactNode }) {
           prompts: [],
           error: null,
           authUrl: null,
+          transportType: savedConn.transportType,
+          proxyConfig: savedConn.proxyConfig,
           listPrompts: async (_serverName?: string) => {
             throw new Error("Not connected");
           },
@@ -548,6 +561,8 @@ export function McpProvider({ children }: { children: ReactNode }) {
         prompts: [],
         error: null,
         authUrl: null,
+        transportType: saved.transportType,
+        proxyConfig: saved.proxyConfig,
         callTool: async () => {
           throw new Error("Not connected");
         },
