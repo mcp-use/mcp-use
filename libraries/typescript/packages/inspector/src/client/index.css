@@ -216,3 +216,9 @@
     font-family: var(--font-family-ubuntu);
   }
 }
+
+@layer utilities {
+  .\@lg\:flex-col {
+    @apply flex-col @lg:flex-row;
+  }
+}
