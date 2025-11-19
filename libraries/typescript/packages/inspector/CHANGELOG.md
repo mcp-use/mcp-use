@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.6.0-canary.1
+
+### Patch Changes
+
+- 451c507: Remove debugger button from pip mode to avoid overlap with close button
+  - mcp-use@1.3.4-canary.1
+
 ## 0.6.0-canary.0
 
 ### Minor Changes
