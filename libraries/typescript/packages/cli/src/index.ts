@@ -241,18 +241,6 @@ async function buildWidgets(
 
   // Get base URL from environment or use default
   const mcpUrl = process.env.MCP_URL;
-  if (!mcpUrl) {
-    console.log(
-      chalk.yellow(
-        "⚠️  MCP_URL not set - using relative paths (widgets may not work correctly)"
-      )
-    );
-    console.log(
-      chalk.gray(
-        "   Set MCP_URL environment variable for production builds (e.g., https://myserver.com)"
-      )
-    );
-  }
 
   // Check if resources directory exists
   try {
