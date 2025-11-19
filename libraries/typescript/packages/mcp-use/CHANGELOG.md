@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.3.3-canary.4
+
+### Patch Changes
+
+- 68d0d4c: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- Updated dependencies [68d0d4c]
+- Updated dependencies [68d0d4c]
+  - @mcp-use/cli@2.2.3-canary.4
+  - @mcp-use/inspector@0.5.3-canary.4
+
 ## 1.3.3-canary.3
 
 ### Patch Changes
