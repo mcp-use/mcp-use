@@ -1,9 +1,9 @@
-import { Check, Clock, Copy, Zap } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
+import { Check, Clock, Copy, Zap } from "lucide-react";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
-import { NotFound } from "../ui/not-found";
 import { JSONDisplay } from "../shared/JSONDisplay";
+import { NotFound } from "../ui/not-found";
 
 export interface ToolResult {
   toolName: string;
