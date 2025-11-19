@@ -155,10 +155,21 @@ async function startTunnel(
         const url = urlMatch[0];
         // Extract subdomain from URL (e.g., "happy-cat.local.mcp-use.run" -> "happy-cat")
         const fullDomain = urlMatch[1];
-        const subdomainMatch = fullDomain.match(/^([a-z0-9-]+)\./);
-        const extractedSubdomain = subdomainMatch
+        // Try to extract the subdomain using a case-insensitive regex.
+        // If the regex fails, fallback to splitting by '.' and taking the first label.
+        // Validate that the extracted subdomain matches the expected format (letters, numbers, hyphens).
+        const subdomainMatch = fullDomain.match(/^([a-z0-9-]+)\./i);
+        let extractedSubdomain = subdomainMatch
           ? subdomainMatch[1]
           : fullDomain.split(".")[0];
+        if (!/^[a-z0-9-]+$/i.test(extractedSubdomain)) {
+          console.warn(
+            chalk.yellow(
+              `Warning: Extracted subdomain "${extractedSubdomain}" does not match expected format.`
+            )
+          );
+          extractedSubdomain = "";
+        }
         resolved = true;
         clearTimeout(setupTimeout);
         console.log(chalk.green.bold(`✓ Tunnel established: ${url}/mcp`));
