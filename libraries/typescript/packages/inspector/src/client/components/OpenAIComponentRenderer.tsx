@@ -1,9 +1,12 @@
 import { cn } from "@/client/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMcpContext } from "../context/McpContext";
-import { Spinner } from "./ui/spinner";
+import { useTheme } from "../context/ThemeContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
+import { FullscreenNavbar } from "./FullscreenNavbar";
 import { IframeConsole } from "./IframeConsole";
+import { Spinner } from "./ui/spinner";
 
 interface OpenAIComponentRendererProps {
   componentUrl: string;
@@ -64,7 +67,11 @@ export function OpenAIComponentRenderer({
   const [iframeHeight, setIframeHeight] = useState<number>(400);
   const lastMeasuredHeightRef = useRef<number>(0);
   const [centerVertically, setCenterVertically] = useState<boolean>(false);
+  const [displayMode, setDisplayMode] = useState<
+    "inline" | "pip" | "fullscreen"
+  >("inline");
   const [isSameOrigin, setIsSameOrigin] = useState<boolean>(false);
+  const [isPipHovered, setIsPipHovered] = useState<boolean>(false);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -77,6 +84,7 @@ export function OpenAIComponentRenderer({
     (connection) => connection.id === serverId
   );
   const serverBaseUrl = server?.url;
+  const { resolvedTheme } = useTheme();
 
   console.log(componentUrl, toolResult);
 
@@ -136,35 +144,6 @@ export function OpenAIComponentRenderer({
 
         console.log("[OpenAIComponentRenderer] Widget CSP:", widgetCSP);
 
-        // Store widget data on server (including the fetched HTML)
-        const storeResponse = await fetch(
-          "/inspector/api/resources/widget/store",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              serverId,
-              uri: componentUrl,
-              toolInput: widgetToolInput,
-              toolOutput: structuredContent,
-              resourceData, // Pass the fetched HTML
-              toolId,
-              widgetCSP, // Pass the CSP metadata
-            }),
-          }
-        );
-
-        if (!storeResponse.ok) {
-          const errorData = await storeResponse
-            .json()
-            .catch(() => ({ error: "Unknown error" }));
-          throw new Error(
-            `Failed to store widget data: ${errorData.error || storeResponse.statusText}`
-          );
-        }
-
         // pass props as url params (toolInput, toolOutput)
         const urlParams = new URLSearchParams();
         const params = {
@@ -195,17 +174,54 @@ export function OpenAIComponentRenderer({
 
         const widgetName = metaForWidget?.["mcp-use/widget"]?.name;
 
+        // Prepare widget data with optional dev URLs
+        const widgetDataToStore: any = {
+          serverId,
+          uri: componentUrl,
+          toolInput: widgetToolInput,
+          toolOutput: structuredContent,
+          resourceData, // Pass the fetched HTML
+          toolId,
+          widgetCSP, // Pass the CSP metadata
+        };
+
         if (useDevMode && widgetName && serverBaseUrl) {
-          const devUrl = `${new URL(serverBaseUrl).origin}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
-          console.log("[OpenAIComponentRenderer] Using DEV mode URL:", devUrl);
-          setWidgetUrl(devUrl);
-          // Check if dev URL is same-origin
-          try {
-            const devUrlObj = new URL(devUrl);
-            setIsSameOrigin(devUrlObj.origin === window.location.origin);
-          } catch {
-            setIsSameOrigin(false);
+          const devServerBaseUrl = new URL(serverBaseUrl).origin;
+          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
+          widgetDataToStore.devWidgetUrl = devWidgetUrl;
+          widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
+        }
+
+        // Store widget data on server (including the fetched HTML and dev URLs if applicable)
+        const storeResponse = await fetch(
+          "/inspector/api/resources/widget/store",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(widgetDataToStore),
           }
+        );
+
+        if (!storeResponse.ok) {
+          const errorData = await storeResponse
+            .json()
+            .catch(() => ({ error: "Unknown error" }));
+          throw new Error(
+            `Failed to store widget data: ${errorData.error || storeResponse.statusText}`
+          );
+        }
+
+        if (useDevMode && widgetName && serverBaseUrl) {
+          // Use proxy URL for dev widgets (same-origin, supports HMR)
+          const proxyUrl = `/inspector/api/dev-widget/${toolId}?${urlParams.toString()}`;
+          console.log(
+            "[OpenAIComponentRenderer] Using DEV mode proxy URL:",
+            proxyUrl
+          );
+          setWidgetUrl(proxyUrl);
+          setIsSameOrigin(true); // Proxy makes it same-origin
         } else {
           const prodUrl = `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`;
           console.log(
@@ -234,6 +250,119 @@ export function OpenAIComponentRenderer({
     readResource,
     serverBaseUrl,
   ]);
+
+  // Helper to update window.openai globals inside iframe
+  const updateIframeGlobals = useCallback(
+    (updates: {
+      displayMode?: "inline" | "pip" | "fullscreen";
+      theme?: "light" | "dark";
+      maxHeight?: number;
+      locale?: string;
+      safeArea?: {
+        insets: { top: number; bottom: number; left: number; right: number };
+      };
+      userAgent?: any;
+    }) => {
+      if (iframeRef.current?.contentWindow) {
+        try {
+          const iframeWindow = iframeRef.current.contentWindow;
+          if (iframeWindow.openai) {
+            // Update all provided properties
+            if (updates.displayMode !== undefined) {
+              iframeWindow.openai.displayMode = updates.displayMode;
+            }
+            if (updates.theme !== undefined) {
+              iframeWindow.openai.theme = updates.theme;
+            }
+            if (updates.maxHeight !== undefined) {
+              iframeWindow.openai.maxHeight = updates.maxHeight;
+            }
+            if (updates.locale !== undefined) {
+              iframeWindow.openai.locale = updates.locale;
+            }
+            if (updates.safeArea !== undefined) {
+              iframeWindow.openai.safeArea = updates.safeArea;
+            }
+            if (updates.userAgent !== undefined) {
+              iframeWindow.openai.userAgent = updates.userAgent;
+            }
+
+            // Dispatch the set_globals event to notify React components
+            try {
+              const globalsEvent = new (iframeWindow as any).CustomEvent(
+                "openai:set_globals",
+                {
+                  detail: {
+                    globals: {
+                      ...iframeWindow.openai,
+                    },
+                  },
+                }
+              );
+              iframeWindow.dispatchEvent(globalsEvent);
+            } catch (eventError) {
+              // If CustomEvent fails, use postMessage fallback
+              iframeWindow.postMessage(
+                {
+                  type: "openai:globalsChanged",
+                  updates,
+                },
+                "*"
+              );
+            }
+          }
+        } catch (e) {
+          // Cross-origin or other error, use postMessage instead
+          iframeRef.current.contentWindow.postMessage(
+            {
+              type: "openai:globalsChanged",
+              updates,
+            },
+            "*"
+          );
+        }
+      }
+    },
+    []
+  );
+
+  // Handle display mode changes with native Fullscreen API
+  const handleDisplayModeChange = useCallback(
+    async (mode: "inline" | "pip" | "fullscreen") => {
+      try {
+        if (mode === "fullscreen") {
+          // Enter fullscreen
+          if (document.fullscreenElement) {
+            // Already in fullscreen, just update state
+            setDisplayMode(mode);
+            updateIframeGlobals({ displayMode: mode });
+            return;
+          }
+
+          if (containerRef.current) {
+            await containerRef.current.requestFullscreen();
+            setDisplayMode(mode);
+            updateIframeGlobals({ displayMode: mode });
+            console.log("[OpenAIComponentRenderer] Entered fullscreen");
+          }
+        } else {
+          // Exit fullscreen
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          }
+          setDisplayMode(mode);
+          updateIframeGlobals({ displayMode: mode });
+          console.log("[OpenAIComponentRenderer] Exited fullscreen");
+        }
+      } catch (err) {
+        console.error("[OpenAIComponentRenderer] Fullscreen error:", err);
+        // Fallback to CSS-based fullscreen if native API fails
+        setDisplayMode(mode);
+        updateIframeGlobals({ displayMode: mode });
+      }
+    },
+    [updateIframeGlobals]
+  );
 
   // Handle postMessage communication with iframe
   useEffect(() => {
@@ -267,21 +396,160 @@ export function OpenAIComponentRenderer({
           break;
 
         case "openai:callTool":
-          // For now, just respond with error - in a full implementation this would call the tool
-          iframeRef.current?.contentWindow?.postMessage(
-            {
-              type: "openai:callTool:response",
-              requestId: event.data.requestId,
-              error:
-                "Tool calls from widgets not yet supported in this inspector",
-            },
-            "*"
-          );
+          try {
+            if (!server) {
+              throw new Error("Server connection not available");
+            }
+
+            const { toolName, params, requestId } = event.data;
+            console.log(
+              "[OpenAIComponentRenderer] Calling tool:",
+              toolName,
+              params
+            );
+
+            // Call the tool via the MCP connection
+            const result = await server.callTool(toolName, params || {});
+
+            // Format the result to match OpenAI's expected format
+            // MCP tools return { contents: [...] }, we need to convert to OpenAI format
+            let formattedResult: any;
+            if (result && typeof result === "object") {
+              if (Array.isArray(result.contents)) {
+                formattedResult = {
+                  content: result.contents.map((content: any) => {
+                    if (typeof content === "string") {
+                      return { type: "text", text: content };
+                    }
+                    if (content.type === "text" && content.text) {
+                      return { type: "text", text: content.text };
+                    }
+                    if (content.type === "image" && content.data) {
+                      return {
+                        type: "image",
+                        image_url: { url: content.data },
+                      };
+                    }
+                    return { type: "text", text: JSON.stringify(content) };
+                  }),
+                };
+              } else {
+                // If it's already in the right format or a simple object
+                formattedResult = {
+                  content: [
+                    {
+                      type: "text",
+                      text:
+                        typeof result === "string"
+                          ? result
+                          : JSON.stringify(result),
+                    },
+                  ],
+                };
+              }
+            } else {
+              formattedResult = {
+                content: [
+                  {
+                    type: "text",
+                    text: String(result),
+                  },
+                ],
+              };
+            }
+
+            // Send success response back to iframe
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: "openai:callTool:response",
+                requestId,
+                result: formattedResult,
+              },
+              "*"
+            );
+          } catch (err: any) {
+            console.error("[OpenAIComponentRenderer] Tool call error:", err);
+            // Send error response back to iframe
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: "openai:callTool:response",
+                requestId: event.data.requestId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              "*"
+            );
+          }
           break;
 
         case "openai:sendFollowup":
-          // Followup messages not yet supported
+          try {
+            const { message } = event.data;
+            const prompt =
+              typeof message === "string"
+                ? message
+                : message?.prompt || message;
+
+            if (!prompt) {
+              console.warn(
+                "[OpenAIComponentRenderer] No prompt in followup message"
+              );
+              return;
+            }
+
+            console.log(
+              "[OpenAIComponentRenderer] Sending follow-up message:",
+              prompt
+            );
+
+            // Dispatch a custom event that the chat component can listen to
+            const followUpEvent = new window.CustomEvent(
+              "mcp-inspector:widget-followup",
+              {
+                detail: { prompt, serverId },
+              }
+            );
+            window.dispatchEvent(followUpEvent);
+
+            // Also try to store in localStorage as a fallback
+            // The chat component can check for this
+            try {
+              const followUpMessages = JSON.parse(
+                localStorage.getItem("mcp-inspector-pending-followups") || "[]"
+              );
+              followUpMessages.push({
+                prompt,
+                serverId,
+                timestamp: Date.now(),
+              });
+              localStorage.setItem(
+                "mcp-inspector-pending-followups",
+                JSON.stringify(followUpMessages.slice(-10)) // Keep last 10
+              );
+            } catch (e) {
+              // Ignore localStorage errors
+            }
+          } catch (err) {
+            console.error(
+              "[OpenAIComponentRenderer] Failed to send followup:",
+              err
+            );
+          }
           break;
+
+        case "openai:requestDisplayMode":
+          try {
+            const { mode } = event.data;
+            if (mode && ["inline", "pip", "fullscreen"].includes(mode)) {
+              handleDisplayModeChange(mode);
+            }
+          } catch (err) {
+            console.error(
+              "[OpenAIComponentRenderer] Failed to change display mode:",
+              err
+            );
+          }
+          break;
+
         default:
           break;
       }
@@ -332,7 +600,7 @@ export function OpenAIComponentRenderer({
       iframe?.removeEventListener("load", handleLoad);
       iframe?.removeEventListener("error", handleError as any);
     };
-  }, [widgetUrl, isSameOrigin]);
+  }, [widgetUrl, isSameOrigin, handleDisplayModeChange, server, serverId]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {
@@ -385,6 +653,38 @@ export function OpenAIComponentRenderer({
     };
   }, [iframeHeight]);
 
+  // Listen for fullscreen changes to sync state
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && displayMode === "fullscreen") {
+        // User exited fullscreen via ESC or other means
+        setDisplayMode("inline");
+        updateIframeGlobals({ displayMode: "inline" });
+        console.log("[OpenAIComponentRenderer] Fullscreen exited by user");
+      } else if (document.fullscreenElement && displayMode !== "fullscreen") {
+        // Fullscreen was entered externally
+        setDisplayMode("fullscreen");
+        updateIframeGlobals({ displayMode: "fullscreen" });
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("fullscreenerror", (e) => {
+      console.error("[OpenAIComponentRenderer] Fullscreen error:", e);
+    });
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, [displayMode, updateIframeGlobals]);
+
+  // Watch for theme changes and update iframe
+  useEffect(() => {
+    if (widgetUrl && resolvedTheme) {
+      updateIframeGlobals({ theme: resolvedTheme });
+    }
+  }, [resolvedTheme, widgetUrl, updateIframeGlobals]);
+
   if (error) {
     return (
       <div className={className}>
@@ -415,27 +715,76 @@ export function OpenAIComponentRenderer({
         </div>
       )}
 
+      {isSameOrigin && displayMode !== "fullscreen" && (
+        <div className="absolute top-2 right-2 z-10">
+          <IframeConsole iframeId={toolId} enabled={true} />
+        </div>
+      )}
       <div
         ref={containerRef}
         className={cn(
-          "w-full h-full flex flex-col justify-center items-center relative",
-          centerVertically && "items-center"
+          "w-full h-full flex flex-col justify-center items-center",
+          centerVertically && "items-center",
+          displayMode === "fullscreen" && "bg-background",
+          displayMode === "pip" &&
+            "fixed bottom-6 right-6 z-50 rounded-3xl w-[768px] h-96 shadow-2xl border overflow-hidden"
         )}
+        onMouseEnter={() => displayMode === "pip" && setIsPipHovered(true)}
+        onMouseLeave={() => displayMode === "pip" && setIsPipHovered(false)}
       >
-        {isSameOrigin && (
-          <div className="absolute top-2 right-2 z-10">
-            <IframeConsole iframeId={toolId} enabled={true} />
-          </div>
+        {displayMode === "fullscreen" && document.fullscreenElement && (
+          <FullscreenNavbar
+            title={toolName}
+            onClose={() => handleDisplayModeChange("inline")}
+          />
         )}
-        <iframe
-          ref={iframeRef}
-          src={widgetUrl}
-          className={cn("w-full max-w-[768px]  rounded-3xl")}
-          style={{ height: `${iframeHeight}px` }}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-          title={`OpenAI Component: ${toolName}`}
-          allow="web-share"
-        />
+
+        {displayMode === "pip" && (
+          <button
+            onClick={() => handleDisplayModeChange("inline")}
+            className={cn(
+              "absolute top-2 right-2 z-50",
+              "flex items-center justify-center",
+              "w-8 h-8 rounded-full",
+              "bg-background/90 hover:bg-background",
+              "border border-border",
+              "shadow-lg",
+              "transition-opacity duration-200",
+              "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+              isPipHovered ? "opacity-100" : "opacity-0"
+            )}
+            aria-label="Exit Picture in Picture"
+          >
+            <X className="w-4 h-4 text-foreground" />
+          </button>
+        )}
+
+        <div
+          className={cn(
+            "flex-1 w-full flex justify-center items-center",
+            displayMode === "fullscreen" && "pt-14",
+            centerVertically && "items-center"
+          )}
+        >
+          <iframe
+            ref={iframeRef}
+            src={widgetUrl}
+            className={cn(
+              displayMode === "inline" && "rounded-3xl w-full max-w-[768px]",
+              displayMode === "fullscreen" && "w-full h-full rounded-none",
+              displayMode === "pip" && "w-full h-full rounded-lg"
+            )}
+            style={{
+              height:
+                displayMode === "fullscreen" || displayMode === "pip"
+                  ? "100%"
+                  : `${iframeHeight}px`,
+            }}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            title={`OpenAI Component: ${toolName}`}
+            allow="web-share"
+          />
+        </div>
       </div>
     </Wrapper>
   );

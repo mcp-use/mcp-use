@@ -135,10 +135,18 @@ async function startTunnel(
     });
 
     let resolved = false;
+    let isShuttingDown = false;
 
     proc.stdout?.on("data", (data) => {
       const text = data.toString();
-      process.stdout.write(text);
+      // Filter out shutdown messages from tunnel package
+      const isShutdownMessage =
+        text.includes("Shutting down") || text.includes("🛑");
+
+      // Suppress tunnel output during shutdown or if it's a shutdown message
+      if (!isShuttingDown && !isShutdownMessage) {
+        process.stdout.write(text);
+      }
 
       // Look for the tunnel URL in the output
       // Expected format: https://subdomain.tunnel-domain.com
@@ -159,7 +167,16 @@ async function startTunnel(
     });
 
     proc.stderr?.on("data", (data) => {
-      process.stderr.write(data);
+      const text = data.toString();
+      // Filter out bore debug logs and shutdown messages
+      if (
+        !isShuttingDown &&
+        !text.includes("INFO") &&
+        !text.includes("bore_cli") &&
+        !text.includes("Shutting down")
+      ) {
+        process.stderr.write(data);
+      }
     });
 
     proc.on("error", (error) => {
@@ -175,6 +192,11 @@ async function startTunnel(
         reject(new Error(`Tunnel process exited with code ${code}`));
       }
     });
+
+    // Add method to mark shutdown state
+    (proc as any).markShutdown = () => {
+      isShuttingDown = true;
+    };
 
     // Timeout after 30 seconds - only for initial setup
     const setupTimeout = setTimeout(() => {
@@ -449,6 +471,15 @@ program
       // Create build manifest
       const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
 
+      // Read existing manifest to preserve tunnel subdomain and other fields
+      let existingManifest: any = {};
+      try {
+        const existingContent = await fs.readFile(manifestPath, "utf-8");
+        existingManifest = JSON.parse(existingContent);
+      } catch {
+        // File doesn't exist, that's okay
+      }
+
       // Transform builtWidgets array into widgets object with metadata
       const widgetsData: Record<string, any> = {};
       for (const widget of builtWidgets) {
@@ -458,7 +489,9 @@ program
       // Convert to boolean: true if flag is present, false otherwise
       const includeInspector = !!options.withInspector;
 
+      // Merge with existing manifest, preserving tunnel and other fields
       const manifest = {
+        ...existingManifest, // Preserve existing fields like tunnel
         includeInspector,
         buildTime: new Date().toISOString(),
         widgets: widgetsData,
@@ -616,6 +649,7 @@ program
       // Start tunnel if requested
       let mcpUrl: string | undefined;
       let tunnelProcess: any = undefined;
+      let tunnelSubdomain: string | undefined = undefined;
       if (options.tunnel) {
         try {
           // Read existing subdomain from mcp-use.json if available
@@ -639,6 +673,7 @@ program
           mcpUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
           const subdomain = tunnelInfo.subdomain;
+          tunnelSubdomain = subdomain;
 
           // Update mcp-use.json with the subdomain
           try {
@@ -664,9 +699,6 @@ program
               manifestPath,
               JSON.stringify(manifest, null, 2),
               "utf-8"
-            );
-            console.log(
-              chalk.green(`✓ Subdomain saved to mcp-use.json: ${subdomain}`)
             );
           } catch (error) {
             console.warn(
@@ -709,8 +741,36 @@ program
       });
 
       // Handle cleanup
-      const cleanup = () => {
-        console.log("\n\nShutting down...");
+      let cleanupInProgress = false;
+      const cleanup = async () => {
+        if (cleanupInProgress) {
+          return; // Prevent double cleanup
+        }
+        cleanupInProgress = true;
+
+        console.log(chalk.gray("\n\nShutting down..."));
+
+        // Mark tunnel as shutting down to suppress output
+        if (
+          tunnelProcess &&
+          typeof (tunnelProcess as any).markShutdown === "function"
+        ) {
+          (tunnelProcess as any).markShutdown();
+        }
+
+        // Clean up tunnel via API if subdomain is available
+        if (tunnelSubdomain) {
+          try {
+            const apiBase =
+              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+              method: "DELETE",
+            });
+          } catch (err) {
+            // Ignore cleanup errors
+          }
+        }
+
         const processesToKill = 1 + (tunnelProcess ? 1 : 0);
         let killedCount = 0;
 
@@ -728,7 +788,8 @@ program
         // Handle tunnel process if it exists
         if (tunnelProcess && typeof tunnelProcess.kill === "function") {
           tunnelProcess.on("exit", checkAndExit);
-          tunnelProcess.kill("SIGTERM");
+          // Use SIGINT for better cleanup of npx/node processes
+          tunnelProcess.kill("SIGINT");
         } else {
           checkAndExit();
         }
@@ -742,7 +803,7 @@ program
             tunnelProcess.kill("SIGKILL");
           }
           process.exit(0);
-        }, 1000);
+        }, 2000); // Increase timeout to 2 seconds to allow graceful shutdown
       };
 
       process.on("SIGINT", cleanup);
