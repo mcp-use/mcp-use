@@ -304,4 +304,87 @@ export class McpUseAPI {
 
     return response.json() as Promise<Deployment>;
   }
+
+  /**
+   * Redeploy deployment
+   */
+  async redeployDeployment(
+    deploymentId: string,
+    request?: CreateDeploymentRequest
+  ): Promise<Deployment> {
+    const options: any = {
+      method: "POST",
+    };
+    if (request) {
+      options.body = JSON.stringify(request);
+    }
+    return this.request<Deployment>(
+      `/deployments/${deploymentId}/redeploy`,
+      options
+    );
+  }
+
+  /**
+   * Redeploy deployment with source code upload
+   */
+  async redeployDeploymentWithUpload(
+    deploymentId: string,
+    request: CreateDeploymentRequest,
+    filePath: string
+  ): Promise<Deployment> {
+    const { readFile } = await import("node:fs/promises");
+    const { basename } = await import("node:path");
+    const { stat } = await import("node:fs/promises");
+
+    // Check file size (2MB max)
+    const stats = await stat(filePath);
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    if (stats.size > maxSize) {
+      throw new Error(
+        `File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`
+      );
+    }
+
+    const fileBuffer = await readFile(filePath);
+    const filename = basename(filePath);
+
+    // Build form data with deployment request and file
+    const formData = new FormData();
+    const blob = new Blob([fileBuffer], { type: "application/gzip" });
+    formData.append("source_file", blob, filename);
+
+    if (request.source.type === "upload") {
+      formData.append("runtime", request.source.runtime || "node");
+      formData.append("port", String(request.source.port || 3000));
+      if (request.source.startCommand) {
+        formData.append("startCommand", request.source.startCommand);
+      }
+      if (request.source.buildCommand) {
+        formData.append("buildCommand", request.source.buildCommand);
+      }
+      if (request.source.env && Object.keys(request.source.env).length > 0) {
+        formData.append("env", JSON.stringify(request.source.env));
+      }
+    }
+
+    const url = `${this.baseUrl}/deployments/${deploymentId}/redeploy`;
+    const headers: Record<string, string> = {};
+
+    if (this.apiKey) {
+      headers["x-api-key"] = this.apiKey;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Redeployment failed: ${error}`);
+    }
+
+    return response.json() as Promise<Deployment>;
+  }
 }

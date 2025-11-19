@@ -1,9 +1,3 @@
-import type { CustomHeader } from "./CustomHeadersEditor";
-import { CircleMinus, Copy, Loader2, RotateCcw } from "lucide-react";
-import { useMcp } from "mcp-use/react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import { Label } from "@/client/components/ui/label";
@@ -17,7 +11,13 @@ import {
 } from "@/client/components/ui/tooltip";
 import { useMcpContext } from "@/client/context/McpContext";
 import { MCPServerAddedEvent, Telemetry } from "@/client/telemetry";
+import { CircleMinus, Copy, Loader2, RotateCcw } from "lucide-react";
+import { useMcp } from "mcp-use/react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
+import type { CustomHeader } from "./CustomHeadersEditor";
 
 // Temporary connection tester component
 function ConnectionTester({

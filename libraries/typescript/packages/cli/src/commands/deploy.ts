@@ -413,6 +413,51 @@ async function displayDeploymentProgress(
   );
 }
 
+async function getExistingDeploymentId(
+  cwd: string
+): Promise<string | undefined> {
+  try {
+    const manifestPath = path.join(cwd, "dist", "mcp-use.json");
+    const content = await fs.readFile(manifestPath, "utf-8");
+    const manifest = JSON.parse(content);
+    return manifest.deployment?.id;
+  } catch {
+    return undefined;
+  }
+}
+
+async function saveDeploymentId(
+  cwd: string,
+  deploymentId: string
+): Promise<void> {
+  try {
+    const distDir = path.join(cwd, "dist");
+    await fs.mkdir(distDir, { recursive: true });
+    const manifestPath = path.join(distDir, "mcp-use.json");
+
+    let manifest: any = {};
+    try {
+      const content = await fs.readFile(manifestPath, "utf-8");
+      manifest = JSON.parse(content);
+    } catch {
+      // Ignore
+    }
+
+    if (!manifest.deployment) {
+      manifest.deployment = {};
+    }
+    manifest.deployment.id = deploymentId;
+
+    await fs.writeFile(
+      manifestPath,
+      JSON.stringify(manifest, null, 2),
+      "utf-8"
+    );
+  } catch (error) {
+    // Ignore save errors
+  }
+}
+
 /**
  * Deploy command - deploys MCP server to mcp-use cloud
  */
@@ -431,6 +476,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     console.log(chalk.cyan.bold("🚀 Deploying to mcp-use cloud...\n"));
 
+    // Initialize API
+    const api = await McpUseAPI.create();
+
     // Check if this is an MCP project
     const isMcp = await isMcpProject(cwd);
     if (!isMcp) {
@@ -447,6 +495,19 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         process.exit(0);
       }
       console.log();
+    }
+
+    // Check for existing deployment
+    let existingDeploymentId = await getExistingDeploymentId(cwd);
+    if (existingDeploymentId) {
+      try {
+        await api.getDeployment(existingDeploymentId);
+        console.log(
+          chalk.gray(`Found existing deployment: ${existingDeploymentId}`)
+        );
+      } catch {
+        existingDeploymentId = undefined;
+      }
     }
 
     // Get git info
@@ -537,14 +598,25 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         healthCheckPath: "/healthz",
       };
 
-      // Create deployment
+      // Create or redeploy
       console.log(chalk.gray("Creating deployment..."));
-      const api = await McpUseAPI.create();
-      const deployment = await api.createDeployment(deploymentRequest);
+      let deployment: Deployment;
 
-      console.log(
-        chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
-      );
+      if (existingDeploymentId) {
+        deployment = await api.redeployDeployment(
+          existingDeploymentId,
+          deploymentRequest
+        );
+        console.log(
+          chalk.green("✓ Deployment updated: ") + chalk.gray(deployment.id)
+        );
+      } else {
+        deployment = await api.createDeployment(deploymentRequest);
+        await saveDeploymentId(cwd, deployment.id);
+        console.log(
+          chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
+        );
+      }
 
       // Display progress
       await displayDeploymentProgress(api, deployment);
@@ -636,18 +708,30 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
       // Create deployment with file upload
       console.log(chalk.gray("Creating deployment..."));
-      const api = await McpUseAPI.create();
-      const deployment = await api.createDeploymentWithUpload(
-        deploymentRequest,
-        tarballPath
-      );
+      let deployment: Deployment;
+
+      if (existingDeploymentId) {
+        deployment = await api.redeployDeploymentWithUpload(
+          existingDeploymentId,
+          deploymentRequest,
+          tarballPath
+        );
+        console.log(
+          chalk.green("✓ Deployment updated: ") + chalk.gray(deployment.id)
+        );
+      } else {
+        deployment = await api.createDeploymentWithUpload(
+          deploymentRequest,
+          tarballPath
+        );
+        await saveDeploymentId(cwd, deployment.id);
+        console.log(
+          chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
+        );
+      }
 
       // Clean up tarball
       await fs.unlink(tarballPath);
-
-      console.log(
-        chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
-      );
 
       // Display progress
       await displayDeploymentProgress(api, deployment);
