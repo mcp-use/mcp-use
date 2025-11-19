@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.5.3-canary.7
+
+### Patch Changes
+
+- 1ed0ab8: Fix formatting of object tool input
+  - mcp-use@1.3.3-canary.7
+
 ## 0.5.3-canary.6
 
 ### Patch Changes
