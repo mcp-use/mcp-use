@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install the inspector package from npm
-RUN npm install -g @mcp-use/inspector
+RUN npm install -g @mcp-use/inspector@latest
 
 # Set production environment
 ENV NODE_ENV=production
