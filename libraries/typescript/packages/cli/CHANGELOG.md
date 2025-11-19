@@ -48,7 +48,7 @@
 
 ### Patch Changes
 
-- f7995c0: Add abiloity to reuse tunnel subdomain when using mcp-use start
+- f7995c0: Add ability to reuse tunnel subdomain when using mcp-use start
   - mcp-use@1.3.3-canary.1
   - @mcp-use/inspector@0.5.3-canary.1
 
