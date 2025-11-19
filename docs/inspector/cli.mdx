@@ -1,0 +1,107 @@
+---
+title: "CLI Usage"
+description: "Run the MCP Inspector from the command line"
+icon: "terminal"
+---
+
+The MCP Inspector can be run directly from the command line using `npx`, making it easy to quickly inspect and debug MCP servers without installing anything globally.
+
+## Quick Start
+
+Run the inspector with a single command:
+
+```bash
+npx @mcp-use/inspector
+```
+
+This will:
+- Start the inspector server on an available port (default: 8080)
+- Automatically open your browser to the inspector interface
+- Display the URL in the terminal
+
+## Command Options
+
+### `--url <url>`
+
+Auto-connect to an MCP server when the inspector starts.
+
+```bash
+npx @mcp-use/inspector --url http://localhost:3000/mcp
+```
+
+**Example URLs:**
+- Local server: `http://localhost:3000/mcp`
+- Remote server: `https://mcp.linear.app/mcp`
+- WebSocket: `ws://localhost:8080/mcp`
+
+<Note>
+The URL must start with `http://`, `https://`, `ws://`, or `wss://`. The inspector will validate the URL format before starting.
+</Note>
+
+### `--port <port>`
+
+Specify the starting port number. The inspector will find the next available port if the specified port is already in use.
+
+```bash
+npx @mcp-use/inspector --port 9000
+```
+
+**Default:** `8080`
+
+**Port Range:** Must be between 1 and 65535
+
+### `--help, -h`
+
+Display help information and available options.
+
+```bash
+npx @mcp-use/inspector --help
+```
+
+## Automatic Port Selection
+
+If the specified port (or default 8080) is already in use, the inspector will automatically try the next available port. The terminal output will show the actual port being used:
+
+```
+🚀 MCP Inspector running on http://localhost:8081
+📡 Auto-connecting to: http://localhost:3000/mcp
+🌐 Browser opened
+```
+
+## Troubleshooting
+
+### Port Already in Use
+
+If you see an error about the port being in use:
+
+```bash
+# Try a different port
+npx @mcp-use/inspector --port 9000
+
+# Or stop the process using the port
+lsof -ti:8080 | xargs kill
+```
+
+### Invalid URL Format
+
+Ensure your URL starts with a valid protocol:
+
+```bash
+# ✅ Valid
+npx @mcp-use/inspector --url http://localhost:3000/mcp
+npx @mcp-use/inspector --url https://mcp.example.com/mcp
+
+# ❌ Invalid
+npx @mcp-use/inspector --url localhost:3000/mcp
+```
+
+### Browser Doesn't Open
+
+If the browser doesn't open automatically, check the terminal output for the inspector URL and open it manually.
+
+## Related Documentation
+
+- [Getting Started](/inspector/index) - Overview of the inspector
+- [Connection Settings](/inspector/connection-settings) - Advanced connection configuration
+- [Self-Hosting](/inspector/self-hosting) - Deploy your own inspector instance
+

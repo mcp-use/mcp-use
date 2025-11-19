@@ -128,7 +128,23 @@ appsSdkMetadata: {
 
 ## Data Injection
 
-Apps SDK widgets receive data through `window.openai.toolOutput`:
+Apps SDK widgets receive data through `window.openai` API:
+
+### Tool Input (`toolInput`)
+
+Parameters passed to the tool that triggered the widget:
+
+```javascript
+// In your widget HTML
+<script>
+  const input = window.openai?.toolInput || {};
+  // { city: "San Francisco", category: "pizza" }
+</script>
+```
+
+### Tool Output (`toolOutput`)
+
+The `structuredContent` returned by the tool execution:
 
 ```javascript
 // In your widget HTML
@@ -154,6 +170,20 @@ Apps SDK widgets receive data through `window.openai.toolOutput`:
   renderWidget(data);
 </script>
 ```
+
+### Widget State (`widgetState`)
+
+Persistent state for the widget instance:
+
+```javascript
+// Read current state
+const state = window.openai?.widgetState || null;
+
+// Update state (persists to localStorage)
+await window.openai?.setWidgetState({ favorites: [...] });
+```
+
+For React widgets, use the `useWidget` hook instead of accessing `window.openai` directly. See [UI Widgets](./ui-widgets) for React integration.
 
 ## Tool Integration
 
@@ -798,9 +828,38 @@ curl -X POST http://localhost:3000/mcp \
 2. Use HTTPS for all resources
 3. Check CORS headers if applicable
 
+## Testing Apps SDK Widgets
+
+### Using the Inspector
+
+The MCP Inspector fully emulates the `window.openai` API, allowing you to test widgets locally:
+
+1. **Start your server**: `npm run dev`
+2. **Open Inspector**: `http://localhost:3000/inspector`
+3. **Execute tools**: Test widgets with different parameters
+4. **Debug interactions**: Use console logs and inspector features
+5. **Test API methods**: Verify `callTool`, `setWidgetState`, etc.
+
+The inspector provides complete `window.openai` API emulation including:
+- `toolInput` and `toolOutput` injection
+- `setWidgetState` with localStorage persistence
+- `callTool` for calling other MCP tools
+- `sendFollowUpMessage` for conversation continuation
+- `requestDisplayMode` for layout changes
+- Theme and display mode synchronization
+
+See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for the complete testing guide and API reference.
+
+### Testing in ChatGPT
+
+1. Configure your MCP server URL in ChatGPT settings
+2. Invoke tools that return Apps SDK widgets
+3. Verify widget rendering and all interactions
+4. Test in production environment
+
 ## Next Steps
 
-- [MCP-UI Resources](./mcp-ui-resources) - MCP-UI framework guide
+- [UI Widgets](./ui-widgets) - Automatic widget registration with React
+- [Creating Apps SDK Server](./creating-apps-sdk-server) - Complete guide
+- [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) - Test widgets with Inspector
 - [Templates](./templates) - Project templates
-- [UI Widgets](./ui-widgets) - General widget guide
-- [Examples](./examples) - Complete implementations
