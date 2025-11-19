@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.5.3-canary.5
+
+### Patch Changes
+
+- f971dd8: Fix connection edit button in inspector
+  - mcp-use@1.3.3-canary.5
+
 ## 0.5.3-canary.4
 
 ### Patch Changes
