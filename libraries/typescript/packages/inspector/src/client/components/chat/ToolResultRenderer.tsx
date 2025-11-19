@@ -86,6 +86,7 @@ export function ToolResultRenderer({
         readResource={readResource}
         noWrapper={true}
         className="my-4"
+        showConsole={false}
       />
     );
   }

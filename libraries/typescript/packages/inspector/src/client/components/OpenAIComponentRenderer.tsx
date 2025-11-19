@@ -17,6 +17,7 @@ interface OpenAIComponentRendererProps {
   readResource: (uri: string) => Promise<any>;
   className?: string;
   noWrapper?: boolean;
+  showConsole?: boolean;
 }
 
 function Wrapper({
@@ -56,6 +57,7 @@ export function OpenAIComponentRenderer({
   readResource,
   className,
   noWrapper = false,
+  showConsole = true,
 }: OpenAIComponentRendererProps) {
   const iframeRef = useRef<InstanceType<
     typeof window.HTMLIFrameElement
@@ -715,7 +717,7 @@ export function OpenAIComponentRenderer({
         </div>
       )}
 
-      {isSameOrigin && displayMode !== "fullscreen" && (
+      {showConsole && isSameOrigin && displayMode !== "fullscreen" && (
         <div className="absolute top-2 right-2 z-10">
           <IframeConsole iframeId={toolId} enabled={true} />
         </div>
