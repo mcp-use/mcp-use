@@ -39,42 +39,6 @@ The inspector can automatically try both connection types if one fails. Enable t
 Auto-switch is skipped for authentication errors (401, Unauthorized) since both connection types will fail the same way.
 </Note>
 
-## Transport Types
-
-The inspector supports two transport protocols for MCP communication:
-
-### Streamable HTTP (SSE)
-
-Also labeled as "SSE" in the UI, this uses HTTP with Server-Sent Events for streaming responses.
-
-**When to use:**
-- Standard HTTP/HTTPS servers
-- Most MCP servers
-- Production deployments
-
-**Technical details:**
-- Uses `http` transport type internally
-- Supports long-lived connections
-- Efficient for streaming responses
-
-### Server-Sent Events (SSE)
-
-Also labeled as "WebSocket" in the UI, this uses WebSocket connections for real-time bidirectional communication.
-
-**When to use:**
-- WebSocket-enabled MCP servers
-- Real-time applications
-- Low-latency requirements
-
-**Technical details:**
-- Uses `sse` transport type internally
-- Full-duplex communication
-- Lower overhead for frequent messages
-
-<Warning>
-The UI labels may seem counterintuitive: "SSE" in the dropdown actually means "Streamable HTTP", while "WebSocket" means "Server-Sent Events". This is due to historical naming conventions.
-</Warning>
-
 ## Advanced Configuration
 
 ### Request Timeout
