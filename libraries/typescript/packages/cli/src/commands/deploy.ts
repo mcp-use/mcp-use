@@ -1,14 +1,14 @@
 import chalk from "chalk";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import { exec } from "node:child_process";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
+import open from "open";
 import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
 import { isLoggedIn } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
-import open from "open";
 
 const execAsync = promisify(exec);
 
