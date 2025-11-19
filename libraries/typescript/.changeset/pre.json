@@ -1,0 +1,22 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.2.2",
+    "create-mcp-use-app": "0.5.1",
+    "@mcp-use/inspector": "0.5.2",
+    "mcp-use": "1.3.2"
+  },
+  "changesets": [
+    "clear-wombats-juggle",
+    "cool-doors-call",
+    "fancy-impalas-shave",
+    "fast-ears-build",
+    "few-oranges-cover",
+    "happy-sides-poke",
+    "legal-mugs-try",
+    "light-lands-speak",
+    "plain-walls-brush",
+    "strict-cows-invite"
+  ]
+}

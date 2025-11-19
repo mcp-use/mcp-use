@@ -1,5 +1,81 @@
 # mcp-use
 
+## 1.3.3-canary.8
+
+### Patch Changes
+
+- Updated dependencies [329ce35]
+  - @mcp-use/inspector@0.5.3-canary.8
+  - @mcp-use/cli@2.2.3-canary.8
+
+## 1.3.3-canary.7
+
+### Patch Changes
+
+- Updated dependencies [1ed0ab8]
+  - @mcp-use/inspector@0.5.3-canary.7
+  - @mcp-use/cli@2.2.3-canary.7
+
+## 1.3.3-canary.6
+
+### Patch Changes
+
+- Updated dependencies [ba654db]
+  - @mcp-use/inspector@0.5.3-canary.6
+  - @mcp-use/cli@2.2.3-canary.6
+
+## 1.3.3-canary.5
+
+### Patch Changes
+
+- Updated dependencies [f971dd8]
+  - @mcp-use/inspector@0.5.3-canary.5
+  - @mcp-use/cli@2.2.3-canary.5
+
+## 1.3.3-canary.4
+
+### Patch Changes
+
+- 68d0d4c: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- Updated dependencies [68d0d4c]
+- Updated dependencies [68d0d4c]
+  - @mcp-use/cli@2.2.3-canary.4
+  - @mcp-use/inspector@0.5.3-canary.4
+
+## 1.3.3-canary.3
+
+### Patch Changes
+
+- d4dc001: hotfix: Wrap all handle request calls in wait function
+  - @mcp-use/cli@2.2.3-canary.3
+  - @mcp-use/inspector@0.5.3-canary.3
+
+## 1.3.3-canary.2
+
+### Patch Changes
+
+- 9fc286c: Fix async server tool calls
+  - @mcp-use/cli@2.2.3-canary.2
+  - @mcp-use/inspector@0.5.3-canary.2
+
+## 1.3.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [f7995c0]
+  - @mcp-use/cli@2.2.3-canary.1
+  - @mcp-use/inspector@0.5.3-canary.1
+
+## 1.3.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d4c246a]
+  - @mcp-use/inspector@0.5.3-canary.0
+  - @mcp-use/cli@2.2.3-canary.0
+
 ## 1.3.2
 
 ### Patch Changes

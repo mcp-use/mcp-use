@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import "dotenv/config";
+import chalk from "chalk";
 import { Command } from "commander";
+import "dotenv/config";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import open from "open";
-import chalk from "chalk";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { deployCommand } from "./commands/deploy.js";
 
@@ -116,37 +116,78 @@ function runCommand(
 
 // Helper to start tunnel and get the URL
 async function startTunnel(
-  port: number
+  port: number,
+  subdomain?: string
 ): Promise<{ url: string; subdomain: string; process: any }> {
   return new Promise((resolve, reject) => {
     console.log(chalk.gray(`Starting tunnel for port ${port}...`));
 
-    const proc = spawn("npx", ["--yes", "@mcp-use/tunnel", String(port)], {
+    const tunnelArgs = ["--yes", "@mcp-use/tunnel", String(port)];
+
+    // Pass subdomain as CLI flag if provided
+    if (subdomain) {
+      tunnelArgs.push("--subdomain", subdomain);
+    }
+
+    const proc = spawn("npx", tunnelArgs, {
       stdio: ["ignore", "pipe", "pipe"],
       shell: false,
     });
 
     let resolved = false;
+    let isShuttingDown = false;
 
     proc.stdout?.on("data", (data) => {
       const text = data.toString();
-      process.stdout.write(text);
+      // Filter out shutdown messages from tunnel package
+      const isShutdownMessage =
+        text.includes("Shutting down") || text.includes("🛑");
+
+      // Suppress tunnel output during shutdown or if it's a shutdown message
+      if (!isShuttingDown && !isShutdownMessage) {
+        process.stdout.write(text);
+      }
 
       // Look for the tunnel URL in the output
       // Expected format: https://subdomain.tunnel-domain.com
       const urlMatch = text.match(/https?:\/\/([a-z0-9-]+\.[a-z0-9.-]+)/i);
       if (urlMatch && !resolved) {
         const url = urlMatch[0];
-        const subdomain = url;
+        // Extract subdomain from URL (e.g., "happy-cat.local.mcp-use.run" -> "happy-cat")
+        const fullDomain = urlMatch[1];
+        // Try to extract the subdomain using a case-insensitive regex.
+        // If the regex fails, fallback to splitting by '.' and taking the first label.
+        // Validate that the extracted subdomain matches the expected format (letters, numbers, hyphens).
+        const subdomainMatch = fullDomain.match(/^([a-z0-9-]+)\./i);
+        let extractedSubdomain = subdomainMatch
+          ? subdomainMatch[1]
+          : fullDomain.split(".")[0];
+        if (!/^[a-z0-9-]+$/i.test(extractedSubdomain)) {
+          console.warn(
+            chalk.yellow(
+              `Warning: Extracted subdomain "${extractedSubdomain}" does not match expected format.`
+            )
+          );
+          extractedSubdomain = "";
+        }
         resolved = true;
         clearTimeout(setupTimeout);
         console.log(chalk.green.bold(`✓ Tunnel established: ${url}/mcp`));
-        resolve({ url, subdomain, process: proc });
+        resolve({ url, subdomain: extractedSubdomain, process: proc });
       }
     });
 
     proc.stderr?.on("data", (data) => {
-      process.stderr.write(data);
+      const text = data.toString();
+      // Filter out bore debug logs and shutdown messages
+      if (
+        !isShuttingDown &&
+        !text.includes("INFO") &&
+        !text.includes("bore_cli") &&
+        !text.includes("Shutting down")
+      ) {
+        process.stderr.write(data);
+      }
     });
 
     proc.on("error", (error) => {
@@ -162,6 +203,11 @@ async function startTunnel(
         reject(new Error(`Tunnel process exited with code ${code}`));
       }
     });
+
+    // Add method to mark shutdown state
+    (proc as any).markShutdown = () => {
+      isShuttingDown = true;
+    };
 
     // Timeout after 30 seconds - only for initial setup
     const setupTimeout = setTimeout(() => {
@@ -195,18 +241,6 @@ async function buildWidgets(
 
   // Get base URL from environment or use default
   const mcpUrl = process.env.MCP_URL;
-  if (!mcpUrl) {
-    console.log(
-      chalk.yellow(
-        "⚠️  MCP_URL not set - using relative paths (widgets may not work correctly)"
-      )
-    );
-    console.log(
-      chalk.gray(
-        "   Set MCP_URL environment variable for production builds (e.g., https://myserver.com)"
-      )
-    );
-  }
 
   // Check if resources directory exists
   try {
@@ -436,6 +470,15 @@ program
       // Create build manifest
       const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
 
+      // Read existing manifest to preserve tunnel subdomain and other fields
+      let existingManifest: any = {};
+      try {
+        const existingContent = await fs.readFile(manifestPath, "utf-8");
+        existingManifest = JSON.parse(existingContent);
+      } catch {
+        // File doesn't exist, that's okay
+      }
+
       // Transform builtWidgets array into widgets object with metadata
       const widgetsData: Record<string, any> = {};
       for (const widget of builtWidgets) {
@@ -445,7 +488,9 @@ program
       // Convert to boolean: true if flag is present, false otherwise
       const includeInspector = !!options.withInspector;
 
+      // Merge with existing manifest, preserving tunnel and other fields
       const manifest = {
+        ...existingManifest, // Preserve existing fields like tunnel
         includeInspector,
         buildTime: new Date().toISOString(),
         widgets: widgetsData,
@@ -496,21 +541,7 @@ program
         port = availablePort;
       }
 
-      // Start tunnel if requested
-      let mcpUrl: string | undefined;
-      // let tunnelProcess: any = undefined;
-      // if (options.tunnel) {
-      //   try {
-      //     const tunnelInfo = await startTunnel(port);
-      //     mcpUrl = tunnelInfo.subdomain;
-      //     tunnelProcess = tunnelInfo.process;
-      //   } catch (error) {
-      //     console.error(chalk.red('Failed to start tunnel:'), error);
-      //     process.exit(1);
-      //   }
-      // }
-
-      // // Find the main source file
+      // Find the main source file
       const serverFile = await findServerFile(projectPath);
 
       // Start all processes concurrently
@@ -522,10 +553,6 @@ program
         NODE_ENV: "development",
       };
 
-      if (mcpUrl) {
-        env.MCP_URL = mcpUrl;
-      }
-
       const serverCommand = runCommand(
         "npx",
         ["tsx", "watch", serverFile],
@@ -535,31 +562,18 @@ program
       );
       processes.push(serverCommand.process);
 
-      // Add tunnel process if it exists
-      // if (tunnelProcess) {
-      //   processes.push(tunnelProcess);
-      // }
-
       // Auto-open inspector if enabled
       if (options.open !== false) {
         const startTime = Date.now();
         const ready = await waitForServer(port, host);
         if (ready) {
           const mcpEndpoint = `http://${host}:${port}/mcp`;
-          let inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
-
-          // Add tunnel URL as query parameter if tunnel is active
-          if (mcpUrl) {
-            inspectorUrl += `&tunnelUrl=${encodeURIComponent(mcpUrl)}`;
-          }
+          const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
           const readyTime = Date.now() - startTime;
           console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
           console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
           console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
-          if (mcpUrl) {
-            console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}`));
-          }
           console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
           console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
           await open(inspectorUrl);
@@ -634,11 +648,69 @@ program
       // Start tunnel if requested
       let mcpUrl: string | undefined;
       let tunnelProcess: any = undefined;
+      let tunnelSubdomain: string | undefined = undefined;
       if (options.tunnel) {
         try {
-          const tunnelInfo = await startTunnel(port);
-          mcpUrl = tunnelInfo.subdomain;
+          // Read existing subdomain from mcp-use.json if available
+          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          let existingSubdomain: string | undefined;
+
+          try {
+            const manifestContent = await readFile(manifestPath, "utf-8");
+            const manifest = JSON.parse(manifestContent);
+            existingSubdomain = manifest.tunnel?.subdomain;
+            if (existingSubdomain) {
+              console.log(
+                chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
+              );
+            }
+          } catch (error) {
+            // Manifest doesn't exist or is invalid, that's okay
+            console.debug(
+              chalk.gray(
+                `Debug: Failed to read or parse mcp-use.json: ${error instanceof Error ? error.message : String(error)}`
+              )
+            );
+          }
+
+          const tunnelInfo = await startTunnel(port, existingSubdomain);
+          mcpUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
+          const subdomain = tunnelInfo.subdomain;
+          tunnelSubdomain = subdomain;
+
+          // Update mcp-use.json with the subdomain
+          try {
+            let manifest: any = {};
+            try {
+              const manifestContent = await readFile(manifestPath, "utf-8");
+              manifest = JSON.parse(manifestContent);
+            } catch {
+              // File doesn't exist, create new manifest
+            }
+
+            // Update or add tunnel subdomain
+            if (!manifest.tunnel) {
+              manifest.tunnel = {};
+            }
+            manifest.tunnel.subdomain = subdomain;
+
+            // Ensure dist directory exists
+            await mkdir(path.dirname(manifestPath), { recursive: true });
+
+            // Write updated manifest
+            await writeFile(
+              manifestPath,
+              JSON.stringify(manifest, null, 2),
+              "utf-8"
+            );
+          } catch (error) {
+            console.warn(
+              chalk.yellow(
+                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+              )
+            );
+          }
         } catch (error) {
           console.error(chalk.red("Failed to start tunnel:"), error);
           process.exit(1);
@@ -663,7 +735,7 @@ program
 
       if (mcpUrl) {
         env.MCP_URL = mcpUrl;
-        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}`));
+        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}/mcp`));
       }
 
       const serverProc = spawn("node", [serverFile], {
@@ -673,8 +745,36 @@ program
       });
 
       // Handle cleanup
-      const cleanup = () => {
-        console.log("\n\nShutting down...");
+      let cleanupInProgress = false;
+      const cleanup = async () => {
+        if (cleanupInProgress) {
+          return; // Prevent double cleanup
+        }
+        cleanupInProgress = true;
+
+        console.log(chalk.gray("\n\nShutting down..."));
+
+        // Mark tunnel as shutting down to suppress output
+        if (
+          tunnelProcess &&
+          typeof (tunnelProcess as any).markShutdown === "function"
+        ) {
+          (tunnelProcess as any).markShutdown();
+        }
+
+        // Clean up tunnel via API if subdomain is available
+        if (tunnelSubdomain) {
+          try {
+            const apiBase =
+              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+              method: "DELETE",
+            });
+          } catch (err) {
+            // Ignore cleanup errors
+          }
+        }
+
         const processesToKill = 1 + (tunnelProcess ? 1 : 0);
         let killedCount = 0;
 
@@ -692,7 +792,8 @@ program
         // Handle tunnel process if it exists
         if (tunnelProcess && typeof tunnelProcess.kill === "function") {
           tunnelProcess.on("exit", checkAndExit);
-          tunnelProcess.kill("SIGTERM");
+          // Use SIGINT for better cleanup of npx/node processes
+          tunnelProcess.kill("SIGINT");
         } else {
           checkAndExit();
         }
@@ -706,7 +807,7 @@ program
             tunnelProcess.kill("SIGKILL");
           }
           process.exit(0);
-        }, 1000);
+        }, 2000); // Increase timeout to 2 seconds to allow graceful shutdown
       };
 
       process.on("SIGINT", cleanup);
