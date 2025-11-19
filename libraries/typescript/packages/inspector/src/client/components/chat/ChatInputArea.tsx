@@ -25,7 +25,7 @@ export function ChatInputArea({
   onSendMessage,
 }: ChatInputAreaProps) {
   return (
-    <div className="w-full flex flex-col justify-center items-center p-4 text-foreground">
+    <div className="w-full flex flex-col justify-center items-center p-2 sm:p-4 text-foreground">
       <div className="relative w-full max-w-3xl backdrop-blur-xl">
         <Textarea
           ref={textareaRef}

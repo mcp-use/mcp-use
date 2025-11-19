@@ -80,15 +80,17 @@ export function ToolResultDisplay({
                         : ""
                     }`}
                   >
-                    <h3 className="text-sm font-medium">Response</h3>
-                    <div className="flex items-center gap-1">
+                    <h3 className="text-sm font-medium hidden sm:block">
+                      Response
+                    </h3>
+                    <div className="hidden sm:flex items-center gap-1">
                       <Clock className="h-3 w-3 text-gray-400" />
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {new Date(result.timestamp).toLocaleTimeString()}
                       </span>
                     </div>
                     {result.duration !== undefined && (
-                      <div className="flex items-center gap-1">
+                      <div className="hidden sm:flex items-center gap-1">
                         <Zap className="h-3 w-3 text-gray-400" />
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {result.duration}
@@ -97,8 +99,8 @@ export function ToolResultDisplay({
                       </div>
                     )}
                     {hasAppsSdkResource && (
-                      <div className="flex items-center gap-4 ml-4">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-4 sm:ml-4">
+                        <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">
                           URI: {appsSdkUri || "No URI"}
                         </span>
                         <div className="flex items-center gap-2">
@@ -127,8 +129,8 @@ export function ToolResultDisplay({
                       </div>
                     )}
                     {hasMcpUIResources && !hasAppsSdkResource && (
-                      <div className="flex items-center gap-4 ml-4">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-4 sm:ml-4">
+                        <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">
                           URI: {mcpUIResources[0]?.resource?.uri || "No URI"}
                         </span>
                         <div className="flex items-center gap-2">
