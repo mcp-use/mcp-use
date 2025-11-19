@@ -1,5 +1,25 @@
 # mcp-use
 
+## 1.3.3
+
+### Patch Changes
+
+- e8ec993: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- e8ec993: hotfix: Wrap all handle request calls in wait function
+- e8ec993: Fix async server tool calls
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+  - @mcp-use/cli@2.2.3
+  - @mcp-use/inspector@0.5.3
+
 ## 1.3.3-canary.8
 
 ### Patch Changes
