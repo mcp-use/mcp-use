@@ -54,16 +54,38 @@
             "icon": "library",
             "pages": [
               "home/redirects/python",
-              "home/redirects/typescript",
-              "home/redirects/inspector",
-              "home/redirects/tunneling"
+              "home/redirects/typescript"
+            ]
+          },
+          {
+            "group": "Dev Tools",
+            "icon": "wrench",
+            "expanded": false,
+            "pages": [
+              {
+                "group": "Inspector",
+                "icon": "bug-play",
+                "pages": [
+                  "inspector/index",
+                  "inspector/cli",
+                  "inspector/connection-settings",
+                  "inspector/keyboard-shortcuts",
+                  "inspector/command-palette",
+                  "inspector/integration",
+                  "inspector/debugging-chatgpt-apps",
+                  "inspector/self-hosting",
+                  "inspector/development"
+                ]
+              },
+              "tunneling/index"
             ]
           },
           {
             "group": "Guides",
             "icon": "",
             "pages": [
-              "home/mcp101"
+              "home/mcp101",
+              "typescript/server/creating-apps-sdk-server"
             ]
           }
         ]
@@ -575,23 +597,6 @@
               }
             ]
           }
-        ]
-      },
-      {
-        "product": "Inspector",
-        "description": "Inspector",
-        "icon": "monitor",
-        "pages": [
-          "inspector/index",
-          "inspector/self-hosting"
-        ]
-      },
-      {
-        "product": "Tunneling",
-        "description": "Test your local MCP server with external clients",
-        "icon": "train-front-tunnel",
-        "pages": [
-          "tunneling/index"
         ]
       }
     ]

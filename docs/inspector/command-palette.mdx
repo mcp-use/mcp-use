@@ -1,0 +1,247 @@
+---
+title: "Command Palette"
+description: "Powerful search and navigation with the command palette"
+icon: "search"
+---
+
+The command palette (`Cmd/Ctrl + K`) is your gateway to rapid navigation and action execution in the MCP Inspector. Search and access tools, servers, saved requests, and more with a few keystrokes.
+
+## Opening the Command Palette
+
+Press **`Cmd/Ctrl + K`** (or **`Ctrl + K`** on Windows/Linux) from anywhere in the inspector.
+
+<Note>
+The command palette works even when input fields are focused, making it always accessible.
+</Note>
+
+<Frame>
+  <img src="/images/inspector/command-palette-empty.png" alt="Command Palette Initial View" />
+</Frame>
+
+## Search Functionality
+
+The command palette provides fuzzy search across all available items:
+
+- **Tool names** and descriptions
+- **Prompt names** and descriptions
+- **Resource names** and URIs
+- **Saved request names**
+- **Server names**
+- **Global commands**
+
+Type to filter results in real-time. The search matches:
+- Beginning of words
+- Partial matches
+- Descriptions and metadata
+
+<Frame>
+  <img src="/images/inspector/command-palette-search.png" alt="Command Palette Search Results" />
+</Frame>
+
+## Available Actions
+
+### Connect to Server
+
+**Action:** "Connect Server"
+
+Navigate to the dashboard to add a new MCP server connection.
+
+**Use cases:**
+- Quick access to connection form
+- Adding new servers
+- Starting new debugging sessions
+
+### Search and Execute Tools
+
+**Action:** Select any tool from search results
+
+Navigate directly to a tool and execute it.
+
+**Workflow:**
+1. Press `Cmd/Ctrl + K`
+2. Type tool name
+3. Select tool from results
+4. Inspector navigates to Tools tab with tool selected
+5. Enter arguments and execute
+
+### Navigate to Saved Requests
+
+**Action:** Select a saved request
+
+Load a saved request with its arguments pre-filled.
+
+**Workflow:**
+1. Press `Cmd/Ctrl + K`
+2. Type saved request name
+3. Select from "Saved Requests" category
+4. Inspector navigates to Tools tab with request loaded
+
+### Quick Server Switching
+
+**Action:** Select a server from "Connected Servers"
+
+Switch to a different server's detail view.
+
+**Workflow:**
+1. Press `Cmd/Ctrl + K`
+2. Type server name or URL
+3. Select server from results
+4. Inspector navigates to that server's view
+
+### Documentation Links
+
+Access documentation and resources:
+
+- **"MCP Use Website"**: Opens mcp-use.com
+- **"How to Create an MCP Server"**: Opens documentation
+- **"MCP Official Documentation"**: Opens Model Context Protocol docs
+
+### Community Links
+
+- **"Join Discord Community"**: Opens Discord server
+
+## Categories
+
+Results are organized into categories for easy navigation:
+
+### Navigation
+
+Global navigation actions like "Connect Server".
+
+### Connected Servers
+
+All currently connected MCP servers with their status.
+
+**Display format:**
+- Server name
+- Connection status indicator
+- Server URL
+
+### Tools
+
+All available tools from connected servers, grouped by server.
+
+**Display format:**
+- Tool name
+- Tool description
+- Server name badge
+
+### Prompts
+
+All available prompts from connected servers, grouped by server.
+
+**Display format:**
+- Prompt name
+- Prompt description
+- Server name badge
+
+### Resources
+
+All available resources from connected servers, grouped by server.
+
+**Display format:**
+- Resource name
+- Resource description
+- Server name badge
+
+### Saved Requests
+
+All saved tool execution requests.
+
+**Display format:**
+- Request name
+- Associated tool name
+- Server name badge
+
+### Documentation
+
+Links to external documentation and resources.
+
+### Community
+
+Links to community resources like Discord.
+
+## Keyboard Navigation
+
+Navigate the command palette with your keyboard:
+
+- **Arrow Keys**: Move up/down through results
+- **Enter**: Select highlighted item
+- **Esc**: Close command palette
+- **Tab**: (Future: Navigate between categories)
+
+## Visual Indicators
+
+The command palette uses icons to identify item types:
+
+- 🔧 **Wrench**: Tools
+- 💬 **Message**: Prompts
+- 📄 **File**: Resources
+- 🕐 **Clock**: Saved requests
+- ➕ **Plus**: Navigation actions
+- 🔗 **Link**: External links
+- 💬 **Discord**: Community links
+- 🖥️ **Server**: Server connections
+
+## Tips and Tricks
+
+### Quick Tool Execution
+
+1. Press `Cmd/Ctrl + K`
+2. Type tool name (e.g., "create issue")
+3. Press `Enter`
+4. Tool is selected, ready for execution
+
+### Finding Saved Requests
+
+1. Press `Cmd/Ctrl + K`
+2. Type part of request name
+3. Look in "Saved Requests" category
+4. Select to load
+
+### Server Switching
+
+1. Press `Cmd/Ctrl + K`
+2. Type server name or URL
+3. Select from "Connected Servers"
+4. Instantly switch context
+
+### Fuzzy Search
+
+The search is forgiving - you don't need exact matches:
+
+- "lin iss" matches "Linear Create Issue"
+- "get" matches "get_user", "get_project", etc.
+- Partial descriptions work too
+
+### Category Filtering
+
+Results are automatically grouped by category. Look for:
+- Server-specific groupings (e.g., "Tools - Linear")
+- Global categories (e.g., "Navigation", "Documentation")
+
+## Advanced Usage
+
+### Multi-Server Search
+
+When multiple servers are connected, search results show which server each item belongs to:
+
+- Tools are grouped by server
+- Server name badges appear on items
+- Filter by server name in search
+
+### Quick Access Patterns
+
+**Common workflows:**
+
+1. **Tool Testing**: `Cmd/Ctrl + K` → type tool → `Enter` → execute
+2. **Saved Request**: `Cmd/Ctrl + K` → type request → `Enter` → execute
+3. **Server Switch**: `Cmd/Ctrl + K` → type server → `Enter`
+4. **New Connection**: `Cmd/Ctrl + K` → "Connect Server" → `Enter`
+
+## Related Documentation
+
+- [Keyboard Shortcuts](/inspector/keyboard-shortcuts) - All available shortcuts
+- [Overview](/inspector/index) - Saved requests and other features
+- [Getting Started](/inspector/index) - Basic inspector usage
+

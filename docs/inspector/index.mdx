@@ -2,6 +2,7 @@
 title: "Inspector"
 description: "Built-in web interface for real-time server monitoring and debugging"
 icon: "monitor"
+sidebarTitle: "Overview"
 ---
 [![See Live Inspector](/images/UseLiveSmall.svg)](https://inspector.mcp-use.com)
 
@@ -20,6 +21,28 @@ The MCP Inspector is a powerful web-based debugging and inspection tool for MCP 
 - **Chat Interface**: Interactive chat with LLM integration for testing conversational flows
 - **OAuth Support**: Built-in OAuth flow handling with popup authentication
 - **Session Persistence**: Connections saved to localStorage with auto-reconnect
+- **OpenAI Apps SDK Support**: Full widget rendering and debugging for ChatGPT Apps
+- **Saved Requests**: Save and replay tool executions
+- **Command Palette**: Powerful search and navigation with `Cmd/Ctrl + K`
+
+## Documentation
+
+Explore the inspector documentation:
+
+### Getting Started
+- **[CLI Usage](/inspector/cli)** - Run the inspector from the command line
+- **[Connection Settings](/inspector/connection-settings)** - Advanced configuration options
+
+### Features
+- **[Overview](/inspector/index)** - Saved requests, preview mode, and connection management
+- **[Keyboard Shortcuts](/inspector/keyboard-shortcuts)** - Complete shortcuts reference
+- **[Command Palette](/inspector/command-palette)** - Search and navigation guide
+
+### Integration & Advanced
+- **[Integration](/inspector/integration)** - Mount inspector on Express or Hono apps
+- **[Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps)** - Test and debug ChatGPT Apps with OpenAI Apps SDK
+- **[Self-Hosting](/inspector/self-hosting)** - Deploy your own inspector instance
+- **[Development](/inspector/development)** - Development setup and contribution guide
 
 # Getting Started
 
@@ -186,8 +209,7 @@ The inspector includes powerful keyboard shortcuts for quick navigation:
 - Search and execute tools directly
 - Navigate to different tabs (Tools, Prompts, Resources, Chat)
 
-Other shortcuts:
-- **Esc**: Close modals and overlays
+For a complete list of all keyboard shortcuts, see the [Keyboard Shortcuts](/inspector/keyboard-shortcuts) guide.
 
 ## Persistency
 

@@ -1,0 +1,242 @@
+---
+title: "Connection Settings"
+description: "Advanced connection configuration and settings"
+icon: "settings"
+---
+
+The MCP Inspector provides extensive configuration options for connecting to MCP servers, including connection types, transport protocols, timeouts, OAuth authentication, and custom headers.
+
+## Connection Types
+
+### Direct Connection
+
+Connect directly to the MCP server without a proxy. This is the default and recommended option for most use cases.
+
+**When to use:**
+- Local development servers
+- Servers accessible from your network
+- Servers with public endpoints
+
+### Via Proxy
+
+Connect through a proxy server. Useful when you need to route traffic through an intermediary or when direct connections are blocked.
+
+**When to use:**
+- Corporate networks with proxy requirements
+- CORS restrictions
+- Testing proxy configurations
+- Development environments with proxy setup
+
+### Auto-Switch
+
+The inspector can automatically try both connection types if one fails. Enable this in the connection settings:
+
+1. Open the **Connection Type** dropdown
+2. Toggle **Auto-switch** on
+3. If Direct connection fails, the inspector will automatically try Via Proxy (and vice versa)
+
+<Note>
+Auto-switch is skipped for authentication errors (401, Unauthorized) since both connection types will fail the same way.
+</Note>
+
+## Transport Types
+
+The inspector supports two transport protocols for MCP communication:
+
+### Streamable HTTP (SSE)
+
+Also labeled as "SSE" in the UI, this uses HTTP with Server-Sent Events for streaming responses.
+
+**When to use:**
+- Standard HTTP/HTTPS servers
+- Most MCP servers
+- Production deployments
+
+**Technical details:**
+- Uses `http` transport type internally
+- Supports long-lived connections
+- Efficient for streaming responses
+
+### Server-Sent Events (SSE)
+
+Also labeled as "WebSocket" in the UI, this uses WebSocket connections for real-time bidirectional communication.
+
+**When to use:**
+- WebSocket-enabled MCP servers
+- Real-time applications
+- Low-latency requirements
+
+**Technical details:**
+- Uses `sse` transport type internally
+- Full-duplex communication
+- Lower overhead for frequent messages
+
+<Warning>
+The UI labels may seem counterintuitive: "SSE" in the dropdown actually means "Streamable HTTP", while "WebSocket" means "Server-Sent Events". This is due to historical naming conventions.
+</Warning>
+
+## Advanced Configuration
+
+### Request Timeout
+
+Maximum time (in milliseconds) to wait for a single request to complete.
+
+**Default:** `10000` (10 seconds)
+
+### Maximum Total Timeout
+
+Maximum total time (in milliseconds) for the entire operation, including retries and progress updates.
+
+**Default:** `60000` (60 seconds)
+
+### Inspector Proxy Address
+
+The proxy endpoint URL when using "Via Proxy" connection type.
+
+**Default:** `${window.location.origin}/inspector/api/proxy`
+
+## OAuth Configuration
+
+The inspector supports OAuth 2.0 authentication for MCP servers that require it.
+
+### Setting Up OAuth
+
+1. Click the **Authentication** button in the connection form
+2. Enter your OAuth credentials:
+
+   - **Client ID**: Your OAuth application client ID
+   - **Redirect URL**: The callback URL (defaults to `/inspector/oauth/callback`)
+   - **Scope**: Space-separated list of OAuth scopes
+
+3. Click **Save** to store the configuration
+
+### OAuth Flow
+
+When connecting to a server that requires OAuth:
+
+1. **Initial Connection**: Inspector attempts to connect
+2. **Authorization Request**: Server responds with authorization URL
+3. **User Approval**: You're redirected to the OAuth provider
+4. **Callback Handling**: Inspector handles the OAuth callback automatically
+5. **Token Storage**: Access tokens are stored securely in browser localStorage
+6. **Connection Established**: Server appears in Connected Servers list
+
+### Authentication States
+
+The inspector shows different states during OAuth:
+
+- **Connecting**: Initial connection attempt
+- **Pending Auth**: Waiting for OAuth approval
+- **Authenticating**: OAuth flow in progress
+- **Ready**: Successfully authenticated and connected
+- **Failed**: Authentication or connection failed
+
+### Manual Authentication
+
+If automatic OAuth redirect doesn't work:
+
+1. Look for the **Authenticate** button in the server card
+2. Click to open the OAuth page in a new tab
+3. Complete the authorization
+4. Return to the inspector - it will detect the completed auth
+
+## Custom Headers
+
+Add custom HTTP headers to all requests sent to the MCP server.
+
+### Adding Headers
+
+1. Click **Custom Headers** in the connection form
+2. Click **Add** to create a new header
+3. Enter the header name and value
+4. Click **Save**
+
+### Common Use Cases
+
+- **API Keys**: `Authorization: Bearer <token>`
+- **Custom Authentication**: `X-API-Key: <key>`
+- **Version Headers**: `X-API-Version: v2`
+- **Request IDs**: `X-Request-ID: <uuid>`
+
+### Security Considerations
+
+<Warning>
+Custom headers are stored in browser localStorage. Never include sensitive credentials that shouldn't be stored locally. Use OAuth for secure authentication instead.
+</Warning>
+
+### Header Visibility
+
+Header values are masked by default for security. Click the eye icon to reveal the value when needed.
+
+## Configuration Import/Export
+
+### Copy Configuration
+
+Export your connection configuration as JSON:
+
+1. Fill in your connection settings
+2. Click **Copy Config** button
+3. The configuration is copied to your clipboard as JSON
+
+**Example configuration:**
+```json
+{
+  "url": "https://mcp.example.com/mcp",
+  "transportType": "http",
+  "connectionType": "Direct",
+  "customHeaders": {
+    "Authorization": "Bearer token123"
+  },
+  "requestTimeout": 10000,
+  "resetTimeoutOnProgress": true,
+  "maxTotalTimeout": 60000,
+  "oauth": {
+    "clientId": "your-client-id",
+    "redirectUrl": "http://localhost:8080/inspector/oauth/callback",
+    "scope": "read write"
+  }
+}
+```
+
+### Paste Configuration
+
+Import a connection configuration from JSON:
+
+1. Copy a configuration JSON (from another inspector instance or saved file)
+2. Paste it into the URL field
+3. The form automatically populates with all settings
+
+<Note>
+The paste detection only works when pasting into the URL field. The inspector recognizes valid JSON configuration and populates the form automatically.
+</Note>
+
+### Sharing Configurations
+
+You can share connection configurations with team members:
+
+1. Export your configuration (Copy Config)
+2. Share the JSON via secure channel
+3. Recipients paste into their inspector
+4. All settings are automatically applied
+
+<Warning>
+Never share configurations containing sensitive credentials. Remove OAuth tokens, API keys, and other secrets before sharing.
+</Warning>
+
+## Connection Status Indicators
+
+The inspector shows visual indicators for connection status:
+
+- 🟢 **Green**: Connected and ready
+- 🟡 **Yellow**: Connecting or authenticating
+- 🔴 **Red**: Connection failed
+- ⚪ **Gray**: Disconnected
+
+Hover over the indicator to see detailed status information.
+
+## Related Documentation
+
+- [Getting Started](/inspector/index) - Basic connection setup
+- [Overview](/inspector/index) - Connection management features
+- [CLI Usage](/inspector/cli) - Command-line connection options
+
