@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.5.3-canary.8
+
+### Patch Changes
+
+- 329ce35: Dynamically load models for the chat
+  - mcp-use@1.3.3-canary.8
+
 ## 0.5.3-canary.7
 
 ### Patch Changes
