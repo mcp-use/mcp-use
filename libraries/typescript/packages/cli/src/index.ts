@@ -676,8 +676,13 @@ program
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
               );
             }
-          } catch {
+          } catch (error) {
             // Manifest doesn't exist or is invalid, that's okay
+            console.debug(
+              chalk.gray(
+                `Debug: Failed to read or parse mcp-use.json: ${error instanceof Error ? error.message : String(error)}`
+              )
+            );
           }
 
           const tunnelInfo = await startTunnel(port, existingSubdomain);
