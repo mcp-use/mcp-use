@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { MCPServerRemovedEvent, Telemetry } from "@/client/telemetry";
 import { useMcp } from "mcp-use/react";
+import type { ReactNode } from "react";
 import {
   createContext,
   use,
@@ -9,7 +10,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { MCPServerRemovedEvent, Telemetry } from "@/client/telemetry";
 
 export interface MCPConnection {
   id: string;
@@ -73,6 +73,17 @@ interface McpContextType {
   setAutoConnect: (autoConnect: boolean) => void;
   connectServer: (id: string) => void;
   disconnectServer: (id: string) => void;
+  updateConnectionConfig: (
+    id: string,
+    config: {
+      name?: string;
+      proxyConfig?: {
+        proxyAddress?: string;
+        customHeaders?: Record<string, string>;
+      };
+      transportType?: "http" | "sse";
+    }
+  ) => void;
 }
 
 const McpContext = createContext<McpContextType | undefined>(undefined);
@@ -539,6 +550,40 @@ export function McpProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const updateConnectionConfig = useCallback(
+    (
+      id: string,
+      config: {
+        name?: string;
+        proxyConfig?: {
+          proxyAddress?: string;
+          customHeaders?: Record<string, string>;
+        };
+        transportType?: "http" | "sse";
+      }
+    ) => {
+      setSavedConnections((prev) => {
+        const updated = prev.map((conn) => {
+          if (conn.id === id) {
+            return {
+              ...conn,
+              name: config.name || conn.name,
+              proxyConfig: config.proxyConfig,
+              transportType: config.transportType || conn.transportType,
+            };
+          }
+          return conn;
+        });
+        localStorage.setItem(
+          "mcp-inspector-connections",
+          JSON.stringify(updated)
+        );
+        return updated;
+      });
+    },
+    []
+  );
+
   // Use connectionVersion to force array recreation when connections update
   const connections = useMemo(() => {
     // Maintain order based on savedConnections, not activeConnections
@@ -596,6 +641,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       setAutoConnect,
       connectServer,
       disconnectServer,
+      updateConnectionConfig,
     }),
     [
       connections,
@@ -606,6 +652,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       setAutoConnect,
       connectServer,
       disconnectServer,
+      updateConnectionConfig,
     ]
   );
 
@@ -615,7 +662,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
         .filter((saved) => autoConnect || manualConnections.has(saved.id))
         .map((saved) => (
           <McpConnectionWrapper
-            key={saved.id}
+            key={`${saved.id}-${saved.transportType || "http"}-${
+              saved.proxyConfig?.proxyAddress || ""
+            }`}
             url={saved.url}
             name={saved.name}
             proxyConfig={saved.proxyConfig}

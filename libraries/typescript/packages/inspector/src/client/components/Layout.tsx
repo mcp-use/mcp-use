@@ -1,7 +1,3 @@
-import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { Spinner } from "@/client/components/ui/spinner";
 import { TooltipProvider } from "@/client/components/ui/tooltip";
 import { useInspector } from "@/client/context/InspectorContext";
@@ -10,6 +6,10 @@ import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
@@ -22,7 +22,12 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { connections, addConnection, removeConnection } = useMcpContext();
+  const {
+    connections,
+    addConnection,
+    removeConnection,
+    updateConnectionConfig,
+  } = useMcpContext();
   const {
     selectedServerId,
     setSelectedServerId,
@@ -119,23 +124,35 @@ export function Layout({ children }: LayoutProps) {
     }) => {
       if (!editingConnectionId) return;
 
-      // Remove the old connection
-      removeConnection(editingConnectionId);
-
-      // Add the new connection with updated settings
-      addConnection(
-        config.url,
-        config.name,
-        config.proxyConfig,
-        config.transportType
-      );
+      // If the URL changed, we need to remove the old one and add a new one
+      if (config.url !== editingConnectionId) {
+        removeConnection(editingConnectionId);
+        addConnection(
+          config.url,
+          config.name,
+          config.proxyConfig,
+          config.transportType
+        );
+      } else {
+        // Otherwise just update the existing connection
+        updateConnectionConfig(editingConnectionId, {
+          name: config.name,
+          proxyConfig: config.proxyConfig,
+          transportType: config.transportType,
+        });
+      }
 
       // Close the modal
       setEditingConnectionId(null);
 
       toast.success("Connection settings updated");
     },
-    [editingConnectionId, removeConnection, addConnection]
+    [
+      editingConnectionId,
+      removeConnection,
+      addConnection,
+      updateConnectionConfig,
+    ]
   );
 
   const handleCommandPaletteNavigate = (
