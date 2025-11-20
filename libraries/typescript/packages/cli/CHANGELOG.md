@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.2.4-canary.2
+
+### Patch Changes
+
+- c754733: Fix deployment from source
+  - mcp-use@1.3.4-canary.2
+  - @mcp-use/inspector@0.6.0-canary.2
+
 ## 2.2.4-canary.1
 
 ### Patch Changes
