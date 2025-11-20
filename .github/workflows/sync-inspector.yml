@@ -28,7 +28,7 @@ jobs:
 
       - name: Clone mirror repo
         env:
-          MIRROR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MIRROR_TOKEN: ${{ secrets.INSPECTOR_MIRROR_TOKEN }}
         run: |
           git clone --no-checkout \
             https://x-access-token:${MIRROR_TOKEN}@github.com/mcp-use/inspector.git \
@@ -69,7 +69,7 @@ jobs:
 
       - name: Commit and push to mirror repo
         env:
-          MIRROR_TOKEN: ${{  secrets.GITHUB_TOKEN }}
+          MIRROR_TOKEN: ${{  secrets.INSPECTOR_MIRROR_TOKEN }}
         run: |
           cd /tmp/inspector-mirror
           git config user.name "github-actions[bot]"
