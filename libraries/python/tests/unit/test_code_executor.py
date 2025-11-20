@@ -195,7 +195,6 @@ class TestCodeExecutorTimeout:
     async def test_timeout_enforcement(self, code_executor):
         """Test that timeout is enforced."""
         code = """
-import asyncio
 await asyncio.sleep(10)  # Sleep longer than timeout
 return "should not reach here"
 """
@@ -276,8 +275,15 @@ return {
     async def test_tool_namespaces_available(self, mock_client, code_executor):
         """Test that __tool_namespaces is available."""
         mock_session = AsyncMock()
-        mock_session.list_tools = AsyncMock(return_value=[])
+        # Return at least one dummy tool so the namespace is created
+        mock_tool = Mock()
+        mock_tool.name = "dummy_tool"
+        mock_session.list_tools = AsyncMock(return_value=[mock_tool])
+
+        # Mock sessions dictionary directly on the client mock
         mock_client.sessions = {"server1": mock_session, "server2": mock_session}
+        # Mock get_server_names to return empty list to avoid connection attempt
+        mock_client.get_server_names = Mock(return_value=[])
 
         code = """
 return {"namespaces": __tool_namespaces}
@@ -332,7 +338,12 @@ class TestCodeExecutorErrorHandling:
         result = await code_executor.execute(code, timeout=5.0)
 
         assert result["error"] is not None
-        assert "syntax" in result["error"].lower() or "invalid" in result["error"].lower()
+        # The actual error message might vary by Python version
+        assert (
+            "syntax" in result["error"].lower()
+            or "invalid" in result["error"].lower()
+            or "expected" in result["error"].lower()
+        )
 
     @pytest.mark.asyncio
     async def test_runtime_error(self, code_executor):
@@ -374,8 +385,6 @@ class TestCodeExecutorAsyncSupport:
     async def test_async_code(self, code_executor):
         """Test executing async code with await."""
         code = """
-import asyncio
-
 async def my_async_function():
     await asyncio.sleep(0.1)
     return "async result"
@@ -393,8 +402,6 @@ return result
     async def test_multiple_awaits(self, code_executor):
         """Test multiple await statements."""
         code = """
-import asyncio
-
 async def func1():
     await asyncio.sleep(0.05)
     return 1
