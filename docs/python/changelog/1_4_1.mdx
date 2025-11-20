@@ -1,0 +1,189 @@
+# Release Notes - mcp-use Python 1.4.1
+
+## Major Features
+
+### Code Mode Integration
+A powerful new feature that enables direct code execution through MCP servers. This allows LLMs to write and execute code in isolated environments with full tool support.
+
+**Key Capabilities:**
+- Execute Python code in isolated environments
+- Full support for MCP tools within code execution
+- Enhanced security with sandboxed code execution
+- Seamless integration with existing MCPClient workflows
+
+**New Components:**
+- `CodeExecutor`: Handles code execution with security and isolation
+- `CodeModeConnector`: New connector type for code mode operations
+- Integrated prompts for code mode interactions
+
+**Usage Example:**
+```python
+from mcp_use import MCPClient
+from mcp_use.client.code_executor import CodeExecutor
+
+client = MCPClient()
+# Enable code mode for your workflow
+```
+
+See full documentation at `docs/python/client/code-mode.mdx`
+
+### Pretty Display for Agent Interactions
+Rich, colorful terminal output for agent operations, making it easier to follow agent thinking and tool calls in real-time.
+
+**Features:**
+- Beautiful formatted output for agent steps
+- Color-coded tool calls and responses
+- Structured display of thinking process
+- Enhanced readability for debugging
+
+**New Module:**
+- `mcp_use.agents.display`: Rich console display utilities
+
+**Usage:**
+```python
+from mcp_use.agents import MCPAgent
+
+agent = MCPAgent(
+    model=model,
+    server_manager=server_manager,
+    pretty_print=True  # Enable pretty display
+)
+```
+
+## Enhancements
+
+### SSL Certificate Verification Control
+Added flexible SSL certificate verification control across HTTP connectors.
+
+**Changes:**
+- New `verify` parameter in `MCPClient`
+- SSL verification control in `HttpConnector`
+- Custom HTTPX client factory support in SSE and Streamable HTTP managers
+
+**Usage:**
+```python
+client = MCPClient(verify=False)  # Disable SSL verification if needed
+```
+
+### LangChain Integration
+Comprehensive integration with LangChain for advanced agent workflows.
+
+**Additions:**
+- Full LangChain adapter support
+- Example implementation: `langchain_integration_example.py`
+- Documentation at `docs/python/integration/langchain.mdx`
+
+### Enhanced Schema Handling
+Improved JSON schema processing for better compatibility with complex data structures.
+
+**Fixes:**
+- List handling in `fix_schema` method
+- Better type inference for nested structures
+- Improved adapter compatibility
+
+## Bug Fixes
+
+### Recursion Limit Configuration
+Fixed issues with recursion limit configuration in MCPAgent to prevent stack overflow errors in deeply nested tool calls.
+
+**Changes:**
+- Proper handling of custom recursion limits
+- Better default configurations
+- Override protection
+
+### Client Info Property
+Fixed the `client_info` property in base connector to properly return client metadata.
+
+**Impact:**
+- Correct client identification in server connections
+- Improved debugging capabilities
+
+## Code Quality
+
+### Import Structure Cleanup
+Removed relative imports across the codebase for better maintainability and clarity.
+
+**Files Updated:**
+- `mcp_use/client/connectors/http.py`
+- `mcp_use/client/connectors/sandbox.py`
+- `mcp_use/errors/error_formatting.py`
+
+### Example Updates
+Updated all example scripts to use latest model versions:
+- Claude: `claude-3-5-sonnet-20240620` → `claude-sonnet-4-5`
+- OpenAI: `gpt-4o` → `gpt-5`
+
+## Dependencies
+
+### New Dependencies
+- `rich>=14.2.0` - For pretty terminal display
+
+### Updated Requirements
+- `langchain>=1.0.0` - Full LangChain 1.0 support
+- `langchain-core>=1.0.0`
+
+## Documentation
+
+### New Documentation
+- Code mode integration guide with examples
+- LangChain integration documentation
+- API reference updates for all new features
+
+### Updated Documentation
+- Client configuration with SSL verification options
+- Agent configuration with pretty print options
+- Connector documentation with new code mode connector
+
+## Breaking Changes
+
+None in this release. All changes are backward compatible.
+
+## Migration Guide
+
+### Enabling Code Mode
+To use the new code mode feature:
+
+```python
+from mcp_use import MCPClient
+from mcp_use.client.connectors.code_mode import CodeModeConnector
+
+client = MCPClient()
+# Configure your code mode connector
+```
+
+### Enabling Pretty Display
+To enable pretty display in your agents:
+
+```python
+agent = MCPAgent(
+    model=model,
+    server_manager=server_manager,
+    pretty_print=True
+)
+```
+
+### Disabling SSL Verification
+If you need to disable SSL verification (e.g., for local development):
+
+```python
+client = MCPClient(verify=False)
+```
+
+## Contributors
+
+Thank you to all contributors who made this release possible:
+- Pietro Zullo (@pietrozullo)
+- Vincenzo Reina (@renvins)
+- Enrico Toniato (@tonxxd)
+
+## Statistics
+
+- **Total Commits:** 10 (Python-specific)
+- **Files Changed:** 50+
+- **Lines Added:** 2,500+
+- **New Examples:** 2
+- **New Documentation Pages:** 3
+
+---
+
+For full changelog and commit history, see the [commit log](https://github.com/mcp-use/mcp-use/compare/dcfbe90d312696f833a6470a9dd1036435803028...616b3840bde6f342e10115aec304391d800e712e).
