@@ -7,6 +7,7 @@
 - 835d367: add node types
 - 835d367: make installation disabled by default and add deploy command to template package
 - 835d367: fix templates deps
+- fix: add missing vite dev dependencies to templates (vite, @vitejs/plugin-react, @tailwindcss/vite) for widget development
 
 ## 0.5.1-canary.2
 
