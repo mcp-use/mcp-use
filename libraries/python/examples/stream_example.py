@@ -28,7 +28,7 @@ async def main():
     # Create LLM
     llm = ChatAnthropic(model="claude-sonnet-4-5")
     # Create agent with the client
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
     # Run the query
     async for step in agent.stream(
         """

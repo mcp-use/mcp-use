@@ -32,6 +32,7 @@ dependencies = [
     "posthog>=4.8.0",
     "scarf-sdk>=0.1.0",
     "authlib>=1.6.3",
+    "rich>=14.2.0"
 ]
 
 [project.optional-dependencies]
