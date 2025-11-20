@@ -10,6 +10,8 @@ import open from "open";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { deployCommand } from "./commands/deploy.js";
 
+import { generateFavicons } from "./utils/favicon-generator.js";
+
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -468,6 +470,12 @@ program
       // Build widgets first (this generates schemas)
       const builtWidgets = await buildWidgets(projectPath);
 
+      // Generate favicons
+      await generateFavicons(
+        projectPath,
+        path.join(projectPath, "dist", "static")
+      );
+
       // Then run tsc (now schemas are available for import)
       console.log(chalk.gray("Building TypeScript..."));
       await runCommand("npx", ["tsc"], projectPath);
@@ -546,6 +554,12 @@ program
         console.log(chalk.green.bold(`✓ Using port ${availablePort} instead`));
         port = availablePort;
       }
+
+      // Generate favicons
+      await generateFavicons(
+        projectPath,
+        path.join(projectPath, ".mcp-use", "static")
+      );
 
       // Find the main source file
       const serverFile = await findServerFile(projectPath);

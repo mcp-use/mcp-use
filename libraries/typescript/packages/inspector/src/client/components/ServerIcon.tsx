@@ -134,7 +134,82 @@ export function ServerIcon({
           domain.startsWith("172.");
 
         if (isLocalServer) {
-          // For local servers, skip favicon fetching and go straight to fallback
+          // Extract base URL (remove /mcp if present)
+          let baseUrl = serverUrl;
+          if (serverUrl.endsWith("/mcp")) {
+            baseUrl = serverUrl.slice(0, -4);
+          } else if (serverUrl.includes("/mcp/")) {
+            baseUrl = serverUrl.split("/mcp")[0];
+          }
+
+          // Try favicons in order of preference (highest resolution first)
+          const faviconSizes = [
+            "favicon-512x512",
+            "favicon-384x384",
+            "favicon-256x256",
+            "favicon-192x192",
+            "favicon-144x144",
+            "favicon-96x96",
+            "favicon-72x72",
+            "favicon-48x48",
+            "favicon-32x32",
+          ];
+
+          // Try both root path and MCP path for each size
+          const tryFetchFavicon = async (
+            url: string
+          ): Promise<string | null> => {
+            try {
+              const response = await fetch(url, { method: "HEAD" });
+              console.log("response", response);
+              if (response.ok) {
+                return await fetchAndCacheImage(url, domain);
+              }
+            } catch {
+              // Continue to next attempt
+            }
+            return null;
+          };
+
+          // Try PNG versions first (higher quality) - try both root and MCP paths
+          for (const size of faviconSizes) {
+            // Try root path first
+            const rootUrl = `${baseUrl}/${size}.png`;
+            const rootImage = await tryFetchFavicon(rootUrl);
+            if (rootImage) {
+              setFaviconUrl(rootImage);
+              setIsLoading(false);
+              return;
+            }
+
+            // Try MCP path
+            const mcpUrl = `${serverUrl}/${size}.png`;
+            const mcpImage = await tryFetchFavicon(mcpUrl);
+            if (mcpImage) {
+              setFaviconUrl(mcpImage);
+              setIsLoading(false);
+              return;
+            }
+          }
+
+          // Fallback to favicon.ico - try both paths
+          const rootIcoUrl = `${baseUrl}/favicon.ico`;
+          const rootIcoImage = await tryFetchFavicon(rootIcoUrl);
+          if (rootIcoImage) {
+            setFaviconUrl(rootIcoImage);
+            setIsLoading(false);
+            return;
+          }
+
+          const mcpIcoUrl = `${serverUrl}/favicon.ico`;
+          const mcpIcoImage = await tryFetchFavicon(mcpIcoUrl);
+          if (mcpIcoImage) {
+            setFaviconUrl(mcpIcoImage);
+            setIsLoading(false);
+            return;
+          }
+
+          // If nothing worked, set error
           setFaviconError(true);
           setIsLoading(false);
           return;

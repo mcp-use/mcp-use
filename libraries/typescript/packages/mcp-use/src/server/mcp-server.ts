@@ -1888,6 +1888,7 @@ if (container && Component) {
       baseRoute: "/mcp-use/widgets",
       resourcesDir: "resources",
     });
+    await this.setupFaviconRoutes();
     await this.mountMcp();
 
     // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
@@ -2024,6 +2025,7 @@ if (container && Component) {
       resourcesDir: "resources",
     });
     console.log("[MCP] Mounted widgets");
+    await this.setupFaviconRoutes();
     await this.mountMcp();
     console.log("[MCP] Mounted MCP");
     console.log("[MCP] Mounting inspector");
@@ -2133,6 +2135,137 @@ if (container && Component) {
     } catch {
       // Inspector package not installed, skip mounting silently
       // This allows the server to work without the inspector in production
+    }
+  }
+
+  /**
+   * Setup favicon serving routes
+   *
+   * Checks for icon files in the project root and serves them as /favicon.ico
+   * and /icon.png/jpg/webp. This allows the MCP server to have a custom icon
+   * that is displayed in the inspector and other clients.
+   *
+   * Supported files (in order of preference):
+   * - favicon.ico
+   * - icon.png
+   * - icon.jpg
+   * - icon.jpeg
+   * - icon.webp
+   * - icon.svg
+   *
+   * Also serves generated favicons from .mcp-use/static (in dev) or dist/static (in prod)
+   *
+   * @private
+   * @returns Promise that resolves when routes are set up
+   */
+  private async setupFaviconRoutes(): Promise<void> {
+    // 1. Serve static generated icons if they exist (from CLI generator)
+    const staticDir = this.isProductionMode()
+      ? pathHelpers.join(isDeno ? "." : getCwd(), "dist", "static")
+      : pathHelpers.join(isDeno ? "." : getCwd(), TMP_MCP_USE_DIR, "static");
+
+    if (await fsHelpers.existsSync(staticDir)) {
+      try {
+        const files = await fsHelpers.readdirSync(staticDir);
+        for (const file of files) {
+          // Helper function to serve a static file
+          const serveStaticFile = async (c: Context) => {
+            try {
+              const content = await fsHelpers.readFile(
+                pathHelpers.join(staticDir, file)
+              );
+              // Determine content type
+              let type = "application/octet-stream";
+              if (file.endsWith(".png")) type = "image/png";
+              else if (file.endsWith(".jpg") || file.endsWith(".jpeg"))
+                type = "image/jpeg";
+              else if (file.endsWith(".ico")) type = "image/x-icon";
+              else if (file.endsWith(".json") || file.endsWith(".webmanifest"))
+                type = "application/manifest+json";
+
+              return new Response(content, {
+                status: 200,
+                headers: {
+                  "Content-Type": type,
+                  "Cache-Control": "public, max-age=86400",
+                },
+              });
+            } catch {
+              return c.notFound();
+            }
+          };
+
+          // Serve at root path
+          this.app.get(`/${file}`, serveStaticFile);
+          // Also serve under /mcp/ for MCP endpoint compatibility
+          this.app.get(`/mcp/${file}`, serveStaticFile);
+        }
+        console.log(`[SERVER] Serving static assets from ${staticDir}`);
+      } catch (e) {
+        console.warn(
+          `[SERVER] Failed to mount static assets from ${staticDir}`,
+          e
+        );
+      }
+    }
+
+    // 2. Fallback: Check for icon files in the project root (direct serving)
+    const iconFiles = [
+      "favicon.ico",
+      "icon.png",
+      "icon.jpg",
+      "icon.jpeg",
+      "icon.webp",
+      "icon.svg",
+    ];
+
+    let foundIcon: string | null = null;
+    let contentType = "image/x-icon";
+
+    for (const file of iconFiles) {
+      const filePath = pathHelpers.join(getCwd(), file);
+      if (await fsHelpers.existsSync(filePath)) {
+        foundIcon = file;
+        const ext = file.split(".").pop()?.toLowerCase();
+        if (ext === "png") contentType = "image/png";
+        else if (ext === "jpg" || ext === "jpeg") contentType = "image/jpeg";
+        else if (ext === "webp") contentType = "image/webp";
+        else if (ext === "svg") contentType = "image/svg+xml";
+        break;
+      }
+    }
+
+    if (foundIcon) {
+      console.log(`[SERVER] Serving favicon from ${foundIcon}`);
+      const iconPath = pathHelpers.join(getCwd(), foundIcon);
+
+      // Helper function to serve the icon
+      const serveIcon = async (c: Context) => {
+        try {
+          const content = await fsHelpers.readFile(iconPath);
+          return new Response(content, {
+            status: 200,
+            headers: {
+              "Content-Type": contentType,
+              "Cache-Control": "public, max-age=86400", // Cache for 1 day
+            },
+          });
+        } catch {
+          return c.notFound();
+        }
+      };
+
+      // Serve at /favicon.ico (for browser/inspector compatibility)
+      this.app.get("/favicon.ico", serveIcon);
+      // Also serve at /mcp/favicon.ico for MCP endpoint compatibility
+      this.app.get("/mcp/favicon.ico", serveIcon);
+
+      // Also serve at the original filename if it's not favicon.ico
+      if (foundIcon !== "favicon.ico") {
+        this.app.get(`/${foundIcon}`, serveIcon);
+        // Also serve under /mcp/
+        this.app.get(`/mcp/${foundIcon}`, serveIcon);
+      }
     }
   }
 
