@@ -27,10 +27,17 @@ function runPackageManager(
   cwd: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    // Ensure NODE_ENV is not production to prevent skipping dev dependencies
+    const env = { ...process.env };
+    if (env.NODE_ENV === "production") {
+      env.NODE_ENV = "development";
+    }
+    
     const child = spawn(packageManager, args, {
       cwd,
       stdio: "inherit",
       shell: false, // Disable shell to prevent command injection
+      env,
     });
 
     child.on("close", (code) => {
