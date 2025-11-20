@@ -184,6 +184,9 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.1.17
+        version: 4.1.17(vite@7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.25
@@ -193,12 +196,18 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.2
         version: 19.2.3(@types/react@19.2.3)
+      '@vitejs/plugin-react':
+        specifier: ^5.1.1
+        version: 5.1.1(vite@7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+      vite:
+        specifier: '>=5.4.21'
+        version: 7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/create-mcp-use-app/src/templates/mcp-ui:
     dependencies:
@@ -224,6 +233,9 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.1.17
+        version: 4.1.17(vite@7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.25
@@ -233,12 +245,18 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.2
         version: 19.2.3(@types/react@19.2.3)
+      '@vitejs/plugin-react':
+        specifier: ^5.1.1
+        version: 5.1.1(vite@7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+      vite:
+        specifier: '>=5.4.21'
+        version: 7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/create-mcp-use-app/src/templates/starter:
     dependencies:
@@ -264,6 +282,9 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.1.17
+        version: 4.1.17(vite@7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.25
@@ -273,12 +294,18 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.2
         version: 19.2.3(@types/react@19.2.3)
+      '@vitejs/plugin-react':
+        specifier: ^5.1.1
+        version: 5.1.1(vite@7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+      vite:
+        specifier: '>=5.4.21'
+        version: 7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/inspector:
     dependencies:
@@ -8408,7 +8435,6 @@ snapshots:
       vite: 7.2.2(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   '@vitejs/plugin-react@5.1.1(vite@7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1))':
     dependencies:
