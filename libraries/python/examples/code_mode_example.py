@@ -10,7 +10,7 @@ Based on Anthropic's research: https://www.anthropic.com/engineering/code-execut
 
 import asyncio
 
-from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 
 from mcp_use import MCPAgent, MCPClient
 from mcp_use.client.prompts import CODE_MODE_AGENT_PROMPT
@@ -21,7 +21,7 @@ config = {
     "mcpServers": {
         "filesystem": {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "./test"],
         }
     }
 }
@@ -33,24 +33,22 @@ async def main():
     client = MCPClient(config=config, code_mode=True)
 
     # Create LLM
-    llm = ChatOpenAI(model="gpt-5-mini")
+    llm = ChatAnthropic(model="claude-haiku-4-5-20251001")
 
     # Create agent with code mode instructions
-    system_prompt = f"""You are an AI assistant with access to MCP tools via code execution.
-{CODE_MODE_AGENT_PROMPT}
-"""
+    agent = MCPAgent(
+        llm=llm,
+        client=client,
+        system_prompt=CODE_MODE_AGENT_PROMPT,
+        max_steps=50,
+        pretty_print=True,
+    )
 
-    agent = MCPAgent(llm=llm, client=client, system_prompt=system_prompt, max_steps=50)
+    # Example query
+    query = """ Please list all the files in the current folder."""
 
-    try:
-        # Example query
-        query = """ Please list all the files in the current folder."""
-
-        result = await agent.run(query)
-        print(result)
-
-    finally:
-        await client.close_all_sessions()
+    async for _ in agent.stream_events(query):
+        pass
 
 
 if __name__ == "__main__":
