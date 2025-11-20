@@ -2,6 +2,7 @@
 title: "Code Mode"
 description: "Execute MCP tools via code for 98.7% reduction in context overhead"
 icon: "code"
+tag: "New"
 ---
 
 # Code Mode
@@ -145,6 +146,77 @@ return {"updated": len(customers)}
 
 **Benefit**: Sensitive data flows through the workflow without entering the model's context
 
+## Real-World Example: File System Exploration
+
+This example demonstrates how Code Mode dramatically simplifies complex workflows. An agent tasked with "list files and rename them" performs the entire operation efficiently.
+
+
+<Frame>
+  <img src="/images/codemode.gif" alt="Code Mode in Action" />
+</Frame>
+
+### Discovery: Finding the Right Tools
+
+The agent starts by searching for filesystem tools:
+
+```python
+# Agent calls search_tools
+tools = await search_tools('filesystem list')
+```
+
+```json Result (16 filesystem tools found)
+[
+  {"name": "list_directory", "server": "filesystem"},
+  {"name": "list_directory_with_sizes", "server": "filesystem"},
+  {"name": "move_file", "server": "filesystem"},
+  {"name": "read_file", "server": "filesystem"},
+  ...
+]
+```
+
+<Note>
+  **Code Mode Advantage**: The agent discovered 16 tools using ~200 tokens, compared to ~8,000+ tokens if all filesystem tool definitions were pre-loaded into the system prompt.
+</Note>
+
+### Execution: Processing Files Efficiently
+
+The agent writes a single Python script to complete the task:
+
+```python
+# Agent-generated code
+# 1. List files
+files_str = await filesystem.list_directory_with_sizes(path="/path/to/folder")
+
+# 2. Parse and filter locally (doesn't consume LLM context)
+lines = files_str.strip().split('\n')
+file_list = [line for line in lines if line.startswith('[FILE]')]
+
+# 3. Rename files using move_file
+for file_line in file_list:
+    filename = file_line.split()[1]  # Extract filename
+    if '_example' not in filename:
+        source = f"/path/to/folder/{filename}"
+        # Split extension
+        name, ext = filename.rsplit('.', 1)
+        dest = f"/path/to/folder/{name}_example.{ext}"
+        await filesystem.move_file(source=source, destination=dest)
+
+# 4. Return summary, not raw data
+return {"renamed": len(file_list), "total_files": len(lines)}
+```
+
+### Efficiency Comparison
+
+| Metric | Without Code Mode | With Code Mode | Improvement |
+|--------|-------------------|----------------|-------------|
+| **Tool Calls** | 18 (1 list + 1 move × 17 files) | 1 (`execute_code`) | **94% fewer** |
+| **Context Tokens** | ~25,000 (tool defs + results) | ~1,500 (meta tools) | **94% reduction** |
+| **Latency** | 18 round trips | 1 execution | **17x faster** |
+
+<Info>
+  By writing code instead of chaining tool calls, the agent processed the file list locally and only returned the summary. This avoided passing the raw directory listing (and each rename confirmation) through the LLM context.
+</Info>
+
 ## API Reference
 
 ### MCPClient
@@ -185,6 +257,8 @@ Search available tools across all servers.
 - **`search_tools(query, detail_level)`** - Discover tools
 - **`server.tool_name(**kwargs)`** - Call any MCP tool
 - **`__tool_namespaces`** - List of server names
+
+> **Note:** Tool names are automatically sanitized to be valid Python identifiers. For example, a tool named `list-files` becomes `list_files`.
 
 ### Builtins
 
