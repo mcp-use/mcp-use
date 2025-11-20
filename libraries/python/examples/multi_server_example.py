@@ -50,7 +50,7 @@ async def run_multi_server_example():
     llm = ChatAnthropic(model="claude-sonnet-4-5")
 
     # Create agent with the client
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
 
     # Example 1: Using tools from different servers in a single query
     result = await agent.run(

@@ -20,7 +20,7 @@ async def main():
     load_dotenv()
     client = MCPClient(config=everything_server)
     llm = ChatOpenAI(model="gpt-5", temperature=0)
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
 
     result = await agent.run(
         """

@@ -86,6 +86,7 @@ async def main():
         llm=llm,
         use_server_manager=True,
         server_manager=simple_server_manager,
+        pretty_print=True,
     )
 
     # Manually initialize the agent
