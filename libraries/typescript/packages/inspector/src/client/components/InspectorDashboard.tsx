@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { ServerConnectionModal } from "./ServerConnectionModal";
+import { ServerIcon } from "./ServerIcon";
 
 // Temporary connection tester component
 function ConnectionTester({
@@ -600,6 +601,11 @@ export function InspectorDashboard() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3">
+                        <ServerIcon
+                          serverUrl={connection.url}
+                          serverName={connection.name}
+                          size="md"
+                        />
                         <h4 className="font-semibold text-sm">
                           {connection.name}
                         </h4>

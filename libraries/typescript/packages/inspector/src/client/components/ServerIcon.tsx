@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
 import { BlurFade } from "@/client/components/ui/blur-fade";
 import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
+import { useEffect, useState } from "react";
 
 interface ServerIconProps {
   serverUrl?: string;
@@ -156,7 +156,8 @@ export function ServerIcon({
         const faviconServices = [
           // list of providers, google and duckduckgo are not working due to CORS
           // `https://www.google.com/s2/favicons?domain={domain}&sz=128`,
-          `https://icon.horse/icon/{domain}`,
+          // `https://icon.horse/icon/{domain}`,
+          `https://favicon.tools.mcp-use.com/{domain}`,
           // `https://icons.duckduckgo.com/ip3/{domain}.ico`,
         ];
 
@@ -195,6 +196,9 @@ export function ServerIcon({
                 return;
               }
             } catch {
+              console.error(
+                `Failed to fetch favicon for ${currentDomain} from ${serviceTemplate}`
+              );
               // Continue to next service
               continue;
             }
