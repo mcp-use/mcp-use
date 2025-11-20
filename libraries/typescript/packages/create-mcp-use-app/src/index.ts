@@ -27,7 +27,6 @@ function runPackageManager(
   cwd: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    
     const child = spawn(packageManager, args, {
       cwd,
       stdio: "inherit",
