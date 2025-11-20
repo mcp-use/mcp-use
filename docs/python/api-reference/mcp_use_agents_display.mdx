@@ -1,0 +1,57 @@
+---
+title: "Display"
+description: "Display API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/display.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/display.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/display.py</a>
+</Callout>
+
+
+## log_agent_step
+<Card type="info">
+### `function` log_agent_step
+
+Display or log an agent step based on pretty_print flag.
+
+```python
+from mcp_use.agents.display import log_agent_step
+```
+
+**Parameters**
+><ParamField body="item" required="True" >   Parameter value </ParamField>
+><ParamField body="pretty_print" default="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def log_agent_step(item, pretty_print = True):
+```
+
+</Card>
+
+
+## log_agent_stream
+<Card type="info">
+### `function` log_agent_stream
+
+Handle streaming events from astream_events.
+
+
+```python
+from mcp_use.agents.display import log_agent_stream
+```
+
+**Parameters**
+><ParamField body="chunk" required="True" >   Event dictionary from LangChain's astream_events </ParamField>
+><ParamField body="pretty_print" default="True" >   If True, use rich formatting. If False, do nothing. </ParamField>
+
+**Signature**
+```python wrap
+def log_agent_stream(chunk, pretty_print = True):
+```
+
+</Card>
