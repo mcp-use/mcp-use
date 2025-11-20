@@ -50,11 +50,12 @@ Initialize a new MCP client.
 ><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
 ><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
 ><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+><ParamField body="code_mode" type="bool" default="False" >   Whether to enable code execution mode for tools. </ParamField>
 ><ParamField body="verify" type="bool | None" default="True" >   Boolean flag </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(config: str | dict[str, typing.Any] | None = None, allowed_servers: list[str] | None = None, sandbox: bool = False, sandbox_options: mcp_use.client.connectors.sandbox.SandboxOptions | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, verify: bool | None = True):
+def __init__(config: str | dict[str, typing.Any] | None = None, allowed_servers: list[str] | None = None, sandbox: bool = False, sandbox_options: mcp_use.client.connectors.sandbox.SandboxOptions | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, code_mode: bool = False, verify: bool | None = True):
 ```
 
 </Card>
@@ -167,6 +168,51 @@ def create_session(server_name: str, auto_initialize: bool = True):
 </Card>
 
 <Card type="info">
+### `method` execute_code
+
+Execute Python code with access to MCP tools (code mode).
+
+        This method allows agents to interact with MCP tools through Python code
+        instead of direct tool calls, enabling more efficient context usage and
+        data processing.
+
+        Example:
+            ```python
+            client = MCPClient(config="config.json", code_mode=True)
+            await client.create_all_sessions()
+
+            result = await client.execute_code('''
+            tools = await search_tools("github")
+            print(f"Found \{len(tools)\} tools")
+
+            pr = await github.get_pull_request(
+                owner="facebook",
+                repo="react",
+                number=12345
+            )
+            return \{"title": pr["title"]\}
+            ''')
+
+            print(result['result'])  # \{'title': 'Fix bug in...'\}
+            print(result['logs'])    # ['Found 5 tools']
+            ```
+
+
+**Parameters**
+><ParamField body="code" type="str" required="True" >   Python code to execute with tool access. </ParamField>
+><ParamField body="timeout" type="float" default="30.0" >   Execution timeout in seconds. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def execute_code(code: str, timeout: float = 30.0):
+```
+
+</Card>
+
+<Card type="info">
 ### `method` get_all_active_sessions
 
 Get all active sessions.
@@ -191,7 +237,7 @@ Get the list of configured server names.
 
 
 **Returns**
-><ResponseField name="returns" type="list[str]" >List of server names.</ResponseField>
+><ResponseField name="returns" type="list[str]" >List of server names (excludes internal code mode server).</ResponseField>
 
 **Signature**
 ```python wrap
@@ -250,6 +296,34 @@ Save the current configuration to a file.
 **Signature**
 ```python wrap
 def save_config(filepath: str):
+```
+
+</Card>
+
+<Card type="info">
+### `method` search_tools
+
+Search available MCP tools across all active sessions.
+
+        Example:
+            ```python
+            # Search for GitHub-related tools
+            tools = await client.search_tools("github pull")
+            for tool in tools:
+                print(f"\{tool['server']\}.\{tool['name']\}: \{tool['description']\}")
+            ```
+
+
+**Parameters**
+><ParamField body="query" type="str" default='' >   Search query to filter tools by name or description. </ParamField>
+><ParamField body="detail_level" type="str" default='full' >   Level of detail to return: </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="list[dict[str, Any]]" >Level of detail to return: - &quot;names&quot;: Only tool names and server - &quot;descriptions&quot;: Names, server, and descriptions - &quot;full&quot;: Complete tool information including schemas List of tool information dictionaries.</ResponseField>
+
+**Signature**
+```python wrap
+def search_tools(query: str = "", detail_level: str = "full"):
 ```
 
 </Card>

@@ -301,12 +301,14 @@
                     ]
                   },
                   "python/api-reference/mcp_use_client_client",
+                  "python/api-reference/mcp_use_client_code_executor",
                   "python/api-reference/mcp_use_client_config",
                   {
                     "group": "Connectors",
                     "icon": "cable",
                     "pages": [
                       "python/api-reference/mcp_use_client_connectors_base",
+                      "python/api-reference/mcp_use_client_connectors_code_mode",
                       "python/api-reference/mcp_use_client_connectors_http",
                       "python/api-reference/mcp_use_client_connectors_sandbox",
                       "python/api-reference/mcp_use_client_connectors_stdio",
@@ -324,6 +326,7 @@
                       "python/api-reference/mcp_use_client_middleware_middleware"
                     ]
                   },
+                  "python/api-reference/mcp_use_client_prompts",
                   "python/api-reference/mcp_use_client_session",
                   {
                     "group": "Task Managers",
