@@ -8,6 +8,7 @@ direct tool calls.
 
 import asyncio
 import io
+import re
 import time
 from contextlib import redirect_stderr, redirect_stdout
 from typing import TYPE_CHECKING, Any
@@ -48,6 +49,16 @@ class CodeExecutor:
                 - error: Error message if execution failed (None on success)
                 - execution_time: Time taken to execute in seconds
         """
+        # Ensure all servers are connected (lazy connection)
+        # We check client.sessions directly to see internal state
+        configured_servers = set(self.client.get_server_names())
+        active_sessions = set(self.client.sessions.keys())
+
+        # If any configured server is missing from sessions, trigger connection
+        if not configured_servers.issubset(active_sessions):
+            logger.debug("Connecting to configured servers for code execution...")
+            await self.client.create_all_sessions()
+
         start_time = time.time()
         logs: list[str] = []
         result = None
@@ -174,21 +185,36 @@ class CodeExecutor:
         # Add tool namespaces organized by server
         tool_namespaces = {}
 
+        logger.debug(f"Building execution namespace from sessions: {list(self.client.sessions.keys())}")
+
         for server_name, session in self.client.sessions.items():
             # Get tools for this server
             try:
                 tools = await session.list_tools()
+
+                # Skip if no tools found
+                if not tools:
+                    continue
 
                 # Create namespace object for this server
                 server_namespace = type(server_name, (), {})()
 
                 for tool in tools:
                     tool_name = tool.name
+                    # Sanitize tool name to be a valid Python identifier
+                    sanitized_name = re.sub(r"[^a-zA-Z0-9_]", "_", tool_name)
+                    if not sanitized_name[0].isalpha() and sanitized_name[0] != "_":
+                        sanitized_name = f"_{sanitized_name}"
+
                     # Create wrapper function for this tool
                     wrapper = self._create_tool_wrapper(server_name, tool_name, tool)
-                    setattr(server_namespace, tool_name, wrapper)
+                    setattr(server_namespace, sanitized_name, wrapper)
+                    # Also keep original name if it's valid, just in case
+                    if sanitized_name != tool_name and tool_name.isidentifier():
+                        setattr(server_namespace, tool_name, wrapper)
 
                 tool_namespaces[server_name] = server_namespace
+                logger.debug(f"Added namespace '{server_name}' with {len(tools)} tools")
 
             except Exception as e:
                 logger.error(f"Failed to load tools for server {server_name}: {e}")
@@ -198,6 +224,7 @@ class CodeExecutor:
 
         # Add metadata about available namespaces
         namespace["__tool_namespaces"] = list(tool_namespaces.keys())
+        logger.debug(f"Final execution namespace keys: {list(namespace.keys())}")
 
         return namespace
 

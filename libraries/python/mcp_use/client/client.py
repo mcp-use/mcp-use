@@ -311,6 +311,15 @@ class MCPClient:
             if self.allowed_servers is None or name in self.allowed_servers:
                 await self.create_session(name, auto_initialize)
 
+        # If code mode is enabled, only expose the code mode session externally
+        # Internal components (like CodeExecutor) access self.sessions directly
+        if self.code_mode:
+            return {
+                name: sess
+                for name, sess in self.sessions.items()
+                if getattr(sess.connector, "public_identifier", "") == "code_mode:internal"
+            }
+
         return self.sessions
 
     def get_session(self, server_name: str) -> MCPSession:
@@ -337,6 +346,15 @@ class MCPClient:
         Returns:
             Dictionary mapping server names to their MCPSession instances.
         """
+        # If code mode is enabled, only expose the code mode session externally
+        # Internal components (like CodeExecutor) access self.sessions directly
+        if self.code_mode:
+            return {
+                name: sess
+                for name, sess in self.sessions.items()
+                if getattr(sess.connector, "public_identifier", "") == "code_mode:internal"
+            }
+
         return {name: self.sessions[name] for name in self.active_sessions if name in self.sessions}
 
     @telemetry("client_close_session")
@@ -464,15 +482,15 @@ class MCPClient:
 
         Returns:
             List of tool information dictionaries.
-
-        Example:
-            ```python
-            # Search for GitHub-related tools
-            tools = await client.search_tools("github pull")
-            for tool in tools:
-                print(f"{tool['server']}.{tool['name']}: {tool['description']}")
-            ```
         """
+        # Ensure all servers are connected if in code mode (lazy connection)
+        if self.code_mode:
+            configured = set(self.get_server_names())
+            active = set(self.sessions.keys())
+            if not configured.issubset(active):
+                logger.debug("Connecting to configured servers for tool search...")
+                await self.create_all_sessions()
+
         all_tools = []
         query_lower = query.lower()
 
