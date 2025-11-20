@@ -257,7 +257,13 @@ async function buildWidgets(
   try {
     const files = await fs.readdir(resourcesDir);
     entries = files
-      .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
+      .filter((f) => {
+        // Exclude macOS resource fork files and other hidden/system files
+        if (f.startsWith("._") || f.startsWith(".DS_Store")) {
+          return false;
+        }
+        return f.endsWith(".tsx") || f.endsWith(".ts");
+      })
       .map((f) => path.join(resourcesDir, f));
   } catch (error) {
     console.log(chalk.gray("No widgets found in resources/ directory"));
