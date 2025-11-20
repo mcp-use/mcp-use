@@ -251,6 +251,7 @@
                     ]
                   },
                   "python/api-reference/mcp_use_agents_base",
+                  "python/api-reference/mcp_use_agents_display",
                   {
                     "group": "Managers",
                     "icon": "users",

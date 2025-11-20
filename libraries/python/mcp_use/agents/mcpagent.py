@@ -33,6 +33,7 @@ from langchain_core.tools import BaseTool
 from pydantic import BaseModel
 
 from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter
+from mcp_use.agents.display import log_agent_step, log_agent_stream
 from mcp_use.agents.managers.base import BaseServerManager
 from mcp_use.agents.managers.server_manager import ServerManager
 
@@ -79,6 +80,7 @@ class MCPAgent:
         use_server_manager: bool = False,
         server_manager: BaseServerManager | None = None,
         verbose: bool = False,
+        pretty_print: bool = False,
         agent_id: str | None = None,
         api_key: str | None = None,
         base_url: str = "https://cloud.mcp-use.com",
@@ -101,6 +103,7 @@ class MCPAgent:
             additional_instructions: Extra instructions to append to the system prompt.
             disallowed_tools: List of tool names that should not be available to the agent.
             use_server_manager: Whether to use server manager mode instead of exposing all tools.
+            pretty_print: Whether to pretty print the output.
             agent_id: Remote agent ID for remote execution. If provided, creates a remote agent.
             api_key: API key for remote execution. If None, checks MCP_USE_API_KEY env var.
             base_url: Base URL for remote API calls.
@@ -136,6 +139,7 @@ class MCPAgent:
         self.use_server_manager = use_server_manager
         self.server_manager = server_manager
         self.verbose = verbose
+        self.pretty_print = pretty_print
         self.retry_on_error = retry_on_error
         self.max_retries_per_step = max_retries_per_step
         # System prompt configuration
@@ -747,7 +751,6 @@ class MCPAgent:
                                         tool_input_str = str(tool_input)
                                         if len(tool_input_str) > 100:
                                             tool_input_str = tool_input_str[:97] + "..."
-                                        logger.info(f"🔧 Tool call: {tool_name} with input: {tool_input_str}")
 
                                 # Track tool results and yield AgentStep
                                 if hasattr(message, "type") and message.type == "tool":
@@ -756,13 +759,14 @@ class MCPAgent:
 
                                     if tool_call_id and tool_call_id in pending_tool_calls:
                                         action = pending_tool_calls.pop(tool_call_id)
-                                        yield (action, str(observation))
+                                        item = (action, str(observation))
+                                        log_agent_step(item, pretty_print=self.pretty_print)
+                                        yield item
 
                                     observation_str = str(observation)
                                     if len(observation_str) > 100:
                                         observation_str = observation_str[:97] + "..."
                                     observation_str = observation_str.replace("\n", " ")
-                                    logger.info(f"📄 Tool result: {observation_str}")
 
                                     # --- Check for tool updates after tool results (safe restart point) ---
                                     if self.use_server_manager and self.server_manager:
@@ -941,7 +945,7 @@ class MCPAgent:
 
         # 3. Build inputs --------------------------------------------------------
         history_to_use = external_history if external_history is not None else self._conversation_history
-        inputs = {"input": query, "chat_history": history_to_use}
+        inputs = {"messages": [*history_to_use, HumanMessage(content=query)]}
 
         # 3. Stream & diff -------------------------------------------------------
         async for event in self._agent_executor.astream_events(inputs, config={"callbacks": self.callbacks}):
@@ -993,6 +997,8 @@ class MCPAgent:
                 manage_connector=manage_connector,
                 external_history=external_history,
             ):
+                # print(chunk)
+                log_agent_stream(chunk, pretty_print=self.pretty_print)
                 chunk_count += 1
                 if isinstance(chunk, str):
                     total_response_length += len(chunk)
