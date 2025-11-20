@@ -153,13 +153,7 @@ export function ServerIcon({
         const domainsToTry =
           domain !== baseDomain ? [domain, baseDomain] : [domain];
 
-        const faviconServices = [
-          // list of providers, google and duckduckgo are not working due to CORS
-          // `https://www.google.com/s2/favicons?domain={domain}&sz=128`,
-          // `https://icon.horse/icon/{domain}`,
-          `https://favicon.tools.mcp-use.com/{domain}`,
-          // `https://icons.duckduckgo.com/ip3/{domain}.ico`,
-        ];
+        const faviconServices = [`https://favicon.tools.mcp-use.com/${domain}`];
 
         for (const currentDomain of domainsToTry) {
           for (const serviceTemplate of faviconServices) {
