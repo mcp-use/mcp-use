@@ -7,7 +7,7 @@ and sessions from configuration.
 
 import json
 import warnings
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
@@ -18,8 +18,6 @@ from mcp_use.client.session import MCPSession
 from mcp_use.logging import logger
 from mcp_use.telemetry.telemetry import telemetry
 
-# Import CodeExecutor only when code_mode is enabled (lazy import to avoid circular dependency)
-TYPE_CHECKING = False
 if TYPE_CHECKING:
     from mcp_use.client.code_executor import CodeExecutor
 
