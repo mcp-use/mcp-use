@@ -43,7 +43,7 @@ jobs:
           cd /tmp/inspector-mirror
           find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
 
-          rsync -av --delete \
+          rsync -av --delete --exclude '.git' \
             "$GITHUB_WORKSPACE/libraries/typescript/packages/inspector/" \
             /tmp/inspector-mirror/
 
