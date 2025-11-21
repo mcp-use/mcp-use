@@ -8,6 +8,7 @@
     "mcp-use": "1.4.0"
   },
   "changesets": [
-    "petite-clouds-heal"
+    "petite-clouds-heal",
+    "silver-cars-prove"
   ]
 }

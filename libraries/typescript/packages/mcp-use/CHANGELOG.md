@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.4.1-canary.1
+
+### Patch Changes
+
+- 0975320: fix node vm
+  - @mcp-use/cli@2.2.5-canary.1
+  - @mcp-use/inspector@0.6.1-canary.1
+
 ## 1.4.1-canary.0
 
 ### Patch Changes
