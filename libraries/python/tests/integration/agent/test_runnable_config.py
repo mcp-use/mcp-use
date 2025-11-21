@@ -24,7 +24,6 @@ async def test_agent_structured_output():
 
     config = {"mcpServers": {"simple": {"command": sys.executable, "args": [str(server_path), "--transport", "stdio"]}}}
 
-
     client = MCPClient.from_dict(config)
     llm = ChatOpenAI(model="gpt-4o")
     agent = MCPAgent(llm=llm, client=client, max_steps=5)
