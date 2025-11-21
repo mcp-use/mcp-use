@@ -1,32 +1,31 @@
+import {
+  McpServer as OfficialMcpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import cors from "cors";
+import express, { type Express } from "express";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createServer } from "vite";
+import { z } from "zod";
+import {
+  createUIResourceFromDefinition,
+  type UrlConfig,
+} from "./adapters/mcp-ui-adapter.js";
+import { requestLogger } from "./logging.js";
 import type {
+  InputDefinition,
   PromptDefinition,
   ResourceDefinition,
   ResourceTemplateDefinition,
   ServerConfig,
   ToolDefinition,
+  UIResourceContent,
   UIResourceDefinition,
   WidgetProps,
-  InputDefinition,
-  UIResourceContent,
 } from "./types/index.js";
-import {
-  McpServer as OfficialMcpServer,
-  ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import express, { type Express } from "express";
-import cors from "cors";
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-import { readFileSync } from "node:fs";
-import { requestLogger } from "./logging.js";
-import {
-  createUIResourceFromDefinition,
-  type UrlConfig,
-} from "./adapters/mcp-ui-adapter.js";
-import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
-import { AsyncLocalStorage } from "node:async_hooks";
-import { createServer } from "vite";
 import type { WidgetMetadata } from "./types/widget.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
