@@ -708,37 +708,6 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
-  test_app:
-    dependencies:
-      cors:
-        specifier: ^2.8.5
-        version: 2.8.5
-      express:
-        specifier: ^4.18.0
-        version: 4.21.2
-      mcp-use:
-        specifier: workspace:*
-        version: link:../packages/mcp-use
-      react:
-        specifier: ^19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.0(react@19.2.0)
-      tailwindcss:
-        specifier: ^4.0.0
-        version: 4.1.17
-      zod:
-        specifier: ^4.1.12
-        version: 4.1.12
-    devDependencies:
-      '@types/react':
-        specifier: ^19.2.2
-        version: 19.2.3
-      '@types/react-dom':
-        specifier: ^19.2.2
-        version: 19.2.3(@types/react@19.2.3)
-
 packages:
 
   '@ai-sdk/provider-utils@2.2.8':

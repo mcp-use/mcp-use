@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.4.1-canary.0
+
+### Patch Changes
+
+- d434691: Avoid top level node:vm import to enable edge envs
+  - @mcp-use/cli@2.2.5-canary.0
+  - @mcp-use/inspector@0.6.1-canary.0
+
 ## 1.4.0
 
 ### Minor Changes
