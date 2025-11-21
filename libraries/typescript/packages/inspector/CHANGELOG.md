@@ -1,5 +1,17 @@
 # @mcp-use/inspector
 
+## 0.6.0
+
+### Minor Changes
+
+- 33e4a68: Responsive design for inspector :O
+
+### Patch Changes
+
+- 33e4a68: Remove debugger button from pip mode to avoid overlap with close button
+- Updated dependencies [33e4a68]
+  - mcp-use@1.4.0
+
 ## 0.6.0-canary.3
 
 ### Patch Changes
