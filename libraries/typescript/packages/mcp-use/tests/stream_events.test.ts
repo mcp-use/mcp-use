@@ -9,9 +9,9 @@
  * - Tracks telemetry correctly
  */
 
-import type { StreamEvent } from "../index.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { StreamEvent } from "../index.js";
 import { MCPAgent, MCPClient } from "../index.js";
 
 // Mock the MCP client for testing
@@ -20,6 +20,7 @@ vi.mock("../src/client.js", () => ({
     getAllActiveSessions: vi.fn().mockResolvedValue({}),
     createAllSessions: vi.fn().mockResolvedValue({}),
     closeAllSessions: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 

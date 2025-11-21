@@ -73,6 +73,7 @@
     "test:integration:agent": "vitest run tests/integration/agent",
     "test:integration:run": "vitest run tests/integration/agent/test_agent_run.test.ts",
     "test:integration:stream": "vitest run tests/integration/agent/test_agent_stream.test.ts",
+    "test:integration:streamevents": "vitest run tests/integration/agent/test_agent_stream_events.test.ts",
     "test:integration:structured": "vitest run tests/integration/agent/test_agent_structured_output.test.ts",
     "test:integration:manager": "vitest run tests/integration/agent/test_server_manager.test.ts",
     "test:integration:observability": "vitest run tests/integration/agent/test_agent_observability.test.ts",
@@ -99,9 +100,12 @@
     "example:blender": "tsx examples/client/blender_use.ts",
     "example:add_server": "tsx examples/client/add_server_tool.ts",
     "example:structured": "tsx examples/client/structured_output.ts",
-    "example:observability": "tsx examples/client/observability.ts"
+    "example:observability": "tsx examples/client/observability.ts",
+    "example:code_mode": "tsx examples/client/code_mode_example.ts",
+    "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts"
   },
   "peerDependencies": {
+    "@e2b/code-interpreter": "^2.2.0",
     "@langchain/anthropic": "^1.0.0",
     "@langchain/openai": "^1.0.0",
     "langfuse": "^3.38.6",
@@ -109,6 +113,9 @@
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
+    "@e2b/code-interpreter": {
+      "optional": true
+    },
     "@langchain/anthropic": {
       "optional": true
     },
@@ -132,6 +139,8 @@
     "@modelcontextprotocol/sdk": "1.20.0",
     "@scarf/scarf": "^1.4.0",
     "ai": "^4.3.19",
+    "chalk": "^5.4.1",
+    "cli-highlight": "^2.1.11",
     "commander": "^14.0.1",
     "dotenv": "^16.5.0",
     "esbuild": ">=0.25.0",
@@ -140,6 +149,7 @@
     "lodash-es": "^4.17.21",
     "posthog-node": "^5.1.1",
     "strict-url-sanitise": "^0.0.1",
+    "strip-ansi": "^7.1.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "uuid": "^11.1.0",

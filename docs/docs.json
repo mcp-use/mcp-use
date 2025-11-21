@@ -513,7 +513,8 @@
                     ]
                   },
                   "typescript/client/authentication",
-                  "typescript/client/usemcp"
+                  "typescript/client/usemcp",
+                  "typescript/client/code-mode"
                 ]
               },
               {

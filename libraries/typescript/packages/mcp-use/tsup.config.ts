@@ -7,6 +7,7 @@ export default defineConfig({
     "src/browser.ts",
     "src/react/index.ts",
     "src/server/index.ts",
+    "src/client/prompts.ts",
   ],
   format: ["cjs", "esm"],
   outDir: "dist",
@@ -29,6 +30,9 @@ export default defineConfig({
     "@langchain/openai",
     "langchain",
     "@langfuse/langchain",
+    // Keep chalk and supports-color external (uses Node.js built-ins, incompatible with neutral platform)
+    "chalk",
+    "supports-color",
   ],
   esbuildOptions(options) {
     // Preserve node: prefix for Deno compatibility
