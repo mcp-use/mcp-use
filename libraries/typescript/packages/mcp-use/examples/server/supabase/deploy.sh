@@ -224,7 +224,7 @@ if [ ! -f "$FUNCTION_DIR/deno.json" ]; then
     cat > "$FUNCTION_DIR/deno.json" << 'EOF'
 {
   "imports": {
-    "mcp-use/": "https://esm.sh/mcp-use@1.2.5-canary.8/"
+    "mcp-use/": "https://esm.sh/mcp-use@canary/"
   }
 }
 EOF
@@ -236,7 +236,7 @@ else
         # Use a temporary file for safer JSON manipulation
         if command -v jq &> /dev/null; then
             # Use jq if available for proper JSON handling
-            jq '.imports."mcp-use/" = "https://esm.sh/mcp-use@1.2.5-canary.8/"' "$FUNCTION_DIR/deno.json" > "$FUNCTION_DIR/deno.json.tmp"
+            jq '.imports."mcp-use/" = "https://esm.sh/mcp-use@canary/"' "$FUNCTION_DIR/deno.json" > "$FUNCTION_DIR/deno.json.tmp"
             mv "$FUNCTION_DIR/deno.json.tmp" "$FUNCTION_DIR/deno.json"
             print_success "Updated deno.json with mcp-use dependency"
         else
