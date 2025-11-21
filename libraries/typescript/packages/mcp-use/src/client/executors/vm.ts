@@ -1,7 +1,73 @@
-import vm from "node:vm";
 import type { MCPClient, VMExecutorOptions } from "../../client.js";
 import { logger } from "../../logging.js";
 import { BaseCodeExecutor, type ExecutionResult } from "./base.js";
+
+// Lazy-loaded VM module - may not be available in all environments (e.g., Deno)
+let vm: any = null;
+let vmCheckAttempted = false;
+
+/**
+ * Attempt to load the node:vm module synchronously
+ * @returns true if successful, false otherwise
+ */
+function tryLoadVM(): boolean {
+  if (vmCheckAttempted) {
+    return vm !== null;
+  }
+
+  vmCheckAttempted = true;
+
+  try {
+    // Try synchronous require first (CommonJS)
+    const nodeRequire = typeof require !== "undefined" ? require : null;
+    if (nodeRequire) {
+      vm = nodeRequire("node:vm");
+      return true;
+    }
+  } catch (error) {
+    // Not available or in ESM-only environment
+    logger.debug("node:vm module not available via require");
+  }
+
+  return false;
+}
+
+/**
+ * Async version to load VM module via dynamic import
+ */
+async function tryLoadVMAsync(): Promise<boolean> {
+  if (vm !== null) {
+    return true;
+  }
+
+  // If sync require failed, try async import
+  if (!vmCheckAttempted) {
+    // Try sync first
+    if (tryLoadVM()) {
+      return true;
+    }
+  }
+
+  try {
+    // Try ESM dynamic import
+    vm = await import("node:vm");
+    return true;
+  } catch (error) {
+    logger.debug(
+      "node:vm module not available in this environment (e.g., Deno)"
+    );
+    return false;
+  }
+}
+
+/**
+ * Check if VM executor is available in the current environment
+ * This is a synchronous check that returns true if vm was already loaded
+ */
+export function isVMAvailable(): boolean {
+  tryLoadVM();
+  return vm !== null;
+}
 
 /**
  * VM-based code executor using Node.js vm module.
@@ -15,6 +81,26 @@ export class VMCodeExecutor extends BaseCodeExecutor {
     super(client);
     this.defaultTimeout = options?.timeoutMs ?? 30000;
     this.memoryLimitMb = options?.memoryLimitMb;
+
+    // Try to load VM synchronously - will throw in execute() if not available
+    tryLoadVM();
+  }
+
+  /**
+   * Ensure VM module is loaded before execution
+   */
+  private async ensureVMLoaded(): Promise<void> {
+    if (vm !== null) {
+      return;
+    }
+
+    const loaded = await tryLoadVMAsync();
+    if (!loaded) {
+      throw new Error(
+        "node:vm module is not available in this environment. " +
+          "Please use E2B executor instead or run in a Node.js environment."
+      );
+    }
   }
 
   /**
@@ -25,6 +111,10 @@ export class VMCodeExecutor extends BaseCodeExecutor {
    */
   async execute(code: string, timeout?: number): Promise<ExecutionResult> {
     const effectiveTimeout = timeout ?? this.defaultTimeout;
+
+    // Ensure VM module is loaded
+    await this.ensureVMLoaded();
+
     // Ensure all servers are connected
     await this.ensureServersConnected();
 
@@ -94,7 +184,7 @@ export class VMCodeExecutor extends BaseCodeExecutor {
    *
    * @param logs - Array to capture console output
    */
-  private async _buildContext(logs: string[]): Promise<vm.Context> {
+  private async _buildContext(logs: string[]): Promise<any> {
     // Helper to capture logs
     const logHandler = (...args: unknown[]) => {
       logs.push(
