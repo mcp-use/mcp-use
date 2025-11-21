@@ -12,28 +12,6 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Default values
-FUNCTION_NAME="${2:-mcp-server}"
-BUCKET_NAME="${3:-widgets}"
-PROJECT_ID="$1"
-
-# Help function
-show_help() {
-    echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
-    echo ""
-    echo "Usage: ./deploy.sh <project-id> [function-name] [bucket-name]"
-    echo ""
-    echo "Arguments:"
-    echo "  project-id     : Your Supabase project ID (required)"
-    echo "  function-name  : Name of the edge function (default: mcp-server)"
-    echo "  bucket-name    : Name of the storage bucket (default: widgets)"
-    echo ""
-    echo "Example:"
-    echo "  ./deploy.sh nnpumlykjksvxivhywwo"
-    echo "  ./deploy.sh nnpumlykjksvxivhywwo my-mcp-function my-bucket"
-    echo ""
-}
-
 # Print colored messages
 print_info() {
     echo -e "${BLUE}ℹ${NC} $1"
@@ -51,12 +29,52 @@ print_warning() {
     echo -e "${YELLOW}⚠${NC} $1"
 }
 
-# Check if project ID is provided
-if [ -z "$PROJECT_ID" ]; then
-    print_error "Project ID is required"
+# Help function
+show_help() {
+    echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
     echo ""
-    show_help
-    exit 1
+    echo "Usage: ./deploy.sh [project-id] [function-name] [bucket-name]"
+    echo ""
+    echo "Arguments (optional if run interactively):"
+    echo "  project-id     : Your Supabase project ID"
+    echo "  function-name  : Name of the edge function (default: mcp-server)"
+    echo "  bucket-name    : Name of the storage bucket (default: widgets)"
+    echo ""
+    echo "Examples:"
+    echo "  ./deploy.sh                                      # Interactive mode"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo                # With project ID"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo my-function    # With custom function name"
+    echo ""
+}
+
+# Check for command-line arguments first
+PROJECT_ID="$1"
+FUNCTION_NAME="$2"
+BUCKET_NAME="$3"
+
+# Interactive prompts if arguments not provided
+echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
+echo ""
+
+# Prompt for project ID if not provided
+if [ -z "$PROJECT_ID" ]; then
+    read -p "Enter your Supabase project ID: " PROJECT_ID </dev/tty
+    if [ -z "$PROJECT_ID" ]; then
+        print_error "Project ID is required"
+        exit 1
+    fi
+fi
+
+# Prompt for function name if not provided
+if [ -z "$FUNCTION_NAME" ]; then
+    read -p "Enter function name (default: mcp-server): " FUNCTION_NAME </dev/tty
+    FUNCTION_NAME="${FUNCTION_NAME:-mcp-server}"
+fi
+
+# Prompt for bucket name if not provided
+if [ -z "$BUCKET_NAME" ]; then
+    read -p "Enter bucket name (default: widgets): " BUCKET_NAME </dev/tty
+    BUCKET_NAME="${BUCKET_NAME:-widgets}"
 fi
 
 print_info "Starting deployment to Supabase..."
@@ -113,7 +131,7 @@ else
     print_success "Project already linked: $LINKED_PROJECT"
     if [ "$LINKED_PROJECT" != "$PROJECT_ID" ]; then
         print_warning "Linked project ($LINKED_PROJECT) differs from specified project ($PROJECT_ID)"
-        read -p "Continue with linked project? (y/N): " -n 1 -r
+        read -p "Continue with linked project? (y/N): " -n 1 -r </dev/tty
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             print_info "Relinking to $PROJECT_ID..."
@@ -271,7 +289,7 @@ if [ -d "dist/resources/widgets" ]; then
         echo -e "  3. Find 'Bucket Settings' and toggle '${BLUE}Public${NC}' ON"
         echo "  4. Save the changes"
         echo ""
-        read -p "Press ENTER once you've made the bucket public..." -r
+        read -p "Press ENTER once you've made the bucket public..." -r </dev/tty
         echo ""
     else
         print_warning "Widget upload failed"
