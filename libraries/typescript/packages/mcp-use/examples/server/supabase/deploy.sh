@@ -58,7 +58,7 @@ echo ""
 
 # Prompt for project ID if not provided
 if [ -z "$PROJECT_ID" ]; then
-    read -p "Enter your Supabase project ID: " PROJECT_ID
+    read -p "Enter your Supabase project ID: " PROJECT_ID </dev/tty
     if [ -z "$PROJECT_ID" ]; then
         print_error "Project ID is required"
         exit 1
@@ -67,13 +67,13 @@ fi
 
 # Prompt for function name if not provided
 if [ -z "$FUNCTION_NAME" ]; then
-    read -p "Enter function name (default: mcp-server): " FUNCTION_NAME
+    read -p "Enter function name (default: mcp-server): " FUNCTION_NAME </dev/tty
     FUNCTION_NAME="${FUNCTION_NAME:-mcp-server}"
 fi
 
 # Prompt for bucket name if not provided
 if [ -z "$BUCKET_NAME" ]; then
-    read -p "Enter bucket name (default: widgets): " BUCKET_NAME
+    read -p "Enter bucket name (default: widgets): " BUCKET_NAME </dev/tty
     BUCKET_NAME="${BUCKET_NAME:-widgets}"
 fi
 
