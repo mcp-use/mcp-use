@@ -30,8 +30,8 @@ export * from "./src/managers/tools/index.js";
 
 // Export observability utilities
 export {
-  type ObservabilityConfig,
   ObservabilityManager,
+  type ObservabilityConfig,
 } from "./src/observability/index.js";
 
 // Export telemetry utilities
@@ -39,14 +39,14 @@ export { setTelemetrySource, Telemetry } from "./src/telemetry/index.js";
 
 // Export OAuth helper (legacy - for backward compatibility)
 export {
-  OAuthHelper,
-  LINEAR_OAUTH_CONFIG,
   createOAuthMCPConfig,
+  LINEAR_OAUTH_CONFIG,
+  OAuthHelper,
 } from "./src/oauth-helper.js";
 export type {
+  ClientRegistration,
   OAuthConfig,
   OAuthDiscovery,
-  ClientRegistration,
   OAuthResult,
   OAuthState,
 } from "./src/oauth-helper.js";
@@ -60,6 +60,9 @@ export type { StoredState } from "./src/auth/types.js";
 
 // Export React hooks
 export * from "./src/react/index.js";
+
+// Export client prompts
+export { PROMPTS } from "./src/agents/index.js";
 
 // !!! NEVER EXPORT @langchain/core types it causes OOM errors when building the package
 // Note: Message classes (AIMessage, BaseMessage, etc.) are not re-exported to avoid
@@ -80,3 +83,12 @@ export {
   StdioConnector,
   WebSocketConnector,
 };
+
+// Export code execution types
+export type {
+  CodeModeConfig,
+  E2BExecutorOptions,
+  ExecutorOptions,
+  MCPClientOptions,
+  VMExecutorOptions,
+} from "./src/client.js";
