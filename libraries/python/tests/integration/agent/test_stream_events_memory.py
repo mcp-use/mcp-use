@@ -44,7 +44,7 @@ async def test_stream_events_keeps_ai_messages_in_memory():
         async for event in agent.stream_events("Add 2 and 2 using the add tool"):
             if event.get("event") == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
-                if chunk and hasattr(chunk, "content"):
+                if chunk and getattr(chunk, "content", None):
                     first_response_chunks.append(chunk.content)
 
         first_response = "".join(first_response_chunks)
@@ -84,7 +84,7 @@ async def test_stream_events_keeps_ai_messages_in_memory():
         async for event in agent.stream_events("What was my previous question?"):
             if event.get("event") == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
-                if chunk and hasattr(chunk, "content"):
+                if chunk and getattr(chunk, "content", None):
                     second_response_chunks.append(chunk.content)
 
         second_response = "".join(second_response_chunks)

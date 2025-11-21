@@ -942,14 +942,14 @@ class MCPAgent:
         if not self._agent_executor:
             raise RuntimeError("MCP agent failed to initialise – call initialise() first?")
 
-        # 2. Build inputs --------------------------------------------------------
+        # 2. Configure max steps -------------------------------------------------
         self.max_steps = max_steps or self.max_steps
 
         # 3. Build inputs --------------------------------------------------------
         history_to_use = external_history if external_history is not None else self._conversation_history
         inputs = {"messages": [*history_to_use, HumanMessage(content=query)]}
 
-        # 3. Stream & diff -------------------------------------------------------
+        # 4. Stream & collect response chunks ------------------------------------
         recursion_limit = self.max_steps * 2
         # Collect AI message content from streaming chunks
         ai_message_chunks = []
@@ -969,7 +969,7 @@ class MCPAgent:
 
             yield event
 
-        # 4. Update conversation history with both messages
+        # 5. Update conversation history with both messages ---------------------
         if self.memory_enabled:
             # Add human message first
             self.add_to_history(HumanMessage(content=query))
@@ -978,7 +978,7 @@ class MCPAgent:
                 ai_content = "".join(ai_message_chunks)
                 self.add_to_history(AIMessage(content=ai_content))
 
-        # 5. House-keeping -------------------------------------------------------
+        # 6. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
         #  when the agent was initialized in this generator and is not client-managed
         #  and the user does want us to manage the connection.
