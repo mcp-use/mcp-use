@@ -1,0 +1,21 @@
+{
+  "name": "@mcp-use/example-auth-bearer",
+  "version": "1.0.0",
+  "description": "Bearer token authentication example for MCP servers",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "API_KEY=test-token-12345 NODE_ENV=development tsx src/server.ts",
+    "start": "NODE_ENV=production node dist/server.js",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+

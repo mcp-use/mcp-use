@@ -2,6 +2,9 @@ export { createMCPServer, type McpServerInstance } from "./mcp-server.js";
 
 export * from "./types/index.js";
 
+// Authentication middleware
+export { oidcAuthMiddleware, bearerAuthMiddleware, type OIDCConfig } from "./auth/oidc-middleware.js";
+
 // MCP-UI adapter utility functions
 export {
   buildWidgetUrl,

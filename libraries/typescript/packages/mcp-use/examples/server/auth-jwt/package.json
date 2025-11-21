@@ -1,0 +1,25 @@
+{
+  "name": "@mcp-use/example-auth-jwt",
+  "version": "1.0.0",
+  "description": "JWT authentication example for MCP servers with Auth0 & Keycloak",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=development tsx src/server.ts",
+    "start": "NODE_ENV=production node dist/server.js",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+
