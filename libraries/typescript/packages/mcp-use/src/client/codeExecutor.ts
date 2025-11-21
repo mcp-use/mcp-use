@@ -9,7 +9,7 @@ export type {
 
 // Re-export implementations
 export { E2BCodeExecutor } from "./executors/e2b.js";
-export { VMCodeExecutor } from "./executors/vm.js";
+export { VMCodeExecutor, isVMAvailable } from "./executors/vm.js";
 
 // Re-export BaseCodeExecutor as CodeExecutor for backward compatibility
 export { BaseCodeExecutor as CodeExecutor } from "./executors/base.js";
