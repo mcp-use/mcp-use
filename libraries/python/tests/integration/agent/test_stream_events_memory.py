@@ -21,14 +21,7 @@ async def test_stream_events_keeps_ai_messages_in_memory():
     """Test that stream_events properly stores AI messages in conversation history."""
     server_path = Path(__file__).parent.parent / "servers_for_testing" / "simple_server.py"
 
-    config = {
-        "mcpServers": {
-            "simple": {
-                "command": sys.executable,
-                "args": [str(server_path), "--transport", "stdio"]
-            }
-        }
-    }
+    config = {"mcpServers": {"simple": {"command": sys.executable, "args": [str(server_path), "--transport", "stdio"]}}}
 
     client = MCPClient.from_dict(config)
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
@@ -55,25 +48,23 @@ async def test_stream_events_keeps_ai_messages_in_memory():
 
         def log_message(i, msg):
             """Helper to log message content with truncation."""
-            content = msg.content[:50] if hasattr(msg, 'content') else str(msg)
+            content = msg.content[:50] if hasattr(msg, "content") else str(msg)
             logger.info(f"  {i}: {type(msg).__name__}: {content}")
 
         for i, msg in enumerate(agent._conversation_history):
             log_message(i, msg)
 
         # Assert we have at least 2 messages (1 human + 1 AI)
-        assert len(agent._conversation_history) >= 2, \
+        assert len(agent._conversation_history) >= 2, (
             f"Expected at least 2 messages after first query, got {len(agent._conversation_history)}"
+        )
 
         # Check message types
-        assert isinstance(agent._conversation_history[0], HumanMessage), \
-            "First message should be HumanMessage"
-        assert isinstance(agent._conversation_history[-1], AIMessage), \
-            "Last message should be AIMessage"
+        assert isinstance(agent._conversation_history[0], HumanMessage), "First message should be HumanMessage"
+        assert isinstance(agent._conversation_history[-1], AIMessage), "Last message should be AIMessage"
 
         # Check that AI message has content
-        assert len(agent._conversation_history[-1].content) > 0, \
-            "AI message should have content"
+        assert len(agent._conversation_history[-1].content) > 0, "AI message should have content"
 
         # Second query - should maintain context
         logger.info("\n" + "=" * 80)
@@ -96,15 +87,17 @@ async def test_stream_events_keeps_ai_messages_in_memory():
             log_message(i, msg)
 
         # Assert we have at least 4 messages (2 human + 2 AI)
-        assert len(agent._conversation_history) >= 4, \
+        assert len(agent._conversation_history) >= 4, (
             f"Expected at least 4 messages after second query, got {len(agent._conversation_history)}"
+        )
 
         # Verify message order and types
         messages = agent._conversation_history
         expected_types = [HumanMessage, AIMessage, HumanMessage, AIMessage]
         for i, expected_type in enumerate(expected_types):
-            assert isinstance(messages[i], expected_type), \
+            assert isinstance(messages[i], expected_type), (
                 f"Message {i} should be {expected_type.__name__}, got {type(messages[i]).__name__}"
+            )
 
         # Verify all AI messages have content
         for i, msg in enumerate(messages):
@@ -124,14 +117,7 @@ async def test_stream_events_memory_disabled():
     """Test that stream_events respects memory_enabled=False."""
     server_path = Path(__file__).parent.parent / "servers_for_testing" / "simple_server.py"
 
-    config = {
-        "mcpServers": {
-            "simple": {
-                "command": sys.executable,
-                "args": [str(server_path), "--transport", "stdio"]
-            }
-        }
-    }
+    config = {"mcpServers": {"simple": {"command": sys.executable, "args": [str(server_path), "--transport", "stdio"]}}}
 
     client = MCPClient.from_dict(config)
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
@@ -143,8 +129,9 @@ async def test_stream_events_memory_disabled():
             pass
 
         # With memory disabled, history should be empty
-        assert len(agent._conversation_history) == 0, \
+        assert len(agent._conversation_history) == 0, (
             f"Expected empty history with memory_enabled=False, got {len(agent._conversation_history)}"
+        )
 
         logger.info("✅ Test passed: stream_events respects memory_enabled=False")
 
