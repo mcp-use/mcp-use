@@ -131,7 +131,7 @@ else
     print_success "Project already linked: $LINKED_PROJECT"
     if [ "$LINKED_PROJECT" != "$PROJECT_ID" ]; then
         print_warning "Linked project ($LINKED_PROJECT) differs from specified project ($PROJECT_ID)"
-        read -p "Continue with linked project? (y/N): " -n 1 -r
+        read -p "Continue with linked project? (y/N): " -n 1 -r </dev/tty
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             print_info "Relinking to $PROJECT_ID..."
@@ -289,7 +289,7 @@ if [ -d "dist/resources/widgets" ]; then
         echo -e "  3. Find 'Bucket Settings' and toggle '${BLUE}Public${NC}' ON"
         echo "  4. Save the changes"
         echo ""
-        read -p "Press ENTER once you've made the bucket public..." -r
+        read -p "Press ENTER once you've made the bucket public..." -r </dev/tty
         echo ""
     else
         print_warning "Widget upload failed"
