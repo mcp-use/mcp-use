@@ -5,6 +5,8 @@ export type {
   SearchToolsFunction,
   ToolNamespaceInfo,
   ToolSearchResult,
+  ToolSearchMeta,
+  ToolSearchResponse,
 } from "./executors/base.js";
 
 // Re-export implementations

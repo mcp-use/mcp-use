@@ -16,10 +16,21 @@ export interface ToolSearchResult {
   input_schema?: Tool["inputSchema"];
 }
 
+export interface ToolSearchMeta {
+  total_tools: number;
+  namespaces: string[];
+  result_count: number;
+}
+
+export interface ToolSearchResponse {
+  meta: ToolSearchMeta;
+  results: ToolSearchResult[];
+}
+
 export type SearchToolsFunction = (
   query?: string,
   detailLevel?: "names" | "descriptions" | "full"
-) => Promise<ToolSearchResult[]>;
+) => Promise<ToolSearchResponse>;
 
 export interface ToolNamespaceInfo {
   serverName: string;
@@ -130,23 +141,22 @@ export abstract class BaseCodeExecutor {
       detailLevel: "names" | "descriptions" | "full" = "full"
     ) => {
       const allTools: ToolSearchResult[] = [];
+      const allNamespaces = new Set<string>();
       const queryLower = query.toLowerCase();
       const activeSessions = this.client.getAllActiveSessions();
 
+      // First pass: collect all tools and namespaces
       for (const [serverName, session] of Object.entries(activeSessions)) {
         if (serverName === "code_mode") continue;
 
         try {
           const tools = session.connector.tools;
-          for (const tool of tools) {
-            if (query) {
-              const nameMatch = tool.name.toLowerCase().includes(queryLower);
-              const descMatch = tool.description
-                ?.toLowerCase()
-                .includes(queryLower);
-              if (!nameMatch && !descMatch) continue;
-            }
+          if (tools && tools.length > 0) {
+            allNamespaces.add(serverName);
+          }
 
+          for (const tool of tools) {
+            // Build tool info based on detail level (before filtering)
             if (detailLevel === "names") {
               allTools.push({ name: tool.name, server: serverName });
             } else if (detailLevel === "descriptions") {
@@ -168,7 +178,28 @@ export abstract class BaseCodeExecutor {
           logger.warn(`Failed to search tools in server ${serverName}: ${e}`);
         }
       }
-      return allTools;
+
+      // Filter by query if provided
+      let filteredTools = allTools;
+      if (query) {
+        filteredTools = allTools.filter((tool) => {
+          const nameMatch = tool.name.toLowerCase().includes(queryLower);
+          const descMatch = tool.description
+            ?.toLowerCase()
+            .includes(queryLower);
+          return nameMatch || descMatch;
+        });
+      }
+
+      // Return metadata along with results
+      return {
+        meta: {
+          total_tools: allTools.length,
+          namespaces: Array.from(allNamespaces).sort(),
+          result_count: filteredTools.length,
+        },
+        results: filteredTools,
+      };
     };
   }
 }

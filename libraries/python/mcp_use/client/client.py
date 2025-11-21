@@ -474,7 +474,7 @@ class MCPClient:
 
         return await self._code_executor.execute(code, timeout)
 
-    async def search_tools(self, query: str = "", detail_level: str = "full") -> list[dict[str, Any]]:
+    async def search_tools(self, query: str = "", detail_level: str = "full") -> dict[str, Any]:
         """Search available MCP tools across all active sessions.
 
         Args:
@@ -485,12 +485,15 @@ class MCPClient:
                 - "full": Complete tool information including schemas
 
         Returns:
-            List of tool information dictionaries.
+            Dictionary with:
+            - meta: Dictionary containing total_tools, namespaces, and result_count
+            - results: List of tool information dictionaries matching the query
         Example:
             ```python
             # Search for GitHub-related tools
-            tools = await client.search_tools("github pull")
-            for tool in tools:
+            result = await client.search_tools("github pull")
+            print(f"Found {result['meta']['result_count']} tools out of {result['meta']['total_tools']} total")
+            for tool in result['results']:
                 print(f"{tool['server']}.{tool['name']}: {tool['description']}")
             ```
         """
@@ -503,22 +506,18 @@ class MCPClient:
                 await self.create_all_sessions()
 
         all_tools = []
+        all_namespaces = set()
         query_lower = query.lower()
 
+        # First pass: collect all tools and namespaces
         for server_name, session in self.sessions.items():
             try:
                 tools = await session.list_tools()
+                if tools:
+                    all_namespaces.add(server_name)
 
                 for tool in tools:
-                    # Filter by query
-                    if query:
-                        tool_name_match = query_lower in tool.name.lower()
-                        desc_match = hasattr(tool, "description") and query_lower in tool.description.lower()
-
-                        if not (tool_name_match or desc_match):
-                            continue
-
-                    # Build tool info based on detail level
+                    # Build tool info based on detail level (before filtering)
                     if detail_level == "names":
                         tool_info = {
                             "name": tool.name,
@@ -543,4 +542,22 @@ class MCPClient:
             except Exception as e:
                 logger.error(f"Failed to list tools for server {server_name}: {e}")
 
-        return all_tools
+        # Filter by query if provided
+        filtered_tools = all_tools
+        if query:
+            filtered_tools = []
+            for tool_info in all_tools:
+                tool_name_match = query_lower in tool_info["name"].lower()
+                desc_match = query_lower in tool_info.get("description", "").lower()
+                if tool_name_match or desc_match:
+                    filtered_tools.append(tool_info)
+
+        # Return metadata along with results
+        return {
+            "meta": {
+                "total_tools": len(all_tools),
+                "namespaces": sorted(list(all_namespaces)),
+                "result_count": len(filtered_tools),
+            },
+            "results": filtered_tools,
+        }

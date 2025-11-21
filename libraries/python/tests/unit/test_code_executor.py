@@ -223,8 +223,9 @@ class TestCodeExecutorWithTools:
         mock_client.sessions = {"test_server": mock_session}
 
         code = """
-tools = await search_tools()
-return {"count": len(tools), "names": [t['name'] for t in tools]}
+result = await search_tools()
+tools = result['results']
+return {"count": len(tools), "names": [t['name'] for t in tools], "total": result['meta']['total_tools']}
 """
 
         result = await code_executor.execute(code, timeout=5.0)
@@ -253,9 +254,13 @@ return {"count": len(tools), "names": [t['name'] for t in tools]}
         mock_client.sessions = {"test": mock_session}
 
         code = """
-all_tools = await search_tools()
-github_tools = await search_tools("github")
-slack_tools = await search_tools("slack")
+all_result = await search_tools()
+github_result = await search_tools("github")
+slack_result = await search_tools("slack")
+
+all_tools = all_result['results']
+github_tools = github_result['results']
+slack_tools = slack_result['results']
 
 return {
     "total": len(all_tools),
