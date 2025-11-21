@@ -440,19 +440,21 @@ class OAuth:
         except httpx.HTTPError as e:
             logger.debug(f"Failed probing server for PRM via 401: {e}")
 
-        if prm_url:
-            try:
-                logger.debug(f"Trying OAuth PRM endpoint at: {prm_url}")
-                prm_response = await client.get(prm_url)
-                prm_response.raise_for_status()
-                prm = prm_response.json()
-                self._resource_metadata = ProtectedResourceMetadata(**prm)
-                logger.debug("Successfully got the PRM data")
-                logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
-                return
-            except (httpx.HTTPError, ValueError) as e:
-                logger.debug(f"Failed to discover OAuth PRM at {prm_url}: {e}")
-                pass
+        if not prm_url:
+            prm_url = f"{base_url}/.well-known/oauth-protected-resource"
+            
+        try:
+            logger.debug(f"Trying OAuth PRM endpoint at: {prm_url}")
+            prm_response = await client.get(prm_url)
+            prm_response.raise_for_status()
+            prm = prm_response.json()
+            self._resource_metadata = ProtectedResourceMetadata(**prm)
+            logger.debug("Successfully got the PRM data")
+            logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
+            return
+        except (httpx.HTTPError, ValueError) as e:
+            logger.debug(f"Failed to discover OAuth PRM at {prm_url}: {e}")
+            pass
 
         well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
         try:
