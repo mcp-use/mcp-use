@@ -7,6 +7,14 @@ let vm: any = null;
 let vmCheckAttempted = false;
 
 /**
+ * Get the node:vm module name dynamically to prevent bundlers from resolving it
+ */
+function getVMModuleName(): string {
+  // Use this indirection to prevent static analysis by bundlers like Deno
+  return ["node", "vm"].join(":");
+}
+
+/**
  * Attempt to load the node:vm module synchronously
  * @returns true if successful, false otherwise
  */
@@ -21,7 +29,8 @@ function tryLoadVM(): boolean {
     // Try synchronous require first (CommonJS)
     const nodeRequire = typeof require !== "undefined" ? require : null;
     if (nodeRequire) {
-      vm = nodeRequire("node:vm");
+      // Use dynamic module name to hide from bundler
+      vm = nodeRequire(getVMModuleName());
       return true;
     }
   } catch (error) {
@@ -49,8 +58,9 @@ async function tryLoadVMAsync(): Promise<boolean> {
   }
 
   try {
-    // Try ESM dynamic import
-    vm = await import("node:vm");
+    // Try ESM dynamic import - use dynamic module name to hide from bundler
+    // This prevents Deno's bundler from trying to resolve node:vm at build time
+    vm = await import(/* @vite-ignore */ getVMModuleName());
     return true;
   } catch (error) {
     logger.debug(
