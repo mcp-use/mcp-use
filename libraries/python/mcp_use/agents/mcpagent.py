@@ -964,7 +964,7 @@ class MCPAgent:
             # Collect AI message chunks for history
             if event.get("event") == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
-                if chunk and hasattr(chunk, "content") and chunk.content:
+                if chunk and getattr(chunk, "content", None):
                     ai_message_chunks.append(chunk.content)
 
             yield event
