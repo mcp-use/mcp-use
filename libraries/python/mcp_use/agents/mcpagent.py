@@ -26,7 +26,6 @@ from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     SystemMessage,
-    ToolMessage,
 )
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
@@ -952,6 +951,9 @@ class MCPAgent:
 
         # 3. Stream & diff -------------------------------------------------------
         recursion_limit = self.max_steps * 2
+        # Collect AI message content from streaming chunks
+        ai_message_chunks = []
+
         async for event in self._agent_executor.astream_events(
             inputs,
             config={
@@ -959,18 +961,22 @@ class MCPAgent:
                 "recursion_limit": recursion_limit,
             },
         ):
-            if event.get("event") == "on_chain_end":
-                output = event["data"]["output"]
-                if isinstance(output, list):
-                    for message in output:
-                        # Filter out ToolMessage (equivalent to old ToolAgentAction)
-                        # to avoid adding intermediate tool execution details to history
-                        if isinstance(message, BaseMessage) and not isinstance(message, ToolMessage):
-                            self.add_to_history(message)
+            # Collect AI message chunks for history
+            if event.get("event") == "on_chat_model_stream":
+                chunk = event.get("data", {}).get("chunk")
+                if chunk and hasattr(chunk, "content") and chunk.content:
+                    ai_message_chunks.append(chunk.content)
+
             yield event
 
+        # 4. Update conversation history with both messages
         if self.memory_enabled:
+            # Add human message first
             self.add_to_history(HumanMessage(content=query))
+            # Add AI message if we collected any chunks
+            if ai_message_chunks:
+                ai_content = "".join(ai_message_chunks)
+                self.add_to_history(AIMessage(content=ai_content))
 
         # 5. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
