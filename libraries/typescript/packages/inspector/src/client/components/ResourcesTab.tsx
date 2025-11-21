@@ -7,8 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
 import type { ResourceResult } from "./resources";
-
 import {
   ResizableHandle,
   ResizablePanel,
@@ -58,6 +60,27 @@ export function ResourcesTab({
   const [isCopied, setIsCopied] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const resourceDisplayRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Handle mobile view transitions
+  useEffect(() => {
+    if (selectedResource) {
+      setMobileView("detail");
+    } else {
+      setMobileView("list");
+    }
+  }, [selectedResource]);
 
   // Expose focusSearch and blurSearch methods via ref
   useImperativeHandle(ref, () => ({
@@ -296,6 +319,109 @@ export function ResourcesTab({
       console.error("[ResourcesTab] Failed to toggle fullscreen:", error);
     }
   }, []);
+
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col overflow-hidden relative bg-background">
+        {/* Breadcrumbs / Header - Only show when not on list view */}
+        {mobileView !== "list" && (
+          <div className="flex items-center gap-2 p-2 border-b shrink-0 bg-background z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedResource(null);
+                setMobileView("list");
+              }}
+              className="p-0 h-8 w-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center text-sm font-medium">
+              <button
+                onClick={() => {
+                  setSelectedResource(null);
+                  setMobileView("list");
+                }}
+                className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+              >
+                Resources
+              </button>
+              {mobileView === "detail" && (
+                <>
+                  <span className="mx-2 text-muted-foreground">/</span>
+                  <span className="text-foreground">Content</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 relative overflow-hidden">
+          <AnimatePresence initial={false} mode="popLayout">
+            {mobileView === "list" && (
+              <motion.div
+                key="list"
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute inset-0 flex flex-col bg-background z-0"
+              >
+                <ResourcesTabHeader
+                  activeTab={activeTab}
+                  isSearchExpanded={isSearchExpanded}
+                  searchQuery={searchQuery}
+                  filteredResourcesCount={filteredResources.length}
+                  onSearchExpand={() => setIsSearchExpanded(true)}
+                  onSearchChange={setSearchQuery}
+                  onSearchBlur={handleSearchBlur}
+                  onTabSwitch={() => {}}
+                  searchInputRef={
+                    searchInputRef as React.RefObject<HTMLInputElement>
+                  }
+                />
+                <div className="flex flex-col h-full">
+                  <ResourcesList
+                    resources={filteredResources}
+                    selectedResource={selectedResource}
+                    onResourceSelect={handleResourceSelect}
+                    focusedIndex={focusedIndex}
+                  />
+                </div>
+              </motion.div>
+            )}
+
+            {mobileView === "detail" && (
+              <motion.div
+                key="detail"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute inset-0 bg-white dark:bg-zinc-900 z-10"
+              >
+                <div ref={resourceDisplayRef} className="h-full">
+                  <ResourceResultDisplay
+                    result={currentResult}
+                    isLoading={isLoading}
+                    previewMode={previewMode}
+                    serverId={serverId}
+                    readResource={readResource}
+                    onTogglePreview={() => setPreviewMode(!previewMode)}
+                    onCopy={handleCopy}
+                    onDownload={handleDownload}
+                    onFullscreen={handleFullscreen}
+                    isCopied={isCopied}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">

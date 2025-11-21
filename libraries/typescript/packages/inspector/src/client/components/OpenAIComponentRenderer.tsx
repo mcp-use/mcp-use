@@ -717,11 +717,14 @@ export function OpenAIComponentRenderer({
         </div>
       )}
 
-      {showConsole && isSameOrigin && displayMode !== "fullscreen" && (
-        <div className="absolute top-2 right-2 z-10">
-          <IframeConsole iframeId={toolId} enabled={true} />
-        </div>
-      )}
+      {showConsole &&
+        isSameOrigin &&
+        displayMode !== "fullscreen" &&
+        displayMode !== "pip" && (
+          <div className="absolute top-2 right-2 z-10">
+            <IframeConsole iframeId={toolId} enabled={true} />
+          </div>
+        )}
       <div
         ref={containerRef}
         className={cn(

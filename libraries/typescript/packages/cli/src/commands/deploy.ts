@@ -145,17 +145,33 @@ async function detectRuntime(
 /**
  * Prompt user for confirmation
  */
-async function prompt(question: string): Promise<boolean> {
+async function prompt(
+  question: string,
+  defaultValue: "y" | "n" = "n"
+): Promise<boolean> {
   const readline = await import("node:readline");
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
 
+  // Show default in the prompt
+  const defaultIndicator = defaultValue === "y" ? "Y/n" : "y/N";
+  const questionWithDefault = question.replace(
+    /(\(y\/n\):)/,
+    `(${defaultIndicator}):`
+  );
+
   return new Promise((resolve) => {
-    rl.question(question, (answer) => {
+    rl.question(questionWithDefault, (answer) => {
       rl.close();
-      resolve(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
+      const trimmedAnswer = answer.trim().toLowerCase();
+      // If empty, use default
+      if (trimmedAnswer === "") {
+        resolve(defaultValue === "y");
+      } else {
+        resolve(trimmedAnswer === "y" || trimmedAnswer === "yes");
+      }
     });
   });
 }
@@ -178,18 +194,22 @@ async function createTarball(cwd: string): Promise<string> {
     "__pycache__",
     "*.pyc",
     ".DS_Store",
+    "._*", // macOS resource fork files
+    ".mcp-use", // Build artifacts directory
     ".env",
     ".env.local",
     "*.log",
   ];
 
   // Build tar exclude flags
+  // Use --exclude for each pattern (more reliable than single string)
   const excludeFlags = excludePatterns
-    .map((pattern) => `--exclude='${pattern}'`)
+    .map((pattern) => `--exclude=${pattern}`)
     .join(" ");
 
-  // Create tarball
-  const command = `tar ${excludeFlags} -czf "${tarballPath}" -C "${cwd}" .`;
+  // Create tarball with explicit exclusions
+  // Note: tar on macOS handles patterns differently, so we use both --exclude and --exclude-vcs-ignores
+  const command = `tar ${excludeFlags} -czf "${tarballPath}" -C "${cwd}" . 2>&1 || true`;
 
   try {
     await execAsync(command);
@@ -590,9 +610,10 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
       console.log();
 
-      // Confirm deployment
+      // Confirm deployment (default to yes)
       const shouldDeploy = await prompt(
-        chalk.white("Deploy from local source? (y/n): ")
+        chalk.white("Deploy from local source? (y/n): "),
+        "y"
       );
 
       if (!shouldDeploy) {

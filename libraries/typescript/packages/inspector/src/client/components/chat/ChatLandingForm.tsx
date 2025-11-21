@@ -41,12 +41,12 @@ export function ChatLandingForm({
 }: ChatLandingFormProps) {
   return (
     <AuroraBackground>
-      <BlurFade className="w-full max-w-4xl mx-auto px-4">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-light mb-2 dark:text-white">
+      <BlurFade className="w-full max-w-4xl mx-auto px-2 sm:px-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-light mb-2 dark:text-white">
             Chat with MCP Server
           </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 font-light">
+          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 font-light break-all px-2">
             {mcpServerUrl}
           </p>
         </div>

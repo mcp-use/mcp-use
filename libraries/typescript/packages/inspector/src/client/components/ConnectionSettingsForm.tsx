@@ -372,7 +372,7 @@ export function ConnectionSettingsForm({
               </Button>
             </div>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Authentication</DialogTitle>
             </DialogHeader>

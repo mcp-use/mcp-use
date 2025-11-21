@@ -39,14 +39,14 @@ export function ListItem({
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full text-left cursor-pointer p-4 border-b dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors group",
+        "w-full text-left cursor-pointer p-2 sm:p-4 border-b dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors group",
         isSelected &&
           "bg-zinc-50 dark:bg-zinc-800 border-l-4 border-l-zinc-500",
         isFocused && "ring-2 ring-zinc-500 dark:ring-zinc-400 ring-inset",
         className
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2 sm:gap-3">
         <div className="flex-shrink-0 mt-1">
           <div
             className={cn(

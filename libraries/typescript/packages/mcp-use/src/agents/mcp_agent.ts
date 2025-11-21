@@ -272,8 +272,13 @@ export class MCPAgent {
           `🔌 Found ${Object.keys(this.sessions).length} existing sessions`
         );
 
-        // If no active sessions exist, create new ones
-        if (Object.keys(this.sessions).length === 0) {
+        // Filter out internal code_mode session to check if real MCP servers are connected
+        const nonCodeModeSessions = Object.keys(this.sessions).filter(
+          (name) => name !== "code_mode"
+        );
+
+        // If no active sessions exist (excluding code_mode), create new ones
+        if (nonCodeModeSessions.length === 0) {
           logger.info("🔄 No active sessions found, creating new ones...");
           this.sessions = await this.client.createAllSessions();
           logger.info(
@@ -282,11 +287,26 @@ export class MCPAgent {
         }
 
         // Create LangChain tools directly from the client using the adapter
-        this._tools = await LangChainAdapter.createTools(this.client);
+        // In code mode, only expose the code_mode tools (execute_code, search_tools)
+        if (this.client.codeMode) {
+          const codeModeSession = this.sessions["code_mode"];
+          if (codeModeSession) {
+            this._tools = await this.adapter.createToolsFromConnectors([
+              codeModeSession.connector,
+            ]);
+            logger.info(`🛠️ Created ${this._tools.length} code mode tools`);
+          } else {
+            throw new Error(
+              "Code mode enabled but code_mode session not found"
+            );
+          }
+        } else {
+          this._tools = await LangChainAdapter.createTools(this.client);
+          logger.info(
+            `🛠️ Created ${this._tools.length} LangChain tools from client`
+          );
+        }
         this._tools.push(...this.additionalTools);
-        logger.info(
-          `🛠️ Created ${this._tools.length} LangChain tools from client`
-        );
       } else {
         // Using direct connector - only establish connection
         logger.info(
@@ -1062,6 +1082,8 @@ export class MCPAgent {
           tags: this.getTags(),
           // Set trace name for LangChain/Langfuse
           runName: this.metadata.trace_name || "mcp-use-agent",
+          // Set recursion limit to 3x maxSteps to account for model calls + tool executions
+          recursionLimit: this.maxSteps * 3,
           // Pass sessionId for Langfuse if present in metadata
           ...(this.metadata.session_id && {
             sessionId: this.metadata.session_id,
@@ -1348,8 +1370,8 @@ export class MCPAgent {
       this._agentExecutor = null;
       this._tools = [];
       if (this.client) {
-        logger.info("🔄 Closing sessions through client");
-        await this.client.closeAllSessions();
+        logger.info("🔄 Closing client and cleaning up resources");
+        await this.client.close();
         this.sessions = {};
       } else {
         for (const connector of this.connectors) {
@@ -1364,6 +1386,36 @@ export class MCPAgent {
       this._initialized = false;
       logger.info("👋 Agent closed successfully");
     }
+  }
+
+  /**
+   * Yields with pretty-printed output for code mode.
+   * This method formats and displays tool executions in a user-friendly way with syntax highlighting.
+   */
+  public async *prettyStreamEvents<T = string>(
+    query: string,
+    maxSteps?: number,
+    manageConnector = true,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): AsyncGenerator<void, string, void> {
+    const { prettyStreamEvents: prettyStream } = await import("./display.js");
+
+    const finalResponse = "";
+
+    for await (const _ of prettyStream(
+      this.streamEvents(
+        query,
+        maxSteps,
+        manageConnector,
+        externalHistory,
+        outputSchema
+      )
+    )) {
+      yield;
+    }
+
+    return finalResponse;
   }
 
   /**
@@ -1408,15 +1460,17 @@ export class MCPAgent {
       this.maxSteps = maxSteps ?? this.maxSteps;
 
       const display_query =
-        query.length > 50
+        typeof query === "string" && query.length > 50
           ? `${query.slice(0, 50).replace(/\n/g, " ")}...`
-          : query.replace(/\n/g, " ");
+          : typeof query === "string"
+            ? query.replace(/\n/g, " ")
+            : String(query);
       logger.info(`💬 Received query for streamEvents: '${display_query}'`);
 
       // Add user message to history if memory enabled
       if (this.memoryEnabled) {
-        logger.info(`🔄 Adding user message to history: ${query}`);
-        this.addToHistory(new HumanMessage(query));
+        logger.info(`🔄 Adding user message to history: ${display_query}`);
+        this.addToHistory(new HumanMessage({ content: query }));
       }
 
       // Prepare history
@@ -1455,6 +1509,8 @@ export class MCPAgent {
           tags: this.getTags(),
           // Set trace name for LangChain/Langfuse
           runName: this.metadata.trace_name || "mcp-use-agent",
+          // Set recursion limit to 3x maxSteps to account for model calls + tool executions
+          recursionLimit: this.maxSteps * 3,
           // Pass sessionId for Langfuse if present in metadata
           ...(this.metadata.session_id && {
             sessionId: this.metadata.session_id,
@@ -1598,7 +1654,7 @@ export class MCPAgent {
         // Add the final AI response to conversation history if memory is enabled
         this.addToHistory(new AIMessage(finalResponse));
       }
-
+      console.log("\n\n");
       logger.info(`🎉 StreamEvents complete - ${eventCount} events emitted`);
       success = true;
     } catch (e) {

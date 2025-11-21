@@ -1,5 +1,46 @@
 # mcp-use
 
+## 1.4.0-canary.3
+
+### Minor Changes
+
+- 35fd9ae: feat: introduced Code Mode
+  - Added a new `code-mode` feature allowing agents to execute code using MCP tools.
+  - Implemented `VMCodeExecutor` and `E2BCodeExecutor` for local and remote execution environments.
+  - Created `CodeModeConnector` to facilitate tool discovery and execution.
+  - Updated documentation and examples for using Code Mode.
+  - Enhanced `MCPClient` to support code execution configuration.
+  - Added tests for code execution functionality and integration with agents.
+
+### Patch Changes
+
+- @mcp-use/cli@2.2.4-canary.3
+- @mcp-use/inspector@0.6.0-canary.3
+
+## 1.3.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [c754733]
+  - @mcp-use/cli@2.2.4-canary.2
+  - @mcp-use/inspector@0.6.0-canary.2
+
+## 1.3.4-canary.1
+
+### Patch Changes
+
+- Updated dependencies [451c507]
+  - @mcp-use/inspector@0.6.0-canary.1
+  - @mcp-use/cli@2.2.4-canary.1
+
+## 1.3.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1f4a798]
+  - @mcp-use/inspector@0.6.0-canary.0
+  - @mcp-use/cli@2.2.4-canary.0
+
 ## 1.3.3
 
 ### Patch Changes

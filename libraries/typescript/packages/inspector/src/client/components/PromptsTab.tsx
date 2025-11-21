@@ -8,6 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -61,6 +64,36 @@ export function PromptsTab({
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "detail" | "response">(
+    "list"
+  );
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Handle mobile view transitions
+  useEffect(() => {
+    if (selectedPrompt) {
+      setMobileView("detail");
+    } else {
+      setMobileView("list");
+    }
+  }, [selectedPrompt]);
+
+  // Switch to response view when execution finishes (if on mobile)
+  useEffect(() => {
+    if (isMobile && results.length > 0 && !isExecuting) {
+      setMobileView("response");
+    }
+  }, [results, isExecuting, isMobile]);
 
   // Expose focusSearch and blurSearch methods via ref
   useImperativeHandle(ref, () => ({
@@ -383,6 +416,157 @@ export function PromptsTab({
     },
     [savedPrompts, saveSavedPrompts, selectedSavedPrompt]
   );
+
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col overflow-hidden relative bg-background">
+        {/* Breadcrumbs / Header - Only show when not on list view */}
+        {mobileView !== "list" && (
+          <div className="flex items-center gap-2 p-2 border-b shrink-0 bg-background z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (mobileView === "response") {
+                  setMobileView("detail");
+                } else {
+                  setSelectedPrompt(null);
+                  setMobileView("list");
+                }
+              }}
+              className="p-0 h-8 w-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center text-sm font-medium">
+              <button
+                onClick={() => {
+                  setSelectedPrompt(null);
+                  setMobileView("list");
+                }}
+                className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+              >
+                Prompts
+              </button>
+              {mobileView !== "list" && (
+                <>
+                  <span className="mx-2 text-muted-foreground">/</span>
+                  <button
+                    onClick={() => {
+                      if (mobileView === "response") {
+                        setMobileView("detail");
+                      }
+                    }}
+                    className={
+                      mobileView === "detail"
+                        ? "text-foreground hover:underline"
+                        : mobileView === "response"
+                          ? "text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+                          : "text-muted-foreground"
+                    }
+                  >
+                    Execute
+                  </button>
+                </>
+              )}
+              {mobileView === "response" && (
+                <>
+                  <span className="mx-2 text-muted-foreground">/</span>
+                  <span className="text-foreground">Response</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 relative overflow-hidden">
+          <AnimatePresence initial={false} mode="popLayout">
+            {mobileView === "list" && (
+              <motion.div
+                key="list"
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute inset-0 flex flex-col bg-background z-0"
+              >
+                <PromptsTabHeader
+                  activeTab={activeTab}
+                  isSearchExpanded={isSearchExpanded}
+                  searchQuery={searchQuery}
+                  filteredPromptsCount={filteredPrompts.length}
+                  savedPromptsCount={savedPrompts.length}
+                  onSearchExpand={() => setIsSearchExpanded(true)}
+                  onSearchChange={setSearchQuery}
+                  onSearchBlur={handleSearchBlur}
+                  onTabSwitch={() =>
+                    setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
+                  }
+                  searchInputRef={
+                    searchInputRef as React.RefObject<HTMLInputElement>
+                  }
+                />
+                {activeTab === "prompts" ? (
+                  <PromptsList
+                    prompts={filteredPrompts}
+                    selectedPrompt={selectedPrompt}
+                    onPromptSelect={handlePromptSelect}
+                    focusedIndex={focusedIndex}
+                  />
+                ) : (
+                  <SavedPromptsList
+                    savedPrompts={savedPrompts}
+                    selectedPrompt={selectedSavedPrompt}
+                    onLoadPrompt={loadSavedPrompt}
+                    onDeletePrompt={deleteSavedPrompt}
+                    focusedIndex={focusedIndex}
+                  />
+                )}
+              </motion.div>
+            )}
+
+            {mobileView === "detail" && (
+              <motion.div
+                key="detail"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute inset-0 bg-background z-10"
+              >
+                <PromptExecutionPanel
+                  selectedPrompt={selectedPrompt}
+                  promptArgs={promptArgs}
+                  isExecuting={isExecuting}
+                  isConnected={isConnected}
+                  onArgChange={handleArgChange}
+                  onExecute={executePrompt}
+                  onSave={openSaveDialog}
+                />
+              </motion.div>
+            )}
+
+            {mobileView === "response" && (
+              <motion.div
+                key="response"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute inset-0 bg-background z-20"
+              >
+                <PromptResultDisplay
+                  results={results}
+                  copiedResult={copiedResult}
+                  onCopy={handleCopyResult}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
