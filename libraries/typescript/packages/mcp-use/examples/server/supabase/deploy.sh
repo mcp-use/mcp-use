@@ -275,8 +275,8 @@ print_success "Function deployed successfully"
 if [ -d "dist/resources/widgets" ]; then
     print_info "Uploading widgets to storage bucket: $BUCKET_NAME"
     
-    # Upload widgets to storage
-    if supabase storage cp -r dist/resources/widgets "ss:///${BUCKET_NAME}/" --experimental 2>&1; then
+    # Upload widgets to storage (upload contents, not the folder itself)
+    if supabase storage cp -r dist/resources/widgets/* "ss:///${BUCKET_NAME}/" --experimental 2>&1; then
         print_success "Widgets uploaded successfully"
         
         # Important: The bucket must be public for widgets to be accessible
