@@ -34,6 +34,7 @@ async def run_limited_memory_chat():
         client=client,
         max_steps=15,
         memory_enabled=True,  # Disable built-in memory, use external history
+        pretty_print=True,
     )
 
     # Configuration: Limited history mode

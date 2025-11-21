@@ -46,7 +46,7 @@ async def main():
 
     # Create LLM and agent
     llm = ChatOpenAI(model="gpt-5", temperature=0)
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
 
     try:
         # Run the same test query
