@@ -43,8 +43,13 @@ export interface MCPClientOptions {
   codeMode?: boolean | CodeModeConfig;
 }
 
-// Export executor classes for external use
-export { BaseCodeExecutor, E2BCodeExecutor, VMCodeExecutor };
+// Export executor classes and utilities for external use
+export {
+  BaseCodeExecutor,
+  E2BCodeExecutor,
+  isVMAvailable,
+  VMCodeExecutor,
+} from "./client/codeExecutor.js";
 
 /**
  * Node.js-specific MCPClient implementation
@@ -168,19 +173,50 @@ export class MCPClient extends BaseMCPClient {
         const opts = this._executorOptions as E2BExecutorOptions | undefined;
         if (!opts?.apiKey) {
           logger.warn("E2B executor requires apiKey. Falling back to VM.");
-          this._codeExecutor = new VMCodeExecutor(
-            this,
-            this._executorOptions as VMExecutorOptions
-          );
+          try {
+            this._codeExecutor = new VMCodeExecutor(
+              this,
+              this._executorOptions as VMExecutorOptions
+            );
+          } catch (error) {
+            throw new Error(
+              "VM executor is not available in this environment and E2B API key is not provided. " +
+                "Please provide an E2B API key or run in a Node.js environment."
+            );
+          }
         } else {
           this._codeExecutor = new E2BCodeExecutor(this, opts);
         }
       } else {
-        // Default to VM
-        this._codeExecutor = new VMCodeExecutor(
-          this,
-          this._executorOptions as VMExecutorOptions
-        );
+        // Default to VM, but fall back to E2B if VM is not available
+        try {
+          this._codeExecutor = new VMCodeExecutor(
+            this,
+            this._executorOptions as VMExecutorOptions
+          );
+        } catch (error) {
+          // VM not available (e.g., in Deno), try E2B fallback
+          const e2bOpts = this._executorOptions as
+            | E2BExecutorOptions
+            | undefined;
+          const e2bApiKey = e2bOpts?.apiKey || process.env.E2B_API_KEY;
+
+          if (e2bApiKey) {
+            logger.info(
+              "VM executor not available in this environment. Falling back to E2B."
+            );
+            this._codeExecutor = new E2BCodeExecutor(this, {
+              ...e2bOpts,
+              apiKey: e2bApiKey,
+            });
+          } else {
+            throw new Error(
+              "VM executor is not available in this environment. " +
+                "Please provide an E2B API key via executorOptions or E2B_API_KEY environment variable, " +
+                "or run in a Node.js environment."
+            );
+          }
+        }
       }
     }
     return this._codeExecutor;

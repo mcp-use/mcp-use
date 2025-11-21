@@ -84,7 +84,7 @@ export {
   WebSocketConnector,
 };
 
-// Export code execution types
+// Export code execution types and classes
 export type {
   CodeModeConfig,
   E2BExecutorOptions,
@@ -92,3 +92,17 @@ export type {
   MCPClientOptions,
   VMExecutorOptions,
 } from "./src/client.js";
+
+export {
+  BaseCodeExecutor,
+  E2BCodeExecutor,
+  VMCodeExecutor,
+  isVMAvailable,
+} from "./src/client.js";
+
+export type {
+  ExecutionResult,
+  SearchToolsFunction,
+  ToolNamespaceInfo,
+  ToolSearchResult,
+} from "./src/client/codeExecutor.js";
