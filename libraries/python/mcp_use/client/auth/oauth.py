@@ -3,6 +3,7 @@
 import json
 import secrets
 import webbrowser
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,15 @@ class ServerOAuthMetadata(BaseModel):
     class Config:
         extra = "allow"  # Allow additional fields
 
+class ProtectedResourceMetadata(BaseModel):
+    """
+    PRC (Protected Resource Metadata) can have metadata
+    describing their configuration. It could contain information
+    about the OAuth metadata.
+    """
+    resource: str
+    authorization_servers: list[str]
+    scopes_supported: list[str] | None = None
 
 class OAuthClientProvider(BaseModel):
     """OAuth client provider configuration for a specific server.
@@ -214,6 +224,7 @@ class OAuth:
         self.redirect_uri = f"http://localhost:{self.callback_port}/callback"
         self._oauth_provider = oauth_provider
         self._metadata: ServerOAuthMetadata | None = None
+        self._resource_metadata: ProtectedResourceMetadata | None = None
 
         if self._oauth_provider:
             self._metadata = self._oauth_provider.oauth_metadata
@@ -418,8 +429,32 @@ class OAuth:
             return
 
         base_url = f"{parsed.scheme}://{parsed.netloc}"
-        well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
+        prm_url: str | None = None
 
+        # Unauthenticated call to get PRM data
+        try:
+            init_resp = await client.get(self.server_url, headers={"Accept": "application/json"})
+            if init_resp.status_code == 401:
+                # Parse the resource_metadata
+                prm_url = self._extract_prm(init_resp)
+        except httpx.HTTPError as e:
+            logger.debug(f"Failed probing server for PRM via 401: {e}")
+
+        if prm_url:
+            try:
+                logger.debug(f"Trying OAuth PRM endpoint at: {prm_url}")
+                prm_response = await client.get(prm_url)
+                prm_response.raise_for_status()
+                prm = prm_response.json()
+                self._resource_metadata = ProtectedResourceMetadata(**prm)
+                logger.debug("Successfully got the PRM data")
+                logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
+                return
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OAuth PRM at {prm_url}: {e}")
+                pass
+
+        well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
         try:
             logger.debug(f"Trying OAuth metadata discovery at: {well_known_url}")
             response = await client.get(well_known_url)
@@ -457,6 +492,17 @@ class OAuth:
             "Server must support OAuth metadata discovery at "
             "/.well-known/oauth-authorization-server or /.well-known/openid-configuration"
         )
+    
+    def _extract_prm(self, response: httpx.Response) -> str | None:
+        www_auth = response.headers.get("WWW-Authenticate")
+        if not www_auth:
+            return None
+        
+        match = re.search(r'resource_metadata="([^"]+)"', www_auth)
+        if match:
+            return match.group(1)
+
+        return None
 
     def _is_token_valid(self, token_data: TokenData) -> bool:
         """Check if token is still valid."""
