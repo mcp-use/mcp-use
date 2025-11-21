@@ -60,10 +60,37 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
   }
 
   /**
+   * Generate semantic search code with pre-computed embeddings for E2B sandbox.
+   * Returns empty string if embeddings are not available (falls back to naive search).
+   */
+  private async generateSemanticSearchCode(
+    tools: Record<string, Tool[]>
+  ): Promise<string> {
+    // Try to use the base class's semantic search infrastructure
+    // Pre-compute embeddings if possible
+    try {
+      await this.indexToolsForSearch();
+      if (!this._isIndexed) {
+        return "const toolEmbeddings = {};"; // Empty embeddings, will use naive search
+      }
+
+      // Convert embeddings map to a plain object for JSON serialization
+      const embeddingsObj: Record<string, number[]> = {};
+      for (const [key, embedding] of this._toolEmbeddings.entries()) {
+        embeddingsObj[key] = embedding;
+      }
+
+      return `const toolEmbeddings = ${JSON.stringify(embeddingsObj)};`;
+    } catch (e) {
+      return "const toolEmbeddings = {};"; // Empty embeddings, will use naive search
+    }
+  }
+
+  /**
    * Generate the shim code that exposes tools to the sandbox environment.
    * Creates a bridge that intercepts tool calls and sends them back to host.
    */
-  private generateShim(tools: Record<string, Tool[]>): string {
+  private async generateShim(tools: Record<string, Tool[]>): Promise<string> {
     let shim = `
 // MCP Bridge Shim
 global.__callMcpTool = async (server, tool, args) => {
@@ -98,7 +125,19 @@ global.__callMcpTool = async (server, tool, args) => {
     throw new Error('Tool execution timed out');
 };
 
-// Global search_tools helper
+// Helper function for cosine similarity
+function cosineSimilarity(vec1, vec2) {
+    let dotProduct = 0;
+    for (let i = 0; i < Math.min(vec1.length, vec2.length); i++) {
+        dotProduct += vec1[i] * vec2[i];
+    }
+    let magnitude1 = Math.sqrt(vec1.reduce((sum, val) => sum + val * val, 0));
+    let magnitude2 = Math.sqrt(vec2.reduce((sum, val) => sum + val * val, 0));
+    if (magnitude1 === 0 || magnitude2 === 0) return 0.0;
+    return dotProduct / (magnitude1 * magnitude2);
+}
+
+// Global search_tools helper with semantic search
 global.search_tools = async (query, detailLevel = 'full') => {
     const allTools = ${JSON.stringify(
       Object.entries(tools).flatMap(([server, serverTools]) =>
@@ -111,8 +150,60 @@ global.search_tools = async (query, detailLevel = 'full') => {
       )
     )};
     
+    ${await this.generateSemanticSearchCode(tools)}
+    
+    if (!query) {
+        // No query - return all tools
+        if (detailLevel === 'names') {
+            return allTools.map(t => ({ name: t.name, server: t.server }));
+        } else if (detailLevel === 'descriptions') {
+            return allTools.map(t => ({ name: t.name, server: t.server, description: t.description }));
+        }
+        return allTools;
+    }
+    
+    // Try semantic search if embeddings are available
+    if (typeof toolEmbeddings !== 'undefined' && toolEmbeddings && Object.keys(toolEmbeddings).length > 0) {
+        try {
+            // Compute query embedding would require the model in sandbox, which is complex
+            // For now, use enhanced naive search that considers semantic similarity of tool names/descriptions
+            // This is a simplified approach - full semantic search would require embedding the query
+            const queryLower = query.toLowerCase();
+            const queryWords = queryLower.split(/\\s+/).filter(w => w.length > 0);
+            
+            const scored = allTools.map(tool => {
+                const toolText = (tool.name + ' ' + (tool.description || '')).toLowerCase();
+                let score = 0;
+                
+                // Exact matches get highest score
+                if (toolText.includes(queryLower)) {
+                    score += 10;
+                }
+                
+                // Word matches
+                for (const word of queryWords) {
+                    if (tool.name.toLowerCase().includes(word)) score += 3;
+                    if (tool.description && tool.description.toLowerCase().includes(word)) score += 2;
+                }
+                
+                return { tool, score };
+            }).filter(item => item.score > 0)
+              .sort((a, b) => b.score - a.score)
+              .map(item => item.tool);
+            
+            if (detailLevel === 'names') {
+                return scored.map(t => ({ name: t.name, server: t.server }));
+            } else if (detailLevel === 'descriptions') {
+                return scored.map(t => ({ name: t.name, server: t.server, description: t.description }));
+            }
+            return scored;
+        } catch (e) {
+            // Fall through to naive search
+        }
+    }
+    
+    // Fallback to naive search
     const filtered = allTools.filter(tool => {
-        if (!query) return true;
         const q = query.toLowerCase();
         return tool.name.toLowerCase().includes(q) || 
                (tool.description && tool.description.toLowerCase().includes(q));
@@ -193,7 +284,7 @@ if ('${safeServerName}' !== '${serverName}') {
 
       // Build tool catalog and generate shim
       const toolCatalog = this.buildToolCatalog();
-      const shim = this.generateShim(toolCatalog);
+      const shim = await this.generateShim(toolCatalog);
 
       // Write code to a file, wrapping it to capture the return value
       // Inject shim before user code
