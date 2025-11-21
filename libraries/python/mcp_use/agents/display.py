@@ -93,7 +93,7 @@ def _pretty_print_step(item):
         if tool_input:
             if tool_name == "execute_code" and "code" in tool_input:
                 code = tool_input["code"]
-                code_md = Markdown(f"```python{code}\n```", code_theme=CODE_THEME)
+                code_md = Markdown(f"```python\n{code}\n```", code_theme=CODE_THEME)
                 title = f"[dim]🔧[/dim] [bold white]{tool_name}[/bold white] [dim]Input[/dim]"
                 console.print(Panel(code_md, title=title, border_style="dim white", padding=(0, 1)))
 
