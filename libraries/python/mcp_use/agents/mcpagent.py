@@ -705,7 +705,7 @@ class MCPAgent:
                     config={
                         "callbacks": self.callbacks,
                         "recursion_limit": self.recursion_limit,
-                        "metadata": self.metadata
+                        "metadata": self.metadata,
                     },
                 ):
                     # chunk is a dict with node names as keys
