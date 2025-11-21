@@ -43,7 +43,7 @@ export class McpServer {
   private serverPort?: number;
   private serverHost: string;
   private serverBaseUrl?: string;
-  private excludedMiddlewareRoutes = ["/inspector"];
+  private excludedMiddlewareRoutes = ["/inspector", "/mcp-use/widgets", "/__vite"];
   private toolMiddleware: Map<string, any> = new Map();
 
   /**
@@ -101,11 +101,12 @@ export class McpServer {
         // Express methods - intercept 'use' to wrap middleware
         if (prop === "use") {
           return function (...args: any[]) {
-            // If the last argument is a middleware function (not a string path)
-            const lastArg = args[args.length - 1];
-            if (typeof lastArg === "function" && typeof args[0] !== "string") {
-              const originalMiddleware = lastArg;
-              const wrappedMiddleware = (req: any, res: any, next: any) => {
+            // Helper function to wrap a middleware function
+            const wrapMiddleware = (middleware: any) => {
+              if (typeof middleware !== "function") {
+                return middleware;
+              }
+              return (req: any, res: any, next: any) => {
                 // Skip middleware for excluded framework routes
                 if (
                   target.excludedMiddlewareRoutes.some((route) =>
@@ -114,11 +115,29 @@ export class McpServer {
                 ) {
                   return next();
                 }
-                return originalMiddleware(req, res, next);
+                return middleware(req, res, next);
               };
-              args[args.length - 1] = wrappedMiddleware;
-            }
-            return target.app.use(...args);
+            };
+
+            // Wrap all middleware arguments (supporting multiple patterns)
+            const wrappedArgs = args.map((arg) => {
+              // Skip string paths
+              if (typeof arg === "string") {
+                return arg;
+              }
+              // Handle array of middleware
+              if (Array.isArray(arg)) {
+                return arg.map(wrapMiddleware);
+              }
+              // Handle individual middleware function
+              if (typeof arg === "function") {
+                return wrapMiddleware(arg);
+              }
+              // Return other args unchanged
+              return arg;
+            });
+
+            return target.app.use(...wrappedArgs);
           };
         }
 
@@ -970,12 +989,6 @@ if (container && Component) {
       );
     });
 
-    widgets.forEach((widget) => {
-      console.log(
-        `[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`
-      );
-    });
-
     // register a tool and resource for each widget
     for (const widget of widgets) {
       // for now expose all widgets as appsSdk
@@ -1656,7 +1669,7 @@ if (container && Component) {
           zodType = z.object({});
           break;
         case "array":
-          zodType = z.array(z.string());
+          zodType = z.array(z.any());
           break;
         default:
           zodType = z.any();
