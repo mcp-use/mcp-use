@@ -43,7 +43,6 @@ async def test_agent_structured_output():
 
         logger.info("\nStructured result:")
         logger.info(f"  result: {result}")
-        logger.info(f"  operation: {result.operation}")
         logger.info(f"Tools used: {agent.tools_used_names}")
         logger.info(f" tools return value is {result}")
 
