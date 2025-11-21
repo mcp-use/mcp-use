@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.5.2
+
+### Patch Changes
+
+- 33e4a68: Fix dev deps
+
 ## 0.5.2-canary.0
 
 ### Patch Changes

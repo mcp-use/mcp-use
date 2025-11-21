@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 2.2.4
+
+### Patch Changes
+
+- 33e4a68: Fix deployment from source
+- Updated dependencies [33e4a68]
+- Updated dependencies [33e4a68]
+- Updated dependencies [33e4a68]
+  - @mcp-use/inspector@0.6.0
+  - mcp-use@1.4.0
+
 ## 2.2.4-canary.3
 
 ### Patch Changes
