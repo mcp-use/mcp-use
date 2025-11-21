@@ -55,7 +55,7 @@ async def main():
     llm = ChatOpenAI(model="gpt-5")
 
     # Create agent with the client
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
 
     # Run the query
     result = await agent.run(

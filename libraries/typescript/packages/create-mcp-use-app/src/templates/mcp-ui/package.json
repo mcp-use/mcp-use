@@ -20,7 +20,8 @@
   "scripts": {
     "build": "mcp-use build",
     "dev": "mcp-use dev",
-    "start": "mcp-use start"
+    "start": "mcp-use start",
+    "deploy": "mcp-use deploy"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -32,8 +33,10 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "typescript": "^5.0.0"
   }
 }

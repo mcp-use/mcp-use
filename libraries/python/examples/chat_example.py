@@ -33,6 +33,7 @@ async def run_memory_chat():
         client=client,
         max_steps=15,
         memory_enabled=True,  # Enable built-in conversation memory
+        pretty_print=True,
     )
 
     print("\n===== Interactive MCP Chat =====")

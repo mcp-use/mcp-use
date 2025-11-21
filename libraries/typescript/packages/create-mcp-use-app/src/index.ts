@@ -89,6 +89,22 @@ function getInstallCommand(packageManager: string): string {
   }
 }
 
+// Get optimized install arguments for faster installation
+function getInstallArgs(packageManager: string): string[] {
+  switch (packageManager) {
+    case "yarn":
+      // Yarn: prefer offline cache, skip audit (faster, but less secure)
+      return ["install", "--prefer-offline", "--no-audit"];
+    case "pnpm":
+      // pnpm: prefer offline cache, skip audit
+      return ["install", "--prefer-offline", "--no-audit"];
+    case "npm":
+    default:
+      // npm: prefer offline cache, skip audit and funding messages
+      return ["install", "--prefer-offline", "--no-audit", "--no-fund"];
+  }
+}
+
 function isInGitRepository(): boolean {
   try {
     execSync("git rev-parse --is-inside-work-tree", { stdio: "ignore" });
@@ -287,7 +303,7 @@ program
   .version(packageJson.version)
   .argument("[project-name]", "Name of the MCP server project")
   .option("-t, --template <template>", "Template to use", "starter")
-  .option("--no-install", "Skip installing dependencies")
+  .option("--install", "Install dependencies after creating project")
   .option("--no-git", "Skip initializing a git repository")
   .option("--dev", "Use workspace dependencies for development")
   .option("--canary", "Use canary versions of packages")
@@ -299,7 +315,7 @@ program
       projectName: string | undefined,
       options: {
         template: string;
-        install: boolean;
+        install?: boolean;
         git: boolean;
         dev: boolean;
         canary: boolean;
@@ -430,8 +446,13 @@ program
           }
         }
 
-        // Install dependencies if requested
-        if (options.install) {
+        // Install dependencies if requested (default is false)
+        if (options.install === true) {
+          // Always show a message before installing
+          console.log("");
+          console.log(chalk.cyan("📦 Installing dependencies..."));
+          console.log("");
+
           // Yarn and npm show their own progress, so we don't need a spinner for them
           const showSpinner =
             usedPackageManager !== "yarn" && usedPackageManager !== "npm";
@@ -446,13 +467,10 @@ program
               options.pnpm ||
               detectPackageManager()
             ) {
-              // Use the specific package manager
-              if (!showSpinner) {
-                console.log("");
-              }
+              // Use the specific package manager with optimized flags
               await runPackageManager(
                 usedPackageManager,
-                ["install"],
+                getInstallArgs(usedPackageManager),
                 projectPath
               );
               if (spinner) {
@@ -461,39 +479,72 @@ program
                 );
               } else {
                 console.log("");
+                console.log(
+                  chalk.green("✅ Dependencies installed successfully!")
+                );
+                console.log("");
               }
             } else {
               // Try in order: yarn → npm → pnpm
               if (spinner)
                 spinner.text = "Installing packages (trying yarn)...";
               try {
-                if (!spinner) console.log("");
-                await runPackageManager("yarn", ["install"], projectPath);
+                await runPackageManager(
+                  "yarn",
+                  getInstallArgs("yarn"),
+                  projectPath
+                );
                 usedPackageManager = "yarn";
                 if (spinner) {
                   spinner.succeed("Packages installed successfully with yarn");
                 } else {
                   console.log("");
+                  console.log(
+                    chalk.green(
+                      "✅ Dependencies installed successfully with yarn!"
+                    )
+                  );
+                  console.log("");
                 }
               } catch {
                 if (spinner) spinner.text = "yarn not found, trying npm...";
                 try {
-                  await runPackageManager("npm", ["install"], projectPath);
+                  await runPackageManager(
+                    "npm",
+                    getInstallArgs("npm"),
+                    projectPath
+                  );
                   usedPackageManager = "npm";
                   if (spinner) {
                     spinner.succeed("Packages installed successfully with npm");
                   } else {
                     console.log("");
+                    console.log(
+                      chalk.green(
+                        "✅ Dependencies installed successfully with npm!"
+                      )
+                    );
+                    console.log("");
                   }
                 } catch {
                   if (spinner) spinner.text = "npm not found, trying pnpm...";
-                  await runPackageManager("pnpm", ["install"], projectPath);
+                  await runPackageManager(
+                    "pnpm",
+                    getInstallArgs("pnpm"),
+                    projectPath
+                  );
                   usedPackageManager = "pnpm";
                   if (spinner) {
                     spinner.succeed(
                       "Packages installed successfully with pnpm"
                     );
                   } else {
+                    console.log("");
+                    console.log(
+                      chalk.green(
+                        "✅ Dependencies installed successfully with pnpm!"
+                      )
+                    );
                     console.log("");
                   }
                 }
@@ -530,8 +581,6 @@ program
         console.log("");
         console.log(chalk.bold("📁 Project structure:"));
         console.log(`   ${sanitizedProjectName}/`);
-        console.log("   ├── src/");
-        console.log("   │   └── server.ts");
         if (validatedTemplate === "apps-sdk") {
           console.log("   ├── resources/");
           console.log("   │   └── display-weather.tsx");
@@ -554,12 +603,15 @@ program
         console.log("");
         console.log(chalk.bold("🚀 To get started:"));
         console.log(chalk.cyan(`   cd ${sanitizedProjectName}`));
-        if (!options.install) {
-          console.log(
-            chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`)
-          );
-        }
+        console.log(chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`));
         console.log(chalk.cyan(`   ${getDevCommand(usedPackageManager)}`));
+        console.log("");
+        console.log(chalk.bold("📤 To deploy:"));
+        console.log(
+          chalk.cyan(
+            `   ${usedPackageManager === "yarn" ? "yarn" : usedPackageManager === "pnpm" ? "pnpm" : "npm run"} deploy`
+          )
+        );
         console.log("");
         if (options.dev) {
           console.log(

@@ -1,7 +1,3 @@
-import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { Spinner } from "@/client/components/ui/spinner";
 import { TooltipProvider } from "@/client/components/ui/tooltip";
 import { useInspector } from "@/client/context/InspectorContext";
@@ -10,9 +6,14 @@ import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
+import { ServerConnectionModal } from "./ServerConnectionModal";
 
 interface LayoutProps {
   children: ReactNode;
@@ -21,7 +22,12 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { connections, addConnection, removeConnection } = useMcpContext();
+  const {
+    connections,
+    addConnection,
+    removeConnection,
+    updateConnectionConfig,
+  } = useMcpContext();
   const {
     selectedServerId,
     setSelectedServerId,
@@ -32,6 +38,9 @@ export function Layout({ children }: LayoutProps) {
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
+    null
+  );
   const savedRequests = useSavedRequests();
 
   // Read tunnelUrl from query parameters and store in context
@@ -95,6 +104,56 @@ export function Layout({ children }: LayoutProps) {
       : `/?server=${encodeURIComponent(serverId)}`;
     navigate(newUrl);
   };
+
+  const handleOpenConnectionOptions = useCallback(
+    (connectionId: string | null) => {
+      setEditingConnectionId(connectionId);
+    },
+    []
+  );
+
+  const handleUpdateConnection = useCallback(
+    (config: {
+      url: string;
+      name?: string;
+      transportType: "http" | "sse";
+      proxyConfig?: {
+        proxyAddress?: string;
+        customHeaders?: Record<string, string>;
+      };
+    }) => {
+      if (!editingConnectionId) return;
+
+      // If the URL changed, we need to remove the old one and add a new one
+      if (config.url !== editingConnectionId) {
+        removeConnection(editingConnectionId);
+        addConnection(
+          config.url,
+          config.name,
+          config.proxyConfig,
+          config.transportType
+        );
+      } else {
+        // Otherwise just update the existing connection
+        updateConnectionConfig(editingConnectionId, {
+          name: config.name,
+          proxyConfig: config.proxyConfig,
+          transportType: config.transportType,
+        });
+      }
+
+      // Close the modal
+      setEditingConnectionId(null);
+
+      toast.success("Connection settings updated");
+    },
+    [
+      editingConnectionId,
+      removeConnection,
+      addConnection,
+      updateConnectionConfig,
+    ]
+  );
 
   const handleCommandPaletteNavigate = (
     tab: "tools" | "prompts" | "resources",
@@ -308,7 +367,7 @@ export function Layout({ children }: LayoutProps) {
           onServerSelect={handleServerSelect}
           onTabChange={setActiveTab}
           onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
-          onOpenConnectionOptions={() => {}}
+          onOpenConnectionOptions={handleOpenConnectionOptions}
         />
 
         {/* Main Content */}
@@ -338,6 +397,20 @@ export function Layout({ children }: LayoutProps) {
         />
 
         {/* Connection Options Dialog */}
+        <ServerConnectionModal
+          connection={
+            editingConnectionId
+              ? connections.find((c) => c.id === editingConnectionId) || null
+              : null
+          }
+          open={editingConnectionId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingConnectionId(null);
+            }
+          }}
+          onConnect={handleUpdateConnection}
+        />
       </div>
     </TooltipProvider>
   );

@@ -69,6 +69,8 @@ export default [
         Request: "readonly",
         Headers: "readonly",
         HeadersInit: "readonly",
+        FormData: "readonly",
+        Blob: "readonly",
         btoa: "readonly",
         atob: "readonly",
         // Browser globals
@@ -84,8 +86,10 @@ export default [
         HTMLDivElement: "readonly",
         HTMLSpanElement: "readonly",
         HTMLTextAreaElement: "readonly",
+        HTMLIFrameElement: "readonly",
         HTMLElement: "readonly",
         // Browser APIs
+        MessageEvent: "readonly",
         MutationObserver: "readonly",
         ResizeObserver: "readonly",
         queueMicrotask: "readonly",

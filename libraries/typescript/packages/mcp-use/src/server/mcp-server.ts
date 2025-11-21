@@ -142,6 +142,9 @@ export class McpServer {
   private serverPort?: number;
   private serverHost: string;
   private serverBaseUrl?: string;
+  private registeredTools: string[] = [];
+  private registeredPrompts: string[] = [];
+  private registeredResources: string[] = [];
 
   /**
    * Creates a new MCP server instance with Hono integration
@@ -328,6 +331,7 @@ export class McpServer {
         return await resourceDefinition.readCallback();
       }
     );
+    this.registeredResources.push(resourceDefinition.name);
     return this;
   }
 
@@ -411,6 +415,7 @@ export class McpServer {
         return await resourceTemplateDefinition.readCallback(uri, params);
       }
     );
+    this.registeredResources.push(resourceTemplateDefinition.name);
     return this;
   }
 
@@ -468,6 +473,7 @@ export class McpServer {
         return await toolDefinition.cb(params);
       }
     );
+    this.registeredTools.push(toolDefinition.name);
     return this;
   }
 
@@ -518,6 +524,7 @@ export class McpServer {
         return await promptDefinition.cb(params);
       }
     );
+    this.registeredPrompts.push(promptDefinition.name);
     return this;
   }
 
@@ -1299,7 +1306,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -1307,7 +1314,7 @@ if (container && Component) {
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
@@ -1513,7 +1520,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -1521,7 +1528,7 @@ if (container && Component) {
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
-              ...(this.serverBaseUrl ? [this.serverBaseUrl] : []),
+              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
@@ -1533,6 +1540,31 @@ if (container && Component) {
         `[WIDGET] ${widgetName} mounted at ${baseRoute}/${widgetName}`
       );
     }
+  }
+
+  /**
+   * Helper to wait for transport.handleRequest to complete and response to be written
+   *
+   * Wraps the transport.handleRequest call in a Promise that only resolves when
+   * expressRes.end() is called, ensuring all async operations complete before
+   * we attempt to read the response.
+   *
+   * @private
+   */
+  private waitForRequestComplete(
+    transport: any,
+    expressReq: any,
+    expressRes: any,
+    body?: any
+  ): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const originalEnd = expressRes.end;
+      expressRes.end = (...args: any[]) => {
+        originalEnd.apply(expressRes, args);
+        resolve();
+      };
+      transport.handleRequest(expressReq, expressRes, body);
+    });
   }
 
   /**
@@ -1718,10 +1750,12 @@ if (container && Component) {
       await this.server.connect(transport);
 
       // Wait for handleRequest to complete and for response to be written
-      await transport.handleRequest(expressReq, expressRes, expressReq.body);
-
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await this.waitForRequestComplete(
+        transport,
+        expressReq,
+        expressRes,
+        expressReq.body
+      );
 
       const response = getResponse();
       if (response) {
@@ -1748,10 +1782,9 @@ if (container && Component) {
       });
 
       await this.server.connect(transport);
-      await transport.handleRequest(expressReq, expressRes);
 
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for handleRequest to complete and for response to be written
+      await this.waitForRequestComplete(transport, expressReq, expressRes);
 
       const response = getResponse();
       if (response) {
@@ -1777,10 +1810,9 @@ if (container && Component) {
       });
 
       await this.server.connect(transport);
-      await transport.handleRequest(expressReq, expressRes);
 
-      // Wait a tiny bit for async writes to complete
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for handleRequest to complete and for response to be written
+      await this.waitForRequestComplete(transport, expressReq, expressRes);
 
       const response = getResponse();
       if (response) {
@@ -1815,6 +1847,32 @@ if (container && Component) {
    * // Inspector UI: http://localhost:8080/inspector
    * ```
    */
+  /**
+   * Log registered tools, prompts, and resources to console
+   */
+  private logRegisteredItems(): void {
+    console.log("\n📋 Server exposes:");
+    console.log(`   Tools: ${this.registeredTools.length}`);
+    if (this.registeredTools.length > 0) {
+      this.registeredTools.forEach((name) => {
+        console.log(`      - ${name}`);
+      });
+    }
+    console.log(`   Prompts: ${this.registeredPrompts.length}`);
+    if (this.registeredPrompts.length > 0) {
+      this.registeredPrompts.forEach((name) => {
+        console.log(`      - ${name}`);
+      });
+    }
+    console.log(`   Resources: ${this.registeredResources.length}`);
+    if (this.registeredResources.length > 0) {
+      this.registeredResources.forEach((name) => {
+        console.log(`      - ${name}`);
+      });
+    }
+    console.log("");
+  }
+
   async listen(port?: number): Promise<void> {
     // Priority: parameter > PORT env var > default (3001)
     const portEnv = getEnv("PORT");
@@ -1834,6 +1892,9 @@ if (container && Component) {
 
     // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
     await this.mountInspector();
+
+    // Log registered items before starting server
+    this.logRegisteredItems();
 
     // Start server based on runtime
     if (isDeno) {

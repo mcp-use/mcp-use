@@ -588,13 +588,13 @@ jobs:
           # Run create command based on PM
           case "${{ matrix.pm }}" in
             npm)
-              npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+              npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
               ;;
             yarn)
-              yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+              yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
               ;;
             pnpm)
-              pnpm --package="$PACKAGE_PATH" dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }} --no-install
+              pnpm --package="$PACKAGE_PATH" dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
               ;;
           esac
 

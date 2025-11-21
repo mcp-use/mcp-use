@@ -40,6 +40,7 @@ def create_connector_from_config(
     message_handler: MessageHandlerFnT | None = None,
     logging_callback: LoggingFnT | None = None,
     middleware: list[Middleware] | None = None,
+    verify: bool | None = True,
 ) -> BaseConnector:
     """Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
@@ -93,6 +94,7 @@ def create_connector_from_config(
             message_handler=message_handler,
             logging_callback=logging_callback,
             middleware=middleware,
+            verify=verify,
         )
 
     # WebSocket connector

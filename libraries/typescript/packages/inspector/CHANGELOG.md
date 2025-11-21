@@ -1,5 +1,141 @@
 # @mcp-use/inspector
 
+## 0.5.3
+
+### Patch Changes
+
+- e8ec993: Fix formatting of object tool input
+- e8ec993: Add support for displaying console logs of widgets in the inspector preview panel
+- e8ec993: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- e8ec993: Fix connection edit button in inspector
+- e8ec993: Fix button overflow in connect form
+- e8ec993: Dynamically load models for the chat
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+- Updated dependencies [e8ec993]
+  - mcp-use@1.3.3
+
+## 0.5.3-canary.8
+
+### Patch Changes
+
+- 329ce35: Dynamically load models for the chat
+  - mcp-use@1.3.3-canary.8
+
+## 0.5.3-canary.7
+
+### Patch Changes
+
+- 1ed0ab8: Fix formatting of object tool input
+  - mcp-use@1.3.3-canary.7
+
+## 0.5.3-canary.6
+
+### Patch Changes
+
+- ba654db: Fix button overflow in connect form
+  - mcp-use@1.3.3-canary.6
+
+## 0.5.3-canary.5
+
+### Patch Changes
+
+- f971dd8: Fix connection edit button in inspector
+  - mcp-use@1.3.3-canary.5
+
+## 0.5.3-canary.4
+
+### Patch Changes
+
+- 68d0d4c: - Add emulation of openai api to the inspector
+  - Add utility component WidgetFullscreenWrapper: render full screen and pip buttons
+  - Add utility component WidgetDebugger: shows an overlay with openai metadata for debugging ChatGPT integration
+- Updated dependencies [68d0d4c]
+  - mcp-use@1.3.3-canary.4
+
+## 0.5.3-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d4dc001]
+  - mcp-use@1.3.3-canary.3
+
+## 0.5.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [9fc286c]
+  - mcp-use@1.3.3-canary.2
+
+## 0.5.3-canary.1
+
+### Patch Changes
+
+- mcp-use@1.3.3-canary.1
+
+## 0.5.3-canary.0
+
+### Patch Changes
+
+- d4c246a: Add support for displaying console logs of widgets in the inspector preview panel
+  - mcp-use@1.3.3-canary.0
+
+## 0.5.2
+
+### Patch Changes
+
+- 835d367: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 835d367: Hanlde large json responses by showing a preview and a download button
+- 835d367: chore: update dependencies
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+- Updated dependencies [835d367]
+  - mcp-use@1.3.2
+
+## 0.5.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [d9e3ae2]
+  - mcp-use@1.3.2-canary.5
+
+## 0.5.2-canary.4
+
+### Patch Changes
+
+- 9db6706: Hanlde large json responses by showing a preview and a download button
+  - mcp-use@1.3.2-canary.4
+
+## 0.5.2-canary.3
+
+### Patch Changes
+
+- mcp-use@1.3.2-canary.3
+
+## 0.5.2-canary.2
+
+### Patch Changes
+
+- mcp-use@1.3.2-canary.2
+
+## 0.5.2-canary.1
+
+### Patch Changes
+
+- mcp-use@1.3.2-canary.1
+
+## 0.5.2-canary.0
+
+### Patch Changes
+
+- 2ebe233: - Updated the version of @modelcontextprotocol/sdk to 1.22.0 in both inspector and mcp-use package.json files.
+- 2ebe233: chore: update dependencies
+- Updated dependencies [2ebe233]
+- Updated dependencies [2ebe233]
+  - mcp-use@1.3.2-canary.0
+
 ## 0.5.1
 
 ### Patch Changes
