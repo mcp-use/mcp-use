@@ -45,6 +45,7 @@ class ServerOAuthMetadata(BaseModel):
     token_endpoint_auth_methods_supported: list[str] = Field(default_factory=lambda: ["client_secret_basic"])
     claims_supported: list[str] | None = None
     code_challenge_methods_supported: list[str] | None = None
+    client_id_metadata_document_supported: bool | None = None
 
     class Config:
         extra = "allow"  # Allow additional fields
@@ -194,6 +195,7 @@ class OAuth:
         client_secret: str | None = None,
         callback_port: int | None = None,
         oauth_provider: OAuthClientProvider | None = None,
+        client_metadata_url: str | None = None,
     ):
         """Initialize OAuth handler.
 
@@ -205,6 +207,7 @@ class OAuth:
             client_secret: OAuth client secret (for confidential clients)
             callback_port: Port for local callback server, if empty, 8080 is used
             oauth_provider: OAuth client provider to prevent metadata discovery
+            client_metadata_url: Field used to authenticate with CIMD
         """
         logger.debug(f"Initializing OAuth for server: {server_url}")
         self.server_url = server_url
@@ -212,6 +215,7 @@ class OAuth:
         self.scope = scope
         self.client_id = client_id
         self.client_secret = client_secret
+        self.client_metadata_url = client_metadata_url
 
         if callback_port:
             self.callback_port = callback_port
@@ -286,36 +290,51 @@ class OAuth:
             logger.error(f"The port {self.callback_port} is not available! Try using a different port!")
             raise exception
 
-        # Try to get client_id - either from config or dynamic registration
+        # Check if it supports CIMD
+        supports_cimd = self._metadata.client_id_metadata_document_supported if self._metadata.client_id_metadata_document_supported else False
+
         client_id = self.client_id
         client_secret = self.client_secret
-        registration = None  # Track if we used DCR
 
-        if not client_id:
-            logger.debug("No client_id provided, attempting dynamic client registration")
-            # Try to load previously registered client
-            registration = await self._load_client_registration()
+        # 1) CIMD path (preferred when configured as specified in MCP spec)
+        if self.client_metadata_url and supports_cimd:
+            logger.debug(f"Using Client ID Metadata Document (CIMD) as client_id: {self.client_metadata_url}")
+            client_id = self.client_metadata_url
+            client_secret = None # public client
+        else:
+            # 2) Legacy paths: pre-reggistered clients or DCR
+            registration = None # Track if we used DCR
+            if not client_id:
+                logger.debug("No client_id provided, attempting dynamic client registration")
+                # Try to load previously registered client
+                registration = await self._load_client_registration()
 
-            if registration:
-                logger.debug("Using previously registered client")
-                client_id = registration.client_id
-                client_secret = registration.client_secret
-            else:
-                # Attempt dynamic registration
-                registration = await self._try_dynamic_registration()
                 if registration:
-                    logger.debug("Dynamic registration successful")
+                    logger.debug("Using previously registered client")
                     client_id = registration.client_id
                     client_secret = registration.client_secret
-                    # Store for future use
-                    await self._store_client_registration(registration)
                 else:
-                    logger.error("Dynamic client registration failed or not supported")
-                    raise OAuthAuthenticationError(
-                        "OAuth requires a client_id. Server does not support dynamic registration. "
-                        "Please provide one in the auth configuration. "
-                        "Example: {'auth': {'client_id': 'your-registered-client-id'}}"
-                    )
+                    # Attempt dynamic registration
+                    registration = await self._try_dynamic_registration()
+                    if registration:
+                        logger.debug("Dynamic registration successful")
+                        client_id = registration.client_id
+                        client_secret = registration.client_secret
+                        # Store for future use
+                        await self._store_client_registration(registration)
+                    else:
+                        if supports_cimd and not self._metadata.registration_endpoint:
+                            raise OAuthAuthenticationError(
+                                "OAuth server only supports Client ID Metadata Documents. "
+                                "Please provide 'client_metadata_url' in the auth configuration "
+                                "pointing to your CIMD JSON document."
+                            )
+                        logger.error("Dynamic client registration failed or not supported")
+                        raise OAuthAuthenticationError(
+                            "OAuth requires a client_id. Server does not support dynamic registration. "
+                            "Please provide one in the auth configuration. "
+                            "Example: {'auth': {'client_id': 'your-registered-client-id'}}"
+                        )
 
         logger.debug(f"Using client_id: {client_id}")
 
@@ -476,7 +495,7 @@ class OAuth:
                 pass
 
             # Fallback OpenID connection discovery
-            oidc_url = f"{base_url}/.well-known/openid-configuration"
+            oidc_url = f"{auth_base}/.well-known/openid-configuration"
             logger.debug(f"Trying OpenID Connect discovery at: {oidc_url}")
             try:
                 response = await client.get(oidc_url)
