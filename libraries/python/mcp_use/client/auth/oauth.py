@@ -1,5 +1,7 @@
 """OAuth authentication support for MCP clients."""
 
+import base64
+import hashlib
 import json
 import secrets
 import webbrowser
@@ -290,6 +292,10 @@ class OAuth:
             logger.error(f"The port {self.callback_port} is not available! Try using a different port!")
             raise exception
 
+        # Check if code challenge exists with S256
+        if not self._metadata.code_challenge_methods_supported or "S256" not in self._metadata.code_challenge_methods_supported:
+            raise OAuthAuthenticationError("The auth must support code challenge S256. Can`t complete auth without it.")
+
         # Check if it supports CIMD
         supports_cimd = self._metadata.client_id_metadata_document_supported if self._metadata.client_id_metadata_document_supported else False
 
@@ -338,6 +344,9 @@ class OAuth:
 
         logger.debug(f"Using client_id: {client_id}")
 
+        # Generate PKCE code_verifier/challenge
+        code_verifier, code_challenge = self._generate_pkce_pair()
+
         # Create OAuth client
         logger.debug("Creating AsyncOAuth2Client")
         self._client = AsyncOAuth2Client(
@@ -359,11 +368,17 @@ class OAuth:
         state = secrets.token_urlsafe(32)
         logger.debug(f"Generated state for CSRF protection: {state}")
 
+        # Get resource as required in the MCP spec
+        resource = self._resource_metadata.resource if self._resource_metadata else self.server_url
+
         # Build authorization URL
         logger.debug("Creating authorization URL")
         auth_url, _ = self._client.create_authorization_url(
             str(self._metadata.authorization_endpoint),
+            resource=resource,
             state=state,
+            code_challenge=code_challenge,
+            code_challenge_method="S256",
         )
 
         logger.debug("OAuth flow started:")
@@ -415,6 +430,7 @@ class OAuth:
                 str(self._metadata.token_endpoint),
                 authorization_response=f"{redirect_uri}?code={response.code}&state={response.state}",
                 grant_type="authorization_code",
+                code_verifier=code_verifier,
             )
             logger.debug("Successfully fetched tokens")
         except OAuth2Error as e:
@@ -429,6 +445,15 @@ class OAuth:
         logger.debug("Creating BearerAuth with new access token")
         self._bearer_auth = BearerAuth(token=SecretStr(token_response["access_token"]))
         return self._bearer_auth
+
+    def _generate_pkce_pair(self) -> tuple[str, str]:
+        """Generate PKCE code_verifier and S256 code_challenge"""
+        code_verifier = secrets.token_urlsafe(64)
+        code_challenge = base64.urlsafe_b64encode(
+            hashlib.sha256(code_verifier.encode("ascii")).digest()
+        ).rstrip(b"=").decode("ascii")
+
+        return code_verifier, code_challenge
 
     async def _discover_metadata(self, client: httpx.AsyncClient) -> None:
         """Discover OAuth metadata from server."""
