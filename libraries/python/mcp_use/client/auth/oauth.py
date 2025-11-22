@@ -431,7 +431,7 @@ class OAuth:
         base_url = f"{parsed.scheme}://{parsed.netloc}"
         prm_url: str | None = None
 
-        # Unauthenticated call to get PRM data
+        # 1) Try to get PRM URL from 401 + WWW-Authenticate
         try:
             init_resp = await client.get(self.server_url, headers={"Accept": "application/json"})
             if init_resp.status_code == 401:
@@ -442,7 +442,8 @@ class OAuth:
 
         if not prm_url:
             prm_url = f"{base_url}/.well-known/oauth-protected-resource"
-            
+
+        # 2) Fetch PRM
         try:
             logger.debug(f"Trying OAuth PRM endpoint at: {prm_url}")
             prm_response = await client.get(prm_url)
@@ -451,43 +452,69 @@ class OAuth:
             self._resource_metadata = ProtectedResourceMetadata(**prm)
             logger.debug("Successfully got the PRM data")
             logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
-            return
         except (httpx.HTTPError, ValueError) as e:
             logger.debug(f"Failed to discover OAuth PRM at {prm_url}: {e}")
             pass
+        
+        # 3) For each authorization server, try AS metadata and stop on first success
+        auth_servers = self._resource_metadata.authorization_servers if self._resource_metadata else []
+        for auth_server in auth_servers:
+            auth_base = auth_server.rstrip("/")
+            well_known_url = f"{auth_base}/.well-known/oauth-authorization-server"
+            try:
+                logger.debug(f"Trying OAuth metadata discovery at: {well_known_url}")
+                response = await client.get(well_known_url)
+                response.raise_for_status()
+                metadata = response.json()
+                self._metadata = ServerOAuthMetadata(**metadata)
+                logger.debug("Successfully discovered OAuth metadata")
+                logger.debug(f"  Authorization endpoint: {self._metadata.authorization_endpoint}")
+                logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
+                return
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OAuth metadata at {well_known_url}: {e}")
+                pass
 
-        well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
-        try:
-            logger.debug(f"Trying OAuth metadata discovery at: {well_known_url}")
-            response = await client.get(well_known_url)
-            response.raise_for_status()
-            metadata = response.json()
-            self._metadata = ServerOAuthMetadata(**metadata)
-            logger.debug("Successfully discovered OAuth metadata")
-            logger.debug(f"  Authorization endpoint: {self._metadata.authorization_endpoint}")
-            logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
-            return
-        except (httpx.HTTPError, ValueError) as e:
-            logger.debug(f"Failed to discover OAuth metadata at {well_known_url}: {e}")
-            pass
+            # Fallback OpenID connection discovery
+            oidc_url = f"{base_url}/.well-known/openid-configuration"
+            logger.debug(f"Trying OpenID Connect discovery at: {oidc_url}")
+            try:
+                response = await client.get(oidc_url)
+                response.raise_for_status()
+                metadata = response.json()
+                self._metadata = ServerOAuthMetadata(**metadata)
+                logger.debug("Successfully discovered OIDC metadata")
+                logger.debug(f"  Authorization endpoint: {self._metadata.authorization_endpoint}")
+                logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
+                return
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OIDC metadata at {oidc_url}: {e}")
+                pass
 
-        # Try OpenID Connect discovery
-        oidc_url = f"{base_url}/.well-known/openid-configuration"
-        logger.debug(f"Trying OpenID Connect discovery at: {oidc_url}")
-        try:
-            response = await client.get(oidc_url)
-            response.raise_for_status()
-            metadata = response.json()
-            self._metadata = ServerOAuthMetadata(**metadata)
-            logger.debug("Successfully discovered OIDC metadata")
-            logger.debug(f"  Authorization endpoint: {self._metadata.authorization_endpoint}")
-            logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
-            return
-        except (httpx.HTTPError, ValueError) as e:
-            logger.debug(f"Failed to discover OIDC metadata at {oidc_url}: {e}")
-            pass
+        # 4) If PRM path didn’t yield anything, fall back to old host-level discovery
+        if not self._metadata:
+            well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
+            try:
+                logger.debug(f"Trying OAuth metadata discovery at: {well_known_url}")
+                resp = await client.get(well_known_url)
+                resp.raise_for_status()
+                self._metadata = ServerOAuthMetadata(**resp.json())
+                logger.debug("Successfully discovered OAuth metadata (host-level fallback)")
+                return
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OAuth metadata at {well_known_url}: {e}")
 
-        # If discovery fails, we'll need the metadata from somewhere else
+            oidc_url = f"{base_url}/.well-known/openid-configuration"
+            logger.debug(f"Trying OpenID Connect discovery at: {oidc_url}")
+            try:
+                resp = await client.get(oidc_url)
+                resp.raise_for_status()
+                self._metadata = ServerOAuthMetadata(**resp.json())
+                logger.debug("Successfully discovered OIDC metadata (host-level fallback)")
+                return
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OIDC metadata at {oidc_url}: {e}")
+
         logger.error(f"Failed to discover OAuth/OIDC metadata for {self.server_url}")
         raise OAuthDiscoveryError(
             f"Failed to discover OAuth metadata for {self.server_url}. "
