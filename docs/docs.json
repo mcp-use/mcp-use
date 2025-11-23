@@ -71,6 +71,7 @@
                   "inspector/connection-settings",
                   "inspector/keyboard-shortcuts",
                   "inspector/command-palette",
+                  "inspector/rpc-logging",
                   "inspector/integration",
                   "inspector/debugging-chatgpt-apps",
                   "inspector/self-hosting",

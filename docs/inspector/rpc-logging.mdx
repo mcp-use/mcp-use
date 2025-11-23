@@ -1,0 +1,82 @@
+---
+title: "RPC Logging"
+description: "Monitor JSON-RPC messages between the inspector and MCP servers in real-time"
+icon: "activity"
+---
+
+The MCP Inspector provides comprehensive RPC logging capabilities that allow you to monitor all [JSON-RPC](https://www.jsonrpc.org/) messages exchanged between the inspector and your MCP servers in real-time. This feature is essential for debugging, understanding server behavior, and troubleshooting connection issues.
+
+## Overview
+<Frame caption="Expanded RPC message showing detailed JSON payload">
+<img src="/images/inspector/rpc-logs-detail.png" alt="Detailed view of an expanded RPC message with JSON payload" />
+</Frame>
+### What is RPC Logging?
+
+RPC (Remote Procedure Call) logging captures every [JSON-RPC](https://www.jsonrpc.org/) message sent to and received from MCP servers. This includes:
+
+- **Tool calls**: Requests to execute tools and their responses
+- **Resource requests**: Queries for resources and their results
+- **Prompt requests**: Prompt execution requests and responses
+- **Notifications**: Server-initiated notifications
+- **Errors**: Error responses and connection issues
+
+### Opening the RPC Panel
+
+<Steps>
+<Step title="Navigate to a Tab">
+Open the Tools, Resources, or Prompts tab for a connected server.
+</Step>
+
+<Step title="Locate RPC Panel">
+The RPC Messages panel appears at the bottom of the left sidebar. It starts collapsed by default.
+</Step>
+
+<Step title="Expand Panel">
+Click on the "RPC Messages" header to expand the panel. You can resize it by dragging the handle above it.
+</Step>
+</Steps>
+
+<Frame caption="RPC Messages panel showing real-time JSON-RPC message logging">
+<img src="/images/inspector/rpc-logs-full-screen.png" alt="RPC logging interface showing message list" />
+</Frame>
+
+
+
+## Understanding the Interface
+
+### Message List
+
+Each RPC message is displayed as a row with:
+
+- **Timestamp**: Local time when the message was received
+- **Direction Badge**: 
+  - <span className="inline-flex items-center px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">↑ SEND</span> - Outgoing messages from inspector to server
+  - <span className="inline-flex items-center px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">↓ RECEIVE</span> - Incoming messages from server to inspector
+- **Method Name**: The JSON-RPC method being called (e.g., `tools/call`, `resources/read`)
+- **Expandable Content**: Click to view the full JSON payload
+
+## Technical Details
+
+### Message Format
+
+Each logged message contains:
+
+```typescript
+{
+  id: string;              // Unique message ID
+  serverId: string;        // Server identifier
+  direction: "SEND" | "RECEIVE";
+  method: string;          // JSON-RPC method name
+  timestamp: string;       // ISO timestamp
+  payload: unknown;        // Full JSON-RPC payload
+}
+```
+
+## Related Documentation
+
+- [Tools Tab](/inspector/index) - Testing and executing tools
+- [Resources Tab](/inspector/index) - Browsing server resources
+- [Prompts Tab](/inspector/index) - Managing prompts
+- [Connection Settings](/inspector/connection-settings) - Server configuration
+- [Development](/inspector/development) - Inspector development guide
+
