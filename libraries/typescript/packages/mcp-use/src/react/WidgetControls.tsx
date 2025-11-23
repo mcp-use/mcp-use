@@ -359,17 +359,41 @@ export function WidgetControls({
       case "top-left":
         return [...baseClasses, "top-full", "left-0", "mt-2"];
       case "top-center":
-        return [...baseClasses, "top-full", "left-1/2", "-translate-x-1/2", "mt-2"];
+        return [
+          ...baseClasses,
+          "top-full",
+          "left-1/2",
+          "-translate-x-1/2",
+          "mt-2",
+        ];
       case "bottom-right":
         return [...baseClasses, "bottom-full", "right-0", "mb-2"];
       case "bottom-left":
         return [...baseClasses, "bottom-full", "left-0", "mb-2"];
       case "bottom-center":
-        return [...baseClasses, "bottom-full", "left-1/2", "-translate-x-1/2", "mb-2"];
+        return [
+          ...baseClasses,
+          "bottom-full",
+          "left-1/2",
+          "-translate-x-1/2",
+          "mb-2",
+        ];
       case "center-left":
-        return [...baseClasses, "left-full", "top-1/2", "-translate-y-1/2", "ml-2"];
+        return [
+          ...baseClasses,
+          "left-full",
+          "top-1/2",
+          "-translate-y-1/2",
+          "ml-2",
+        ];
       case "center-right":
-        return [...baseClasses, "right-full", "top-1/2", "-translate-y-1/2", "mr-2"];
+        return [
+          ...baseClasses,
+          "right-full",
+          "top-1/2",
+          "-translate-y-1/2",
+          "mr-2",
+        ];
       default:
         return [...baseClasses, "top-full", "right-0", "mt-2"];
     }
@@ -456,7 +480,10 @@ export function WidgetControls({
         onMouseLeave={() => !attachTo && setIsHovered(false)}
       >
         {/* Inline styles needed for dynamic safe area offsets */}
-        <div className={getPositionClasses().join(" ")} style={getPositionOffsetStyles()}>
+        <div
+          className={getPositionClasses().join(" ")}
+          style={getPositionOffsetStyles()}
+        >
           {/* In dev mode, hide all controls as they're shown in the inspector instead */}
           {!isDevMode && (
             <>
@@ -530,17 +557,13 @@ export function WidgetControls({
             <table className="w-full border-collapse border-spacing-0">
               <tbody>
                 <tr className="border-b border-gray-700">
-                  <td className="p-2 font-bold w-[200px] align-top">
-                    Props
-                  </td>
+                  <td className="p-2 font-bold w-[200px] align-top">Props</td>
                   <td className="p-2 whitespace-pre-wrap break-all">
                     {formatValue(props)}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-700">
-                  <td className="p-2 font-bold w-[200px] align-top">
-                    Output
-                  </td>
+                  <td className="p-2 font-bold w-[200px] align-top">Output</td>
                   <td className="p-2 whitespace-pre-wrap break-all">
                     {formatValue(output)}
                   </td>
@@ -554,17 +577,13 @@ export function WidgetControls({
                   </td>
                 </tr>
                 <tr className="border-b border-gray-700">
-                  <td className="p-2 font-bold w-[200px] align-top">
-                    State
-                  </td>
+                  <td className="p-2 font-bold w-[200px] align-top">State</td>
                   <td className="p-2 whitespace-pre-wrap break-all">
                     {formatValue(state)}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-700">
-                  <td className="p-2 font-bold w-[200px] align-top">
-                    Theme
-                  </td>
+                  <td className="p-2 font-bold w-[200px] align-top">Theme</td>
                   <td className="p-2">{theme}</td>
                 </tr>
                 <tr className="border-b border-gray-700">
@@ -574,9 +593,7 @@ export function WidgetControls({
                   <td className="p-2">{displayMode}</td>
                 </tr>
                 <tr className="border-b border-gray-700">
-                  <td className="p-2 font-bold w-[200px] align-top">
-                    Locale
-                  </td>
+                  <td className="p-2 font-bold w-[200px] align-top">Locale</td>
                   <td className="p-2">{locale}</td>
                 </tr>
                 <tr className="border-b border-gray-700">
@@ -589,9 +606,7 @@ export function WidgetControls({
                   <td className="p-2 font-bold w-[200px] align-top">
                     User Agent
                   </td>
-                  <td className="p-2">
-                    {formatUserAgent(userAgent)}
-                  </td>
+                  <td className="p-2">{formatUserAgent(userAgent)}</td>
                 </tr>
                 <tr className="border-b border-gray-700">
                   <td className="p-2 font-bold w-[200px] align-top">
@@ -603,9 +618,7 @@ export function WidgetControls({
                   <td className="p-2 font-bold w-[200px] align-top">
                     API Available
                   </td>
-                  <td className="p-2">
-                    {isAvailable ? "Yes" : "No"}
-                  </td>
+                  <td className="p-2">{isAvailable ? "Yes" : "No"}</td>
                 </tr>
                 <tr className="border-b border-gray-700">
                   <td className="p-2 font-bold w-[200px] align-top">
@@ -686,9 +699,7 @@ export function WidgetControls({
 
               {/* Request Display Mode */}
               <div className="flex gap-2 items-center">
-                <span className="w-[150px] text-xs">
-                  Display Mode:
-                </span>
+                <span className="w-[150px] text-xs">Display Mode:</span>
                 <button
                   onClick={() => handleRequestDisplayMode("inline")}
                   className="py-1.5 px-3 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-xs flex-1"
@@ -722,9 +733,7 @@ export function WidgetControls({
               {/* Action Result */}
               {actionResult && (
                 <div className="mt-2 p-2 bg-[#1a1a1a] border border-gray-700 rounded whitespace-pre-wrap break-all text-[11px] max-h-[200px] overflow-auto">
-                  <div className="font-bold mb-1 text-gray-400">
-                    Result:
-                  </div>
+                  <div className="font-bold mb-1 text-gray-400">Result:</div>
                   {actionResult}
                   <button
                     onClick={() => setActionResult("")}

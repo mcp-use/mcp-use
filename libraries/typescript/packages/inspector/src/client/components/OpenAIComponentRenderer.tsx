@@ -392,7 +392,11 @@ function OpenAIComponentRendererBase({
 
       // Log all messages for debugging (can be filtered later)
       if (event.data?.type === "openai:notifyIntrinsicHeight") {
-        console.log("[OpenAIComponentRenderer] Received message from iframe:", event.data.type, event.data);
+        console.log(
+          "[OpenAIComponentRenderer] Received message from iframe:",
+          event.data.type,
+          event.data
+        );
       }
 
       // Let console log messages pass through (handled by useIframeConsole hook)
@@ -595,7 +599,12 @@ function OpenAIComponentRendererBase({
               event.data
             );
             const { height } = event.data;
-            console.log("[OpenAIComponentRenderer] Extracted height:", height, "type:", typeof height);
+            console.log(
+              "[OpenAIComponentRenderer] Extracted height:",
+              height,
+              "type:",
+              typeof height
+            );
             if (typeof height === "number" && height > 0) {
               // For inline mode, respect the requested height (allow scrolling if needed)
               // For fullscreen/pip modes, cap at viewport
@@ -607,14 +616,20 @@ function OpenAIComponentRendererBase({
               }
               // Always update if the requested height is different from what we last applied
               // This ensures we update even if we cap it (so widget knows the actual applied height)
-              if (height !== lastNotifiedHeightRef.current || newHeight !== iframeHeight) {
-                console.log("[OpenAIComponentRenderer] Calculated new height:", {
-                  requestedHeight: height,
-                  displayMode,
-                  newHeight,
-                  lastNotifiedHeight: lastNotifiedHeightRef.current,
-                  currentIframeHeight: iframeHeight,
-                });
+              if (
+                height !== lastNotifiedHeightRef.current ||
+                newHeight !== iframeHeight
+              ) {
+                console.log(
+                  "[OpenAIComponentRenderer] Calculated new height:",
+                  {
+                    requestedHeight: height,
+                    displayMode,
+                    newHeight,
+                    lastNotifiedHeight: lastNotifiedHeightRef.current,
+                    currentIframeHeight: iframeHeight,
+                  }
+                );
                 lastNotifiedHeightRef.current = height; // Track requested height from notifyIntrinsicHeight
                 lastMeasuredHeightRef.current = newHeight; // Track applied height
                 useNotifiedHeightRef.current = true; // Use notified height instead of automatic measurement

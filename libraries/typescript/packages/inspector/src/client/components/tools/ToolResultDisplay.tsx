@@ -338,9 +338,15 @@ export function ToolResultDisplay({
   // Memoize result.args and result.result to prevent unnecessary re-renders
   // in OpenAIComponentRenderer when only relativeTime changes
   // Use stable identifiers (timestamp, selectedIndex) instead of the objects themselves
-  const memoizedArgs = useMemo(() => result?.args, [result?.timestamp, selectedIndex]);
-  const memoizedResult = useMemo(() => result?.result, [result?.timestamp, selectedIndex]);
-  
+  const memoizedArgs = useMemo(
+    () => result?.args,
+    [result?.timestamp, selectedIndex]
+  );
+  const memoizedResult = useMemo(
+    () => result?.result,
+    [result?.timestamp, selectedIndex]
+  );
+
   // Memoize readResource to ensure stable reference
   const memoizedReadResource = useCallback(
     (uri: string) => readResource(uri),

@@ -76,23 +76,38 @@ export function McpUseProvider({
   const notifyHeight = useCallback((height: number) => {
     console.log("[McpUseProvider] notifyHeight called with height:", height);
     if (typeof window !== "undefined" && window.openai?.notifyIntrinsicHeight) {
-      console.log("[McpUseProvider] window.openai.notifyIntrinsicHeight is available, calling...");
+      console.log(
+        "[McpUseProvider] window.openai.notifyIntrinsicHeight is available, calling..."
+      );
       window.openai.notifyIntrinsicHeight(height).catch((error) => {
-        console.error("[McpUseProvider] Failed to notify intrinsic height:", error);
+        console.error(
+          "[McpUseProvider] Failed to notify intrinsic height:",
+          error
+        );
       });
     } else {
-      console.warn("[McpUseProvider] window.openai.notifyIntrinsicHeight is not available", {
-        hasWindow: typeof window !== "undefined",
-        hasOpenai: typeof window !== "undefined" && !!window.openai,
-        hasMethod: typeof window !== "undefined" && !!window.openai?.notifyIntrinsicHeight,
-      });
+      console.warn(
+        "[McpUseProvider] window.openai.notifyIntrinsicHeight is not available",
+        {
+          hasWindow: typeof window !== "undefined",
+          hasOpenai: typeof window !== "undefined" && !!window.openai,
+          hasMethod:
+            typeof window !== "undefined" &&
+            !!window.openai?.notifyIntrinsicHeight,
+        }
+      );
     }
   }, []);
 
   // Debounced height notification
   const debouncedNotifyHeight = useCallback(
     (height: number) => {
-      console.log("[McpUseProvider] debouncedNotifyHeight called with height:", height, "lastHeight:", lastHeightRef.current);
+      console.log(
+        "[McpUseProvider] debouncedNotifyHeight called with height:",
+        height,
+        "lastHeight:",
+        lastHeightRef.current
+      );
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
@@ -102,7 +117,9 @@ export function McpUseProvider({
           lastHeightRef.current = height;
           notifyHeight(height);
         } else {
-          console.log("[McpUseProvider] Height unchanged or invalid, skipping notification");
+          console.log(
+            "[McpUseProvider] Height unchanged or invalid, skipping notification"
+          );
         }
       }, 150); // 150ms debounce
     },
@@ -111,14 +128,24 @@ export function McpUseProvider({
 
   // Set up ResizeObserver for auto-sizing
   useEffect(() => {
-    console.log("[McpUseProvider] autoSize effect running, autoSize:", autoSize);
+    console.log(
+      "[McpUseProvider] autoSize effect running, autoSize:",
+      autoSize
+    );
     if (!autoSize) {
-      console.log("[McpUseProvider] autoSize is disabled, skipping ResizeObserver setup");
+      console.log(
+        "[McpUseProvider] autoSize is disabled, skipping ResizeObserver setup"
+      );
       return;
     }
 
     const container = containerRef.current;
-    console.log("[McpUseProvider] Container ref:", container, "ResizeObserver available:", typeof ResizeObserver !== "undefined");
+    console.log(
+      "[McpUseProvider] Container ref:",
+      container,
+      "ResizeObserver available:",
+      typeof ResizeObserver !== "undefined"
+    );
     if (!container || typeof ResizeObserver === "undefined") {
       console.warn("[McpUseProvider] Cannot set up ResizeObserver:", {
         hasContainer: !!container,
@@ -143,7 +170,9 @@ export function McpUseProvider({
     });
 
     observer.observe(container);
-    console.log("[McpUseProvider] ResizeObserver successfully set up and observing container");
+    console.log(
+      "[McpUseProvider] ResizeObserver successfully set up and observing container"
+    );
 
     // Initial measurement
     const initialHeight = Math.max(
