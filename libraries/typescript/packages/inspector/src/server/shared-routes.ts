@@ -375,9 +375,12 @@ export function registerInspectorRoutes(
 
         // Insert base tag immediately after <head> (before any scripts)
         html = html.replace(/<head>/i, `<head>\n    ${baseTag}`);
-        
+
         // Insert CSP warning and config scripts before the first script tag
-        html = html.replace(/<script/, cspWarningScript + viteConfigScript + "\n    <script");
+        html = html.replace(
+          /<script/,
+          cspWarningScript + viteConfigScript + "\n    <script"
+        );
       }
 
       // Set security headers

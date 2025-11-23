@@ -13,14 +13,20 @@ export const Carousel: React.FC<CarouselProps> = ({ mcpUrl }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch fruits from the API using React Query
-  const { data: items, isLoading, error } = useQuery({
+  const {
+    data: items,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["fruits"],
     queryFn: async () => {
       const response = await fetch(`${mcpUrl}/api/fruits`);
       if (!response.ok) {
         throw new Error("Failed to fetch fruits");
       }
-      return response.json() as Promise<Array<{ fruit: string; color: string }>>;
+      return response.json() as Promise<
+        Array<{ fruit: string; color: string }>
+      >;
     },
     enabled: !!mcpUrl, // Only run query if mcpUrl is available
   });
@@ -57,4 +63,3 @@ export const Carousel: React.FC<CarouselProps> = ({ mcpUrl }) => {
     </div>
   );
 };
-

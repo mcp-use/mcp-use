@@ -980,7 +980,10 @@ export class McpServer {
       const files = await fs.readdir(srcDir, { withFileTypes: true });
       for (const dirent of files) {
         // Exclude macOS resource fork files and other hidden/system files
-        if (dirent.name.startsWith("._") || dirent.name.startsWith(".DS_Store")) {
+        if (
+          dirent.name.startsWith("._") ||
+          dirent.name.startsWith(".DS_Store")
+        ) {
           continue;
         }
 
@@ -995,7 +998,11 @@ export class McpServer {
           });
         } else if (dirent.isDirectory()) {
           // Check for widget.tsx in folder
-          const widgetPath = pathHelpers.join(srcDir, dirent.name, "widget.tsx");
+          const widgetPath = pathHelpers.join(
+            srcDir,
+            dirent.name,
+            "widget.tsx"
+          );
           try {
             await fs.access(widgetPath);
             entries.push({

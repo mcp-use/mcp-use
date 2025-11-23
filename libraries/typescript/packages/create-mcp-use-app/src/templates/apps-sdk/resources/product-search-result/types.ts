@@ -12,4 +12,3 @@ export type AccordionItemProps = {
   isOpen: boolean;
   onToggle: () => void;
 };
-

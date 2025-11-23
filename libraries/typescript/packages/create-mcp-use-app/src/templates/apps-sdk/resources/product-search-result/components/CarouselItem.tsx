@@ -6,10 +6,7 @@ export interface CarouselItemProps {
   color: string;
 }
 
-export const CarouselItem: React.FC<CarouselItemProps> = ({
-  fruit,
-  color,
-}) => {
+export const CarouselItem: React.FC<CarouselItemProps> = ({ fruit, color }) => {
   return (
     <div
       className={`carousel-item size-52 rounded-xl border border-gray-200 dark:border-gray-800 ${color}`}
@@ -27,4 +24,3 @@ export const CarouselItem: React.FC<CarouselItemProps> = ({
     </div>
   );
 };
-

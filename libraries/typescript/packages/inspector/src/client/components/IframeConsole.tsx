@@ -165,26 +165,28 @@ export function IframeConsole({
       <SheetTrigger asChild>
         <Tooltip>
           <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-          onClick={() => setIsOpen(true)}
-        >
-          <TerminalIcon className="size-4" />
-          {(errorCount > 0 || warnCount > 0) && (
-            <span className={cn(
-              "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
-              errorCount > 0 ? "bg-red-500" : "bg-yellow-500"
-            )}>
-              {errorCount + warnCount}
-            </span>
-          )}
-        </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{errorCount + warnCount} console logs from the iframe</p>
-        </TooltipContent>
+            <Button
+              variant="outline"
+              size="sm"
+              className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+              onClick={() => setIsOpen(true)}
+            >
+              <TerminalIcon className="size-4" />
+              {(errorCount > 0 || warnCount > 0) && (
+                <span
+                  className={cn(
+                    "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
+                    errorCount > 0 ? "bg-red-500" : "bg-yellow-500"
+                  )}
+                >
+                  {errorCount + warnCount}
+                </span>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{errorCount + warnCount} console logs from the iframe</p>
+          </TooltipContent>
         </Tooltip>
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[400px] flex flex-col p-0">

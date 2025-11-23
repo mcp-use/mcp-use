@@ -30,9 +30,7 @@ export const Accordion: React.FC<AccordionProps> = ({
             answer={item.answer}
             isOpen={openAccordionIndex === index}
             onToggle={() =>
-              setOpenAccordionIndex(
-                openAccordionIndex === index ? null : index
-              )
+              setOpenAccordionIndex(openAccordionIndex === index ? null : index)
             }
           />
         ))}
@@ -40,4 +38,3 @@ export const Accordion: React.FC<AccordionProps> = ({
     </div>
   );
 };
-

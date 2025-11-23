@@ -71,4 +71,3 @@ const ProductSearchResultWithProvider: React.FC = () => {
 };
 
 export default ProductSearchResultWithProvider;
-

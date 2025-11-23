@@ -76,4 +76,3 @@ export function useCarouselAnimation(
     };
   }, [carouselContainerRef, scrollContainerRef]);
 }
-
