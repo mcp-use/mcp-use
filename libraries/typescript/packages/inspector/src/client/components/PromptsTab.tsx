@@ -581,7 +581,10 @@ export function PromptsTab({
         defaultSize={33}
         className="flex flex-col h-full relative"
       >
-        <ResizablePanelGroup direction="vertical" className="h-full border-r dark:border-zinc-700">
+        <ResizablePanelGroup
+          direction="vertical"
+          className="h-full border-r dark:border-zinc-700"
+        >
           <ResizablePanel defaultSize={75} minSize={30}>
             <PromptsTabHeader
               activeTab={activeTab}
@@ -595,7 +598,9 @@ export function PromptsTab({
               onTabSwitch={() =>
                 setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
               }
-              searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+              searchInputRef={
+                searchInputRef as React.RefObject<HTMLInputElement>
+              }
             />
 
             {activeTab === "prompts" ? (
@@ -628,8 +633,8 @@ export function PromptsTab({
             onExpand={() => setRpcPanelCollapsed(false)}
             className="flex flex-col border-t dark:border-zinc-700"
           >
-            <div 
-              className="group flex items-center justify-between p-3 shrink-0 cursor-pointer hover:bg-muted/50 transition-colors" 
+            <div
+              className="group flex items-center justify-between p-3 shrink-0 cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -714,7 +719,6 @@ export function PromptsTab({
               />
             </div>
           </ResizablePanel>
-
         </ResizablePanelGroup>
       </ResizablePanel>
     </ResizablePanelGroup>

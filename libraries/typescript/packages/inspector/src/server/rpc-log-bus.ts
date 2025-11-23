@@ -48,7 +48,7 @@ class RpcLogBus {
 
   subscribe(
     serverIds: string[],
-    listener: (event: RpcLogEvent) => void,
+    listener: (event: RpcLogEvent) => void
   ): () => void {
     const filter = new Set(serverIds);
     const handler = (event: RpcLogEvent) => {
@@ -87,4 +87,3 @@ class RpcLogBus {
 }
 
 export const rpcLogBus = new RpcLogBus();
-

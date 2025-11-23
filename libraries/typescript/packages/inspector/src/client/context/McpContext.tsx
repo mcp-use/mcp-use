@@ -144,10 +144,12 @@ function McpConnectionWrapper({
 
   // Import transport wrapper for RPC logging - load it immediately
   // We need to load this BEFORE useMcp is called, so we use a ref to track readiness
-  const wrapTransportRef = useRef<((transport: any, serverId: string) => any) | null>(null);
+  const wrapTransportRef = useRef<
+    ((transport: any, serverId: string) => any) | null
+  >(null);
   const [wrapTransportReady, setWrapTransportReady] = useState(false);
   const wrapperLoadAttemptedRef = useRef(false);
-  
+
   // Load the transport wrapper immediately on mount - BEFORE useMcp connects
   useEffect(() => {
     if (typeof window !== "undefined" && !wrapperLoadAttemptedRef.current) {
@@ -172,7 +174,12 @@ function McpConnectionWrapper({
     return (transport: any, serverIdFromConnector: string) => {
       // Use original URL (not finalUrl) as serverId to match connection.id
       const actualServerId = url;
-      console.log("[McpContext] Applying transport wrapper, serverId:", actualServerId, "from connector:", serverIdFromConnector);
+      console.log(
+        "[McpContext] Applying transport wrapper, serverId:",
+        actualServerId,
+        "from connector:",
+        serverIdFromConnector
+      );
       return wrapTransportRef.current!(transport, actualServerId);
     };
   }, [wrapTransportReady, url]);
@@ -474,8 +481,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
     setConnections((prev) => prev.filter((c) => c.id !== id));
 
     // Also remove from localStorage immediately
-    const currentConfigs =
-      localStorage.getItem("mcp-inspector-connections");
+    const currentConfigs = localStorage.getItem("mcp-inspector-connections");
     if (currentConfigs) {
       try {
         const parsed = JSON.parse(currentConfigs);
@@ -488,7 +494,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
         console.error("Failed to update localStorage on remove:", e);
       }
     }
-    
+
     // Track removal
     Telemetry.getInstance().track(new MCPServerRemovedEvent(id));
   }, []);
@@ -614,4 +620,3 @@ export function McpProvider({ children }: { children: ReactNode }) {
     </McpContext.Provider>
   );
 }
-

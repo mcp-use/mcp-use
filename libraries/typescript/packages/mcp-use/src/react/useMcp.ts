@@ -291,7 +291,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
           wrapTransport: wrapTransport
             ? (transport: any) => {
-                console.log("[useMcp] Applying transport wrapper for server:", serverName, "url:", url);
+                console.log(
+                  "[useMcp] Applying transport wrapper for server:",
+                  serverName,
+                  "url:",
+                  url
+                );
                 return wrapTransport(transport, url);
               }
             : undefined,

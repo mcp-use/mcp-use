@@ -433,7 +433,10 @@ export function ResourcesTab({
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel defaultSize={25}>
-        <ResizablePanelGroup direction="vertical" className="h-full border-r dark:border-zinc-700">
+        <ResizablePanelGroup
+          direction="vertical"
+          className="h-full border-r dark:border-zinc-700"
+        >
           <ResizablePanel defaultSize={75} minSize={30}>
             <ResourcesTabHeader
               activeTab={activeTab}
@@ -444,7 +447,9 @@ export function ResourcesTab({
               onSearchChange={setSearchQuery}
               onSearchBlur={handleSearchBlur}
               onTabSwitch={() => {}}
-              searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+              searchInputRef={
+                searchInputRef as React.RefObject<HTMLInputElement>
+              }
             />
 
             <div className="flex flex-col h-full">
@@ -469,8 +474,8 @@ export function ResourcesTab({
             onExpand={() => setRpcPanelCollapsed(false)}
             className="flex flex-col border-t dark:border-zinc-700"
           >
-            <div 
-              className="group flex items-center justify-between p-3 shrink-0 cursor-pointer hover:bg-muted/50 transition-colors" 
+            <div
+              className="group flex items-center justify-between p-3 shrink-0 cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -551,7 +556,6 @@ export function ResourcesTab({
               />
             </div>
           </ResizablePanel>
-
         </ResizablePanelGroup>
       </ResizablePanel>
     </ResizablePanelGroup>

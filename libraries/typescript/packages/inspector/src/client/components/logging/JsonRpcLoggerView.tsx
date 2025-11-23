@@ -55,18 +55,24 @@ export function JsonRpcLoggerView({
     setItems([]);
     setExpanded(new Set());
     onCountChange?.(0);
-    
+
     // Also clear server-side buffer to prevent replay of old events
     try {
       const params = new URLSearchParams();
       if (serverIds && serverIds.length > 0) {
         params.set("serverIds", serverIds.join(","));
       }
-      const response = await fetch(`/inspector/api/rpc/log?${params.toString()}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/inspector/api/rpc/log?${params.toString()}`,
+        {
+          method: "DELETE",
+        }
+      );
       if (!response.ok) {
-        console.warn("[RPC Logger] Failed to clear server buffer:", response.status);
+        console.warn(
+          "[RPC Logger] Failed to clear server buffer:",
+          response.status
+        );
       }
     } catch (err) {
       console.warn("[RPC Logger] Error clearing server buffer:", err);
@@ -140,7 +146,11 @@ export function JsonRpcLoggerView({
             payload: message,
           };
 
-          console.log("[RPC Logger] Received RPC event:", { method, direction, serverId });
+          console.log("[RPC Logger] Received RPC event:", {
+            method,
+            direction,
+            serverId,
+          });
           setItems((prev) => {
             const newItems = [item, ...prev].slice(0, 1000);
             onCountChange?.(newItems.length);
@@ -199,11 +209,7 @@ export function JsonRpcLoggerView({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-          
-      <div
-        ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto"
-      >
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         {filteredItems.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-xs text-muted-foreground">
@@ -276,4 +282,3 @@ export function JsonRpcLoggerView({
 }
 
 export default JsonRpcLoggerView;
-

@@ -63,7 +63,7 @@ export function ToolExecutionPanel({
               {selectedTool.name}
             </h3>
             <div className="flex gap-2 flex-shrink-0">
-            <Button
+              <Button
                 variant="outline"
                 onClick={onSave}
                 disabled={isExecuting}
@@ -94,7 +94,6 @@ export function ToolExecutionPanel({
                   </>
                 )}
               </Button>
-              
             </div>
           </div>
           {selectedTool.description && (

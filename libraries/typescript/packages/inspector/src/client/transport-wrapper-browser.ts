@@ -11,7 +11,7 @@ import { browserRpcLogBus } from "./rpc-log-bus-browser.js";
  */
 export function wrapTransportForLogging(
   transport: Transport,
-  serverId: string,
+  serverId: string
 ): Transport {
   console.log("[RPC Logger] Wrapping transport for server:", serverId);
   // Wrapper that proxies to the underlying transport while emitting logs
@@ -24,7 +24,7 @@ export function wrapTransportForLogging(
       // Intercept incoming messages
       this.inner.onmessage = (
         message: JSONRPCMessage,
-        extra?: MessageExtraInfo,
+        extra?: MessageExtraInfo
       ) => {
         // Log RPC message
         browserRpcLogBus
@@ -58,7 +58,7 @@ export function wrapTransportForLogging(
 
     async send(
       message: JSONRPCMessage,
-      options?: TransportSendOptions,
+      options?: TransportSendOptions
     ): Promise<void> {
       // Log RPC message
       browserRpcLogBus
@@ -92,4 +92,3 @@ export function wrapTransportForLogging(
 
   return new LoggingTransport(transport);
 }
-

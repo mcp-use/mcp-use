@@ -587,7 +587,10 @@ export function registerInspectorRoutes(
 
         // Replay recent messages
         try {
-          const recent = rpcLogBus.getBuffer(serverIds, isNaN(replay) ? 3 : replay);
+          const recent = rpcLogBus.getBuffer(
+            serverIds,
+            isNaN(replay) ? 3 : replay
+          );
           for (const evt of recent) {
             send({ type: "rpc", ...evt });
           }
@@ -596,9 +599,12 @@ export function registerInspectorRoutes(
         }
 
         // Subscribe to live events
-        const unsubscribe = rpcLogBus.subscribe(serverIds, (evt: RpcLogEvent) => {
-          send({ type: "rpc", ...evt });
-        });
+        const unsubscribe = rpcLogBus.subscribe(
+          serverIds,
+          (evt: RpcLogEvent) => {
+            send({ type: "rpc", ...evt });
+          }
+        );
 
         // Keepalive comments
         const keepalive = setInterval(() => {
