@@ -2,4 +2,4 @@
 "mcp-use": minor
 ---
 
-Introduce searc_tools metadata in addition to results to improve model context
+Enhance search_tools to return metadata (total_tools, namespaces, result_count) along with results to provide better context for model decision-making
