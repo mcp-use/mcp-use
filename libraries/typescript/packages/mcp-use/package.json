@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "packageManager": "pnpm@10.6.1",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents and Clients + MCP Servers with support for MCP-UI.",
   "author": "mcp-use, Inc.",
@@ -139,7 +139,7 @@
     "@modelcontextprotocol/sdk": "1.20.0",
     "@scarf/scarf": "^1.4.0",
     "ai": "^4.3.19",
-    "chalk": "^5.4.1",
+    "chalk": "^5.6.2",
     "cli-highlight": "^2.1.11",
     "commander": "^14.0.1",
     "dotenv": "^16.5.0",
@@ -162,9 +162,9 @@
   "optionalDependencies": {
     "@tailwindcss/vite": "^4.1.15",
     "@vitejs/plugin-react": "^5.0.4",
-    "vite": ">=5.4.21",
     "connect": "^3.7.0",
-    "node-mocks-http": "^1.16.2"
+    "node-mocks-http": "^1.16.2",
+    "vite": ">=5.4.21"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.13.2",
