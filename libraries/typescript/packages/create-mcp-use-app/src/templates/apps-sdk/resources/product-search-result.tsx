@@ -90,29 +90,9 @@ const ProductSearchResult: React.FC = () => {
 
   const accordionItems = [
     {
-      question: "Which model should I use?",
+      question: "Demo of the autosize feature",
       answer:
-        "For most use cases, we recommend starting with GPT-4 for the best balance of performance and cost. GPT-3.5-turbo is great for simpler tasks and is more cost-effective. For specialized tasks, consider GPT-4 Turbo or fine-tuned models.",
-    },
-    {
-      question: "Do you offer an enterprise package or SLAs?",
-      answer:
-        "Yes, we offer enterprise packages with custom SLAs, dedicated support, and advanced features. Contact our sales team to discuss your specific needs and get a tailored solution for your organization.",
-    },
-    {
-      question: "Will I be charged for API usage in the Playground?",
-      answer:
-        "The Playground is free to use for testing and experimentation. However, if you exceed the free tier limits, you may be charged for additional usage. Check your account settings to see your current usage and limits.",
-    },
-    {
-      question: "How will I know how many tokens I've used each month?",
-      answer:
-        "You can monitor your token usage in real-time through the dashboard. We provide detailed analytics showing token consumption by model, date, and project. You'll also receive monthly usage reports via email.",
-    },
-    {
-      question: "How can I manage my spending on the API platform?",
-      answer:
-        "You can set spending limits and budgets in your account settings. We also offer usage alerts that notify you when you approach your limits. For enterprise customers, we provide advanced cost management tools and dedicated account management.",
+        "This is a demo of the autosize feature. The widget will automatically resize to fit the content, as supported by the OpenAI apps sdk https://developers.openai.com/apps-sdk/build/mcp-server/",
     },
   ];
 
@@ -250,7 +230,7 @@ const ProductSearchResult: React.FC = () => {
             </div>
           </div>
           <div className="p-8 pt-4 border-t border-gray-200 dark:border-gray-800 mt-4">
-            <h3 className="heading-lg mb-4">Frequently Asked Questions</h3>
+            <h3 className="heading-lg mb-4">Can fruit be cute?</h3>
             <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
               {accordionItems.map((item, index) => (
                 <AccordionItem

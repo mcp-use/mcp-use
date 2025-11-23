@@ -833,10 +833,13 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 /**
  * Get security headers for widget content
  */
-export function getWidgetSecurityHeaders(widgetCSP?: {
-  connect_domains?: string[];
-  resource_domains?: string[];
-}): Record<string, string> {
+export function getWidgetSecurityHeaders(
+  widgetCSP?: {
+    connect_domains?: string[];
+    resource_domains?: string[];
+  },
+  devServerBaseUrl?: string
+): Record<string, string> {
   const trustedCdns = [
     "https://persistent.oaistatic.com",
     "https://*.oaistatic.com",
@@ -852,7 +855,30 @@ export function getWidgetSecurityHeaders(widgetCSP?: {
     allResourceDomains.push(...widgetCSP.resource_domains);
   }
 
+  // Add dev server origin for HMR scripts in development mode
+  let devServerOrigin: string | null = null;
+  if (devServerBaseUrl) {
+    try {
+      devServerOrigin = new URL(devServerBaseUrl).origin;
+      allResourceDomains.push(devServerOrigin);
+    } catch (e) {
+      console.warn(`[CSP] Invalid devServerBaseUrl: ${devServerBaseUrl}`);
+    }
+  }
+
   const resourceDomainsStr = allResourceDomains.join(" ");
+
+  // Build img-src with dev server origin for images in development mode
+  let imgSrc = "'self' data: https: blob:";
+  if (devServerOrigin) {
+    imgSrc = `'self' data: https: blob: ${devServerOrigin}`;
+  }
+
+  // Build media-src with dev server origin for media in development mode
+  let mediaSrc = "'self' data: https: blob:";
+  if (devServerOrigin) {
+    mediaSrc = `'self' data: https: blob: ${devServerOrigin}`;
+  }
 
   // Build connect-src with widget-specific domains
   let connectSrc = "'self' https: wss: ws:";
@@ -867,8 +893,8 @@ export function getWidgetSecurityHeaders(widgetCSP?: {
       "worker-src 'self' blob:",
       "child-src 'self' blob:",
       `style-src 'self' 'unsafe-inline' ${resourceDomainsStr}`,
-      "img-src 'self' data: https: blob:",
-      "media-src 'self' data: https: blob:",
+      `img-src ${imgSrc}`,
+      `media-src ${mediaSrc}`,
       `font-src 'self' data: ${resourceDomainsStr}`,
       `connect-src ${connectSrc}`,
       "frame-ancestors 'self'",

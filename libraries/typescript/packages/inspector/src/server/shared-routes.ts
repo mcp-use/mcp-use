@@ -310,20 +310,13 @@ export function registerInspectorRoutes(
       );
 
       // Also handle relative paths that start with /mcp-use/widgets/
-      // BUT exclude @vite/client and @react-refresh which need direct access for HMR
+      // In dev mode, load all assets directly from dev server for simplicity
+      // This avoids issues with dynamically loaded assets that bypass HTML rewriting
       html = html.replace(
         /(src|href)="(\/mcp-use\/widgets\/[^"]+)"/g,
         (_match, attr, path) => {
-          // Don't proxy Vite's HMR client scripts - they need direct connection
-          if (
-            path.includes("/@vite/client") ||
-            path.includes("/@react-refresh")
-          ) {
-            // Rewrite to absolute URL pointing to dev server
-            return `${attr}="${widgetData.devServerBaseUrl}${path}"`;
-          }
-          // Proxy other assets
-          return `${attr}="${proxyBase}${path}"`;
+          // Rewrite to absolute URL pointing to dev server
+          return `${attr}="${widgetData.devServerBaseUrl}${path}"`;
         }
       );
 
@@ -339,14 +332,19 @@ export function registerInspectorRoutes(
         return match;
       });
 
-      // Inject Vite HMR WebSocket configuration before @vite/client loads
+      // Inject base tag and Vite HMR WebSocket configuration
       if (widgetData.devServerBaseUrl) {
         const devServerUrl = new URL(widgetData.devServerBaseUrl);
         const wsProtocol = devServerUrl.protocol === "https:" ? "wss" : "ws";
-        const wsHost = devServerUrl.host; // e.g., "localhost:3000"
+        const wsHost = devServerUrl.host; // e.g., "localhost:3004"
 
         // Point directly to Vite HMR endpoint on the dev server
         const directWsUrl = `${wsProtocol}://${wsHost}/mcp-use/widgets/`;
+
+        // Inject base tag to make all relative URLs resolve against dev server
+        // This is critical for Vite's dynamic module loading
+        // MUST be injected right after <head> tag, before any scripts
+        const baseTag = `<base href="${widgetData.devServerBaseUrl}/mcp-use/widgets/${widgetName}/">`;
 
         // Inject configuration script before Vite client loads
         // This tells Vite where to connect for HMR
@@ -356,12 +354,18 @@ export function registerInspectorRoutes(
       window.__vite_ws_url__ = "${directWsUrl}";
     </script>`;
 
-        // Insert before the first script tag (typically @vite/client)
+        // Insert base tag immediately after <head> (before any scripts)
+        html = html.replace(/<head>/i, `<head>\n    ${baseTag}`);
+        
+        // Insert config script before the first script tag (typically @vite/client)
         html = html.replace(/<script/, viteConfigScript + "\n    <script");
       }
 
       // Set security headers
-      const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
+      const headers = getWidgetSecurityHeaders(
+        widgetData.widgetCSP,
+        widgetData.devServerBaseUrl
+      );
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value);
       });
