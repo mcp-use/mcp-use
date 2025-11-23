@@ -484,21 +484,45 @@ class OAuth:
         except httpx.HTTPError as e:
             logger.debug(f"Failed probing server for PRM via 401: {e}")
 
+        # 1b) If WWW-Authenticate didn’t give us a URL, try well-known PRM paths
         if not prm_url:
-            prm_url = f"{base_url}/.well-known/oauth-protected-resource"
+            path = (parsed.path or "").rstrip("/")
+            candidate_prm_urls: list[str] = []
 
-        # 2) Fetch PRM
-        try:
-            logger.debug(f"Trying OAuth PRM endpoint at: {prm_url}")
-            prm_response = await client.get(prm_url)
-            prm_response.raise_for_status()
-            prm = prm_response.json()
-            self._resource_metadata = ProtectedResourceMetadata(**prm)
-            logger.debug("Successfully got the PRM data")
-            logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
-        except (httpx.HTTPError, ValueError) as e:
-            logger.debug(f"Failed to discover OAuth PRM at {prm_url}: {e}")
-            pass
+            # Path-specific form: /.well-known/oauth-protected-resource{path}
+            if path:
+                candidate_prm_urls.append(f"{base_url}/.well-known/oauth-protected-resource{path}")
+
+            # Root form: /.well-known/oauth-protected-resource
+            candidate_prm_urls.append(f"{base_url}/.well-known/oauth-protected-resource")
+
+            for candidate in candidate_prm_urls:
+                try:
+                    logger.debug(f"Trying OAuth PRM endpoint at: {candidate}")
+                    prm_response = await client.get(candidate)
+                    prm_response.raise_for_status()
+                    prm = prm_response.json()
+                    self._resource_metadata = ProtectedResourceMetadata(**prm)
+                    logger.debug("Successfully got the PRM data")
+                    logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
+                    prm_url = candidate
+                    break
+                except (httpx.HTTPError, ValueError) as e:
+                    logger.debug(f"Failed to discover OAuth PRM at {candidate}: {e}")
+
+        # 2) If we have PRM URL but _resource_metadata is still None
+        if prm_url and not self._resource_metadata:
+            try:
+                logger.debug(f"Trying OAuth PRM endpoint at: {prm_url}")
+                prm_response = await client.get(prm_url)
+                prm_response.raise_for_status()
+                prm = prm_response.json()
+                self._resource_metadata = ProtectedResourceMetadata(**prm)
+                logger.debug("Successfully got the PRM data")
+                logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OAuth PRM at {prm_url}: {e}")
+                pass
         
         # 3) For each authorization server, try AS metadata and stop on first success
         auth_servers = self._resource_metadata.authorization_servers if self._resource_metadata else []
@@ -570,7 +594,14 @@ class OAuth:
         www_auth = response.headers.get("WWW-Authenticate")
         if not www_auth:
             return None
+
+        # If the server has a scope and the user didn't override it
+        scope_match = re.search(r'scope="([^"]+)"', www_auth)
+        if scope_match and not self.scope:
+            self.scope = scope_match.group(1)
+            logger.debug("Using scope from WWW-Authenticate header")
         
+        # Extract PRM url
         match = re.search(r'resource_metadata="([^"]+)"', www_auth)
         if match:
             return match.group(1)
