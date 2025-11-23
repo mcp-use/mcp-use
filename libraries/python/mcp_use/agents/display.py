@@ -40,12 +40,12 @@ def _extract_json_from_textcontent(result):
 
 def _format_search_tools_as_tree(tools, meta=None, query=None):
     """Format search_tools result as a tree structure.
-    
+
     Args:
         tools: List of tool dictionaries with 'server', 'name', and optionally 'description'
         meta: Optional dictionary with 'total_tools', 'namespaces', 'result_count'
         query: Optional query string that was used for the search
-    
+
     Returns:
         Formatted tree string
     """
@@ -58,13 +58,13 @@ def _format_search_tools_as_tree(tools, meta=None, query=None):
             meta_lines.append(f"Namespaces: {', '.join(meta['namespaces'])}")
         if meta.get("result_count") is not None:
             meta_lines.append(f"Results: {meta['result_count']}")
-    
+
     if not isinstance(tools, list) or len(tools) == 0:
         no_results_msg = f'No tools found for query "{query}"' if query else "(no tools found)"
         if meta_lines:
             return "\n".join(meta_lines) + "\n\n" + no_results_msg
         return no_results_msg
-    
+
     # Group tools by server
     tools_by_server = {}
     for tool in tools:
@@ -72,39 +72,39 @@ def _format_search_tools_as_tree(tools, meta=None, query=None):
         if server not in tools_by_server:
             tools_by_server[server] = []
         tools_by_server[server].append(tool)
-    
+
     # Build tree structure
     lines = []
-    
+
     # Add meta information at the top if available
     if meta_lines:
         lines.extend(meta_lines)
         lines.append("")  # Empty line before tree
-    
+
     servers = sorted(tools_by_server.keys())
-    
+
     for i, server in enumerate(servers):
         server_tools = tools_by_server[server]
         is_last_server = i == len(servers) - 1
         server_prefix = "└─" if is_last_server else "├─"
-        
+
         # Use rich Text for colored output
         server_text = Text(f"{server_prefix} ")
         server_text.append(server, style="cyan")
         server_text.append(f" ({len(server_tools)} tools)")
         lines.append(server_text)
-        
+
         # Add tools under this server
         for j, tool in enumerate(server_tools):
             is_last_tool = j == len(server_tools) - 1
             indent = "  " if is_last_server else "│ "
             tool_prefix = "└─" if is_last_tool else "├─"
-            
+
             # Tool name line
             tool_name = tool.get("name", "unknown")
             tool_text = Text(f"{indent}{tool_prefix} {tool_name}")
             lines.append(tool_text)
-            
+
             # Description on new line, aligned with tool name
             if tool.get("description"):
                 # Calculate indent for description lines
@@ -113,18 +113,18 @@ def _format_search_tools_as_tree(tools, meta=None, query=None):
                 desc_align = "   " if is_last_tool else "│  "
                 description_indent = indent + desc_align
                 description = tool["description"]
-                
+
                 # Get terminal width for wrapping (default to 120 if not available)
                 try:
                     terminal_width = console.width
                 except Exception:
                     terminal_width = 120
-                
+
                 # Calculate available width for description
                 # Account for: indent + Panel padding (approximately 4 chars for borders/padding)
                 indent_length = len(description_indent)
                 available_width = max(40, terminal_width - indent_length - 4)
-                
+
                 # Wrap description text at word boundaries
                 wrapped_lines = textwrap.wrap(
                     description,
@@ -132,13 +132,13 @@ def _format_search_tools_as_tree(tools, meta=None, query=None):
                     break_long_words=False,
                     break_on_hyphens=False
                 )
-                
+
                 # Add indent to each line (including continuation lines)
                 for desc_line in wrapped_lines:
                     desc_text = Text(description_indent)
                     desc_text.append(desc_line, style="dim")
                     lines.append(desc_text)
-    
+
     # Convert to string for display
     result_lines = []
     for line in lines:
@@ -146,7 +146,7 @@ def _format_search_tools_as_tree(tools, meta=None, query=None):
             result_lines.append(line.plain)
         else:
             result_lines.append(str(line))
-    
+
     return "\n".join(result_lines)
 
 
@@ -239,7 +239,7 @@ def _pretty_print_step(item):
                 if tool_name == "search_tools":
                     # Get query from tool input
                     query = tool_input.get("query") if isinstance(tool_input, dict) else None
-                    
+
                     # Handle new format: object with meta and results
                     if isinstance(parsed_json, dict) and "results" in parsed_json:
                         results = parsed_json["results"]
@@ -268,7 +268,7 @@ def _pretty_print_step(item):
                             )
                         )
                         return
-                
+
                 if tool_name == "execute_code" and isinstance(parsed_json, dict):
                     execution_time = parsed_json.get("execution_time")
                     time_str = f" [dim]⏱️  {execution_time:.3f}s[/dim]" if execution_time is not None else ""
@@ -443,13 +443,13 @@ def log_agent_stream(chunk, pretty_print=True):
             parsed_json = _extract_json_from_textcontent(output_str) if output_str else None
             if parsed_json:
                 tool_name = name.split("/")[-1] if "/" in name else name
-                
+
                 # Special handling for search_tools to display as tree
                 if tool_name == "search_tools":
                     # Try to get query from event data input
                     event_input = event_data.get("input", {}) if event_data else {}
                     query = event_input.get("query") if isinstance(event_input, dict) else None
-                    
+
                     # Handle new format: object with meta and results
                     if isinstance(parsed_json, dict) and "results" in parsed_json:
                         results = parsed_json["results"]
@@ -477,7 +477,7 @@ def log_agent_stream(chunk, pretty_print=True):
                             )
                         )
                         return
-                
+
                 if tool_name == "execute_code" and isinstance(parsed_json, dict):
                     execution_time = parsed_json.get("execution_time")
                     time_str = f" [dim]⏱️  {execution_time:.3f}s[/dim]" if execution_time is not None else ""
