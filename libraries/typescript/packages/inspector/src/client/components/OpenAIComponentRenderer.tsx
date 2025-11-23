@@ -742,9 +742,6 @@ function OpenAIComponentRendererBase({
     const measure = () => {
       // Skip automatic measurement if widget is using notifyIntrinsicHeight
       if (useNotifiedHeightRef.current) {
-        console.log(
-          "[OpenAIComponentRenderer] Skipping automatic measurement - using notified height"
-        );
         return;
       }
 

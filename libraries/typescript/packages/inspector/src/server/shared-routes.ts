@@ -346,6 +346,25 @@ export function registerInspectorRoutes(
         // MUST be injected right after <head> tag, before any scripts
         const baseTag = `<base href="${widgetData.devServerBaseUrl}/mcp-use/widgets/${widgetName}/">`;
 
+        // Inject CSP violation listener to warn about non-whitelisted resources
+        const cspWarningScript = `
+    <script>
+      // Listen for CSP violations (from Report-Only policy)
+      document.addEventListener('securitypolicyviolation', (e) => {
+        // Only warn about report-only violations (not enforced ones)
+        if (e.disposition === 'report') {
+          console.warn(
+            '%c⚠️ CSP Warning: Resource would be blocked in production',
+            'color: orange; font-weight: bold',
+            '\\n  Blocked URL:', e.blockedURI,
+            '\\n  Directive:', e.violatedDirective,
+            '\\n  Policy:', e.originalPolicy,
+            '\\n\\nℹ️ To fix: Add this domain to your widget\\'s CSP configuration in appsSdkMetadata[\\'openai/widgetCSP\\']'
+          );
+        }
+      });
+    </script>`;
+
         // Inject configuration script before Vite client loads
         // This tells Vite where to connect for HMR
         const viteConfigScript = `
@@ -357,8 +376,8 @@ export function registerInspectorRoutes(
         // Insert base tag immediately after <head> (before any scripts)
         html = html.replace(/<head>/i, `<head>\n    ${baseTag}`);
         
-        // Insert config script before the first script tag (typically @vite/client)
-        html = html.replace(/<script/, viteConfigScript + "\n    <script");
+        // Insert CSP warning and config scripts before the first script tag
+        html = html.replace(/<script/, cspWarningScript + viteConfigScript + "\n    <script");
       }
 
       // Set security headers

@@ -149,6 +149,8 @@ export interface UseWidgetResult<
   userAgent: UserAgent;
   /** Current locale */
   locale: string;
+  /** MCP server base URL for making API requests */
+  mcp_url: string;
 
   // Actions
   /** Call a tool on the MCP server */

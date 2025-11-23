@@ -974,13 +974,39 @@ export class McpServer {
       return;
     }
 
-    // Find all TSX widget files
-    let entries: string[] = [];
+    // Find all TSX widget files and folders with widget.tsx
+    const entries: Array<{ name: string; path: string }> = [];
     try {
-      const files = await fs.readdir(srcDir);
-      entries = files
-        .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
-        .map((f) => pathHelpers.join(srcDir, f));
+      const files = await fs.readdir(srcDir, { withFileTypes: true });
+      for (const dirent of files) {
+        // Exclude macOS resource fork files and other hidden/system files
+        if (dirent.name.startsWith("._") || dirent.name.startsWith(".DS_Store")) {
+          continue;
+        }
+
+        if (
+          dirent.isFile() &&
+          (dirent.name.endsWith(".tsx") || dirent.name.endsWith(".ts"))
+        ) {
+          // Single file widget
+          entries.push({
+            name: dirent.name.replace(/\.tsx?$/, ""),
+            path: pathHelpers.join(srcDir, dirent.name),
+          });
+        } else if (dirent.isDirectory()) {
+          // Check for widget.tsx in folder
+          const widgetPath = pathHelpers.join(srcDir, dirent.name, "widget.tsx");
+          try {
+            await fs.access(widgetPath);
+            entries.push({
+              name: dirent.name,
+              path: widgetPath,
+            });
+          } catch {
+            // widget.tsx doesn't exist in this folder, skip it
+          }
+        }
+      }
     } catch (error) {
       console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`);
       return;
@@ -1027,16 +1053,10 @@ export class McpServer {
     }
 
     const widgets = entries.map((entry) => {
-      const baseName =
-        entry
-          .split("/")
-          .pop()
-          ?.replace(/\.tsx?$/, "") || "widget";
-      const widgetName = baseName;
       return {
-        name: widgetName,
-        description: `Widget: ${widgetName}`,
-        entry: entry,
+        name: entry.name,
+        description: `Widget: ${entry.name}`,
+        entry: entry.path,
       };
     });
 

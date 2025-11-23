@@ -21,6 +21,31 @@ const server = createMCPServer("test-app", {
  * Add here your standard MCP tools, resources and prompts
  */
 
+// Fruits data for the API
+const fruits = [
+  { fruit: "mango", color: "bg-[#FBF1E1] dark:bg-[#FBF1E1]/10" },
+  { fruit: "pineapple", color: "bg-[#f8f0d9] dark:bg-[#f8f0d9]/10" },
+  { fruit: "cherries", color: "bg-[#E2EDDC] dark:bg-[#E2EDDC]/10" },
+  { fruit: "coconut", color: "bg-[#fbedd3] dark:bg-[#fbedd3]/10" },
+  { fruit: "apricot", color: "bg-[#fee6ca] dark:bg-[#fee6ca]/10" },
+  { fruit: "blueberry", color: "bg-[#e0e6e6] dark:bg-[#e0e6e6]/10" },
+  { fruit: "grapes", color: "bg-[#f4ebe2] dark:bg-[#f4ebe2]/10" },
+  { fruit: "watermelon", color: "bg-[#e6eddb] dark:bg-[#e6eddb]/10" },
+  { fruit: "orange", color: "bg-[#fdebdf] dark:bg-[#fdebdf]/10" },
+  { fruit: "avocado", color: "bg-[#ecefda] dark:bg-[#ecefda]/10" },
+  { fruit: "apple", color: "bg-[#F9E7E4] dark:bg-[#F9E7E4]/10" },
+  { fruit: "pear", color: "bg-[#f1f1cf] dark:bg-[#f1f1cf]/10" },
+  { fruit: "plum", color: "bg-[#ece5ec] dark:bg-[#ece5ec]/10" },
+  { fruit: "banana", color: "bg-[#fdf0dd] dark:bg-[#fdf0dd]/10" },
+  { fruit: "strawberry", color: "bg-[#f7e6df] dark:bg-[#f7e6df]/10" },
+  { fruit: "lemon", color: "bg-[#feeecd] dark:bg-[#feeecd]/10" },
+];
+
+// API endpoint for fruits data
+server.get("/api/fruits", (c) => {
+  return c.json(fruits);
+});
+
 // Brand Info Tool - Returns brand information
 server.tool({
   name: "get-brand-info",

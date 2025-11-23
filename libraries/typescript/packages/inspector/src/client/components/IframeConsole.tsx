@@ -15,6 +15,7 @@ import {
 } from "./ui/sheet";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface IframeConsoleProps {
   iframeId?: string;
@@ -162,20 +163,29 @@ export function IframeConsole({
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
+        <Tooltip>
+          <TooltipTrigger asChild>
         <Button
           variant="outline"
           size="sm"
           className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
           onClick={() => setIsOpen(true)}
         >
-          <TerminalIcon className="size-4 mr-2" />
-          <span className="hidden sm:inline">Console</span>
+          <TerminalIcon className="size-4" />
           {(errorCount > 0 || warnCount > 0) && (
-            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-red-500 text-white font-semibold">
+            <span className={cn(
+              "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
+              errorCount > 0 ? "bg-red-500" : "bg-yellow-500"
+            )}>
               {errorCount + warnCount}
             </span>
           )}
         </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{errorCount + warnCount} console logs from the iframe</p>
+        </TooltipContent>
+        </Tooltip>
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[400px] flex flex-col p-0">
         <SheetHeader className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">

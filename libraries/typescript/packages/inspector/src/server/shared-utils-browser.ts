@@ -911,14 +911,16 @@ export function getWidgetSecurityHeaders(
     "https://cdn.skypack.dev",
   ];
 
-  // Merge widget-specific resource domains with trusted CDNs
-  const allResourceDomains = [...trustedCdns];
+  // Merge widget-specific resource domains with trusted CDNs (production CSP)
+  const prodResourceDomains = [...trustedCdns];
   if (widgetCSP?.resource_domains) {
-    allResourceDomains.push(...widgetCSP.resource_domains);
+    prodResourceDomains.push(...widgetCSP.resource_domains);
   }
+  const prodResourceDomainsStr = prodResourceDomains.join(" ");
 
   // Add dev server origin for HMR scripts in development mode
   let devServerOrigin: string | null = null;
+  const allResourceDomains = [...prodResourceDomains];
   if (devServerBaseUrl) {
     try {
       devServerOrigin = new URL(devServerBaseUrl).origin;
@@ -942,13 +944,19 @@ export function getWidgetSecurityHeaders(
     mediaSrc = `'self' data: https: blob: ${devServerOrigin}`;
   }
 
+  // Build font-src - allow all http/https in dev mode for maximum compatibility
+  let fontSrc = `'self' data: ${resourceDomainsStr}`;
+  if (devServerOrigin) {
+    fontSrc = `'self' data: https: http: ${resourceDomainsStr}`;
+  }
+
   // Build connect-src with widget-specific domains
   let connectSrc = "'self' https: wss: ws:";
   if (widgetCSP?.connect_domains && widgetCSP.connect_domains.length > 0) {
     connectSrc = `'self' ${widgetCSP.connect_domains.join(" ")} https: wss: ws:`;
   }
 
-  return {
+  const headers: Record<string, string> = {
     "Content-Security-Policy": [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${resourceDomainsStr}`,
@@ -957,7 +965,7 @@ export function getWidgetSecurityHeaders(
       `style-src 'self' 'unsafe-inline' ${resourceDomainsStr}`,
       `img-src ${imgSrc}`,
       `media-src ${mediaSrc}`,
-      `font-src 'self' data: ${resourceDomainsStr}`,
+      `font-src ${fontSrc}`,
       `connect-src ${connectSrc}`,
       "frame-ancestors 'self'",
     ].join("; "),
@@ -967,4 +975,24 @@ export function getWidgetSecurityHeaders(
     Pragma: "no-cache",
     Expires: "0",
   };
+
+  // In dev mode, add a Report-Only CSP header with production rules
+  // This will warn about resources that would fail in production
+  if (devServerOrigin) {
+    const prodConnectSrc = "'self' https: wss: ws:";
+    headers["Content-Security-Policy-Report-Only"] = [
+      "default-src 'self'",
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${prodResourceDomainsStr}`,
+      "worker-src 'self' blob:",
+      "child-src 'self' blob:",
+      `style-src 'self' 'unsafe-inline' ${prodResourceDomainsStr}`,
+      "img-src 'self' data: https: blob:",
+      "media-src 'self' data: https: blob:",
+      `font-src 'self' data: ${prodResourceDomainsStr}`,
+      `connect-src ${prodConnectSrc}`,
+      "frame-ancestors 'self'",
+    ].join("; ");
+  }
+
+  return headers;
 }

@@ -181,6 +181,15 @@ export function useWidget<
   const userAgent = useOpenAiGlobal("userAgent") as UserAgent | undefined;
   const locale = useOpenAiGlobal("locale") as string | undefined;
 
+  // Compute MCP server base URL from window.__mcpPublicUrl
+  const mcp_url = useMemo(() => {
+    if (typeof window !== "undefined" && window.__mcpPublicUrl) {
+      // Remove the /mcp-use/public suffix to get the base server URL
+      return window.__mcpPublicUrl.replace(/\/mcp-use\/public$/, "");
+    }
+    return "";
+  }, []);
+
   // Use local state for widget state with sync to window.openai
   const [localWidgetState, setLocalWidgetState] = useState<TState | null>(null);
 
@@ -267,6 +276,7 @@ export function useWidget<
       capabilities: { hover: true, touch: false },
     },
     locale: locale || "en",
+    mcp_url,
 
     // Actions
     callTool,
