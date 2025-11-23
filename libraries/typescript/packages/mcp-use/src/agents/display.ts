@@ -275,10 +275,32 @@ export function extractToolMessageContent(
  * Format search_tools result as a tree structure
  */
 export function formatSearchToolsAsTree(
-  tools: Array<{ server: string; name: string; description?: string }>
+  tools: Array<{ server: string; name: string; description?: string }>,
+  meta?: { total_tools?: number; namespaces?: string[]; result_count?: number },
+  query?: string
 ): string {
+  // Build meta information display
+  const metaLines: string[] = [];
+  if (meta) {
+    if (meta.total_tools !== undefined) {
+      metaLines.push(`Total tools: ${meta.total_tools}`);
+    }
+    if (meta.namespaces && meta.namespaces.length > 0) {
+      metaLines.push(`Namespaces: ${meta.namespaces.join(", ")}`);
+    }
+    if (meta.result_count !== undefined) {
+      metaLines.push(`Results: ${meta.result_count}`);
+    }
+  }
+
   if (!Array.isArray(tools) || tools.length === 0) {
-    return "(no tools found)";
+    const noResultsMsg = query
+      ? `No tools found for query "${query}"`
+      : "(no tools found)";
+    if (metaLines.length > 0) {
+      return `${metaLines.join("\n")}\n\n${noResultsMsg}`;
+    }
+    return noResultsMsg;
   }
 
   // Group tools by server
@@ -296,6 +318,23 @@ export function formatSearchToolsAsTree(
 
   // Build tree structure
   const lines: string[] = [];
+  
+  // Add meta information at the top if available
+  if (meta) {
+    if (meta.total_tools !== undefined) {
+      lines.push(`Total tools: ${meta.total_tools}`);
+    }
+    if (meta.namespaces && meta.namespaces.length > 0) {
+      lines.push(`Namespaces: ${meta.namespaces.join(", ")}`);
+    }
+    if (meta.result_count !== undefined) {
+      lines.push(`Results: ${meta.result_count}`);
+    }
+    if (lines.length > 0) {
+      lines.push(""); // Empty line before tree
+    }
+  }
+  
   const servers = Object.keys(toolsByServer).sort();
 
   for (let i = 0; i < servers.length; i++) {
@@ -315,11 +354,48 @@ export function formatSearchToolsAsTree(
       const indent = isLastServer ? "  " : "│ ";
       const toolPrefix = isLastTool ? "└─" : "├─";
 
-      let toolLine = `${indent}${toolPrefix} ${tool.name}`;
-      if (tool.description) {
-        toolLine += chalk.dim(` - ${tool.description}`);
-      }
+      // Tool name line
+      const toolLine = `${indent}${toolPrefix} ${tool.name}`;
       lines.push(toolLine);
+
+      // Description on new line, aligned with tool name
+      if (tool.description) {
+        // Calculate indent for description lines
+        // Use the same base indent as the tool, then add alignment
+        // If not the last tool, add vertical bar to show continuation, otherwise spaces
+        const descAlign = isLastTool ? "   " : "│  ";
+        const descriptionIndent = `${indent}${descAlign}`;
+        
+        // Calculate available width for description
+        // Account for: indent + box padding (4 chars for "│ " on each side)
+        const indentLength = stripAnsi(descriptionIndent).length;
+        const availableWidth = Math.max(40, TERMINAL_WIDTH - indentLength - 4);
+        
+        // Wrap description at word boundaries
+        const words = tool.description.split(/(\s+)/); // Keep whitespace
+        const wrappedLines: string[] = [];
+        let currentLine = "";
+        
+        for (const word of words) {
+          const testLine = currentLine + word;
+          if (stripAnsi(testLine).length <= availableWidth) {
+            currentLine = testLine;
+          } else {
+            if (currentLine) {
+              wrappedLines.push(currentLine.trimEnd());
+            }
+            currentLine = word.trimStart();
+          }
+        }
+        if (currentLine) {
+          wrappedLines.push(currentLine.trimEnd());
+        }
+        
+        // Add indent and dim styling to each line
+        for (const descLine of wrappedLines) {
+          lines.push(`${descriptionIndent}${chalk.dim(descLine)}`);
+        }
+      }
     }
   }
 
@@ -396,6 +472,10 @@ export function handleToolEnd(event: StreamEvent) {
 
     // Special handling for search_tools to display as tree
     if (toolName === "search_tools") {
+      // Try to get the query from event input
+      const toolInput = event.data?.input as Record<string, unknown> | undefined;
+      const query = toolInput?.query as string | undefined;
+
       // Extract actual content if it's wrapped
       let actualContent = content;
       if (
@@ -416,8 +496,31 @@ export function handleToolEnd(event: StreamEvent) {
         }
       }
 
+      // Handle new format: object with meta and results
+      if (
+        typeof actualContent === "object" &&
+        actualContent !== null &&
+        !Array.isArray(actualContent) &&
+        "results" in actualContent &&
+        Array.isArray(actualContent.results)
+      ) {
+        const results = actualContent.results;
+        const contentWithMeta = actualContent as {
+          results: unknown[];
+          meta?: { total_tools?: number; namespaces?: string[]; result_count?: number };
+        };
+        const meta = contentWithMeta.meta;
+        const treeStr = formatSearchToolsAsTree(results, meta, query);
+        const statusText =
+          status === "success" ? chalk.green("Success") : chalk.red("Error");
+        const title = `${statusText}: ${toolName} - Result`;
+        printBox(treeStr, title, undefined, false);
+        return;
+      }
+
+      // Handle old format: direct array (backward compatibility)
       if (Array.isArray(actualContent)) {
-        const treeStr = formatSearchToolsAsTree(actualContent);
+        const treeStr = formatSearchToolsAsTree(actualContent, undefined, query);
         const statusText =
           status === "success" ? chalk.green("Success") : chalk.red("Error");
         const title = `${statusText}: ${toolName} - Result`;

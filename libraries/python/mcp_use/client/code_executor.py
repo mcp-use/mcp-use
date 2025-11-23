@@ -335,7 +335,8 @@ class CodeExecutor:
                 for tool_info in all_tools:
                     tool_name_match = query_lower in tool_info["name"].lower()
                     desc_match = query_lower in tool_info.get("description", "").lower()
-                    if tool_name_match or desc_match:
+                    server_match = query_lower in tool_info["server"].lower()
+                    if tool_name_match or desc_match or server_match:
                         filtered_tools.append(tool_info)
 
             # Return metadata along with results

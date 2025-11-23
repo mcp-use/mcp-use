@@ -187,7 +187,8 @@ export abstract class BaseCodeExecutor {
           const descMatch = tool.description
             ?.toLowerCase()
             .includes(queryLower);
-          return nameMatch || descMatch;
+          const serverMatch = tool.server.toLowerCase().includes(queryLower);
+          return nameMatch || descMatch || serverMatch;
         });
       }
 
