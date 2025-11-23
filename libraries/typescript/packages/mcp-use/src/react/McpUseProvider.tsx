@@ -1,9 +1,8 @@
-import React, { StrictMode } from "react";
-import { BrowserRouter } from "react-router";
+import React, { StrictMode, useCallback, useEffect, useRef } from "react";
+import { BrowserRouter } from "react-router-dom";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { ThemeProvider } from "./ThemeProvider.js";
-import { WidgetDebugger } from "./WidgetDebugger.js";
-import { WidgetFullscreenWrapper } from "./WidgetFullscreenWrapper.js";
+import { WidgetControls } from "./WidgetControls.js";
 
 /**
  * Calculate basename for proper routing in both dev proxy and production
@@ -22,34 +21,40 @@ function getBasename(): string {
 interface McpUseProviderProps {
   children: React.ReactNode;
   /**
-   * Enable WidgetDebugger component
+   * Enable debug button in WidgetControls component
    * @default false
    */
   debugger?: boolean;
   /**
-   * Enable WidgetFullscreenWrapper component
+   * Enable view controls (fullscreen/pip) in WidgetControls component
    * - `true` = show both pip and fullscreen buttons
    * - `"pip"` = show only pip button
    * - `"fullscreen"` = show only fullscreen button
    * @default false
    */
   viewControls?: boolean | "pip" | "fullscreen";
+  /**
+   * Automatically notify OpenAI about container height changes for auto-sizing
+   * Uses ResizeObserver to monitor the children container and calls window.openai.notifyIntrinsicHeight()
+   * @default false
+   */
+  autoSize?: boolean;
 }
 
 /**
  * Unified provider component that combines all common React setup for mcp-use widgets.
- * 
+ *
  * Includes:
  * - StrictMode (always)
  * - ThemeProvider (always)
  * - BrowserRouter with automatic basename calculation (always)
- * - WidgetDebugger (if debugger={true})
- * - WidgetFullscreenWrapper (if viewControls is set)
+ * - WidgetControls (if debugger={true} or viewControls is set)
  * - ErrorBoundary (always)
- * 
+ * - Auto-sizing (if autoSize={true})
+ *
  * @example
  * ```tsx
- * <McpUseProvider debugger viewControls>
+ * <McpUseProvider debugger viewControls autoSize>
  *   <AppsSDKUIProvider linkComponent={Link}>
  *     <div>My widget content</div>
  *   </AppsSDKUIProvider>
@@ -60,8 +65,77 @@ export function McpUseProvider({
   children,
   debugger: enableDebugger = false,
   viewControls = false,
+  autoSize = false,
 }: McpUseProviderProps) {
   const basename = getBasename();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const lastHeightRef = useRef<number>(0);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Notify OpenAI about height changes
+  const notifyHeight = useCallback((height: number) => {
+    if (typeof window !== "undefined" && window.openai?.notifyIntrinsicHeight) {
+      window.openai.notifyIntrinsicHeight(height).catch((error) => {
+        console.error("Failed to notify intrinsic height:", error);
+      });
+    }
+  }, []);
+
+  // Debounced height notification
+  const debouncedNotifyHeight = useCallback(
+    (height: number) => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      debounceTimeoutRef.current = setTimeout(() => {
+        if (height !== lastHeightRef.current && height > 0) {
+          lastHeightRef.current = height;
+          notifyHeight(height);
+        }
+      }, 150); // 150ms debounce
+    },
+    [notifyHeight]
+  );
+
+  // Set up ResizeObserver for auto-sizing
+  useEffect(() => {
+    if (!autoSize) {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        // Use scrollHeight as fallback for more accurate intrinsic height
+        const scrollHeight = entry.target.scrollHeight;
+        const intrinsicHeight = Math.max(height, scrollHeight);
+        debouncedNotifyHeight(intrinsicHeight);
+      }
+    });
+
+    observer.observe(container);
+
+    // Initial measurement
+    const initialHeight = Math.max(
+      container.offsetHeight,
+      container.scrollHeight
+    );
+    if (initialHeight > 0) {
+      debouncedNotifyHeight(initialHeight);
+    }
+
+    return () => {
+      observer.disconnect();
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [autoSize, debouncedNotifyHeight]);
 
   // Build the component tree with conditional wrappers
   let content: React.ReactNode = children;
@@ -69,18 +143,14 @@ export function McpUseProvider({
   // ErrorBoundary is always the innermost wrapper
   content = <ErrorBoundary>{content}</ErrorBoundary>;
 
-  // WidgetFullscreenWrapper wraps ErrorBoundary if viewControls is enabled
-  if (viewControls) {
+  // WidgetControls wraps ErrorBoundary if debugger is enabled or viewControls is set
+  // It combines both debug and view control functionality with shared hover logic
+  if (enableDebugger || viewControls) {
     content = (
-      <WidgetFullscreenWrapper viewControls={viewControls}>
+      <WidgetControls debugger={enableDebugger} viewControls={viewControls}>
         {content}
-      </WidgetFullscreenWrapper>
+      </WidgetControls>
     );
-  }
-
-  // WidgetDebugger wraps WidgetFullscreenWrapper (or ErrorBoundary) if debugger is enabled
-  if (enableDebugger) {
-    content = <WidgetDebugger>{content}</WidgetDebugger>;
   }
 
   // BrowserRouter wraps everything
@@ -89,7 +159,19 @@ export function McpUseProvider({
   // ThemeProvider wraps BrowserRouter
   content = <ThemeProvider>{content}</ThemeProvider>;
 
+  // Wrap in container div for auto-sizing if enabled
+  if (autoSize) {
+    const containerStyle: React.CSSProperties = {
+      width: "100%",
+      minHeight: 0,
+    };
+    content = (
+      <div ref={containerRef} style={containerStyle}>
+        {content}
+      </div>
+    );
+  }
+
   // StrictMode is the outermost wrapper
   return <StrictMode>{content}</StrictMode>;
 }
-

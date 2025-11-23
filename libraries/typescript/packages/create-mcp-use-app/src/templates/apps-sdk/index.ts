@@ -24,7 +24,8 @@ const server = createMCPServer("test-app", {
 // Brand Info Tool - Returns brand information
 server.tool({
   name: "get-brand-info",
-  description: "Get information about the brand, including company details, mission, and values",
+  description:
+    "Get information about the brand, including company details, mission, and values",
   cb: async () => {
     return {
       content: [

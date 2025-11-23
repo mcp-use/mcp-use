@@ -688,6 +688,16 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             return this.sendFollowupTurn(prompt);
           },
 
+          async notifyIntrinsicHeight(height) {
+            if (typeof height !== 'number' || height < 0) {
+              throw new Error('Height must be a non-negative number');
+            }
+            window.parent.postMessage({
+              type: 'openai:notifyIntrinsicHeight',
+              height
+            }, '*');
+          },
+
           openExternal(payload) {
             const href = typeof payload === 'string' ? payload : payload?.href;
             if (href) {
@@ -731,6 +741,18 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             window.dispatchEvent(globalsEvent);
           } catch (err) {}
         }, 0);
+
+        // Listen for widget state requests from inspector
+        window.addEventListener('message', (event) => {
+          if (event.data?.type === 'mcp-inspector:getWidgetState') {
+            window.parent.postMessage({
+              type: 'mcp-inspector:widgetStateResponse',
+              toolId: event.data.toolId,
+              state: openaiAPI.widgetState
+            }, '*');
+            return;
+          }
+        });
 
         // Listen for globals changes from parent (for displayMode, theme, etc.)
         window.addEventListener('message', (event) => {

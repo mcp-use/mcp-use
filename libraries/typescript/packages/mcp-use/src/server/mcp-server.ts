@@ -1109,20 +1109,28 @@ if (container && Component) {
 
     // Create a plugin to handle CSS imports in SSR only
     const ssrCssPlugin = {
-      name: 'ssr-css-handler',
-      enforce: 'pre' as const,
-      resolveId(id: string, importer: string | undefined, options?: { ssr?: boolean }) {
+      name: "ssr-css-handler",
+      enforce: "pre" as const,
+      resolveId(
+        id: string,
+        importer: string | undefined,
+        options?: { ssr?: boolean }
+      ) {
         // Only intercept CSS in SSR mode - be very explicit about this
-        if (options && options.ssr === true && (id.endsWith('.css') || id.endsWith('.module.css'))) {
-          return '\0ssr-css:' + id;
+        if (
+          options &&
+          options.ssr === true &&
+          (id.endsWith(".css") || id.endsWith(".module.css"))
+        ) {
+          return "\0ssr-css:" + id;
         }
         // Don't interfere with normal resolution
         return null;
       },
       load(id: string, options?: { ssr?: boolean }) {
         // Only return empty export for CSS files in SSR mode
-        if (options && options.ssr === true && id.startsWith('\0ssr-css:')) {
-          return 'export default {}';
+        if (options && options.ssr === true && id.startsWith("\0ssr-css:")) {
+          return "export default {}";
         }
         // Don't interfere with normal loading
         return null;
@@ -1131,7 +1139,7 @@ if (container && Component) {
 
     // Create a plugin to ensure Vite watches the resources directory for HMR
     const watchResourcesPlugin = {
-      name: 'watch-resources',
+      name: "watch-resources",
       configureServer(server: any) {
         // Explicitly add the resources directory to Vite's watch list
         // This ensures HMR works when widget source files change
@@ -1156,7 +1164,7 @@ if (container && Component) {
         watch: {
           // Watch the resources directory for HMR to work
           // This ensures changes to widget source files trigger hot reload
-          ignored: ['**/node_modules/**', '**/.git/**'],
+          ignored: ["**/node_modules/**", "**/.git/**"],
           // Include the resources directory in watch list
           // Vite will watch files imported from outside root
           usePolling: false,
@@ -1170,15 +1178,17 @@ if (container && Component) {
       },
       ssr: {
         // Force Vite to transform these packages in SSR instead of using external requires
-        noExternal: ['@openai/apps-sdk-ui', 'react-router'],
+        noExternal: ["@openai/apps-sdk-ui", "react-router"],
       },
       define: {
         // Define process.env for SSR context
-        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-        'import.meta.env.DEV': true,
-        'import.meta.env.PROD': false,
-        'import.meta.env.MODE': JSON.stringify('development'),
-        'import.meta.env.SSR': true,
+        "process.env.NODE_ENV": JSON.stringify(
+          process.env.NODE_ENV || "development"
+        ),
+        "import.meta.env.DEV": true,
+        "import.meta.env.PROD": false,
+        "import.meta.env.MODE": JSON.stringify("development"),
+        "import.meta.env.SSR": true,
       },
     });
 
@@ -2022,7 +2032,9 @@ if (container && Component) {
         console.error("MCP Transport error:", err);
         try {
           writer.close();
-        } catch {}
+        } catch {
+          // Ignore errors when closing writer
+        }
       });
 
       // Wait for headers to be sent (or timeout?)

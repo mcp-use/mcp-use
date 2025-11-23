@@ -8,10 +8,9 @@ import React from "react";
  *
  * @param props Standard img props
  */
-export const Image: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = ({
-  src,
-  ...props
-}) => {
+export const Image: React.FC<
+  React.ImgHTMLAttributes<globalThis.HTMLImageElement>
+> = ({ src, ...props }) => {
   // Get the public URL from the window global injected by the MCP server
   const publicUrl =
     typeof window !== "undefined" && (window as any).__mcpPublicUrl
@@ -23,7 +22,11 @@ export const Image: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = ({
     if (!source) return source;
 
     // If src is absolute or data URI, leave it alone
-    if (source.startsWith("http://") || source.startsWith("https://") || source.startsWith("data:")) {
+    if (
+      source.startsWith("http://") ||
+      source.startsWith("https://") ||
+      source.startsWith("data:")
+    ) {
       return source;
     }
 
@@ -44,4 +47,3 @@ export const Image: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = ({
 
   return <img src={finalSrc} {...props} />;
 };
-

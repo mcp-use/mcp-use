@@ -7,6 +7,7 @@ import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { IframeConsole } from "./IframeConsole";
 import { Spinner } from "./ui/spinner";
+import { WidgetInspectorControls } from "./WidgetInspectorControls";
 
 interface OpenAIComponentRendererProps {
   componentUrl: string;
@@ -74,6 +75,10 @@ export function OpenAIComponentRenderer({
   >("inline");
   const [isSameOrigin, setIsSameOrigin] = useState<boolean>(false);
   const [isPipHovered, setIsPipHovered] = useState<boolean>(false);
+  const [useDevMode, setUseDevMode] = useState<boolean>(false);
+  const [widgetToolInput, setWidgetToolInput] = useState<any>(null);
+  const [widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
+  const [widgetHasControls, setWidgetHasControls] = useState<boolean>(false);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -127,12 +132,14 @@ export function OpenAIComponentRenderer({
 
         // For Apps SDK widgets, use structuredContent as toolInput (the actual tool parameters)
         // toolArgs might be empty or from the initial invocation, structuredContent has the real data
-        const widgetToolInput = structuredContent || toolArgs;
+        const computedToolInput = structuredContent || toolArgs;
+        setWidgetToolInput(computedToolInput);
+        setWidgetToolOutput(structuredContent);
 
         console.log("[OpenAIComponentRenderer] Widget inputs:", {
           toolArgs,
           structuredContent,
-          widgetToolInput,
+          widgetToolInput: computedToolInput,
         });
 
         // Extract CSP metadata from tool result
@@ -170,9 +177,10 @@ export function OpenAIComponentRenderer({
         });
 
         // Use dev mode if metadata says so
-        const useDevMode =
+        const computedUseDevMode =
           metaForWidget?.["mcp-use/widget"]?.html &&
           metaForWidget?.["mcp-use/widget"]?.dev;
+        setUseDevMode(computedUseDevMode || false);
 
         const widgetName = metaForWidget?.["mcp-use/widget"]?.name;
 
@@ -180,7 +188,7 @@ export function OpenAIComponentRenderer({
         const widgetDataToStore: any = {
           serverId,
           uri: componentUrl,
-          toolInput: widgetToolInput,
+          toolInput: computedToolInput,
           toolOutput: structuredContent,
           resourceData, // Pass the fetched HTML
           toolId,
@@ -188,7 +196,7 @@ export function OpenAIComponentRenderer({
           theme: resolvedTheme, // Pass the current theme to prevent flash
         };
 
-        if (useDevMode && widgetName && serverBaseUrl) {
+        if (computedUseDevMode && widgetName && serverBaseUrl) {
           const devServerBaseUrl = new URL(serverBaseUrl).origin;
           const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
           widgetDataToStore.devWidgetUrl = devWidgetUrl;
@@ -216,7 +224,7 @@ export function OpenAIComponentRenderer({
           );
         }
 
-        if (useDevMode && widgetName && serverBaseUrl) {
+        if (computedUseDevMode && widgetName && serverBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
           const proxyUrl = `/inspector/api/dev-widget/${toolId}?${urlParams.toString()}`;
           console.log(
@@ -383,6 +391,26 @@ export function OpenAIComponentRenderer({
 
       // Let console log messages pass through (handled by useIframeConsole hook)
       if (event.data?.type === "iframe-console-log") {
+        return;
+      }
+
+      // Handle widget state requests from inspector
+      if (event.data?.type === "mcp-inspector:getWidgetState") {
+        try {
+          const iframeWindow = iframeRef.current?.contentWindow;
+          if (iframeWindow?.openai?.widgetState !== undefined) {
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: "mcp-inspector:widgetStateResponse",
+                toolId: event.data.toolId,
+                state: iframeWindow.openai.widgetState,
+              },
+              "*"
+            );
+          }
+        } catch (e) {
+          // Cross-origin or not accessible
+        }
         return;
       }
 
@@ -554,12 +582,68 @@ export function OpenAIComponentRenderer({
           }
           break;
 
+        case "openai:notifyIntrinsicHeight":
+          try {
+            const { height } = event.data;
+            if (typeof height === "number" && height > 0) {
+              const maxHeight =
+                typeof window !== "undefined" ? window.innerHeight : height;
+              const newHeight = Math.min(height, maxHeight);
+              if (newHeight !== lastMeasuredHeightRef.current) {
+                lastMeasuredHeightRef.current = newHeight;
+                setIframeHeight(newHeight);
+                console.log(
+                  "[OpenAIComponentRenderer] Updated iframe height from notifyIntrinsicHeight:",
+                  newHeight
+                );
+              }
+            }
+          } catch (err) {
+            console.error(
+              "[OpenAIComponentRenderer] Failed to handle intrinsic height notification:",
+              err
+            );
+          }
+          break;
+
         default:
           break;
       }
     };
 
     window.addEventListener("message", handleMessage);
+
+    const checkWidgetControls = () => {
+      if (!useDevMode || !isSameOrigin || !iframeRef.current) return;
+
+      try {
+        const iframeDoc = iframeRef.current.contentDocument;
+        if (iframeDoc) {
+          // Look for WidgetControls buttons by their aria-labels
+          // WidgetControls renders buttons with labels: "Debug Info", "Fullscreen", "Picture in Picture"
+          const hasDebugButton = iframeDoc.querySelector(
+            '[aria-label="Debug Info"]'
+          );
+          const hasFullscreenButton = iframeDoc.querySelector(
+            '[aria-label="Fullscreen"]'
+          );
+          const hasPipButton = iframeDoc.querySelector(
+            '[aria-label="Picture in Picture"]'
+          );
+
+          // Widget has controls if it has debugger OR viewControls
+          const hasControls = !!(
+            hasDebugButton ||
+            hasFullscreenButton ||
+            hasPipButton
+          );
+          setWidgetHasControls(hasControls);
+        }
+      } catch (e) {
+        // If we can't access, assume no controls
+        setWidgetHasControls(false);
+      }
+    };
 
     const handleLoad = () => {
       setIsReady(true);
@@ -571,6 +655,12 @@ export function OpenAIComponentRenderer({
           const canAccess = !!iframeRef.current.contentDocument;
           if (canAccess && isSameOrigin) {
             injectConsoleInterceptor(iframeRef.current);
+
+            // Check if widget has WidgetControls (debugger/viewControls buttons)
+            // Only check in dev mode - use a delay to ensure React has rendered
+            if (useDevMode) {
+              setTimeout(checkWidgetControls, 200);
+            }
           } else if (!canAccess) {
             // Cross-origin iframe detected - update state
             setIsSameOrigin(false);
@@ -611,7 +701,50 @@ export function OpenAIComponentRenderer({
       iframe?.removeEventListener("load", handleLoad);
       iframe?.removeEventListener("error", handleError as any);
     };
-  }, [widgetUrl, isSameOrigin, handleDisplayModeChange, server, serverId, resolvedTheme, updateIframeGlobals]);
+  }, [
+    widgetUrl,
+    isSameOrigin,
+    handleDisplayModeChange,
+    server,
+    serverId,
+    resolvedTheme,
+    updateIframeGlobals,
+    useDevMode,
+  ]);
+
+  // Re-check for widget controls when useDevMode or isReady changes
+  useEffect(() => {
+    if (useDevMode && isReady && isSameOrigin && iframeRef.current) {
+      // Use a delay to ensure React has rendered the WidgetControls
+      const timeoutId = setTimeout(() => {
+        try {
+          const iframeDoc = iframeRef.current?.contentDocument;
+          if (iframeDoc) {
+            const hasDebugButton = iframeDoc.querySelector(
+              '[aria-label="Debug Info"]'
+            );
+            const hasFullscreenButton = iframeDoc.querySelector(
+              '[aria-label="Fullscreen"]'
+            );
+            const hasPipButton = iframeDoc.querySelector(
+              '[aria-label="Picture in Picture"]'
+            );
+            const hasControls = !!(
+              hasDebugButton ||
+              hasFullscreenButton ||
+              hasPipButton
+            );
+            setWidgetHasControls(hasControls);
+          }
+        } catch (e) {
+          setWidgetHasControls(false);
+        }
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setWidgetHasControls(false);
+    }
+  }, [useDevMode, isReady, isSameOrigin]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {
@@ -701,6 +834,40 @@ export function OpenAIComponentRenderer({
     }
   }, [resolvedTheme, widgetUrl, isReady, updateIframeGlobals]);
 
+  // Re-check for widget controls when useDevMode or isReady changes
+  useEffect(() => {
+    if (useDevMode && isReady && isSameOrigin && iframeRef.current) {
+      // Use a delay to ensure React has rendered the WidgetControls
+      const timeoutId = setTimeout(() => {
+        try {
+          const iframeDoc = iframeRef.current?.contentDocument;
+          if (iframeDoc) {
+            const hasDebugButton = iframeDoc.querySelector(
+              '[aria-label="Debug Info"]'
+            );
+            const hasFullscreenButton = iframeDoc.querySelector(
+              '[aria-label="Fullscreen"]'
+            );
+            const hasPipButton = iframeDoc.querySelector(
+              '[aria-label="Picture in Picture"]'
+            );
+            const hasControls = !!(
+              hasDebugButton ||
+              hasFullscreenButton ||
+              hasPipButton
+            );
+            setWidgetHasControls(hasControls);
+          }
+        } catch (e) {
+          setWidgetHasControls(false);
+        }
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setWidgetHasControls(false);
+    }
+  }, [useDevMode, isReady, isSameOrigin]);
+
   if (error) {
     return (
       <div className={className}>
@@ -735,8 +902,19 @@ export function OpenAIComponentRenderer({
         isSameOrigin &&
         displayMode !== "fullscreen" &&
         displayMode !== "pip" && (
-          <div className="absolute top-2 right-2 z-10">
+          <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
             <IframeConsole iframeId={toolId} enabled={true} />
+            {useDevMode && !widgetHasControls && (
+              <WidgetInspectorControls
+                displayMode={displayMode}
+                onDisplayModeChange={handleDisplayModeChange}
+                toolInput={widgetToolInput}
+                toolOutput={widgetToolOutput}
+                toolResult={toolResult}
+                iframeRef={iframeRef}
+                toolId={toolId}
+              />
+            )}
           </div>
         )}
       <div

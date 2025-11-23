@@ -315,7 +315,10 @@ export function registerInspectorRoutes(
         /(src|href)="(\/mcp-use\/widgets\/[^"]+)"/g,
         (_match, attr, path) => {
           // Don't proxy Vite's HMR client scripts - they need direct connection
-          if (path.includes('/@vite/client') || path.includes('/@react-refresh')) {
+          if (
+            path.includes("/@vite/client") ||
+            path.includes("/@react-refresh")
+          ) {
             // Rewrite to absolute URL pointing to dev server
             return `${attr}="${widgetData.devServerBaseUrl}${path}"`;
           }
@@ -341,10 +344,10 @@ export function registerInspectorRoutes(
         const devServerUrl = new URL(widgetData.devServerBaseUrl);
         const wsProtocol = devServerUrl.protocol === "https:" ? "wss" : "ws";
         const wsHost = devServerUrl.host; // e.g., "localhost:3000"
-        
+
         // Point directly to Vite HMR endpoint on the dev server
         const directWsUrl = `${wsProtocol}://${wsHost}/mcp-use/widgets/`;
-        
+
         // Inject configuration script before Vite client loads
         // This tells Vite where to connect for HMR
         const viteConfigScript = `
@@ -352,7 +355,7 @@ export function registerInspectorRoutes(
       // Configure Vite HMR to connect directly to dev server
       window.__vite_ws_url__ = "${directWsUrl}";
     </script>`;
-        
+
         // Insert before the first script tag (typically @vite/client)
         html = html.replace(/<script/, viteConfigScript + "\n    <script");
       }

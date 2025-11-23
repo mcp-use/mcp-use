@@ -758,6 +758,17 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           enumerable: true
         });
 
+        // Listen for widget state requests from inspector
+        window.addEventListener('message', (event) => {
+          if (event.data?.type === 'mcp-inspector:getWidgetState') {
+            window.parent.postMessage({
+              type: 'mcp-inspector:widgetStateResponse',
+              toolId: event.data.toolId,
+              state: openaiAPI.widgetState
+            }, '*');
+          }
+        });
+
         setTimeout(() => {
           try {
             const globalsEvent = new CustomEvent('openai:set_globals', {

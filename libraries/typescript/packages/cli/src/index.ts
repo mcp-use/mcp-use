@@ -271,7 +271,10 @@ async function buildWidgets(
         continue;
       }
 
-      if (dirent.isFile() && (dirent.name.endsWith(".tsx") || dirent.name.endsWith(".ts"))) {
+      if (
+        dirent.isFile() &&
+        (dirent.name.endsWith(".tsx") || dirent.name.endsWith(".ts"))
+      ) {
         // Single file widget
         entries.push({
           name: dirent.name.replace(/\.tsx?$/, ""),
@@ -396,15 +399,17 @@ if (container && Component) {
         },
         ssr: {
           // Force Vite to transform these packages in SSR instead of using external requires
-          noExternal: ['@openai/apps-sdk-ui', 'react-router'],
+          noExternal: ["@openai/apps-sdk-ui", "react-router"],
         },
         define: {
           // Define process.env for SSR context
-          'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-          'import.meta.env.DEV': true,
-          'import.meta.env.PROD': false,
-          'import.meta.env.MODE': JSON.stringify('development'),
-          'import.meta.env.SSR': true,
+          "process.env.NODE_ENV": JSON.stringify(
+            process.env.NODE_ENV || "development"
+          ),
+          "import.meta.env.DEV": true,
+          "import.meta.env.PROD": false,
+          "import.meta.env.MODE": JSON.stringify("development"),
+          "import.meta.env.SSR": true,
         },
         clearScreen: false,
         logLevel: "silent",
@@ -516,11 +521,9 @@ program
       try {
         await fs.access(publicDir);
         console.log(chalk.gray("Copying public assets..."));
-        await fs.cp(
-          publicDir,
-          path.join(projectPath, "dist", "public"),
-          { recursive: true }
-        );
+        await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
+          recursive: true,
+        });
         console.log(chalk.green("✓ Public assets copied"));
       } catch {
         // Public folder doesn't exist, skip

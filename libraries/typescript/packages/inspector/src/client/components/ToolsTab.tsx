@@ -78,7 +78,7 @@ export function ToolsTab({
     "list"
   );
   const [isMaximized, setIsMaximized] = useState(false);
-  
+
   // Refs for resizable panels
   const leftPanelRef = useRef<any>(null);
   const topPanelRef = useRef<any>(null);
@@ -877,11 +877,7 @@ export function ToolsTab({
 
       <ResizablePanel defaultSize={67}>
         <ResizablePanelGroup direction="vertical">
-          <ResizablePanel 
-            ref={topPanelRef}
-            defaultSize={40}
-            collapsible
-          >
+          <ResizablePanel ref={topPanelRef} defaultSize={40} collapsible>
             <ToolExecutionPanel
               selectedTool={selectedTool}
               toolArgs={toolArgs}
@@ -895,10 +891,7 @@ export function ToolsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel 
-            ref={bottomPanelRef}
-            defaultSize={60}
-          >
+          <ResizablePanel ref={bottomPanelRef} defaultSize={60}>
             <div className="flex flex-col h-full">
               <ToolResultDisplay
                 results={results}

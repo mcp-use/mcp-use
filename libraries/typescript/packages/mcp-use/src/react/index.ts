@@ -11,8 +11,10 @@ export { onMcpAuthorization } from "../auth/callback.js";
 
 // Re-export core types for convenience when using hook result
 export type {
-  Prompt, Resource,
-  ResourceTemplate, Tool
+  Prompt,
+  Resource,
+  ResourceTemplate,
+  Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Export OpenAI Apps SDK widget hooks and types
@@ -21,13 +23,22 @@ export { Image } from "./Image.js";
 export { ThemeProvider } from "./ThemeProvider.js";
 export {
   useWidget,
-  useWidgetProps, useWidgetState, useWidgetTheme
+  useWidgetProps,
+  useWidgetState,
+  useWidgetTheme,
 } from "./useWidget.js";
 export type {
-  API, CallToolResponse, DeviceType, DisplayMode, OpenAiGlobals, SafeArea,
-  SafeAreaInsets, Theme, UnknownObject, UserAgent, UseWidgetResult
+  API,
+  CallToolResponse,
+  DeviceType,
+  DisplayMode,
+  OpenAiGlobals,
+  SafeArea,
+  SafeAreaInsets,
+  Theme,
+  UnknownObject,
+  UserAgent,
+  UseWidgetResult,
 } from "./widget-types.js";
-export { WidgetDebugger } from "./WidgetDebugger.js";
-export { WidgetFullscreenWrapper } from "./WidgetFullscreenWrapper.js";
+export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
-

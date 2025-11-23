@@ -87,6 +87,9 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
 
   /** Persist widget state that will be shown to the model */
   setWidgetState: (state: WidgetState) => Promise<void>;
+
+  /** Notify OpenAI about intrinsic height changes for auto-sizing */
+  notifyIntrinsicHeight: (height: number) => Promise<void>;
 }
 
 // Event types

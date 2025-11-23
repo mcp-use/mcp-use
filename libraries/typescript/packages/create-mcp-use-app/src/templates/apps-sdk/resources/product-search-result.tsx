@@ -1,7 +1,7 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { Animate } from "@openai/apps-sdk-ui/components/Transition";
 import { Image, McpUseProvider, useWidget } from "mcp-use/react";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { z } from "zod";
 import "../styles.css";
@@ -27,14 +27,11 @@ const CarouselItem: React.FC<{ fruit: string; color: string }> = ({
       className={`carousel-item size-52 rounded-xl border border-gray-200 dark:border-gray-800 ${color}`}
     >
       <div className="carousel-item-bg">
-        <Image
-          src={"/fruits/" + fruit + ".png"}
-          alt={fruit}
-        />
+        <Image src={"/fruits/" + fruit + ".png"} alt={fruit} />
       </div>
       <div className="carousel-item-content">
-        <Image 
-          src={"/fruits/" + fruit + ".png"} 
+        <Image
+          src={"/fruits/" + fruit + ".png"}
           alt={fruit}
           className="w-24 h-24 object-contain"
         />
@@ -43,12 +40,81 @@ const CarouselItem: React.FC<{ fruit: string; color: string }> = ({
   );
 };
 
+type AccordionItemProps = {
+  question: string;
+  answer: string;
+  isOpen: boolean;
+  onToggle: () => void;
+};
+
+const AccordionItem: React.FC<AccordionItemProps> = ({
+  question,
+  answer,
+  isOpen,
+  onToggle,
+}) => {
+  return (
+    <div className="border-b border-gray-200 dark:border-gray-800 last:border-b-0">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+        aria-expanded={isOpen}
+      >
+        <span className="font-medium text-gray-900 dark:text-gray-100">
+          {question}
+        </span>
+        <span className="text-xl text-gray-500 dark:text-gray-400 transition-transform duration-200">
+          {isOpen ? "−" : "+"}
+        </span>
+      </button>
+      <Animate enter={{ y: 0, delay: 150, duration: 450 }} exit={{ y: -8 }}>
+        {isOpen && (
+          <div key="content" className="pb-4 text-secondary px-4">
+            {answer}
+          </div>
+        )}
+      </Animate>
+    </div>
+  );
+};
+
 const ProductSearchResult: React.FC = () => {
   const { props } = useWidget<ProductSearchResultProps>();
   const carouselContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [openAccordionIndex, setOpenAccordionIndex] = useState<number | null>(
+    null
+  );
 
   console.log(props);
+
+  const accordionItems = [
+    {
+      question: "Which model should I use?",
+      answer:
+        "For most use cases, we recommend starting with GPT-4 for the best balance of performance and cost. GPT-3.5-turbo is great for simpler tasks and is more cost-effective. For specialized tasks, consider GPT-4 Turbo or fine-tuned models.",
+    },
+    {
+      question: "Do you offer an enterprise package or SLAs?",
+      answer:
+        "Yes, we offer enterprise packages with custom SLAs, dedicated support, and advanced features. Contact our sales team to discuss your specific needs and get a tailored solution for your organization.",
+    },
+    {
+      question: "Will I be charged for API usage in the Playground?",
+      answer:
+        "The Playground is free to use for testing and experimentation. However, if you exceed the free tier limits, you may be charged for additional usage. Check your account settings to see your current usage and limits.",
+    },
+    {
+      question: "How will I know how many tokens I've used each month?",
+      answer:
+        "You can monitor your token usage in real-time through the dashboard. We provide detailed analytics showing token consumption by model, date, and project. You'll also receive monthly usage reports via email.",
+    },
+    {
+      question: "How can I manage my spending on the API platform?",
+      answer:
+        "You can set spending limits and budgets in your account settings. We also offer usage alerts that notify you when you approach your limits. For enterprise customers, we provide advanced cost management tools and dedicated account management.",
+    },
+  ];
 
   // const handleProductClick = async (product: { id: string; name: string }) => {
   //   // Call tool to get product details
@@ -90,8 +156,9 @@ const ProductSearchResult: React.FC = () => {
       const container = carouselContainerRef.current;
       if (!container) return;
 
-      const articles = container.querySelectorAll<HTMLElement>(".carousel-item");
-      
+      const articles =
+        container.querySelectorAll<HTMLElement>(".carousel-item");
+
       articles.forEach((article) => {
         const rect = article.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
@@ -102,11 +169,13 @@ const ProductSearchResult: React.FC = () => {
         const y = relativeY / (rect.height / 2);
 
         // Calculate distance from cursor to center of item
-        const distance = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
+        const distance = Math.sqrt(
+          relativeX * relativeX + relativeY * relativeY
+        );
         // Use a larger max distance to make the effect work across gaps
         const maxDistance = Math.max(rect.width, rect.height) * 2;
         const normalizedDistance = Math.min(distance / maxDistance, 1);
-        
+
         // Closer items get higher opacity and scale
         // Use exponential falloff for smoother transition
         const proximity = Math.pow(1 - normalizedDistance, 2);
@@ -129,10 +198,10 @@ const ProductSearchResult: React.FC = () => {
     const handleScroll = () => {
       updateItems();
     };
-    
+
     document.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("scroll", handleScroll, true);
-    
+
     const scrollContainer = scrollContainerRef.current;
     if (scrollContainer) {
       scrollContainer.addEventListener("scroll", handleScroll);
@@ -152,17 +221,19 @@ const ProductSearchResult: React.FC = () => {
   }, []);
 
   return (
-    <McpUseProvider debugger viewControls>
+    <McpUseProvider debugger viewControls autoSize>
       <AppsSDKUIProvider linkComponent={Link}>
         <div className="relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-3xl">
           <div className="p-8">
             <h5 className="text-secondary mb-1">Apps SDK Template</h5>
             <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>
             <p className="text-md">
-              Start building your ChatGPT widget this this mcp-use template. It features the openai apps sdk ui components, dark/light theme support, actions like callTool and sendFollowUpMessage, and more.
+              Start building your ChatGPT widget this this mcp-use template. It
+              features the openai apps sdk ui components, dark/light theme
+              support, actions like callTool and sendFollowUpMessage, and more.
             </p>
           </div>
-          <div 
+          <div
             ref={scrollContainerRef}
             className="carousel-scroll-container w-full overflow-x-auto overflow-y-visible pl-8"
           >
@@ -176,6 +247,24 @@ const ProductSearchResult: React.FC = () => {
                   />
                 ))}
               </Animate>
+            </div>
+          </div>
+          <div className="p-8 pt-4 border-t border-gray-200 dark:border-gray-800 mt-4">
+            <h3 className="heading-lg mb-4">Frequently Asked Questions</h3>
+            <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+              {accordionItems.map((item, index) => (
+                <AccordionItem
+                  key={index}
+                  question={item.question}
+                  answer={item.answer}
+                  isOpen={openAccordionIndex === index}
+                  onToggle={() =>
+                    setOpenAccordionIndex(
+                      openAccordionIndex === index ? null : index
+                    )
+                  }
+                />
+              ))}
             </div>
           </div>
         </div>

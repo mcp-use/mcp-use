@@ -1,6 +1,6 @@
 /**
- * Wrapper component that adds a debug button to display widget debug information.
- * Shows a bug icon button that opens a minimal overlay with debug data in table format.
+ * Wrapper component that adds control buttons for widget debugging and view controls.
+ * Combines debug button and view controls (fullscreen/pip) with shared hover logic.
  */
 
 import React, { useEffect, useRef, useState } from "react";
@@ -16,36 +16,51 @@ type Position =
   | "bottom-center"
   | "bottom-right";
 
-interface WidgetDebuggerProps {
+interface WidgetControlsProps {
   children: React.ReactNode;
   className?: string;
   position?: Position;
   attachTo?: HTMLElement | null;
   showLabels?: boolean;
+  /**
+   * Enable debug button to display widget debug information
+   * @default false
+   */
+  debugger?: boolean;
+  /**
+   * Enable fullscreen and pip view controls
+   * - `true` = show both pip and fullscreen buttons
+   * - `"pip"` = show only pip button
+   * - `"fullscreen"` = show only fullscreen button
+   * @default false
+   */
+  viewControls?: boolean | "pip" | "fullscreen";
 }
 
 /**
- * Wrapper component that adds a debug button to display widget debug information.
- * The button shows a bug icon and opens an overlay with debug data in a minimal table format.
+ * Wrapper component that adds control buttons for widget debugging and view controls.
+ * All buttons share the same hover logic and are rendered together.
  *
  * @example
  * ```tsx
  * const MyWidget: React.FC = () => {
  *   return (
- *     <WidgetDebugger position="top-right">
+ *     <WidgetControls debugger viewControls position="top-right">
  *       <div>My widget content</div>
- *     </WidgetDebugger>
+ *     </WidgetControls>
  *   );
  * };
  * ```
  */
-export function WidgetDebugger({
+export function WidgetControls({
   children,
   className = "",
   position = "top-right",
   attachTo,
   showLabels = true,
-}: WidgetDebuggerProps) {
+  debugger: enableDebugger = false,
+  viewControls = false,
+}: WidgetControlsProps) {
   const {
     props,
     output,
@@ -146,11 +161,6 @@ export function WidgetDebugger({
       case "top-right":
         styles.top = topOffset;
         styles.right = rightOffset;
-        // Offset to the left when not in fullscreen/pip to make room for WidgetFullscreenWrapper buttons
-        // 32px (maximize) + 8px (gap) + 32px (pip) + 8px (gap to bug button) = 80px
-        if (!isFullscreen && !isPip) {
-          styles.right = `calc(${rightOffset} + 80px)`;
-        }
         break;
       case "center-left":
         styles.top = "50%";
@@ -287,6 +297,22 @@ export function WidgetDebugger({
       setActionResult(`State updated: ${JSON.stringify(newState, null, 2)}`);
     } catch (error: any) {
       setActionResult(`Error: ${error.message}`);
+    }
+  };
+
+  const handleFullscreen = async () => {
+    try {
+      await requestDisplayMode("fullscreen");
+    } catch (error) {
+      console.error("Failed to go fullscreen:", error);
+    }
+  };
+
+  const handlePip = async () => {
+    try {
+      await requestDisplayMode("pip");
+    } catch (error) {
+      console.error("Failed to go pip:", error);
     }
   };
 
@@ -487,24 +513,46 @@ export function WidgetDebugger({
         onMouseLeave={() => !attachTo && setIsHovered(false)}
       >
         <div style={getPositionStyles()}>
-          <IconButton onClick={handleToggleOverlay} label="Debug Info">
-            <path d="M12 20v-9" />
-            <path d="M14 7a4 4 0 0 1 4 4v3a6 6 0 0 1-12 0v-3a4 4 0 0 1 4-4z" />
-            <path d="M14.12 3.88 16 2" />
-            <path d="M21 21a4 4 0 0 0-3.81-4" />
-            <path d="M21 5a4 4 0 0 1-3.55 3.97" />
-            <path d="M22 13h-4" />
-            <path d="M3 21a4 4 0 0 1 3.81-4" />
-            <path d="M3 5a4 4 0 0 0 3.55 3.97" />
-            <path d="M6 13H2" />
-            <path d="m8 2 1.88 1.88" />
-            <path d="M9 7.13V6a3 3 0 1 1 6 0v1.13" />
-          </IconButton>
+          {/* View controls (fullscreen/pip) - only show when not already in fullscreen/pip */}
+          {!isFullscreen && !isPip && (
+            <>
+              {(viewControls === true || viewControls === "fullscreen") && (
+                <IconButton onClick={handleFullscreen} label="Fullscreen">
+                  <path d="M15 3h6v6" />
+                  <path d="m21 3-7 7" />
+                  <path d="m3 21 7-7" />
+                  <path d="M9 21H3v-6" />
+                </IconButton>
+              )}
+              {(viewControls === true || viewControls === "pip") && (
+                <IconButton onClick={handlePip} label="Picture in Picture">
+                  <path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4" />
+                  <rect width="10" height="7" x="12" y="13" rx="2" />
+                </IconButton>
+              )}
+            </>
+          )}
+          {/* Debug button - only show if debugger prop is true */}
+          {enableDebugger && (
+            <IconButton onClick={handleToggleOverlay} label="Debug Info">
+              <path d="M12 20v-9" />
+              <path d="M14 7a4 4 0 0 1 4 4v3a6 6 0 0 1-12 0v-3a4 4 0 0 1 4-4z" />
+              <path d="M14.12 3.88 16 2" />
+              <path d="M21 21a4 4 0 0 0-3.81-4" />
+              <path d="M21 5a4 4 0 0 1-3.55 3.97" />
+              <path d="M22 13h-4" />
+              <path d="M3 21a4 4 0 0 1 3.81-4" />
+              <path d="M3 5a4 4 0 0 0 3.55 3.97" />
+              <path d="M6 13H2" />
+              <path d="m8 2 1.88 1.88" />
+              <path d="M9 7.13V6a3 3 0 1 1 6 0v1.13" />
+            </IconButton>
+          )}
         </div>
         {children}
       </div>
 
-      {isOverlayOpen && (
+      {isOverlayOpen && enableDebugger && (
         <div
           ref={overlayRef}
           style={{
