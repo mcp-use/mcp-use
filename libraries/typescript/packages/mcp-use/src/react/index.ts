@@ -29,4 +29,5 @@ export type {
 } from "./widget-types.js";
 export { WidgetDebugger } from "./WidgetDebugger.js";
 export { WidgetFullscreenWrapper } from "./WidgetFullscreenWrapper.js";
+export { McpUseProvider } from "./McpUseProvider.js";
 

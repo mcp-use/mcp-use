@@ -23,6 +23,7 @@ interface WidgetFullscreenWrapperProps {
   position?: Position;
   attachTo?: HTMLElement | null;
   showLabels?: boolean;
+  viewControls?: boolean | "pip" | "fullscreen";
 }
 
 /**
@@ -46,6 +47,7 @@ export function WidgetFullscreenWrapper({
   position = "top-right",
   attachTo,
   showLabels = true,
+  viewControls = true,
 }: WidgetFullscreenWrapperProps) {
   const { displayMode, requestDisplayMode, theme, safeArea, isAvailable } =
     useWidget();
@@ -347,16 +349,20 @@ export function WidgetFullscreenWrapper({
     >
       {!isFullscreen && !isPip && (
         <div style={getPositionStyles()}>
-          <IconButton onClick={handleFullscreen} label="Fullscreen">
-            <path d="M15 3h6v6" />
-            <path d="m21 3-7 7" />
-            <path d="m3 21 7-7" />
-            <path d="M9 21H3v-6" />
-          </IconButton>
-          <IconButton onClick={handlePip} label="Picture in Picture">
-            <path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4" />
-            <rect width="10" height="7" x="12" y="13" rx="2" />
-          </IconButton>
+          {(viewControls === true || viewControls === "fullscreen") && (
+            <IconButton onClick={handleFullscreen} label="Fullscreen">
+              <path d="M15 3h6v6" />
+              <path d="m21 3-7 7" />
+              <path d="m3 21 7-7" />
+              <path d="M9 21H3v-6" />
+            </IconButton>
+          )}
+          {(viewControls === true || viewControls === "pip") && (
+            <IconButton onClick={handlePip} label="Picture in Picture">
+              <path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4" />
+              <rect width="10" height="7" x="12" y="13" rx="2" />
+            </IconButton>
+          )}
         </div>
       )}
       {children}

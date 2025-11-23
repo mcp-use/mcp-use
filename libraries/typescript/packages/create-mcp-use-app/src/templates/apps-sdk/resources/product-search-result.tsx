@@ -1,8 +1,8 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { Animate } from "@openai/apps-sdk-ui/components/Transition";
-import { ErrorBoundary, Image, ThemeProvider, useWidget, WidgetDebugger } from "mcp-use/react";
-import React, { StrictMode, useEffect, useRef } from "react";
-import { BrowserRouter, Link } from "react-router";
+import { Image, McpUseProvider, useWidget } from "mcp-use/react";
+import React, { useEffect, useRef } from "react";
+import { Link } from "react-router";
 import { z } from "zod";
 import "../styles.css";
 
@@ -49,18 +49,6 @@ const ProductSearchResult: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   console.log(props);
-
-  // Calculate basename for proper routing in both dev proxy and production
-  const getBasename = () => {
-    if (typeof window === "undefined") return "/";
-    const path = window.location.pathname;
-    // Check for inspector dev widget proxy pattern
-    const match = path.match(/^(\/inspector\/api\/dev-widget\/[^/]+)/);
-    if (match) {
-      return match[1];
-    }
-    return "/";
-  };
 
   // const handleProductClick = async (product: { id: string; name: string }) => {
   //   // Call tool to get product details
@@ -164,42 +152,35 @@ const ProductSearchResult: React.FC = () => {
   }, []);
 
   return (
-    <StrictMode>
-      <ThemeProvider>
-        <WidgetDebugger>
-        <BrowserRouter basename={getBasename()}>
-          <AppsSDKUIProvider linkComponent={Link}>
-            <ErrorBoundary>
-              <div className="relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-3xl">
-                <div className="p-8">
-                  <h5 className="text-secondary mb-1">Apps SDK Template</h5>
-                  <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>
-                  <p className="text-md">
-                    Start building your ChatGPT widget this this mcp-use template. It features the openai apps sdk ui components, dark/light theme support, actions like callTool and sendFollowUpMessage, and more.
-                  </p>
-                </div>
-                <div 
-                  ref={scrollContainerRef}
-                  className="carousel-scroll-container w-full overflow-x-auto overflow-y-visible pl-8"
-                >
-                  <div ref={carouselContainerRef} className="overflow-visible">
-                    <Animate className="flex gap-4">
-                      {items.map((item) => (
-                        <CarouselItem
-                          key={item.fruit}
-                          fruit={item.fruit}
-                          color={item.color}
-                        />
-                      ))}
-                    </Animate>
-                  </div>
-                </div>
-              </div>
-            </ErrorBoundary>
-          </AppsSDKUIProvider>
-        </BrowserRouter></WidgetDebugger>
-      </ThemeProvider>
-    </StrictMode>
+    <McpUseProvider debugger viewControls>
+      <AppsSDKUIProvider linkComponent={Link}>
+        <div className="relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-3xl">
+          <div className="p-8">
+            <h5 className="text-secondary mb-1">Apps SDK Template</h5>
+            <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>
+            <p className="text-md">
+              Start building your ChatGPT widget this this mcp-use template. It features the openai apps sdk ui components, dark/light theme support, actions like callTool and sendFollowUpMessage, and more.
+            </p>
+          </div>
+          <div 
+            ref={scrollContainerRef}
+            className="carousel-scroll-container w-full overflow-x-auto overflow-y-visible pl-8"
+          >
+            <div ref={carouselContainerRef} className="overflow-visible">
+              <Animate className="flex gap-4">
+                {items.map((item) => (
+                  <CarouselItem
+                    key={item.fruit}
+                    fruit={item.fruit}
+                    color={item.color}
+                  />
+                ))}
+              </Animate>
+            </div>
+          </div>
+        </div>
+      </AppsSDKUIProvider>
+    </McpUseProvider>
   );
 };
 
