@@ -1,29 +1,13 @@
-import React, { useState, useEffect } from "react";
+import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
+import { Animate } from "@openai/apps-sdk-ui/components/Transition";
+import { Image, useWidget } from "mcp-use/react";
+import React, { StrictMode } from "react";
+import { Link } from "react-router";
 import { z } from "zod";
-import { useWidget } from "mcp-use/react";
-import {
-  Button,
-  Card,
-  Input,
-  Icon,
-  Transition,
-} from "@openai/apps-sdk-ui";
 import "../styles.css";
 
 const propSchema = z.object({
   query: z.string().describe("The search query"),
-  results: z
-    .array(
-      z.object({
-        id: z.string().describe("Product ID"),
-        name: z.string().describe("Product name"),
-        price: z.number().describe("Product price"),
-        image: z.string().url().optional().describe("Product image URL"),
-        rating: z.number().min(0).max(5).optional().describe("Product rating"),
-        inStock: z.boolean().describe("Whether product is in stock"),
-      })
-    )
-    .describe("Array of search results"),
 });
 
 export const widgetMetadata = {
@@ -34,226 +18,98 @@ export const widgetMetadata = {
 
 type ProductSearchResultProps = z.infer<typeof propSchema>;
 
-const ProductSearchResult: React.FC = () => {
-  const { props, theme, callTool, sendFollowUpMessage, setState, state } =
-    useWidget<ProductSearchResultProps>();
-  const { query, results } = props;
-  const [filteredResults, setFilteredResults] = useState(results);
-  const [searchTerm, setSearchTerm] = useState(query);
-  const [filters, setFilters] = useState<{
-    minPrice?: number;
-    maxPrice?: number;
-    inStockOnly?: boolean;
-  }>(state?.filters || {});
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
-  useEffect(() => {
-    let filtered = [...results];
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
 
-    if (filters.minPrice !== undefined) {
-      filtered = filtered.filter((r) => r.price >= filters.minPrice!);
-    }
-    if (filters.maxPrice !== undefined) {
-      filtered = filtered.filter((r) => r.price <= filters.maxPrice!);
-    }
-    if (filters.inStockOnly) {
-      filtered = filtered.filter((r) => r.inStock);
-    }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Widget Error:", error, errorInfo);
+  }
 
-    setFilteredResults(filtered);
-  }, [results, filters]);
-
-  const handleSearch = async (newQuery: string) => {
-    setSearchTerm(newQuery);
-    // Call tool to perform new search
-    try {
-      const result = await callTool("search-products", {
-        query: newQuery,
-      });
-      // Send follow-up message to update the conversation
-      await sendFollowUpMessage(
-        `Searching for "${newQuery}" returned ${result.content?.length || 0} results`
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 border border-red-500 bg-red-50 text-red-900 rounded-md">
+          <h3 className="font-bold mb-2">Widget Error</h3>
+          <pre className="text-sm whitespace-pre-wrap">
+            {this.state.error?.message}
+          </pre>
+        </div>
       );
-    } catch (error) {
-      console.error("Failed to search products:", error);
     }
-  };
 
-  const handleFilterChange = async (newFilters: typeof filters) => {
-    const updatedFilters = { ...filters, ...newFilters };
-    setFilters(updatedFilters);
-    await setState({ filters: updatedFilters });
-  };
+    return this.props.children;
+  }
+}
 
-  const handleProductClick = async (product: {
-    id: string;
-    name: string;
-  }) => {
-    // Call tool to get product details
-    try {
-      await callTool("get-product-details", {
-        productId: product.id,
-      });
-      await sendFollowUpMessage(`Viewing details for ${product.name}`);
-    } catch (error) {
-      console.error("Failed to get product details:", error);
-    }
-  };
+const ProductSearchResult: React.FC = () => {
+  const { props } = useWidget<ProductSearchResultProps>();
 
-  const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white";
-  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900";
-  const subtextColor = theme === "dark" ? "text-gray-400" : "text-gray-600";
-  const cardBg = theme === "dark" ? "bg-gray-800" : "bg-gray-50";
-  const borderColor =
-    theme === "dark" ? "border-gray-700" : "border-gray-200";
+  console.log(props);
+
+  // const handleProductClick = async (product: { id: string; name: string }) => {
+  //   // Call tool to get product details
+  //   try {
+  //     await callTool("get-product-details", {
+  //       productId: product.id,
+  //     });
+  //     await sendFollowUpMessage(`Viewing details for ${product.name}`);
+  //   } catch (error) {
+  //     console.error("Failed to get product details:", error);
+  //   }
+  // };
+
+  const items = [
+    { image_name: "apricot.jpg", top_right_color: "#fee6ca" },
+    { image_name: "coconut.jpg", top_right_color: "#fbedd3" },
+    { image_name: "pineapple.jpg", top_right_color: "#f8f0d9" },
+    { image_name: "blueberry.jpg", top_right_color: "#e0e6e6" },
+    { image_name: "mango.jpg", top_right_color: "#f9f0df" },
+    { image_name: "grapse.jpg", top_right_color: "#f4ebe2" },
+    { image_name: "watermelon.jpg", top_right_color: "#e6eddb" },
+    { image_name: "cherries.jpg", top_right_color: "#e2ebda" },
+    { image_name: "orange.jpg", top_right_color: "#fdebdf" },
+    { image_name: "apple.jpg", top_right_color: "#ffffff" },
+    { image_name: "avocado.jpg", top_right_color: "#ecefda" },
+    { image_name: "pear.jpg", top_right_color: "#f1f1cf" },
+    { image_name: "plum.jpg", top_right_color: "#ece5ec" },
+    { image_name: "banana.jpg", top_right_color: "#fdf0dd" },
+    { image_name: "lemon.jpg", top_right_color: "#feeecd" },
+    { image_name: "strawberry.jpg", top_right_color: "#f7e6df" },
+  ];
 
   return (
-    <div className={`${bgColor} rounded-lg p-6 max-w-6xl mx-auto`}>
-      <div className="mb-6">
-        <h1 className={`text-3xl font-bold ${textColor} mb-4`}>
-          Product Search Results
-        </h1>
-
-        <div className="flex gap-3 mb-4">
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search products..."
-            onKeyPress={(e) => {
-              if (e.key === "Enter") {
-                handleSearch(searchTerm);
-              }
-            }}
-            className="flex-1"
-          />
-          <Button onClick={() => handleSearch(searchTerm)}>
-            <Icon name="search" size={16} className="mr-2" />
-            Search
-          </Button>
-        </div>
-
-        <div className="flex gap-4 items-center flex-wrap">
-          <label className={`${textColor} text-sm flex items-center gap-2`}>
-            <input
-              type="checkbox"
-              checked={filters.inStockOnly || false}
-              onChange={(e) =>
-                handleFilterChange({ inStockOnly: e.target.checked })
-              }
-              className="mr-1"
-            />
-            In Stock Only
-          </label>
-
-          <div className="flex items-center gap-2">
-            <label className={`${textColor} text-sm`}>Min Price:</label>
-            <Input
-              type="number"
-              value={filters.minPrice || ""}
-              onChange={(e) =>
-                handleFilterChange({
-                  minPrice: e.target.value
-                    ? parseFloat(e.target.value)
-                    : undefined,
-                })
-              }
-              placeholder="0"
-              className="w-24"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className={`${textColor} text-sm`}>Max Price:</label>
-            <Input
-              type="number"
-              value={filters.maxPrice || ""}
-              onChange={(e) =>
-                handleFilterChange({
-                  maxPrice: e.target.value
-                    ? parseFloat(e.target.value)
-                    : undefined,
-                })
-              }
-              placeholder="1000"
-              className="w-24"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <p className={subtextColor}>
-          Found {filteredResults.length} result
-          {filteredResults.length !== 1 ? "s" : ""} for "{query}"
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredResults.map((product, index) => (
-          <Transition
-            key={product.id}
-            in={true}
-            timeout={200}
-            style={{ transitionDelay: `${index * 50}ms` }}
-          >
-            <Card
-              className={`${cardBg} p-4 rounded-lg shadow-md border ${borderColor} cursor-pointer hover:shadow-lg transition-shadow`}
-              onClick={() => handleProductClick(product)}
-            >
-              <div className="flex flex-col h-full">
-                <div className="w-full h-40 bg-gray-300 rounded-lg flex items-center justify-center overflow-hidden mb-3">
-                  {product.image ? (
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
+    <StrictMode>
+      <AppsSDKUIProvider linkComponent={Link}>
+        <ErrorBoundary>
+          <div className="p-8 relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl">
+            <h1 className="dark:text-white">Cute Fruits Store</h1>
+            <p className="dark:text-gray-400">Find your favorite fruits</p>
+            <div className="w-full overflow-x-auto">
+              <Animate className="flex flex-wrap gap-4">
+                {items.map((item) => (
+                  <div key={item.image_name}>
+                    <Image
+                      src={"/fruits/" + item.image_name}
+                      alt={item.image_name}
                     />
-                  ) : (
-                    <Icon name="image" size={32} />
-                  )}
-                </div>
-
-                <h3 className={`text-lg font-semibold ${textColor} mb-2`}>
-                  {product.name}
-                </h3>
-
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xl font-bold ${textColor}`}>
-                    ${product.price.toFixed(2)}
-                  </span>
-                  {product.rating !== undefined && (
-                    <div className="flex items-center">
-                      <Icon name="star" size={16} className="text-yellow-400" />
-                      <span className={`${subtextColor} text-sm ml-1`}>
-                        {product.rating.toFixed(1)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-auto pt-2">
-                  {product.inStock ? (
-                    <span className="text-green-500 text-sm font-medium">
-                      ✓ In Stock
-                    </span>
-                  ) : (
-                    <span className="text-red-500 text-sm font-medium">
-                      ✗ Out of Stock
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Card>
-          </Transition>
-        ))}
-      </div>
-
-      {filteredResults.length === 0 && (
-        <div className="text-center py-12">
-          <Icon name="search" size={48} className={`${subtextColor} mb-4`} />
-          <p className={subtextColor}>No products found matching your criteria</p>
-        </div>
-      )}
-    </div>
+                  </div>
+                ))}
+              </Animate>
+            </div>
+          </div>
+        </ErrorBoundary>
+      </AppsSDKUIProvider>
+    </StrictMode>
   );
 };
 

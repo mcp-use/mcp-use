@@ -77,6 +77,12 @@ export function ToolsTab({
   const [mobileView, setMobileView] = useState<"list" | "detail" | "response">(
     "list"
   );
+  const [isMaximized, setIsMaximized] = useState(false);
+  
+  // Refs for resizable panels
+  const leftPanelRef = useRef<any>(null);
+  const topPanelRef = useRef<any>(null);
+  const bottomPanelRef = useRef<any>(null);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -580,6 +586,28 @@ export function ToolsTab({
     [results]
   );
 
+  const handleMaximize = useCallback(() => {
+    if (!isMaximized) {
+      // Maximize: collapse left panel and top panel
+      if (leftPanelRef.current) {
+        leftPanelRef.current.collapse();
+      }
+      if (topPanelRef.current) {
+        topPanelRef.current.collapse();
+      }
+      setIsMaximized(true);
+    } else {
+      // Restore: expand left panel and top panel
+      if (leftPanelRef.current) {
+        leftPanelRef.current.expand();
+      }
+      if (topPanelRef.current) {
+        topPanelRef.current.expand();
+      }
+      setIsMaximized(false);
+    }
+  }, [isMaximized]);
+
   const openSaveDialog = useCallback(() => {
     if (!selectedTool) return;
     setRequestName("");
@@ -807,7 +835,9 @@ export function ToolsTab({
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel
+        ref={leftPanelRef}
         defaultSize={33}
+        collapsible
         className="flex flex-col h-full relative"
       >
         <ToolsTabHeader
@@ -847,7 +877,11 @@ export function ToolsTab({
 
       <ResizablePanel defaultSize={67}>
         <ResizablePanelGroup direction="vertical">
-          <ResizablePanel defaultSize={40}>
+          <ResizablePanel 
+            ref={topPanelRef}
+            defaultSize={40}
+            collapsible
+          >
             <ToolExecutionPanel
               selectedTool={selectedTool}
               toolArgs={toolArgs}
@@ -861,7 +895,10 @@ export function ToolsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize={60}>
+          <ResizablePanel 
+            ref={bottomPanelRef}
+            defaultSize={60}
+          >
             <div className="flex flex-col h-full">
               <ToolResultDisplay
                 results={results}
@@ -873,6 +910,8 @@ export function ToolsTab({
                 onDelete={handleDeleteResult}
                 onFullscreen={handleFullscreen}
                 onTogglePreview={() => setPreviewMode(!previewMode)}
+                onMaximize={handleMaximize}
+                isMaximized={isMaximized}
               />
             </div>
           </ResizablePanel>
