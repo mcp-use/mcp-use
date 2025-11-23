@@ -31,7 +31,7 @@ export function ResourcesTabHeader({
   searchInputRef,
 }: ResourcesTabHeaderProps) {
   return (
-    <div className="flex items-center justify-between p-4 py-3 border-r dark:border-zinc-700">
+    <div className="flex items-center justify-between p-4 py-3">
       <div className="flex items-center gap-2 flex-1">
         {!isSearchExpanded ? (
           <>

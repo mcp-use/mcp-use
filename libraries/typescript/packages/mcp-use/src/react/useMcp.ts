@@ -72,6 +72,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
+    wrapTransport,
   } = options;
 
   const [state, setState] = useState<UseMcpResult["state"]>("discovering");
@@ -284,9 +285,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
 
         // Add server to client with OAuth provider
+        // Include wrapTransport if provided
         clientRef.current!.addServer(serverName, {
           ...serverConfig,
           authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
+          wrapTransport: wrapTransport
+            ? (transport: any) => {
+                console.log("[useMcp] Applying transport wrapper for server:", serverName, "url:", url);
+                return wrapTransport(transport, url);
+              }
+            : undefined,
         });
 
         // Create session (this connects to server)
