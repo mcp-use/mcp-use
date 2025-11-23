@@ -6,6 +6,7 @@ import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.j
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import { logger } from "../logging.js";
+import type { SamplingCallback } from "../types/sampling.js";
 
 export interface ConnectorInitOptions {
   /**
@@ -21,6 +22,10 @@ export interface ConnectorInitOptions {
    * OAuth client provider for automatic authentication
    */
   authProvider?: any;
+  /**
+   * Sampling callback for handling sampling/createMessage requests from servers
+   */
+  samplingCallback?: SamplingCallback;
 }
 
 /**
@@ -34,9 +39,11 @@ export abstract class BaseConnector {
   protected serverInfoCache: { name: string; version?: string } | null = null;
   protected connected = false;
   protected readonly opts: ConnectorInitOptions;
+  protected readonly samplingCallback?: SamplingCallback;
 
   constructor(opts: ConnectorInitOptions = {}) {
     this.opts = opts;
+    this.samplingCallback = opts.samplingCallback;
   }
 
   /** Establish the connection and create the SDK client. */

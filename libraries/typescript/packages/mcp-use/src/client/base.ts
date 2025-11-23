@@ -1,6 +1,7 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { logger } from "../logging.js";
 import { MCPSession } from "../session.js";
+import type { SamplingCallback } from "../types/sampling.js";
 
 /**
  * Base MCPClient class with shared functionality
@@ -12,11 +13,13 @@ export abstract class BaseMCPClient {
   protected config: Record<string, any> = {};
   protected sessions: Record<string, MCPSession> = {};
   public activeSessions: string[] = [];
+  protected samplingCallback?: SamplingCallback;
 
-  constructor(config?: Record<string, any>) {
+  constructor(config?: Record<string, any>, samplingCallback?: SamplingCallback) {
     if (config) {
       this.config = config;
     }
+    this.samplingCallback = samplingCallback;
   }
 
   public static fromDict(_cfg: Record<string, any>): BaseMCPClient {
@@ -55,6 +58,13 @@ export abstract class BaseMCPClient {
   protected abstract createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector;
+
+  /**
+   * Get the sampling callback if set
+   */
+  public getSamplingCallback(): SamplingCallback | undefined {
+    return this.samplingCallback;
+  }
 
   public async createSession(
     serverName: string,

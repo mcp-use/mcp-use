@@ -1,9 +1,11 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { InputDefinition } from "./common.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import type { ToolContext } from "./context.js";
 
 export type ToolCallback = (
-  params: Record<string, any>
+  params: Record<string, any>,
+  ctx: ToolContext
 ) => Promise<CallToolResult>;
 
 export interface ToolDefinition {

@@ -12,61 +12,36 @@ Sampling allows MCP tools to request LLM completions during their execution.
 
 ## Configuration
 
-To enable sampling, provide a `sampling_callback` function when initializing the MCPClient:
+To enable sampling, provide a `samplingCallback` function when initializing the MCPClient:
 
 <CodeGroup>
 ```typescript TypeScript
-// ⚠️ Sampling callbacks are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use
+import { MCPClient, type SamplingCallback, type CreateMessageRequestParams, type CreateMessageResult, type ErrorData } from 'mcp-use'
 
-// When supported, the API will look similar to:
-/*
-import { MCPClient } from 'mcp-use'
+async function samplingCallback(
+  context: any,
+  params: CreateMessageRequestParams
+): Promise<CreateMessageResult | ErrorData> {
+  // Integrate with your LLM of choice (OpenAI, Anthropic, etc.)
+  const lastMessage = params.messages[params.messages.length - 1]
+  const textContent = Array.isArray(lastMessage.content)
+    ? lastMessage.content[0]?.text || ''
+    : lastMessage.content?.text || ''
+  
+  const response = await yourLlm.complete(textContent)
 
-async function samplingCallback(context, params) {
-    // Integrate with your LLM of choice
-    const response = await yourLlm.complete(params.messages.at(-1).content.text)
-
-    return {
-        content: { text: response, type: 'text' },
-        model: 'your-model-name',
-        role: 'assistant'
-    }
+  return {
+    role: 'assistant',
+    content: { text: response, type: 'text' },
+    model: 'your-model-name',
+    stopReason: 'endTurn'
+  }
 }
 
 const client = new MCPClient(
-    config,
-    { samplingCallback }
+  config,
+  { samplingCallback }
 )
-*/
-```
-
-```typescript TypeScript
-// ⚠️ Sampling callbacks are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use
-
-// When supported, the API will look similar to:
-/*
-import { MCPClient } from 'mcp-use'
-
-async function samplingCallback(context, params) {
-    // Integrate with your LLM of choice
-    const response = await yourLlm.complete(params.messages.at(-1).content.text)
-
-    return {
-        content: { text: response, type: 'text' },
-        model: 'your-model-name',
-        role: 'assistant'
-    }
-}
-
-const client = new MCPClient(
-    config,
-    { samplingCallback }
-)
-*/
 ```
 </CodeGroup>
 
@@ -74,18 +49,170 @@ const client = new MCPClient(
 
 When building MCP servers, tools can request sampling using the context parameter:
 
+```typescript
+import { createMCPServer, type ToolContext } from 'mcp-use/server'
+
+const server = createMCPServer('my-server')
+
+server.tool({
+  name: 'analyze_sentiment',
+  description: 'Analyze the sentiment of text using the client\'s LLM',
+  inputs: [
+    { name: 'text', type: 'string', required: true }
+  ],
+  cb: async (params, ctx: ToolContext) => {
+    const prompt = `Analyze the sentiment of the following text as positive, negative, or neutral.
+    Just output a single word - 'positive', 'negative', or 'neutral'.
+
+    Text to analyze: ${params.text}`
+
+    // Request LLM analysis through sampling
+    const result = await ctx.sample({
+      messages: [
+        { role: 'user', content: { type: 'text', text: prompt } }
+      ]
+    })
+
+    // Check for errors
+    if ('code' in result) {
+      throw new Error(result.message)
+    }
+
+    return {
+      content: [{ type: 'text', text: result.content.text.trim() }]
+    }
+  }
+})
+```
+
+## Message Content Types
+
+Sampling supports multiple content types:
+
+### Text Content
+
+```typescript
+const content = {
+  type: 'text',
+  text: 'Your message text here'
+}
+```
+
+### Image Content
+
+```typescript
+// Encode image as base64
+const imageData = btoa(imageBuffer) // or use a base64 library
+
+const content = {
+  type: 'image',
+  data: imageData,
+  mimeType: 'image/jpeg'
+}
+```
+
+### Audio Content
+
+```typescript
+// Encode audio as base64
+const audioData = btoa(audioBuffer) // or use a base64 library
+
+const content = {
+  type: 'audio',
+  data: audioData,
+  mimeType: 'audio/wav'
+}
+```
+
+## Model Preferences
+
+You can specify model preferences to guide the client's model selection:
+
+```typescript
+const result = await ctx.sample({
+  messages: [
+    { role: 'user', content: { type: 'text', text: 'Hello' } }
+  ],
+  modelPreferences: {
+    hints: [
+      { name: 'claude-3-sonnet' },  // Prefer Sonnet-class models
+      { name: 'claude' }  // Fall back to any Claude model
+    ],
+    costPriority: 0.3,  // Cost is less important (0-1 scale)
+    speedPriority: 0.8,  // Speed is very important (0-1 scale)
+    intelligencePriority: 0.5  // Moderate capability needs (0-1 scale)
+  },
+  systemPrompt: 'You are a helpful assistant.',
+  maxTokens: 100
+})
+```
+
+### Priority Values
+
+- **costPriority** (0-1): Higher values prefer cheaper models
+- **speedPriority** (0-1): Higher values prefer faster models  
+- **intelligencePriority** (0-1): Higher values prefer more capable models
+
+### Model Hints
+
+Model hints are treated as substrings that can match model names flexibly. Multiple hints are evaluated in order of preference. Clients may map hints to equivalent models from different providers.
+
+## Advanced Usage
+
+### Using System Prompts
+
+```typescript
+const result = await ctx.sample({
+  messages: [...],
+  systemPrompt: 'You are an expert TypeScript developer.',
+  maxTokens: 500
+})
+```
+
+### Limiting Response Length
+
+```typescript
+const result = await ctx.sample({
+  messages: [...],
+  maxTokens: 100  // Limit response to 100 tokens
+})
+```
+
 ## Error Handling
 
-If no sampling callback is provided but a tool requests sampling:
+If no sampling callback is provided but a tool requests sampling, the tool will receive an error response:
 
-<CodeGroup>
-```typescript TypeScript
-// ⚠️ Not yet supported - see above for details
-// When supported, similar error handling will apply
+```typescript
+// Without sampling callback
+const client = new MCPClient(config)  // No samplingCallback
+
+// Tool that requires sampling will return an error
+const result = await session.callTool('analyze_sentiment', { text: 'Hello' })
+// result.isError will be true
 ```
 
-```typescript TypeScript
-// ⚠️ Not yet supported - see above for details
-// When supported, similar error handling will apply
+### Handling Errors in Sampling Callbacks
+
+Your sampling callback can return error data to reject requests:
+
+```typescript
+async function samplingCallback(context: any, params: CreateMessageRequestParams) {
+  // Validate request
+  if (!params.messages || params.messages.length === 0) {
+    return {
+      code: -32602,
+      message: 'Invalid request: messages array is empty'
+    } as ErrorData
+  }
+
+  // Check rate limits, permissions, etc.
+  if (rateLimitExceeded) {
+    return {
+      code: -32000,
+      message: 'Rate limit exceeded'
+    } as ErrorData
+  }
+
+  // Process request...
+}
 ```
-</CodeGroup>

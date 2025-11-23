@@ -39,8 +39,11 @@ export interface CodeModeConfig {
   executorOptions?: ExecutorOptions; // Type-safe based on executor
 }
 
+import type { SamplingCallback } from "./types/sampling.js";
+
 export interface MCPClientOptions {
   codeMode?: boolean | CodeModeConfig;
+  samplingCallback?: SamplingCallback;
 }
 
 // Export executor classes and utilities for external use
@@ -74,15 +77,13 @@ export class MCPClient extends BaseMCPClient {
     config?: string | Record<string, any>,
     options?: MCPClientOptions
   ) {
-    if (config) {
-      if (typeof config === "string") {
-        super(loadConfigFile(config));
-      } else {
-        super(config);
-      }
-    } else {
-      super();
-    }
+    const configObj = config
+      ? typeof config === "string"
+        ? loadConfigFile(config)
+        : config
+      : undefined;
+    
+    super(configObj, options?.samplingCallback);
 
     let codeModeEnabled = false;
     let executorConfig:
@@ -143,7 +144,8 @@ export class MCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
-    return createConnectorFromConfig(serverConfig);
+    const samplingCallback = this.getSamplingCallback();
+    return createConnectorFromConfig(serverConfig, samplingCallback);
   }
 
   private _setupCodeModeConnector(): void {

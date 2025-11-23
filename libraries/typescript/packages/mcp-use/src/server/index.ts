@@ -1,4 +1,5 @@
 export { createMCPServer, type McpServerInstance } from "./mcp-server.js";
+export type { ToolContext } from "./types/index.js";
 
 export * from "./types/index.js";
 

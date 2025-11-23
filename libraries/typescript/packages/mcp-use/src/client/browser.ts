@@ -2,6 +2,7 @@ import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { WebSocketConnector } from "../connectors/websocket.js";
 import { BaseMCPClient } from "./base.js";
+import type { SamplingCallback } from "../types/sampling.js";
 
 /**
  * Browser-compatible MCPClient implementation
@@ -13,12 +14,15 @@ import { BaseMCPClient } from "./base.js";
  * - All base client functionality
  */
 export class BrowserMCPClient extends BaseMCPClient {
-  constructor(config?: Record<string, any>) {
-    super(config);
+  constructor(config?: Record<string, any>, samplingCallback?: SamplingCallback) {
+    super(config, samplingCallback);
   }
 
-  public static fromDict(cfg: Record<string, any>): BrowserMCPClient {
-    return new BrowserMCPClient(cfg);
+  public static fromDict(
+    cfg: Record<string, any>,
+    samplingCallback?: SamplingCallback
+  ): BrowserMCPClient {
+    return new BrowserMCPClient(cfg, samplingCallback);
   }
 
   /**
@@ -29,6 +33,7 @@ export class BrowserMCPClient extends BaseMCPClient {
     serverConfig: Record<string, any>
   ): BaseConnector {
     const { url, transport, headers, authToken, authProvider } = serverConfig;
+    const samplingCallback = this.getSamplingCallback();
 
     if (!url) {
       throw new Error("Server URL is required");
@@ -39,6 +44,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       headers,
       authToken,
       authProvider, // ← Pass OAuth provider to connector
+      samplingCallback,
     };
 
     // Determine transport type

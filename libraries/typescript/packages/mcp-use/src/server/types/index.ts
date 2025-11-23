@@ -37,5 +37,8 @@ export {
 // Tool types
 export { ToolCallback, ToolDefinition } from "./tool.js";
 
+// Context types
+export type { ToolContext } from "./context.js";
+
 // Prompt types
 export { PromptCallback, PromptDefinition } from "./prompt.js";

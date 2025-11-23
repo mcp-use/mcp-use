@@ -65,6 +65,94 @@ function toBase64(str: string): string {
 }
 
 /**
+ * Create a sampling callback that uses the provided LLM config
+ */
+function createSamplingCallback(llmConfig: LLMConfig): any {
+  return async (_context: any, params: any) => {
+    try {
+      // Dynamically import LLM providers
+      let samplingLlm: BaseLLM;
+      if (llmConfig.provider === "openai") {
+        // @ts-ignore - Dynamic import of peer dependency
+        const { ChatOpenAI } = await import("@langchain/openai");
+        samplingLlm = new ChatOpenAI({
+          model: llmConfig.model,
+          apiKey: llmConfig.apiKey,
+        });
+      } else if (llmConfig.provider === "anthropic") {
+        // @ts-ignore - Dynamic import of peer dependency
+        const { ChatAnthropic } = await import("@langchain/anthropic");
+        samplingLlm = new ChatAnthropic({
+          model: llmConfig.model,
+          apiKey: llmConfig.apiKey,
+        });
+      } else if (llmConfig.provider === "google") {
+        // @ts-ignore - Dynamic import of peer dependency
+        const { ChatGoogleGenerativeAI } = await import("@langchain/google-genai");
+        samplingLlm = new ChatGoogleGenerativeAI({
+          model: llmConfig.model,
+          apiKey: llmConfig.apiKey,
+        });
+      } else {
+        return {
+          code: -1,
+          message: `Unsupported LLM provider for sampling: ${llmConfig.provider}`,
+        };
+      }
+
+      // Convert MCP messages to LangChain format
+      const langchainMessages: any[] = [];
+      
+      // Add system prompt if provided
+      if (params.systemPrompt) {
+        langchainMessages.push({
+          role: "system",
+          content: params.systemPrompt,
+        });
+      }
+
+      // Convert MCP messages
+      for (const msg of params.messages) {
+        if (msg.role === "user") {
+          const content = Array.isArray(msg.content)
+            ? msg.content[0]?.text || ""
+            : msg.content?.text || "";
+          langchainMessages.push({ role: "user", content });
+        } else if (msg.role === "assistant") {
+          const content = Array.isArray(msg.content)
+            ? msg.content[0]?.text || ""
+            : msg.content?.text || "";
+          langchainMessages.push({ role: "assistant", content });
+        }
+      }
+
+      // Invoke the LLM
+      const response = await samplingLlm.invoke(langchainMessages);
+
+      // Convert response back to MCP format
+      return {
+        role: "assistant",
+        content: {
+          type: "text",
+          text:
+            typeof response.content === "string"
+              ? response.content
+              : String(response.content),
+        },
+        model: llmConfig.model,
+        stopReason: "endTurn",
+      };
+    } catch (error: any) {
+      return {
+        code: -1,
+        message: error.message || "Sampling request failed",
+        data: error,
+      };
+    }
+  };
+}
+
+/**
  * Handle chat API request with MCP agent (streaming)
  */
 export async function* handleChatRequestStream(requestBody: {
@@ -112,8 +200,11 @@ export async function* handleChatRequestStream(requestBody: {
     throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
   }
 
-  // Create MCP client and connect to server
-  const client = new MCPClient();
+  // Create sampling callback that uses the LLM config
+  const samplingCallback = createSamplingCallback(llmConfig);
+
+  // Create MCP client with sampling callback
+  const client = new MCPClient(undefined, { samplingCallback } as any);
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
@@ -277,8 +368,11 @@ export async function handleChatRequest(requestBody: {
     throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
   }
 
-  // Create MCP client and connect to server
-  const client = new MCPClient();
+  // Create sampling callback that uses the LLM config
+  const samplingCallback = createSamplingCallback(llmConfig);
+
+  // Create MCP client with sampling callback
+  const client = new MCPClient(undefined, { samplingCallback } as any);
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers

@@ -172,7 +172,14 @@ export class HttpConnector extends BaseConnector {
 
       // Create and connect the client
       // This performs both initialize AND initialized notification
-      this.client = new Client(this.clientInfo, this.opts.clientOptions);
+      // Pass sampling callback through client options if available
+      const clientOptions = {
+        ...this.opts.clientOptions,
+        ...(this.samplingCallback && {
+          samplingCallback: this.samplingCallback,
+        }),
+      };
+      this.client = new Client(this.clientInfo, clientOptions);
 
       try {
         await this.client.connect(transport);
@@ -220,7 +227,14 @@ export class HttpConnector extends BaseConnector {
       const transport = await this.connectionManager.start();
 
       // Create and connect the client
-      this.client = new Client(this.clientInfo, this.opts.clientOptions);
+      // Pass sampling callback through client options if available
+      const clientOptions = {
+        ...this.opts.clientOptions,
+        ...(this.samplingCallback && {
+          samplingCallback: this.samplingCallback,
+        }),
+      };
+      this.client = new Client(this.clientInfo, clientOptions);
       await this.client.connect(transport);
 
       this.connected = true;

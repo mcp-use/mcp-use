@@ -22,7 +22,9 @@ from mcp.types import (
     CreateMessageRequestParams,
     CreateMessageResult,
     ErrorData,
-    TextContent
+    TextContent,
+    ImageContent,
+    AudioContent
 )
 
 async def sampling_callback(
@@ -33,13 +35,30 @@ async def sampling_callback(
     Your sampling callback implementation.
     This function receives a prompt and returns an LLM response.
     """
+    # Extract messages and system prompt
+    messages = params.messages
+    system_prompt = params.systemPrompt
+    max_tokens = params.maxTokens
+    
+    # Handle model preferences if provided
+    model_prefs = params.modelPreferences
+    if model_prefs:
+        # Use hints, costPriority, speedPriority, intelligencePriority
+        # to select appropriate model
+        pass
+    
     # Integrate with your LLM of choice (OpenAI, Anthropic, etc.)
-    response = await your_llm.complete(params.messages[-1].content.text)
+    response = await your_llm.complete(
+        messages=messages,
+        system_prompt=system_prompt,
+        max_tokens=max_tokens
+    )
 
     return CreateMessageResult(
         content=TextContent(text=response, type="text"),
         model="your-model-name",
-        role="assistant"
+        role="assistant",
+        stopReason="endTurn"
     )
 
 # Initialize client with sampling support
@@ -72,6 +91,109 @@ async def analyze_sentiment(text: str, ctx: Context) -> str:
     response = await ctx.sample(prompt)
 
     return response.text.strip()
+```
+
+## Message Content Types
+
+Sampling supports multiple content types:
+
+### Text Content
+
+```python
+from mcp.types import TextContent
+
+content = TextContent(
+    type="text",
+    text="Your message text here"
+)
+```
+
+### Image Content
+
+```python
+from mcp.types import ImageContent
+import base64
+
+# Encode image as base64
+with open("image.jpg", "rb") as f:
+    image_data = base64.b64encode(f.read()).decode("utf-8")
+
+content = ImageContent(
+    type="image",
+    data=image_data,
+    mimeType="image/jpeg"
+)
+```
+
+### Audio Content
+
+```python
+from mcp.types import AudioContent
+import base64
+
+# Encode audio as base64
+with open("audio.wav", "rb") as f:
+    audio_data = base64.b64encode(f.read()).decode("utf-8")
+
+content = AudioContent(
+    type="audio",
+    data=audio_data,
+    mimeType="audio/wav"
+)
+```
+
+## Model Preferences
+
+You can specify model preferences to guide the client's model selection:
+
+```python
+from mcp.types import CreateMessageRequestParams, ModelPreferences, ModelHint
+
+params = CreateMessageRequestParams(
+    messages=[...],
+    modelPreferences=ModelPreferences(
+        hints=[
+            ModelHint(name="claude-3-sonnet"),  # Prefer Sonnet-class models
+            ModelHint(name="claude")  # Fall back to any Claude model
+        ],
+        costPriority=0.3,  # Cost is less important (0-1 scale)
+        speedPriority=0.8,  # Speed is very important (0-1 scale)
+        intelligencePriority=0.5  # Moderate capability needs (0-1 scale)
+    ),
+    systemPrompt="You are a helpful assistant.",
+    maxTokens=100
+)
+```
+
+### Priority Values
+
+- **costPriority** (0-1): Higher values prefer cheaper models
+- **speedPriority** (0-1): Higher values prefer faster models  
+- **intelligencePriority** (0-1): Higher values prefer more capable models
+
+### Model Hints
+
+Model hints are treated as substrings that can match model names flexibly. Multiple hints are evaluated in order of preference. Clients may map hints to equivalent models from different providers.
+
+## Advanced Usage
+
+### Using System Prompts
+
+```python
+params = CreateMessageRequestParams(
+    messages=[...],
+    systemPrompt="You are an expert Python developer.",
+    maxTokens=500
+)
+```
+
+### Limiting Response Length
+
+```python
+params = CreateMessageRequestParams(
+    messages=[...],
+    maxTokens=100  # Limit response to 100 tokens
+)
 ```
 
 ## Error Handling

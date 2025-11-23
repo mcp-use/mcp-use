@@ -106,3 +106,17 @@ export type {
   ToolNamespaceInfo,
   ToolSearchResult,
 } from "./src/client/codeExecutor.js";
+
+// Export sampling types
+export type {
+  CreateMessageRequestParams,
+  CreateMessageResult,
+  ErrorData,
+  MessageContent,
+  ModelHint,
+  ModelPreferences,
+  SamplingCallback,
+  SamplingMessage,
+} from "./src/types/sampling.js";
+
+export { validateCreateMessageRequestParams } from "./src/types/sampling.js";

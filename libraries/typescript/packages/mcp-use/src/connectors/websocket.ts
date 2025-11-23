@@ -8,8 +8,9 @@ import { logger } from "../logging.js";
 import { WebSocketConnectionManager } from "../task_managers/websocket.js";
 
 import { BaseConnector } from "./base.js";
+import type { ConnectorInitOptions } from "./base.js";
 
-export interface WebSocketConnectorOptions {
+export interface WebSocketConnectorOptions extends ConnectorInitOptions {
   authToken?: string;
   headers?: Record<string, string>;
 }
@@ -29,7 +30,7 @@ export class WebSocketConnector extends BaseConnector {
   protected toolsCache: Tool[] | null = null;
 
   constructor(url: string, opts: WebSocketConnectorOptions = {}) {
-    super();
+    super(opts);
     this.url = url;
     this.headers = { ...(opts.headers ?? {}) };
     if (opts.authToken) this.headers.Authorization = `Bearer ${opts.authToken}`;

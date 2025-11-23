@@ -21,12 +21,18 @@ import type {
   ResourceDefinition,
   ResourceTemplateDefinition,
   ServerConfig,
+  ToolContext,
   ToolDefinition,
   UIResourceContent,
   UIResourceDefinition,
   WidgetProps,
 } from "./types/index.js";
 import type { WidgetMetadata } from "./types/widget.js";
+import type {
+  CreateMessageRequestParams,
+  CreateMessageResult,
+  ErrorData,
+} from "../types/sampling.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
 
@@ -469,8 +475,47 @@ export class McpServer {
         annotations: toolDefinition.annotations,
         _meta: toolDefinition._meta,
       },
-      async (params: any) => {
-        return await toolDefinition.cb(params);
+      async (params: any, handlerContext?: any) => {
+        // Create tool context with sampling support
+        const ctx: ToolContext = {
+          sample: async (
+            samplingParams: CreateMessageRequestParams
+          ): Promise<CreateMessageResult | ErrorData> => {
+            try {
+              // Send sampling request to the client via the server
+              // The MCP SDK server handles forwarding this to the client
+              // Try using the handler context if available, otherwise use server.request
+              if (handlerContext?.request) {
+                const result = await handlerContext.request(
+                  "sampling/createMessage",
+                  samplingParams
+                );
+                return result as CreateMessageResult;
+              } else if ((this.server as any).request) {
+                const result = await (this.server as any).request(
+                  "sampling/createMessage",
+                  samplingParams
+                );
+                return result as CreateMessageResult;
+              } else {
+                // Fallback: return error if no request method available
+                return {
+                  code: -32601,
+                  message:
+                    "Sampling not supported: server cannot send requests to client",
+                } as ErrorData;
+              }
+            } catch (error: any) {
+              // Return error data if request fails
+              return {
+                code: error.code || -1,
+                message: error.message || "Sampling request failed",
+                data: error.data,
+              } as ErrorData;
+            }
+          },
+        };
+        return await toolDefinition.cb(params, ctx);
       }
     );
     this.registeredTools.push(toolDefinition.name);
