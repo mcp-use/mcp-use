@@ -775,7 +775,7 @@ export function OpenAIComponentRenderer({
             ref={iframeRef}
             src={widgetUrl}
             className={cn(
-              displayMode === "inline" && "rounded-3xl w-full max-w-[768px]",
+              displayMode === "inline" && " w-full max-w-[768px]",
               displayMode === "fullscreen" && "w-full h-full rounded-none",
               displayMode === "pip" && "w-full h-full rounded-lg"
             )}

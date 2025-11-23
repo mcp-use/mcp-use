@@ -1,7 +1,7 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { Animate } from "@openai/apps-sdk-ui/components/Transition";
 import { ErrorBoundary, Image, ThemeProvider, useWidget } from "mcp-use/react";
-import React, { StrictMode } from "react";
+import React, { StrictMode, useEffect, useRef } from "react";
 import { BrowserRouter, Link } from "react-router";
 import { z } from "zod";
 import "../styles.css";
@@ -18,8 +18,35 @@ export const widgetMetadata = {
 
 type ProductSearchResultProps = z.infer<typeof propSchema>;
 
+const CarouselItem: React.FC<{ fruit: string; color: string }> = ({
+  fruit,
+  color,
+}) => {
+  return (
+    <div
+      className={`carousel-item size-52 rounded-xl border border-gray-200 dark:border-gray-800 ${color}`}
+    >
+      <div className="carousel-item-bg">
+        <Image
+          src={"/fruits/" + fruit + ".png"}
+          alt={fruit}
+        />
+      </div>
+      <div className="carousel-item-content">
+        <Image 
+          src={"/fruits/" + fruit + ".png"} 
+          alt={fruit}
+          className="w-24 h-24 object-contain"
+        />
+      </div>
+    </div>
+  );
+};
+
 const ProductSearchResult: React.FC = () => {
   const { props } = useWidget<ProductSearchResultProps>();
+  const carouselContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   console.log(props);
 
@@ -48,23 +75,93 @@ const ProductSearchResult: React.FC = () => {
   // };
 
   const items = [
-    { fruit: "mango", color: "bg-[#f9f0df] dark:bg-[#f9f0df]/20" },
-    { fruit: "apple", color: "bg-[#ffffff] dark:bg-[#ffffff]/50" },
-    { fruit: "apricot", color: "bg-[#fee6ca] dark:bg-[#fee6ca]/50" },
-    { fruit: "coconut", color: "bg-[#fbedd3] dark:bg-[#fbedd3]/50" },
-    { fruit: "pineapple", color: "bg-[#f8f0d9] dark:bg-[#f8f0d9]/50" },
-    { fruit: "blueberry", color: "bg-[#e0e6e6] dark:bg-[#e0e6e6]/50" },
-    { fruit: "grapes", color: "bg-[#f4ebe2] dark:bg-[#f4ebe2]/50" },
-    { fruit: "watermelon", color: "bg-[#e6eddb] dark:bg-[#e6eddb]/50" },
-    { fruit: "cherries", color: "bg-[#e2ebda] dark:bg-[#e2ebda]/50" },
-    { fruit: "orange", color: "bg-[#fdebdf] dark:bg-[#fdebdf]/50" },
-    { fruit: "avocado", color: "bg-[#ecefda] dark:bg-[#ecefda]/50" },
-    { fruit: "pear", color: "bg-[#f1f1cf] dark:bg-[#f1f1cf]/50" },
-    { fruit: "plum", color: "bg-[#ece5ec] dark:bg-[#ece5ec]/50" },
-    { fruit: "banana", color: "bg-[#fdf0dd] dark:bg-[#fdf0dd]/50" },
-    { fruit: "lemon", color: "bg-[#feeecd] dark:bg-[#feeecd]/50" },
-    { fruit: "strawberry", color: "bg-[#f7e6df] dark:bg-[#f7e6df]/50" },
+    { fruit: "mango", color: "bg-[#FBF1E1] dark:bg-[#FBF1E1]/10" },
+    { fruit: "pineapple", color: "bg-[#f8f0d9] dark:bg-[#f8f0d9]/10" },
+    { fruit: "cherries", color: "bg-[#E2EDDC] dark:bg-[#E2EDDC]/10" },
+    { fruit: "coconut", color: "bg-[#fbedd3] dark:bg-[#fbedd3]/10" },
+    { fruit: "apricot", color: "bg-[#fee6ca] dark:bg-[#fee6ca]/10" },
+    { fruit: "blueberry", color: "bg-[#e0e6e6] dark:bg-[#e0e6e6]/10" },
+    { fruit: "grapes", color: "bg-[#f4ebe2] dark:bg-[#f4ebe2]/10" },
+    { fruit: "watermelon", color: "bg-[#e6eddb] dark:bg-[#e6eddb]/10" },
+    { fruit: "orange", color: "bg-[#fdebdf] dark:bg-[#fdebdf]/10" },
+    { fruit: "avocado", color: "bg-[#ecefda] dark:bg-[#ecefda]/10" },
+    { fruit: "apple", color: "bg-[#F9E7E4] dark:bg-[#F9E7E4]/10" },
+    { fruit: "pear", color: "bg-[#f1f1cf] dark:bg-[#f1f1cf]/10" },
+    { fruit: "plum", color: "bg-[#ece5ec] dark:bg-[#ece5ec]/10" },
+    { fruit: "banana", color: "bg-[#fdf0dd] dark:bg-[#fdf0dd]/10" },
+    { fruit: "strawberry", color: "bg-[#f7e6df] dark:bg-[#f7e6df]/10" },
+    { fruit: "lemon", color: "bg-[#feeecd] dark:bg-[#feeecd]/10" },
   ];
+
+  // Global pointer tracking for all carousel items
+  useEffect(() => {
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+
+    const updateItems = () => {
+      const container = carouselContainerRef.current;
+      if (!container) return;
+
+      const articles = container.querySelectorAll<HTMLElement>(".carousel-item");
+      
+      articles.forEach((article) => {
+        const rect = article.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const relativeX = lastPointerX - centerX;
+        const relativeY = lastPointerY - centerY;
+        const x = relativeX / (rect.width / 2);
+        const y = relativeY / (rect.height / 2);
+
+        // Calculate distance from cursor to center of item
+        const distance = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
+        // Use a larger max distance to make the effect work across gaps
+        const maxDistance = Math.max(rect.width, rect.height) * 2;
+        const normalizedDistance = Math.min(distance / maxDistance, 1);
+        
+        // Closer items get higher opacity and scale
+        // Use exponential falloff for smoother transition
+        const proximity = Math.pow(1 - normalizedDistance, 2);
+        const opacity = 0.1 + proximity * 0.3; // Range from 0.1 to 0.4
+        const scale = 2.0 + proximity * 2.0; // Range from 2.0 to 4.0
+
+        article.style.setProperty("--pointer-x", x.toFixed(3));
+        article.style.setProperty("--pointer-y", y.toFixed(3));
+        article.style.setProperty("--icon-opacity", opacity.toFixed(3));
+        article.style.setProperty("--icon-scale", scale.toFixed(2));
+      });
+    };
+
+    const handlePointerMove = (event: { clientX: number; clientY: number }) => {
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      updateItems();
+    };
+
+    const handleScroll = () => {
+      updateItems();
+    };
+    
+    document.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("scroll", handleScroll, true);
+    
+    const scrollContainer = scrollContainerRef.current;
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", handleScroll);
+    }
+
+    // Initial update
+    updateItems();
+
+    return () => {
+      document.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("scroll", handleScroll, true);
+      const container = scrollContainerRef.current;
+      if (container) {
+        container.removeEventListener("scroll", handleScroll);
+      }
+    };
+  }, []);
 
   return (
     <StrictMode>
@@ -72,7 +169,7 @@ const ProductSearchResult: React.FC = () => {
         <BrowserRouter basename={getBasename()}>
           <AppsSDKUIProvider linkComponent={Link}>
             <ErrorBoundary>
-              <div className="relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl">
+              <div className="relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-3xl">
                 <div className="p-8">
                   <h5 className="text-secondary mb-1">Get started</h5>
                   <h2 className="heading-xl mb-3">Building your first app</h2>
@@ -82,20 +179,21 @@ const ProductSearchResult: React.FC = () => {
                     a clear next step.
                   </p>
                 </div>
-                <div className="w-full overflow-x-auto p-8">
-                  <Animate className="flex gap-4">
-                    {items.map((item) => (
-                      <div
-                        key={item.fruit}
-                        className={`size-52 p-16 rounded-xl flex items-center justify-center border border-gray-200 dark:border-gray-800 ${item.color}`}
-                      >
-                        <Image
-                          src={"/fruits/" + item.fruit + ".png"}
-                          alt={item.fruit}
+                <div 
+                  ref={scrollContainerRef}
+                  className="carousel-scroll-container w-full overflow-x-auto overflow-y-visible pl-8"
+                >
+                  <div ref={carouselContainerRef} className="overflow-visible">
+                    <Animate className="flex gap-4">
+                      {items.map((item) => (
+                        <CarouselItem
+                          key={item.fruit}
+                          fruit={item.fruit}
+                          color={item.color}
                         />
-                      </div>
-                    ))}
-                  </Animate>
+                      ))}
+                    </Animate>
+                  </div>
                 </div>
               </div>
             </ErrorBoundary>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useWidget } from "./useWidget.js";
 
 /**
@@ -37,20 +37,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // Apply dark class based on priority: widget theme > system preference
-  useEffect(() => {
+  // Calculate effective theme
+  const effectiveTheme = isAvailable ? theme : systemPreference;
+
+  // Apply dark class synchronously before browser paint to prevent flash
+  useLayoutEffect(() => {
     if (typeof document === "undefined") return;
 
     // Priority 1: If widget API is available, use widget theme
-    const effectiveTheme = isAvailable ? theme : systemPreference;
-
     // Apply or remove dark class
     if (effectiveTheme === "dark") {
       document.documentElement.classList.add("dark");
     } else {
       document.documentElement.classList.remove("dark");
     }
-  }, [theme, isAvailable, systemPreference]);
+  }, [effectiveTheme]);
 
   return <>{children}</>;
 };
