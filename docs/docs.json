@@ -456,7 +456,7 @@
                     "pages": [
                       "typescript/server/ui-widgets",
                       "typescript/server/mcp-ui-resources",
-                          "typescript/server/apps-sdk-resources",
+                      "typescript/server/apps-sdk-resources",
                       {
                         "group": "Components & Hooks",
                         "icon": "component",
@@ -469,10 +469,8 @@
                           "typescript/server/widget-components/themeprovider"
                         ]
                       }
-                      
                     ]
                   },
-                  
                   {
                     "group": "Deployment",
                     "icon": "rocket",
