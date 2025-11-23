@@ -53,6 +53,106 @@ my-mcp-server/
 
 ### 2. Create a Widget
 
+## Widget Organization
+
+Widgets can be organized in two ways: **single-file widgets** or **folder-based widgets**. Choose the organization style that best fits your widget's complexity.
+
+### Single-File Widgets
+
+For simple widgets, a single file is sufficient:
+
+```
+resources/
+├── user-card.tsx          # Widget file
+├── weather-display.tsx    # Another widget
+└── product-card.tsx       # Yet another widget
+```
+
+Each `.tsx` file in the `resources/` folder becomes a widget. The widget name is derived from the filename (without extension).
+
+### Folder-Based Widgets
+
+For complex widgets with multiple components, hooks, or utilities, organize them in folders:
+
+```
+resources/
+├── widget-name.tsx                    # Single-file widget
+└── product-search-result/             # Folder-based widget
+    ├── widget.tsx                     # Entry point (required)
+    ├── components/                    # Sub-components
+    │   ├── Accordion.tsx
+    │   ├── AccordionItem.tsx
+    │   ├── Carousel.tsx
+    │   └── CarouselItem.tsx
+    ├── hooks/                         # Custom hooks
+    │   └── useCarouselAnimation.ts
+    ├── constants.ts                   # Constants
+    └── types.ts                       # Type definitions
+```
+
+**Key Points:**
+- The folder name becomes the widget name (e.g., `product-search-result`)
+- The entry point must be named `widget.tsx` (not `index.tsx`)
+- You can organize sub-components, hooks, utilities, and types within the folder
+- The `widget.tsx` file should export `widgetMetadata` and the default component
+
+**Example Folder-Based Widget:**
+
+```tsx
+// resources/product-search-result/widget.tsx
+import { McpUseProvider, useWidget } from 'mcp-use/react';
+import { Accordion } from './components/Accordion';
+import { Carousel } from './components/Carousel';
+import type { ProductSearchResultProps } from './types';
+import { propSchema } from './types';
+
+export const widgetMetadata = {
+  description: 'Display product search results with filtering',
+  inputs: propSchema,
+};
+
+const ProductSearchResult: React.FC = () => {
+  const { props } = useWidget<ProductSearchResultProps>();
+  
+  return (
+    <McpUseProvider autoSize>
+      <div>
+        <Carousel />
+        <Accordion items={props.items} />
+      </div>
+    </McpUseProvider>
+  );
+};
+
+export default ProductSearchResult;
+```
+
+### When to Use Each Approach
+
+**Use Single-File Widgets When:**
+- Widget is simple and self-contained
+- No need for sub-components or custom hooks
+- Quick prototypes or simple displays
+
+**Use Folder-Based Widgets When:**
+- Widget has multiple components
+- You need custom hooks or utilities
+- Widget is complex and benefits from organization
+- You want to share code between components
+- Widget needs constants, types, or configuration files
+
+### Widget Name Resolution
+
+- **Single-file**: `user-card.tsx` → widget name: `user-card`
+- **Folder-based**: `product-search-result/widget.tsx` → widget name: `product-search-result`
+
+The widget name is used for:
+- MCP tool registration (`callTool('product-search-result', {...})`)
+- MCP resource URI (`ui://widget/product-search-result`)
+- Widget discovery and routing
+
+### 2. Create a Widget
+
 Add a new file in `resources/`, for example `resources/user-card.tsx`:
 
 ```tsx
@@ -132,9 +232,22 @@ graph LR
 
 When you call `server.listen()`, the framework automatically calls `mountWidgets()` which:
 
-- Scans the `resources/` directory for `.tsx` and `.ts` files
+- Scans the `resources/` directory for:
+  - **Single-file widgets**: `.tsx` and `.ts` files directly in `resources/`
+  - **Folder-based widgets**: Folders containing `widget.tsx` entry point
 - Creates a Vite dev server for each widget with HMR support
 - Loads widget metadata using Vite SSR
+- Widget names are derived from:
+  - Filename (without extension) for single-file widgets
+  - Folder name for folder-based widgets
+
+**CLI Build Process:**
+
+When using `mcp-use build` or `npm run build`:
+- Widgets are discovered using the same logic
+- Public folder (`public/`) is automatically copied to `dist/public/`
+- Widget metadata is extracted and included in the build manifest
+- Production-optimized builds are created for each widget
 
 ### 2. Metadata Extraction
 
@@ -155,7 +268,9 @@ The `inputs` Zod schema defines:
 ### 3. Tool Registration
 
 The framework automatically registers a tool with:
-- **Name**: Derived from filename (e.g., `display-weather.tsx` → `display-weather`)
+- **Name**: Derived from filename (single-file) or folder name (folder-based)
+  - Single-file: `display-weather.tsx` → `display-weather`
+  - Folder-based: `product-search-result/widget.tsx` → `product-search-result`
 - **Description**: From `widgetMetadata.description`
 - **Inputs**: Converted from Zod schema to MCP input definitions
 - **Callback**: Returns the widget resource with a unique URI
@@ -345,14 +460,149 @@ const result = await callTool('search', { query: 'weather' });
 await sendFollowUpMessage('Show me weather for New York');
 ```
 
+## Components & Hooks
+
+mcp-use provides a comprehensive set of React components and hooks for building OpenAI Apps SDK widgets. These components handle common setup tasks like theme management, error handling, routing, and debugging.
+
+### Components
+
+| Component | Description | Link |
+|-----------|-------------|------|
+| **McpUseProvider** | Unified provider that combines all common React setup (StrictMode, ThemeProvider, BrowserRouter, WidgetControls, ErrorBoundary) | [McpUseProvider →](./widget-components/mcpuseprovider) |
+| **WidgetControls** | Debug button and view controls (fullscreen/pip) with customizable positioning | [WidgetControls →](./widget-components/widgetcontrols) |
+| **ErrorBoundary** | Error boundary component for graceful error handling in widgets | [ErrorBoundary →](./widget-components/errorboundary) |
+| **Image** | Image component that handles both data URLs and public file paths | [Image →](./widget-components/image) |
+| **ThemeProvider** | Theme provider for consistent theme management across widgets | [ThemeProvider →](./widget-components/themeprovider) |
+
+### Hooks
+
+| Hook | Description | Link |
+|------|-------------|------|
+| **useWidget** | Main hook providing type-safe access to all widget capabilities (props, state, theme, actions) | [useWidget →](./widget-components/usewidget) |
+| **useWidgetProps** | Get only the widget props | [useWidget →](./widget-components/usewidget#usewidgetprops) |
+| **useWidgetTheme** | Get only the theme value | [useWidget →](./widget-components/usewidget#usewidgettheme) |
+| **useWidgetState** | Get state management (state and setState) | [useWidget →](./widget-components/usewidget#usewidgetstate) |
+
+### Quick Start with Components
+
+The recommended way to set up a widget is using `McpUseProvider`, which includes everything you need:
+
+```tsx
+import { McpUseProvider } from 'mcp-use/react';
+import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
+import { Link } from 'react-router-dom';
+import { useWidget } from 'mcp-use/react';
+
+function MyWidget() {
+  const { props, theme } = useWidget<{ title: string }>();
+  
+  return (
+    <div data-theme={theme}>
+      <h1>{props.title}</h1>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <McpUseProvider debugger viewControls autoSize>
+      <AppsSDKUIProvider linkComponent={Link}>
+        <MyWidget />
+      </AppsSDKUIProvider>
+    </McpUseProvider>
+  );
+}
+```
+
+This setup provides:
+- ✅ Theme management (syncs with ChatGPT)
+- ✅ Error handling (graceful failures)
+- ✅ Routing support (React Router)
+- ✅ Debug controls (optional)
+- ✅ View controls (fullscreen/pip, optional)
+- ✅ Auto-sizing (optional, for dynamic content)
+
+For detailed documentation on each component and hook, see the individual reference pages linked above.
+
+## Public Folder Support
+
+Widgets can use static assets from a `public/` folder. The framework automatically serves these assets and copies them during build.
+
+### Folder Structure
+
+```
+my-mcp-server/
+├── resources/
+│   └── product-widget.tsx
+├── public/                    # Static assets
+│   ├── fruits/
+│   │   ├── apple.png
+│   │   ├── banana.png
+│   │   └── orange.png
+│   └── logo.svg
+└── index.ts
+```
+
+### Using Public Assets
+
+In development, assets are served from `/mcp-use/public/`. In production, they're copied to `dist/public/` during build.
+
+**Using the Image Component:**
+
+```tsx
+import { Image } from 'mcp-use/react';
+
+function ProductWidget() {
+  return (
+    <div>
+      {/* Paths are relative to public/ folder */}
+      <Image src="/fruits/apple.png" alt="Apple" />
+      <Image src="/logo.svg" alt="Logo" />
+    </div>
+  );
+}
+```
+
+**Direct URL Access:**
+
+The framework provides utilities for accessing public files:
+
+- `window.__mcpPublicUrl`: Base URL for public assets (e.g., `http://localhost:3000/mcp-use/public`)
+- `window.__getFile`: Helper function to get file URLs
+
+```tsx
+// Get public URL
+const publicUrl = window.__mcpPublicUrl; // "http://localhost:3000/mcp-use/public"
+const imageUrl = `${publicUrl}/fruits/apple.png`;
+
+// Or use the helper
+const imageUrl = window.__getFile?.('fruits/apple.png');
+```
+
+### Build-Time Copying
+
+During `npm run build`, the CLI automatically:
+1. Copies the `public/` folder to `dist/public/`
+2. Preserves the folder structure
+3. Makes assets available in production builds
+
+### Best Practices
+
+- Use the `Image` component for images (handles URL resolution automatically)
+- Keep assets organized in subfolders (e.g., `public/images/`, `public/icons/`)
+- Use relative paths starting with `/` (e.g., `/fruits/apple.png`)
+- The `Image` component handles both data URLs and public file paths
+
 ## Complete Example: Weather Widget
 
-Here's the complete `display-weather.tsx` from the template:
+Here's a complete widget example using `McpUseProvider`:
 
 ```tsx
 import React from 'react';
 import { z } from 'zod';
-import { useWidget } from 'mcp-use/react';
+import { McpUseProvider, useWidget } from 'mcp-use/react';
+import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
+import { Link } from 'react-router-dom';
 
 // Define props schema
 const propSchema = z.object({
@@ -417,7 +667,18 @@ const WeatherWidget: React.FC = () => {
   );
 };
 
-export default WeatherWidget;
+// Wrap with providers
+const WeatherWidgetWithProviders: React.FC = () => {
+  return (
+    <McpUseProvider debugger viewControls autoSize>
+      <AppsSDKUIProvider linkComponent={Link}>
+        <WeatherWidget />
+      </AppsSDKUIProvider>
+    </McpUseProvider>
+  );
+};
+
+export default WeatherWidgetWithProviders;
 ```
 
 ### Testing in ChatGPT

@@ -1,0 +1,99 @@
+---
+title: "ErrorBoundary"
+description: "Error boundary component for graceful error handling in widgets"
+icon: "alert-triangle"
+---
+
+# ErrorBoundary
+
+The `ErrorBoundary` component catches React errors anywhere in the child component tree, logs those errors, and displays a friendly fallback UI instead of crashing the entire widget.
+
+## Import
+
+```typescript
+import { ErrorBoundary } from 'mcp-use/react';
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | **required** | The widget content to wrap |
+
+## Basic Usage
+
+```tsx
+import { ErrorBoundary } from 'mcp-use/react';
+
+function MyWidget() {
+  return (
+    <ErrorBoundary>
+      <div>My widget content</div>
+    </ErrorBoundary>
+  );
+}
+```
+
+## Automatic Inclusion
+
+`ErrorBoundary` is automatically included when using `McpUseProvider`:
+
+```tsx
+import { McpUseProvider } from 'mcp-use/react';
+
+<McpUseProvider>
+  <MyWidget />
+</McpUseProvider>
+```
+
+The error boundary wraps your widget content as the innermost wrapper, ensuring all errors are caught.
+
+## Error Display
+
+When an error occurs, the boundary displays:
+
+- A red-bordered error container
+- The error message in a readable format
+- Dark mode support (adapts to theme)
+
+The error UI is styled to be visible but not intrusive, allowing users to understand what went wrong while maintaining a professional appearance.
+
+## Error Logging
+
+Errors are automatically logged to the console with:
+
+- The error object
+- React error info (component stack, etc.)
+
+This helps with debugging during development.
+
+## Best Practices
+
+1. **Use McpUseProvider**: For most cases, use `McpUseProvider` which includes `ErrorBoundary` automatically
+2. **Wrap at widget level**: Wrap your entire widget, not individual components
+3. **Handle errors gracefully**: Consider what fallback UI makes sense for your widget
+
+## Example: Custom Error Handling
+
+If you need custom error handling, you can wrap specific parts:
+
+```tsx
+import { ErrorBoundary } from 'mcp-use/react';
+
+function MyWidget() {
+  return (
+    <div>
+      <ErrorBoundary>
+        <RiskyComponent />
+      </ErrorBoundary>
+      <SafeComponent />
+    </div>
+  );
+}
+```
+
+## Related Components
+
+- [`McpUseProvider`](./mcpuseprovider) - Includes ErrorBoundary automatically
+- [`useWidget`](./usewidget) - Widget hook for accessing props and actions
+

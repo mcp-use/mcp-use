@@ -79,16 +79,21 @@ const widget = await client.callTool('display-weather', {
 
 ### ⚡ Apps SDK Template
 
-The **apps-sdk** template demonstrates how to build OpenAI Apps SDK compatible widgets for ChatGPT.
+The **apps-sdk** template demonstrates how to build OpenAI Apps SDK compatible widgets for ChatGPT with official UI components integration.
 
 **What's Included:**
 - Lightweight MCP server setup
 - **Automatic UI Widget Registration** from `resources/` folder:
-  - `display-weather` - Weather visualization widget
-- Simple tool example: `get-my-city`
+  - `product-search-result` - Complete ecommerce widget example with carousel, accordion, and filtering
+- **Official UI Components**: Integrated [OpenAI Apps SDK UI components](https://openai.github.io/apps-sdk-ui/) for consistent, accessible widgets
+- **Fruits API**: Example API endpoint (`/api/fruits`) demonstrating data fetching
+- **React Query**: Integrated `@tanstack/react-query` for data fetching and caching
+- Example tool: `get-brand-info` - Returns brand information
+- **Public Assets**: 16 fruit product images in `public/fruits/` directory
+- **McpUseProvider**: Pre-configured with auto-sizing, debug controls, and view controls
 - Minimal configuration for fast development
 
-**Best For:** Quick prototypes, widget-focused apps, minimal overhead projects
+**Best For:** Quick prototypes, widget-focused apps, learning OpenAI Apps SDK patterns, ecommerce widgets
 
 **Quick Start:**
 ```bash
@@ -102,11 +107,38 @@ npm run dev
 // All React components in resources/ folder are automatically registered!
 // Just export widgetMetadata and mcp-use handles the rest
 
-const widget = await client.callTool('display-weather', { 
-  city: 'San Francisco',
-  temperature: '22',
-  condition: 'Sunny'
+// Call the brand info tool
+const brandInfo = await client.callTool('get-brand-info', {});
+
+// Display product search results widget
+const widget = await client.callTool('product-search-result', { 
+  query: 'fruits',
+  filters: { priceRange: [0, 50] }
 })
+```
+
+**Template Structure:**
+```
+apps-sdk/
+├── resources/
+│   └── product-search-result/    # Folder-based widget
+│       ├── widget.tsx             # Entry point
+│       ├── components/            # Sub-components
+│       │   ├── Accordion.tsx
+│       │   ├── AccordionItem.tsx
+│       │   ├── Carousel.tsx
+│       │   └── CarouselItem.tsx
+│       ├── hooks/
+│       │   └── useCarouselAnimation.ts
+│       ├── constants.ts
+│       └── types.ts
+├── public/
+│   └── fruits/                    # Static assets
+│       ├── apple.png
+│       ├── banana.png
+│       └── ... (16 fruit images)
+├── index.ts                       # Server entry point
+└── package.json
 ```
 
 ---

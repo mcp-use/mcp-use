@@ -238,6 +238,103 @@ window.openai.openExternal("https://example.com");
 - Uses `window.open()` with security flags
 - Opens in new tab with `noopener,noreferrer`
 
+#### `notifyIntrinsicHeight(height)`
+
+Notify OpenAI about intrinsic height changes for auto-sizing. This allows widgets to dynamically resize based on content.
+
+```javascript
+await window.openai.notifyIntrinsicHeight(800);
+```
+
+**Implementation:**
+- Sends `postMessage` with type `openai:notifyIntrinsicHeight`
+- Inspector updates iframe height accordingly
+- Height is capped based on display mode (fullscreen/pip respect viewport)
+- Used by `McpUseProvider` with `autoSize={true}` for automatic height updates
+
+**Usage Example:**
+
+```javascript
+// Manual height notification
+const container = document.getElementById('widget-content');
+const height = container.scrollHeight;
+await window.openai.notifyIntrinsicHeight(height);
+
+// Or use McpUseProvider with autoSize for automatic updates
+<McpUseProvider autoSize>
+  <MyWidget />
+</McpUseProvider>
+```
+
+## Console Proxy Toggle
+
+The inspector provides a console proxy feature that allows you to forward iframe console logs to the page console for easier debugging.
+
+### Enabling Console Proxy
+
+1. Open the **Console** panel in the inspector (click the terminal icon)
+2. Toggle **"Proxy logs to page console"** switch
+3. Console logs from the widget iframe will now appear in your browser's developer console
+
+### Features
+
+- **Persistent Preference**: Your preference is saved in `localStorage` and persists across sessions
+- **Formatted Output**: Logs are prefixed with `[WIDGET CONSOLE]` for easy identification
+- **Log Level Preservation**: Error, warn, info, debug, and trace levels are preserved
+- **JSON Formatting**: Objects are automatically stringified for better readability
+
+### Use Cases
+
+- **Debugging Widget Issues**: See all console logs in one place
+- **Development Workflow**: Use browser DevTools features (filtering, searching)
+- **Error Tracking**: Easier to spot errors and warnings
+
+## Widget State Inspection
+
+The inspector provides built-in widget state inspection capabilities through the `WidgetInspectorControls` component.
+
+### Viewing Widget State
+
+When a widget is rendered in the inspector, you can inspect:
+
+- **Props**: Current widget props from `toolInput`
+- **Output**: Tool output data (`toolOutput`)
+- **Metadata**: Response metadata (`toolResponseMetadata`)
+- **State**: Persistent widget state (`widgetState`)
+- **Theme**: Current theme (light/dark)
+- **Display Mode**: Current display mode (inline/pip/fullscreen)
+- **Safe Area**: Safe area insets for mobile
+- **User Agent**: Device capabilities
+- **Locale**: User locale
+
+### Debug Information Display
+
+The inspector automatically displays debug information when widgets use `McpUseProvider` with `debugger={true}` or when using `WidgetControls` component. This provides:
+
+- Real-time state updates
+- Interactive tool testing
+- State modification capabilities
+- Full widget context visibility
+
+### State Inspection API
+
+Widgets can respond to state inspection requests:
+
+```javascript
+// Inspector sends: mcp-inspector:getWidgetState
+window.addEventListener('message', (event) => {
+  if (event.data?.type === 'mcp-inspector:getWidgetState') {
+    window.parent.postMessage({
+      type: 'mcp-inspector:widgetStateResponse',
+      toolId: event.data.toolId,
+      state: window.openai.widgetState
+    }, '*');
+  }
+});
+```
+
+This allows the inspector to display current widget state even when the widget is in an iframe.
+
 ### Events
 
 #### `openai:set_globals`
