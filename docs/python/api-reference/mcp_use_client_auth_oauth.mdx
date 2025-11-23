@@ -194,10 +194,11 @@ Initialize OAuth handler.
 ><ParamField body="client_secret" type="str | None" default="None" >   OAuth client secret (for confidential clients) </ParamField>
 ><ParamField body="callback_port" type="int | None" default="None" >   Port for local callback server, if empty, 8080 is used </ParamField>
 ><ParamField body="oauth_provider" type="mcp_use.client.auth.oauth.OAuthClientProvider | None" default="None" >   OAuth client provider to prevent metadata discovery </ParamField>
+><ParamField body="client_metadata_url" type="str | None" default="None" >   Field used to authenticate with CIMD </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(server_url: str, token_storage: mcp_use.client.auth.oauth.FileTokenStorage | None = None, scope: str | None = None, client_id: str | None = None, client_secret: str | None = None, callback_port: int | None = None, oauth_provider: mcp_use.client.auth.oauth.OAuthClientProvider | None = None):
+def __init__(server_url: str, token_storage: mcp_use.client.auth.oauth.FileTokenStorage | None = None, scope: str | None = None, client_id: str | None = None, client_secret: str | None = None, callback_port: int | None = None, oauth_provider: mcp_use.client.auth.oauth.OAuthClientProvider | None = None, client_metadata_url: str | None = None):
 ```
 
 </Card>
@@ -318,6 +319,53 @@ def oauth_metadata():
 
 </div>
 
+## ProtectedResourceMetadata
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ProtectedResourceMetadata</div>
+
+PRC (Protected Resource Metadata) can have metadata
+    describing their configuration. It could contain information
+    about the OAuth metadata.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.client.auth.oauth import ProtectedResourceMetadata
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="resource" type="str" required="True" >   String value </ParamField>
+<ParamField body="authorization_servers" type="list[str]" required="True" >   Server name or configuration </ParamField>
+<ParamField body="scopes_supported" type="list[str] | None" required="True" >   List of items </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+Create a new model by parsing and validating input data from keyword arguments.
+
+        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+        validated to form a valid model.
+
+        `self` is explicitly positional-only to allow `self` as a field name.
+
+**Parameters**
+><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(data: Any):
+```
+
+</Card>
+</div>
+
 ## ServerOAuthMetadata
 
 <div>
@@ -357,6 +405,7 @@ from mcp_use.client.auth.oauth import ServerOAuthMetadata
 <ParamField body="token_endpoint_auth_methods_supported" type="list[str]" required="True" >   List of items </ParamField>
 <ParamField body="claims_supported" type="list[str] | None" required="True" >   List of items </ParamField>
 <ParamField body="code_challenge_methods_supported" type="list[str] | None" required="True" >   List of items </ParamField>
+<ParamField body="client_id_metadata_document_supported" type="bool | None" required="True" >   MCP client instance </ParamField>
 
 </Card>
 
