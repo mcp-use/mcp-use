@@ -1,6 +1,9 @@
 from langchain_openai import ChatOpenAI
 
 from mcp_use import MCPAgent, MCPClient
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # This example demonstrates OAuth with Dynamic Client Registration (DCR)
 # The client will automatically register itself with the Linear MCP server
@@ -25,9 +28,9 @@ async def main():
     # )
 
     llm = ChatOpenAI(model="gpt-5", temperature=0)
-    agent = MCPAgent(llm=llm, client=client, pretty_print=True)
+    agent = MCPAgent(llm=llm, client=client, pretty_print=True, max_steps=50)
 
-    response = await agent.run(query="What are my latest linear tickets")
+    response = await agent.run(query="What are my latest linear issues")
     print(response)
 
 
