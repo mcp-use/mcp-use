@@ -318,7 +318,7 @@ export function formatSearchToolsAsTree(
 
   // Build tree structure
   const lines: string[] = [];
-  
+
   // Add meta information at the top if available
   if (meta) {
     if (meta.total_tools !== undefined) {
@@ -334,7 +334,7 @@ export function formatSearchToolsAsTree(
       lines.push(""); // Empty line before tree
     }
   }
-  
+
   const servers = Object.keys(toolsByServer).sort();
 
   for (let i = 0; i < servers.length; i++) {
@@ -365,17 +365,17 @@ export function formatSearchToolsAsTree(
         // If not the last tool, add vertical bar to show continuation, otherwise spaces
         const descAlign = isLastTool ? "   " : "│  ";
         const descriptionIndent = `${indent}${descAlign}`;
-        
+
         // Calculate available width for description
         // Account for: indent + box padding (4 chars for "│ " on each side)
         const indentLength = stripAnsi(descriptionIndent).length;
         const availableWidth = Math.max(40, TERMINAL_WIDTH - indentLength - 4);
-        
+
         // Wrap description at word boundaries
         const words = tool.description.split(/(\s+)/); // Keep whitespace
         const wrappedLines: string[] = [];
         let currentLine = "";
-        
+
         for (const word of words) {
           const testLine = currentLine + word;
           if (stripAnsi(testLine).length <= availableWidth) {
@@ -390,7 +390,7 @@ export function formatSearchToolsAsTree(
         if (currentLine) {
           wrappedLines.push(currentLine.trimEnd());
         }
-        
+
         // Add indent and dim styling to each line
         for (const descLine of wrappedLines) {
           lines.push(`${descriptionIndent}${chalk.dim(descLine)}`);
@@ -473,7 +473,9 @@ export function handleToolEnd(event: StreamEvent) {
     // Special handling for search_tools to display as tree
     if (toolName === "search_tools") {
       // Try to get the query from event input
-      const toolInput = event.data?.input as Record<string, unknown> | undefined;
+      const toolInput = event.data?.input as
+        | Record<string, unknown>
+        | undefined;
       const query = toolInput?.query as string | undefined;
 
       // Extract actual content if it's wrapped
@@ -507,7 +509,11 @@ export function handleToolEnd(event: StreamEvent) {
         const results = actualContent.results;
         const contentWithMeta = actualContent as {
           results: unknown[];
-          meta?: { total_tools?: number; namespaces?: string[]; result_count?: number };
+          meta?: {
+            total_tools?: number;
+            namespaces?: string[];
+            result_count?: number;
+          };
         };
         const meta = contentWithMeta.meta;
         const treeStr = formatSearchToolsAsTree(results, meta, query);
@@ -520,7 +526,11 @@ export function handleToolEnd(event: StreamEvent) {
 
       // Handle old format: direct array (backward compatibility)
       if (Array.isArray(actualContent)) {
-        const treeStr = formatSearchToolsAsTree(actualContent, undefined, query);
+        const treeStr = formatSearchToolsAsTree(
+          actualContent,
+          undefined,
+          query
+        );
         const statusText =
           status === "success" ? chalk.green("Success") : chalk.red("Error");
         const title = `${statusText}: ${toolName} - Result`;
