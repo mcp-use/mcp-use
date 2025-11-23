@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import { Check, Copy, History, Maximize, Minimize, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
@@ -335,6 +335,18 @@ export function ToolResultDisplay({
     return () => clearInterval(interval);
   }, [result]);
 
+  // Memoize result.args and result.result to prevent unnecessary re-renders
+  // in OpenAIComponentRenderer when only relativeTime changes
+  // Use stable identifiers (timestamp, selectedIndex) instead of the objects themselves
+  const memoizedArgs = useMemo(() => result?.args, [result?.timestamp, selectedIndex]);
+  const memoizedResult = useMemo(() => result?.result, [result?.timestamp, selectedIndex]);
+  
+  // Memoize readResource to ensure stable reference
+  const memoizedReadResource = useCallback(
+    (uri: string) => readResource(uri),
+    [readResource]
+  );
+
   if (results.length === 0) {
     return (
       <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
@@ -582,10 +594,10 @@ export function ToolResultDisplay({
                       <OpenAIComponentRenderer
                         componentUrl={appsSdkUri}
                         toolName={result.toolName}
-                        toolArgs={result.args}
-                        toolResult={result.result}
+                        toolArgs={memoizedArgs}
+                        toolResult={memoizedResult}
                         serverId={serverId}
-                        readResource={readResource}
+                        readResource={memoizedReadResource}
                         className="w-full h-full relative p-4"
                       />
                     </div>

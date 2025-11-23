@@ -96,6 +96,12 @@ export function WidgetControls({
   const isFullscreen = displayMode === "fullscreen" && isAvailable;
   const isPip = displayMode === "pip" && isAvailable;
 
+  // Detect if we're in dev mode (running in inspector dev widget proxy)
+  // In dev mode, hide the controls as they're shown in the inspector instead
+  const isDevMode =
+    typeof window !== "undefined" &&
+    window.location.pathname.includes("/inspector/api/dev-widget/");
+
   // Get window.openai keys
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -116,78 +122,93 @@ export function WidgetControls({
 
   // Theme-aware styling
   const isDark = theme === "dark";
-  const buttonBg = isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.7)";
-  const buttonBgHover = isDark
-    ? "rgba(255, 255, 255, 0.2)"
-    : "rgba(0, 0, 0, 0.9)";
-  const buttonColor = "white";
 
-  // Calculate position based on position prop and safe area
-  const getPositionStyles = (): React.CSSProperties => {
-    const baseOffset = 16;
-    const topOffset = safeArea?.insets?.top
-      ? `${Math.max(baseOffset, safeArea.insets.top + 8)}px`
-      : `${baseOffset}px`;
-    const rightOffset = safeArea?.insets?.right
-      ? `${Math.max(baseOffset, safeArea.insets.right + 8)}px`
-      : `${baseOffset}px`;
-    const bottomOffset = safeArea?.insets?.bottom
-      ? `${Math.max(baseOffset, safeArea.insets.bottom + 8)}px`
-      : `${baseOffset}px`;
-    const leftOffset = safeArea?.insets?.left
-      ? `${Math.max(baseOffset, safeArea.insets.left + 8)}px`
-      : `${baseOffset}px`;
-
-    const styles: React.CSSProperties = {
-      position: "absolute",
-      zIndex: 1000,
-      display: "flex",
-      gap: "8px",
-      opacity: isHovered ? 1 : 0,
-      transition: "opacity 0.2s ease-in-out",
-      pointerEvents: isHovered ? "auto" : "none",
-    };
+  // Calculate position classes and dynamic offsets based on position prop and safe area
+  const getPositionClasses = () => {
+    const baseClasses = [
+      "absolute",
+      "z-[1000]",
+      "flex",
+      "gap-2",
+      "transition-opacity",
+      "duration-200",
+      "ease-in-out",
+      isHovered ? "opacity-100" : "opacity-0",
+      isHovered ? "pointer-events-auto" : "pointer-events-none",
+    ];
 
     switch (position) {
       case "top-left":
-        styles.top = topOffset;
-        styles.left = leftOffset;
+        return [...baseClasses, "top-4", "left-4"];
+      case "top-center":
+        return [...baseClasses, "top-4", "left-1/2", "-translate-x-1/2"];
+      case "top-right":
+        return [...baseClasses, "top-4", "right-4"];
+      case "center-left":
+        return [...baseClasses, "top-1/2", "left-4", "-translate-y-1/2"];
+      case "center-right":
+        return [...baseClasses, "top-1/2", "right-4", "-translate-y-1/2"];
+      case "bottom-left":
+        return [...baseClasses, "bottom-4", "left-4"];
+      case "bottom-center":
+        return [...baseClasses, "bottom-4", "left-1/2", "-translate-x-1/2"];
+      case "bottom-right":
+        return [...baseClasses, "bottom-4", "right-4"];
+      default:
+        return [...baseClasses, "top-4", "right-4"];
+    }
+  };
+
+  // Get dynamic offset styles for safe area (must remain inline)
+  const getPositionOffsetStyles = (): React.CSSProperties => {
+    const baseOffset = 16;
+    const topOffset = safeArea?.insets?.top
+      ? Math.max(baseOffset, safeArea.insets.top + 8)
+      : baseOffset;
+    const rightOffset = safeArea?.insets?.right
+      ? Math.max(baseOffset, safeArea.insets.right + 8)
+      : baseOffset;
+    const bottomOffset = safeArea?.insets?.bottom
+      ? Math.max(baseOffset, safeArea.insets.bottom + 8)
+      : baseOffset;
+    const leftOffset = safeArea?.insets?.left
+      ? Math.max(baseOffset, safeArea.insets.left + 8)
+      : baseOffset;
+
+    const styles: React.CSSProperties = {};
+
+    switch (position) {
+      case "top-left":
+        styles.top = `${topOffset}px`;
+        styles.left = `${leftOffset}px`;
         break;
       case "top-center":
-        styles.top = topOffset;
-        styles.left = "50%";
-        styles.transform = "translateX(-50%)";
+        styles.top = `${topOffset}px`;
         break;
       case "top-right":
-        styles.top = topOffset;
-        styles.right = rightOffset;
+        styles.top = `${topOffset}px`;
+        styles.right = `${rightOffset}px`;
         break;
       case "center-left":
-        styles.top = "50%";
-        styles.left = leftOffset;
-        styles.transform = "translateY(-50%)";
+        styles.left = `${leftOffset}px`;
         break;
       case "center-right":
-        styles.top = "50%";
-        styles.right = rightOffset;
-        styles.transform = "translateY(-50%)";
+        styles.right = `${rightOffset}px`;
         break;
       case "bottom-left":
-        styles.bottom = bottomOffset;
-        styles.left = leftOffset;
+        styles.bottom = `${bottomOffset}px`;
+        styles.left = `${leftOffset}px`;
         break;
       case "bottom-center":
-        styles.bottom = bottomOffset;
-        styles.left = "50%";
-        styles.transform = "translateX(-50%)";
+        styles.bottom = `${bottomOffset}px`;
         break;
       case "bottom-right":
-        styles.bottom = bottomOffset;
-        styles.right = rightOffset;
+        styles.bottom = `${bottomOffset}px`;
+        styles.right = `${rightOffset}px`;
         break;
       default:
-        styles.top = topOffset;
-        styles.right = rightOffset;
+        styles.top = `${topOffset}px`;
+        styles.right = `${rightOffset}px`;
         break;
     }
 
@@ -316,87 +337,41 @@ export function WidgetControls({
     }
   };
 
-  const getTooltipStyles = (): React.CSSProperties => {
-    const baseStyles: React.CSSProperties = {
-      position: "absolute",
-      padding: "4px 8px",
-      backgroundColor: "rgba(0, 0, 0, 0.9)",
-      color: "white",
-      borderRadius: "4px",
-      fontSize: "12px",
-      whiteSpace: "nowrap",
-      pointerEvents: "none",
-      transition: "opacity 0.2s ease-in-out",
-    };
+  const getTooltipClasses = () => {
+    const baseClasses = [
+      "absolute",
+      "px-2",
+      "py-1",
+      "bg-black/90",
+      "text-white",
+      "rounded",
+      "text-xs",
+      "whitespace-nowrap",
+      "pointer-events-none",
+      "transition-opacity",
+      "duration-200",
+      "ease-in-out",
+    ];
 
     switch (position) {
       case "top-right":
-        return {
-          ...baseStyles,
-          top: "100%",
-          right: "0",
-          marginTop: "8px",
-        };
+        return [...baseClasses, "top-full", "right-0", "mt-2"];
       case "top-left":
-        return {
-          ...baseStyles,
-          top: "100%",
-          left: "0",
-          marginTop: "8px",
-        };
+        return [...baseClasses, "top-full", "left-0", "mt-2"];
       case "top-center":
-        return {
-          ...baseStyles,
-          top: "100%",
-          left: "50%",
-          transform: "translateX(-50%)",
-          marginTop: "8px",
-        };
+        return [...baseClasses, "top-full", "left-1/2", "-translate-x-1/2", "mt-2"];
       case "bottom-right":
-        return {
-          ...baseStyles,
-          bottom: "100%",
-          right: "0",
-          marginBottom: "8px",
-        };
+        return [...baseClasses, "bottom-full", "right-0", "mb-2"];
       case "bottom-left":
-        return {
-          ...baseStyles,
-          bottom: "100%",
-          left: "0",
-          marginBottom: "8px",
-        };
+        return [...baseClasses, "bottom-full", "left-0", "mb-2"];
       case "bottom-center":
-        return {
-          ...baseStyles,
-          bottom: "100%",
-          left: "50%",
-          transform: "translateX(-50%)",
-          marginBottom: "8px",
-        };
+        return [...baseClasses, "bottom-full", "left-1/2", "-translate-x-1/2", "mb-2"];
       case "center-left":
-        return {
-          ...baseStyles,
-          left: "100%",
-          top: "50%",
-          transform: "translateY(-50%)",
-          marginLeft: "8px",
-        };
+        return [...baseClasses, "left-full", "top-1/2", "-translate-y-1/2", "ml-2"];
       case "center-right":
-        return {
-          ...baseStyles,
-          right: "100%",
-          top: "50%",
-          transform: "translateY(-50%)",
-          marginRight: "8px",
-        };
+        return [...baseClasses, "right-full", "top-1/2", "-translate-y-1/2", "mr-2"];
       default:
-        return {
-          ...baseStyles,
-          top: "100%",
-          right: "0",
-          marginTop: "8px",
-        };
+        return [...baseClasses, "top-full", "right-0", "mt-2"];
     }
   };
 
@@ -410,38 +385,13 @@ export function WidgetControls({
     children: React.ReactNode;
   }) => {
     const [isButtonHovered, setIsButtonHovered] = useState(false);
-    const tooltipStyles = getTooltipStyles();
+    const tooltipClasses = getTooltipClasses();
 
     return (
       <button
-        style={{
-          padding: "8px",
-          backgroundColor: buttonBg,
-          color: buttonColor,
-          border: "none",
-          borderRadius: "8px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "32px",
-          height: "32px",
-          transition: "background-color 0.2s",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-          boxShadow: isDark
-            ? "0 2px 8px rgba(0, 0, 0, 0.3)"
-            : "0 2px 8px rgba(0, 0, 0, 0.2)",
-          position: "relative",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = buttonBgHover;
-          setIsButtonHovered(true);
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = buttonBg;
-          setIsButtonHovered(false);
-        }}
+        className={`p-2 ${isDark ? "bg-white/10 hover:bg-white/20" : "bg-black/70 hover:bg-black/90"} text-white border-none rounded-lg cursor-pointer flex items-center justify-center w-8 h-8 transition-colors duration-200 backdrop-blur-md ${isDark ? "shadow-[0_2px_8px_rgba(0,0,0,0.3)]" : "shadow-[0_2px_8px_rgba(0,0,0,0.2)]"} relative`}
+        onMouseEnter={() => setIsButtonHovered(true)}
+        onMouseLeave={() => setIsButtonHovered(false)}
         onClick={onClick}
         aria-label={label}
       >
@@ -455,16 +405,13 @@ export function WidgetControls({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          style={{ display: "block" }}
+          className="block"
         >
           {icon}
         </svg>
         {showLabels && (
           <span
-            style={{
-              ...tooltipStyles,
-              opacity: isButtonHovered ? 1 : 0,
-            }}
+            className={`${tooltipClasses.join(" ")} ${isButtonHovered ? "opacity-100" : "opacity-0"}`}
           >
             {label}
           </span>
@@ -504,49 +451,51 @@ export function WidgetControls({
     <>
       <div
         ref={containerRef}
-        className={className}
-        style={{
-          position: "relative",
-          height: "fit-content",
-        }}
+        className={`${className} relative h-fit`}
         onMouseEnter={() => !attachTo && setIsHovered(true)}
         onMouseLeave={() => !attachTo && setIsHovered(false)}
       >
-        <div style={getPositionStyles()}>
-          {/* View controls (fullscreen/pip) - only show when not already in fullscreen/pip */}
-          {!isFullscreen && !isPip && (
+        {/* Inline styles needed for dynamic safe area offsets */}
+        <div className={getPositionClasses().join(" ")} style={getPositionOffsetStyles()}>
+          {/* In dev mode, hide all controls as they're shown in the inspector instead */}
+          {!isDevMode && (
             <>
-              {(viewControls === true || viewControls === "fullscreen") && (
-                <IconButton onClick={handleFullscreen} label="Fullscreen">
-                  <path d="M15 3h6v6" />
-                  <path d="m21 3-7 7" />
-                  <path d="m3 21 7-7" />
-                  <path d="M9 21H3v-6" />
-                </IconButton>
+              {/* View controls (fullscreen/pip) - only show when not already in fullscreen/pip */}
+              {!isFullscreen && !isPip && (
+                <>
+                  {(viewControls === true || viewControls === "fullscreen") && (
+                    <IconButton onClick={handleFullscreen} label="Fullscreen">
+                      <path d="M15 3h6v6" />
+                      <path d="m21 3-7 7" />
+                      <path d="m3 21 7-7" />
+                      <path d="M9 21H3v-6" />
+                    </IconButton>
+                  )}
+                  {(viewControls === true || viewControls === "pip") && (
+                    <IconButton onClick={handlePip} label="Picture in Picture">
+                      <path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4" />
+                      <rect width="10" height="7" x="12" y="13" rx="2" />
+                    </IconButton>
+                  )}
+                </>
               )}
-              {(viewControls === true || viewControls === "pip") && (
-                <IconButton onClick={handlePip} label="Picture in Picture">
-                  <path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4" />
-                  <rect width="10" height="7" x="12" y="13" rx="2" />
+              {/* Debug button - only show if debugger prop is true */}
+              {enableDebugger && (
+                <IconButton onClick={handleToggleOverlay} label="Debug Info">
+                  <path d="M12 20v-9" />
+                  <path d="M14 7a4 4 0 0 1 4 4v3a6 6 0 0 1-12 0v-3a4 4 0 0 1 4-4z" />
+                  <path d="M14.12 3.88 16 2" />
+                  <path d="M21 21a4 4 0 0 0-3.81-4" />
+                  <path d="M21 5a4 4 0 0 1-3.55 3.97" />
+                  <path d="M22 13h-4" />
+                  <path d="M3 21a4 4 0 0 1 3.81-4" />
+                  <path d="M3 5a4 4 0 0 0 3.55 3.97" />
+                  <path d="M6 13H2" />
+                  <path d="m8 2 1.88 1.88" />
+                  <path d="M9 7.13V6a3 3 0 1 1 6 0v1.13" />
                 </IconButton>
               )}
             </>
-          )}
-          {/* Debug button - only show if debugger prop is true */}
-          {enableDebugger && (
-            <IconButton onClick={handleToggleOverlay} label="Debug Info">
-              <path d="M12 20v-9" />
-              <path d="M14 7a4 4 0 0 1 4 4v3a6 6 0 0 1-12 0v-3a4 4 0 0 1 4-4z" />
-              <path d="M14.12 3.88 16 2" />
-              <path d="M21 21a4 4 0 0 0-3.81-4" />
-              <path d="M21 5a4 4 0 0 1-3.55 3.97" />
-              <path d="M22 13h-4" />
-              <path d="M3 21a4 4 0 0 1 3.81-4" />
-              <path d="M3 5a4 4 0 0 0 3.55 3.97" />
-              <path d="M6 13H2" />
-              <path d="m8 2 1.88 1.88" />
-              <path d="M9 7.13V6a3 3 0 1 1 6 0v1.13" />
-            </IconButton>
           )}
         </div>
         {children}
@@ -555,20 +504,7 @@ export function WidgetControls({
       {isOverlayOpen && enableDebugger && (
         <div
           ref={overlayRef}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "#000000",
-            color: "#ffffff",
-            fontFamily: "monospace",
-            fontSize: "12px",
-            zIndex: 10000,
-            overflow: "auto",
-            padding: "16px",
-          }}
+          className="fixed inset-0 bg-black text-white font-mono text-xs z-[10000] overflow-auto p-4"
           onClick={(e) => {
             // Close on backdrop click
             if (e.target === overlayRef.current) {
@@ -579,243 +515,103 @@ export function WidgetControls({
           {/* Close button */}
           <button
             onClick={() => setIsOverlayOpen(false)}
-            style={{
-              position: "absolute",
-              top: "16px",
-              right: "16px",
-              backgroundColor: "rgba(255, 255, 255, 0.1)",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "4px",
-              width: "32px",
-              height: "32px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "18px",
-              lineHeight: 1,
-            }}
+            className="absolute top-4 right-4 bg-white/10 text-white border-none rounded w-8 h-8 cursor-pointer flex items-center justify-center text-lg leading-none"
             aria-label="Close"
           >
             ×
           </button>
 
           {/* Debug info table */}
-          <div
-            style={{ maxWidth: "1200px", margin: "0 auto", paddingTop: "40px" }}
-          >
-            <h1
-              style={{
-                fontSize: "18px",
-                fontWeight: "bold",
-                marginBottom: "16px",
-                borderBottom: "1px solid #333",
-                paddingBottom: "8px",
-              }}
-            >
+          <div className="max-w-[1200px] mx-auto pt-10">
+            <h1 className="text-lg font-bold mb-4 border-b border-gray-700 pb-2">
               Debug Info
             </h1>
 
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                borderSpacing: 0,
-              }}
-            >
+            <table className="w-full border-collapse border-spacing-0">
               <tbody>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     Props
                   </td>
-                  <td
-                    style={{
-                      padding: "8px",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-all",
-                    }}
-                  >
+                  <td className="p-2 whitespace-pre-wrap break-all">
                     {formatValue(props)}
                   </td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     Output
                   </td>
-                  <td
-                    style={{
-                      padding: "8px",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-all",
-                    }}
-                  >
+                  <td className="p-2 whitespace-pre-wrap break-all">
                     {formatValue(output)}
                   </td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     Metadata
                   </td>
-                  <td
-                    style={{
-                      padding: "8px",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-all",
-                    }}
-                  >
+                  <td className="p-2 whitespace-pre-wrap break-all">
                     {formatValue(metadata)}
                   </td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     State
                   </td>
-                  <td
-                    style={{
-                      padding: "8px",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-all",
-                    }}
-                  >
+                  <td className="p-2 whitespace-pre-wrap break-all">
                     {formatValue(state)}
                   </td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     Theme
                   </td>
-                  <td style={{ padding: "8px" }}>{theme}</td>
+                  <td className="p-2">{theme}</td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     Display Mode
                   </td>
-                  <td style={{ padding: "8px" }}>{displayMode}</td>
+                  <td className="p-2">{displayMode}</td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     Locale
                   </td>
-                  <td style={{ padding: "8px" }}>{locale}</td>
+                  <td className="p-2">{locale}</td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     Max Height
                   </td>
-                  <td style={{ padding: "8px" }}>{maxHeight}px</td>
+                  <td className="p-2">{maxHeight}px</td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     User Agent
                   </td>
-                  <td style={{ padding: "8px" }}>
+                  <td className="p-2">
                     {formatUserAgent(userAgent)}
                   </td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     Safe Area
                   </td>
-                  <td style={{ padding: "8px" }}>{formatSafeArea(safeArea)}</td>
+                  <td className="p-2">{formatSafeArea(safeArea)}</td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     API Available
                   </td>
-                  <td style={{ padding: "8px" }}>
+                  <td className="p-2">
                     {isAvailable ? "Yes" : "No"}
                   </td>
                 </tr>
-                <tr style={{ borderBottom: "1px solid #333" }}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      fontWeight: "bold",
-                      width: "200px",
-                      verticalAlign: "top",
-                    }}
-                  >
+                <tr className="border-b border-gray-700">
+                  <td className="p-2 font-bold w-[200px] align-top">
                     window.openai Keys
                   </td>
-                  <td style={{ padding: "8px" }}>
+                  <td className="p-2">
                     {windowOpenAiKeys.length > 0
                       ? windowOpenAiKeys.join(", ")
                       : "N/A"}
@@ -825,222 +621,99 @@ export function WidgetControls({
             </table>
 
             {/* Actions Section */}
-            <h2
-              style={{
-                fontSize: "16px",
-                fontWeight: "bold",
-                marginTop: "32px",
-                marginBottom: "16px",
-                borderBottom: "1px solid #333",
-                paddingBottom: "8px",
-              }}
-            >
+            <h2 className="text-base font-bold mt-8 mb-4 border-b border-gray-700 pb-2">
               Actions
             </h2>
 
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-            >
+            <div className="flex flex-col gap-3">
               {/* Call Tool */}
-              <div
-                style={{ display: "flex", gap: "8px", alignItems: "center" }}
-              >
+              <div className="flex gap-2 items-center">
                 <input
                   type="text"
                   value={toolName}
                   onChange={(e) => setToolName(e.target.value)}
                   placeholder="Tool name"
-                  style={{
-                    padding: "6px 8px",
-                    backgroundColor: "#1a1a1a",
-                    color: "#ffffff",
-                    border: "1px solid #333",
-                    borderRadius: "4px",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    width: "150px",
-                  }}
+                  className="py-1.5 px-2 bg-[#1a1a1a] text-white border border-gray-700 rounded font-mono text-xs w-[150px]"
                 />
                 <input
                   type="text"
                   value={toolArgs}
                   onChange={(e) => setToolArgs(e.target.value)}
                   placeholder='{"key": "value"}'
-                  style={{
-                    padding: "6px 8px",
-                    backgroundColor: "#1a1a1a",
-                    color: "#ffffff",
-                    border: "1px solid #333",
-                    borderRadius: "4px",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    flex: 1,
-                  }}
+                  className="py-1.5 px-2 bg-[#1a1a1a] text-white border border-gray-700 rounded font-mono text-xs flex-1"
                 />
                 <button
                   onClick={handleCallTool}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#333",
-                    color: "#ffffff",
-                    border: "1px solid #555",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                  }}
+                  className="py-1.5 px-3 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-xs"
                 >
                   Call Tool
                 </button>
               </div>
 
               {/* Send Follow-Up Message */}
-              <div
-                style={{ display: "flex", gap: "8px", alignItems: "center" }}
-              >
+              <div className="flex gap-2 items-center">
                 <input
                   type="text"
                   value={followUpMessage}
                   onChange={(e) => setFollowUpMessage(e.target.value)}
                   placeholder="Follow-up message"
-                  style={{
-                    padding: "6px 8px",
-                    backgroundColor: "#1a1a1a",
-                    color: "#ffffff",
-                    border: "1px solid #333",
-                    borderRadius: "4px",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    flex: 1,
-                  }}
+                  className="py-1.5 px-2 bg-[#1a1a1a] text-white border border-gray-700 rounded font-mono text-xs flex-1"
                 />
                 <button
                   onClick={handleSendFollowUpMessage}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#333",
-                    color: "#ffffff",
-                    border: "1px solid #555",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                  }}
+                  className="py-1.5 px-3 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-xs"
                 >
                   Send Follow-Up
                 </button>
               </div>
 
               {/* Open External */}
-              <div
-                style={{ display: "flex", gap: "8px", alignItems: "center" }}
-              >
+              <div className="flex gap-2 items-center">
                 <input
                   type="text"
                   value={externalUrl}
                   onChange={(e) => setExternalUrl(e.target.value)}
                   placeholder="External URL"
-                  style={{
-                    padding: "6px 8px",
-                    backgroundColor: "#1a1a1a",
-                    color: "#ffffff",
-                    border: "1px solid #333",
-                    borderRadius: "4px",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    flex: 1,
-                  }}
+                  className="py-1.5 px-2 bg-[#1a1a1a] text-white border border-gray-700 rounded font-mono text-xs flex-1"
                 />
                 <button
                   onClick={handleOpenExternal}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#333",
-                    color: "#ffffff",
-                    border: "1px solid #555",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                  }}
+                  className="py-1.5 px-3 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-xs"
                 >
                   Open Link
                 </button>
               </div>
 
               {/* Request Display Mode */}
-              <div
-                style={{ display: "flex", gap: "8px", alignItems: "center" }}
-              >
-                <span style={{ width: "150px", fontSize: "12px" }}>
+              <div className="flex gap-2 items-center">
+                <span className="w-[150px] text-xs">
                   Display Mode:
                 </span>
                 <button
                   onClick={() => handleRequestDisplayMode("inline")}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#333",
-                    color: "#ffffff",
-                    border: "1px solid #555",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    flex: 1,
-                  }}
+                  className="py-1.5 px-3 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-xs flex-1"
                 >
                   Inline
                 </button>
                 <button
                   onClick={() => handleRequestDisplayMode("pip")}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#333",
-                    color: "#ffffff",
-                    border: "1px solid #555",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    flex: 1,
-                  }}
+                  className="py-1.5 px-3 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-xs flex-1"
                 >
                   PiP
                 </button>
                 <button
                   onClick={() => handleRequestDisplayMode("fullscreen")}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#333",
-                    color: "#ffffff",
-                    border: "1px solid #555",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    flex: 1,
-                  }}
+                  className="py-1.5 px-3 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-xs flex-1"
                 >
                   Fullscreen
                 </button>
               </div>
 
               {/* Set State */}
-              <div
-                style={{ display: "flex", gap: "8px", alignItems: "center" }}
-              >
+              <div className="flex gap-2 items-center">
                 <button
                   onClick={handleSetState}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: "#333",
-                    color: "#ffffff",
-                    border: "1px solid #555",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                  }}
+                  className="py-1.5 px-3 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-xs"
                 >
                   Set State (Add Timestamp)
                 </button>
@@ -1048,43 +721,14 @@ export function WidgetControls({
 
               {/* Action Result */}
               {actionResult && (
-                <div
-                  style={{
-                    marginTop: "8px",
-                    padding: "8px",
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #333",
-                    borderRadius: "4px",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-all",
-                    fontSize: "11px",
-                    maxHeight: "200px",
-                    overflow: "auto",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: "bold",
-                      marginBottom: "4px",
-                      color: "#aaa",
-                    }}
-                  >
+                <div className="mt-2 p-2 bg-[#1a1a1a] border border-gray-700 rounded whitespace-pre-wrap break-all text-[11px] max-h-[200px] overflow-auto">
+                  <div className="font-bold mb-1 text-gray-400">
                     Result:
                   </div>
                   {actionResult}
                   <button
                     onClick={() => setActionResult("")}
-                    style={{
-                      marginTop: "8px",
-                      padding: "4px 8px",
-                      backgroundColor: "#333",
-                      color: "#ffffff",
-                      border: "1px solid #555",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontFamily: "monospace",
-                      fontSize: "11px",
-                    }}
+                    className="mt-2 py-1 px-2 bg-gray-800 text-white border border-gray-600 rounded cursor-pointer font-mono text-[11px]"
                   >
                     Clear
                   </button>

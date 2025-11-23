@@ -689,13 +689,17 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           },
 
           async notifyIntrinsicHeight(height) {
+            console.log('[OpenAI Widget] notifyIntrinsicHeight called with:', height);
             if (typeof height !== 'number' || height < 0) {
+              console.error('[OpenAI Widget] Invalid height value:', height);
               throw new Error('Height must be a non-negative number');
             }
-            window.parent.postMessage({
+            const message = {
               type: 'openai:notifyIntrinsicHeight',
               height
-            }, '*');
+            };
+            console.log('[OpenAI Widget] Sending postMessage to parent:', message);
+            window.parent.postMessage(message, '*');
           },
 
           openExternal(payload) {

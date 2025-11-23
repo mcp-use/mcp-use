@@ -1,6 +1,6 @@
 import { cn } from "@/client/lib/utils";
 import { X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useMcpContext } from "../context/McpContext";
 import { useTheme } from "../context/ThemeContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
@@ -49,7 +49,7 @@ function Wrapper({
  * OpenAIComponentRenderer renders OpenAI Apps SDK components
  * Provides window.openai API bridge for component interaction via iframe
  */
-export function OpenAIComponentRenderer({
+function OpenAIComponentRendererBase({
   componentUrl,
   toolName,
   toolArgs,
@@ -69,6 +69,8 @@ export function OpenAIComponentRenderer({
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
   const [iframeHeight, setIframeHeight] = useState<number>(400);
   const lastMeasuredHeightRef = useRef<number>(0);
+  const lastNotifiedHeightRef = useRef<number>(0);
+  const useNotifiedHeightRef = useRef<boolean>(false); // Flag to prefer notified height over automatic measurement
   const [centerVertically, setCenterVertically] = useState<boolean>(false);
   const [displayMode, setDisplayMode] = useState<
     "inline" | "pip" | "fullscreen"
@@ -78,7 +80,6 @@ export function OpenAIComponentRenderer({
   const [useDevMode, setUseDevMode] = useState<boolean>(false);
   const [widgetToolInput, setWidgetToolInput] = useState<any>(null);
   const [widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
-  const [widgetHasControls, setWidgetHasControls] = useState<boolean>(false);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -389,6 +390,11 @@ export function OpenAIComponentRenderer({
         return;
       }
 
+      // Log all messages for debugging (can be filtered later)
+      if (event.data?.type === "openai:notifyIntrinsicHeight") {
+        console.log("[OpenAIComponentRenderer] Received message from iframe:", event.data.type, event.data);
+      }
+
       // Let console log messages pass through (handled by useIframeConsole hook)
       if (event.data?.type === "iframe-console-log") {
         return;
@@ -584,19 +590,59 @@ export function OpenAIComponentRenderer({
 
         case "openai:notifyIntrinsicHeight":
           try {
+            console.log(
+              "[OpenAIComponentRenderer] Received notifyIntrinsicHeight message:",
+              event.data
+            );
             const { height } = event.data;
+            console.log("[OpenAIComponentRenderer] Extracted height:", height, "type:", typeof height);
             if (typeof height === "number" && height > 0) {
-              const maxHeight =
-                typeof window !== "undefined" ? window.innerHeight : height;
-              const newHeight = Math.min(height, maxHeight);
-              if (newHeight !== lastMeasuredHeightRef.current) {
-                lastMeasuredHeightRef.current = newHeight;
+              // For inline mode, respect the requested height (allow scrolling if needed)
+              // For fullscreen/pip modes, cap at viewport
+              let newHeight = height;
+              if (displayMode === "fullscreen" || displayMode === "pip") {
+                const maxHeight =
+                  typeof window !== "undefined" ? window.innerHeight : height;
+                newHeight = Math.min(height, maxHeight);
+              }
+              // Always update if the requested height is different from what we last applied
+              // This ensures we update even if we cap it (so widget knows the actual applied height)
+              if (height !== lastNotifiedHeightRef.current || newHeight !== iframeHeight) {
+                console.log("[OpenAIComponentRenderer] Calculated new height:", {
+                  requestedHeight: height,
+                  displayMode,
+                  newHeight,
+                  lastNotifiedHeight: lastNotifiedHeightRef.current,
+                  currentIframeHeight: iframeHeight,
+                });
+                lastNotifiedHeightRef.current = height; // Track requested height from notifyIntrinsicHeight
+                lastMeasuredHeightRef.current = newHeight; // Track applied height
+                useNotifiedHeightRef.current = true; // Use notified height instead of automatic measurement
                 setIframeHeight(newHeight);
                 console.log(
                   "[OpenAIComponentRenderer] Updated iframe height from notifyIntrinsicHeight:",
-                  newHeight
+                  newHeight,
+                  "(requested:",
+                  height,
+                  "), disabled automatic measurement"
+                );
+              } else {
+                console.log(
+                  "[OpenAIComponentRenderer] Height unchanged, skipping update",
+                  {
+                    requestedHeight: height,
+                    lastNotifiedHeight: lastNotifiedHeightRef.current,
+                    currentIframeHeight: iframeHeight,
+                  }
                 );
               }
+            } else {
+              console.warn(
+                "[OpenAIComponentRenderer] Invalid height value:",
+                height,
+                "type:",
+                typeof height
+              );
             }
           } catch (err) {
             console.error(
@@ -613,38 +659,6 @@ export function OpenAIComponentRenderer({
 
     window.addEventListener("message", handleMessage);
 
-    const checkWidgetControls = () => {
-      if (!useDevMode || !isSameOrigin || !iframeRef.current) return;
-
-      try {
-        const iframeDoc = iframeRef.current.contentDocument;
-        if (iframeDoc) {
-          // Look for WidgetControls buttons by their aria-labels
-          // WidgetControls renders buttons with labels: "Debug Info", "Fullscreen", "Picture in Picture"
-          const hasDebugButton = iframeDoc.querySelector(
-            '[aria-label="Debug Info"]'
-          );
-          const hasFullscreenButton = iframeDoc.querySelector(
-            '[aria-label="Fullscreen"]'
-          );
-          const hasPipButton = iframeDoc.querySelector(
-            '[aria-label="Picture in Picture"]'
-          );
-
-          // Widget has controls if it has debugger OR viewControls
-          const hasControls = !!(
-            hasDebugButton ||
-            hasFullscreenButton ||
-            hasPipButton
-          );
-          setWidgetHasControls(hasControls);
-        }
-      } catch (e) {
-        // If we can't access, assume no controls
-        setWidgetHasControls(false);
-      }
-    };
-
     const handleLoad = () => {
       setIsReady(true);
       setError(null);
@@ -655,12 +669,6 @@ export function OpenAIComponentRenderer({
           const canAccess = !!iframeRef.current.contentDocument;
           if (canAccess && isSameOrigin) {
             injectConsoleInterceptor(iframeRef.current);
-
-            // Check if widget has WidgetControls (debugger/viewControls buttons)
-            // Only check in dev mode - use a delay to ensure React has rendered
-            if (useDevMode) {
-              setTimeout(checkWidgetControls, 200);
-            }
           } else if (!canAccess) {
             // Cross-origin iframe detected - update state
             setIsSameOrigin(false);
@@ -712,45 +720,19 @@ export function OpenAIComponentRenderer({
     useDevMode,
   ]);
 
-  // Re-check for widget controls when useDevMode or isReady changes
-  useEffect(() => {
-    if (useDevMode && isReady && isSameOrigin && iframeRef.current) {
-      // Use a delay to ensure React has rendered the WidgetControls
-      const timeoutId = setTimeout(() => {
-        try {
-          const iframeDoc = iframeRef.current?.contentDocument;
-          if (iframeDoc) {
-            const hasDebugButton = iframeDoc.querySelector(
-              '[aria-label="Debug Info"]'
-            );
-            const hasFullscreenButton = iframeDoc.querySelector(
-              '[aria-label="Fullscreen"]'
-            );
-            const hasPipButton = iframeDoc.querySelector(
-              '[aria-label="Picture in Picture"]'
-            );
-            const hasControls = !!(
-              hasDebugButton ||
-              hasFullscreenButton ||
-              hasPipButton
-            );
-            setWidgetHasControls(hasControls);
-          }
-        } catch (e) {
-          setWidgetHasControls(false);
-        }
-      }, 300);
-      return () => clearTimeout(timeoutId);
-    } else {
-      setWidgetHasControls(false);
-    }
-  }, [useDevMode, isReady, isSameOrigin]);
-
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {
     if (!widgetUrl) return;
 
     const measure = () => {
+      // Skip automatic measurement if widget is using notifyIntrinsicHeight
+      if (useNotifiedHeightRef.current) {
+        console.log(
+          "[OpenAIComponentRenderer] Skipping automatic measurement - using notified height"
+        );
+        return;
+      }
+
       const iframe = iframeRef.current;
       const contentDoc = iframe?.contentWindow?.document;
       const body = contentDoc?.body;
@@ -834,40 +816,6 @@ export function OpenAIComponentRenderer({
     }
   }, [resolvedTheme, widgetUrl, isReady, updateIframeGlobals]);
 
-  // Re-check for widget controls when useDevMode or isReady changes
-  useEffect(() => {
-    if (useDevMode && isReady && isSameOrigin && iframeRef.current) {
-      // Use a delay to ensure React has rendered the WidgetControls
-      const timeoutId = setTimeout(() => {
-        try {
-          const iframeDoc = iframeRef.current?.contentDocument;
-          if (iframeDoc) {
-            const hasDebugButton = iframeDoc.querySelector(
-              '[aria-label="Debug Info"]'
-            );
-            const hasFullscreenButton = iframeDoc.querySelector(
-              '[aria-label="Fullscreen"]'
-            );
-            const hasPipButton = iframeDoc.querySelector(
-              '[aria-label="Picture in Picture"]'
-            );
-            const hasControls = !!(
-              hasDebugButton ||
-              hasFullscreenButton ||
-              hasPipButton
-            );
-            setWidgetHasControls(hasControls);
-          }
-        } catch (e) {
-          setWidgetHasControls(false);
-        }
-      }, 300);
-      return () => clearTimeout(timeoutId);
-    } else {
-      setWidgetHasControls(false);
-    }
-  }, [useDevMode, isReady, isSameOrigin]);
-
   if (error) {
     return (
       <div className={className}>
@@ -904,7 +852,7 @@ export function OpenAIComponentRenderer({
         displayMode !== "pip" && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
             <IframeConsole iframeId={toolId} enabled={true} />
-            {useDevMode && !widgetHasControls && (
+            {useDevMode && (
               <WidgetInspectorControls
                 displayMode={displayMode}
                 onDisplayModeChange={handleDisplayModeChange}
@@ -986,3 +934,6 @@ export function OpenAIComponentRenderer({
     </Wrapper>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders when props haven't changed
+export const OpenAIComponentRenderer = memo(OpenAIComponentRendererBase);
