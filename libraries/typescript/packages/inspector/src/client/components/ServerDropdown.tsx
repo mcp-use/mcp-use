@@ -16,7 +16,7 @@ import {
 } from "@/client/components/ui/tooltip";
 import type { MCPConnection } from "@/client/context/McpContext";
 import { cn } from "@/client/lib/utils";
-import { Settings } from "lucide-react";
+import { ChevronDown, Server, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerIcon } from "./ServerIcon";
@@ -26,6 +26,7 @@ interface ServerDropdownProps {
   selectedServer: MCPConnection | undefined;
   onServerSelect: (serverId: string) => void;
   onOpenConnectionOptions: (connectionId: string | null) => void;
+  mobileMode?: boolean;
 }
 
 export function ServerDropdown({
@@ -33,6 +34,7 @@ export function ServerDropdown({
   selectedServer,
   onServerSelect,
   onOpenConnectionOptions,
+  mobileMode = false,
 }: ServerDropdownProps) {
   const navigate = useNavigate();
 
@@ -45,6 +47,88 @@ export function ServerDropdown({
     onServerSelect(serverId);
   };
 
+  // Mobile mode: show icon + chevron only
+  if (mobileMode) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-11 px-2 bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200 flex items-center gap-1.5"
+              >
+                {selectedServer ? (
+                  <ServerIcon
+                    serverUrl={selectedServer.url}
+                    serverName={selectedServer.name}
+                    size="md"
+                  />
+                ) : (
+                  <Server className="h-5 w-5" />
+                )}
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="w-[calc(100vw-2rem)] sm:w-[300px]"
+              align="start"
+            >
+              <DropdownMenuLabel
+                className="cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                onClick={() => navigate("/")}
+              >
+                MCP Servers
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {connections.length === 0 ? (
+                <div className="px-2 py-4 text-sm text-muted-foreground dark:text-zinc-400 text-center">
+                  No servers connected. Go to the dashboard to add one.
+                </div>
+              ) : (
+                connections.map((connection) => (
+                  <DropdownMenuItem
+                    key={connection.id}
+                    onClick={() => handleServerSelect(connection.id)}
+                    className="flex items-center gap-3"
+                  >
+                    <ServerIcon
+                      serverUrl={connection.url}
+                      serverName={connection.name}
+                      size="sm"
+                    />
+                    <div className="flex items-center gap-2 flex-1">
+                      <div className="font-medium">{connection.name}</div>
+                      <StatusDot status={connection.state} />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenConnectionOptions(connection.id);
+                      }}
+                    >
+                      <Settings className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuItem>
+                ))
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/")}>
+                <span className="text-blue-600 dark:text-blue-400">
+                  + Add new server
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop mode: show full dropdown with text
   return (
     <div className="flex items-center gap-2">
       <div className="relative">
@@ -52,7 +136,7 @@ export function ServerDropdown({
           <DropdownMenuTrigger asChild>
             <ShimmerButton
               className={cn(
-                "min-w-[200px] p-0 px-1 text-sm h-11 justify-start bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
+                "min-w-0 sm:min-w-[200px] p-0 px-1 text-sm h-11 justify-start bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
                 !selectedServer && "pl-4",
                 selectedServer && "pr-10"
               )}
@@ -126,7 +210,10 @@ export function ServerDropdown({
               </TooltipContent>
             </Tooltip>
           )}
-          <DropdownMenuContent className="w-[300px]" align="start">
+          <DropdownMenuContent
+            className="w-[calc(100vw-2rem)] sm:w-[300px]"
+            align="start"
+          >
             <DropdownMenuLabel
               className="cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
               onClick={() => navigate("/")}

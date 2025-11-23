@@ -1,5 +1,73 @@
 # @mcp-use/cli
 
+## 2.2.5
+
+### Patch Changes
+
+- Updated dependencies [95c9d9f]
+- Updated dependencies [95c9d9f]
+  - mcp-use@1.4.1
+  - @mcp-use/inspector@0.6.1
+
+## 2.2.5-canary.1
+
+### Patch Changes
+
+- Updated dependencies [0975320]
+  - mcp-use@1.4.1-canary.1
+  - @mcp-use/inspector@0.6.1-canary.1
+
+## 2.2.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d434691]
+  - mcp-use@1.4.1-canary.0
+  - @mcp-use/inspector@0.6.1-canary.0
+
+## 2.2.4
+
+### Patch Changes
+
+- 33e4a68: Fix deployment from source
+- Updated dependencies [33e4a68]
+- Updated dependencies [33e4a68]
+- Updated dependencies [33e4a68]
+  - @mcp-use/inspector@0.6.0
+  - mcp-use@1.4.0
+
+## 2.2.4-canary.3
+
+### Patch Changes
+
+- Updated dependencies [35fd9ae]
+  - mcp-use@1.4.0-canary.3
+  - @mcp-use/inspector@0.6.0-canary.3
+
+## 2.2.4-canary.2
+
+### Patch Changes
+
+- c754733: Fix deployment from source
+  - mcp-use@1.3.4-canary.2
+  - @mcp-use/inspector@0.6.0-canary.2
+
+## 2.2.4-canary.1
+
+### Patch Changes
+
+- Updated dependencies [451c507]
+  - @mcp-use/inspector@0.6.0-canary.1
+  - mcp-use@1.3.4-canary.1
+
+## 2.2.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1f4a798]
+  - @mcp-use/inspector@0.6.0-canary.0
+  - mcp-use@1.3.4-canary.0
+
 ## 2.2.3
 
 ### Patch Changes

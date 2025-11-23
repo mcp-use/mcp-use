@@ -1,0 +1,86 @@
+name: Sync inspector subfolder to mcp-use/inspector
+
+on:
+  push:
+    branches:
+      - main
+      - canary
+    paths:
+      - 'libraries/typescript/packages/inspector/**'
+      - '.github/workflows/sync-inspector.yml'
+  workflow_dispatch:
+
+jobs:
+  sync-inspector:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout monorepo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine target branch
+        id: vars
+        run: |
+          # Use the same branch name in the mirror repo
+          echo "target_branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+      - name: Clone mirror repo
+        env:
+          MIRROR_TOKEN: ${{ secrets.INSPECTOR_MIRROR_TOKEN }}
+        run: |
+          git clone --no-checkout \
+            https://x-access-token:${MIRROR_TOKEN}@github.com/mcp-use/inspector.git \
+            /tmp/inspector-mirror
+          cd /tmp/inspector-mirror
+          git fetch origin
+          git checkout -B "${{ steps.vars.outputs.target_branch }}" "origin/${{ steps.vars.outputs.target_branch }}" || \
+          git checkout -B "${{ steps.vars.outputs.target_branch }}"
+
+      - name: Replace contents with inspector subfolder
+        run: |
+          cd /tmp/inspector-mirror
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+
+          rsync -av --delete --exclude '.git' \
+            "$GITHUB_WORKSPACE/libraries/typescript/packages/inspector/" \
+            /tmp/inspector-mirror/
+
+      - name: Inject mirror notice into README
+        run: |
+          cd /tmp/inspector-mirror
+
+          NOTICE="> ⚠️ This is a read-only mirror of \`libraries/typescript/packages/inspector\` in the [mcp-use/mcp-use](https://github.com/mcp-use/mcp-use) monorepo.
+          >
+          > 🚀 Please submit issues and pull requests to the monorepo instead.
+          >
+          > 🛠 This branch mirrors: \`${{ steps.vars.outputs.target_branch }}\`
+          >
+          > 🌐 Source folder: \`libraries/typescript/packages/inspector\`"
+
+          if [ -f README.md ]; then
+            awk 'BEGIN{printed=0} !printed { if ($0 ~ /^> ⚠️ This is a read-only mirror/) { while (getline && $0 !~ /^$/) {}; next } } { print }' README.md > README.tmp || true
+            mv README.tmp README.md
+            echo -e "$NOTICE\n\n$(cat README.md)" > README.md
+          else
+            echo -e "$NOTICE" > README.md
+          fi
+
+      - name: Commit and push to mirror repo
+        env:
+          MIRROR_TOKEN: ${{  secrets.INSPECTOR_MIRROR_TOKEN }}
+        run: |
+          cd /tmp/inspector-mirror
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to mirror."
+            exit 0
+          fi
+
+          git commit -m "Mirror update from mcp-use/mcp-use@${GITHUB_SHA} on ${{ steps.vars.outputs.target_branch }}"
+          git push --force origin "${{ steps.vars.outputs.target_branch }}"

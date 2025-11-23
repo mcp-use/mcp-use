@@ -354,7 +354,7 @@ export function CommandPalette({
       open={isOpen}
       onOpenChange={onOpenChange}
       label="Command Palette"
-      className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[51] max-w-[640px] w-full p-2 bg-white dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl overflow-hidden border border-border shadow-[var(--cmdk-shadow)] transition-transform duration-100 ease-out outline-none max-sm:max-w-full"
+      className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[51] max-w-[640px] w-[calc(100vw-2rem)] sm:w-full p-2 bg-white dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl overflow-hidden border border-border shadow-[var(--cmdk-shadow)] transition-transform duration-100 ease-out outline-none"
       overlayClassName="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
     >
       <Command.Input
@@ -365,7 +365,7 @@ export function CommandPalette({
       />
       <Command.List
         ref={listRef}
-        className="min-h-[330px] max-h-[400px] overflow-auto overscroll-contain transition-[height] duration-100 ease-out"
+        className="min-h-[200px] sm:min-h-[330px] max-h-[400px] overflow-auto overscroll-contain transition-[height] duration-100 ease-out"
       >
         <Command.Empty className="text-sm flex items-center justify-center h-12 whitespace-pre-wrap text-muted-foreground">
           No results found.

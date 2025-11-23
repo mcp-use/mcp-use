@@ -12,20 +12,52 @@ This guide demonstrates how to deploy an MCP server on [Supabase Edge Functions]
 3. **Docker** Required to solve bug https://github.com/orgs/supabase/discussions/32815
 4. **Node.js/Bun**: For building your MCP server
 
+<iframe
+  className="w-full aspect-video rounded-xl"
+  src="https://www.youtube.com/embed/xua76KPhH9A"
+  title="Deploying MCP Server to Supabase"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
+
+## Create your mcp-use project
+
+```bash
+npx create-mcp-use-app your-project-name
+```
+
+This will create a new directory called `your-project-name` with a basic MCP server setup.
+
+## Install dependencies
+
+```bash
+cd your-project-name
+yarn
+```
+
+## Init supabase project
+
+```bash
+supabase init
+```
+
+This will create a new directory called `supabase` with a basic Supabase project setup.
+
 ## Quick Deployment
 
 Deploy your MCP server to Supabase in one command using our automated deployment script:
 
 ```bash
-# Download and run the deployment script
-curl -fsSL https://raw.githubusercontent.com/mcp-use/mcp-use/main/examples/typescript/server/supabase/deploy.sh | bash -s -- YOUR_PROJECT_ID
+# Download and run the deployment script (interactive mode)
+curl -fsSL https://url.mcp-use.com/supabase | bash
 ```
 
 Or download the script first to review it:
 
 ```bash
 # Download the script
-curl -fsSL https://raw.githubusercontent.com/mcp-use/mcp-use/main/examples/typescript/server/supabase/deploy.sh -o deploy.sh
+curl -fsSL https://url.mcp-use.com/supabase -o deploy.sh
 chmod +x deploy.sh
 
 # Run with your project ID
@@ -35,9 +67,13 @@ chmod +x deploy.sh
 ./deploy.sh YOUR_PROJECT_ID my-function-name my-bucket-name
 ```
 
+Done!
+You can now inspect your MCP server at https://inspector.mcp-use.com
+
 ### What the script does
 
 The deployment script automatically:
+
 1. ✅ Validates Supabase CLI installation and authentication
 2. ✅ Checks if the project is initialized and linked
 3. ✅ Patches `config.toml` with your project ID
@@ -47,10 +83,9 @@ The deployment script automatically:
 7. ✅ Uploads widgets to the storage bucket
 
 <Note>
-**Prerequisites for the script**
-- Supabase CLI installed (`npm install -g supabase`)
-- Logged in to Supabase (`supabase login`)
-- Docker running (for deployment)
+  **Prerequisites for the script** - Supabase CLI installed (`npm install -g
+  supabase`) - Logged in to Supabase (`supabase login`) - Docker running (for
+  deployment)
 </Note>
 
 For manual deployment or to understand each step in detail, continue reading below.
@@ -83,6 +118,7 @@ Widgets in the resources folder are automatically registered. Additional widgets
 **Complete Example**
 
 A full working example is available in the repository: [Supabase Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/supabase)
+
 </Note>
 
 ```typescript
@@ -91,12 +127,15 @@ A full working example is available in the repository: [Supabase Example](https:
 import { createMCPServer } from "https://esm.sh/mcp-use@latest/server";
 
 const PROJECT_REF = Deno.env.get("SUPABASE_PROJECT_REF") || "your-project-ref";
-const BASE_URL = Deno.env.get("MCP_URL") || `https://${PROJECT_REF}.supabase.co/functions/v1/mcp-server`;
+const BASE_URL =
+  Deno.env.get("MCP_URL") ||
+  `https://${PROJECT_REF}.supabase.co/functions/v1/mcp-server`;
 
 // Create the mcp-use MCP server instance
 const server = createMCPServer("test-app", {
   version: "1.0.0",
-  description: "MCP server with automatic UI widget registration deployed on Supabase",
+  description:
+    "MCP server with automatic UI widget registration deployed on Supabase",
   baseUrl: BASE_URL,
 });
 
@@ -118,14 +157,15 @@ Upload the <ins>**content**</ins> of the dist/resources/widgets folder to Supaba
 
 E.g if you created a bucket called "widgets" in Supabase Storage:
 
-```bash 
+```bash
 # UPLOAD
 supabase storage cp -r dist/resources/widgets ss://widgets/ --experimental
 ```
+
 and then set the MCP_URL environment variable to the URL of the widgets bucket.
 
 ```bash
-export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets" 
+export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets"
 ```
 
 ### 5. Build the mcp-use app
@@ -142,7 +182,7 @@ pnpm build
 cp -r dist supabase/functions/mcp-server/
 ```
 
-### 7. Configure the function in config.toml  
+### 7. Configure the function in config.toml
 
 ```toml
 [functions.mcp-server]
@@ -224,7 +264,6 @@ await session.initialize();
 const response = await session.connector.callTool("greet", { name: "World" });
 ```
 
-
 <Warning>
 **Important: Docker Required for Static Files**
 
@@ -238,8 +277,8 @@ supabase functions deploy mcp-server --use-docker
 ```
 
 See the [Supabase static files documentation](https://github.com/orgs/supabase/discussions/32815) for more details.
-</Warning>
 
+</Warning>
 
 ### CORS Issues
 

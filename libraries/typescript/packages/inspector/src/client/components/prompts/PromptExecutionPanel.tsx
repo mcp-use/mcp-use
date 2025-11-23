@@ -38,26 +38,28 @@ export function PromptExecutionPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 p-6 pt-3 pb-4 pr-3">
+      <div className="flex-shrink-0 p-3 sm:p-6 pt-3 pb-4 pr-3">
         <div>
-          <div className="flex items-center justify-between mb-0">
-            <h3 className="text-lg font-semibold mb-2">
+          <div className="flex flex-row items-center justify-between mb-0 gap-2">
+            <h3 className="text-base sm:text-lg font-semibold">
               {selectedPrompt.name}
             </h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-shrink-0">
               <Button
                 onClick={onExecute}
                 disabled={isExecuting || !isConnected}
+                size="sm"
+                className="lg:size-default"
               >
                 {isExecuting ? (
                   <>
                     <Spinner className="mr-2" />
-                    Executing...
+                    <span className="hidden sm:inline">Executing...</span>
                   </>
                 ) : (
                   <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Execute
+                    <Play className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Execute</span>
                   </>
                 )}
               </Button>
@@ -65,22 +67,23 @@ export function PromptExecutionPanel({
                 variant="outline"
                 onClick={onSave}
                 disabled={isExecuting}
-                className="gap-2"
+                size="sm"
+                className="lg:size-default gap-2"
               >
                 <Save className="h-4 w-4" />
-                Save
+                <span className="hidden sm:inline">Save</span>
               </Button>
             </div>
           </div>
           {selectedPrompt.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-2">
               {selectedPrompt.description}
             </p>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-4 pr-3">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-6 pb-4 pr-3">
         <PromptInputForm
           selectedPrompt={selectedPrompt}
           promptArgs={promptArgs}
