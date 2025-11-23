@@ -1129,10 +1129,22 @@ if (container && Component) {
       },
     };
 
+    // Create a plugin to ensure Vite watches the resources directory for HMR
+    const watchResourcesPlugin = {
+      name: 'watch-resources',
+      configureServer(server: any) {
+        // Explicitly add the resources directory to Vite's watch list
+        // This ensures HMR works when widget source files change
+        const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
+        server.watcher.add(resourcesPath);
+        console.log(`[WIDGETS] Watching resources directory: ${resourcesPath}`);
+      },
+    };
+
     const viteServer = await createServer({
       root: tempDir,
       base: baseRoute + "/",
-      plugins: [ssrCssPlugin, tailwindcss(), react()],
+      plugins: [ssrCssPlugin, watchResourcesPlugin, tailwindcss(), react()],
       resolve: {
         alias: {
           "@": pathHelpers.join(getCwd(), resourcesDir),
@@ -1141,6 +1153,20 @@ if (container && Component) {
       server: {
         middlewareMode: true,
         origin: serverOrigin,
+        watch: {
+          // Watch the resources directory for HMR to work
+          // This ensures changes to widget source files trigger hot reload
+          ignored: ['**/node_modules/**', '**/.git/**'],
+          // Include the resources directory in watch list
+          // Vite will watch files imported from outside root
+          usePolling: false,
+        },
+      },
+      // Explicitly tell Vite to watch files outside root
+      // This is needed because widget entry files import from resources directory
+      optimizeDeps: {
+        // Don't optimize dependencies that might change
+        exclude: [],
       },
       ssr: {
         // Force Vite to transform these packages in SSR instead of using external requires
