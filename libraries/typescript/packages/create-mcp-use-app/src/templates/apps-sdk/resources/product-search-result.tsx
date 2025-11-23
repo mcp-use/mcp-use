@@ -1,6 +1,6 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { Animate } from "@openai/apps-sdk-ui/components/Transition";
-import { ErrorBoundary, Image, ThemeProvider, useWidget } from "mcp-use/react";
+import { ErrorBoundary, Image, ThemeProvider, useWidget, WidgetDebugger } from "mcp-use/react";
 import React, { StrictMode, useEffect, useRef } from "react";
 import { BrowserRouter, Link } from "react-router";
 import { z } from "zod";
@@ -166,17 +166,16 @@ const ProductSearchResult: React.FC = () => {
   return (
     <StrictMode>
       <ThemeProvider>
+        <WidgetDebugger>
         <BrowserRouter basename={getBasename()}>
           <AppsSDKUIProvider linkComponent={Link}>
             <ErrorBoundary>
               <div className="relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-3xl">
                 <div className="p-8">
-                  <h5 className="text-secondary mb-1">Get started</h5>
-                  <h2 className="heading-xl mb-3">Building your first app</h2>
+                  <h5 className="text-secondary mb-1">Apps SDK Template</h5>
+                  <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>
                   <p className="text-md">
-                    Inline cards in Apps SDK UI keep copy short and actionable.
-                    Provide just enough context for the task, then pair it with
-                    a clear next step.
+                    Start building your ChatGPT widget this this mcp-use template. It features the openai apps sdk ui components, dark/light theme support, actions like callTool and sendFollowUpMessage, and more.
                   </p>
                 </div>
                 <div 
@@ -198,7 +197,7 @@ const ProductSearchResult: React.FC = () => {
               </div>
             </ErrorBoundary>
           </AppsSDKUIProvider>
-        </BrowserRouter>
+        </BrowserRouter></WidgetDebugger>
       </ThemeProvider>
     </StrictMode>
   );

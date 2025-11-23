@@ -394,6 +394,7 @@ export interface WidgetData {
   };
   devWidgetUrl?: string;
   devServerBaseUrl?: string;
+  theme?: "light" | "dark";
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -538,6 +539,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     resourceData,
     toolId,
     devServerBaseUrl,
+    theme,
   } = widgetData;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
@@ -586,6 +588,8 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     .replace(/>/g, "\\u003e");
   const safeToolId = JSON.stringify(toolId);
   const safeWidgetStateKey = JSON.stringify(widgetStateKey);
+  // Safely serialize theme, defaulting to 'light' if not provided
+  const safeTheme = JSON.stringify(theme === "dark" ? "dark" : "light");
 
   // Inject window.openai API script
   const apiScript = `
@@ -611,7 +615,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           toolResponseMetadata: null,
           displayMode: 'inline',
           maxHeight: 600,
-          theme: 'dark',
+          theme: ${safeTheme},
           locale: 'en-US',
           safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
           userAgent: {},

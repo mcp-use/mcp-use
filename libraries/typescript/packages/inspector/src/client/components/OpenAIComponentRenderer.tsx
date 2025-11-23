@@ -185,6 +185,7 @@ export function OpenAIComponentRenderer({
           resourceData, // Pass the fetched HTML
           toolId,
           widgetCSP, // Pass the CSP metadata
+          theme: resolvedTheme, // Pass the current theme to prevent flash
         };
 
         if (useDevMode && widgetName && serverBaseUrl) {
@@ -251,6 +252,7 @@ export function OpenAIComponentRenderer({
     toolId,
     readResource,
     serverBaseUrl,
+    resolvedTheme, // Include theme so widget data is updated when theme changes
   ]);
 
   // Helper to update window.openai globals inside iframe
@@ -578,6 +580,13 @@ export function OpenAIComponentRenderer({
           setIsSameOrigin(false);
         }
       }
+      // Update theme when iframe loads to ensure correct initial theme
+      // Use a small delay to ensure window.openai is fully initialized
+      if (resolvedTheme) {
+        setTimeout(() => {
+          updateIframeGlobals({ theme: resolvedTheme });
+        }, 50);
+      }
     };
 
     const handleError = () => {
@@ -602,7 +611,7 @@ export function OpenAIComponentRenderer({
       iframe?.removeEventListener("load", handleLoad);
       iframe?.removeEventListener("error", handleError as any);
     };
-  }, [widgetUrl, isSameOrigin, handleDisplayModeChange, server, serverId]);
+  }, [widgetUrl, isSameOrigin, handleDisplayModeChange, server, serverId, resolvedTheme, updateIframeGlobals]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {
@@ -681,11 +690,16 @@ export function OpenAIComponentRenderer({
   }, [displayMode, updateIframeGlobals]);
 
   // Watch for theme changes and update iframe
+  // Also update when iframe becomes ready to ensure initial theme is set correctly
   useEffect(() => {
-    if (widgetUrl && resolvedTheme) {
-      updateIframeGlobals({ theme: resolvedTheme });
+    if (widgetUrl && resolvedTheme && isReady) {
+      // Use a small delay to ensure window.openai is fully initialized
+      const timeoutId = setTimeout(() => {
+        updateIframeGlobals({ theme: resolvedTheme });
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
-  }, [resolvedTheme, widgetUrl, updateIframeGlobals]);
+  }, [resolvedTheme, widgetUrl, isReady, updateIframeGlobals]);
 
   if (error) {
     return (
