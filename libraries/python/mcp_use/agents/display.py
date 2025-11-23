@@ -127,10 +127,7 @@ def _format_search_tools_as_tree(tools, meta=None, query=None):
 
                 # Wrap description text at word boundaries
                 wrapped_lines = textwrap.wrap(
-                    description,
-                    width=available_width,
-                    break_long_words=False,
-                    break_on_hyphens=False
+                    description, width=available_width, break_long_words=False, break_on_hyphens=False
                 )
 
                 # Add indent to each line (including continuation lines)
