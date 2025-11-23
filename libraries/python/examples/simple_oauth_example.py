@@ -1,7 +1,7 @@
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 from mcp_use import MCPAgent, MCPClient
-from dotenv import load_dotenv
 
 load_dotenv()
 
