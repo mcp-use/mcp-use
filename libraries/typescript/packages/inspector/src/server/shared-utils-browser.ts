@@ -530,8 +530,15 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   html: string;
   error?: string;
 } {
-  const { serverId, uri, toolInput, toolOutput, resourceData, toolId } =
-    widgetData;
+  const {
+    serverId,
+    uri,
+    toolInput,
+    toolOutput,
+    resourceData,
+    toolId,
+    devServerBaseUrl,
+  } = widgetData;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
     serverId,
@@ -587,9 +594,16 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
         'use strict';
 
         // Change URL to "/" for React Router compatibility
-        if (window.location.pathname !== '/') {
+        // Skip if running in Inspector dev-widget proxy to prevent redirecting iframe to Inspector home
+        if (window.location.pathname !== '/' && !window.location.pathname.includes('/dev-widget/')) {
           history.replaceState(null, '', '/');
         }
+
+        // Inject MCP widget utilities for Image component and file access
+        window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
+        window.__getFile = function(filename) {
+          return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
+        };
 
         const openaiAPI = {
           toolInput: ${safeToolInput},

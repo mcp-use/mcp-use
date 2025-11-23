@@ -1107,10 +1107,32 @@ if (container && Component) {
       `[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`
     );
 
+    // Create a plugin to handle CSS imports in SSR only
+    const ssrCssPlugin = {
+      name: 'ssr-css-handler',
+      enforce: 'pre' as const,
+      resolveId(id: string, importer: string | undefined, options?: { ssr?: boolean }) {
+        // Only intercept CSS in SSR mode - be very explicit about this
+        if (options && options.ssr === true && (id.endsWith('.css') || id.endsWith('.module.css'))) {
+          return '\0ssr-css:' + id;
+        }
+        // Don't interfere with normal resolution
+        return null;
+      },
+      load(id: string, options?: { ssr?: boolean }) {
+        // Only return empty export for CSS files in SSR mode
+        if (options && options.ssr === true && id.startsWith('\0ssr-css:')) {
+          return 'export default {}';
+        }
+        // Don't interfere with normal loading
+        return null;
+      },
+    };
+
     const viteServer = await createServer({
       root: tempDir,
       base: baseRoute + "/",
-      plugins: [tailwindcss(), react()],
+      plugins: [ssrCssPlugin, tailwindcss(), react()],
       resolve: {
         alias: {
           "@": pathHelpers.join(getCwd(), resourcesDir),
@@ -1119,6 +1141,18 @@ if (container && Component) {
       server: {
         middlewareMode: true,
         origin: serverOrigin,
+      },
+      ssr: {
+        // Force Vite to transform these packages in SSR instead of using external requires
+        noExternal: ['@openai/apps-sdk-ui', 'react-router'],
+      },
+      define: {
+        // Define process.env for SSR context
+        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+        'import.meta.env.DEV': true,
+        'import.meta.env.PROD': false,
+        'import.meta.env.MODE': JSON.stringify('development'),
+        'import.meta.env.SSR': true,
       },
     });
 
@@ -1167,6 +1201,69 @@ if (container && Component) {
       `${baseRoute}/*`
     );
     this.app.use(`${baseRoute}/*`, viteMiddleware);
+
+    // Serve static files from public directory in dev mode
+    this.app.get("/mcp-use/public/*", async (c: Context) => {
+      const filePath = c.req.path.replace("/mcp-use/public/", "");
+      const fullPath = pathHelpers.join(getCwd(), "public", filePath);
+
+      try {
+        if (await fsHelpers.existsSync(fullPath)) {
+          const content = await fsHelpers.readFile(fullPath);
+          const ext = filePath.split(".").pop()?.toLowerCase();
+          const contentType =
+            ext === "js"
+              ? "application/javascript"
+              : ext === "css"
+                ? "text/css"
+                : ext === "png"
+                  ? "image/png"
+                  : ext === "jpg" || ext === "jpeg"
+                    ? "image/jpeg"
+                    : ext === "svg"
+                      ? "image/svg+xml"
+                      : ext === "gif"
+                        ? "image/gif"
+                        : ext === "webp"
+                          ? "image/webp"
+                          : ext === "ico"
+                            ? "image/x-icon"
+                            : ext === "woff" || ext === "woff2"
+                              ? "font/woff" + (ext === "woff2" ? "2" : "")
+                              : ext === "ttf"
+                                ? "font/ttf"
+                                : ext === "otf"
+                                  ? "font/otf"
+                                  : ext === "json"
+                                    ? "application/json"
+                                    : ext === "pdf"
+                                      ? "application/pdf"
+                                      : "application/octet-stream";
+          return new Response(content, {
+            status: 200,
+            headers: { "Content-Type": contentType },
+          });
+        }
+        return c.notFound();
+      } catch {
+        return c.notFound();
+      }
+    });
+
+    // Add a catch-all 404 handler for widget routes to prevent falling through to other middleware
+    // (like the inspector) which might intercept the request and return the wrong content
+    this.app.use(`${baseRoute}/*`, async (c) => {
+      const url = new URL(c.req.url);
+      // Check if it's an asset request
+      const isAsset = url.pathname.match(
+        /\.(js|css|png|jpg|jpeg|svg|json|ico|woff2?|tsx?)$/i
+      );
+
+      // For assets or any unhandled request, return a clean 404
+      // This prevents fall-through to inspector middleware
+      const message = isAsset ? "Widget asset not found" : "Widget not found";
+      return c.text(message, 404);
+    });
 
     widgets.forEach((widget) => {
       console.log(
@@ -1259,10 +1356,10 @@ if (container && Component) {
           `href="${baseUrl}/mcp-use/widgets/$1"`
         );
 
-        // add window.__getFile to head
+        // add window.__getFile and window.__mcpPublicUrl to head
         html = html.replace(
           /<head[^>]*>/i,
-          `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widget.name}/"+filename }</script>`
+          `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widget.name}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
         );
       } catch (error) {
         console.error(
@@ -1466,10 +1563,10 @@ if (container && Component) {
             `href="${baseUrl}/mcp-use/widgets/$1"`
           );
 
-          // add window.__getFile to head
+          // add window.__getFile and window.__mcpPublicUrl to head
           html = html.replace(
             /<head[^>]*>/i,
-            `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widgetName}/"+filename }</script>`
+            `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widgetName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
           );
         }
       } catch (error) {
@@ -1614,7 +1711,10 @@ if (container && Component) {
         query: Object.fromEntries(new URL(req.url).searchParams),
         params: {},
         body: {},
-        headers: Object.fromEntries(req.headers.entries()),
+        headers:
+          req.headers && typeof req.headers.entries === "function"
+            ? Object.fromEntries(req.headers.entries())
+            : (req.headers as any),
         method: req.method,
       };
 
@@ -1768,9 +1868,6 @@ if (container && Component) {
 
     // GET endpoint for SSE streaming
     this.app.get(endpoint, async (c: Context) => {
-      const { expressReq, expressRes, getResponse } =
-        createExpressLikeObjects(c);
-
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,
@@ -1781,17 +1878,131 @@ if (container && Component) {
         transport.close();
       });
 
+      // For streaming, we need to return a Response with a ReadableStream immediately
+      // Use globalThis to access TransformStream (available in Node 18+ and modern browsers)
+      const { readable, writable } = new (globalThis as any).TransformStream();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+
+      // Create a promise to track when headers are received
+      let resolveResponse: (res: Response) => void;
+      const responsePromise = new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      });
+
+      let headersSent = false;
+      const headers: Record<string, string> = {};
+      let statusCode = 200;
+
+      const expressRes: any = {
+        statusCode: 200,
+        headersSent: false,
+        status: (code: number) => {
+          statusCode = code;
+          expressRes.statusCode = code;
+          return expressRes;
+        },
+        setHeader: (name: string, value: string | string[]) => {
+          if (!headersSent) {
+            headers[name] = Array.isArray(value) ? value.join(", ") : value;
+          }
+        },
+        getHeader: (name: string) => headers[name],
+        write: (chunk: any) => {
+          if (!headersSent) {
+            headersSent = true;
+            resolveResponse(
+              new Response(readable, {
+                status: statusCode,
+                headers,
+              })
+            );
+          }
+          const data =
+            typeof chunk === "string"
+              ? encoder.encode(chunk)
+              : chunk instanceof Uint8Array
+                ? chunk
+                : Buffer.from(chunk);
+          writer.write(data);
+          return true;
+        },
+        end: (chunk?: any) => {
+          if (chunk) {
+            expressRes.write(chunk);
+          }
+          if (!headersSent) {
+            headersSent = true;
+            // Empty body case
+            resolveResponse(
+              new Response(null, {
+                status: statusCode,
+                headers,
+              })
+            );
+            writer.close();
+          } else {
+            writer.close();
+          }
+        },
+        on: (event: string, handler: any) => {
+          if (event === "close") {
+            expressRes._closeHandler = handler;
+          }
+        },
+        once: () => {},
+        removeListener: () => {},
+        writeHead: (code: number, _headers?: any) => {
+          statusCode = code;
+          expressRes.statusCode = code;
+          if (_headers) {
+            Object.assign(headers, _headers);
+          }
+          // Don't resolve yet, wait for first write or end?
+          // Usually writeHead is followed by write or end
+          // If we resolve here, we start the stream
+          if (!headersSent) {
+            headersSent = true;
+            resolveResponse(
+              new Response(readable, {
+                status: statusCode,
+                headers,
+              })
+            );
+          }
+          return expressRes;
+        },
+        flushHeaders: () => {
+          // No-op - headers are flushed on first write
+        },
+      };
+
+      // Mock expressReq
+      // Hono's c.req.header() returns Record<string, string> which is compatible
+      const expressReq: any = {
+        ...c.req.raw,
+        url: new URL(c.req.url).pathname + new URL(c.req.url).search,
+        path: new URL(c.req.url).pathname,
+        query: Object.fromEntries(new URL(c.req.url).searchParams),
+        headers: c.req.header(),
+        method: c.req.method,
+      };
+
       await this.server.connect(transport);
 
-      // Wait for handleRequest to complete and for response to be written
-      await this.waitForRequestComplete(transport, expressReq, expressRes);
+      // Start handling the request
+      // We don't await this because it blocks for SSE
+      transport.handleRequest(expressReq, expressRes).catch((err) => {
+        console.error("MCP Transport error:", err);
+        try {
+          writer.close();
+        } catch {}
+      });
 
-      const response = getResponse();
-      if (response) {
-        return response;
-      }
-
-      return c.text("", 200);
+      // Wait for headers to be sent (or timeout?)
+      // If handleRequest fails synchronously or writes nothing, this might hang?
+      // But MCP transport usually writes headers immediately for SSE
+      return responsePromise;
     });
 
     // DELETE endpoint for session cleanup
@@ -2283,6 +2494,54 @@ if (container && Component) {
         );
 
         return c.html(html);
+      } catch {
+        return c.notFound();
+      }
+    });
+
+    // Serve static files from public directory
+    this.app.get("/mcp-use/public/*", async (c: Context) => {
+      const filePath = c.req.path.replace("/mcp-use/public/", "");
+      const fullPath = pathHelpers.join(getCwd(), "dist", "public", filePath);
+
+      try {
+        if (await fsHelpers.existsSync(fullPath)) {
+          const content = await fsHelpers.readFile(fullPath);
+          const ext = filePath.split(".").pop()?.toLowerCase();
+          const contentType =
+            ext === "js"
+              ? "application/javascript"
+              : ext === "css"
+                ? "text/css"
+                : ext === "png"
+                  ? "image/png"
+                  : ext === "jpg" || ext === "jpeg"
+                    ? "image/jpeg"
+                    : ext === "svg"
+                      ? "image/svg+xml"
+                      : ext === "gif"
+                        ? "image/gif"
+                        : ext === "webp"
+                          ? "image/webp"
+                          : ext === "ico"
+                            ? "image/x-icon"
+                            : ext === "woff" || ext === "woff2"
+                              ? "font/woff" + (ext === "woff2" ? "2" : "")
+                              : ext === "ttf"
+                                ? "font/ttf"
+                                : ext === "otf"
+                                  ? "font/otf"
+                                  : ext === "json"
+                                    ? "application/json"
+                                    : ext === "pdf"
+                                      ? "application/pdf"
+                                      : "application/octet-stream";
+          return new Response(content, {
+            status: 200,
+            headers: { "Content-Type": contentType },
+          });
+        }
+        return c.notFound();
       } catch {
         return c.notFound();
       }

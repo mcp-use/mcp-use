@@ -439,6 +439,8 @@ export interface WidgetData {
     connect_domains?: string[];
     resource_domains?: string[];
   };
+  devWidgetUrl?: string;
+  devServerBaseUrl?: string;
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -471,7 +473,9 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     toolOutput,
     resourceData,
     toolId,
-    widgetCSP,
+    widgetCSP: _widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   } = data;
 
   console.log("[Widget Store] Received request for toolId:", toolId);
@@ -481,7 +485,9 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     hasResourceData: !!resourceData,
     hasToolInput: !!toolInput,
     hasToolOutput: !!toolOutput,
-    hasWidgetCSP: !!widgetCSP,
+    hasWidgetCSP: !!_widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   });
 
   if (!serverId || !uri || !toolId || !resourceData) {
@@ -507,7 +513,9 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     resourceData,
     toolId,
     timestamp: Date.now(),
-    widgetCSP,
+    widgetCSP: _widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   });
 
   console.log("[Widget Store] Data stored successfully for toolId:", toolId);
@@ -569,8 +577,16 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   html: string;
   error?: string;
 } {
-  const { serverId, uri, toolInput, toolOutput, resourceData, toolId } =
-    widgetData;
+  const {
+    serverId,
+    uri,
+    toolInput,
+    toolOutput,
+    resourceData,
+    toolId,
+    widgetCSP: _widgetCSP,
+    devServerBaseUrl,
+  } = widgetData;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
     serverId,
@@ -626,9 +642,16 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
         'use strict';
 
         // Change URL to "/" for React Router compatibility
-        if (window.location.pathname !== '/') {
+        // Skip if running in Inspector dev-widget proxy to prevent redirecting iframe to Inspector home
+        if (window.location.pathname !== '/' && !window.location.pathname.includes('/dev-widget/')) {
           history.replaceState(null, '', '/');
         }
+
+        // Inject MCP widget utilities for Image component and file access
+        window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
+        window.__getFile = function(filename) {
+          return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
+        };
 
         const openaiAPI = {
           toolInput: ${safeToolInput},

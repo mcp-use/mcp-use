@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { defineConfig } from "vite";
 
 // Read version from package.json
@@ -93,8 +93,10 @@ export default defineConfig({
     noExternal: ["react-syntax-highlighter", "refractor"],
   },
   build: {
+    minify: false, // Disable minification for debugging
     outDir: "dist/client",
     rollupOptions: {
+      external: ["langfuse-langchain", "langfuse", "@e2b/code-interpreter"],
       onwarn(warning, warn) {
         // Suppress warnings about externalized modules for refractor
         if (

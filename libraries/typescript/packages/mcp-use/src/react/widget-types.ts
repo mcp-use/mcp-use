@@ -101,6 +101,8 @@ export class SetGlobalsEvent extends CustomEvent<{
 declare global {
   interface Window {
     openai?: API<any> & OpenAiGlobals<any, any, any, any>;
+    __getFile?: (filename: string) => string;
+    __mcpPublicUrl?: string;
   }
 
   interface WindowEventMap {

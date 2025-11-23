@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import "@openai/apps-sdk-ui/css";
+
+/* Configure Tailwind v4 to scan for classes */
 @source "../node_modules/@openai/apps-sdk-ui";
+@source "./**/*.{ts,tsx,js,jsx,html}";
+
+
+@theme {
+  /* Enable class-based dark mode */
+  --color-scheme: light dark;
+}
+
+@variant dark (&:where(.dark, .dark *));
 
 /* Custom styles */
 body {
@@ -10,4 +21,17 @@ body {
     "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+
+h1, h2, h3, h4, h5, h6 {
+  @apply text-gray-900 dark:text-white;
+}
+
+p {
+  @apply text-gray-600 dark:text-gray-400;
+}
+
+a {
+  @apply text-blue-600 dark:text-blue-400;
 }

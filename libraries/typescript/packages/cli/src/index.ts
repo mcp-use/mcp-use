@@ -57,13 +57,22 @@ async function waitForServer(
   maxAttempts = 30
 ): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
+    const controller = new AbortController();
     try {
-      const response = await fetch(`http://${host}:${port}/mcp`);
+      const response = await fetch(`http://${host}:${port}/mcp`, {
+        headers: {
+          Accept: "text/event-stream",
+        },
+        signal: controller.signal,
+      });
+
       if (response.status !== 404) {
         return true;
       }
     } catch {
       // Server not ready yet
+    } finally {
+      controller.abort();
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -252,19 +261,36 @@ async function buildWidgets(
     return [];
   }
 
-  // Find all TSX widget files
-  let entries: string[] = [];
+  // Find all TSX widget files and folders with widget.tsx
+  const entries: Array<{ name: string; path: string }> = [];
   try {
-    const files = await fs.readdir(resourcesDir);
-    entries = files
-      .filter((f) => {
-        // Exclude macOS resource fork files and other hidden/system files
-        if (f.startsWith("._") || f.startsWith(".DS_Store")) {
-          return false;
+    const files = await fs.readdir(resourcesDir, { withFileTypes: true });
+    for (const dirent of files) {
+      // Exclude macOS resource fork files and other hidden/system files
+      if (dirent.name.startsWith("._") || dirent.name.startsWith(".DS_Store")) {
+        continue;
+      }
+
+      if (dirent.isFile() && (dirent.name.endsWith(".tsx") || dirent.name.endsWith(".ts"))) {
+        // Single file widget
+        entries.push({
+          name: dirent.name.replace(/\.tsx?$/, ""),
+          path: path.join(resourcesDir, dirent.name),
+        });
+      } else if (dirent.isDirectory()) {
+        // Check for widget.tsx in folder
+        const widgetPath = path.join(resourcesDir, dirent.name, "widget.tsx");
+        try {
+          await fs.access(widgetPath);
+          entries.push({
+            name: dirent.name,
+            path: widgetPath,
+          });
+        } catch {
+          // widget.tsx doesn't exist in this folder, skip it
         }
-        return f.endsWith(".tsx") || f.endsWith(".ts");
-      })
-      .map((f) => path.join(resourcesDir, f));
+      }
+    }
   } catch (error) {
     console.log(chalk.gray("No widgets found in resources/ directory"));
     return [];
@@ -284,8 +310,8 @@ async function buildWidgets(
   const builtWidgets: Array<{ name: string; metadata: any }> = [];
 
   for (const entry of entries) {
-    const baseName = path.basename(entry).replace(/\.tsx?$/, "");
-    const widgetName = baseName;
+    const widgetName = entry.name;
+    const entryPath = entry.path;
 
     console.log(chalk.gray(`  - Building ${widgetName}...`));
 
@@ -304,7 +330,7 @@ async function buildWidgets(
     const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import Component from '${entry}'
+import Component from '${entryPath}'
 
 const container = document.getElementById('widget-root')
 if (container && Component) {
@@ -368,6 +394,18 @@ if (container && Component) {
         server: {
           middlewareMode: true,
         },
+        ssr: {
+          // Force Vite to transform these packages in SSR instead of using external requires
+          noExternal: ['@openai/apps-sdk-ui', 'react-router'],
+        },
+        define: {
+          // Define process.env for SSR context
+          'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+          'import.meta.env.DEV': true,
+          'import.meta.env.PROD': false,
+          'import.meta.env.MODE': JSON.stringify('development'),
+          'import.meta.env.SSR': true,
+        },
         clearScreen: false,
         logLevel: "silent",
         customLogger: {
@@ -382,7 +420,7 @@ if (container && Component) {
       });
 
       try {
-        const mod = await metadataServer.ssrLoadModule(entry);
+        const mod = await metadataServer.ssrLoadModule(entryPath);
         if (mod.widgetMetadata) {
           widgetMetadata = {
             ...mod.widgetMetadata,
@@ -472,6 +510,21 @@ program
       console.log(chalk.gray("Building TypeScript..."));
       await runCommand("npx", ["tsc"], projectPath);
       console.log(chalk.green("✓ TypeScript build complete!"));
+
+      // Copy public folder if it exists
+      const publicDir = path.join(projectPath, "public");
+      try {
+        await fs.access(publicDir);
+        console.log(chalk.gray("Copying public assets..."));
+        await fs.cp(
+          publicDir,
+          path.join(projectPath, "dist", "public"),
+          { recursive: true }
+        );
+        console.log(chalk.green("✓ Public assets copied"));
+      } catch {
+        // Public folder doesn't exist, skip
+      }
 
       // Create build manifest
       const manifestPath = path.join(projectPath, "dist", "mcp-use.json");

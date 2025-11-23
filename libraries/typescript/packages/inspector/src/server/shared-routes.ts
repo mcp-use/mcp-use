@@ -310,9 +310,18 @@ export function registerInspectorRoutes(
       );
 
       // Also handle relative paths that start with /mcp-use/widgets/
+      // BUT exclude @vite/client and @react-refresh which need direct access for HMR
       html = html.replace(
-        /(src|href)="\/mcp-use\/widgets\//g,
-        `$1="${proxyBase}/mcp-use/widgets/`
+        /(src|href)="(\/mcp-use\/widgets\/[^"]+)"/g,
+        (_match, attr, path) => {
+          // Don't proxy Vite's HMR client scripts - they need direct connection
+          if (path.includes('/@vite/client') || path.includes('/@react-refresh')) {
+            // Rewrite to absolute URL pointing to dev server
+            return `${attr}="${widgetData.devServerBaseUrl}${path}"`;
+          }
+          // Proxy other assets
+          return `${attr}="${proxyBase}${path}"`;
+        }
       );
 
       // Handle Vite's asset imports (e.g., import.meta.url, __VITE_ASSET__)
@@ -327,16 +336,26 @@ export function registerInspectorRoutes(
         return match;
       });
 
-      // Rewrite Vite HMR WebSocket URL to go through proxy
-      const host = c.req.header("host") || "localhost:3000";
-      const protocol =
-        c.req.header("x-forwarded-proto") ||
-        (c.req.url.startsWith("https") ? "https" : "http");
-      const wsProtocol = protocol === "https" ? "wss" : "ws";
-      html = html.replace(/__vite_ws__:\s*["']([^"']+)["']/g, () => {
-        const proxyWsUrl = `${wsProtocol}://${host}/inspector/api/dev-widget/${toolId}/__vite_hmr`;
-        return `__vite_ws__: "${proxyWsUrl}"`;
-      });
+      // Inject Vite HMR WebSocket configuration before @vite/client loads
+      if (widgetData.devServerBaseUrl) {
+        const devServerUrl = new URL(widgetData.devServerBaseUrl);
+        const wsProtocol = devServerUrl.protocol === "https:" ? "wss" : "ws";
+        const wsHost = devServerUrl.host; // e.g., "localhost:3000"
+        
+        // Point directly to Vite HMR endpoint on the dev server
+        const directWsUrl = `${wsProtocol}://${wsHost}/mcp-use/widgets/`;
+        
+        // Inject configuration script before Vite client loads
+        // This tells Vite where to connect for HMR
+        const viteConfigScript = `
+    <script>
+      // Configure Vite HMR to connect directly to dev server
+      window.__vite_ws_url__ = "${directWsUrl}";
+    </script>`;
+        
+        // Insert before the first script tag (typically @vite/client)
+        html = html.replace(/<script/, viteConfigScript + "\n    <script");
+      }
 
       // Set security headers
       const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
@@ -403,12 +422,6 @@ export function registerInspectorRoutes(
       return c.notFound();
     }
   });
-
-  // WebSocket proxy for Vite HMR - placeholder
-  // Note: WebSocket proxy requires WebSocket library (e.g., 'ws' package)
-  // This endpoint would handle WebSocket upgrades for /inspector/api/dev-widget/:toolId/__vite_hmr
-  // For now, Vite HMR may work directly if the WebSocket URL is rewritten correctly in the HTML
-  // TODO: Implement WebSocket proxy using 'ws' package or similar when needed
 
   // Inspector config endpoint
   app.get("/inspector/config.json", (c) => {
