@@ -474,6 +474,76 @@ llm = ChatOpenAI(
 agent = MCPAgent(llm=llm, client=client)
 ```
 
+### Automatic Error Retry
+
+The agent includes automatic error handling that catches tool failures and allows the LLM to retry with corrected input. This is controlled by the `retry_on_error` parameter (default: `True`).
+
+```python
+# Default: Error handling enabled
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    retry_on_error=True  # Default
+)
+
+# Disable automatic error handling (errors will halt execution)
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    retry_on_error=False
+)
+```
+
+**How it works:**
+
+When `retry_on_error=True`, the agent uses middleware to intercept tool errors:
+
+1. **Catches all tool errors** including validation errors, connection errors, and execution errors
+2. **Formats the error** into a clear, actionable message
+3. **Returns error to LLM** as a tool result (not an exception)
+4. **LLM reads the error** and can retry with corrected input
+5. **Execution continues** based on the LLM's decision
+
+**Example Flow:**
+
+```python
+# First attempt - missing required field
+# Tool call: create_board_column(board_id="123", body={"name": "Assignee"})
+# Error returned: "Tool input validation failed. Please fix the following errors and retry:
+#   - body.metaData: Field required (type: missing)"
+
+# Second attempt - LLM automatically retries with correction
+# Tool call: create_board_column(board_id="123", body={"name": "Assignee", "metaData": {}})
+# Success: Column created
+```
+
+<Note>
+The automatic retry mechanism works for all error types and is handled by the middleware, ensuring errors are caught at the right level - including Pydantic validation errors that occur before tool execution.
+</Note>
+
+**Error Message Formatting:**
+
+Different error types receive different formatting:
+
+- **Validation Errors**: Field-by-field breakdown showing exactly what's wrong
+  ```
+  Tool input validation failed. Please fix the following errors and retry:
+    - body.metaData: Field required (type: missing)
+    - timeout: Input should be a valid integer (type: int_type)
+  ```
+
+- **Other Errors**: Error type and description
+  ```
+  ConnectionError: Failed to connect to MCP server
+  ```
+
+**When to disable `retry_on_error`:**
+
+Set `retry_on_error=False` when:
+- Debugging tool issues and you want immediate failure
+- You want strict validation without retry attempts
+- Running in environments where retries could cause issues
+
 ## Best Practices
 
 1. **LLM Selection**: Use models with tool calling capabilities
