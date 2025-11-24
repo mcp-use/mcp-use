@@ -145,6 +145,7 @@ export class McpServer {
   private registeredTools: string[] = [];
   private registeredPrompts: string[] = [];
   private registeredResources: string[] = [];
+  private buildId?: string;
 
   /**
    * Creates a new MCP server instance with Hono integration
@@ -604,19 +605,19 @@ export class McpServer {
 
     switch (definition.type) {
       case "externalUrl":
-        resourceUri = `ui://widget/${definition.widget}`;
+        resourceUri = this.generateWidgetUri(definition.widget);
         mimeType = "text/uri-list";
         break;
       case "rawHtml":
-        resourceUri = `ui://widget/${definition.name}`;
+        resourceUri = this.generateWidgetUri(definition.name);
         mimeType = "text/html";
         break;
       case "remoteDom":
-        resourceUri = `ui://widget/${definition.name}`;
+        resourceUri = this.generateWidgetUri(definition.name);
         mimeType = "application/vnd.mcp-ui.remote-dom+javascript";
         break;
       case "appsSdk":
-        resourceUri = `ui://widget/${definition.name}.html`;
+        resourceUri = this.generateWidgetUri(definition.name, ".html");
         mimeType = "text/html+skybridge";
         break;
       default:
@@ -642,6 +643,9 @@ export class McpServer {
             : {};
 
         const uiResource = this.createWidgetUIResource(definition, params);
+        
+        // Ensure the resource content URI matches the registered URI (with build ID)
+        uiResource.resource.uri = resourceUri;
 
         return {
           contents: [uiResource.resource],
@@ -651,10 +655,14 @@ export class McpServer {
 
     // For Apps SDK, also register a resource template to handle dynamic URIs with random IDs
     if (definition.type === "appsSdk") {
+      // Build URI template with build ID if available
+      const buildIdPart = this.buildId ? `-${this.buildId}` : "";
+      const uriTemplate = `ui://widget/${definition.name}${buildIdPart}-{id}.html`;
+      
       this.resourceTemplate({
         name: `${definition.name}-dynamic`,
         resourceTemplate: {
-          uriTemplate: `ui://widget/${definition.name}-{id}.html`,
+          uriTemplate,
           name: definition.title || definition.name,
           description: definition.description,
           mimeType,
@@ -666,6 +674,9 @@ export class McpServer {
         readCallback: async (uri, params) => {
           // Use empty params for Apps SDK since structuredContent is passed separately
           const uiResource = this.createWidgetUIResource(definition, {});
+          
+          // Ensure the resource content URI matches the template URI (with build ID)
+          uiResource.resource.uri = uri;
 
           return {
             contents: [uiResource.resource],
@@ -711,7 +722,7 @@ export class McpServer {
         if (definition.type === "appsSdk") {
           // Generate a unique URI with random ID for each invocation
           const randomId = Math.random().toString(36).substring(2, 15);
-          const uniqueUri = `ui://widget/${definition.name}-${randomId}.html`;
+          const uniqueUri = this.generateWidgetUri(definition.name, ".html", randomId);
 
           // Update toolMetadata with the unique URI
           const uniqueToolMetadata = {
@@ -783,6 +794,7 @@ export class McpServer {
     const urlConfig: UrlConfig = {
       baseUrl: configBaseUrl,
       port: configPort,
+      buildId: this.buildId,
     };
 
     const uiResource = createUIResourceFromDefinition(
@@ -801,6 +813,36 @@ export class McpServer {
     }
 
     return uiResource;
+  }
+
+  /**
+   * Generate a widget URI with optional build ID for cache busting
+   *
+   * @private
+   * @param widgetName - Widget name/identifier
+   * @param extension - Optional file extension (e.g., '.html')
+   * @param suffix - Optional suffix (e.g., random ID for dynamic URIs)
+   * @returns Widget URI with build ID if available
+   */
+  private generateWidgetUri(
+    widgetName: string,
+    extension: string = "",
+    suffix: string = ""
+  ): string {
+    const parts = [widgetName];
+    
+    // Add build ID if available (for cache busting)
+    if (this.buildId) {
+      parts.push(this.buildId);
+    }
+    
+    // Add suffix if provided (e.g., random ID for dynamic URIs)
+    if (suffix) {
+      parts.push(suffix);
+    }
+    
+    // Construct URI: ui://widget/name-buildId-suffix.extension
+    return `ui://widget/${parts.join("-")}${extension}`;
   }
 
   /**
@@ -1524,6 +1566,12 @@ if (container && Component) {
         "utf8"
       );
       const manifest = JSON.parse(manifestContent);
+
+      // Store build ID from manifest for use in widget URIs
+      if (manifest.buildId && typeof manifest.buildId === "string") {
+        this.buildId = manifest.buildId;
+        console.log(`[WIDGETS] Build ID: ${this.buildId}`);
+      }
 
       if (
         manifest.widgets &&
