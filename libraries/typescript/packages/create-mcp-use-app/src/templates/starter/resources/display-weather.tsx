@@ -1,6 +1,6 @@
 import React from "react";
 import { z } from "zod";
-import { useWidget } from "mcp-use/react";
+import { useWidget, type WidgetProps } from "mcp-use/react";
 import "../styles.css";
 
 /*
@@ -26,7 +26,7 @@ export const widgetMetadata = {
   inputs: propSchema,
 };
 
-type WeatherProps = z.infer<typeof propSchema>;
+type WeatherProps = WidgetProps<z.infer<typeof propSchema>>;
 
 const WeatherWidget: React.FC = () => {
   // Use the useWidget hook to get props from OpenAI Apps SDK

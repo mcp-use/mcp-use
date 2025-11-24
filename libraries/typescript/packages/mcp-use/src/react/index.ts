@@ -39,6 +39,7 @@ export type {
   UnknownObject,
   UserAgent,
   UseWidgetResult,
+  WidgetProps,
 } from "./widget-types.js";
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";

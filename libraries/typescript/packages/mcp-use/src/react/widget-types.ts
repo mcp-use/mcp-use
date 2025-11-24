@@ -114,6 +114,27 @@ declare global {
 }
 
 /**
+ * Type for widget props passed to widgets via the useWidget hook.
+ * This represents the props that are mapped from toolInput for MCP compatibility.
+ *
+ * @example
+ * ```tsx
+ * import type { WidgetProps } from 'mcp-use/react';
+ *
+ * type MyWidgetProps = WidgetProps<{
+ *   city: string;
+ *   temperature: number;
+ * }>;
+ *
+ * const MyWidget: React.FC = () => {
+ *   const { props } = useWidget<MyWidgetProps>();
+ *   // ...
+ * };
+ * ```
+ */
+export type WidgetProps<T extends UnknownObject = UnknownObject> = T;
+
+/**
  * Result type for the useWidget hook
  */
 export interface UseWidgetResult<
