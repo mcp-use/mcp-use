@@ -145,7 +145,6 @@ return {
 
         result = await client.execute_code(
             """
-import asyncio
 await asyncio.sleep(10)
 return "should timeout"
 """,
