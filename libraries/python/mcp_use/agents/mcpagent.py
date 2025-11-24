@@ -972,11 +972,12 @@ class MCPAgent:
             if event.get("event") == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
                 if chunk and getattr(chunk, "content", None):
-                    content = (
-                        chunk.content
-                        if isinstance(chunk.content, str)
-                        else "".join([item.get("text", "") for item in chunk.content])
-                    )
+                    if isinstance(chunk.content, str):
+                        content = chunk.content
+                    elif hasattr(chunk.content, '__iter__'):
+                        content = "".join([item.get("text", "") for item in chunk.content])
+                    else:
+                        content = str(chunk.content)
                     ai_message_chunks.append(content)
 
             yield event
