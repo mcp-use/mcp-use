@@ -26,7 +26,7 @@ export function ToolsList({
   }
 
   return (
-    <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
+    <div className="overflow-y-auto flex-1 overscroll-contain">
       {tools.map((tool, index) => (
         <ListItem
           key={tool.name}

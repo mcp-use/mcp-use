@@ -50,18 +50,12 @@ class TestCodeModeIntegration:
         """Test search_tools with no active sessions."""
         client = MCPClient(code_mode=True)
 
-        tools = await client.search_tools("", detail_level="names")
+        result = await client.search_tools()
 
-        assert tools == [
-            {
-                "name": "execute_code",
-                "server": "code_mode",
-            },
-            {
-                "name": "search_tools",
-                "server": "code_mode",
-            },
-        ]
+        assert result["results"] == []
+        assert result["meta"]["total_tools"] == 0
+        assert result["meta"]["namespaces"] == []
+        assert result["meta"]["result_count"] == 0
 
     def test_from_dict_with_code_mode(self):
         """Test creating client from dict with code_mode."""
@@ -195,27 +189,14 @@ class TestSearchToolsIntegration:
         """Test search_tools with different detail levels."""
         client = MCPClient(code_mode=True)
 
-        # Test with empty sessions (should return empty list)
-        names = await client.search_tools("", detail_level="names")
-        descriptions = await client.search_tools("", detail_level="descriptions")
-        full = await client.search_tools("", detail_level="full")
+        # Test with empty sessions (should return empty results but with metadata)
+        names_result = await client.search_tools("", detail_level="names")
+        descriptions_result = await client.search_tools("", detail_level="descriptions")
+        full_result = await client.search_tools("", detail_level="full")
 
-        assert names == [
-            {
-                "name": "execute_code",
-                "server": "code_mode",
-            },
-            {
-                "name": "search_tools",
-                "server": "code_mode",
-            },
-        ]
-        assert len(descriptions) == 2
-        assert all("name" in t and "server" in t and "description" in t for t in descriptions)
-        assert descriptions[0]["name"] == "execute_code"
-        assert descriptions[1]["name"] == "search_tools"
-
-        assert len(full) == 2
-        assert all("name" in t and "server" in t and "description" in t and "input_schema" in t for t in full)
-        assert full[0]["name"] == "execute_code"
-        assert full[1]["name"] == "search_tools"
+        assert names_result["results"] == []
+        assert names_result["meta"]["total_tools"] == 0
+        assert descriptions_result["results"] == []
+        assert descriptions_result["meta"]["total_tools"] == 0
+        assert full_result["results"] == []
+        assert full_result["meta"]["total_tools"] == 0

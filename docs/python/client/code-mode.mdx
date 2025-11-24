@@ -22,7 +22,8 @@ await client.create_all_sessions()
 
 result = await client.execute_code("""
 # Discover tools
-tools = await search_tools("github")
+search_result = await search_tools("github")
+tools = search_result['results']
 
 # Call tools as functions
 pr = await github.get_pull_request(owner="facebook", repo="react", number=12345)
@@ -65,7 +66,8 @@ Agents load only the tools they need, when they need them:
 ```python
 result = await client.execute_code("""
 # Search for relevant tools instead of loading all upfront
-github_tools = await search_tools("github pull request")
+search_result = await search_tools("github pull request")
+github_tools = search_result['results']
 
 # Only the 3 PR-related tools are loaded, not all 150+ tools
 pr = await github.get_pull_request(...)
@@ -163,17 +165,26 @@ The agent starts by searching for filesystem tools:
 
 ```python
 # Agent calls search_tools
-tools = await search_tools('filesystem list')
+result = await search_tools('filesystem list')
+tools = result['results']
+print(f"Found {result['meta']['result_count']} tools out of {result['meta']['total_tools']} total")
 ```
 
 ```json Result (16 filesystem tools found)
-[
-  {"name": "list_directory", "server": "filesystem"},
-  {"name": "list_directory_with_sizes", "server": "filesystem"},
-  {"name": "move_file", "server": "filesystem"},
-  {"name": "read_file", "server": "filesystem"},
-  ...
-]
+{
+  "meta": {
+    "total_tools": 50,
+    "namespaces": ["filesystem"],
+    "result_count": 16
+  },
+  "results": [
+    {"name": "list_directory", "server": "filesystem"},
+    {"name": "list_directory_with_sizes", "server": "filesystem"},
+    {"name": "move_file", "server": "filesystem"},
+    {"name": "read_file", "server": "filesystem"},
+    ...
+  ]
+}
 ```
 
 <Note>
@@ -249,6 +260,10 @@ Execute Python code with MCP tool access.
 #### `search_tools(query: str = "", detail_level: str = "full")`
 
 Search available tools across all servers.
+
+**Returns:** Dictionary with:
+- `meta`: Dictionary containing `total_tools`, `namespaces`, and `result_count`
+- `results`: List of tool information dictionaries matching the query
 
 **Detail levels:** `"names"`, `"descriptions"`, `"full"`
 

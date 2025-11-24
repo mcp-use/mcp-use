@@ -71,6 +71,7 @@
                   "inspector/connection-settings",
                   "inspector/keyboard-shortcuts",
                   "inspector/command-palette",
+                  "inspector/rpc-logging",
                   "inspector/integration",
                   "inspector/debugging-chatgpt-apps",
                   "inspector/self-hosting",
@@ -456,22 +457,20 @@
                     "tag": "Apps SDK",
                     "pages": [
                       "typescript/server/ui-widgets",
+                      "typescript/server/mcp-ui-resources",
+                      "typescript/server/apps-sdk-resources",
                       {
-                        "group": "References",
-                        "icon": "book",
+                        "group": "Components & Hooks",
+                        "icon": "component",
                         "pages": [
-                          "typescript/server/mcp-ui-resources",
-                          "typescript/server/apps-sdk-resources"
+                          "typescript/server/widget-components/mcpuseprovider",
+                          "typescript/server/widget-components/widgetcontrols",
+                          "typescript/server/widget-components/usewidget",
+                          "typescript/server/widget-components/errorboundary",
+                          "typescript/server/widget-components/image",
+                          "typescript/server/widget-components/themeprovider"
                         ]
                       }
-                    ]
-                  },
-                  {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
-                    "pages": [
-                      "typescript/server/configuration",
-                      "typescript/server/examples"
                     ]
                   },
                   {

@@ -1,12 +1,13 @@
 import { cn } from "@/client/lib/utils";
 import { X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useMcpContext } from "../context/McpContext";
 import { useTheme } from "../context/ThemeContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { IframeConsole } from "./IframeConsole";
 import { Spinner } from "./ui/spinner";
+import { WidgetInspectorControls } from "./WidgetInspectorControls";
 
 interface OpenAIComponentRendererProps {
   componentUrl: string;
@@ -48,7 +49,7 @@ function Wrapper({
  * OpenAIComponentRenderer renders OpenAI Apps SDK components
  * Provides window.openai API bridge for component interaction via iframe
  */
-export function OpenAIComponentRenderer({
+function OpenAIComponentRendererBase({
   componentUrl,
   toolName,
   toolArgs,
@@ -68,12 +69,17 @@ export function OpenAIComponentRenderer({
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
   const [iframeHeight, setIframeHeight] = useState<number>(400);
   const lastMeasuredHeightRef = useRef<number>(0);
+  const lastNotifiedHeightRef = useRef<number>(0);
+  const useNotifiedHeightRef = useRef<boolean>(false); // Flag to prefer notified height over automatic measurement
   const [centerVertically, setCenterVertically] = useState<boolean>(false);
   const [displayMode, setDisplayMode] = useState<
     "inline" | "pip" | "fullscreen"
   >("inline");
   const [isSameOrigin, setIsSameOrigin] = useState<boolean>(false);
   const [isPipHovered, setIsPipHovered] = useState<boolean>(false);
+  const [useDevMode, setUseDevMode] = useState<boolean>(false);
+  const [widgetToolInput, setWidgetToolInput] = useState<any>(null);
+  const [widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -88,52 +94,21 @@ export function OpenAIComponentRenderer({
   const serverBaseUrl = server?.url;
   const { resolvedTheme } = useTheme();
 
-  console.log(componentUrl, toolResult);
-
   // Store widget data and set up iframe URL
   useEffect(() => {
     const storeAndSetUrl = async () => {
       try {
-        console.log("[OpenAIComponentRenderer] Starting storeAndSetUrl:", {
-          toolName,
-          toolArgs,
-          toolResult: JSON.stringify(toolResult).substring(0, 200),
-          toolResultKeys: toolResult ? Object.keys(toolResult) : [],
-          hasToolResultMeta: !!toolResult?._meta,
-          hasToolResultContents: !!toolResult?.contents,
-        });
-
         // Extract structured content from tool result (the actual tool parameters)
         const structuredContent = toolResult?.structuredContent || null;
-
-        console.log(
-          "[OpenAIComponentRenderer] Extracted structuredContent:",
-          structuredContent
-        );
 
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await readResource(componentUrl);
 
-        console.log("[OpenAIComponentRenderer] Resource data:", {
-          hasContents: !!resourceData?.contents,
-          firstContentKeys: resourceData?.contents?.[0]
-            ? Object.keys(resourceData.contents[0])
-            : [],
-          hasMeta: !!resourceData?.contents?.[0]?._meta,
-          metaKeys: resourceData?.contents?.[0]?._meta
-            ? Object.keys(resourceData.contents[0]._meta)
-            : [],
-        });
-
         // For Apps SDK widgets, use structuredContent as toolInput (the actual tool parameters)
         // toolArgs might be empty or from the initial invocation, structuredContent has the real data
-        const widgetToolInput = structuredContent || toolArgs;
-
-        console.log("[OpenAIComponentRenderer] Widget inputs:", {
-          toolArgs,
-          structuredContent,
-          widgetToolInput,
-        });
+        const computedToolInput = structuredContent || toolArgs;
+        setWidgetToolInput(computedToolInput);
+        setWidgetToolOutput(structuredContent);
 
         // Extract CSP metadata from tool result
         // Check both toolResult._meta (for tool calls) and toolResult.contents?.[0]?._meta (for resources)
@@ -143,8 +118,6 @@ export function OpenAIComponentRenderer({
         if (metaSource?.["openai/widgetCSP"]) {
           widgetCSP = metaSource["openai/widgetCSP"];
         }
-
-        console.log("[OpenAIComponentRenderer] Widget CSP:", widgetCSP);
 
         // pass props as url params (toolInput, toolOutput)
         const urlParams = new URLSearchParams();
@@ -159,20 +132,11 @@ export function OpenAIComponentRenderer({
         const metaForWidget =
           toolResult?._meta || toolResult?.contents?.[0]?._meta;
 
-        console.log("[OpenAIComponentRenderer] Checking for dev mode widget:", {
-          hasMeta: !!metaForWidget,
-          metaKeys: metaForWidget ? Object.keys(metaForWidget) : [],
-          hasWidgetMeta: !!metaForWidget?.["mcp-use/widget"],
-          widgetMeta: metaForWidget?.["mcp-use/widget"],
-          checkedFromToolResultMeta: !!toolResult?._meta,
-          checkedFromContentsMeta: !!toolResult?.contents?.[0]?._meta,
-          serverBaseUrl,
-        });
-
         // Use dev mode if metadata says so
-        const useDevMode =
+        const computedUseDevMode =
           metaForWidget?.["mcp-use/widget"]?.html &&
           metaForWidget?.["mcp-use/widget"]?.dev;
+        setUseDevMode(computedUseDevMode || false);
 
         const widgetName = metaForWidget?.["mcp-use/widget"]?.name;
 
@@ -180,14 +144,15 @@ export function OpenAIComponentRenderer({
         const widgetDataToStore: any = {
           serverId,
           uri: componentUrl,
-          toolInput: widgetToolInput,
+          toolInput: computedToolInput,
           toolOutput: structuredContent,
           resourceData, // Pass the fetched HTML
           toolId,
           widgetCSP, // Pass the CSP metadata
+          theme: resolvedTheme, // Pass the current theme to prevent flash
         };
 
-        if (useDevMode && widgetName && serverBaseUrl) {
+        if (computedUseDevMode && widgetName && serverBaseUrl) {
           const devServerBaseUrl = new URL(serverBaseUrl).origin;
           const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
           widgetDataToStore.devWidgetUrl = devWidgetUrl;
@@ -215,21 +180,13 @@ export function OpenAIComponentRenderer({
           );
         }
 
-        if (useDevMode && widgetName && serverBaseUrl) {
+        if (computedUseDevMode && widgetName && serverBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
           const proxyUrl = `/inspector/api/dev-widget/${toolId}?${urlParams.toString()}`;
-          console.log(
-            "[OpenAIComponentRenderer] Using DEV mode proxy URL:",
-            proxyUrl
-          );
           setWidgetUrl(proxyUrl);
           setIsSameOrigin(true); // Proxy makes it same-origin
         } else {
           const prodUrl = `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`;
-          console.log(
-            "[OpenAIComponentRenderer] Using PROD mode URL:",
-            prodUrl
-          );
           setWidgetUrl(prodUrl);
           // Relative URLs are always same-origin
           setIsSameOrigin(true);
@@ -251,6 +208,7 @@ export function OpenAIComponentRenderer({
     toolId,
     readResource,
     serverBaseUrl,
+    resolvedTheme, // Include theme so widget data is updated when theme changes
   ]);
 
   // Helper to update window.openai globals inside iframe
@@ -291,7 +249,9 @@ export function OpenAIComponentRenderer({
 
             // Dispatch the set_globals event to notify React components
             try {
-              const globalsEvent = new (iframeWindow as any).CustomEvent(
+              const CustomEventConstructor =
+                iframeWindow.CustomEvent as typeof window.CustomEvent;
+              const globalsEvent = new CustomEventConstructor(
                 "openai:set_globals",
                 {
                   detail: {
@@ -379,8 +339,30 @@ export function OpenAIComponentRenderer({
         return;
       }
 
+      // Messages are handled silently unless there's an error
+
       // Let console log messages pass through (handled by useIframeConsole hook)
       if (event.data?.type === "iframe-console-log") {
+        return;
+      }
+
+      // Handle widget state requests from inspector
+      if (event.data?.type === "mcp-inspector:getWidgetState") {
+        try {
+          const iframeWindow = iframeRef.current?.contentWindow;
+          if (iframeWindow?.openai?.widgetState !== undefined) {
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: "mcp-inspector:widgetStateResponse",
+                toolId: event.data.toolId,
+                state: iframeWindow.openai.widgetState,
+              },
+              "*"
+            );
+          }
+        } catch (e) {
+          // Cross-origin or not accessible
+        }
         return;
       }
 
@@ -404,11 +386,6 @@ export function OpenAIComponentRenderer({
             }
 
             const { toolName, params, requestId } = event.data;
-            console.log(
-              "[OpenAIComponentRenderer] Calling tool:",
-              toolName,
-              params
-            );
 
             // Call the tool via the MCP connection
             const result = await server.callTool(toolName, params || {});
@@ -498,11 +475,6 @@ export function OpenAIComponentRenderer({
               return;
             }
 
-            console.log(
-              "[OpenAIComponentRenderer] Sending follow-up message:",
-              prompt
-            );
-
             // Dispatch a custom event that the chat component can listen to
             const followUpEvent = new window.CustomEvent(
               "mcp-inspector:widget-followup",
@@ -542,11 +514,43 @@ export function OpenAIComponentRenderer({
           try {
             const { mode } = event.data;
             if (mode && ["inline", "pip", "fullscreen"].includes(mode)) {
-              handleDisplayModeChange(mode);
+              await handleDisplayModeChange(mode);
             }
           } catch (err) {
             console.error(
               "[OpenAIComponentRenderer] Failed to change display mode:",
+              err
+            );
+          }
+          break;
+
+        case "openai:notifyIntrinsicHeight":
+          try {
+            const { height } = event.data;
+            if (typeof height === "number" && height > 0) {
+              // For inline mode, respect the requested height (allow scrolling if needed)
+              // For fullscreen/pip modes, cap at viewport
+              let newHeight = height;
+              if (displayMode === "fullscreen" || displayMode === "pip") {
+                const maxHeight =
+                  typeof window !== "undefined" ? window.innerHeight : height;
+                newHeight = Math.min(height, maxHeight);
+              }
+              // Always update if the requested height is different from what we last applied
+              // This ensures we update even if we cap it (so widget knows the actual applied height)
+              if (
+                height !== lastNotifiedHeightRef.current ||
+                newHeight !== iframeHeight
+              ) {
+                lastNotifiedHeightRef.current = height; // Track requested height from notifyIntrinsicHeight
+                lastMeasuredHeightRef.current = newHeight; // Track applied height
+                useNotifiedHeightRef.current = true; // Use notified height instead of automatic measurement
+                setIframeHeight(newHeight);
+              }
+            }
+          } catch (err) {
+            console.error(
+              "[OpenAIComponentRenderer] Failed to handle intrinsic height notification:",
               err
             );
           }
@@ -578,6 +582,13 @@ export function OpenAIComponentRenderer({
           setIsSameOrigin(false);
         }
       }
+      // Update theme when iframe loads to ensure correct initial theme
+      // Use a small delay to ensure window.openai is fully initialized
+      if (resolvedTheme) {
+        setTimeout(() => {
+          updateIframeGlobals({ theme: resolvedTheme });
+        }, 50);
+      }
     };
 
     const handleError = () => {
@@ -586,7 +597,7 @@ export function OpenAIComponentRenderer({
 
     const iframe = iframeRef.current;
     iframe?.addEventListener("load", handleLoad);
-    iframe?.addEventListener("error", handleError as any);
+    iframe?.addEventListener("error", handleError);
 
     // Also try to inject immediately if iframe is already loaded (only for same-origin)
     if (
@@ -600,15 +611,29 @@ export function OpenAIComponentRenderer({
     return () => {
       window.removeEventListener("message", handleMessage);
       iframe?.removeEventListener("load", handleLoad);
-      iframe?.removeEventListener("error", handleError as any);
+      iframe?.removeEventListener("error", handleError);
     };
-  }, [widgetUrl, isSameOrigin, handleDisplayModeChange, server, serverId]);
+  }, [
+    widgetUrl,
+    isSameOrigin,
+    handleDisplayModeChange,
+    server,
+    serverId,
+    resolvedTheme,
+    updateIframeGlobals,
+    useDevMode,
+  ]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {
     if (!widgetUrl) return;
 
     const measure = () => {
+      // Skip automatic measurement if widget is using notifyIntrinsicHeight
+      if (useNotifiedHeightRef.current) {
+        return;
+      }
+
       const iframe = iframeRef.current;
       const contentDoc = iframe?.contentWindow?.document;
       const body = contentDoc?.body;
@@ -681,11 +706,16 @@ export function OpenAIComponentRenderer({
   }, [displayMode, updateIframeGlobals]);
 
   // Watch for theme changes and update iframe
+  // Also update when iframe becomes ready to ensure initial theme is set correctly
   useEffect(() => {
-    if (widgetUrl && resolvedTheme) {
-      updateIframeGlobals({ theme: resolvedTheme });
+    if (widgetUrl && resolvedTheme && isReady) {
+      // Use a small delay to ensure window.openai is fully initialized
+      const timeoutId = setTimeout(() => {
+        updateIframeGlobals({ theme: resolvedTheme });
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
-  }, [resolvedTheme, widgetUrl, updateIframeGlobals]);
+  }, [resolvedTheme, widgetUrl, isReady, updateIframeGlobals]);
 
   if (error) {
     return (
@@ -721,8 +751,19 @@ export function OpenAIComponentRenderer({
         isSameOrigin &&
         displayMode !== "fullscreen" &&
         displayMode !== "pip" && (
-          <div className="absolute top-2 right-2 z-10">
+          <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
             <IframeConsole iframeId={toolId} enabled={true} />
+            {useDevMode && (
+              <WidgetInspectorControls
+                displayMode={displayMode}
+                onDisplayModeChange={handleDisplayModeChange}
+                toolInput={widgetToolInput}
+                toolOutput={widgetToolOutput}
+                toolResult={toolResult}
+                iframeRef={iframeRef}
+                toolId={toolId}
+              />
+            )}
           </div>
         )}
       <div
@@ -775,7 +816,7 @@ export function OpenAIComponentRenderer({
             ref={iframeRef}
             src={widgetUrl}
             className={cn(
-              displayMode === "inline" && "rounded-3xl w-full max-w-[768px]",
+              displayMode === "inline" && " w-full max-w-[768px]",
               displayMode === "fullscreen" && "w-full h-full rounded-none",
               displayMode === "pip" && "w-full h-full rounded-lg"
             )}
@@ -794,3 +835,6 @@ export function OpenAIComponentRenderer({
     </Wrapper>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders when props haven't changed
+export const OpenAIComponentRenderer = memo(OpenAIComponentRendererBase);

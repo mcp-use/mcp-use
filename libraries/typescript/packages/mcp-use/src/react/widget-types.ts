@@ -87,6 +87,9 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
 
   /** Persist widget state that will be shown to the model */
   setWidgetState: (state: WidgetState) => Promise<void>;
+
+  /** Notify OpenAI about intrinsic height changes for auto-sizing */
+  notifyIntrinsicHeight: (height: number) => Promise<void>;
 }
 
 // Event types
@@ -101,6 +104,8 @@ export class SetGlobalsEvent extends CustomEvent<{
 declare global {
   interface Window {
     openai?: API<any> & OpenAiGlobals<any, any, any, any>;
+    __getFile?: (filename: string) => string;
+    __mcpPublicUrl?: string;
   }
 
   interface WindowEventMap {
@@ -144,6 +149,8 @@ export interface UseWidgetResult<
   userAgent: UserAgent;
   /** Current locale */
   locale: string;
+  /** MCP server base URL for making API requests */
+  mcp_url: string;
 
   // Actions
   /** Call a tool on the MCP server */

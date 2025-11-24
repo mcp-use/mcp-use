@@ -1,0 +1,152 @@
+---
+title: "McpUseProvider"
+description: "Unified provider component that combines all common React setup for mcp-use widgets"
+icon: "layers"
+---
+
+# McpUseProvider
+
+The `McpUseProvider` is a unified provider component that combines all common React setup for mcp-use widgets. It automatically includes StrictMode, ThemeProvider, BrowserRouter, optional WidgetControls, and ErrorBoundary, eliminating the need to manually set up these providers.
+
+## Import
+
+```typescript
+import { McpUseProvider } from 'mcp-use/react';
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | **required** | The widget content to wrap |
+| `debugger` | `boolean` | `false` | Enable debug button in WidgetControls component |
+| `viewControls` | `boolean \| "pip" \| "fullscreen"` | `false` | Enable view controls (fullscreen/pip). `true` shows both, `"pip"` shows only pip, `"fullscreen"` shows only fullscreen |
+| `autoSize` | `boolean` | `false` | Automatically notify OpenAI about container height changes using ResizeObserver |
+
+## What's Included
+
+The `McpUseProvider` automatically wraps your widget with:
+
+1. **StrictMode** (outermost) - React's development mode checks
+2. **ThemeProvider** - Theme management that syncs with ChatGPT
+3. **BrowserRouter** - React Router with automatic basename calculation
+4. **WidgetControls** (conditional) - Debug and view controls if enabled
+5. **ErrorBoundary** (innermost) - Error handling for graceful failures
+6. **Auto-sizing container** (conditional) - ResizeObserver wrapper if `autoSize={true}`
+
+## Basic Usage
+
+```tsx
+import { McpUseProvider } from 'mcp-use/react';
+import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
+import { Link } from 'react-router-dom';
+
+function MyWidget() {
+  return (
+    <McpUseProvider>
+      <AppsSDKUIProvider linkComponent={Link}>
+        <div>My widget content</div>
+      </AppsSDKUIProvider>
+    </McpUseProvider>
+  );
+}
+```
+
+## With Debug Controls
+
+Enable the debug button to inspect widget state, props, and test tool calls:
+
+```tsx
+<McpUseProvider debugger>
+  <AppsSDKUIProvider linkComponent={Link}>
+    <MyWidget />
+  </AppsSDKUIProvider>
+</McpUseProvider>
+```
+
+## With View Controls
+
+Enable fullscreen and picture-in-picture controls:
+
+```tsx
+<McpUseProvider viewControls>
+  <AppsSDKUIProvider linkComponent={Link}>
+    <MyWidget />
+  </AppsSDKUIProvider>
+</McpUseProvider>
+```
+
+## With Auto-sizing
+
+Enable automatic height notifications for dynamic content:
+
+```tsx
+<McpUseProvider autoSize>
+  <AppsSDKUIProvider linkComponent={Link}>
+    <MyWidget />
+  </AppsSDKUIProvider>
+</McpUseProvider>
+```
+
+## Complete Example
+
+```tsx
+import { McpUseProvider } from 'mcp-use/react';
+import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
+import { Link } from 'react-router-dom';
+import { useWidget } from 'mcp-use/react';
+
+function ProductWidget() {
+  const { props } = useWidget<{ productName: string }>();
+  
+  return (
+    <div>
+      <h1>{props.productName}</h1>
+      {/* Widget content */}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <McpUseProvider debugger viewControls autoSize>
+      <AppsSDKUIProvider linkComponent={Link}>
+        <ProductWidget />
+      </AppsSDKUIProvider>
+    </McpUseProvider>
+  );
+}
+```
+
+## Auto-sizing Feature
+
+When `autoSize={true}`, the provider:
+
+- Uses `ResizeObserver` to monitor the container height
+- Automatically calls `window.openai.notifyIntrinsicHeight()` when height changes
+- Debounces notifications (150ms) to prevent excessive calls
+- Uses `scrollHeight` as fallback for more accurate measurements
+- Prevents feedback loops by tracking notification state
+
+This is especially useful for widgets with dynamic content that changes height based on user interactions or data loading.
+
+## Automatic Basename Calculation
+
+The `BrowserRouter` automatically calculates the correct `basename` for routing:
+
+- In **production**: Uses `/` as basename
+- In **inspector dev proxy**: Detects `/inspector/api/dev-widget/:toolId` pattern and sets basename accordingly
+
+This ensures React Router works correctly in both development and production environments.
+
+## Dev Mode Detection
+
+When running in the inspector's dev widget proxy, `WidgetControls` are automatically hidden since the inspector provides its own debugging interface. This prevents duplicate controls from appearing.
+
+## Related Components
+
+- [`WidgetControls`](./widgetcontrols) - Debug and view controls
+- [`ThemeProvider`](./themeprovider) - Theme management
+- [`ErrorBoundary`](./errorboundary) - Error handling
+- [`useWidget`](./usewidget) - Widget hook for accessing props and actions
+

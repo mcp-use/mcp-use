@@ -1,0 +1,16 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.2.5",
+    "create-mcp-use-app": "0.5.2",
+    "@mcp-use/inspector": "0.6.1",
+    "mcp-use": "1.4.1"
+  },
+  "changesets": [
+    "legal-teeth-drive",
+    "major-spies-accept",
+    "tricky-hounds-attack",
+    "twenty-houses-shine"
+  ]
+}

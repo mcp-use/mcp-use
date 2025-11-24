@@ -52,6 +52,8 @@ export type UseMcpOptions = {
   timeout?: number;
   /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */
   sseReadTimeout?: number;
+  /** Optional callback to wrap the transport before passing it to the Client. Useful for logging, monitoring, or other transport-level interceptors. */
+  wrapTransport?: (transport: any, serverId: string) => any;
 };
 
 export type UseMcpResult = {
