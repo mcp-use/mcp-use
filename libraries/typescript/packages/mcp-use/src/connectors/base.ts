@@ -21,6 +21,11 @@ export interface ConnectorInitOptions {
    * OAuth client provider for automatic authentication
    */
   authProvider?: any;
+  /**
+   * Optional callback to wrap the transport before passing it to the Client.
+   * Useful for logging, monitoring, or other transport-level interceptors.
+   */
+  wrapTransport?: (transport: any, serverId: string) => any;
 }
 
 /**

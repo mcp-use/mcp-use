@@ -10,6 +10,7 @@ import {
   storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
+import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
@@ -532,5 +533,113 @@ export function registerInspectorRoutes(
       // Don't fail - telemetry should be silent
       return c.json({ success: false });
     }
+  });
+
+  // RPC Log endpoint - receives RPC events from browser
+  app.post("/inspector/api/rpc/log", async (c) => {
+    try {
+      const event = (await c.req.json()) as RpcLogEvent;
+      rpcLogBus.publish(event);
+      return c.json({ success: true });
+    } catch (error) {
+      console.error("[RPC Log] Error receiving RPC event:", error);
+      return c.json({ success: false });
+    }
+  });
+
+  // Clear RPC log buffer endpoint
+  app.delete("/inspector/api/rpc/log", async (c) => {
+    try {
+      const url = new URL(c.req.url);
+      const serverIdsParam = url.searchParams.get("serverIds");
+      const serverIds = serverIdsParam
+        ? serverIdsParam.split(",").filter(Boolean)
+        : undefined;
+      rpcLogBus.clear(serverIds);
+      return c.json({ success: true });
+    } catch (error) {
+      console.error("[RPC Log] Error clearing RPC log:", error);
+      return c.json({ success: false });
+    }
+  });
+
+  // RPC Stream endpoint - streams RPC events via SSE
+  app.get("/inspector/api/rpc/stream", async (c) => {
+    const url = new URL(c.req.url);
+    const replay = parseInt(url.searchParams.get("replay") || "3", 10);
+    const serverIdsParam = url.searchParams.get("serverIds");
+    const serverIds = serverIdsParam
+      ? serverIdsParam.split(",").filter(Boolean)
+      : [];
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        const send = (data: unknown) => {
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+            );
+          } catch {
+            // Ignore encoding errors
+          }
+        };
+
+        // Replay recent messages
+        try {
+          const recent = rpcLogBus.getBuffer(
+            serverIds,
+            isNaN(replay) ? 3 : replay
+          );
+          for (const evt of recent) {
+            send({ type: "rpc", ...evt });
+          }
+        } catch {
+          // Ignore replay errors
+        }
+
+        // Subscribe to live events
+        const unsubscribe = rpcLogBus.subscribe(
+          serverIds,
+          (evt: RpcLogEvent) => {
+            send({ type: "rpc", ...evt });
+          }
+        );
+
+        // Keepalive comments
+        const keepalive = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(`: keepalive ${Date.now()}\n\n`));
+          } catch {
+            // Ignore keepalive errors
+          }
+        }, 15000);
+
+        // Cleanup on client disconnect
+        c.req.raw.signal?.addEventListener("abort", () => {
+          try {
+            clearInterval(keepalive);
+            unsubscribe();
+          } catch {
+            // Ignore cleanup errors
+          }
+          try {
+            controller.close();
+          } catch {
+            // Ignore close errors
+          }
+        });
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Expose-Headers": "*",
+      },
+    });
   });
 }

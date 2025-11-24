@@ -168,7 +168,13 @@ export class HttpConnector extends BaseConnector {
           maxRetries: 2,
         },
       });
-      const transport = await this.connectionManager.start();
+      let transport = await this.connectionManager.start();
+
+      // Wrap transport if wrapper is provided
+      if (this.opts.wrapTransport) {
+        const serverId = this.baseUrl; // Use URL as server ID for now
+        transport = this.opts.wrapTransport(transport, serverId);
+      }
 
       // Create and connect the client
       // This performs both initialize AND initialized notification
@@ -217,7 +223,13 @@ export class HttpConnector extends BaseConnector {
           headers: this.headers,
         },
       });
-      const transport = await this.connectionManager.start();
+      let transport = await this.connectionManager.start();
+
+      // Wrap transport if wrapper is provided
+      if (this.opts.wrapTransport) {
+        const serverId = this.baseUrl; // Use URL as server ID for now
+        transport = this.opts.wrapTransport(transport, serverId);
+      }
 
       // Create and connect the client
       this.client = new Client(this.clientInfo, this.opts.clientOptions);
