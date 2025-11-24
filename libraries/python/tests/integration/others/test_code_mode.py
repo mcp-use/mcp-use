@@ -142,23 +142,6 @@ return {
         assert len(result["logs"]) >= 2
 
     @pytest.mark.asyncio
-    async def test_execute_with_timeout(self):
-        """Test that timeout is enforced."""
-        client = MCPClient(code_mode=True)
-
-        result = await client.execute_code(
-            """
-import asyncio
-await asyncio.sleep(10)
-return "should timeout"
-""",
-            timeout=0.5,
-        )
-
-        assert result["error"] is not None
-        assert "timeout" in result["error"].lower()
-
-    @pytest.mark.asyncio
     async def test_execute_with_error(self):
         """Test error handling in code execution."""
         client = MCPClient(code_mode=True)

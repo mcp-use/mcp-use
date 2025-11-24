@@ -2,8 +2,6 @@ import traceback
 
 from mcp_use.logging import logger
 
-retryable_exceptions = (TimeoutError, ConnectionError)  # We can add more exceptions here
-
 
 def format_error(error: Exception, **context) -> dict:
     """
@@ -19,7 +17,6 @@ def format_error(error: Exception, **context) -> dict:
     formatted_context = {
         "error": type(error).__name__,
         "details": str(error),
-        "isRetryable": isinstance(error, retryable_exceptions),
         "stack": traceback.format_exc(),
         "code": getattr(error, "code", "UNKNOWN"),
     }

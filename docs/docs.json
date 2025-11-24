@@ -268,6 +268,7 @@
                     ]
                   },
                   "python/api-reference/mcp_use_agents_mcpagent",
+                  "python/api-reference/mcp_use_agents_middleware_tool_error_middleware",
                   {
                     "group": "Observability",
                     "icon": "eye",

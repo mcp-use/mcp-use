@@ -21,7 +21,7 @@ config = {
     "mcpServers": {
         "filesystem": {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", "./test"],
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
         }
     }
 }
