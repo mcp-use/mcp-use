@@ -29,6 +29,7 @@ export {
 } from "./useWidget.js";
 export type {
   API,
+  AppsSdkMetadata,
   CallToolResponse,
   DeviceType,
   DisplayMode,
@@ -39,6 +40,7 @@ export type {
   UnknownObject,
   UserAgent,
   UseWidgetResult,
+  WidgetMetadata,
   WidgetProps,
 } from "./widget-types.js";
 export { WidgetControls } from "./WidgetControls.js";

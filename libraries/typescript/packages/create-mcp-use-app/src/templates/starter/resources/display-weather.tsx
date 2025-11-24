@@ -1,6 +1,6 @@
 import React from "react";
 import { z } from "zod";
-import { useWidget, type WidgetProps } from "mcp-use/react";
+import { useWidget, type WidgetMetadata, type WidgetProps } from "mcp-use/react";
 import "../styles.css";
 
 /*
@@ -21,7 +21,7 @@ const propSchema = z.object({
     .describe("The temperature in Celsius"),
 });
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata<typeof propSchema> = {
   description: "Display weather for a city",
   inputs: propSchema,
 };

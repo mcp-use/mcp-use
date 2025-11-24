@@ -135,6 +135,80 @@ declare global {
 export type WidgetProps<T extends UnknownObject = UnknownObject> = T;
 
 /**
+ * Apps SDK metadata fields for widgets
+ *
+ * These fields control how the widget is rendered and secured in OpenAI Apps SDK.
+ *
+ * @see https://developers.openai.com/apps-sdk/build/mcp-server
+ */
+export interface AppsSdkMetadata extends Record<string, unknown> {
+  /** Description of the widget for Apps SDK - helps the model understand what's displayed */
+  "openai/widgetDescription"?: string;
+
+  /** Content Security Policy for the widget */
+  "openai/widgetCSP"?: {
+    /** Domains the widget can connect to (for fetch, websocket, etc.) */
+    connect_domains?: string[];
+    /** Domains the widget can load resources from (scripts, styles, images, fonts) */
+    resource_domains?: string[];
+  };
+
+  /** Whether the widget prefers a border in card layout */
+  "openai/widgetPrefersBorder"?: boolean;
+
+  /** Whether the widget can initiate tool calls (component-initiated tool access) */
+  "openai/widgetAccessible"?: boolean;
+
+  /** Custom subdomain for the widget (e.g., 'chatgpt.com' becomes 'chatgpt-com.web-sandbox.oaiusercontent.com') */
+  "openai/widgetDomain"?: string;
+
+  /** Locale for the widget (e.g., 'en-US', 'fr-FR') */
+  "openai/locale"?: string;
+
+  /** Status text while tool is invoking */
+  "openai/toolInvocation/invoking"?: string;
+
+  /** Status text after tool has invoked */
+  "openai/toolInvocation/invoked"?: string;
+}
+
+/**
+ * Type for the widgetMetadata constant exported from widget components.
+ * This metadata describes the widget's configuration, inputs schema, and Apps SDK settings.
+ *
+ * @example
+ * ```tsx
+ * import { z } from 'zod';
+ * import type { WidgetMetadata } from 'mcp-use/react';
+ *
+ * const propSchema = z.object({
+ *   city: z.string().describe("The city to display weather for"),
+ *   temperature: z.number().describe("The temperature in Celsius"),
+ * });
+ *
+ * export const widgetMetadata: WidgetMetadata<typeof propSchema> = {
+ *   description: "Display weather for a city",
+ *   inputs: propSchema,
+ *   appsSdkMetadata: {
+ *     "openai/widgetAccessible": true,
+ *   },
+ * };
+ * ```
+ */
+export interface WidgetMetadata<TInputSchema = any> {
+  /** Optional title for the widget */
+  title?: string;
+  /** Description of what the widget does */
+  description?: string;
+  /** Zod schema defining the widget's input properties */
+  inputs?: TInputSchema;
+  /** Additional metadata fields */
+  _meta?: Record<string, unknown>;
+  /** Apps SDK specific metadata */
+  appsSdkMetadata?: AppsSdkMetadata;
+}
+
+/**
  * Result type for the useWidget hook
  */
 export interface UseWidgetResult<
