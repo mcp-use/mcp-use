@@ -11,13 +11,18 @@ export interface ConsoleLogEntry {
 interface UseIframeConsoleOptions {
   enabled?: boolean;
   maxLogs?: number;
+  proxyToPageConsole?: boolean;
 }
 
 /**
  * Hook to manage console logs from iframes
  */
 export function useIframeConsole(options: UseIframeConsoleOptions = {}) {
-  const { enabled = true, maxLogs = 1000 } = options;
+  const {
+    enabled = true,
+    maxLogs = 1000,
+    proxyToPageConsole = false,
+  } = options;
   const [logs, setLogs] = useState<ConsoleLogEntry[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const logIdCounterRef = useRef(0);
@@ -36,8 +41,46 @@ export function useIframeConsole(options: UseIframeConsoleOptions = {}) {
         // Keep only the most recent logs
         return updated.slice(-maxLogs);
       });
+
+      // Proxy to page console if enabled
+      if (proxyToPageConsole) {
+        const prefix = "[WIDGET CONSOLE]";
+
+        // Format arguments for console output
+        const formattedArgs = entry.args.map((arg) => {
+          if (typeof arg === "object" && arg !== null) {
+            try {
+              return JSON.stringify(arg, null, 2);
+            } catch {
+              return String(arg);
+            }
+          }
+          return arg;
+        });
+
+        // Use appropriate console method based on level
+        switch (entry.level) {
+          case "error":
+            console.error(prefix, ...formattedArgs);
+            break;
+          case "warn":
+            console.warn(prefix, ...formattedArgs);
+            break;
+          case "info":
+            console.info(prefix, ...formattedArgs);
+            break;
+          case "debug":
+            console.debug(prefix, ...formattedArgs);
+            break;
+          case "trace":
+            console.trace(prefix, ...formattedArgs);
+            break;
+          default:
+            console.log(prefix, ...formattedArgs);
+        }
+      }
     },
-    [enabled, maxLogs]
+    [enabled, maxLogs, proxyToPageConsole]
   );
 
   const clearLogs = useCallback(() => {

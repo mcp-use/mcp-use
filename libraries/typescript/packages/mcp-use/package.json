@@ -110,7 +110,8 @@
     "@langchain/openai": "^1.0.0",
     "langfuse": "^3.38.6",
     "langfuse-langchain": "^3.38.6",
-    "react": "^18.0.0 || ^19.0.0"
+    "react": "^18.0.0 || ^19.0.0",
+    "react-router-dom": "^7.0.0"
   },
   "peerDependenciesMeta": {
     "@e2b/code-interpreter": {
@@ -183,6 +184,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "react": "^19.2.0",
+    "react-router-dom": "^7.9.5",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },
