@@ -394,17 +394,6 @@
   - @mcp-use/inspector@0.7.0-canary.1
   - @mcp-use/cli@2.3.0-canary.1
 
-## 1.5.0-canary.0
-
-### Minor Changes
-
-- abf15ba: Enhance search_tools to return metadata (total_tools, namespaces, result_count) along with results to provide better context for model decision-making
-
-### Patch Changes
-
-- @mcp-use/cli@2.2.6-canary.0
-- @mcp-use/inspector@0.6.2-canary.0
-
 ## 1.4.1
 
 ### Patch Changes

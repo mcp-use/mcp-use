@@ -389,14 +389,6 @@
   - @mcp-use/inspector@0.7.0-canary.1
   - mcp-use@1.5.0-canary.1
 
-## 2.2.6-canary.0
-
-### Patch Changes
-
-- Updated dependencies [abf15ba]
-  - mcp-use@1.5.0-canary.0
-  - @mcp-use/inspector@0.6.2-canary.0
-
 ## 2.2.5
 
 ### Patch Changes
