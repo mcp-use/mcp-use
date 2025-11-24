@@ -974,7 +974,7 @@ class MCPAgent:
                 if chunk and getattr(chunk, "content", None):
                     if isinstance(chunk.content, str):
                         content = chunk.content
-                    elif hasattr(chunk.content, '__iter__'):
+                    elif hasattr(chunk.content, "__iter__"):
                         content = "".join([item.get("text", "") for item in chunk.content])
                     else:
                         content = str(chunk.content)
