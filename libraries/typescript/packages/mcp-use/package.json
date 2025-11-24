@@ -184,7 +184,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "react": "^19.2.0",
-    "react-router-dom": "^7.9.3",
+    "react-router-dom": "^7.9.5",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },

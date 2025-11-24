@@ -94,54 +94,21 @@ function OpenAIComponentRendererBase({
   const serverBaseUrl = server?.url;
   const { resolvedTheme } = useTheme();
 
-  console.log(componentUrl, toolResult);
-
   // Store widget data and set up iframe URL
   useEffect(() => {
     const storeAndSetUrl = async () => {
       try {
-        console.log("[OpenAIComponentRenderer] Starting storeAndSetUrl:", {
-          toolName,
-          toolArgs,
-          toolResult: JSON.stringify(toolResult).substring(0, 200),
-          toolResultKeys: toolResult ? Object.keys(toolResult) : [],
-          hasToolResultMeta: !!toolResult?._meta,
-          hasToolResultContents: !!toolResult?.contents,
-        });
-
         // Extract structured content from tool result (the actual tool parameters)
         const structuredContent = toolResult?.structuredContent || null;
 
-        console.log(
-          "[OpenAIComponentRenderer] Extracted structuredContent:",
-          structuredContent
-        );
-
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await readResource(componentUrl);
-
-        console.log("[OpenAIComponentRenderer] Resource data:", {
-          hasContents: !!resourceData?.contents,
-          firstContentKeys: resourceData?.contents?.[0]
-            ? Object.keys(resourceData.contents[0])
-            : [],
-          hasMeta: !!resourceData?.contents?.[0]?._meta,
-          metaKeys: resourceData?.contents?.[0]?._meta
-            ? Object.keys(resourceData.contents[0]._meta)
-            : [],
-        });
 
         // For Apps SDK widgets, use structuredContent as toolInput (the actual tool parameters)
         // toolArgs might be empty or from the initial invocation, structuredContent has the real data
         const computedToolInput = structuredContent || toolArgs;
         setWidgetToolInput(computedToolInput);
         setWidgetToolOutput(structuredContent);
-
-        console.log("[OpenAIComponentRenderer] Widget inputs:", {
-          toolArgs,
-          structuredContent,
-          widgetToolInput: computedToolInput,
-        });
 
         // Extract CSP metadata from tool result
         // Check both toolResult._meta (for tool calls) and toolResult.contents?.[0]?._meta (for resources)
@@ -151,8 +118,6 @@ function OpenAIComponentRendererBase({
         if (metaSource?.["openai/widgetCSP"]) {
           widgetCSP = metaSource["openai/widgetCSP"];
         }
-
-        console.log("[OpenAIComponentRenderer] Widget CSP:", widgetCSP);
 
         // pass props as url params (toolInput, toolOutput)
         const urlParams = new URLSearchParams();
@@ -166,16 +131,6 @@ function OpenAIComponentRendererBase({
         // Check for dev mode widget - check both _meta locations
         const metaForWidget =
           toolResult?._meta || toolResult?.contents?.[0]?._meta;
-
-        console.log("[OpenAIComponentRenderer] Checking for dev mode widget:", {
-          hasMeta: !!metaForWidget,
-          metaKeys: metaForWidget ? Object.keys(metaForWidget) : [],
-          hasWidgetMeta: !!metaForWidget?.["mcp-use/widget"],
-          widgetMeta: metaForWidget?.["mcp-use/widget"],
-          checkedFromToolResultMeta: !!toolResult?._meta,
-          checkedFromContentsMeta: !!toolResult?.contents?.[0]?._meta,
-          serverBaseUrl,
-        });
 
         // Use dev mode if metadata says so
         const computedUseDevMode =
@@ -228,18 +183,10 @@ function OpenAIComponentRendererBase({
         if (computedUseDevMode && widgetName && serverBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
           const proxyUrl = `/inspector/api/dev-widget/${toolId}?${urlParams.toString()}`;
-          console.log(
-            "[OpenAIComponentRenderer] Using DEV mode proxy URL:",
-            proxyUrl
-          );
           setWidgetUrl(proxyUrl);
           setIsSameOrigin(true); // Proxy makes it same-origin
         } else {
           const prodUrl = `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`;
-          console.log(
-            "[OpenAIComponentRenderer] Using PROD mode URL:",
-            prodUrl
-          );
           setWidgetUrl(prodUrl);
           // Relative URLs are always same-origin
           setIsSameOrigin(true);
@@ -302,7 +249,8 @@ function OpenAIComponentRendererBase({
 
             // Dispatch the set_globals event to notify React components
             try {
-              const globalsEvent = new (iframeWindow as any).CustomEvent(
+              const CustomEventConstructor = iframeWindow.CustomEvent as typeof CustomEvent;
+              const globalsEvent = new CustomEventConstructor(
                 "openai:set_globals",
                 {
                   detail: {
@@ -390,14 +338,7 @@ function OpenAIComponentRendererBase({
         return;
       }
 
-      // Log all messages for debugging (can be filtered later)
-      if (event.data?.type === "openai:notifyIntrinsicHeight") {
-        console.log(
-          "[OpenAIComponentRenderer] Received message from iframe:",
-          event.data.type,
-          event.data
-        );
-      }
+      // Messages are handled silently unless there's an error
 
       // Let console log messages pass through (handled by useIframeConsole hook)
       if (event.data?.type === "iframe-console-log") {
@@ -444,11 +385,6 @@ function OpenAIComponentRendererBase({
             }
 
             const { toolName, params, requestId } = event.data;
-            console.log(
-              "[OpenAIComponentRenderer] Calling tool:",
-              toolName,
-              params
-            );
 
             // Call the tool via the MCP connection
             const result = await server.callTool(toolName, params || {});
@@ -538,11 +474,6 @@ function OpenAIComponentRendererBase({
               return;
             }
 
-            console.log(
-              "[OpenAIComponentRenderer] Sending follow-up message:",
-              prompt
-            );
-
             // Dispatch a custom event that the chat component can listen to
             const followUpEvent = new window.CustomEvent(
               "mcp-inspector:widget-followup",
@@ -582,7 +513,7 @@ function OpenAIComponentRendererBase({
           try {
             const { mode } = event.data;
             if (mode && ["inline", "pip", "fullscreen"].includes(mode)) {
-              handleDisplayModeChange(mode);
+              await handleDisplayModeChange(mode);
             }
           } catch (err) {
             console.error(
@@ -594,17 +525,7 @@ function OpenAIComponentRendererBase({
 
         case "openai:notifyIntrinsicHeight":
           try {
-            console.log(
-              "[OpenAIComponentRenderer] Received notifyIntrinsicHeight message:",
-              event.data
-            );
             const { height } = event.data;
-            console.log(
-              "[OpenAIComponentRenderer] Extracted height:",
-              height,
-              "type:",
-              typeof height
-            );
             if (typeof height === "number" && height > 0) {
               // For inline mode, respect the requested height (allow scrolling if needed)
               // For fullscreen/pip modes, cap at viewport
@@ -620,44 +541,11 @@ function OpenAIComponentRendererBase({
                 height !== lastNotifiedHeightRef.current ||
                 newHeight !== iframeHeight
               ) {
-                console.log(
-                  "[OpenAIComponentRenderer] Calculated new height:",
-                  {
-                    requestedHeight: height,
-                    displayMode,
-                    newHeight,
-                    lastNotifiedHeight: lastNotifiedHeightRef.current,
-                    currentIframeHeight: iframeHeight,
-                  }
-                );
                 lastNotifiedHeightRef.current = height; // Track requested height from notifyIntrinsicHeight
                 lastMeasuredHeightRef.current = newHeight; // Track applied height
                 useNotifiedHeightRef.current = true; // Use notified height instead of automatic measurement
                 setIframeHeight(newHeight);
-                console.log(
-                  "[OpenAIComponentRenderer] Updated iframe height from notifyIntrinsicHeight:",
-                  newHeight,
-                  "(requested:",
-                  height,
-                  "), disabled automatic measurement"
-                );
-              } else {
-                console.log(
-                  "[OpenAIComponentRenderer] Height unchanged, skipping update",
-                  {
-                    requestedHeight: height,
-                    lastNotifiedHeight: lastNotifiedHeightRef.current,
-                    currentIframeHeight: iframeHeight,
-                  }
-                );
               }
-            } else {
-              console.warn(
-                "[OpenAIComponentRenderer] Invalid height value:",
-                height,
-                "type:",
-                typeof height
-              );
             }
           } catch (err) {
             console.error(
@@ -702,13 +590,13 @@ function OpenAIComponentRendererBase({
       }
     };
 
-    const handleError = () => {
+    const handleError: OnErrorEventHandler = () => {
       setError("Failed to load component");
     };
 
     const iframe = iframeRef.current;
     iframe?.addEventListener("load", handleLoad);
-    iframe?.addEventListener("error", handleError as any);
+    iframe?.addEventListener("error", handleError);
 
     // Also try to inject immediately if iframe is already loaded (only for same-origin)
     if (
@@ -722,7 +610,7 @@ function OpenAIComponentRendererBase({
     return () => {
       window.removeEventListener("message", handleMessage);
       iframe?.removeEventListener("load", handleLoad);
-      iframe?.removeEventListener("error", handleError as any);
+      iframe?.removeEventListener("error", handleError);
     };
   }, [
     widgetUrl,

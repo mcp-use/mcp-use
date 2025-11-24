@@ -639,7 +639,7 @@ importers:
         specifier: ^19.2.0
         version: 19.2.0
       react-router-dom:
-        specifier: ^7.9.3
+        specifier: ^7.9.5
         version: 7.9.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       typescript:
         specifier: ^5.8.3

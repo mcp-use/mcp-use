@@ -140,9 +140,12 @@ export function useWidget<
     return isOpenAiAvailable ? "openai" : "mcp-ui";
   }, [isOpenAiAvailable]);
 
+  // Extract search string to avoid dependency issues
+  const searchString = typeof window !== "undefined" ? window.location.search : "";
+  
   const urlParams = useMemo(() => {
     // check if it has mcpUseParams
-    const urlParams = new URLSearchParams(window?.location?.search);
+    const urlParams = new URLSearchParams(searchString);
     if (urlParams.has("mcpUseParams")) {
       return JSON.parse(urlParams.get("mcpUseParams") as string) as {
         toolInput: TProps;
@@ -155,7 +158,7 @@ export function useWidget<
       toolOutput: {} as TOutput,
       toolId: "",
     };
-  }, [window?.location?.search]);
+  }, [searchString]);
 
   // Subscribe to globals
   const toolInput =
@@ -245,17 +248,20 @@ export function useWidget<
     async (
       state: TState | ((prevState: TState | null) => TState)
     ): Promise<void> => {
-      const newState =
-        typeof state === "function" ? state(localWidgetState) : state;
-
       if (!window.openai?.setWidgetState) {
         throw new Error("window.openai.setWidgetState is not available");
       }
 
+      // Use functional update to always get latest state
+      // Prefer widgetState (from window.openai) over localWidgetState for most up-to-date value
+      const currentState = widgetState !== undefined ? widgetState : localWidgetState;
+      const newState =
+        typeof state === "function" ? state(currentState) : state;
+
       setLocalWidgetState(newState);
       return window.openai.setWidgetState(newState);
     },
-    [localWidgetState]
+    [widgetState, localWidgetState]
   );
 
   return {
