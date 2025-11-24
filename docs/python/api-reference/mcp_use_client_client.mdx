@@ -182,8 +182,9 @@ Execute Python code with access to MCP tools (code mode).
             await client.create_all_sessions()
 
             result = await client.execute_code('''
-            tools = await search_tools("github")
-            print(f"Found \{len(tools)\} tools")
+            result = await search_tools("github")
+            tools = result['results']
+            print(f"Found \{len(tools)\} tools out of \{result['meta']['total_tools']\} total")
 
             pr = await github.get_pull_request(
                 owner="facebook",
@@ -308,8 +309,9 @@ Search available MCP tools across all active sessions.
         Example:
             ```python
             # Search for GitHub-related tools
-            tools = await client.search_tools("github pull")
-            for tool in tools:
+            result = await client.search_tools("github pull")
+            print(f"Found \{result['meta']['result_count']\} tools out of \{result['meta']['total_tools']\} total")
+            for tool in result['results']:
                 print(f"\{tool['server']\}.\{tool['name']\}: \{tool['description']\}")
             ```
 
@@ -319,7 +321,7 @@ Search available MCP tools across all active sessions.
 ><ParamField body="detail_level" type="str" default='full' >   Level of detail to return: </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="list[dict[str, Any]]" >Level of detail to return: - &quot;names&quot;: Only tool names and server - &quot;descriptions&quot;: Names, server, and descriptions - &quot;full&quot;: Complete tool information including schemas List of tool information dictionaries.</ResponseField>
+><ResponseField name="returns" type="dict[str, Any]" >Dictionary with: - meta: Dictionary containing total_tools, namespaces, and result_count - results: List of tool information dictionaries matching the query Level of detail to return: - &quot;names&quot;: Only tool names and server - &quot;descriptions&quot;: Names, server, and descriptions - &quot;full&quot;: Complete tool information including schemas</ResponseField>
 
 **Signature**
 ```python wrap

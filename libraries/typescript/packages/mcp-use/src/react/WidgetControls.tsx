@@ -117,7 +117,9 @@ export function WidgetControls({
       }
     }, 100);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   // Theme-aware styling

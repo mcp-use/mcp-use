@@ -18,6 +18,10 @@ function getBasename(): string {
   return "/";
 }
 
+// Constants for height management
+const HEIGHT_DEBOUNCE_MS = 150; // Debounce duration to wait for animations to settle
+const MIN_HEIGHT_CHANGE_PX = 5; // Minimum height change to trigger notification
+
 interface McpUseProviderProps {
   children: React.ReactNode;
   /**
@@ -76,26 +80,19 @@ export function McpUseProvider({
   // Notify OpenAI about height changes
   const notifyHeight = useCallback((height: number) => {
     if (typeof window !== "undefined" && window.openai?.notifyIntrinsicHeight) {
-      console.log(
-        "[McpUseProvider] window.openai.notifyIntrinsicHeight is available, calling..."
-      );
-      window.openai.notifyIntrinsicHeight(height).catch((error) => {
-        console.error(
-          "[McpUseProvider] Failed to notify intrinsic height:",
-          error
-        );
-      });
-    } else {
-      console.warn(
-        "[McpUseProvider] window.openai.notifyIntrinsicHeight is not available",
-        {
-          hasWindow: typeof window !== "undefined",
-          hasOpenai: typeof window !== "undefined" && !!window.openai,
-          hasMethod:
-            typeof window !== "undefined" &&
-            !!window.openai?.notifyIntrinsicHeight,
-        }
-      );
+      notificationInProgressRef.current = true;
+      window.openai
+        .notifyIntrinsicHeight(height)
+        .then(() => {
+          notificationInProgressRef.current = false;
+        })
+        .catch((error) => {
+          notificationInProgressRef.current = false;
+          console.error(
+            "[McpUseProvider] Failed to notify intrinsic height:",
+            error
+          );
+        });
     }
   }, []);
 
@@ -107,12 +104,13 @@ export function McpUseProvider({
         clearTimeout(debounceTimeoutRef.current);
       }
       debounceTimeoutRef.current = setTimeout(() => {
-        if (height !== lastHeightRef.current && height > 0) {
-          console.log("[McpUseProvider] Height changed, notifying:", height);
+        // Only notify if height changed by more than threshold and is positive
+        const heightDiff = Math.abs(height - lastHeightRef.current);
+        if (heightDiff >= MIN_HEIGHT_CHANGE_PX && height > 0) {
           lastHeightRef.current = height;
           notifyHeight(height);
         }
-      }, 150); // 150ms debounce
+      }, HEIGHT_DEBOUNCE_MS);
     },
     [notifyHeight]
   );
@@ -158,7 +156,10 @@ export function McpUseProvider({
       observer.disconnect();
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
       }
+      // Reset notification flag
+      notificationInProgressRef.current = false;
     };
   }, [autoSize, debouncedNotifyHeight]);
 

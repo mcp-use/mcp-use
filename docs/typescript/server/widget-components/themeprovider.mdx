@@ -1,0 +1,104 @@
+---
+title: "ThemeProvider"
+description: "Theme provider component for consistent theme management across widgets"
+icon: "palette"
+---
+
+# ThemeProvider
+
+The `ThemeProvider` component manages dark mode by setting the `dark` class on the document root. It prioritizes the widget theme from OpenAI Apps SDK, falling back to system preference if the widget API is not available.
+
+## Import
+
+```typescript
+import { ThemeProvider } from 'mcp-use/react';
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | **required** | The widget content to wrap |
+
+## Theme Priority
+
+The provider uses the following priority:
+
+1. **Widget theme** (from `window.openai.theme`) - When Apps SDK is available
+2. **System preference** (`prefers-color-scheme: dark`) - Fallback when widget API is not available
+
+## Basic Usage
+
+```tsx
+import { ThemeProvider } from 'mcp-use/react';
+
+function MyWidget() {
+  return (
+    <ThemeProvider>
+      <div>My widget content</div>
+    </ThemeProvider>
+  );
+}
+```
+
+## Automatic Inclusion
+
+`ThemeProvider` is automatically included when using `McpUseProvider`:
+
+```tsx
+import { McpUseProvider } from 'mcp-use/react';
+
+<McpUseProvider>
+  <MyWidget />
+</McpUseProvider>
+```
+
+## Theme Synchronization
+
+The provider:
+
+- **Syncs with ChatGPT**: Automatically matches ChatGPT's theme when running in Apps SDK
+- **Listens to system changes**: Updates when user changes system theme preference
+- **Prevents flash**: Uses `useLayoutEffect` to apply theme synchronously before browser paint
+
+## Dark Class Management
+
+The provider adds/removes the `dark` class on `document.documentElement`:
+
+```tsx
+// When theme is 'dark'
+document.documentElement.classList.add('dark');
+
+// When theme is 'light'
+document.documentElement.classList.remove('dark');
+```
+
+This works with Tailwind CSS and other CSS frameworks that use the `dark` class for dark mode.
+
+## Usage with Tailwind CSS
+
+When using Tailwind CSS, the dark class enables dark mode variants:
+
+```tsx
+function MyWidget() {
+  return (
+    <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <h1>My Widget</h1>
+    </div>
+  );
+}
+```
+
+## System Preference Detection
+
+When the widget API is not available, the provider:
+
+- Detects initial system preference on mount
+- Listens to `prefers-color-scheme` media query changes
+- Updates theme when user changes system preference
+
+## Related Components
+
+- [`McpUseProvider`](./mcpuseprovider) - Includes ThemeProvider automatically
+- [`useWidget`](./usewidget) - Hook for accessing theme and other widget data
+

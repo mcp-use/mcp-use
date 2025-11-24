@@ -29,18 +29,6 @@ const ProductSearchResult: React.FC = () => {
     },
   ];
 
-  // const handleProductClick = async (product: { id: string; name: string }) => {
-  //   // Call tool to get product details
-  //   try {
-  //     await callTool("get-product-details", {
-  //       productId: product.id,
-  //     });
-  //     await sendFollowUpMessage(`Viewing details for ${product.name}`);
-  //   } catch (error) {
-  //     console.error("Failed to get product details:", error);
-  //   }
-  // };
-
   return (
     <McpUseProvider debugger viewControls autoSize>
       <AppsSDKUIProvider linkComponent={Link}>

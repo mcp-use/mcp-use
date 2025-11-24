@@ -1,0 +1,345 @@
+---
+title: "useWidget Hook"
+description: "Type-safe React adapter for OpenAI Apps SDK window.openai API"
+icon: "webhook"
+---
+
+The `useWidget` hook provides a type-safe React adapter for the OpenAI Apps SDK `window.openai` API. It automatically maps MCP UI props from `toolInput`, subscribes to all OpenAI global changes, and provides access to theme, display mode, safe areas, and action methods.
+
+## Import
+
+```typescript
+import { useWidget } from 'mcp-use/react';
+```
+
+## Basic Usage
+
+```tsx
+import { useWidget } from 'mcp-use/react';
+
+interface MyWidgetProps {
+  city: string;
+  temperature: number;
+}
+
+const MyWidget: React.FC = () => {
+  const { props, theme, callTool } = useWidget<MyWidgetProps>();
+  
+  return (
+    <div data-theme={theme}>
+      <h1>{props.city}</h1>
+      <p>{props.temperature}°C</p>
+    </div>
+  );
+};
+```
+
+## Type Parameters
+
+The hook accepts four optional type parameters:
+
+```typescript
+useWidget<
+  TProps,      // Props type (from toolInput)
+  TOutput,     // Output type (from toolOutput/structuredContent)
+  TMetadata,   // Metadata type (from toolResponseMetadata)
+  TState       // State type (for widgetState)
+>()
+```
+
+## Return Values
+
+### Props and State
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `props` | `TProps` | Widget props (mapped from `toolInput` for MCP compatibility) |
+| `output` | `TOutput \| null` | Tool output from the last execution |
+| `metadata` | `TMetadata \| null` | Response metadata from the tool |
+| `state` | `TState \| null` | Persisted widget state |
+| `setState` | `(state: TState \| ((prev: TState \| null) => TState)) => Promise<void>` | Update widget state (persisted and shown to model) |
+
+### Layout and Theme
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `theme` | `"light" \| "dark"` | Current theme (auto-syncs with ChatGPT) |
+| `displayMode` | `"inline" \| "pip" \| "fullscreen"` | Current display mode |
+| `safeArea` | `SafeArea` | Safe area insets for mobile layout |
+| `maxHeight` | `number` | Maximum height available (pixels) |
+| `userAgent` | `UserAgent` | Device capabilities (`device`, `capabilities`) |
+| `locale` | `string` | Current locale (e.g., `"en-US"`) |
+| `mcp_url` | `string` | MCP server base URL for making API requests |
+
+### Actions
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `callTool` | `(name: string, args: Record<string, unknown>) => Promise<CallToolResponse>` | Call a tool on the MCP server |
+| `sendFollowUpMessage` | `(prompt: string) => Promise<void>` | Send a follow-up message to the ChatGPT conversation |
+| `openExternal` | `(href: string) => void` | Open an external URL in a new tab |
+| `requestDisplayMode` | `(mode: DisplayMode) => Promise<{ mode: DisplayMode }>` | Request a different display mode |
+| `notifyIntrinsicHeight` | `(height: number) => Promise<void>` | Notify OpenAI about intrinsic height changes for auto-sizing |
+
+### Availability
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `isAvailable` | `boolean` | Whether the `window.openai` API is available |
+
+## Complete Example
+
+```tsx
+import { useWidget } from 'mcp-use/react';
+
+interface ProductProps {
+  productId: string;
+  name: string;
+  price: number;
+}
+
+interface ProductOutput {
+  reviews: Array<{ rating: number; comment: string }>;
+}
+
+interface ProductState {
+  favorites: string[];
+}
+
+const ProductWidget: React.FC = () => {
+  const {
+    // Props and state
+    props,
+    output,
+    state,
+    setState,
+    
+    // Layout & theme
+    theme,
+    displayMode,
+    safeArea,
+    
+    // Actions
+    callTool,
+    sendFollowUpMessage,
+    openExternal,
+    requestDisplayMode,
+    notifyIntrinsicHeight,
+    
+    // Availability
+    isAvailable,
+  } = useWidget<ProductProps, ProductOutput, {}, ProductState>();
+  
+  const handleAddToFavorites = async () => {
+    const newFavorites = [...(state?.favorites || []), props.productId];
+    await setState({ favorites: newFavorites });
+  };
+  
+  const handleGetReviews = async () => {
+    const result = await callTool('get-product-reviews', { 
+      productId: props.productId 
+    });
+    // Handle result
+  };
+  
+  return (
+    <div data-theme={theme}>
+      <h1>{props.name}</h1>
+      <p>${props.price}</p>
+      <button onClick={handleAddToFavorites}>Add to Favorites</button>
+      <button onClick={handleGetReviews}>Get Reviews</button>
+    </div>
+  );
+};
+```
+
+## Helper Hooks
+
+For convenience, there are specialized hooks for common use cases:
+
+### useWidgetProps
+
+Get only the widget props:
+
+```tsx
+import { useWidgetProps } from 'mcp-use/react';
+
+const props = useWidgetProps<{ city: string; temperature: number }>();
+// { city: "Paris", temperature: 22 }
+```
+
+### useWidgetTheme
+
+Get only the theme:
+
+```tsx
+import { useWidgetTheme } from 'mcp-use/react';
+
+const theme = useWidgetTheme(); // 'light' | 'dark'
+```
+
+### useWidgetState
+
+Get state management:
+
+```tsx
+import { useWidgetState } from 'mcp-use/react';
+
+const [favorites, setFavorites] = useWidgetState<string[]>([]);
+
+// Update state
+await setFavorites(['item1', 'item2']);
+
+// Or use functional update
+await setFavorites(prev => [...prev, 'newItem']);
+```
+
+## Key Features
+
+### 1. Props Without Props
+
+Components don't accept props via React props. Instead, props come from the hook:
+
+```tsx
+// ❌ Don't do this
+const MyWidget: React.FC<MyProps> = ({ city, temperature }) => { ... }
+
+// ✅ Do this
+const MyWidget: React.FC = () => {
+  const { props } = useWidget<MyProps>();
+  const { city, temperature } = props;
+  // ...
+}
+```
+
+### 2. Automatic Provider Detection
+
+The hook automatically detects whether it's running in:
+
+- **Apps SDK** (ChatGPT): Reads from `window.openai`
+- **MCP-UI**: Reads from URL parameters
+- **Standalone**: Uses default props
+
+### 3. Reactive Updates
+
+The hook subscribes to all `window.openai` global changes via the `openai:set_globals` event, ensuring your component re-renders when:
+
+- Theme changes
+- Display mode changes
+- Widget state updates
+- Tool input/output changes
+
+### 4. Auto-sizing Support
+
+Use `notifyIntrinsicHeight` to notify OpenAI about height changes:
+
+```tsx
+const { notifyIntrinsicHeight } = useWidget();
+
+useEffect(() => {
+  const height = containerRef.current?.scrollHeight || 0;
+  notifyIntrinsicHeight(height);
+}, [content]);
+```
+
+Or use `McpUseProvider` with `autoSize={true}` for automatic height notifications.
+
+### 5. State Management
+
+Widget state persists across widget interactions and is shown to the model:
+
+```tsx
+const { state, setState } = useWidget<{}, {}, {}, { favorites: string[] }>();
+
+// Update state
+await setState({ favorites: ['item1', 'item2'] });
+
+// Functional update
+await setState(prev => ({
+  favorites: [...(prev?.favorites || []), 'newItem']
+}));
+```
+
+### 6. Tool Calls
+
+Call other MCP tools from your widget:
+
+```tsx
+const { callTool } = useWidget();
+
+const handleSearch = async () => {
+  const result = await callTool('search-products', { 
+    query: 'laptop' 
+  });
+  // Handle result
+};
+```
+
+### 7. Follow-up Messages
+
+Send messages to the ChatGPT conversation:
+
+```tsx
+const { sendFollowUpMessage } = useWidget();
+
+const handleRequestInfo = async () => {
+  await sendFollowUpMessage('Show me more details about this product');
+};
+```
+
+### 8. Display Mode Control
+
+Request display mode changes:
+
+```tsx
+const { requestDisplayMode } = useWidget();
+
+const handleFullscreen = async () => {
+  const result = await requestDisplayMode('fullscreen');
+  // result.mode is the granted mode (may differ from requested)
+};
+```
+
+## Default Values
+
+The hook provides safe defaults when values are not available:
+
+- `theme`: `"light"`
+- `displayMode`: `"inline"`
+- `safeArea`: `{ insets: { top: 0, bottom: 0, left: 0, right: 0 } }`
+- `maxHeight`: `600`
+- `userAgent`: `{ device: { type: "desktop" }, capabilities: { hover: true, touch: false } }`
+- `locale`: `"en"`
+- `props`: `{}` (or `defaultProps` if provided)
+- `output`: `null`
+- `metadata`: `null`
+- `state`: `null`
+
+## Error Handling
+
+The hook throws errors when methods are called but the API is not available:
+
+```tsx
+const { callTool, isAvailable } = useWidget();
+
+const handleAction = async () => {
+  if (!isAvailable) {
+    console.warn('Widget API not available');
+    return;
+  }
+  
+  try {
+    await callTool('my-tool', {});
+  } catch (error) {
+    console.error('Tool call failed:', error);
+  }
+};
+```
+
+## Related Components
+
+- [`McpUseProvider`](./mcpuseprovider) - Unified provider that includes necessary setup
+- [`WidgetControls`](./widgetcontrols) - Debug and view controls
+- [`ThemeProvider`](./themeprovider) - Theme management
+- [`ErrorBoundary`](./errorboundary) - Error handling
+

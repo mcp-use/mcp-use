@@ -707,14 +707,12 @@ export function ToolsTab({
               >
                 Tools
               </button>
-              {mobileView !== "list" && (
+              {mobileView === "detail" && (
                 <>
                   <span className="mx-2 text-muted-foreground">/</span>
                   <button
                     onClick={() => {
-                      if (mobileView === "response") {
-                        setMobileView("detail");
-                      }
+                      setMobileView("response");
                     }}
                     className={
                       mobileView === "detail"
@@ -985,7 +983,7 @@ export function ToolsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel ref={bottomPanelRef} defaultSize={50}>
+          <ResizablePanel ref={bottomPanelRef} defaultSize={60}>
             <div className="flex flex-col h-full">
               <ToolResultDisplay
                 results={results}

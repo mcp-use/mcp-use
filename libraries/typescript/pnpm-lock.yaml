@@ -391,7 +391,7 @@ importers:
         specifier: ^12.23.22
         version: 12.23.24(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       hono:
-        specifier: ^4.0.0
+        specifier: ^4.6.0
         version: 4.10.5
       lucide-react:
         specifier: ^0.545.0
@@ -639,7 +639,7 @@ importers:
         specifier: ^19.2.0
         version: 19.2.0
       react-router-dom:
-        specifier: ^7.9.3
+        specifier: ^7.9.5
         version: 7.9.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       typescript:
         specifier: ^5.8.3

@@ -58,31 +58,32 @@ server.tool({
           type: "text",
           text: JSON.stringify(
             {
-              name: "EcoShop",
-              tagline: "Sustainable Products for a Better Tomorrow",
+              name: "mcp-use",
+              tagline: "Build MCP servers with UI widgets in minutes",
               description:
-                "EcoShop is a leading e-commerce platform dedicated to providing high-quality, sustainable products that help customers live more environmentally conscious lives.",
-              founded: "2015",
-              headquarters: "San Francisco, CA",
+                "mcp-use is a modern framework for building Model Context Protocol (MCP) servers with automatic UI widget registration, making it easy to create interactive AI tools and resources.",
+              founded: "2024",
               mission:
-                "To make sustainable living accessible and affordable for everyone",
+                "To simplify the development of MCP servers and make AI integration accessible for developers",
               values: [
-                "Sustainability",
-                "Quality",
-                "Transparency",
-                "Customer Focus",
+                "Developer Experience",
+                "Simplicity",
+                "Performance",
+                "Open Source",
                 "Innovation",
               ],
               contact: {
-                email: "info@ecoshop.com",
-                phone: "+1 (555) 123-4567",
-                website: "https://www.ecoshop.com",
+                website: "https://mcp-use.com",
+                docs: "https://docs.mcp-use.com",
+                github: "https://github.com/mcp-use/mcp-use",
               },
-              socialMedia: {
-                twitter: "@ecoshop",
-                instagram: "@ecoshop_official",
-                facebook: "EcoShopOfficial",
-              },
+              features: [
+                "Automatic UI widget registration",
+                "React component support",
+                "Full TypeScript support",
+                "Built-in HTTP server",
+                "MCP protocol compliance",
+              ],
             },
             null,
             2
