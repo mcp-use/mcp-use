@@ -1,0 +1,82 @@
+---
+title: "Server Manager"
+description: "Server Manager API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/managers/server_manager.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/managers/server_manager.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/managers/server_manager.py</a>
+</Callout>
+
+## ServerManager
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ServerManager</div>
+
+Manages MCP servers and provides tools for server selection and management.
+
+    This class allows an agent to discover and select which MCP server to use,
+    dynamically activating the tools for the selected server.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.agents.managers.server_manager import ServerManager
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize the server manager.
+
+
+**Parameters**
+><ParamField body="client" type="mcp_use.client.client.MCPClient" required="True" >   The MCPClient instance managing server connections </ParamField>
+><ParamField body="adapter" type="mcp_use.agents.adapters.base.BaseAdapter" required="True" >   The LangChainAdapter for converting MCP tools to LangChain tools </ParamField>
+
+**Signature**
+```python wrap
+def __init__(client: mcp_use.client.client.MCPClient, adapter: mcp_use.agents.adapters.base.BaseAdapter):
+```
+
+</Card>
+<Card type="info">
+### `method` get_active_server_tools
+
+Get tools from the currently active server.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[langchain_core.tools.base.BaseTool]" >List of tools from the active server, or empty list if no server is active</ResponseField>
+
+**Signature**
+```python wrap
+def get_active_server_tools():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_management_tools
+
+Get the server management tools.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[langchain_core.tools.base.BaseTool]" >List of server management tools</ResponseField>
+
+**Signature**
+```python wrap
+def get_management_tools():
+```
+
+</Card>
+
+</div>
