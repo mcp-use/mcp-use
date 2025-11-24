@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 0.7.0-canary.3
+
+### Minor Changes
+
+- 018395c: Release canary
+
+### Patch Changes
+
+- Updated dependencies [018395c]
+  - mcp-use@1.5.0-canary.3
+
 ## 0.7.0-canary.2
 
 ### Minor Changes

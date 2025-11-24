@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.6.0-canary.1
+
+### Minor Changes
+
+- 018395c: Release canary
+
 ## 0.6.0-canary.0
 
 ### Minor Changes
