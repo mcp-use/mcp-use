@@ -151,6 +151,24 @@ class RemoteAgent:
                     raise
             raise
 
+    def _format_query_message(self, query: str | BaseMessage | dict[str, Any]) -> dict[str, Any]:
+        """Normalize a query into the message format expected by the API."""
+        if isinstance(query, BaseMessage):
+            role = getattr(query, "role", None) or query.type
+            role_map = {"human": "user", "ai": "assistant"}
+            role = role_map.get(role, role)
+            return {"role": role, "content": query.content}
+
+        if isinstance(query, dict):
+            if "role" not in query or "content" not in query:
+                raise ValueError("Query dicts must include 'role' and 'content' keys")
+            return query
+
+        if isinstance(query, str):
+            return {"role": "user", "content": query}
+
+        raise TypeError("Query must be a string, BaseMessage, or dict with role/content")
+
     async def _upsert_chat_session(self) -> str:
         """Create or resume a persistent chat session for the agent via upsert.
 
@@ -198,13 +216,18 @@ class RemoteAgent:
 
     async def stream(
         self,
-        query: str,
+        query: str | BaseMessage | dict[str, Any],
         max_steps: int | None = None,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
         prompt_files: list[dict] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Stream the execution of a query on the remote agent using HTTP streaming."""
+        """
+        Stream the execution of a query on the remote agent using HTTP streaming.
+
+        The query can be a simple string or a pre-formatted user message (e.g., LangChain
+        HumanMessage or an OpenAI-style message dict) so you can inline attachments directly.
+        """
         if external_history is not None:
             logger.warning("External history is not yet supported for remote execution")
 
@@ -217,7 +240,10 @@ class RemoteAgent:
         stream_url = f"{self.base_url}{API_CHAT_STREAM_ENDPOINT.format(chat_id=chat_id)}"
 
         # Prepare the request payload
-        request_payload = {"messages": [{"role": "user", "content": query}], "max_steps": max_steps or 30}
+        request_payload = {
+            "messages": [self._format_query_message(query)],
+            "max_steps": max_steps or 30,
+        }
         if output_schema is not None:
             request_payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
 
@@ -307,7 +333,7 @@ class RemoteAgent:
 
     async def run(
         self,
-        query: str,
+        query: str | BaseMessage | dict[str, Any],
         max_steps: int | None = None,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
@@ -317,6 +343,9 @@ class RemoteAgent:
         Executes the agent and returns the final result.
         This method uses HTTP streaming to avoid timeouts for long-running tasks.
         It consumes the entire stream and returns only the final result.
+
+        The query may be a plain string or a user message (HumanMessage/OpenAI-style dict),
+        which allows embedding multimodal content directly in the request.
         """
         final_result = None
         steps_taken = 0
