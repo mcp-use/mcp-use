@@ -45,6 +45,9 @@ jobs:
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
           registry-url: "https://registry.npmjs.org"
 
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest
+
       - name: Install Dependencies
         working-directory: libraries/typescript
         run: pnpm install --no-frozen-lockfile
@@ -103,12 +106,9 @@ jobs:
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
         run: |
-          echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > .npmrc
+          # Using npm trusted publishing (OIDC) - no token needed
           pnpm changeset publish
-          echo "✅ Published canary packages to npm"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "✅ Published canary packages to npm using trusted publishing"
 
       # ============================================================================
       # MAIN BRANCH: Stable release workflow
@@ -198,22 +198,18 @@ jobs:
 
       - name: Publish packages (Main)
         if: github.ref == 'refs/heads/main' && steps.check-release.outputs.should_publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Setup npm auth
+          # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
-          echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > .npmrc
-
-          # Publish to npm
           pnpm changeset publish
 
           # Push git tags from repo root
           cd ../..
           git push --follow-tags
 
-          echo "✅ Published packages to npm and pushed tags"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "✅ Published packages to npm using trusted publishing and pushed tags"
 
       - name: Create GitHub Release (Main)
         if: github.ref == 'refs/heads/main' && steps.check-release.outputs.should_publish == 'true'
