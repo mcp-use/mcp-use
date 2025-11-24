@@ -23,11 +23,14 @@ describe("Code Mode Integration", () => {
   it("searches tools through client method", async () => {
     const client = new MCPClient({}, { codeMode: true });
 
-    const tools = await client.searchTools("", "names");
+    const result = await client.searchTools("", "names");
     // Should include at least the code mode tools if no other servers are added
     // But wait, code_mode server is excluded from normal discovery to avoid recursion?
     // The search_tools implementation in CodeExecutor filters OUT 'code_mode'
     // So if no other servers, it should be empty
-    expect(tools).toEqual([]);
+    expect(result.results).toEqual([]);
+    expect(result.meta.total_tools).toBe(0);
+    expect(result.meta.namespaces).toEqual([]);
+    expect(result.meta.result_count).toBe(0);
   });
 });

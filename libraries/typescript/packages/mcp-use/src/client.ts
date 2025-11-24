@@ -248,7 +248,7 @@ export class MCPClient extends BaseMCPClient {
   public async searchTools(
     query: string = "",
     detailLevel: "names" | "descriptions" | "full" = "full"
-  ): Promise<import("./client/codeExecutor.js").ToolSearchResult[]> {
+  ): Promise<import("./client/codeExecutor.js").ToolSearchResponse> {
     if (!this.codeMode) {
       throw new Error("Code execution mode is not enabled");
     }

@@ -279,7 +279,7 @@ class CodeExecutor:
             Function that searches available tools.
         """
 
-        async def search_tools(query: str = "", detail_level: str = "full") -> list[dict[str, Any]]:
+        async def search_tools(query: str = "", detail_level: str = "full") -> dict[str, Any]:
             """Search available MCP tools.
 
             Args:
@@ -287,25 +287,23 @@ class CodeExecutor:
                 detail_level: Level of detail to return ("names", "descriptions", "full").
 
             Returns:
-                List of tool information dictionaries.
+                Dictionary with:
+                - meta: Dictionary containing total_tools, namespaces, and result_count
+                - results: List of tool information dictionaries matching the query
             """
             all_tools = []
+            all_namespaces = set()
             query_lower = query.lower()
 
+            # First pass: collect all tools and namespaces
             for server_name, session in self.client.sessions.items():
                 try:
                     tools = await session.list_tools()
+                    if tools:
+                        all_namespaces.add(server_name)
 
                     for tool in tools:
-                        # Filter by query
-                        if query:
-                            tool_name_match = query_lower in tool.name.lower()
-                            desc_match = hasattr(tool, "description") and query_lower in tool.description.lower()
-
-                            if not (tool_name_match or desc_match):
-                                continue
-
-                        # Build tool info based on detail level
+                        # Build tool info based on detail level (before filtering)
                         if detail_level == "names":
                             tool_info = {
                                 "name": tool.name,
@@ -330,6 +328,25 @@ class CodeExecutor:
                 except Exception as e:
                     logger.error(f"Failed to list tools for server {server_name}: {e}")
 
-            return all_tools
+            # Filter by query if provided
+            filtered_tools = all_tools
+            if query:
+                filtered_tools = []
+                for tool_info in all_tools:
+                    tool_name_match = query_lower in tool_info["name"].lower()
+                    desc_match = query_lower in tool_info.get("description", "").lower()
+                    server_match = query_lower in tool_info["server"].lower()
+                    if tool_name_match or desc_match or server_match:
+                        filtered_tools.append(tool_info)
+
+            # Return metadata along with results
+            return {
+                "meta": {
+                    "total_tools": len(all_tools),
+                    "namespaces": sorted(list(all_namespaces)),
+                    "result_count": len(filtered_tools),
+                },
+                "results": filtered_tools,
+            }
 
         return search_tools

@@ -283,16 +283,21 @@ Use `search_tools()` to discover available tools at runtime:
 
 ```javascript
 // Find all tools (returns full schemas)
-const allTools = await search_tools();
+const allResult = await search_tools();
+const allTools = allResult.results;
+console.log(`Found ${allResult.meta.result_count} tools out of ${allResult.meta.total_tools} total`);
 
 // Search for specific tools
-const githubTools = await search_tools("github");
+const githubResult = await search_tools("github");
+const githubTools = githubResult.results;
 
 // Get just names and servers
-const toolNames = await search_tools("", "names");
+const namesResult = await search_tools("", "names");
+const toolNames = namesResult.results;
 
 // Get names and descriptions
-const toolDescs = await search_tools("", "descriptions");
+const descsResult = await search_tools("", "descriptions");
+const toolDescs = descsResult.results;
 ```
 
 ### 3. Standard JavaScript
@@ -321,8 +326,9 @@ Here's how an agent might write code to analyze GitHub issues:
 
 ```javascript
 // 1. Discover what tools are available
-const tools = await search_tools("github issue");
-console.log(`Found ${tools.length} GitHub issue tools`);
+const searchResult = await search_tools("github issue");
+const tools = searchResult.results;
+console.log(`Found ${searchResult.meta.result_count} GitHub issue tools out of ${searchResult.meta.total_tools} total`);
 
 // 2. Fetch issues from repository
 const issues = await github.list_issues({
@@ -424,16 +430,23 @@ Different ways to discover tools based on your needs:
 
 ```javascript
 // Quick overview - just names
-const names = await search_tools("", "names");
+const namesResult = await search_tools("", "names");
+const names = namesResult.results;
 // [{ name: "list_issues", server: "github" }, ...]
 
 // With descriptions for better understanding
-const withDesc = await search_tools("file", "descriptions");
+const withDescResult = await search_tools("file", "descriptions");
+const withDesc = withDescResult.results;
 // [{ name: "read_file", server: "filesystem", description: "..." }, ...]
 
 // Full schemas for validation
-const full = await search_tools("github", "full");
+const fullResult = await search_tools("github", "full");
+const full = fullResult.results;
 // [{ name: "...", server: "...", description: "...", input_schema: {...} }]
+
+// Access metadata
+console.log(`Total tools: ${fullResult.meta.total_tools}`);
+console.log(`Namespaces: ${fullResult.meta.namespaces.join(", ")}`);
 
 // Check available namespaces
 console.log("Available servers:", __tool_namespaces);
@@ -574,10 +587,32 @@ class MCPClient {
   async searchTools(
     query?: string,
     detailLevel?: "names" | "descriptions" | "full"
-  ): Promise<ToolSearchResult[]>;
+  ): Promise<ToolSearchResponse>;
 
   // Clean up resources (E2B sandboxes, MCP sessions)
   async close(): Promise<void>;
+}
+```
+
+### ToolSearchResponse
+
+```typescript
+interface ToolSearchMeta {
+  total_tools: number;      // Total number of tools across all servers
+  namespaces: string[];     // List of server namespaces
+  result_count: number;    // Number of tools matching the query
+}
+
+interface ToolSearchResponse {
+  meta: ToolSearchMeta;
+  results: ToolSearchResult[];
+}
+
+interface ToolSearchResult {
+  name: string;             // Tool name
+  server: string;           // Server namespace
+  description?: string;     // Tool description (if detailLevel >= "descriptions")
+  input_schema?: object;   // JSON Schema for inputs (if detailLevel === "full")
 }
 ```
 
@@ -687,8 +722,9 @@ Make sure MCP servers are configured and connected:
 console.log("Available servers:", __tool_namespaces);
 
 // Search for tools
-const tools = await search_tools();
-console.log("Available tools:", tools);
+const result = await search_tools();
+console.log(`Found ${result.meta.result_count} tools out of ${result.meta.total_tools} total`);
+console.log("Available tools:", result.results);
 ```
 
 ### E2B sandbox issues
