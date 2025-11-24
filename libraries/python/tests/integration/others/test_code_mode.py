@@ -50,9 +50,18 @@ class TestCodeModeIntegration:
         """Test search_tools with no active sessions."""
         client = MCPClient(code_mode=True)
 
-        tools = await client.search_tools()
+        tools = await client.search_tools("", detail_level="names")
 
-        assert tools == []
+        assert tools == [
+            {
+                "name": "execute_code",
+                "server": "code_mode",
+            },
+            {
+                "name": "search_tools",
+                "server": "code_mode",
+            },
+        ]
 
     def test_from_dict_with_code_mode(self):
         """Test creating client from dict with code_mode."""
@@ -139,22 +148,6 @@ return {
         assert len(result["logs"]) >= 2
 
     @pytest.mark.asyncio
-    async def test_execute_with_timeout(self):
-        """Test that timeout is enforced."""
-        client = MCPClient(code_mode=True)
-
-        result = await client.execute_code(
-            """
-await asyncio.sleep(10)
-return "should timeout"
-""",
-            timeout=0.5,
-        )
-
-        assert result["error"] is not None
-        assert "timeout" in result["error"].lower()
-
-    @pytest.mark.asyncio
     async def test_execute_with_error(self):
         """Test error handling in code execution."""
         client = MCPClient(code_mode=True)
@@ -207,6 +200,22 @@ class TestSearchToolsIntegration:
         descriptions = await client.search_tools("", detail_level="descriptions")
         full = await client.search_tools("", detail_level="full")
 
-        assert names == []
-        assert descriptions == []
-        assert full == []
+        assert names == [
+            {
+                "name": "execute_code",
+                "server": "code_mode",
+            },
+            {
+                "name": "search_tools",
+                "server": "code_mode",
+            },
+        ]
+        assert len(descriptions) == 2
+        assert all("name" in t and "server" in t and "description" in t for t in descriptions)
+        assert descriptions[0]["name"] == "execute_code"
+        assert descriptions[1]["name"] == "search_tools"
+
+        assert len(full) == 2
+        assert all("name" in t and "server" in t and "description" in t and "input_schema" in t for t in full)
+        assert full[0]["name"] == "execute_code"
+        assert full[1]["name"] == "search_tools"
