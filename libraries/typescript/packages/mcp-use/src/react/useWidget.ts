@@ -141,8 +141,9 @@ export function useWidget<
   }, [isOpenAiAvailable]);
 
   // Extract search string to avoid dependency issues
-  const searchString = typeof window !== "undefined" ? window.location.search : "";
-  
+  const searchString =
+    typeof window !== "undefined" ? window.location.search : "";
+
   const urlParams = useMemo(() => {
     // check if it has mcpUseParams
     const urlParams = new URLSearchParams(searchString);
@@ -254,7 +255,8 @@ export function useWidget<
 
       // Use functional update to always get latest state
       // Prefer widgetState (from window.openai) over localWidgetState for most up-to-date value
-      const currentState = widgetState !== undefined ? widgetState : localWidgetState;
+      const currentState =
+        widgetState !== undefined ? widgetState : localWidgetState;
       const newState =
         typeof state === "function" ? state(currentState) : state;
 

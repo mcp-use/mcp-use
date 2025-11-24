@@ -249,7 +249,8 @@ function OpenAIComponentRendererBase({
 
             // Dispatch the set_globals event to notify React components
             try {
-              const CustomEventConstructor = iframeWindow.CustomEvent as typeof CustomEvent;
+              const CustomEventConstructor =
+                iframeWindow.CustomEvent as typeof window.CustomEvent;
               const globalsEvent = new CustomEventConstructor(
                 "openai:set_globals",
                 {
@@ -590,7 +591,7 @@ function OpenAIComponentRendererBase({
       }
     };
 
-    const handleError: OnErrorEventHandler = () => {
+    const handleError = () => {
       setError("Failed to load component");
     };
 
