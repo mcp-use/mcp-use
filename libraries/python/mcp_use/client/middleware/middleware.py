@@ -236,7 +236,7 @@ class CallbackClientSession:
     async def call_tool(self, name: str, arguments: dict[str, Any], *args, **kwargs) -> CallToolResult:
         params = CallToolRequestParams(name=name, arguments=arguments)
         return await self._intercept_call(
-            "tools/call", params, lambda: self._client_session.call_tool(name, arguments, *args, **kwargs)
+            "tools/call", params, lambda: self._client_session.call_tool(params.name, params.arguments, *args, **kwargs)
         )
 
     async def list_resources(self, *args, **kwargs) -> ListResourcesResult:
