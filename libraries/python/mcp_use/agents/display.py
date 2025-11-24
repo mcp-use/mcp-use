@@ -364,13 +364,16 @@ def log_agent_stream(chunk, pretty_print=True):
 
         # Try to get content from chunk object
         content = chunk_obj.content if hasattr(chunk_obj, "content") else None
+        # It is unbelievable, but content can be a dict or a string depending on the model.
         if content is not None:
-            item: dict
-            for item in content:
-                # Extract text from various possible fields
-                if "text" in item and item.get("type") != "input_json_delta":
-                    text_parts.append(item["text"])
-                # Skip partial_json - these are tool call arguments being built
+            if isinstance(content, str):
+                text_parts.append(content)
+            else:
+                item: dict
+                for item in content:
+                    # Extract text from various possible fields
+                    if "text" in item and item.get("type") != "input_json_delta":
+                        text_parts.append(item["text"])
 
         text = "".join(text_parts)
         if text:
