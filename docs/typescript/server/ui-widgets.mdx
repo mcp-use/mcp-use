@@ -309,6 +309,19 @@ export const widgetMetadata = {
   
   // Required: Zod schema defining component props
   inputs: z.ZodObject<...>,
+  
+  // Optional: Apps SDK metadata (CSP, widget description, etc.)
+  appsSdkMetadata?: {
+    'openai/widgetDescription'?: string,
+    'openai/widgetCSP'?: {
+      connect_domains?: string[],
+      resource_domains?: string[],
+    },
+    'openai/toolInvocation/invoking'?: string,
+    'openai/toolInvocation/invoked'?: string,
+    'openai/widgetAccessible'?: boolean,
+    'openai/resultCanProduceWidget'?: boolean,
+  },
 }
 ```
 
@@ -343,6 +356,46 @@ const propSchema = z.object({
   }).describe('User address'),
 });
 ```
+
+### Apps SDK Metadata
+
+Configure Apps SDK-specific settings including Content Security Policy (CSP) for external resources:
+
+```typescript
+export const widgetMetadata = {
+  description: 'Display product search results',
+  inputs: propSchema,
+  appsSdkMetadata: {
+    // Widget description for accessibility
+    'openai/widgetDescription': 'Interactive product search with filtering',
+    
+    // Content Security Policy - define allowed external resources
+    'openai/widgetCSP': {
+      // API endpoints the widget can connect to
+      connect_domains: [
+        'https://api.example.com',
+        'wss://websocket.example.com'
+      ],
+      // External resources (scripts, styles, images, fonts)
+      resource_domains: [
+        'https://cdn.jsdelivr.net',
+        'https://unpkg.com',
+        'https://fonts.googleapis.com'
+      ]
+    },
+    
+    // Tool invocation status messages
+    'openai/toolInvocation/invoking': 'Loading products...',
+    'openai/toolInvocation/invoked': 'Products loaded',
+    
+    // Accessibility options
+    'openai/widgetAccessible': true,
+    'openai/resultCanProduceWidget': true,
+  },
+};
+```
+
+**Note**: The CSP domains you specify will be merged with default trusted domains (like `*.oaistatic.com`, `*.oaiusercontent.com`, and your server's base URL). This ensures your widget can access both your custom resources and OpenAI's required domains.
 
 ## The useWidget Hook
 
@@ -1111,8 +1164,25 @@ const MyWidget: React.FC = () => {
 
 **Solutions**:
 - Set `baseUrl` in server config
-- Add external domains to `appsSdkMetadata['openai/widgetCSP']`
+- Add external domains to CSP configuration
 - Check browser console for blocked domains
+
+**For automatic widget registration** (via `widgetMetadata`):
+
+```typescript
+export const widgetMetadata = {
+  description: 'My widget',
+  inputs: propSchema,
+  appsSdkMetadata: {
+    'openai/widgetCSP': {
+      connect_domains: ['https://api.example.com'],
+      resource_domains: ['https://cdn.example.com'],
+    }
+  }
+};
+```
+
+**For manual registration** (via `server.uiResource()`):
 
 ```typescript
 server.uiResource({

@@ -1,4 +1,5 @@
 import { createMCPServer } from "mcp-use/server";
+import { cors } from 'hono/cors';
 
 // Create MCP server instance
 const server = createMCPServer("my-mcp-server", {
@@ -6,6 +7,17 @@ const server = createMCPServer("my-mcp-server", {
   description: "My first MCP server with all features",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
 });
+
+server.use(
+  cors({
+    origin: "*",
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    exposeHeaders: ["Content-Length"],
+    maxAge: 86400,
+    credentials: false,
+  })
+);
 
 /**
  * Define UI Widgets
