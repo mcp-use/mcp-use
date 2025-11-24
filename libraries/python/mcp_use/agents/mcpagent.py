@@ -972,7 +972,12 @@ class MCPAgent:
             if event.get("event") == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
                 if chunk and getattr(chunk, "content", None):
-                    ai_message_chunks.append(chunk.content)
+                    content = (
+                        chunk.content
+                        if isinstance(chunk.content, str)
+                        else "".join([item.get("text", "") for item in chunk.content])
+                    )
+                    ai_message_chunks.append(content)
 
             yield event
 
@@ -1020,7 +1025,6 @@ class MCPAgent:
                 manage_connector=manage_connector,
                 external_history=external_history,
             ):
-                # print(chunk)
                 log_agent_stream(chunk, pretty_print=self.pretty_print)
                 chunk_count += 1
                 if isinstance(chunk, str):
