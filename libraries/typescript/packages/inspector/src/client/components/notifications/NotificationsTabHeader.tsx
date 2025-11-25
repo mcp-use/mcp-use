@@ -87,12 +87,9 @@ export function NotificationsTabHeader({
               <Trash2 className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">
-            Clear all
-          </TooltipContent>
+          <TooltipContent side="bottom">Clear all</TooltipContent>
         </Tooltip>
       </div>
     </div>
   );
 }
-

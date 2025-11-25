@@ -1,11 +1,5 @@
 import type { MCPNotification } from "@/client/context/McpContext";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import {
   ResizableHandle,
@@ -74,7 +68,12 @@ export function NotificationsTab({
 
   // Auto-scroll to top when new notifications arrive (only if user hasn't scrolled)
   useEffect(() => {
-    if (autoScroll && notifications.length > 0 && listRef.current && !userHasScrolledRef.current) {
+    if (
+      autoScroll &&
+      notifications.length > 0 &&
+      listRef.current &&
+      !userHasScrolledRef.current
+    ) {
       listRef.current.scrollTop = 0;
     }
   }, [notifications.length, autoScroll]);
@@ -136,7 +135,6 @@ export function NotificationsTab({
           .includes(query)
     );
   }, [notifications, searchQuery]);
-
 
   // Reset focused index when filtered notifications change
   useEffect(() => {
@@ -263,7 +261,10 @@ export function NotificationsTab({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("[NotificationsTab] Failed to download notification:", error);
+      console.error(
+        "[NotificationsTab] Failed to download notification:",
+        error
+      );
     }
   }, [selectedNotification]);
 

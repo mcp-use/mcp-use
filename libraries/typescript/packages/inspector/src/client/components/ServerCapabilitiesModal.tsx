@@ -95,10 +95,14 @@ export function ServerCapabilitiesModal({
   };
 
   const getAdditionalCapabilities = () => {
-    const knownKeys = ["tools", "resources", "prompts", "logging", "completions"];
-    return Object.keys(capabilities).filter(
-      (key) => !knownKeys.includes(key)
-    );
+    const knownKeys = [
+      "tools",
+      "resources",
+      "prompts",
+      "logging",
+      "completions",
+    ];
+    return Object.keys(capabilities).filter((key) => !knownKeys.includes(key));
   };
 
   const additionalCapabilities = getAdditionalCapabilities();
@@ -219,4 +223,3 @@ export function ServerCapabilitiesModal({
     </Dialog>
   );
 }
-

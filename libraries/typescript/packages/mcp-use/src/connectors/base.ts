@@ -107,9 +107,11 @@ export abstract class BaseConnector {
    */
   protected setupNotificationHandler(): void {
     if (!this.client) return;
-    
+
     // Use fallbackNotificationHandler to catch all notifications
-    this.client.fallbackNotificationHandler = async (notification: Notification) => {
+    this.client.fallbackNotificationHandler = async (
+      notification: Notification
+    ) => {
       // Auto-handle list_changed notifications per MCP spec
       // Clients SHOULD re-fetch the list when receiving these notifications
       switch (notification.method) {
@@ -144,10 +146,14 @@ export abstract class BaseConnector {
   protected async refreshToolsCache(): Promise<void> {
     if (!this.client) return;
     try {
-      logger.debug("[Auto] Refreshing tools cache due to list_changed notification");
+      logger.debug(
+        "[Auto] Refreshing tools cache due to list_changed notification"
+      );
       const result = await this.client.listTools();
       this.toolsCache = (result.tools ?? []) as Tool[];
-      logger.debug(`[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`);
+      logger.debug(
+        `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
+      );
     } catch (err) {
       logger.warn("[Auto] Failed to refresh tools cache:", err);
     }
@@ -158,7 +164,9 @@ export abstract class BaseConnector {
    * Resources aren't cached by default, but we log for user awareness
    */
   protected async onResourcesListChanged(): Promise<void> {
-    logger.debug("[Auto] Resources list changed - clients should re-fetch if needed");
+    logger.debug(
+      "[Auto] Resources list changed - clients should re-fetch if needed"
+    );
   }
 
   /**
@@ -166,7 +174,9 @@ export abstract class BaseConnector {
    * Prompts aren't cached by default, but we log for user awareness
    */
   protected async onPromptsListChanged(): Promise<void> {
-    logger.debug("[Auto] Prompts list changed - clients should re-fetch if needed");
+    logger.debug(
+      "[Auto] Prompts list changed - clients should re-fetch if needed"
+    );
   }
 
   /**
@@ -186,7 +196,9 @@ export abstract class BaseConnector {
   async setRoots(roots: Root[]): Promise<void> {
     this.rootsCache = [...roots];
     if (this.client) {
-      logger.debug(`Sending roots/list_changed notification with ${roots.length} root(s)`);
+      logger.debug(
+        `Sending roots/list_changed notification with ${roots.length} root(s)`
+      );
       await this.client.sendRootsListChanged();
     }
   }
@@ -209,7 +221,9 @@ export abstract class BaseConnector {
     this.client.setRequestHandler(
       ListRootsRequestSchema,
       async (_request, _extra) => {
-        logger.debug(`Server requested roots list, returning ${this.rootsCache.length} root(s)`);
+        logger.debug(
+          `Server requested roots list, returning ${this.rootsCache.length} root(s)`
+        );
         return { roots: this.rootsCache };
       }
     );

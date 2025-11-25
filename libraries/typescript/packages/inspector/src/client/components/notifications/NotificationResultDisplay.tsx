@@ -104,21 +104,18 @@ export function NotificationResultDisplay({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-
-          <div className="px-4 pt-4">
-            <JSONDisplay
-              data={{
-                method: notification.method,
-                timestamp: notification.timestamp,
-                read: notification.read,
-                params: notification.params,
-              }}
-              filename={`notification-${notification.method.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}
-            />
-          </div>
-
+        <div className="px-4 pt-4">
+          <JSONDisplay
+            data={{
+              method: notification.method,
+              timestamp: notification.timestamp,
+              read: notification.read,
+              params: notification.params,
+            }}
+            filename={`notification-${notification.method.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}
+          />
+        </div>
       </div>
     </div>
   );
 }
-

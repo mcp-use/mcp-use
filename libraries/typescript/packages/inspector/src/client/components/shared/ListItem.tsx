@@ -47,18 +47,20 @@ export function ListItem({
       )}
     >
       <div className="flex items-start gap-2 sm:gap-3">
-        {icon && <div className="flex-shrink-0 mt-1">
-          <div
-            className={cn(
-              "p-2.5 rounded-full transition-colors",
-              isSelected
-                ? "bg-zinc-500 dark:bg-zinc-100/80 text-zinc-100 dark:text-zinc-900"
-                : "bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-zinc-600"
-            )}
-          >
-            {icon}
+        {icon && (
+          <div className="flex-shrink-0 mt-1">
+            <div
+              className={cn(
+                "p-2.5 rounded-full transition-colors",
+                isSelected
+                  ? "bg-zinc-500 dark:bg-zinc-100/80 text-zinc-100 dark:text-zinc-900"
+                  : "bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-zinc-600"
+              )}
+            >
+              {icon}
+            </div>
           </div>
-        </div>}
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className={cn("font-medium truncate font-mono text-sm")}>

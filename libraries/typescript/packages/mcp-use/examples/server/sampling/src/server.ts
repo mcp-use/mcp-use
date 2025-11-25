@@ -233,6 +233,7 @@ await server.listen(PORT);
 console.log(`🚀 Sampling Example Server running on port ${PORT}`);
 console.log(`📊 Inspector available at http://localhost:${PORT}/inspector`);
 console.log(`🔧 MCP endpoint at http://localhost:${PORT}/mcp`);
-console.log(`\n💡 This server requires a client with sampling support to use the tools.`);
+console.log(
+  `\n💡 This server requires a client with sampling support to use the tools.`
+);
 console.log(`   See examples/client/sampling-client.ts for a client example.`);
-

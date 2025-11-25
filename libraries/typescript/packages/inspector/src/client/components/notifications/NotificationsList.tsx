@@ -8,7 +8,9 @@ interface NotificationsListProps {
   onNotificationSelect: (notification: MCPNotification) => void;
   focusedIndex: number;
   formatRelativeTime: (timestamp: number) => string;
-  listRef?: React.RefObject<HTMLDivElement> | React.MutableRefObject<HTMLDivElement | null>;
+  listRef?:
+    | React.RefObject<HTMLDivElement>
+    | React.MutableRefObject<HTMLDivElement | null>;
 }
 
 export function NotificationsList({
@@ -23,9 +25,7 @@ export function NotificationsList({
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
         <Bell className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
-        <p className="text-gray-500 dark:text-gray-400">
-          No notifications yet
-        </p>
+        <p className="text-gray-500 dark:text-gray-400">No notifications yet</p>
       </div>
     );
   }
@@ -40,11 +40,13 @@ export function NotificationsList({
             isSelected={selectedNotification?.id === notification.id}
             isFocused={focusedIndex === index}
             title={
-                <span className="flex items-center gap-3">
-                  {notification.method}
-                  {!notification.read && <span className="size-1.5 block rounded-full bg-orange-500" />}
-                </span>
-              }
+              <span className="flex items-center gap-3">
+                {notification.method}
+                {!notification.read && (
+                  <span className="size-1.5 block rounded-full bg-orange-500" />
+                )}
+              </span>
+            }
             description={(() => {
               const timeStr = formatRelativeTime(notification.timestamp);
               const paramCount =
@@ -65,4 +67,3 @@ export function NotificationsList({
     </div>
   );
 }
-

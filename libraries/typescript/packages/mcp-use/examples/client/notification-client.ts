@@ -20,7 +20,12 @@
  *   2. Run this client: tsx examples/client/notification-client.ts
  */
 
-import { HttpConnector, MCPSession, type Notification, type Root } from "../../dist/index.js";
+import {
+  HttpConnector,
+  MCPSession,
+  type Notification,
+  type Root,
+} from "../../dist/index.js";
 
 const SERVER_URL = process.env.MCP_SERVER_URL || "http://localhost:3000/mcp";
 
@@ -77,13 +82,19 @@ async function main() {
 
       case "custom/welcome":
         console.log(`\n[${timestamp}] 👋 NOTIFICATION: custom/welcome`);
-        console.log(`  → ${(notification.params as any)?.message || "Welcome!"}`);
+        console.log(
+          `  → ${(notification.params as any)?.message || "Welcome!"}`
+        );
         break;
 
       case "custom/heartbeat":
         const hb = notification.params as any;
-        console.log(`\n[${timestamp}] 💓 NOTIFICATION: custom/heartbeat #${hb?.count}`);
-        console.log(`  → Mode: ${hb?.currentMode}, Clients: ${hb?.connectedClients}`);
+        console.log(
+          `\n[${timestamp}] 💓 NOTIFICATION: custom/heartbeat #${hb?.count}`
+        );
+        console.log(
+          `  → Mode: ${hb?.currentMode}, Clients: ${hb?.connectedClients}`
+        );
         break;
 
       case "custom/broadcast":
@@ -143,14 +154,18 @@ async function main() {
     { uri: "file:///tmp/workspace", name: "Temp Workspace" },
   ];
   await session.setRoots(newRoots);
-  console.log(`[Demo] ✓ Sent roots/list_changed notification with ${newRoots.length} roots`);
+  console.log(
+    `[Demo] ✓ Sent roots/list_changed notification with ${newRoots.length} roots`
+  );
   newRoots.forEach((r) => console.log(`  - ${r.name}: ${r.uri}`));
 
   // Wait a moment
   await sleep(2000);
 
   // Demonstrate calling a tool that triggers tools/list_changed
-  console.log("\n[Demo] 🔧 Calling 'toggle-mode' tool (triggers tools/list_changed)...");
+  console.log(
+    "\n[Demo] 🔧 Calling 'toggle-mode' tool (triggers tools/list_changed)..."
+  );
   try {
     const result = await session.connector.callTool("toggle-mode", {});
     const text = (result.content[0] as any)?.text || "No response";
@@ -177,7 +192,9 @@ async function main() {
   console.log("🔄 Listening for notifications (Ctrl+C to exit)");
   console.log("═".repeat(50));
   console.log("\nThe server sends heartbeat notifications every 15 seconds.");
-  console.log("You can also use the Inspector to trigger more notifications.\n");
+  console.log(
+    "You can also use the Inspector to trigger more notifications.\n"
+  );
 
   // Handle graceful shutdown
   process.on("SIGINT", async () => {
@@ -196,4 +213,3 @@ function sleep(ms: number): Promise<void> {
 }
 
 main().catch(console.error);
-

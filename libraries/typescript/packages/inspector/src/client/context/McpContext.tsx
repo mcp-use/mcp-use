@@ -671,7 +671,8 @@ export function McpProvider({ children }: { children: ReactNode }) {
           current.serverInfo === updatedConnection.serverInfo &&
           current.client === updatedConnection.client &&
           current.notifications === updatedConnection.notifications &&
-          current.unreadNotificationCount === updatedConnection.unreadNotificationCount
+          current.unreadNotificationCount ===
+            updatedConnection.unreadNotificationCount
         ) {
           return prev;
         }

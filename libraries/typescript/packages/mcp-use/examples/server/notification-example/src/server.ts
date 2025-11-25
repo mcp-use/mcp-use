@@ -31,7 +31,7 @@ import { createMCPServer } from "../../../../dist/src/server/index.js";
 let currentMode: "ping" | "pong" = "ping";
 
 // We'll dynamically update tool descriptions
-const getToolDescription = () => 
+const getToolDescription = () =>
   `Returns "${currentMode.toUpperCase()}!" - Current mode: ${currentMode}`;
 
 // Create an MCP server
@@ -44,7 +44,9 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Handle client roots changes (CLIENT → SERVER notification)
 server.onRootsChanged(async (roots) => {
-  console.log(`\n[Roots] 📁 Client roots updated! Received ${roots.length} root(s):`);
+  console.log(
+    `\n[Roots] 📁 Client roots updated! Received ${roots.length} root(s):`
+  );
   roots.forEach((root) => {
     console.log(`  - ${root.name || "unnamed"}: ${root.uri}`);
   });
@@ -70,7 +72,8 @@ server.tool({
 // Toggle mode and send list_changed notification
 server.tool({
   name: "toggle-mode",
-  description: "Toggle between ping and pong mode, then notify all clients to refresh tools",
+  description:
+    "Toggle between ping and pong mode, then notify all clients to refresh tools",
   inputs: [],
   cb: async () => {
     const oldMode = currentMode;
@@ -80,15 +83,18 @@ server.tool({
     // Clients with auto-refresh will re-fetch the tools list
     await server.sendNotification("notifications/tools/list_changed", {});
 
-    console.log(`[Toggle] Mode changed from "${oldMode}" to "${currentMode}" - sent tools/list_changed`);
+    console.log(
+      `[Toggle] Mode changed from "${oldMode}" to "${currentMode}" - sent tools/list_changed`
+    );
 
     return {
       content: [
         {
           type: "text",
-          text: `Mode toggled from "${oldMode}" to "${currentMode}"!\n\n` +
-                `All ${server.getActiveSessions().length} client(s) received tools/list_changed notification.\n` +
-                `The ping-pong tool will now respond with "${currentMode.toUpperCase()}!"`,
+          text:
+            `Mode toggled from "${oldMode}" to "${currentMode}"!\n\n` +
+            `All ${server.getActiveSessions().length} client(s) received tools/list_changed notification.\n` +
+            `The ping-pong tool will now respond with "${currentMode.toUpperCase()}!"`,
         },
       ],
     };
@@ -151,8 +157,12 @@ setTimeout(async () => {
   console.log(`\n[Demo] Found ${sessions.length} connected client(s)`);
 
   if (sessions.length === 0) {
-    console.log("[Demo] No clients connected. Connect via the Inspector to receive notifications.");
-    console.log(`[Demo] Open http://localhost:${PORT}/inspector in your browser`);
+    console.log(
+      "[Demo] No clients connected. Connect via the Inspector to receive notifications."
+    );
+    console.log(
+      `[Demo] Open http://localhost:${PORT}/inspector in your browser`
+    );
     return;
   }
 
@@ -182,7 +192,9 @@ const periodicInterval = setInterval(async () => {
       connectedClients: sessions.length,
       currentMode,
     });
-    console.log(`[Heartbeat #${heartbeatCount}] Mode: ${currentMode}, ${sessions.length} client(s)`);
+    console.log(
+      `[Heartbeat #${heartbeatCount}] Mode: ${currentMode}, ${sessions.length} client(s)`
+    );
   }
 }, 15000);
 
