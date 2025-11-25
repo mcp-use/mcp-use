@@ -42,3 +42,6 @@ export type {
 } from "./widget-types.js";
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
+
+// Export WidgetMetadata type for widget developers
+export type { WidgetMetadata } from "../server/types/widget.js";
