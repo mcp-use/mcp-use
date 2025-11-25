@@ -15,9 +15,7 @@ export const AccordionItem: React.FC<AccordionItemProps> = ({
         onClick={onToggle}
         className="w-full flex items-center justify-between p-4 text-left hover:bg-primary-soft-hover transition-colors"
       >
-        <span className="font-medium text-default">
-          {question}
-        </span>
+        <span className="font-medium text-default">{question}</span>
         <span className="text-xl text-tertiary transition-transform duration-200">
           {isOpen ? "−" : "+"}
         </span>
