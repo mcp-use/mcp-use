@@ -47,15 +47,16 @@ class TestCodeModeIntegration:
 
     @pytest.mark.asyncio
     async def test_search_tools_empty_sessions(self):
-        """Test search_tools with no active sessions."""
+        """Test search_tools with no active MCP sessions returns code_mode tools."""
         client = MCPClient(code_mode=True)
 
         result = await client.search_tools()
 
-        assert result["results"] == []
-        assert result["meta"]["total_tools"] == 0
-        assert result["meta"]["namespaces"] == []
-        assert result["meta"]["result_count"] == 0
+        # Code mode tools should be present even without MCP sessions
+        assert result["meta"]["namespaces"] == ["code_mode"]
+        tool_names = [t["name"] for t in result["results"]]
+        assert "execute_code" in tool_names
+        assert "search_tools" in tool_names
 
     def test_from_dict_with_code_mode(self):
         """Test creating client from dict with code_mode."""
@@ -186,17 +187,32 @@ class TestSearchToolsIntegration:
 
     @pytest.mark.asyncio
     async def test_search_tools_with_different_detail_levels(self):
-        """Test search_tools with different detail levels."""
+        """Test search_tools with different detail levels returns correct structure."""
         client = MCPClient(code_mode=True)
 
-        # Test with empty sessions (should return empty results but with metadata)
+        # Test different detail levels - code_mode tools should be present
         names_result = await client.search_tools("", detail_level="names")
         descriptions_result = await client.search_tools("", detail_level="descriptions")
         full_result = await client.search_tools("", detail_level="full")
 
-        assert names_result["results"] == []
-        assert names_result["meta"]["total_tools"] == 0
-        assert descriptions_result["results"] == []
-        assert descriptions_result["meta"]["total_tools"] == 0
-        assert full_result["results"] == []
-        assert full_result["meta"]["total_tools"] == 0
+        # All should have code_mode tools
+        assert len(names_result["results"]) >= 2
+        assert len(descriptions_result["results"]) >= 2
+        assert len(full_result["results"]) >= 2
+
+        # Check detail level differences in structure
+        # "names" should have minimal info
+        names_tool = names_result["results"][0]
+        assert "name" in names_tool
+        assert "server" in names_tool
+
+        # "descriptions" should include description
+        desc_tool = descriptions_result["results"][0]
+        assert "name" in desc_tool
+        assert "description" in desc_tool
+
+        # "full" should include input_schema
+        full_tool = full_result["results"][0]
+        assert "name" in full_tool
+        assert "description" in full_tool
+        assert "input_schema" in full_tool
