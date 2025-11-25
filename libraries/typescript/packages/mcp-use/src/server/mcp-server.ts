@@ -1687,6 +1687,7 @@ if (container && Component) {
             resource_domains: [
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
+              "https://*.openai.com",
               // always also add the base url of the server
               ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
