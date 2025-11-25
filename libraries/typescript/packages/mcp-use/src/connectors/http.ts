@@ -2,7 +2,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { logger } from "../logging.js";
 import { SseConnectionManager } from "../task_managers/sse.js";
-import { StreamableHttpConnectionManager } from "../task_managers/streamable_http.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 

@@ -122,6 +122,9 @@ export abstract class BaseConnector {
         case "notifications/prompts/list_changed":
           await this.onPromptsListChanged();
           break;
+        default:
+          // Other notification methods are handled by user-registered handlers
+          break;
       }
 
       // Then call user-registered handlers

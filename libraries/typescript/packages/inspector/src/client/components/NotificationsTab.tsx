@@ -203,7 +203,7 @@ export function NotificationsTab({
 
   const handleClearAll = useCallback(() => {
     if (
-      confirm(
+      window.confirm(
         "Are you sure you want to clear all notifications? This cannot be undone."
       )
     ) {

@@ -271,7 +271,7 @@ function McpConnectionWrapper({
     wrapTransport: wrapTransportFn,
     onNotification: (notification) => {
       onNotificationReceived({
-        id: crypto.randomUUID(),
+        id: globalThis.crypto.randomUUID(),
         method: notification.method,
         params: notification.params,
         timestamp: Date.now(),
