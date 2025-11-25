@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 0.7.0-canary.6
+
+### Patch Changes
+
+- 3870aa5: - Fix OpenAI Apps SDK UI theme synchronization by setting data-theme attribute and color-scheme on iframe document
+  - Replace hardcoded Tailwind color classes with design tokens in create-mcp-use-app template components
+  - Fix collapsed panel size from 5 to 6 in Prompts, Resources, and Tools tabs
+  - mcp-use@1.5.0-canary.6
+
 ## 0.7.0-canary.5
 
 ### Minor Changes
