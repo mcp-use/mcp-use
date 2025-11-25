@@ -46,6 +46,7 @@ dev = [
     "ruff>=0.1.0",
     "fastmcp>=2.13.0",
     "fastapi>=0.100.0",
+    "pre-commit>=4.5.0"
 ]
 anthropic = [
     "langchain_anthropic",
