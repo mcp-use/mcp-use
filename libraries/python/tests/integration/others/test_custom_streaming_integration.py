@@ -3,6 +3,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import httpx
 import pytest
 
 from mcp_use import MCPClient
@@ -148,26 +149,25 @@ async def test_mcp_tool_execution(streaming_server_process):
 @pytest.mark.asyncio
 async def test_long_running_sse_stream(streaming_server_process):
     """Test that SSE streams can run for extended periods"""
-    import aiohttp
-
     server_url = streaming_server_process
     sse_url = f"{server_url}/sse"
 
     received_events = []
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(sse_url) as response:
-            assert response.status == 200, "SSE endpoint should return 200"
+    # Use longer timeout for SSE which has long-lived connections
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=60.0)) as client:
+        async with client.stream("GET", sse_url) as response:
+            assert response.status_code == 200, "SSE endpoint should return 200"
 
             # Read events for a limited time
             start_time = time.time()
-            timeout = 15  # seconds
+            test_timeout = 10  # seconds
 
-            async for line in response.content:
-                if time.time() - start_time > timeout:
+            async for line in response.aiter_lines():
+                if time.time() - start_time > test_timeout:
                     break
 
-                line = line.decode("utf-8").strip()
+                line = line.strip()
                 if line.startswith("data:") or line.startswith("event:"):
                     received_events.append(line)
                     print(f"Received SSE: {line[:100]}...")  # Truncate long lines
@@ -178,7 +178,7 @@ async def test_long_running_sse_stream(streaming_server_process):
 
             # Verify we received some events
             assert len(received_events) > 0, "Should receive at least some SSE events"
-            print(f"✓ Received {len(received_events)} SSE events during {timeout}s test")
+            print(f"✓ Received {len(received_events)} SSE events")
 
 
 @pytest.mark.asyncio

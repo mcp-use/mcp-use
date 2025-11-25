@@ -8,7 +8,7 @@ and returns them as formatted error messages to the LLM, enabling automatic retr
 from typing import Any
 
 from langchain.agents.middleware import wrap_tool_call
-from langchain.agents.middleware.types import ToolCallRequest
+from langchain.tools.tool_node import ToolCallRequest
 from langchain_core.messages import ToolMessage
 
 from mcp_use.errors.error_formatting import format_error
