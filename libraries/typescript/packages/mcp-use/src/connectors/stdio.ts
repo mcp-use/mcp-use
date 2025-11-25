@@ -87,6 +87,7 @@ export class StdioConnector extends BaseConnector {
       await this.client.connect(transport);
 
       this.connected = true;
+      this.setupNotificationHandler();
       logger.debug(
         `Successfully connected to MCP implementation: ${this.command}`
       );

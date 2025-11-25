@@ -102,7 +102,10 @@
     "example:structured": "tsx examples/client/structured_output.ts",
     "example:observability": "tsx examples/client/observability.ts",
     "example:code_mode": "tsx examples/client/code_mode_example.ts",
-    "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts"
+    "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts",
+    "example:server:notification": "tsx examples/server/notification-example/src/server.ts",
+    "example:client:notification": "tsx examples/client/notification-client.ts",
+    "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/notification-example/src/server.ts & sleep 3 && tsx examples/client/notification-client.ts"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.2.0",

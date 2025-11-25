@@ -178,7 +178,15 @@ export class HttpConnector extends BaseConnector {
 
       // Create and connect the client
       // This performs both initialize AND initialized notification
-      this.client = new Client(this.clientInfo, this.opts.clientOptions);
+      // Include roots capability if roots are provided
+      const clientOptions = {
+        ...this.opts.clientOptions,
+        capabilities: {
+          ...this.opts.clientOptions?.capabilities,
+          roots: this.rootsCache.length > 0 ? { listChanged: true } : undefined,
+        },
+      };
+      this.client = new Client(this.clientInfo, clientOptions);
 
       try {
         await this.client.connect(transport);
@@ -203,6 +211,8 @@ export class HttpConnector extends BaseConnector {
 
       this.connected = true;
       this.transportType = "streamable-http";
+      this.setupNotificationHandler();
+      this.setupRootsHandler();
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
       );
@@ -232,11 +242,21 @@ export class HttpConnector extends BaseConnector {
       }
 
       // Create and connect the client
-      this.client = new Client(this.clientInfo, this.opts.clientOptions);
+      // Include roots capability if roots are provided
+      const clientOptions = {
+        ...this.opts.clientOptions,
+        capabilities: {
+          ...this.opts.clientOptions?.capabilities,
+          roots: this.rootsCache.length > 0 ? { listChanged: true } : undefined,
+        },
+      };
+      this.client = new Client(this.clientInfo, clientOptions);
       await this.client.connect(transport);
 
       this.connected = true;
       this.transportType = "sse";
+      this.setupNotificationHandler();
+      this.setupRootsHandler();
       logger.debug(
         `Successfully connected to MCP implementation via HTTP/SSE: ${baseUrl}`
       );

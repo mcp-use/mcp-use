@@ -1,83 +1,351 @@
 ---
 title: "Notifications"
-description: "MCP servers can send various notifications to the client to signal events or provide updates on long-running tasks. This is distinct from logging, which is handled separately."
+description: "Handle real-time notifications from MCP servers and send notifications to servers"
 icon: "bell-ring"
 ---
-import { Callout } from "nextra/components";
 
-`mcp-use` allows you to handle these notifications by providing a `message_handler` to the `MCPClient`.
+# Notifications
 
-## Server-Side: Sending Notifications
+MCP supports bidirectional notifications between clients and servers. Notifications are one-way JSON-RPC messages that don't require a response.
 
-On the server (using `fastmcp`), you can send notifications from within a tool's context (`ctx`). Here's an example of a tool that sends multiple types of notifications, including progress updates.
+**Server → Client**: Servers send notifications to signal events like `tools/list_changed`, `resources/list_changed`, or custom events.
 
-## Available Notification Types
+**Client → Server**: Clients send notifications like `roots/list_changed` when their roots change.
 
-The `fastmcp` server context provides several methods for sending specific notifications. Here are the ones you can use and the corresponding type to check for in your client's `message_handler`:
+## Receiving Notifications (Server → Client)
 
--   `ctx.report_progress(...)` sends a `types.ProgressNotification`. This is used to report the progress of a long-running operation.
--   `ctx.send_tool_list_changed()` sends a `types.ToolListChangedNotification`. This signals that the tool list has changed (see [Tools documentation](/typescript/client/tools)).
--   `ctx.send_resource_list_changed()` sends a `types.ResourceListChangedNotification`. This signals that the resource list has changed (see [Resources documentation](/typescript/client/resources)).
--   `ctx.send_prompt_list_changed()` sends a `types.PromptListChangedNotification`. This signals that the prompt list has changed (see [Prompts documentation](/typescript/client/prompts)).
+Register a notification handler on your session using the `on` method:
 
-## Client-Side: Handling Notifications
+```typescript
+import { MCPClient } from "mcp-use";
 
-On the client, you create a `message_handler` function and pass it to the `MCPClient`. This function will receive all messages from the server, including notifications.
+const client = new MCPClient({
+  mcpServers: {
+    myServer: { url: "http://localhost:3000/mcp" }
+  }
+});
 
-Since the `message_handler` receives all message types (requests, notifications, exceptions), you need to check the type of the incoming message to handle it correctly. Notifications are of type `mcp.types.ServerNotification`, and their specific type is stored in the `.root` attribute.
+const session = await client.createSession("myServer");
 
-<CodeGroup>
-```typescript TypeScript
-// ⚠️ Notification handlers are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use
-
-// When supported, the API will look similar to:
-/*
-import { MCPClient, types } from 'mcp-use'
-
-// The message handler receives all server-sent messages
-async function handleMessages(message: any) {
-    // Check notification types and handle accordingly
-    // ...
-}
-
-const config = {
-    mcpServers: {
-        PrimitiveServer: { url: `${primitiveServer}/mcp` }
-    }
-}
-
-const client = new MCPClient(config, { messageHandler: handleMessages })
-*/
+// Register notification handler
+session.on("notification", async (notification) => {
+  console.log(`Received: ${notification.method}`, notification.params);
+});
 ```
 
-```typescript TypeScript
-// ⚠️ Notification handlers are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use
+## Notification Structure
 
-// When supported, the API will look similar to:
-/*
-import { MCPClient, types } from 'mcp-use'
+Notifications follow the JSON-RPC 2.0 format without an `id` field:
 
-// The message handler receives all server-sent messages
-async function handleMessages(message: any) {
-    // Check notification types and handle accordingly
-    // ...
+```typescript
+interface Notification {
+  method: string;           // The notification method name
+  params?: Record<string, any>;  // Optional parameters
 }
-
-const config = {
-    mcpServers: {
-        PrimitiveServer: { url: `${primitiveServer}/mcp` }
-    }
-}
-
-const client = new MCPClient(config, { messageHandler: handleMessages })
-*/
 ```
-</CodeGroup>
 
-<Callout>
-  The `message_handler` is a powerful catch-all for any message from the server. By inspecting the message type, you can build rich, responsive applications that react to server-side events in real time.
-</Callout>
+## Standard MCP Notifications
+
+MCP defines several standard notification types that servers may send:
+
+### Tools List Changed
+
+Sent when the server's available tools have changed:
+
+```typescript
+session.on("notification", async (notification) => {
+  if (notification.method === "notifications/tools/list_changed") {
+    console.log("Tools list updated - refreshing...");
+    // Refresh tools cache
+    const tools = await session.connector.listTools();
+    console.log(`Now have ${tools.length} tools`);
+  }
+});
+```
+
+### Resources List Changed
+
+Sent when resources have been added, removed, or modified:
+
+```typescript
+session.on("notification", async (notification) => {
+  if (notification.method === "notifications/resources/list_changed") {
+    console.log("Resources updated");
+    const resources = await session.connector.listAllResources();
+    // Update your UI or cache
+  }
+});
+```
+
+### Prompts List Changed
+
+Sent when prompts have changed:
+
+```typescript
+session.on("notification", async (notification) => {
+  if (notification.method === "notifications/prompts/list_changed") {
+    console.log("Prompts updated");
+    const prompts = await session.connector.listPrompts();
+    // Update your UI or cache
+  }
+});
+```
+
+## Custom Notifications
+
+Servers can send custom notifications with any method name:
+
+```typescript
+session.on("notification", async (notification) => {
+  switch (notification.method) {
+    case "custom/heartbeat":
+      console.log(`Heartbeat #${notification.params?.count}`);
+      break;
+      
+    case "custom/user-joined":
+      console.log(`User joined: ${notification.params?.username}`);
+      break;
+      
+    case "custom/data-updated":
+      console.log("Data updated:", notification.params);
+      break;
+      
+    default:
+      console.log(`Unknown notification: ${notification.method}`);
+  }
+});
+```
+
+## Sending Notifications (Client → Server)
+
+### Roots Changed
+
+Roots represent directories or files that the client has access to. When you update roots, the client automatically sends a `notifications/roots/list_changed` notification to the server:
+
+```typescript
+import { MCPClient, Root } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    myServer: { url: "http://localhost:3000/mcp" }
+  }
+});
+
+const session = await client.createSession("myServer");
+
+// Set roots - this sends notifications/roots/list_changed to the server
+await session.setRoots([
+  { uri: "file:///home/user/project", name: "My Project" },
+  { uri: "file:///home/user/data", name: "Data Directory" }
+]);
+
+// Get current roots
+const roots = session.getRoots();
+console.log(`Current roots: ${roots.length}`);
+```
+
+### Initial Roots at Connection
+
+You can provide initial roots when creating the connector:
+
+```typescript
+import { HttpConnector } from "mcp-use";
+
+const connector = new HttpConnector("http://localhost:3000/mcp", {
+  roots: [
+    { uri: "file:///workspace", name: "Workspace" }
+  ]
+});
+
+const session = new MCPSession(connector);
+await session.connect();
+await session.initialize();
+
+// Later, update roots
+await session.setRoots([
+  { uri: "file:///workspace", name: "Workspace" },
+  { uri: "file:///tmp/scratch", name: "Scratch" }
+]);
+```
+
+### Root Type
+
+```typescript
+interface Root {
+  uri: string;      // Must start with "file://"
+  name?: string;    // Optional human-readable name
+}
+```
+
+## Practical Examples
+
+### Building a Real-Time Dashboard
+
+```typescript
+import { MCPClient, Notification } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    dashboard: { url: "http://localhost:3000/mcp" }
+  }
+});
+
+const session = await client.createSession("dashboard");
+
+// State
+let connectedUsers = 0;
+let lastHeartbeat: Date | null = null;
+
+session.on("notification", async (notification: Notification) => {
+  switch (notification.method) {
+    case "custom/heartbeat":
+      lastHeartbeat = new Date();
+      connectedUsers = notification.params?.connectedClients ?? 0;
+      updateStatusUI();
+      break;
+      
+    case "custom/alert":
+      showAlert(notification.params?.message);
+      break;
+      
+    case "notifications/tools/list_changed":
+      await refreshToolsList();
+      break;
+  }
+});
+
+function updateStatusUI() {
+  console.log(`Status: ${connectedUsers} users, last heartbeat: ${lastHeartbeat}`);
+}
+```
+
+### Handling Connection Events
+
+```typescript
+session.on("notification", async (notification) => {
+  if (notification.method === "custom/welcome") {
+    console.log("Connected to server!");
+    console.log("Server time:", notification.params?.serverTime);
+    console.log("Available tools:", notification.params?.availableTools);
+  }
+});
+```
+
+### Progress Updates
+
+```typescript
+session.on("notification", async (notification) => {
+  if (notification.method === "custom/progress") {
+    const { taskId, progress, status } = notification.params ?? {};
+    console.log(`Task ${taskId}: ${progress}% - ${status}`);
+    
+    // Update progress bar UI
+    updateProgressBar(taskId, progress);
+  }
+});
+```
+
+## Multiple Handlers
+
+You can register multiple notification handlers:
+
+```typescript
+// Handler for logging
+session.on("notification", async (notification) => {
+  console.log("[LOG]", notification.method, notification.params);
+});
+
+// Handler for specific notifications
+session.on("notification", async (notification) => {
+  if (notification.method === "custom/important") {
+    await handleImportantNotification(notification);
+  }
+});
+
+// Handler for UI updates
+session.on("notification", async (notification) => {
+  if (notification.method.startsWith("ui/")) {
+    updateUI(notification);
+  }
+});
+```
+
+## Error Handling
+
+Errors in notification handlers are caught and logged, but don't stop other handlers:
+
+```typescript
+session.on("notification", async (notification) => {
+  try {
+    // Process notification
+    await processNotification(notification);
+  } catch (error) {
+    console.error("Error processing notification:", error);
+    // Handle error - maybe retry or log for debugging
+  }
+});
+```
+
+## Browser Usage
+
+Notifications work the same way in browser environments:
+
+```typescript
+import { MCPClient } from "mcp-use/browser";
+
+const client = new MCPClient({
+  mcpServers: {
+    api: { url: "https://api.example.com/mcp" }
+  }
+});
+
+const session = await client.createSession("api");
+
+session.on("notification", (notification) => {
+  // Update React state, Vue refs, etc.
+  setNotifications(prev => [...prev, notification]);
+});
+```
+
+## TypeScript Types
+
+Import the `Notification` type for type-safe handlers:
+
+```typescript
+import { MCPClient, Notification, NotificationHandler } from "mcp-use";
+
+// Type-safe handler
+const handler: NotificationHandler = async (notification: Notification) => {
+  // notification.method is string
+  // notification.params is Record<string, any> | undefined
+};
+
+session.on("notification", handler);
+```
+
+## Requirements
+
+Notifications require:
+
+1. **Stateful Connection**: The server must maintain sessions (stateful mode)
+2. **Active Session**: The client must have an active, initialized session
+3. **Streaming Transport**: Either SSE or Streamable HTTP transport
+
+<Note>
+Notifications don't work in stateless edge environments where sessions aren't maintained between requests.
+</Note>
+
+## Best Practices
+
+1. **Handle Unknown Notifications**: Always have a fallback for notifications you don't recognize
+2. **Keep Handlers Fast**: Notification handlers should be quick - offload heavy work
+3. **Use TypeScript**: Leverage the `Notification` type for better code quality
+4. **Log Notifications**: During development, log all notifications to understand server behavior
+5. **Clean Up**: If your session disconnects, handlers won't receive new notifications
+
+## Next Steps
+
+- [Server Notifications](/typescript/server/notifications) - Send notifications from your server
+- [Connection Types](./connection-types) - Understand transport options
+- [Resources](./resources) - Handle resource change notifications
+- [Tools](./tools) - Handle tool list change notifications
