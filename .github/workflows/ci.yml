@@ -141,7 +141,7 @@ jobs:
 
   python-unit-tests:
     needs: python-lint
-    name: "python-unit/${{ matrix.python-version }}/${{ matrix.deps }}"
+    name: "python-unit"
     runs-on: ubuntu-latest
     strategy:
       matrix:
