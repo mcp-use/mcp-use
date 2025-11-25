@@ -1,5 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { logger } from "../logging.js";
 import { SseConnectionManager } from "../task_managers/sse.js";
 import type { ConnectorInitOptions } from "./base.js";
@@ -154,7 +157,7 @@ export class HttpConnector extends BaseConnector {
 
   private async connectWithStreamableHttp(baseUrl: string): Promise<void> {
     try {
-      // Create StreamableHTTPClientTransport directly 
+      // Create StreamableHTTPClientTransport directly
       // The official SDK's StreamableHTTPClientTransport automatically handles session IDs
       // when client.connect() is called - it sends initialize, gets session ID from response header,
       // and opens the SSE stream with that session ID
@@ -183,7 +186,10 @@ export class HttpConnector extends BaseConnector {
       // Wrap transport if wrapper is provided
       if (this.opts.wrapTransport) {
         const serverId = this.baseUrl; // Use URL as server ID for now
-        transport = this.opts.wrapTransport(transport, serverId) as StreamableHTTPClientTransport;
+        transport = this.opts.wrapTransport(
+          transport,
+          serverId
+        ) as StreamableHTTPClientTransport;
       }
 
       // Create and connect the client
@@ -198,7 +204,10 @@ export class HttpConnector extends BaseConnector {
           ...(this.opts.samplingCallback ? { sampling: {} } : {}),
         },
       };
-      logger.debug(`Creating Client with capabilities:`, JSON.stringify(clientOptions.capabilities, null, 2));
+      logger.debug(
+        `Creating Client with capabilities:`,
+        JSON.stringify(clientOptions.capabilities, null, 2)
+      );
       this.client = new Client(this.clientInfo, clientOptions);
 
       // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
@@ -207,7 +216,7 @@ export class HttpConnector extends BaseConnector {
       logger.debug("Roots handler registered before connect");
 
       try {
-        // Connect with timeout 
+        // Connect with timeout
         // The SDK's StreamableHTTPClientTransport should automatically:
         // 1. Send POST initialize request
         // 2. Extract mcp-session-id from response header
@@ -215,14 +224,16 @@ export class HttpConnector extends BaseConnector {
         await this.client.connect(transport, {
           timeout: Math.min(this.timeout, 3000),
         });
-        
+
         // Verify session ID is available after connect
         // The transport should have the session ID from the initialize response
         const sessionId = streamableTransport.sessionId;
         if (sessionId) {
           logger.debug(`Session ID obtained: ${sessionId}`);
         } else {
-          logger.warn("Session ID not available after connect - this may cause issues with SSE stream");
+          logger.warn(
+            "Session ID not available after connect - this may cause issues with SSE stream"
+          );
         }
       } catch (connectErr) {
         // Check if the error is due to missing session ID during connection handshake
@@ -305,14 +316,17 @@ export class HttpConnector extends BaseConnector {
           ...(this.opts.samplingCallback ? { sampling: {} } : {}),
         },
       };
-      logger.debug(`Creating Client with capabilities (SSE):`, JSON.stringify(clientOptions.capabilities, null, 2));
+      logger.debug(
+        `Creating Client with capabilities (SSE):`,
+        JSON.stringify(clientOptions.capabilities, null, 2)
+      );
       this.client = new Client(this.clientInfo, clientOptions);
-      
+
       // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
       // The server may call roots/list during initialization if it advertises roots capability
       this.setupRootsHandler();
       logger.debug("Roots handler registered before connect (SSE)");
-      
+
       await this.client.connect(transport);
 
       this.connected = true;

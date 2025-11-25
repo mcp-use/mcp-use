@@ -46,10 +46,7 @@ export class MCPSession {
    * });
    * ```
    */
-  on(
-    event: "notification",
-    handler: NotificationHandler
-  ): void {
+  on(event: "notification", handler: NotificationHandler): void {
     if (event === "notification") {
       this.connector.onNotification(handler);
     }

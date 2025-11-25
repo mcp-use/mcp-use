@@ -183,10 +183,14 @@ export class WebSocketConnector extends BaseConnector {
    */
   protected override async refreshToolsCache(): Promise<void> {
     try {
-      logger.debug("[Auto] Refreshing tools cache due to list_changed notification");
+      logger.debug(
+        "[Auto] Refreshing tools cache due to list_changed notification"
+      );
       const tools = await this.listTools();
       this.toolsCache = tools.map((t) => t as Tool);
-      logger.debug(`[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`);
+      logger.debug(
+        `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
+      );
     } catch (err) {
       logger.warn("[Auto] Failed to refresh tools cache:", err);
     }

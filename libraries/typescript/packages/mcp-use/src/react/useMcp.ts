@@ -309,7 +309,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Create session WITHOUT auto-initialization
         // This allows us to register the notification handler BEFORE connecting
-        const session = await clientRef.current!.createSession(serverName, false);
+        const session = await clientRef.current!.createSession(
+          serverName,
+          false
+        );
 
         // Wire up notification handler BEFORE initializing
         // This ensures the handler is registered before setupNotificationHandler() is called during connect()

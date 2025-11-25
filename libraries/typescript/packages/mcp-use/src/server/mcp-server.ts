@@ -567,15 +567,15 @@ export class McpServer {
 
   /**
    * Request LLM sampling from connected clients.
-   * 
+   *
    * This method allows server tools to request LLM completions from clients
    * that support the sampling capability. The client will handle model selection,
    * user approval (human-in-the-loop), and return the generated response.
-   * 
+   *
    * @param params - Sampling request parameters including messages, model preferences, etc.
    * @param options - Optional request options (timeouts, cancellation, etc.)
    * @returns Promise resolving to the generated message from the client's LLM
-   * 
+   *
    * @example
    * ```typescript
    * // In a tool callback
@@ -725,7 +725,7 @@ export class McpServer {
             : {};
 
         const uiResource = this.createWidgetUIResource(definition, params);
-        
+
         // Ensure the resource content URI matches the registered URI (with build ID)
         uiResource.resource.uri = resourceUri;
 
@@ -740,7 +740,7 @@ export class McpServer {
       // Build URI template with build ID if available
       const buildIdPart = this.buildId ? `-${this.buildId}` : "";
       const uriTemplate = `ui://widget/${definition.name}${buildIdPart}-{id}.html`;
-      
+
       this.resourceTemplate({
         name: `${definition.name}-dynamic`,
         resourceTemplate: {
@@ -756,7 +756,7 @@ export class McpServer {
         readCallback: async (uri, params) => {
           // Use empty params for Apps SDK since structuredContent is passed separately
           const uiResource = this.createWidgetUIResource(definition, {});
-          
+
           // Ensure the resource content URI matches the template URI (with build ID)
           uiResource.resource.uri = uri.toString();
 
@@ -804,7 +804,11 @@ export class McpServer {
         if (definition.type === "appsSdk") {
           // Generate a unique URI with random ID for each invocation
           const randomId = Math.random().toString(36).substring(2, 15);
-          const uniqueUri = this.generateWidgetUri(definition.name, ".html", randomId);
+          const uniqueUri = this.generateWidgetUri(
+            definition.name,
+            ".html",
+            randomId
+          );
 
           // Update toolMetadata with the unique URI
           const uniqueToolMetadata = {
@@ -912,17 +916,17 @@ export class McpServer {
     suffix: string = ""
   ): string {
     const parts = [widgetName];
-    
+
     // Add build ID if available (for cache busting)
     if (this.buildId) {
       parts.push(this.buildId);
     }
-    
+
     // Add suffix if provided (e.g., random ID for dynamic URIs)
     if (suffix) {
       parts.push(suffix);
     }
-    
+
     // Construct URI: ui://widget/name-buildId-suffix.extension
     return `ui://widget/${parts.join("-")}${extension}`;
   }
@@ -1885,8 +1889,7 @@ if (container && Component) {
     );
 
     const endpoint = "/mcp";
-    const idleTimeoutMs =
-      this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
+    const idleTimeoutMs = this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
     // Helper to get or create a transport for a session
     const getOrCreateTransport = async (
@@ -2790,7 +2793,9 @@ if (container && Component) {
   }
 
   // Store the roots changed callback
-  private onRootsChangedCallback?: (roots: Array<{ uri: string; name?: string }>) => void | Promise<void>;
+  private onRootsChangedCallback?: (
+    roots: Array<{ uri: string; name?: string }>
+  ) => void | Promise<void>;
 
   /**
    * Register a callback for when a client's roots change
@@ -2812,7 +2817,9 @@ if (container && Component) {
    * ```
    */
   onRootsChanged(
-    callback: (roots: Array<{ uri: string; name?: string }>) => void | Promise<void>
+    callback: (
+      roots: Array<{ uri: string; name?: string }>
+    ) => void | Promise<void>
   ): this {
     this.onRootsChangedCallback = callback;
     return this;
@@ -2858,12 +2865,13 @@ if (container && Component) {
 
       // The transport handles the request-response flow
       const response = await session.transport.send(request);
-      
+
       // The response should contain the roots array
       if (response && typeof response === "object" && "roots" in response) {
-        return (response as { roots: Array<{ uri: string; name?: string }> }).roots;
+        return (response as { roots: Array<{ uri: string; name?: string }> })
+          .roots;
       }
-      
+
       return [];
     } catch (error) {
       console.warn(
