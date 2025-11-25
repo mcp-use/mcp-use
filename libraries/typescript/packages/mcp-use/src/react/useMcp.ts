@@ -73,6 +73,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     timeout = 30000, // 30 seconds default for connection timeout
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
     wrapTransport,
+    onNotification,
+    samplingCallback,
   } = options;
 
   const [state, setState] = useState<UseMcpResult["state"]>("discovering");
@@ -286,9 +288,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Add server to client with OAuth provider
         // Include wrapTransport if provided
+        // Pass clientConfig as clientOptions so connector can set up capabilities
         clientRef.current!.addServer(serverName, {
           ...serverConfig,
           authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
+          clientOptions: clientConfig, // ← Pass client config to connector
+          samplingCallback: samplingCallback, // ← Pass sampling callback to connector
           wrapTransport: wrapTransport
             ? (transport: any) => {
                 console.log(
@@ -302,10 +307,20 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             : undefined,
         });
 
-        // Create session (this connects to server)
-        const session = await clientRef.current!.createSession(serverName);
+        // Create session WITHOUT auto-initialization
+        // This allows us to register the notification handler BEFORE connecting
+        const session = await clientRef.current!.createSession(
+          serverName,
+          false
+        );
 
-        // Initialize session (caches tools, resources, prompts)
+        // Wire up notification handler BEFORE initializing
+        // This ensures the handler is registered before setupNotificationHandler() is called during connect()
+        if (onNotification) {
+          session.on("notification", onNotification);
+        }
+
+        // Now initialize the session (this connects to server and caches tools, resources, prompts)
         await session.initialize();
 
         addLog("info", "✅ Successfully connected to MCP server");

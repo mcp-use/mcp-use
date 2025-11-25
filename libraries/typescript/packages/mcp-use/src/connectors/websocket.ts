@@ -105,6 +105,10 @@ export class WebSocketConnector extends BaseConnector {
         this.pending.delete(id);
         if ("result" in data) resolve(data.result);
         else if ("error" in data) reject(data.error);
+      } else if (data.method && !data.id) {
+        // This is a notification (has method but no id)
+        logger.debug("Received notification", data.method, data.params);
+        this.handleNotification(data);
       } else {
         logger.debug("Received unsolicited message", data);
       }
@@ -138,6 +142,58 @@ export class WebSocketConnector extends BaseConnector {
   private rejectAll(err: Error) {
     for (const { reject } of this.pending.values()) reject(err);
     this.pending.clear();
+  }
+
+  private async handleNotification(data: {
+    method: string;
+    params?: Record<string, any>;
+  }): Promise<void> {
+    // Auto-handle list_changed notifications per MCP spec
+    switch (data.method) {
+      case "notifications/tools/list_changed":
+        await this.refreshToolsCache();
+        break;
+      case "notifications/resources/list_changed":
+        await this.onResourcesListChanged();
+        break;
+      case "notifications/prompts/list_changed":
+        await this.onPromptsListChanged();
+        break;
+      default:
+        // Other notification methods are handled by user-registered handlers
+        break;
+    }
+
+    // Then call user-registered handlers
+    for (const handler of this.notificationHandlers) {
+      try {
+        await handler({
+          method: data.method,
+          params: data.params,
+        } as any);
+      } catch (err) {
+        logger.error("Error in notification handler:", err);
+      }
+    }
+  }
+
+  /**
+   * Auto-refresh tools cache when server sends tools/list_changed notification
+   * Override to use WebSocket-specific listTools method
+   */
+  protected override async refreshToolsCache(): Promise<void> {
+    try {
+      logger.debug(
+        "[Auto] Refreshing tools cache due to list_changed notification"
+      );
+      const tools = await this.listTools();
+      this.toolsCache = tools.map((t) => t as Tool);
+      logger.debug(
+        `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
+      );
+    } catch (err) {
+      logger.warn("[Auto] Failed to refresh tools cache:", err);
+    }
   }
 
   async initialize(): Promise<Record<string, any>> {
