@@ -83,11 +83,12 @@ export class StdioConnector extends BaseConnector {
       const transport = await this.connectionManager.start();
 
       // 3. Create & connect the MCP client
-      // Add sampling capability if callback is provided
+      // Always advertise roots capability - server may query roots/list even if client has no roots
       const clientOptions = {
         ...(this.opts.clientOptions || {}),
         capabilities: {
           ...(this.opts.clientOptions?.capabilities || {}),
+          roots: { listChanged: true }, // Always advertise roots capability
           // Add sampling capability if callback is provided
           ...(this.opts.samplingCallback ? { sampling: {} } : {}),
         },
