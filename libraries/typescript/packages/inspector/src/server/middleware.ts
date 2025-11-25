@@ -9,6 +9,7 @@ import { checkClientFiles, getClientDistPath } from "./shared-utils.js";
  * Similar to how FastAPI mounts Swagger UI at /docs
  *
  * @param app - Express or Hono application instance
+ * @param config - Optional configuration including autoConnectUrl
  *
  * @example
  * ```typescript
@@ -17,9 +18,13 @@ import { checkClientFiles, getClientDistPath } from "./shared-utils.js";
  *
  * const server = createMCPServer('my-server')
  * mountInspector(server) // Mounts at /inspector
+ * mountInspector(server, { autoConnectUrl: 'http://localhost:3001/mcp' }) // With auto-connect
  * ```
  */
-export function mountInspector(app: Express | Hono): void {
+export function mountInspector(
+  app: Express | Hono,
+  config?: { autoConnectUrl?: string | null }
+): void {
   // Find the built client files
   const clientDistPath = getClientDistPath();
 
@@ -34,7 +39,7 @@ export function mountInspector(app: Express | Hono): void {
 
   // If it's already a Hono app, register routes directly
   if (app instanceof Hono) {
-    registerInspectorRoutes(app);
+    registerInspectorRoutes(app, config);
     registerStaticRoutes(app, clientDistPath);
     return;
   }
@@ -43,7 +48,7 @@ export function mountInspector(app: Express | Hono): void {
   const honoApp = new Hono();
 
   // Register routes on Hono app
-  registerInspectorRoutes(honoApp);
+  registerInspectorRoutes(honoApp, config);
   registerStaticRoutes(honoApp, clientDistPath);
 
   // Convert all Hono routes to Express middleware

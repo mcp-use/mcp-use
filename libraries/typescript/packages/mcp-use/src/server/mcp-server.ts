@@ -2401,8 +2401,16 @@ if (container && Component) {
     try {
       // @ts-ignore - Optional peer dependency, may not be installed during build
       const { mountInspector } = await import("@mcp-use/inspector");
-      // Auto-connect to the local MCP server at /mcp
-      mountInspector(this.app);
+      // Auto-connect to the local MCP server at /mcp (SSE endpoint)
+      // Use JSON config to specify SSE transport type
+      const mcpUrl = `http://${this.serverHost}:${this.serverPort}/mcp`;
+      const autoConnectConfig = JSON.stringify({
+        url: mcpUrl,
+        name: "Local MCP Server",
+        transportType: "sse",
+        connectionType: "Direct",
+      });
+      mountInspector(this.app, { autoConnectUrl: autoConnectConfig });
       this.inspectorMounted = true;
       console.log(
         `[INSPECTOR] UI available at http://${this.serverHost}:${this.serverPort}/inspector`
