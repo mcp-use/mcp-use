@@ -676,7 +676,7 @@ export class McpServer {
           const uiResource = this.createWidgetUIResource(definition, {});
           
           // Ensure the resource content URI matches the template URI (with build ID)
-          uiResource.resource.uri = uri;
+          uiResource.resource.uri = uri.toString();
 
           return {
             contents: [uiResource.resource],
