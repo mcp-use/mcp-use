@@ -226,6 +226,19 @@ function OpenAIComponentRendererBase({
       if (iframeRef.current?.contentWindow) {
         try {
           const iframeWindow = iframeRef.current.contentWindow;
+          const iframeDocument = iframeRef.current.contentDocument;
+
+          // Set color-scheme on iframe document for light-dark() CSS function
+          // OpenAI Apps SDK UI uses [data-theme] attribute to set color-scheme via CSS
+          // This is required for design tokens to work correctly
+          if (updates.theme !== undefined && iframeDocument) {
+            const htmlElement = iframeDocument.documentElement;
+            // Set data-theme attribute (used by OpenAI Apps SDK UI CSS)
+            htmlElement.setAttribute("data-theme", updates.theme);
+            // Also set inline style as fallback
+            htmlElement.style.colorScheme = updates.theme;
+          }
+
           if (iframeWindow.openai) {
             // Update all provided properties
             if (updates.displayMode !== undefined) {
@@ -623,6 +636,21 @@ function OpenAIComponentRendererBase({
     updateIframeGlobals,
     useDevMode,
   ]);
+
+  // Sync theme changes to iframe's color-scheme for light-dark() CSS function
+  // OpenAI Apps SDK UI uses [data-theme] attribute to set color-scheme via CSS
+  // This ensures design tokens adapt to dark mode
+  useEffect(() => {
+    if (!iframeRef.current?.contentDocument || !isReady) return;
+
+    const iframeDoc = iframeRef.current.contentDocument;
+    const htmlElement = iframeDoc.documentElement;
+    // Set data-theme attribute (used by OpenAI Apps SDK UI CSS)
+    htmlElement.setAttribute("data-theme", resolvedTheme);
+    // Also set inline style as fallback
+    htmlElement.style.colorScheme = resolvedTheme;
+    updateIframeGlobals({ theme: resolvedTheme });
+  }, [resolvedTheme, isReady, updateIframeGlobals]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
   useEffect(() => {

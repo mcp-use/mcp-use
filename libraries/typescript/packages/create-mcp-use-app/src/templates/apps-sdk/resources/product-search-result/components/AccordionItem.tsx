@@ -9,16 +9,14 @@ export const AccordionItem: React.FC<AccordionItemProps> = ({
   onToggle,
 }) => {
   return (
-    <div className="border-b border-gray-200 dark:border-gray-800 last:border-b-0">
+    <div className="border-b border-subtle last:border-b-0">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+        className="w-full flex items-center justify-between p-4 text-left hover:bg-primary-soft-hover transition-colors"
       >
-        <span className="font-medium text-gray-900 dark:text-gray-100">
-          {question}
-        </span>
-        <span className="text-xl text-gray-500 dark:text-gray-400 transition-transform duration-200">
+        <span className="font-medium text-default">{question}</span>
+        <span className="text-xl text-tertiary transition-transform duration-200">
           {isOpen ? "−" : "+"}
         </span>
       </button>

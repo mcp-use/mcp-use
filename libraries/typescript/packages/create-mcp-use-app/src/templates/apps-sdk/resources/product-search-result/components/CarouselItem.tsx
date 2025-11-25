@@ -9,7 +9,7 @@ export interface CarouselItemProps {
 export const CarouselItem: React.FC<CarouselItemProps> = ({ fruit, color }) => {
   return (
     <div
-      className={`carousel-item size-52 rounded-xl border border-gray-200 dark:border-gray-800 ${color}`}
+      className={`carousel-item size-52 rounded-xl border border-subtle ${color}`}
     >
       <div className="carousel-item-bg">
         <Image src={"/fruits/" + fruit + ".png"} alt={fruit} />
