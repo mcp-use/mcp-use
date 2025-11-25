@@ -24,6 +24,7 @@ import type {
 export interface UrlConfig {
   baseUrl: string;
   port: number | string;
+  buildId?: string;
 }
 
 /**
@@ -212,11 +213,12 @@ export function createUIResourceFromDefinition(
   params: Record<string, any>,
   config: UrlConfig
 ): UIResourceContent {
-  // For Apps SDK, use .html extension following the convention
+  // Generate URI with build ID if available (for cache busting)
+  const buildIdPart = config.buildId ? `-${config.buildId}` : "";
   const uri =
     definition.type === "appsSdk"
-      ? (`ui://widget/${definition.name}.html` as `ui://${string}`)
-      : (`ui://widget/${definition.name}` as `ui://${string}`);
+      ? (`ui://widget/${definition.name}${buildIdPart}.html` as `ui://${string}`)
+      : (`ui://widget/${definition.name}${buildIdPart}` as `ui://${string}`);
   const encoding = definition.encoding || "text";
 
   switch (definition.type) {

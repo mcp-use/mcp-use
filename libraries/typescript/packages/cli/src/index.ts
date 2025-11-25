@@ -550,11 +550,20 @@ program
       // Convert to boolean: true if flag is present, false otherwise
       const includeInspector = !!options.withInspector;
 
+      // Generate a build ID (hash of build time + random component for uniqueness)
+      const buildTime = new Date().toISOString();
+      const { createHash } = await import("node:crypto");
+      const buildId = createHash("sha256")
+        .update(buildTime + Math.random().toString())
+        .digest("hex")
+        .substring(0, 16); // Use first 16 chars for shorter IDs
+
       // Merge with existing manifest, preserving tunnel and other fields
       const manifest = {
         ...existingManifest, // Preserve existing fields like tunnel
         includeInspector,
-        buildTime: new Date().toISOString(),
+        buildTime,
+        buildId,
         widgets: widgetsData,
       };
 

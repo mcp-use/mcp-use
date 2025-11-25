@@ -1,4 +1,7 @@
 import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+  Notification,
   Prompt,
   Resource,
   ResourceTemplate,
@@ -54,6 +57,16 @@ export type UseMcpOptions = {
   sseReadTimeout?: number;
   /** Optional callback to wrap the transport before passing it to the Client. Useful for logging, monitoring, or other transport-level interceptors. */
   wrapTransport?: (transport: any, serverId: string) => any;
+  /** Callback function that is invoked when a notification is received from the MCP server */
+  onNotification?: (notification: Notification) => void;
+  /**
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
+  samplingCallback?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
 };
 
 export type UseMcpResult = {

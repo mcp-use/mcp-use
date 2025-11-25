@@ -8,6 +8,8 @@ export interface ServerConfig {
   description?: string;
   host?: string; // Hostname for widget URLs and server endpoints (defaults to 'localhost')
   baseUrl?: string; // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
+  allowedOrigins?: string[]; // Allowed origins for DNS rebinding protection (if empty, protection is disabled)
+  sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
 }
 
 export interface InputDefinition {
