@@ -469,7 +469,7 @@ export function ResourcesTab({
             defaultSize={0}
             collapsible
             minSize={5}
-            collapsedSize={5}
+            collapsedSize={6}
             onCollapse={() => setRpcPanelCollapsed(true)}
             onExpand={() => setRpcPanelCollapsed(false)}
             className="flex flex-col border-t dark:border-zinc-700"
