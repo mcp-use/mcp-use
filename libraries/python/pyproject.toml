@@ -31,8 +31,6 @@ dependencies = [
     "scarf-sdk>=0.1.0",
     "authlib>=1.0.0",
     "rich>=13.0.0",
-    "starlette>=0.35.0",
-    "uvicorn>=0.35.0",
 ]
 
 [project.optional-dependencies]
