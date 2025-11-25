@@ -73,6 +73,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     timeout = 30000, // 30 seconds default for connection timeout
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
     wrapTransport,
+    onNotification,
   } = options;
 
   const [state, setState] = useState<UseMcpResult["state"]>("discovering");
@@ -307,6 +308,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Initialize session (caches tools, resources, prompts)
         await session.initialize();
+
+        // Wire up notification handler if provided
+        if (onNotification) {
+          session.on("notification", onNotification);
+        }
 
         addLog("info", "✅ Successfully connected to MCP server");
         addLog("info", "Server info:", session.connector.serverInfo);

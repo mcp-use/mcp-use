@@ -1,4 +1,5 @@
 import type {
+  Notification,
   Prompt,
   Resource,
   ResourceTemplate,
@@ -54,6 +55,8 @@ export type UseMcpOptions = {
   sseReadTimeout?: number;
   /** Optional callback to wrap the transport before passing it to the Client. Useful for logging, monitoring, or other transport-level interceptors. */
   wrapTransport?: (transport: any, serverId: string) => any;
+  /** Callback function that is invoked when a notification is received from the MCP server */
+  onNotification?: (notification: Notification) => void;
 };
 
 export type UseMcpResult = {

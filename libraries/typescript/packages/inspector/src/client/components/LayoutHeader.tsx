@@ -16,6 +16,7 @@ import { useInspector } from "@/client/context/InspectorContext";
 import type { MCPConnection } from "@/client/context/McpContext";
 import { cn } from "@/client/lib/utils";
 import {
+  Bell,
   Check,
   Command,
   Copy,
@@ -46,6 +47,7 @@ const tabs = [
   { id: "prompts", label: "Prompts", icon: MessageSquare },
   { id: "resources", label: "Resources", icon: FolderOpen },
   { id: "chat", label: "Chat", icon: MessageCircle },
+  { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
 export function LayoutHeader({
@@ -132,12 +134,16 @@ export function LayoutHeader({
                 {tabs.map((tab) => {
                   // Get count for the current tab
                   let count = 0;
+                  let isUnreadBadge = false;
                   if (tab.id === "tools") {
                     count = selectedServer.tools.length;
                   } else if (tab.id === "prompts") {
                     count = selectedServer.prompts.length;
                   } else if (tab.id === "resources") {
                     count = selectedServer.resources.length;
+                  } else if (tab.id === "notifications") {
+                    count = selectedServer.unreadNotificationCount;
+                    isUnreadBadge = count > 0;
                   }
 
                   return (
@@ -145,9 +151,19 @@ export function LayoutHeader({
                       key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
-                      className="[&>svg]:mr-0 flex-1 flex-row gap-2"
+                      className="[&>svg]:mr-0 flex-1 flex-row gap-2 relative"
                     >
-                      {count > 0 && (
+                      {isUnreadBadge && (
+                        <span
+                          className={cn(
+                            "bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                            "animate-pulse"
+                          )}
+                        >
+                          {count}
+                        </span>
+                      )}
+                      {!isUnreadBadge && count > 0 && (
                         <span
                           className={cn(
                             activeTab === tab.id
@@ -191,12 +207,16 @@ export function LayoutHeader({
                 {tabs.map((tab) => {
                   // Get count for the current tab
                   let count = 0;
+                  let isUnreadBadge = false;
                   if (tab.id === "tools") {
                     count = selectedServer.tools.length;
                   } else if (tab.id === "prompts") {
                     count = selectedServer.prompts.length;
                   } else if (tab.id === "resources") {
                     count = selectedServer.resources.length;
+                  } else if (tab.id === "notifications") {
+                    count = selectedServer.unreadNotificationCount;
+                    isUnreadBadge = count > 0;
                   }
 
                   return (
@@ -204,11 +224,21 @@ export function LayoutHeader({
                       key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
-                      className="[&>svg]:mr-0 lg:[&>svg]:mr-2"
+                      className="[&>svg]:mr-0 lg:[&>svg]:mr-2 relative"
                     >
                       <div className="items-center gap-2 hidden lg:flex">
                         {tab.label}
-                        {count > 0 && (
+                        {isUnreadBadge && (
+                          <span
+                            className={cn(
+                              "bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-medium",
+                              "animate-pulse"
+                            )}
+                          >
+                            {count}
+                          </span>
+                        )}
+                        {!isUnreadBadge && count > 0 && (
                           <span
                             className={cn(
                               activeTab === tab.id

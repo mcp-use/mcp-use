@@ -11,6 +11,14 @@ import {
   useState,
 } from "react";
 
+export interface MCPNotification {
+  id: string;
+  method: string;
+  params?: Record<string, any>;
+  timestamp: number;
+  read: boolean;
+}
+
 export interface MCPConnection {
   id: string;
   url: string;
@@ -46,6 +54,11 @@ export interface MCPConnection {
     completions?: Record<string, any>;
     [key: string]: any;
   };
+  notifications: MCPNotification[];
+  unreadNotificationCount: number;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  clearNotifications: () => void;
   callTool: (toolName: string, args: any) => Promise<any>;
   readResource: (uri: string) => Promise<any>;
   listPrompts: (serverName?: string) => Promise<void>;
@@ -184,6 +197,68 @@ function McpConnectionWrapper({
     };
   }, [wrapTransportReady, url]);
 
+  // Notification state management
+  const NOTIFICATIONS_STORAGE_KEY = `mcp-inspector-notifications-${url}`;
+  const MAX_NOTIFICATIONS = 500;
+
+  const [notifications, setNotifications] = useState<MCPNotification[]>([]);
+
+  // Load notifications from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setNotifications(parsed);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load notifications from localStorage:", e);
+    }
+  }, [NOTIFICATIONS_STORAGE_KEY]);
+
+  // Save notifications to localStorage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        NOTIFICATIONS_STORAGE_KEY,
+        JSON.stringify(notifications)
+      );
+    } catch (e) {
+      console.error("Failed to save notifications to localStorage:", e);
+    }
+  }, [notifications, NOTIFICATIONS_STORAGE_KEY]);
+
+  // Notification handlers
+  const markNotificationRead = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
+
+  const onNotificationReceived = useCallback(
+    (notification: MCPNotification) => {
+      setNotifications((prev) => {
+        // Prune oldest if we exceed max
+        const updated = [notification, ...prev];
+        if (updated.length > MAX_NOTIFICATIONS) {
+          return updated.slice(0, MAX_NOTIFICATIONS);
+        }
+        return updated;
+      });
+    },
+    []
+  );
+
   // Only enable useMcp connection after transport wrapper is ready
   // This ensures RPC logging is active from the start
   const mcpHook = useMcp({
@@ -194,6 +269,15 @@ function McpConnectionWrapper({
     transportType: transportType || "http", // Default to 'http' for Streamable HTTP
     enabled: wrapTransportReady, // Only connect when wrapper is ready
     wrapTransport: wrapTransportFn,
+    onNotification: (notification) => {
+      onNotificationReceived({
+        id: crypto.randomUUID(),
+        method: notification.method,
+        params: notification.params,
+        timestamp: Date.now(),
+        read: false,
+      });
+    },
   });
 
   const onUpdateRef = useRef(onUpdate);
@@ -219,6 +303,8 @@ function McpConnectionWrapper({
           );
         }
 
+        const unreadCount = notifications.filter((n) => !n.read).length;
+
         const connection: MCPConnection = {
           id: url,
           url,
@@ -234,6 +320,11 @@ function McpConnectionWrapper({
           proxyConfig,
           serverInfo: mcpHook.serverInfo,
           capabilities: mcpHook.capabilities,
+          notifications,
+          unreadNotificationCount: unreadCount,
+          markNotificationRead,
+          markAllNotificationsRead,
+          clearNotifications,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
@@ -257,6 +348,8 @@ function McpConnectionWrapper({
           prev.prompts.length !== connection.prompts.length ||
           prev.serverInfo !== connection.serverInfo ||
           prev.capabilities !== connection.capabilities ||
+          prev.notifications.length !== connection.notifications.length ||
+          prev.unreadNotificationCount !== connection.unreadNotificationCount ||
           !prev.client
         ) {
           prevConnectionRef.current = connection;
@@ -265,6 +358,8 @@ function McpConnectionWrapper({
       });
     } else {
       // Fallback for environments without queueMicrotask
+      const unreadCount = notifications.filter((n) => !n.read).length;
+
       const connection: MCPConnection = {
         id: url,
         url,
@@ -280,6 +375,11 @@ function McpConnectionWrapper({
         proxyConfig,
         serverInfo: mcpHook.serverInfo,
         capabilities: mcpHook.capabilities,
+        notifications,
+        unreadNotificationCount: unreadCount,
+        markNotificationRead,
+        markAllNotificationsRead,
+        clearNotifications,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
@@ -303,6 +403,8 @@ function McpConnectionWrapper({
         prev.prompts.length !== connection.prompts.length ||
         prev.serverInfo !== connection.serverInfo ||
         prev.capabilities !== connection.capabilities ||
+        prev.notifications.length !== connection.notifications.length ||
+        prev.unreadNotificationCount !== connection.unreadNotificationCount ||
         !prev.client
       ) {
         prevConnectionRef.current = connection;
@@ -324,6 +426,10 @@ function McpConnectionWrapper({
     mcpHook.serverInfo,
     mcpHook.capabilities,
     mcpHook.client,
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    clearNotifications,
     // Stable functions don't strictly need to be here but good practice
     mcpHook.callTool,
     mcpHook.readResource,
@@ -381,6 +487,11 @@ export function McpProvider({ children }: { children: ReactNode }) {
               customHeaders: config.proxyConfig?.customHeaders,
               transportType: config.transportType,
               proxyConfig: config.proxyConfig,
+              notifications: [],
+              unreadNotificationCount: 0,
+              markNotificationRead: () => {},
+              markAllNotificationsRead: () => {},
+              clearNotifications: () => {},
               callTool: async () => {},
               readResource: async () => {},
               listPrompts: async () => {},
@@ -462,6 +573,11 @@ export function McpProvider({ children }: { children: ReactNode }) {
           customHeaders: proxyConfig?.customHeaders,
           transportType,
           proxyConfig,
+          notifications: [],
+          unreadNotificationCount: 0,
+          markNotificationRead: () => {},
+          markAllNotificationsRead: () => {},
+          clearNotifications: () => {},
           callTool: async () => {},
           readResource: async () => {},
           listPrompts: async () => {},
