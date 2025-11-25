@@ -1,5 +1,14 @@
 # create-mcp-use-app
 
+## 0.6.0-canary.2
+
+### Patch Changes
+
+- d1af70d: - **Security**: Added `https://*.openai.com` to Content Security Policy trusted domains for widgets
+  - **Type safety**: Exported `WidgetMetadata` type from `mcp-use/react` for better widget development experience
+  - **Templates**: Updated widget templates to use `WidgetMetadata` type and fixed CSS import paths (moved styles to resources directory)
+  - **Documentation**: Added comprehensive Apps SDK metadata documentation including CSP configuration examples
+
 ## 0.6.0-canary.1
 
 ### Minor Changes

@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.5.0-canary.4
+
+### Patch Changes
+
+- d1af70d: - **Security**: Added `https://*.openai.com` to Content Security Policy trusted domains for widgets
+  - **Type safety**: Exported `WidgetMetadata` type from `mcp-use/react` for better widget development experience
+  - **Templates**: Updated widget templates to use `WidgetMetadata` type and fixed CSS import paths (moved styles to resources directory)
+  - **Documentation**: Added comprehensive Apps SDK metadata documentation including CSP configuration examples
+- Updated dependencies [d1af70d]
+  - @mcp-use/inspector@0.7.0-canary.4
+  - @mcp-use/cli@2.3.0-canary.4
+
 ## 1.5.0-canary.3
 
 ### Minor Changes
