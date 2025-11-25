@@ -2,7 +2,12 @@ import {
   McpServer as OfficialMcpServer,
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+  GetPromptResult,
+} from "@modelcontextprotocol/sdk/types.js";
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
@@ -477,6 +482,16 @@ export class McpServer {
   tool(toolDefinition: ToolDefinition): this {
     const inputSchema = this.createParamsSchema(toolDefinition.inputs || []);
 
+    // Create context object with sample method for tools
+    const context = {
+      sample: async (
+        params: CreateMessageRequest["params"],
+        options?: RequestOptions
+      ): Promise<CreateMessageResult> => {
+        return await this.createMessage(params, options);
+      },
+    };
+
     this.server.registerTool(
       toolDefinition.name,
       {
@@ -487,6 +502,11 @@ export class McpServer {
         _meta: toolDefinition._meta,
       },
       async (params: any) => {
+        // Pass context as second parameter if callback accepts it
+        // Check if callback signature accepts 2 parameters
+        if (toolDefinition.cb.length >= 2) {
+          return await (toolDefinition.cb as any)(params, context);
+        }
         return await toolDefinition.cb(params);
       }
     );
@@ -543,6 +563,52 @@ export class McpServer {
     );
     this.registeredPrompts.push(promptDefinition.name);
     return this;
+  }
+
+  /**
+   * Request LLM sampling from connected clients.
+   * 
+   * This method allows server tools to request LLM completions from clients
+   * that support the sampling capability. The client will handle model selection,
+   * user approval (human-in-the-loop), and return the generated response.
+   * 
+   * @param params - Sampling request parameters including messages, model preferences, etc.
+   * @param options - Optional request options (timeouts, cancellation, etc.)
+   * @returns Promise resolving to the generated message from the client's LLM
+   * 
+   * @example
+   * ```typescript
+   * // In a tool callback
+   * server.tool({
+   *   name: 'analyze-sentiment',
+   *   description: 'Analyze sentiment using LLM',
+   *   inputs: [{ name: 'text', type: 'string', required: true }],
+   *   cb: async (params, ctx) => {
+   *     const result = await ctx.sample({
+   *       messages: [{
+   *         role: 'user',
+   *         content: { type: 'text', text: `Analyze sentiment: ${params.text}` }
+   *       }],
+   *       modelPreferences: {
+   *         intelligencePriority: 0.8,
+   *         speedPriority: 0.5
+   *       }
+   *     });
+   *     return {
+   *       content: [{ type: 'text', text: result.content.text }]
+   *     };
+   *   }
+   * })
+   * ```
+   */
+  async createMessage(
+    params: CreateMessageRequest["params"],
+    options?: RequestOptions
+  ): Promise<CreateMessageResult> {
+    console.log("createMessage", params, options);
+    // The official SDK's McpServer has a `server` property which is the Server instance
+    // The Server instance has the createMessage method
+    return await this.server.server.createMessage(params, options);
   }
 
   /**

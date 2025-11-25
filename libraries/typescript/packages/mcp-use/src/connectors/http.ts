@@ -195,6 +195,8 @@ export class HttpConnector extends BaseConnector {
         capabilities: {
           ...(this.opts.clientOptions?.capabilities || {}),
           roots: { listChanged: true }, // Always advertise roots capability
+          // Add sampling capability if callback is provided
+          ...(this.opts.samplingCallback ? { sampling: {} } : {}),
         },
       };
       logger.debug(`Creating Client with capabilities:`, JSON.stringify(clientOptions.capabilities, null, 2));
@@ -263,6 +265,7 @@ export class HttpConnector extends BaseConnector {
       this.connected = true;
       this.transportType = "streamable-http";
       this.setupNotificationHandler();
+      this.setupSamplingHandler();
       // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
@@ -299,6 +302,8 @@ export class HttpConnector extends BaseConnector {
         capabilities: {
           ...(this.opts.clientOptions?.capabilities || {}),
           roots: { listChanged: true }, // Always advertise roots capability
+          // Add sampling capability if callback is provided
+          ...(this.opts.samplingCallback ? { sampling: {} } : {}),
         },
       };
       logger.debug(`Creating Client with capabilities (SSE):`, JSON.stringify(clientOptions.capabilities, null, 2));
@@ -314,6 +319,7 @@ export class HttpConnector extends BaseConnector {
       this.connected = true;
       this.transportType = "sse";
       this.setupNotificationHandler();
+      this.setupSamplingHandler();
       // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
       logger.debug(
         `Successfully connected to MCP implementation via HTTP/SSE: ${baseUrl}`

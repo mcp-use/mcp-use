@@ -5,9 +5,12 @@ import type {
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import {
   ListRootsRequestSchema,
+  CreateMessageRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type {
   CallToolResult,
+  CreateMessageRequest,
+  CreateMessageResult,
   Notification,
   Root,
   Tool,
@@ -46,6 +49,14 @@ export interface ConnectorInitOptions {
    * Roots allow the server to know which directories/files the client has access to.
    */
   roots?: Root[];
+  /**
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
+  samplingCallback?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
 }
 
 /**
@@ -197,6 +208,24 @@ export abstract class BaseConnector {
       async (_request, _extra) => {
         logger.debug(`Server requested roots list, returning ${this.rootsCache.length} root(s)`);
         return { roots: this.rootsCache };
+      }
+    );
+  }
+
+  /**
+   * Internal: set up sampling/createMessage request handler.
+   * This is called after the client connects to register the handler for sampling requests.
+   */
+  protected setupSamplingHandler(): void {
+    if (!this.client) return;
+    if (!this.opts.samplingCallback) return;
+
+    // Handle sampling/createMessage requests from the server
+    this.client.setRequestHandler(
+      CreateMessageRequestSchema,
+      async (request, _extra) => {
+        logger.debug("Server requested sampling, forwarding to callback");
+        return await this.opts.samplingCallback!(request.params);
       }
     );
   }

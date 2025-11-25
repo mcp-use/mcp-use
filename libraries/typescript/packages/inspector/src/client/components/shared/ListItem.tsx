@@ -9,9 +9,9 @@ interface ListItemProps {
   /** Whether this item is focused (keyboard navigation) */
   isFocused: boolean;
   /** Icon to display */
-  icon: ReactNode;
+  icon?: ReactNode;
   /** Primary title text */
-  title: string;
+  title: ReactNode;
   /** Optional description text */
   description?: string;
   /** Optional metadata to display (like badges, tags, etc.) */
@@ -47,7 +47,7 @@ export function ListItem({
       )}
     >
       <div className="flex items-start gap-2 sm:gap-3">
-        <div className="flex-shrink-0 mt-1">
+        {icon && <div className="flex-shrink-0 mt-1">
           <div
             className={cn(
               "p-2.5 rounded-full transition-colors",
@@ -58,7 +58,7 @@ export function ListItem({
           >
             {icon}
           </div>
-        </div>
+        </div>}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className={cn("font-medium truncate font-mono text-sm")}>

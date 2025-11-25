@@ -12,61 +12,60 @@ Sampling allows MCP tools to request LLM completions during their execution.
 
 ## Configuration
 
-To enable sampling, provide a `sampling_callback` function when initializing the MCPClient:
+To enable sampling, provide a `samplingCallback` function when initializing the MCPClient:
 
 <CodeGroup>
 ```typescript TypeScript
-// ⚠️ Sampling callbacks are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use
-
-// When supported, the API will look similar to:
-/*
 import { MCPClient } from 'mcp-use'
+import type { CreateMessageRequestParams, CreateMessageResult } from '@modelcontextprotocol/sdk/types'
 
-async function samplingCallback(context, params) {
-    // Integrate with your LLM of choice
-    const response = await yourLlm.complete(params.messages.at(-1).content.text)
+async function samplingCallback(
+  params: CreateMessageRequestParams
+): Promise<CreateMessageResult> {
+  // Integrate with your LLM of choice (OpenAI, Anthropic, etc.)
+  // Extract the last message content
+  const lastMessage = params.messages[params.messages.length - 1]
+  const content = Array.isArray(lastMessage.content) 
+    ? lastMessage.content[0] 
+    : lastMessage.content
+  
+  // Call your LLM
+  const response = await yourLlm.complete(content.text)
 
-    return {
-        content: { text: response, type: 'text' },
-        model: 'your-model-name',
-        role: 'assistant'
-    }
+  return {
+    role: 'assistant',
+    content: { type: 'text', text: response },
+    model: 'your-model-name',
+    stopReason: 'endTurn'
+  }
 }
 
-const client = new MCPClient(
-    config,
-    { samplingCallback }
-)
-*/
+const client = new MCPClient(config, {
+  samplingCallback
+})
 ```
 
 ```typescript TypeScript
-// ⚠️ Sampling callbacks are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use
+// Using with React hook
+import { useMcp } from 'mcp-use/react'
 
-// When supported, the API will look similar to:
-/*
-import { MCPClient } from 'mcp-use'
-
-async function samplingCallback(context, params) {
-    // Integrate with your LLM of choice
-    const response = await yourLlm.complete(params.messages.at(-1).content.text)
-
-    return {
-        content: { text: response, type: 'text' },
+function MyComponent() {
+  const mcp = useMcp({
+    url: 'http://localhost:3000/mcp',
+    samplingCallback: async (params) => {
+      // Your sampling implementation
+      const response = await yourLlm.complete(params.messages[0].content.text)
+      return {
+        role: 'assistant',
+        content: { type: 'text', text: response },
         model: 'your-model-name',
-        role: 'assistant'
+        stopReason: 'endTurn'
+      }
     }
+  })
+  
+  // ... rest of component
 }
-
-const client = new MCPClient(
-    config,
-    { samplingCallback }
-)
-*/
 ```
 </CodeGroup>
 
@@ -74,18 +73,115 @@ const client = new MCPClient(
 
 When building MCP servers, tools can request sampling using the context parameter:
 
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+import type { ToolContext } from 'mcp-use/server'
+
+const server = createMCPServer({
+  name: 'MyServer',
+  version: '1.0.0'
+})
+
+server.tool({
+  name: 'analyze-sentiment',
+  description: 'Analyze the sentiment of text using the client\'s LLM',
+  inputs: [
+    { name: 'text', type: 'string', required: true }
+  ],
+  cb: async (params, ctx?: ToolContext) => {
+    if (!ctx) {
+      throw new Error('Sampling not available - client does not support sampling')
+    }
+
+    // Request LLM analysis through sampling
+    const prompt = `Analyze the sentiment of the following text as positive, negative, or neutral.
+Just output a single word - 'positive', 'negative', or 'neutral'.
+
+Text to analyze: ${params.text}`
+
+    const result = await ctx.sample({
+      messages: [{
+        role: 'user',
+        content: { type: 'text', text: prompt }
+      }],
+      modelPreferences: {
+        intelligencePriority: 0.8,
+        speedPriority: 0.5
+      }
+    })
+
+    // Extract text from result
+    const content = Array.isArray(result.content) 
+      ? result.content[0] 
+      : result.content
+    
+    return {
+      content: [{
+        type: 'text',
+        text: content.text || 'Unable to analyze sentiment'
+      }]
+    }
+  }
+})
+```
+
+## Using createMessage Directly
+
+You can also use `server.createMessage()` directly if you need more control:
+
+```typescript
+const server = createMCPServer({
+  name: 'MyServer',
+  version: '1.0.0'
+})
+
+server.tool({
+  name: 'custom-llm-task',
+  description: 'Perform a custom LLM task',
+  inputs: [{ name: 'query', type: 'string', required: true }],
+  cb: async (params) => {
+    // Use server.createMessage() directly
+    const result = await server.createMessage({
+      messages: [{
+        role: 'user',
+        content: { type: 'text', text: params.query }
+      }],
+      systemPrompt: 'You are a helpful assistant.',
+      maxTokens: 100
+    })
+
+    return {
+      content: [{
+        type: 'text',
+        text: result.content.text || ''
+      }]
+    }
+  }
+})
+```
+
 ## Error Handling
 
 If no sampling callback is provided but a tool requests sampling:
 
-<CodeGroup>
-```typescript TypeScript
-// ⚠️ Not yet supported - see above for details
-// When supported, similar error handling will apply
-```
+```typescript
+// The server will receive an error from the client
+// indicating that sampling is not supported
 
-```typescript TypeScript
-// ⚠️ Not yet supported - see above for details
-// When supported, similar error handling will apply
+server.tool({
+  name: 'needs-sampling',
+  cb: async (params, ctx) => {
+    try {
+      const result = await ctx?.sample({ messages: [...] })
+      return { content: [{ type: 'text', text: result.content.text }] }
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Error: Client does not support sampling - ${error.message}`
+        }]
+      }
+    }
+  }
+})
 ```
-</CodeGroup>

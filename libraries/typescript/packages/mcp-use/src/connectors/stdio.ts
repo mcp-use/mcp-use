@@ -83,11 +83,22 @@ export class StdioConnector extends BaseConnector {
       const transport = await this.connectionManager.start();
 
       // 3. Create & connect the MCP client
-      this.client = new Client(this.clientInfo, this.opts.clientOptions);
+      // Add sampling capability if callback is provided
+      const clientOptions = {
+        ...(this.opts.clientOptions || {}),
+        capabilities: {
+          ...(this.opts.clientOptions?.capabilities || {}),
+          // Add sampling capability if callback is provided
+          ...(this.opts.samplingCallback ? { sampling: {} } : {}),
+        },
+      };
+      this.client = new Client(this.clientInfo, clientOptions);
       await this.client.connect(transport);
 
       this.connected = true;
       this.setupNotificationHandler();
+      this.setupRootsHandler();
+      this.setupSamplingHandler();
       logger.debug(
         `Successfully connected to MCP implementation: ${this.command}`
       );

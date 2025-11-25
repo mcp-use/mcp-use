@@ -74,6 +74,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
     wrapTransport,
     onNotification,
+    samplingCallback,
   } = options;
 
   const [state, setState] = useState<UseMcpResult["state"]>("discovering");
@@ -292,6 +293,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           ...serverConfig,
           authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
           clientOptions: clientConfig, // ← Pass client config to connector
+          samplingCallback: samplingCallback, // ← Pass sampling callback to connector
           wrapTransport: wrapTransport
             ? (transport: any) => {
                 console.log(

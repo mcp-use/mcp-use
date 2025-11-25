@@ -134,7 +134,6 @@ export function LayoutHeader({
                 {tabs.map((tab) => {
                   // Get count for the current tab
                   let count = 0;
-                  let isUnreadBadge = false;
                   if (tab.id === "tools") {
                     count = selectedServer.tools.length;
                   } else if (tab.id === "prompts") {
@@ -143,7 +142,6 @@ export function LayoutHeader({
                     count = selectedServer.resources.length;
                   } else if (tab.id === "notifications") {
                     count = selectedServer.unreadNotificationCount;
-                    isUnreadBadge = count > 0;
                   }
 
                   return (
@@ -153,17 +151,7 @@ export function LayoutHeader({
                       icon={tab.icon}
                       className="[&>svg]:mr-0 flex-1 flex-row gap-2 relative"
                     >
-                      {isUnreadBadge && (
-                        <span
-                          className={cn(
-                            "bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                            "animate-pulse"
-                          )}
-                        >
-                          {count}
-                        </span>
-                      )}
-                      {!isUnreadBadge && count > 0 && (
+                      {count > 0 && (
                         <span
                           className={cn(
                             activeTab === tab.id
@@ -207,7 +195,6 @@ export function LayoutHeader({
                 {tabs.map((tab) => {
                   // Get count for the current tab
                   let count = 0;
-                  let isUnreadBadge = false;
                   if (tab.id === "tools") {
                     count = selectedServer.tools.length;
                   } else if (tab.id === "prompts") {
@@ -216,7 +203,6 @@ export function LayoutHeader({
                     count = selectedServer.resources.length;
                   } else if (tab.id === "notifications") {
                     count = selectedServer.unreadNotificationCount;
-                    isUnreadBadge = count > 0;
                   }
 
                   return (
@@ -228,17 +214,7 @@ export function LayoutHeader({
                     >
                       <div className="items-center gap-2 hidden lg:flex">
                         {tab.label}
-                        {isUnreadBadge && (
-                          <span
-                            className={cn(
-                              "bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-medium",
-                              "animate-pulse"
-                            )}
-                          >
-                            {count}
-                          </span>
-                        )}
-                        {!isUnreadBadge && count > 0 && (
+                        {count > 0 && (
                           <span
                             className={cn(
                               activeTab === tab.id

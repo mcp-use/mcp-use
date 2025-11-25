@@ -1,4 +1,6 @@
 import type {
+  CreateMessageRequest,
+  CreateMessageResult,
   Notification,
   Prompt,
   Resource,
@@ -57,6 +59,14 @@ export type UseMcpOptions = {
   wrapTransport?: (transport: any, serverId: string) => any;
   /** Callback function that is invoked when a notification is received from the MCP server */
   onNotification?: (notification: Notification) => void;
+  /**
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
+  samplingCallback?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
 };
 
 export type UseMcpResult = {
