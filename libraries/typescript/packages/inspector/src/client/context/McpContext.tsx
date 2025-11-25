@@ -669,7 +669,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
           current.prompts === updatedConnection.prompts &&
           current.error === updatedConnection.error &&
           current.serverInfo === updatedConnection.serverInfo &&
-          current.client === updatedConnection.client
+          current.client === updatedConnection.client &&
+          current.notifications === updatedConnection.notifications &&
+          current.unreadNotificationCount === updatedConnection.unreadNotificationCount
         ) {
           return prev;
         }
