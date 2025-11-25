@@ -28,7 +28,7 @@ export class BrowserMCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
-    const { url, transport, headers, authToken, authProvider, wrapTransport } =
+    const { url, transport, headers, authToken, authProvider, wrapTransport, clientOptions } =
       serverConfig;
 
     if (!url) {
@@ -41,7 +41,15 @@ export class BrowserMCPClient extends BaseMCPClient {
       authToken,
       authProvider, // ← Pass OAuth provider to connector
       wrapTransport, // ← Pass transport wrapper if provided
+      clientOptions, // ← Pass client options (capabilities, etc.) to connector
     };
+    
+    // Debug: Log if clientOptions are being passed
+    if (clientOptions) {
+      console.log("[BrowserMCPClient] Passing clientOptions to connector:", JSON.stringify(clientOptions, null, 2));
+    } else {
+      console.warn("[BrowserMCPClient] No clientOptions provided to connector!");
+    }
 
     // Determine transport type
     if (

@@ -191,17 +191,19 @@ export class HttpConnector extends BaseConnector {
       // This performs both initialize AND initialized notification
       // Always advertise roots capability - server may query roots/list even if client has no roots
       const clientOptions = {
-        ...this.opts.clientOptions,
+        ...(this.opts.clientOptions || {}),
         capabilities: {
-          ...this.opts.clientOptions?.capabilities,
+          ...(this.opts.clientOptions?.capabilities || {}),
           roots: { listChanged: true }, // Always advertise roots capability
         },
       };
+      logger.debug(`Creating Client with capabilities:`, JSON.stringify(clientOptions.capabilities, null, 2));
       this.client = new Client(this.clientInfo, clientOptions);
 
       // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
       // The server may call roots/list during initialization if it advertises roots capability
       this.setupRootsHandler();
+      logger.debug("Roots handler registered before connect");
 
       try {
         // Connect with timeout 
@@ -293,17 +295,19 @@ export class HttpConnector extends BaseConnector {
       // Create and connect the client
       // Always advertise roots capability - server may query roots/list even if client has no roots
       const clientOptions = {
-        ...this.opts.clientOptions,
+        ...(this.opts.clientOptions || {}),
         capabilities: {
-          ...this.opts.clientOptions?.capabilities,
+          ...(this.opts.clientOptions?.capabilities || {}),
           roots: { listChanged: true }, // Always advertise roots capability
         },
       };
+      logger.debug(`Creating Client with capabilities (SSE):`, JSON.stringify(clientOptions.capabilities, null, 2));
       this.client = new Client(this.clientInfo, clientOptions);
       
       // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
       // The server may call roots/list during initialization if it advertises roots capability
       this.setupRootsHandler();
+      logger.debug("Roots handler registered before connect (SSE)");
       
       await this.client.connect(transport);
 
