@@ -100,13 +100,13 @@ resources/
 
 ```tsx
 // resources/product-search-result/widget.tsx
-import { McpUseProvider, useWidget } from 'mcp-use/react';
+import { McpUseProvider, useWidget, type WidgetMetadata } from 'mcp-use/react';
 import { Accordion } from './components/Accordion';
 import { Carousel } from './components/Carousel';
 import type { ProductSearchResultProps } from './types';
 import { propSchema } from './types';
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display product search results with filtering',
   inputs: propSchema,
 };
@@ -158,7 +158,7 @@ Add a new file in `resources/`, for example `resources/user-card.tsx`:
 ```tsx
 import React from 'react';
 import { z } from 'zod';
-import { useWidget } from 'mcp-use/react';
+import { useWidget, type WidgetMetadata } from 'mcp-use/react';
 
 // Define the props schema
 const propSchema = z.object({
@@ -169,7 +169,7 @@ const propSchema = z.object({
 });
 
 // Export metadata for automatic registration
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display a user profile card',
   inputs: propSchema,
 };
@@ -254,7 +254,9 @@ When using `mcp-use build` or `npm run build`:
 The framework looks for the `widgetMetadata` export in each widget file:
 
 ```typescript
-export const widgetMetadata = {
+import type { WidgetMetadata } from 'mcp-use/react';
+
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather for a city',
   inputs: propSchema,  // Zod schema for props
 }
@@ -303,7 +305,9 @@ When an LLM invokes the tool:
 ### widgetMetadata Object
 Contains the information that the MCP resource (and the tool that exposes it) will use when are automatically built by mcp-use.
 ```typescript
-export const widgetMetadata = {
+import type { WidgetMetadata } from 'mcp-use/react';
+
+export const widgetMetadata: WidgetMetadata = {
   // Required: Human-readable description
   description: string,
   
@@ -362,7 +366,9 @@ const propSchema = z.object({
 Configure Apps SDK-specific settings including Content Security Policy (CSP) for external resources:
 
 ```typescript
-export const widgetMetadata = {
+import type { WidgetMetadata } from 'mcp-use/react';
+
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display product search results',
   inputs: propSchema,
   appsSdkMetadata: {
@@ -653,7 +659,7 @@ Here's a complete widget example using `McpUseProvider`:
 ```tsx
 import React from 'react';
 import { z } from 'zod';
-import { McpUseProvider, useWidget } from 'mcp-use/react';
+import { McpUseProvider, useWidget, type WidgetMetadata } from 'mcp-use/react';
 import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
 import { Link } from 'react-router-dom';
 
@@ -665,7 +671,7 @@ const propSchema = z.object({
 });
 
 // Export metadata for auto-registration
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather for a city',
   inputs: propSchema,
 }
@@ -889,13 +895,13 @@ Add a new file in `resources/`:
 // resources/my-new-widget.tsx
 import React from 'react';
 import { z } from 'zod';
-import { useWidget } from 'mcp-use/react';
+import { useWidget, type WidgetMetadata } from 'mcp-use/react';
 
 const propSchema = z.object({
   title: z.string(),
 });
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'My new widget',
   inputs: propSchema,
 };
@@ -1068,14 +1074,16 @@ const propSchema = z.object({
 Each widget should do one thing well:
 
 ```typescript
+import type { WidgetMetadata } from 'mcp-use/react';
+
 // Good: Focused widget
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather for a single city',
   inputs: z.object({ city: z.string() }),
 };
 
 // ❌ Bad: Too many responsibilities
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather, forecast, map, and news for cities',
   inputs: z.object({ /* too many fields */ }),
 };
@@ -1170,7 +1178,9 @@ const MyWidget: React.FC = () => {
 **For automatic widget registration** (via `widgetMetadata`):
 
 ```typescript
-export const widgetMetadata = {
+import type { WidgetMetadata } from 'mcp-use/react';
+
+export const widgetMetadata: WidgetMetadata = {
   description: 'My widget',
   inputs: propSchema,
   appsSdkMetadata: {
@@ -1202,11 +1212,13 @@ server.uiResource({
 
 ```tsx
 // resources/weather.tsx
+import type { WidgetMetadata } from 'mcp-use/react';
+
 const propSchema = z.object({
   city: z.string(),
 });
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Show weather',
   inputs: propSchema,
 };

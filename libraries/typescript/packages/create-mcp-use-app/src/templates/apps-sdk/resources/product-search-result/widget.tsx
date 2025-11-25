@@ -1,6 +1,6 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { McpUseProvider, useWidget } from "mcp-use/react";
+import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { Link } from "react-router";
 import { Accordion } from "./components/Accordion";
@@ -10,7 +10,7 @@ import type { ProductSearchResultProps } from "./types";
 import { propSchema } from "./types";
 import "../../styles.css";
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description:
     "Display product search results with filtering, state management, and tool interactions",
   inputs: propSchema,

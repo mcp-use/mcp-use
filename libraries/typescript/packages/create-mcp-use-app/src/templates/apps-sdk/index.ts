@@ -1,21 +1,9 @@
 import { createMCPServer } from "mcp-use/server";
-import { cors } from 'hono/cors';
 
 const server = createMCPServer("test-app", {
   version: "1.0.0",
   description: "Test MCP server with automatic UI widget registration",
 });
-
-server.use(
-  cors({
-    origin: "*",
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
-    exposeHeaders: ["Content-Length"],
-    maxAge: 86400,
-    credentials: false,
-  })
-);
 
 /**
  * AUTOMATIC UI WIDGET REGISTRATION
