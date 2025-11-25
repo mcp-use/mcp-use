@@ -847,6 +847,7 @@ export function getWidgetSecurityHeaders(
     "https://cdn.jsdelivr.net",
     "https://cdnjs.cloudflare.com",
     "https://cdn.skypack.dev",
+    "https://*.openai.com",
   ];
 
   // Merge widget-specific resource domains with trusted CDNs (production CSP)
