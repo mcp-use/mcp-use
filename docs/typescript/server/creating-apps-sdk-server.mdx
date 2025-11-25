@@ -88,7 +88,7 @@ Create `resources/user-profile.tsx`:
 ```tsx
 import React from "react";
 import { z } from "zod";
-import { useWidget } from "mcp-use/react";
+import { useWidget, type WidgetMetadata } from "mcp-use/react";
 
 // Define the props schema using Zod
 const propSchema = z.object({
@@ -100,7 +100,7 @@ const propSchema = z.object({
 });
 
 // Export metadata for automatic registration
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: "Display a user profile card with avatar and information",
   inputs: propSchema,
 };
@@ -440,14 +440,16 @@ const MyWidget: React.FC = () => {
 Keep widgets focused on a single purpose:
 
 ```typescript
+import type { WidgetMetadata } from "mcp-use/react";
+
 // ✅ Good: Single purpose
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: "Display weather for a city",
   inputs: z.object({ city: z.string() }),
 };
 
 // ❌ Bad: Too many responsibilities
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: "Display weather, forecast, map, and news",
   inputs: z.object({
     /* too many fields */

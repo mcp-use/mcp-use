@@ -79,13 +79,14 @@ All React components in the `resources/` folder are automatically registered as 
 
 ```typescript
 import { z } from 'zod';
+import type { WidgetMetadata } from 'mcp-use/react';
 
 const propSchema = z.object({
   city: z.string().describe('The city name'),
   temperature: z.number().describe('Temperature in Celsius'),
 });
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'My widget description',
   inputs: propSchema,
 };
@@ -135,6 +136,7 @@ Use Zod schemas to define widget inputs:
 
 ```typescript
 import { z } from 'zod';
+import type { WidgetMetadata } from 'mcp-use/react';
 
 const propSchema = z.object({
   name: z.string().describe('Person name'),
@@ -142,7 +144,7 @@ const propSchema = z.object({
   email: z.string().email().describe('Email address'),
 });
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display user information',
   inputs: propSchema,
 };
@@ -285,13 +287,13 @@ await client.readResource('ui://widget/display-weather');
 ```tsx
 import React from 'react';
 import { z } from 'zod';
-import { useWidget } from 'mcp-use/react';
+import { useWidget, type WidgetMetadata } from 'mcp-use/react';
 
 const propSchema = z.object({
   message: z.string().describe('Message to display'),
 });
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display a message',
   inputs: propSchema,
 };
