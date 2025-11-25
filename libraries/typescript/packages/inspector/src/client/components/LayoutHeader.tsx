@@ -16,6 +16,7 @@ import { useInspector } from "@/client/context/InspectorContext";
 import type { MCPConnection } from "@/client/context/McpContext";
 import { cn } from "@/client/lib/utils";
 import {
+  Bell,
   Check,
   Command,
   Copy,
@@ -46,6 +47,7 @@ const tabs = [
   { id: "prompts", label: "Prompts", icon: MessageSquare },
   { id: "resources", label: "Resources", icon: FolderOpen },
   { id: "chat", label: "Chat", icon: MessageCircle },
+  { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
 export function LayoutHeader({
@@ -138,6 +140,8 @@ export function LayoutHeader({
                     count = selectedServer.prompts.length;
                   } else if (tab.id === "resources") {
                     count = selectedServer.resources.length;
+                  } else if (tab.id === "notifications") {
+                    count = selectedServer.unreadNotificationCount;
                   }
 
                   return (
@@ -145,7 +149,7 @@ export function LayoutHeader({
                       key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
-                      className="[&>svg]:mr-0 flex-1 flex-row gap-2"
+                      className="[&>svg]:mr-0 flex-1 flex-row gap-2 relative"
                     >
                       {count > 0 && (
                         <span
@@ -197,6 +201,8 @@ export function LayoutHeader({
                     count = selectedServer.prompts.length;
                   } else if (tab.id === "resources") {
                     count = selectedServer.resources.length;
+                  } else if (tab.id === "notifications") {
+                    count = selectedServer.unreadNotificationCount;
                   }
 
                   return (
@@ -204,7 +210,7 @@ export function LayoutHeader({
                       key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
-                      className="[&>svg]:mr-0 lg:[&>svg]:mr-2"
+                      className="[&>svg]:mr-0 lg:[&>svg]:mr-2 relative"
                     >
                       <div className="items-center gap-2 hidden lg:flex">
                         {tab.label}

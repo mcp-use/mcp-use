@@ -12,11 +12,13 @@ export { BaseAdapter, LangChainAdapter } from "./adapters/index.js";
 
 // Export connectors that work in the browser
 export { BaseConnector } from "./connectors/base.js";
+export type { NotificationHandler } from "./connectors/base.js";
 export { HttpConnector } from "./connectors/http.js";
 export { WebSocketConnector } from "./connectors/websocket.js";
 
-// Export session
+// Export session and notification types
 export { MCPSession } from "./session.js";
+export type { Notification, Root } from "./session.js";
 
 // Export OAuth utilities
 export { BrowserOAuthClientProvider } from "./auth/browser-provider.js";
