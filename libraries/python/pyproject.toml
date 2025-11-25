@@ -54,7 +54,7 @@ openai = [
     "langchain_openai",
 ]
 search = [
-    "fastembed>=0.0.1",
+    "fastembed>=0.3.0",
 ]
 e2b = [
     "e2b-code-interpreter>=1.5.0",
