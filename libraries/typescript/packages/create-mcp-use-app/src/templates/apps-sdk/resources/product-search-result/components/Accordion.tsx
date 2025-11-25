@@ -20,9 +20,9 @@ export const Accordion: React.FC<AccordionProps> = ({
   );
 
   return (
-    <div className="p-8 pt-4 border-t border-gray-200 dark:border-gray-800 mt-4">
+    <div className="p-8 pt-4 border-t border-subtle mt-4">
       <h3 className="heading-lg mb-4">{title}</h3>
-      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="rounded-lg border border-default overflow-hidden">
         {items.map((item, index) => (
           <AccordionItem
             key={index}

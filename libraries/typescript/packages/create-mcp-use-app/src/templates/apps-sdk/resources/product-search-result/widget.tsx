@@ -32,7 +32,7 @@ const ProductSearchResult: React.FC = () => {
   return (
     <McpUseProvider debugger viewControls autoSize>
       <AppsSDKUIProvider linkComponent={Link}>
-        <div className="relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-3xl">
+        <div className="relative bg-surface-elevated border border-default rounded-3xl">
           <div className="p-8">
             <h5 className="text-secondary mb-1">Apps SDK Template</h5>
             <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>

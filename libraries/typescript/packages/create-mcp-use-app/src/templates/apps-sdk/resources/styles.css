@@ -28,15 +28,15 @@ h3,
 h4,
 h5,
 h6 {
-  @apply text-gray-900 dark:text-white;
+  @apply text-default;
 }
 
 p {
-  @apply text-gray-600 dark:text-gray-400;
+  @apply text-secondary;
 }
 
 a {
-  @apply text-blue-600 dark:text-blue-400;
+  @apply text-info;
 }
 
 /* Carousel scroll container with padding for blur effect */
