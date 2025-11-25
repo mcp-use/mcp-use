@@ -22,17 +22,17 @@ classifiers = [
 dependencies = [
     "mcp>=1.10.0",
     "langchain>=1.0.0",
-    "langchain-core>=1.0.0",
     "websockets>=15.0",
-    "aiohttp>=3.9.0",
-    "pydantic==2.11.10",
-    "pydantic-core==2.33.2",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
     "jsonschema-pydantic>=0.1.0",
     "python-dotenv>=1.0.0",
-    "posthog>=4.8.0",
+    "posthog>=3.0.0",
     "scarf-sdk>=0.1.0",
-    "authlib>=1.6.3",
-    "rich>=14.2.0"
+    "authlib>=1.0.0",
+    "rich>=13.0.0",
+    "starlette>=0.35.0",
+    "uvicorn>=0.25.0",
 ]
 
 [project.optional-dependencies]
@@ -44,7 +44,7 @@ dev = [
     "isort>=5.12.0",
     "mypy>=1.5.0",
     "ruff>=0.1.0",
-    "fastmcp==2.10.5",
+    "fastmcp>=2.13.0",
     "fastapi",
 ]
 anthropic = [
@@ -60,8 +60,6 @@ e2b = [
     "e2b-code-interpreter>=1.5.0",
 ]
 
-[project.scripts]
-mcp-use = "mcp_use.cli:main"
 
 [build-system]
 requires = ["hatchling"]
