@@ -8,7 +8,7 @@ import { Carousel } from "./components/Carousel";
 import { queryClient } from "./constants";
 import type { ProductSearchResultProps } from "./types";
 import { propSchema } from "./types";
-import "../../styles.css";
+import "../styles.css";
 
 export const widgetMetadata: WidgetMetadata = {
   description:

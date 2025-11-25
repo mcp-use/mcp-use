@@ -1,7 +1,7 @@
 import React from "react";
 import { z } from "zod";
 import { useWidget, type WidgetMetadata } from "mcp-use/react";
-import "../styles.css";
+import "./styles.css";
 
 /*
  * Apps SDK widget
