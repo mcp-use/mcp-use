@@ -2,20 +2,24 @@
 
 import sys
 from functools import partial
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import anyio
 import uvicorn
 
 from mcp_use.server.cli import display_startup_info
 from mcp_use.server.logging import get_logging_config
+
+if TYPE_CHECKING:
+    from mcp_use.server.server import MCPServer
+
 from mcp_use.server.signals import setup_signal_handlers
 
 
 class ServerRunner:
     """Handles running the server with different transport types."""
 
-    def __init__(self, server):
+    def __init__(self, server: "MCPServer"):
         self.server = server
 
     async def run_streamable_http_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
