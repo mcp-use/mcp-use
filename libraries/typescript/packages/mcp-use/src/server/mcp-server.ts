@@ -2012,6 +2012,10 @@ if (container && Component) {
         props = metadata.inputs;
       }
 
+      const mcp_connect_domain = this.getServerBaseUrl()
+        ? new URL(this.getServerBaseUrl() || "").origin
+        : null;
+
       this.uiResource({
         name: widgetName,
         title: metadata.title || widgetName,
@@ -2040,7 +2044,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              ...(mcp_connect_domain ? [mcp_connect_domain] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -2049,7 +2053,7 @@ if (container && Component) {
               "https://*.oaiusercontent.com",
               "https://*.openai.com",
               // always also add the base url of the server
-              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              ...(mcp_connect_domain ? [mcp_connect_domain] : []),
               // add additional CSP URLs from environment variable
               ...this.getCSPUrls(),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
