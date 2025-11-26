@@ -99,10 +99,15 @@ function ProductWidget() {
 
 ## Related Utilities
 
-The component uses these window globals (injected by the MCP server):
+The component uses these window globals (injected by the MCP server or at build time):
 
-- `window.__mcpPublicUrl`: Base URL for public assets (e.g., `http://localhost:3000/mcp-use/public`)
+- `window.__mcpPublicAssetsUrl`: Base URL for public assets in static deployments (e.g., Supabase storage bucket)
+- `window.__mcpPublicUrl`: Base URL for public assets (e.g., `http://localhost:3000/mcp-use/public`) - used as fallback
 - `window.__getFile`: Helper function to get file URLs
+
+<Note>
+The Image component prefers `__mcpPublicAssetsUrl` when available (static deployments), falling back to `__mcpPublicUrl` for dynamic serving.
+</Note>
 
 ## Related Components
 

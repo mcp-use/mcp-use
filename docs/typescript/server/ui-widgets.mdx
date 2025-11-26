@@ -1038,9 +1038,21 @@ PORT=3000
 HOST=localhost
 MCP_URL=https://myserver.com
 
+# For Static Deployments (e.g., Supabase)
+MCP_SERVER_URL=https://myserver.com/functions/v1/my-function
+
 # For Production
 NODE_ENV=production
 ```
+
+**Environment Variable Details:**
+
+- `MCP_URL`: Base URL for widget assets and public files. Used by Vite's `base` option during build.
+- `MCP_SERVER_URL`: (Optional) MCP server URL for API calls. When set, URLs are injected at build time for static deployments where widgets are served from storage rather than the MCP server.
+
+<Note>
+**Static Deployments**: Set both `MCP_URL` (for assets) and `MCP_SERVER_URL` (for API calls) when deploying to platforms like Supabase where widgets are served from static storage.
+</Note>
 
 ## Best Practices
 

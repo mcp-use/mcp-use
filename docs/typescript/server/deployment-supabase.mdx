@@ -77,7 +77,7 @@ The deployment script automatically:
 1. ✅ Validates Supabase CLI installation and authentication
 2. ✅ Checks if the project is initialized and linked
 3. ✅ Patches `config.toml` with your project ID
-4. ✅ Builds your MCP application with the correct `MCP_URL`
+4. ✅ Builds your MCP application with the correct `MCP_URL` and `MCP_SERVER_URL`
 5. ✅ Copies build artifacts to the function directory
 6. ✅ Deploys the function to Supabase Edge Functions
 7. ✅ Uploads widgets to the storage bucket
@@ -162,17 +162,27 @@ E.g if you created a bucket called "widgets" in Supabase Storage:
 supabase storage cp -r dist/resources/widgets ss://widgets/ --experimental
 ```
 
-and then set the MCP_URL environment variable to the URL of the widgets bucket.
+and then set the environment variables for Supabase deployments:
 
 ```bash
+# MCP_URL: Where widget assets (JS/CSS) are stored
 export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets"
+
+# MCP_SERVER_URL: Where the MCP server runs (for API calls in widgets)
+export MCP_SERVER_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME"
 ```
+
+<Note>
+**Two URLs Required**: Supabase deployments need both URLs because widget files are served from static storage while API calls go to the edge function. `MCP_SERVER_URL` enables build-time URL injection for static deployments.
+</Note>
 
 ### 5. Build the mcp-use app
 
 ```bash
 echo $MCP_URL
 # should output: https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets
+echo $MCP_SERVER_URL
+# should output: https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME
 pnpm build
 ```
 

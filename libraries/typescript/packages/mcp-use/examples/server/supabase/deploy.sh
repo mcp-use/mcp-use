@@ -185,9 +185,15 @@ fi
 
 # Build the project
 print_info "Building the project..."
+# MCP_URL: Where widget assets (JS/CSS) are stored (storage bucket)
 MCP_URL="https://${PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}"
 export MCP_URL
 print_info "Using MCP_URL: $MCP_URL"
+
+# MCP_SERVER_URL: Where the MCP server runs (edge function) for API calls
+MCP_SERVER_URL="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}"
+export MCP_SERVER_URL
+print_info "Using MCP_SERVER_URL: $MCP_SERVER_URL"
 
 if ! $PKG_MANAGER run build; then
     print_error "Build failed"
