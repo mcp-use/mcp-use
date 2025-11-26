@@ -487,7 +487,12 @@ jobs:
         run: |
           if [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "✅ Changeset found"
-            pnpm changeset status --since=origin/main
+            # Skip --since check for canary branch (it has its own changesets for canary releases)
+            if [ "${{ github.ref }}" = "refs/heads/canary" ] || [ "${{ github.base_ref }}" = "canary" ]; then
+              echo "ℹ️  On canary branch - skipping changeset status check (changesets will be used for canary release)"
+            else
+              pnpm changeset status --since=origin/main
+            fi
           else
             echo "⚠️ No changeset found. If this PR includes changes that should be published, please add a changeset:"
             echo "  pnpm changeset"
