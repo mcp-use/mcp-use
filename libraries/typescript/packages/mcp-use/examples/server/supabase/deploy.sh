@@ -33,7 +33,7 @@ print_warning() {
 show_help() {
     echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
     echo ""
-    echo "Usage: ./deploy.sh [project-id] [function-name] [bucket-name] [--canary]"
+    echo "Usage: ./deploy.sh [project-id] [function-name] [bucket-name] [--version VERSION]"
     echo ""
     echo "Arguments (optional if run interactively):"
     echo "  project-id     : Your Supabase project ID"
@@ -41,25 +41,31 @@ show_help() {
     echo "  bucket-name    : Name of the storage bucket (default: widgets)"
     echo ""
     echo "Flags:"
-    echo "  --canary       : Use @canary version instead of @latest"
+    echo "  --version      : Specify mcp-use version (default: latest)"
+    echo "                   Examples: latest, canary, 1.5.1, 1.5.1.canary.3"
     echo ""
     echo "Examples:"
-    echo "  ./deploy.sh                                      # Interactive mode"
-    echo "  ./deploy.sh nnpumlykjksvxivhywwo                # With project ID"
-    echo "  ./deploy.sh nnpumlykjksvxivhywwo my-function    # With custom function name"
-    echo "  ./deploy.sh nnpumlykjksvxivhywwo mcp-server widgets --canary  # Use canary version"
+    echo "  ./deploy.sh                                                    # Interactive mode"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo                              # With project ID"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo my-function                  # With custom function name"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo mcp-server widgets --version canary           # Use canary version"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo mcp-server widgets --version 1.5.1.canary.3   # Use specific version"
     echo ""
 }
 
 # Parse flags and arguments
-USE_CANARY=false
+MCP_USE_VERSION="latest"
 PROJECT_ID=""
 FUNCTION_NAME=""
 BUCKET_NAME=""
+NEXT_IS_VERSION=false
 
 for arg in "$@"; do
-    if [ "$arg" = "--canary" ]; then
-        USE_CANARY=true
+    if [ "$NEXT_IS_VERSION" = true ]; then
+        MCP_USE_VERSION="$arg"
+        NEXT_IS_VERSION=false
+    elif [ "$arg" = "--version" ]; then
+        NEXT_IS_VERSION=true
     elif [ -z "$PROJECT_ID" ]; then
         PROJECT_ID="$arg"
     elif [ -z "$FUNCTION_NAME" ]; then
@@ -92,13 +98,6 @@ fi
 if [ -z "$BUCKET_NAME" ]; then
     read -p "Enter bucket name (default: widgets): " BUCKET_NAME </dev/tty
     BUCKET_NAME="${BUCKET_NAME:-widgets}"
-fi
-
-# Set MCP-USE version based on flag
-if [ "$USE_CANARY" = true ]; then
-    MCP_USE_VERSION="canary"
-else
-    MCP_USE_VERSION="latest"
 fi
 
 print_info "Starting deployment to Supabase..."
