@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.5.1-canary.5
+
+### Patch Changes
+
+- 95fa604: Fix conenct domains prod
+  - @mcp-use/cli@2.3.1-canary.5
+  - @mcp-use/inspector@0.7.1-canary.5
+
 ## 1.5.1-canary.4
 
 ### Patch Changes
