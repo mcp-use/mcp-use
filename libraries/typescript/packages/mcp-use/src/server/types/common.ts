@@ -8,7 +8,33 @@ export interface ServerConfig {
   description?: string;
   host?: string; // Hostname for widget URLs and server endpoints (defaults to 'localhost')
   baseUrl?: string; // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
-  allowedOrigins?: string[]; // Allowed origins for DNS rebinding protection (if empty, protection is disabled)
+  /**
+   * Allowed origins for DNS rebinding protection
+   *
+   * **Development mode** (NODE_ENV !== "production"):
+   * - If not set: All origins are allowed (DNS rebinding protection disabled)
+   * - This enables direct browser connections from any origin for easier development
+   *
+   * **Production mode** (NODE_ENV === "production"):
+   * - If not set: DNS rebinding protection is disabled (not recommended for production)
+   * - If set to empty array: DNS rebinding protection is disabled
+   * - If set with origins: DNS rebinding protection is enabled with those specific origins
+   *
+   * @example
+   * ```typescript
+   * // Development: No need to set (allows all origins)
+   * const server = createMCPServer('my-server');
+   *
+   * // Production: Explicitly set allowed origins
+   * const server = createMCPServer('my-server', {
+   *   allowedOrigins: [
+   *     'https://myapp.com',
+   *     'https://app.myapp.com'
+   *   ]
+   * });
+   * ```
+   */
+  allowedOrigins?: string[];
   sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
 }
 
