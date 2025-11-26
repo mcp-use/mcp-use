@@ -59,7 +59,16 @@ export interface MCPConnection {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
-  callTool: (toolName: string, args: any) => Promise<any>;
+  callTool: (
+    toolName: string,
+    args: any,
+    options?: {
+      timeout?: number;
+      maxTotalTimeout?: number;
+      resetTimeoutOnProgress?: boolean;
+      signal?: AbortSignal;
+    }
+  ) => Promise<any>;
   readResource: (uri: string) => Promise<any>;
   listPrompts: (serverName?: string) => Promise<void>;
   getPrompt: (name: string, args: any) => Promise<any>;

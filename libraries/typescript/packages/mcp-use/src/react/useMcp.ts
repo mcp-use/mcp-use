@@ -456,20 +456,37 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    *
    * @param name - Name of the tool to call
    * @param args - Arguments to pass to the tool
+   * @param options - Optional request options for timeout configuration
    * @returns Tool execution result
    * @throws {Error} If client is not ready or tool call fails
    *
    * @example
    * ```typescript
+   * // Simple tool call
    * const result = await mcp.callTool('send-email', {
    *   to: 'user@example.com',
    *   subject: 'Hello',
    *   body: 'Test message'
    * })
+   *
+   * // Tool call with extended timeout (e.g., for tools that trigger sampling)
+   * const result = await mcp.callTool('analyze-sentiment', { text: 'Hello' }, {
+   *   timeout: 300000, // 5 minutes
+   *   resetTimeoutOnProgress: true
+   * })
    * ```
    */
   const callTool = useCallback(
-    async (name: string, args?: Record<string, unknown>) => {
+    async (
+      name: string,
+      args?: Record<string, unknown>,
+      options?: {
+        timeout?: number;
+        maxTotalTimeout?: number;
+        resetTimeoutOnProgress?: boolean;
+        signal?: AbortSignal;
+      }
+    ) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
           `MCP client is not ready (current state: ${state}). Cannot call tool "${name}".`
@@ -482,7 +499,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         if (!session) {
           throw new Error("No active session found");
         }
-        const result = await session.connector.callTool(name, args || {});
+        const result = await session.connector.callTool(name, args || {}, options);
         addLog("info", `Tool "${name}" call successful:`, result);
         return result;
       } catch (err) {

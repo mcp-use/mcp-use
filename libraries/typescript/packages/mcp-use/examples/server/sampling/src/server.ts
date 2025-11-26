@@ -1,5 +1,4 @@
-import { createMCPServer } from "../../../../dist/src/server/index.js";
-import type { ToolContext } from "../../../../dist/src/server/types/tool.js";
+import { createMCPServer, type ToolContext } from "../../../../dist/src/server/index.js";
 
 // Create an MCP server with sampling support
 const server = createMCPServer("sampling-example-server", {
@@ -9,7 +8,14 @@ const server = createMCPServer("sampling-example-server", {
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
-// Example tool that uses sampling to analyze sentiment
+/**
+ * Example tool that uses sampling to analyze sentiment.
+ * 
+ * The ctx.sample() function automatically:
+ * - Sends progress notifications every 5 seconds while waiting for the LLM
+ * - Has no timeout by default (waits indefinitely)
+ * - Resets client-side timeouts when resetTimeoutOnProgress is enabled
+ */
 server.tool({
   name: "analyze-sentiment",
   description:
@@ -37,24 +43,36 @@ server.tool({
 
     try {
       // Request LLM analysis through sampling
+      // Progress notifications are sent automatically every 5 seconds
       const prompt = `Analyze the sentiment of the following text as positive, negative, or neutral.
 Just output a single word - 'positive', 'negative', or 'neutral'.
 
 Text to analyze: ${params.text}`;
 
-      const result = await ctx.sample({
-        messages: [
-          {
-            role: "user",
-            content: { type: "text", text: prompt },
+      const result = await ctx.sample(
+        {
+          messages: [
+            {
+              role: "user",
+              content: { type: "text", text: prompt },
+            },
+          ],
+          modelPreferences: {
+            intelligencePriority: 0.8,
+            speedPriority: 0.5,
           },
-        ],
-        modelPreferences: {
-          intelligencePriority: 0.8,
-          speedPriority: 0.5,
+          maxTokens: 100,
         },
-        maxTokens: 100,
-      });
+        {
+          // Optional: custom progress handling
+          onProgress: ({ message }: { progress: number; total?: number; message: string }) =>
+            console.log(`[Progress] ${message}`),
+          // Optional: custom progress interval (default: 5000ms)
+          // progressIntervalMs: 3000,
+          // Optional: timeout (default: no timeout)
+          // timeout: 120000, // 2 minutes
+        }
+      );
 
       // Extract text from result
       const content = Array.isArray(result.content)
@@ -83,7 +101,10 @@ Text to analyze: ${params.text}`;
   },
 });
 
-// Example tool that uses sampling for text summarization
+/**
+ * Example tool that uses sampling for text summarization.
+ * Uses default options - no timeout, progress every 5 seconds.
+ */
 server.tool({
   name: "summarize-text",
   description:
@@ -121,6 +142,7 @@ server.tool({
 
 ${params.text}`;
 
+      // Simple call - progress is automatic
       const result = await ctx.sample({
         messages: [
           {
@@ -161,7 +183,11 @@ ${params.text}`;
   },
 });
 
-// Example tool using server.createMessage() directly
+/**
+ * Example tool using server.createMessage() directly.
+ * Note: This bypasses the automatic progress handling of ctx.sample().
+ * Use ctx.sample() when you need automatic progress notifications.
+ */
 server.tool({
   name: "translate-text",
   description:
@@ -180,9 +206,56 @@ server.tool({
       description: "The target language (e.g., 'Spanish', 'French', 'German')",
     },
   ],
-  cb: async (params) => {
+  cb: async (params, ctx?: ToolContext) => {
+    // Prefer ctx.sample() for automatic progress handling
+    if (ctx) {
+      try {
+        const result = await ctx.sample({
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: `Translate the following text to ${params.targetLanguage}:\n\n${params.text}`,
+              },
+            },
+          ],
+          systemPrompt:
+            "You are a professional translator. Provide only the translation, no additional commentary.",
+          modelPreferences: {
+            intelligencePriority: 0.9,
+            speedPriority: 0.4,
+          },
+          maxTokens: 500,
+        });
+
+        const content = Array.isArray(result.content)
+          ? result.content[0]
+          : result.content;
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Translation: ${content.text || "Unable to translate"}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error during translation: ${error.message || String(error)}. Make sure the client supports sampling.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // Fallback to server.createMessage() if no context (no progress notifications)
     try {
-      // Use server.createMessage() directly instead of context
       const result = await server.createMessage({
         messages: [
           {
@@ -233,7 +306,12 @@ await server.listen(PORT);
 console.log(`🚀 Sampling Example Server running on port ${PORT}`);
 console.log(`📊 Inspector available at http://localhost:${PORT}/inspector`);
 console.log(`🔧 MCP endpoint at http://localhost:${PORT}/mcp`);
-console.log(
-  `\n💡 This server requires a client with sampling support to use the tools.`
-);
-console.log(`   See examples/client/sampling-client.ts for a client example.`);
+console.log(`
+💡 This server requires a client with sampling support to use the tools.
+   See examples/client/sampling-client.ts for a client example.
+
+📝 The ctx.sample() function automatically:
+   - Sends progress notifications every 5 seconds
+   - Has no timeout by default (waits indefinitely for LLM response)
+   - Prevents client-side timeouts when resetTimeoutOnProgress is enabled
+`);

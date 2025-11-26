@@ -120,10 +120,36 @@ export type UseMcpResult = {
    * Function to call a tool on the MCP server.
    * @param name The name of the tool to call.
    * @param args Optional arguments for the tool.
+   * @param options Optional request options including timeout configuration.
    * @returns A promise that resolves with the tool's result.
    * @throws If the client is not in the 'ready' state or the call fails.
+   *
+   * @example
+   * ```typescript
+   * // Simple tool call
+   * const result = await mcp.callTool('my-tool', { arg: 'value' })
+   *
+   * // Tool call with extended timeout (e.g., for tools that trigger sampling)
+   * const result = await mcp.callTool('analyze-sentiment', { text: 'Hello' }, {
+   *   timeout: 300000, // 5 minutes
+   *   resetTimeoutOnProgress: true // Reset timeout when progress notifications are received
+   * })
+   * ```
    */
-  callTool: (name: string, args?: Record<string, unknown>) => Promise<any>;
+  callTool: (
+    name: string,
+    args?: Record<string, unknown>,
+    options?: {
+      /** Timeout in milliseconds for this tool call (default: 60000 / 60 seconds) */
+      timeout?: number;
+      /** Maximum total timeout in milliseconds, even with progress resets */
+      maxTotalTimeout?: number;
+      /** Reset the timeout when progress notifications are received (default: false) */
+      resetTimeoutOnProgress?: boolean;
+      /** AbortSignal to cancel the request */
+      signal?: AbortSignal;
+    }
+  ) => Promise<any>;
   /**
    * Function to list resources from the MCP server.
    * @returns A promise that resolves when resources are refreshed.

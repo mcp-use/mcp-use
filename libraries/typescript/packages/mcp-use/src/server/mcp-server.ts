@@ -7,6 +7,93 @@ import type {
   CreateMessageResult,
   GetPromptResult,
 } from "@modelcontextprotocol/sdk/types.js";
+
+/**
+ * Options for the sample() function in tool context.
+ */
+export interface SampleOptions {
+  /**
+   * Timeout in milliseconds for the sampling request.
+   * Default: no timeout (Infinity) - waits indefinitely for the LLM response.
+   * Set this if you want to limit how long to wait for sampling.
+   */
+  timeout?: number;
+
+  /**
+   * Interval in milliseconds between progress notifications.
+   * Default: 5000 (5 seconds).
+   * Progress notifications are sent to the client to prevent timeout
+   * when the client has resetTimeoutOnProgress enabled.
+   */
+  progressIntervalMs?: number;
+
+  /**
+   * Optional callback called each time a progress notification is sent.
+   * Useful for logging or custom progress handling.
+   */
+  onProgress?: (progress: {
+    progress: number;
+    total?: number;
+    message: string;
+  }) => void;
+}
+
+/**
+ * Context object passed to tool callbacks.
+ * Provides access to sampling and progress reporting capabilities.
+ */
+export interface ToolContext {
+  /**
+   * Request sampling from the client's LLM with automatic progress notifications.
+   *
+   * Progress notifications are sent every 5 seconds (configurable) while waiting
+   * for the sampling response. This prevents client-side timeouts when the client
+   * has `resetTimeoutOnProgress: true` enabled.
+   *
+   * By default, there is no timeout - the function waits indefinitely for the
+   * LLM response. Set `options.timeout` to limit the wait time.
+   *
+   * @param params - Sampling parameters (messages, model preferences, etc.)
+   * @param options - Optional configuration for timeout and progress
+   * @returns The sampling result from the client's LLM
+   *
+   * @example
+   * ```typescript
+   * // Basic usage - waits indefinitely with automatic progress notifications
+   * const result = await ctx.sample({
+   *   messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+   * });
+   *
+   * // With timeout and custom progress handling
+   * const result = await ctx.sample(
+   *   { messages: [...] },
+   *   {
+   *     timeout: 120000, // 2 minute timeout
+   *     progressIntervalMs: 3000, // Report progress every 3 seconds
+   *     onProgress: ({ progress, message }) => console.log(message),
+   *   }
+   * );
+   * ```
+   */
+  sample: (
+    params: CreateMessageRequest["params"],
+    options?: SampleOptions
+  ) => Promise<CreateMessageResult>;
+
+  /**
+   * Send a progress notification to the client.
+   * Only available if the client requested progress updates for this tool call.
+   *
+   * @param progress - Current progress value (should increase with each call)
+   * @param total - Total progress value if known
+   * @param message - Optional message describing current progress
+   */
+  reportProgress?: (
+    progress: number,
+    total?: number,
+    message?: string
+  ) => Promise<void>;
+}
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import { cors } from "hono/cors";
@@ -482,16 +569,6 @@ export class McpServer {
   tool(toolDefinition: ToolDefinition): this {
     const inputSchema = this.createParamsSchema(toolDefinition.inputs || []);
 
-    // Create context object with sample method for tools
-    const context = {
-      sample: async (
-        params: CreateMessageRequest["params"],
-        options?: RequestOptions
-      ): Promise<CreateMessageResult> => {
-        return await this.createMessage(params, options);
-      },
-    };
-
     this.server.registerTool(
       toolDefinition.name,
       {
@@ -501,7 +578,122 @@ export class McpServer {
         annotations: toolDefinition.annotations,
         _meta: toolDefinition._meta,
       },
-      async (params: any) => {
+      async (params: any, extra?: any) => {
+        // Extract progress token from request metadata
+        const progressToken = extra?._meta?.progressToken;
+
+        // Create context object with sample method that automatically sends progress
+        const context: ToolContext = {
+          /**
+           * Request sampling from the client's LLM with automatic progress notifications.
+           *
+           * Progress notifications are sent every 5 seconds (configurable) while waiting
+           * for the sampling response. This prevents client-side timeouts when
+           * resetTimeoutOnProgress is enabled.
+           *
+           * @param params - Sampling parameters (messages, model preferences, etc.)
+           * @param options - Optional configuration
+           * @param options.timeout - Timeout in milliseconds (default: no timeout / Infinity)
+           * @param options.progressIntervalMs - Interval between progress notifications (default: 5000ms)
+           * @param options.onProgress - Optional callback called each time progress is reported
+           * @returns The sampling result from the client's LLM
+           */
+          sample: async (
+            sampleParams: CreateMessageRequest["params"],
+            options?: SampleOptions
+          ): Promise<CreateMessageResult> => {
+            const {
+              timeout,
+              progressIntervalMs = 5000,
+              onProgress,
+            } = options ?? {};
+
+            let progressCount = 0;
+            let completed = false;
+            let progressInterval: ReturnType<typeof setInterval> | null = null;
+
+            // Set up progress notifications if we have a progress token
+            if (progressToken && extra?.sendNotification) {
+              progressInterval = setInterval(async () => {
+                if (completed) return;
+
+                progressCount++;
+                const progressData = {
+                  progress: progressCount,
+                  total: undefined as number | undefined,
+                  message: `Waiting for LLM response... (${progressCount * Math.round(progressIntervalMs / 1000)}s elapsed)`,
+                };
+
+                // Call user's progress callback if provided
+                if (onProgress) {
+                  try {
+                    onProgress(progressData);
+                  } catch {
+                    // Ignore errors in progress callback
+                  }
+                }
+
+                // Send progress notification to client
+                try {
+                  await extra.sendNotification({
+                    method: "notifications/progress",
+                    params: {
+                      progressToken,
+                      progress: progressData.progress,
+                      total: progressData.total,
+                      message: progressData.message,
+                    },
+                  });
+                } catch {
+                  // Ignore errors - request might have completed
+                }
+              }, progressIntervalMs);
+            }
+
+            try {
+              // Create the sampling promise
+              const samplePromise = this.createMessage(sampleParams);
+
+              // If timeout is specified, race against it
+              if (timeout && timeout !== Infinity) {
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                  setTimeout(
+                    () => reject(new Error(`Sampling timed out after ${timeout}ms`)),
+                    timeout
+                  );
+                });
+                return await Promise.race([samplePromise, timeoutPromise]);
+              }
+
+              // No timeout - wait indefinitely
+              return await samplePromise;
+            } finally {
+              completed = true;
+              if (progressInterval) {
+                clearInterval(progressInterval);
+              }
+            }
+          },
+
+          /**
+           * Send a progress notification to the client.
+           * Only works if the client requested progress updates for this tool call.
+           */
+          reportProgress: progressToken && extra?.sendNotification
+            ? async (progress: number, total?: number, message?: string) => {
+                await extra.sendNotification({
+                  method: "notifications/progress",
+                  params: {
+                    progressToken,
+                    progress,
+                    total,
+                    message,
+                  },
+                });
+              }
+            : undefined,
+        };
+
         // Pass context as second parameter if callback accepts it
         // Check if callback signature accepts 2 parameters
         if (toolDefinition.cb.length >= 2) {
