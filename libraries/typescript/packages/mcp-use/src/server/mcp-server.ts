@@ -1863,7 +1863,7 @@ if (container && Component) {
   }
 
   /**
-   * Mount MCP server endpoints at /mcp
+   * Mount MCP server endpoints at /mcp and /sse
    *
    * Sets up the HTTP transport layer for the MCP server, creating endpoints for
    * Server-Sent Events (SSE) streaming, POST message handling, and DELETE session cleanup.
@@ -1877,9 +1877,9 @@ if (container && Component) {
    *
    * @example
    * Endpoints created:
-   * - GET /mcp - SSE streaming endpoint for real-time communication
-   * - POST /mcp - Message handling endpoint for MCP protocol messages
-   * - DELETE /mcp - Session cleanup endpoint
+   * - GET /mcp, GET /sse - SSE streaming endpoint for real-time communication
+   * - POST /mcp, POST /sse - Message handling endpoint for MCP protocol messages
+   * - DELETE /mcp, DELETE /sse - Session cleanup endpoint
    */
   private async mountMcp(): Promise<void> {
     if (this.mcpMounted) return;
@@ -1888,7 +1888,6 @@ if (container && Component) {
       "@modelcontextprotocol/sdk/server/streamableHttp.js"
     );
 
-    const endpoint = "/mcp";
     const idleTimeoutMs = this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
     // Helper to get or create a transport for a session
@@ -1896,50 +1895,62 @@ if (container && Component) {
       sessionId?: string,
       isInit = false
     ): Promise<InstanceType<typeof StreamableHTTPServerTransport> | null> => {
-      // Reuse existing transport for session
+      // For initialize requests, always create a new session (ignore any provided session ID)
+      if (isInit) {
+        // Close old session if it exists (cleanup)
+        if (sessionId && this.sessions.has(sessionId)) {
+          try {
+            this.sessions.get(sessionId)!.transport.close();
+          } catch (error) {
+            // Ignore errors when closing old session
+          }
+          this.sessions.delete(sessionId);
+        }
+
+        // Create new transport for initialization
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => generateUUID(),
+          enableJsonResponse: true,
+          allowedOrigins: this.config.allowedOrigins,
+          enableDnsRebindingProtection:
+            this.config.allowedOrigins !== undefined &&
+            this.config.allowedOrigins.length > 0,
+          onsessioninitialized: (id) => {
+            if (id) {
+              this.sessions.set(id, {
+                transport,
+                lastAccessedAt: Date.now(),
+              });
+            }
+          },
+          onsessionclosed: (id) => {
+            if (id) {
+              this.sessions.delete(id);
+            }
+          },
+        });
+
+        await this.server.connect(transport);
+        return transport;
+      }
+
+      // For non-init requests, reuse existing transport for session
       if (sessionId && this.sessions.has(sessionId)) {
         const session = this.sessions.get(sessionId)!;
+        // Update last accessed time immediately to prevent cleanup during request processing
         session.lastAccessedAt = Date.now();
         return session.transport;
       }
 
       // For non-init requests without a valid session ID, return null
-      // to signal that we should return a 400 error
-      if (!isInit && sessionId) {
+      // to signal that we should return an error
+      if (sessionId) {
         // Session ID was provided but not found (expired or invalid)
         return null;
       }
 
-      if (!isInit && !sessionId) {
-        // No session ID provided for non-init request
-        return null;
-      }
-
-      // Create new transport (for initialization only)
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => generateUUID(),
-        enableJsonResponse: true,
-        allowedOrigins: this.config.allowedOrigins,
-        enableDnsRebindingProtection:
-          this.config.allowedOrigins !== undefined &&
-          this.config.allowedOrigins.length > 0,
-        onsessioninitialized: (id) => {
-          if (id) {
-            this.sessions.set(id, {
-              transport,
-              lastAccessedAt: Date.now(),
-            });
-          }
-        },
-        onsessionclosed: (id) => {
-          if (id) {
-            this.sessions.delete(id);
-          }
-        },
-      });
-
-      await this.server.connect(transport);
-      return transport;
+      // No session ID provided for non-init request
+      return null;
     };
 
     // Start idle cleanup interval if timeout is configured
@@ -2086,8 +2097,10 @@ if (container && Component) {
       };
     };
 
-    // POST endpoint for messages
-    this.app.post(endpoint, async (c: Context) => {
+    // Helper function to mount endpoints for a given path
+    const mountEndpoint = (endpoint: string) => {
+      // POST endpoint for messages
+      this.app.post(endpoint, async (c: Context) => {
       const { expressReq, expressRes, getResponse } =
         createExpressLikeObjects(c);
 
@@ -2111,6 +2124,10 @@ if (container && Component) {
       if (!transport) {
         if (sessionId) {
           // Session ID was provided but not found (expired or invalid)
+          // Per MCP spec: "The server MAY terminate the session at any time, after which
+          // it MUST respond to requests containing that session ID with HTTP 404 Not Found."
+          // For notifications, we still return 404 as per spec, but the client should handle
+          // this gracefully by starting a new session.
           return c.json(
             {
               jsonrpc: "2.0",
@@ -2118,12 +2135,17 @@ if (container && Component) {
                 code: -32000,
                 message: "Session not found or expired",
               },
-              id: null,
+              // Notifications don't have an id, but we include null for consistency
+              id: body?.id ?? null,
             },
             404
           );
         } else {
           // No session ID for non-init request
+          // Per MCP spec: "Servers that require a session ID SHOULD respond to requests
+          // without an MCP-Session-Id header (other than initialization) with HTTP 400 Bad Request."
+          // For notifications without session ID, we return 202 Accepted if we accept them,
+          // or 400 Bad Request if we require session ID. Since we use sessions, we require it.
           return c.json(
             {
               jsonrpc: "2.0",
@@ -2131,14 +2153,15 @@ if (container && Component) {
                 code: -32000,
                 message: "Bad Request: Mcp-Session-Id header is required",
               },
-              id: null,
+              id: body?.id ?? null,
             },
             400
           );
         }
       }
 
-      // Update last accessed time if session exists
+      // Note: lastAccessedAt is already updated in getOrCreateTransport when session is found
+      // This redundant update is kept for safety but should not be necessary
       if (sessionId && this.sessions.has(sessionId)) {
         this.sessions.get(sessionId)!.lastAccessedAt = Date.now();
       }
@@ -2167,10 +2190,10 @@ if (container && Component) {
 
       // If no response was written, return empty response
       return c.text("", 200);
-    });
+      });
 
-    // GET endpoint for SSE streaming
-    this.app.get(endpoint, async (c: Context) => {
+      // GET endpoint for SSE streaming
+      this.app.get(endpoint, async (c: Context) => {
       const sessionId = c.req.header("mcp-session-id");
 
       // Get or create transport for this session
@@ -2345,10 +2368,10 @@ if (container && Component) {
       // If handleRequest fails synchronously or writes nothing, this might hang?
       // But MCP transport usually writes headers immediately for SSE
       return responsePromise;
-    });
+      });
 
-    // DELETE endpoint for session cleanup
-    this.app.delete(endpoint, async (c: Context) => {
+      // DELETE endpoint for session cleanup
+      this.app.delete(endpoint, async (c: Context) => {
       const { expressReq, expressRes, getResponse } =
         createExpressLikeObjects(c);
 
@@ -2401,10 +2424,15 @@ if (container && Component) {
       }
 
       return c.text("", 200);
-    });
+      });
+    };
+
+    // Mount endpoints for both /mcp and /sse
+    mountEndpoint("/mcp");
+    mountEndpoint("/sse");
 
     this.mcpMounted = true;
-    console.log(`[MCP] Server mounted at ${endpoint}`);
+    console.log(`[MCP] Server mounted at /mcp and /sse`);
   }
 
   /**
@@ -2414,7 +2442,7 @@ if (container && Component) {
    * the inspector UI (if available), and starting the server to listen
    * for incoming connections. This is the main entry point for running the server.
    *
-   * The server will be accessible at the specified port with MCP endpoints at /mcp
+   * The server will be accessible at the specified port with MCP endpoints at /mcp and /sse
    * and inspector UI at /inspector (if the inspector package is installed).
    *
    * @param port - Port number to listen on (defaults to 3001 if not specified)
@@ -2424,7 +2452,7 @@ if (container && Component) {
    * ```typescript
    * await server.listen(8080)
    * // Server now running at http://localhost:8080 (or configured host)
-   * // MCP endpoints: http://localhost:8080/mcp
+   * // MCP endpoints: http://localhost:8080/mcp and http://localhost:8080/sse
    * // Inspector UI: http://localhost:8080/inspector
    * ```
    */
@@ -2556,7 +2584,7 @@ if (container && Component) {
             `[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`
           );
           console.log(
-            `[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp`
+            `[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp and http://${this.serverHost}:${this.serverPort}/sse`
           );
         }
       );
@@ -2898,7 +2926,7 @@ if (container && Component) {
    * @example
    * If @mcp-use/inspector is installed:
    * - Inspector UI available at http://localhost:PORT/inspector
-   * - Automatically connects to http://localhost:PORT/mcp
+   * - Automatically connects to http://localhost:PORT/mcp (or /sse)
    *
    * If not installed:
    * - Server continues to function normally
@@ -2926,7 +2954,7 @@ if (container && Component) {
       const { mountInspector } = await import("@mcp-use/inspector");
       // Auto-connect to the local MCP server at /mcp (SSE endpoint)
       // Use JSON config to specify SSE transport type
-      const mcpUrl = `http://${this.serverHost}:${this.serverPort}/mcp`;
+      const mcpUrl = `http://${this.serverHost}:${this.serverPort}/mcp`; // Also available at /sse
       const autoConnectConfig = JSON.stringify({
         url: mcpUrl,
         name: "Local MCP Server",
