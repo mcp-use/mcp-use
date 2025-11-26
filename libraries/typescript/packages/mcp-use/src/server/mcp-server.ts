@@ -1890,6 +1890,69 @@ if (container && Component) {
 
     const idleTimeoutMs = this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
+    // Helper to create a new transport and session
+    const createNewTransport = async (
+      closeOldSessionId?: string
+    ): Promise<InstanceType<typeof StreamableHTTPServerTransport>> => {
+      // Close old session if it exists (cleanup)
+      if (closeOldSessionId && this.sessions.has(closeOldSessionId)) {
+        try {
+          this.sessions.get(closeOldSessionId)!.transport.close();
+        } catch (error) {
+          // Ignore errors when closing old session
+        }
+        this.sessions.delete(closeOldSessionId);
+      }
+
+      // Create new transport for initialization
+      // DNS rebinding protection behavior:
+      // - In development mode: Allow all origins (disable DNS rebinding protection)
+      //   This enables direct browser connections from any origin for easier development
+      // - In production mode: Only use explicitly configured allowedOrigins
+      //   If allowedOrigins is not set in production, DNS rebinding protection is disabled
+      //   (not recommended for production - should explicitly set allowedOrigins)
+      const isProduction = this.isProductionMode();
+      let allowedOrigins = this.config.allowedOrigins;
+      let enableDnsRebindingProtection = false;
+
+      if (isProduction) {
+        // Production mode: Only use explicitly configured origins
+        if (allowedOrigins !== undefined) {
+          enableDnsRebindingProtection = allowedOrigins.length > 0;
+        }
+        // If not set in production, DNS rebinding protection is disabled
+        // (undefined allowedOrigins = no protection)
+      } else {
+        // Development mode: Allow all origins (disable DNS rebinding protection)
+        // This makes it easy to connect from browser dev tools, inspector, etc.
+        allowedOrigins = undefined;
+        enableDnsRebindingProtection = false;
+      }
+
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => generateUUID(),
+        enableJsonResponse: true,
+        allowedOrigins: allowedOrigins,
+        enableDnsRebindingProtection: enableDnsRebindingProtection,
+        onsessioninitialized: (id) => {
+          if (id) {
+            this.sessions.set(id, {
+              transport,
+              lastAccessedAt: Date.now(),
+            });
+          }
+        },
+        onsessionclosed: (id) => {
+          if (id) {
+            this.sessions.delete(id);
+          }
+        },
+      });
+
+      await this.server.connect(transport);
+      return transport;
+    };
+
     // Helper to get or create a transport for a session
     const getOrCreateTransport = async (
       sessionId?: string,
@@ -1897,63 +1960,7 @@ if (container && Component) {
     ): Promise<InstanceType<typeof StreamableHTTPServerTransport> | null> => {
       // For initialize requests, always create a new session (ignore any provided session ID)
       if (isInit) {
-        // Close old session if it exists (cleanup)
-        if (sessionId && this.sessions.has(sessionId)) {
-          try {
-            this.sessions.get(sessionId)!.transport.close();
-          } catch (error) {
-            // Ignore errors when closing old session
-          }
-          this.sessions.delete(sessionId);
-        }
-
-        // Create new transport for initialization
-        // DNS rebinding protection behavior:
-        // - In development mode: Allow all origins (disable DNS rebinding protection)
-        //   This enables direct browser connections from any origin for easier development
-        // - In production mode: Only use explicitly configured allowedOrigins
-        //   If allowedOrigins is not set in production, DNS rebinding protection is disabled
-        //   (not recommended for production - should explicitly set allowedOrigins)
-        const isProduction = this.isProductionMode();
-        let allowedOrigins = this.config.allowedOrigins;
-        let enableDnsRebindingProtection = false;
-
-        if (isProduction) {
-          // Production mode: Only use explicitly configured origins
-          if (allowedOrigins !== undefined) {
-            enableDnsRebindingProtection = allowedOrigins.length > 0;
-          }
-          // If not set in production, DNS rebinding protection is disabled
-          // (undefined allowedOrigins = no protection)
-        } else {
-          // Development mode: Allow all origins (disable DNS rebinding protection)
-          // This makes it easy to connect from browser dev tools, inspector, etc.
-          allowedOrigins = undefined;
-          enableDnsRebindingProtection = false;
-        }
-
-        const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => generateUUID(),
-          enableJsonResponse: true,
-          allowedOrigins: allowedOrigins,
-          enableDnsRebindingProtection: enableDnsRebindingProtection,
-          onsessioninitialized: (id) => {
-            if (id) {
-              this.sessions.set(id, {
-                transport,
-                lastAccessedAt: Date.now(),
-              });
-            }
-          },
-          onsessionclosed: (id) => {
-            if (id) {
-              this.sessions.delete(id);
-            }
-          },
-        });
-
-        await this.server.connect(transport);
-        return transport;
+        return await createNewTransport(sessionId);
       }
 
       // For non-init requests, reuse existing transport for session
@@ -1964,11 +1971,22 @@ if (container && Component) {
         return session.transport;
       }
 
-      // For non-init requests without a valid session ID, return null
-      // to signal that we should return an error
+      // For non-init requests with an invalid session ID
       if (sessionId) {
-        // Session ID was provided but not found (expired or invalid)
-        return null;
+        // Check if auto-create is enabled (default: true for compatibility with non-compliant clients)
+        const autoCreate = this.config.autoCreateSessionOnInvalidId ?? true;
+
+        if (autoCreate) {
+          // Auto-create a new session to allow seamless reconnection
+          console.warn(
+            `[MCP] Session ${sessionId} not found (expired or invalid), auto-creating new session for seamless reconnection`
+          );
+          return await createNewTransport(sessionId);
+        } else {
+          // Follow MCP protocol spec: return null to signal session not found
+          // This will result in a 404 error response
+          return null;
+        }
       }
 
       // No session ID provided for non-init request
@@ -2148,8 +2166,7 @@ if (container && Component) {
             // Session ID was provided but not found (expired or invalid)
             // Per MCP spec: "The server MAY terminate the session at any time, after which
             // it MUST respond to requests containing that session ID with HTTP 404 Not Found."
-            // For notifications, we still return 404 as per spec, but the client should handle
-            // this gracefully by starting a new session.
+            // This happens when autoCreateSessionOnInvalidId is false (default behavior)
             return c.json(
               {
                 jsonrpc: "2.0",
@@ -2225,6 +2242,8 @@ if (container && Component) {
         // Handle missing or invalid session
         if (!transport) {
           if (sessionId) {
+            // Session ID was provided but not found (expired or invalid)
+            // Per MCP spec: return 404 when session not found
             return c.json(
               {
                 jsonrpc: "2.0",
@@ -2237,6 +2256,7 @@ if (container && Component) {
               404
             );
           } else {
+            // No session ID for SSE request
             return c.json(
               {
                 jsonrpc: "2.0",

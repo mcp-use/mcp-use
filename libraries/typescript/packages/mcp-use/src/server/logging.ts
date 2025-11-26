@@ -10,7 +10,9 @@ function getEnv(key: string): string | undefined {
   if (isDeno) {
     return (globalThis as any).Deno.env.get(key);
   }
-  return typeof process !== "undefined" && process.env ? process.env[key] : undefined;
+  return typeof process !== "undefined" && process.env
+    ? process.env[key]
+    : undefined;
 }
 
 /**
@@ -18,7 +20,12 @@ function getEnv(key: string): string | undefined {
  */
 function isDebugMode(): boolean {
   const debugEnv = getEnv("DEBUG");
-  return debugEnv !== undefined && debugEnv !== "" && debugEnv !== "0" && debugEnv.toLowerCase() !== "false";
+  return (
+    debugEnv !== undefined &&
+    debugEnv !== "" &&
+    debugEnv !== "0" &&
+    debugEnv.toLowerCase() !== "false"
+  );
 }
 
 /**
@@ -148,7 +155,7 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
         try {
           const clonedResponse = c.res.clone();
           const responseBody = await clonedResponse.text().catch(() => null);
-          
+
           if (responseBody !== null && responseBody.length > 0) {
             console.log("\x1b[33mResponse Body:\x1b[0m");
             // Try to parse as JSON for pretty printing
@@ -159,7 +166,10 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
               // Not JSON, print as text (truncate if too long)
               const maxLength = 10000;
               if (responseBody.length > maxLength) {
-                console.log(responseBody.substring(0, maxLength) + `\n... (truncated, ${responseBody.length - maxLength} more characters)`);
+                console.log(
+                  responseBody.substring(0, maxLength) +
+                    `\n... (truncated, ${responseBody.length - maxLength} more characters)`
+                );
               } else {
                 console.log(responseBody);
               }
