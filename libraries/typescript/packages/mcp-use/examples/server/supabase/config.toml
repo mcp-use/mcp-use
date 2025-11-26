@@ -356,4 +356,4 @@ verify_jwt = false
 entrypoint = "./functions/mcp-server/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # Bundle widget HTML and metadata files for manual registration
-static_files = [ "./functions/mcp-server/dist/**/*.html","./functions/mcp-server/dist/mcp-use.json"  ]
+static_files = [ "./functions/mcp-server/dist/**/*.html","./functions/mcp-server/dist/mcp-use.json", "./functions/mcp-server/dist/public/**/*"  ]

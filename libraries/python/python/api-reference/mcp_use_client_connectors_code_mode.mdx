@@ -1,0 +1,52 @@
+---
+title: "Code Mode"
+description: "Code Mode Connector - Meta MCP server for code execution API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/code_mode.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/code_mode.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/code_mode.py</a>
+</Callout>
+
+Code Mode Connector - Meta MCP server for code execution.
+
+This connector provides code execution capabilities as if they were
+MCP tools, allowing seamless integration with existing adapter logic.
+
+## CodeModeConnector
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> CodeModeConnector</div>
+
+Meta connector that provides code execution as MCP tools.
+
+    This connector doesn't connect to an external MCP server. Instead,
+    it provides built-in tools for code execution and tool discovery.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.client.connectors.code_mode import CodeModeConnector
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize the code mode connector.
+
+
+**Parameters**
+><ParamField body="client" type="MCPClient" required="True" >   The MCPClient instance (for execute_code and search_tools) </ParamField>
+
+**Signature**
+```python wrap
+def __init__(client: MCPClient):
+```
+
+</Card>
+</div>

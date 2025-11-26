@@ -22,30 +22,29 @@ classifiers = [
 dependencies = [
     "mcp>=1.10.0",
     "langchain>=1.0.0",
-    "langchain-core>=1.0.0",
     "websockets>=15.0",
-    "aiohttp>=3.9.0",
-    "pydantic==2.11.10",
-    "pydantic-core==2.33.2",
+    "httpx>=0.27.1",
+    "pydantic>=2.11.0,<3.0.0",
     "jsonschema-pydantic>=0.1.0",
     "python-dotenv>=1.0.0",
-    "posthog>=4.8.0",
+    "posthog>=3.0.0",
     "scarf-sdk>=0.1.0",
-    "authlib>=1.6.3",
-    "rich>=14.2.0"
+    "authlib>=1.0.0",
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
+    "pytest-asyncio>=1.3.0",
     "pytest-cov>=4.1.0",
     "black>=23.9.0",
     "isort>=5.12.0",
     "mypy>=1.5.0",
     "ruff>=0.1.0",
-    "fastmcp==2.10.5",
-    "fastapi",
+    "fastmcp>=2.13.0",
+    "fastapi>=0.100.0",
+    "pre-commit>=4.5.0"
 ]
 anthropic = [
     "langchain_anthropic",
@@ -54,19 +53,12 @@ openai = [
     "langchain_openai",
 ]
 search = [
-    "fastembed>=0.0.1",
+    "fastembed>=0.3.0",
 ]
 e2b = [
     "e2b-code-interpreter>=1.5.0",
 ]
 
-[project.scripts]
-mcp-use = "mcp_use.cli:main"
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.pytest.ini_options]
-asyncio_mode = "strict"
-asyncio_default_fixture_loop_scope = "function"

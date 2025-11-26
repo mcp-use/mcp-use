@@ -175,7 +175,7 @@ if [ -f "supabase/config.toml" ]; then
         echo "" >> supabase/config.toml
         echo "[functions.$FUNCTION_NAME]" >> supabase/config.toml
         echo "verify_jwt = false" >> supabase/config.toml
-        echo "static_files = [ \"./functions/$FUNCTION_NAME/dist/**/*.html\", \"./functions/$FUNCTION_NAME/dist/mcp-use.json\" ]" >> supabase/config.toml
+        echo "static_files = [ \"./functions/$FUNCTION_NAME/dist/**/*.html\", \"./functions/$FUNCTION_NAME/dist/mcp-use.json\", \"./functions/$FUNCTION_NAME/dist/public/**/*\" ]" >> supabase/config.toml
         print_success "Added function configuration to config.toml"
     fi
 else
@@ -298,6 +298,21 @@ if [ -d "dist/resources/widgets" ]; then
 else
     print_warning "No widgets directory found at dist/resources/widgets"
     echo "Skipping widget upload..."
+fi
+
+# Upload public files to storage
+if [ -d "dist/public" ]; then
+    print_info "Uploading public files to storage bucket: $BUCKET_NAME"
+    
+    if supabase storage cp -r dist/public/* "ss:///${BUCKET_NAME}/public/" --experimental 2>&1; then
+        print_success "Public files uploaded successfully"
+    else
+        print_warning "Public file upload failed"
+        echo "You may need to check your bucket permissions"
+    fi
+else
+    print_warning "No public directory found at dist/public"
+    echo "Skipping public files upload..."
 fi
 
 # Print deployment summary

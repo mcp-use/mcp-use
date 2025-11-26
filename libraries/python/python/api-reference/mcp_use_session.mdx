@@ -1,0 +1,43 @@
+---
+title: "Session"
+description: "Session API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/session.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/session.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/session.py</a>
+</Callout>
+
+## MCPSession
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPSession</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.session import MCPSession
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize a new MCP session.
+
+
+**Parameters**
+><ParamField body="connector" type="mcp_use.client.connectors.base.BaseConnector" required="True" >   The connector to use for communicating with the MCP implementation. </ParamField>
+><ParamField body="auto_connect" type="bool" default="True" >   Whether to automatically connect to the MCP implementation. </ParamField>
+
+**Signature**
+```python wrap
+def __init__(connector: mcp_use.client.connectors.base.BaseConnector, auto_connect: bool = True):
+```
+
+</Card>
+</div>

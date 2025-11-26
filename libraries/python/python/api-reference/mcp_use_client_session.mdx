@@ -1,0 +1,232 @@
+---
+title: "Session"
+description: "Session manager for MCP connections API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/session.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/session.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/session.py</a>
+</Callout>
+
+Session manager for MCP connections.
+
+This module provides a session manager for MCP connections,
+which handles authentication, initialization, and tool discovery.
+
+## MCPSession
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPSession</div>
+
+Session manager for MCP connections.
+
+    This class manages the lifecycle of an MCP connection, including
+    authentication, initialization, and tool discovery.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.client.session import MCPSession
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize a new MCP session.
+
+
+**Parameters**
+><ParamField body="connector" type="mcp_use.client.connectors.base.BaseConnector" required="True" >   The connector to use for communicating with the MCP implementation. </ParamField>
+><ParamField body="auto_connect" type="bool" default="True" >   Whether to automatically connect to the MCP implementation. </ParamField>
+
+**Signature**
+```python wrap
+def __init__(connector: mcp_use.client.connectors.base.BaseConnector, auto_connect: bool = True):
+```
+
+</Card>
+<Card type="info">
+### `method` call_tool
+
+Call an MCP tool.
+
+
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   The name of the tool to call. </ParamField>
+><ParamField body="arguments" type="dict[str, Any]" required="True" >   The arguments to pass to the tool. </ParamField>
+><ParamField body="read_timeout_seconds" type="datetime.timedelta | None" default="None" >   Optional timeout for the tool call. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp.types.CallToolResult" >The result of the tool call.</ResponseField>
+
+**Signature**
+```python wrap
+def call_tool(
+name: str,
+    arguments: dict[str,
+    Any],
+    read_timeout_seconds: datetime.timedelta | None = None
+):
+```
+
+</Card>
+
+<Card type="info">
+### `method` connect
+
+Connect to the MCP implementation.
+
+
+**Signature**
+```python wrap
+def connect():
+```
+
+</Card>
+
+<Card type="info">
+### `method` disconnect
+
+Disconnect from the MCP implementation.
+
+
+**Signature**
+```python wrap
+def disconnect():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_prompt
+
+Get a prompt by name.
+
+
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   The name of the prompt to get. </ParamField>
+><ParamField body="arguments" type="dict[str, typing.Any] | None" default="None" >   Optional arguments for the prompt. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp.types.GetPromptResult" >The prompt result with messages.</ResponseField>
+
+**Signature**
+```python wrap
+def get_prompt(name: str, arguments: dict[str, typing.Any] | None = None):
+```
+
+</Card>
+
+<Card type="info">
+### `method` initialize
+
+Initialize the MCP session and discover available tools.
+
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" >The session information returned by the MCP implementation.</ResponseField>
+
+**Signature**
+```python wrap
+def initialize():
+```
+
+</Card>
+
+<Card type="info">
+### `property` is_connected
+
+Check if the connector is connected.
+
+
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def is_connected():
+```
+
+</Card>
+
+<Card type="info">
+### `method` list_prompts
+
+List all available prompts from the MCP server.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Prompt]" >List of available prompts.</ResponseField>
+
+**Signature**
+```python wrap
+def list_prompts():
+```
+
+</Card>
+
+<Card type="info">
+### `method` list_resources
+
+List all available resources from the MCP server.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Resource]" >List of available resources.</ResponseField>
+
+**Signature**
+```python wrap
+def list_resources():
+```
+
+</Card>
+
+<Card type="info">
+### `method` list_tools
+
+List all available tools from the MCP server.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Tool]" >List of available tools.</ResponseField>
+
+**Signature**
+```python wrap
+def list_tools():
+```
+
+</Card>
+
+<Card type="info">
+### `method` read_resource
+
+Read a resource by URI.
+
+
+
+**Parameters**
+><ParamField body="uri" type="pydantic.networks.AnyUrl" required="True" >   The URI of the resource to read. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp.types.ReadResourceResult" >The resource content.</ResponseField>
+
+**Signature**
+```python wrap
+def read_resource(uri: pydantic.networks.AnyUrl):
+```
+
+</Card>
+
+</div>

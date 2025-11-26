@@ -7,11 +7,13 @@ An MCP server template with OpenAI Apps SDK integration for ChatGPT-compatible w
 ## Features
 
 - **🤖 OpenAI Apps SDK**: Full compatibility with ChatGPT widgets
-- **🎨 React Widgets**: Interactive UI components with theme support
+- **🎨 Official UI Components**: Integrated [OpenAI Apps SDK UI components](https://openai.github.io/apps-sdk-ui/) for consistent, accessible widgets
+- **🛒 Ecommerce Widgets**: Complete ecommerce example with carousel, search, map, and order confirmation
 - **🔄 Automatic Registration**: Widgets auto-register from `resources/` folder
 - **📦 Props Schema**: Zod schema validation for widget props
 - **🌙 Theme Support**: Dark/light theme detection via `useWidget` hook
 - **🛠️ TypeScript**: Complete type safety
+- **🔧 Widget Capabilities**: Full support for `callTool`, `sendFollowUpMessage`, and persistent state
 
 ## What's New: Apps SDK Integration
 
@@ -59,9 +61,13 @@ npm start
 
 ```
 apps-sdk/
-├── resources/                  # React widget components
-│   └── display-weather.tsx      # Weather widget example
-├── index.ts                     # Server entry point
+├── resources/                          # React widget components
+│   ├── display-weather.tsx              # Weather widget example
+│   ├── ecommerce-carousel.tsx           # Ecommerce product carousel
+│   ├── product-search-result.tsx        # Product search with filters
+│   ├── stores-locations-map.tsx         # Store locations map
+│   └── order-confirmation.tsx           # Order confirmation widget
+├── index.ts                             # Server entry point (includes brand info tool)
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -151,6 +157,89 @@ const { theme } = useWidget();
 
 const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
 const textColor = theme === 'dark' ? 'text-gray-100' : 'text-gray-800';
+```
+
+## Official UI Components
+
+This template uses the [OpenAI Apps SDK UI component library](https://openai.github.io/apps-sdk-ui/) for building consistent, accessible widgets. The library provides:
+
+- **Button**: Primary, secondary, and outline button variants
+- **Card**: Container component for content sections
+- **Carousel**: Image and content carousel with transitions
+- **Input**: Form input fields
+- **Icon**: Consistent iconography
+- **Transition**: Smooth animations and transitions
+
+Import components like this:
+
+```typescript
+import {
+  Button,
+  Card,
+  Carousel,
+  CarouselItem,
+  Transition,
+  Icon,
+  Input,
+} from '@openai/apps-sdk-ui';
+```
+
+## Ecommerce Widgets
+
+This template includes a complete ecommerce example with four widgets:
+
+### 1. Ecommerce Carousel (`ecommerce-carousel.tsx`)
+
+A product carousel widget featuring:
+- Title and description
+- Carousel of product items with placeholder images
+- Info button and Add to Cart button for each item
+- Uses official Carousel, Card, Button, Icon, and Transition components
+- Integrates with `callTool` for cart operations
+- Persistent state management
+
+### 2. Product Search Result (`product-search-result.tsx`)
+
+A search results widget with:
+- Search input with real-time filtering
+- Price range filters and stock status filter
+- Grid layout of product cards
+- Uses `callTool` to perform searches
+- Uses `sendFollowUpMessage` to update conversation
+- Persistent filter state
+
+### 3. Stores Locations Map (`stores-locations-map.tsx`)
+
+A store locator widget featuring:
+- Interactive map display (placeholder)
+- List of store locations with details
+- Distance calculation
+- Get directions functionality
+- Store details on click
+- Uses `callTool` for directions and store info
+
+### 4. Order Confirmation (`order-confirmation.tsx`)
+
+An order confirmation widget with:
+- Order summary and items list
+- Shipping information
+- Order status tracking
+- Track order and view receipt actions
+- Uses `callTool` for order tracking
+
+## Brand Info Tool
+
+The template includes a `get-brand-info` tool (normal MCP tool, not a widget) that returns brand information:
+
+```typescript
+// Call the tool
+await client.callTool('get-brand-info', {});
+
+// Returns brand details including:
+// - Company name, tagline, description
+// - Mission and values
+// - Contact information
+// - Social media links
 ```
 
 ## Example: Weather Widget
@@ -321,8 +410,59 @@ const { props } = useWidget();
 const city = props.city;
 ```
 
+## Using Widget Capabilities
+
+The widgets in this template demonstrate the full capabilities of the Apps SDK:
+
+### Calling Tools (`callTool`)
+
+Widgets can call other MCP tools:
+
+```typescript
+const { callTool } = useWidget();
+
+const handleAction = async () => {
+  const result = await callTool('add-to-cart', {
+    productId: '123',
+    productName: 'Product Name',
+    price: 29.99
+  });
+};
+```
+
+### Sending Follow-up Messages (`sendFollowUpMessage`)
+
+Widgets can send messages to the ChatGPT conversation:
+
+```typescript
+const { sendFollowUpMessage } = useWidget();
+
+await sendFollowUpMessage('Product added to cart successfully!');
+```
+
+### Persistent State (`setState`)
+
+Widgets can maintain state across interactions:
+
+```typescript
+const { setState, state } = useWidget();
+
+// Save state
+await setState({ cart: [...cart, newItem] });
+
+// Read state
+const savedCart = state?.cart || [];
+```
+
+## Component Library Note
+
+This template uses the [OpenAI Apps SDK UI component library](https://openai.github.io/apps-sdk-ui/). The exact component API may vary based on the library version. If you encounter import errors, check the [official documentation](https://openai.github.io/apps-sdk-ui/) for the correct component names and props.
+
+If the official library is not available, you can replace the imports with custom React components or other UI libraries while maintaining the same widget structure.
+
 ## Learn More
 
+- [OpenAI Apps SDK UI Components](https://openai.github.io/apps-sdk-ui/) - Official component library
 - [MCP Documentation](https://modelcontextprotocol.io)
 - [OpenAI Apps SDK](https://platform.openai.com/docs/apps)
 - [mcp-use Documentation](https://docs.mcp-use.com)

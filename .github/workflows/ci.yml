@@ -141,10 +141,12 @@ jobs:
 
   python-unit-tests:
     needs: python-lint
+    name: "python-unit"
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
+        deps: ["latest", "minimum"]
     defaults:
       run:
         working-directory: libraries/python
@@ -156,15 +158,18 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .[dev,anthropic,openai,search,e2b]
+      - name: Install uv
+        run: pip install uv
+      - name: Install dependencies (latest)
+        if: matrix.deps == 'latest'
+        run: uv pip install --system -e ".[dev,anthropic,openai,search,e2b]"
+      - name: Install dependencies (minimum)
+        if: matrix.deps == 'minimum'
+        run: uv pip install --system -e ".[dev,anthropic,openai,search,e2b]" --resolution lowest-direct
       - name: Test with pytest
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: |
-          pytest tests/unit
+        run: pytest -vv tests/unit
 
   python-transport-tests:
     needs: python-lint
@@ -194,8 +199,7 @@ jobs:
       - name: Run integration tests for ${{ matrix.transport }} transport
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: |
-          pytest tests/integration/transports/test_${{ matrix.transport }}.py
+        run: pytest -vv tests/integration/transports/test_${{ matrix.transport }}.py
 
   python-primitive-tests:
     needs: python-lint
@@ -234,8 +238,7 @@ jobs:
       - name: Run integration tests for ${{ matrix.primitive }} primitive
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: |
-          pytest tests/integration/primitives/test_${{ matrix.primitive }}.py
+        run: pytest -vv tests/integration/primitives/test_${{ matrix.primitive }}.py
 
   python-integration-tests:
     needs: python-lint
@@ -261,8 +264,7 @@ jobs:
       - name: Run other integration tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: |
-          pytest tests/integration/others/
+        run: pytest -vv tests/integration/others/
 
   python-agent-tests:
     needs: python-lint
@@ -300,8 +302,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: |
-          pytest tests/integration/agent/test_${{ matrix.test }}.py
+        run: pytest -vv tests/integration/agent/test_${{ matrix.test }}.py
 
   # TypeScript Jobs
   typescript-lint:

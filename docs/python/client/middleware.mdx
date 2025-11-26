@@ -258,6 +258,43 @@ class Audit(Middleware):
         return await call_next(context)
 ```
 
+**Note on Modifying `context.params` and Headers**
+
+Middleware receives a typed `context.params` object and may modify it before the request is executed. The runtime guarantees and recommended patterns are:
+
+- **Preferred — Mutate fields on `context.params`:**
+    - Example: `context.params.arguments["user_id"] = "alice"`
+    - These mutations are observed by the final MCP client call and are the most compatible approach.
+
+- **Replacement — Reassigning `context.params`:**
+    - Example: `context.params = NewParams(...)`
+    - This pattern is supported: the middleware system reads `context.params` at call-time so replacements are respected. However, prefer mutation for clarity and to avoid surprises for readers of middleware code.
+
+- **Per-request HTTP headers:**
+    - Adding `context.metadata["headers"]` is useful for carrying header-like information through middleware, but it will only be applied to the actual HTTP transport if the connector/transport code explicitly reads and merges those values into the request headers.
+    - There is no global automatic mechanism that takes `context.metadata["headers"]` and injects them into every transport unless the connector implements that behavior.
+
+Example — add a trace id that downstream middleware or server can observe (does not automatically modify HTTP headers):
+
+```python
+class AddTraceMiddleware(Middleware):
+        async def on_call_tool(self, context: MiddlewareContext[CallToolRequestParams], call_next: NextFunctionT):
+                # Mutate params (preferred)
+                context.params.arguments.setdefault("meta", {})["trace_id"] = "trace-123"
+
+                # Or store headers-like info in metadata for connector-level handling
+                context.metadata.setdefault("headers", {})["X-Trace-Id"] = "trace-123"
+
+                return await call_next(context)
+```
+
+If you need middleware to inject actual HTTP headers per request, there are two safe approaches:
+
+1. **Connector support (recommended):** update the connector/transport to read `context.metadata["headers"]` and merge them into the outgoing HTTPX request headers for that call. This is robust and concurrency-safe when implemented correctly.
+2. **Mutate request params the server understands:** include header-like fields inside `context.params` (for example inside a tool's `arguments`) and let the server interpret them.
+
+If you'd like, we can add a small connector example showing how to merge `context.metadata["headers"]` into the HTTP request — say if you want automatic per-request header injection. Let me know and I will add that example as a follow-up.
+
 ## Integration with MCP Clients
 
 ### MCPClient

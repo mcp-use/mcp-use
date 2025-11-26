@@ -35,6 +35,7 @@ from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter
 from mcp_use.agents.display import log_agent_step, log_agent_stream
 from mcp_use.agents.managers.base import BaseServerManager
 from mcp_use.agents.managers.server_manager import ServerManager
+from mcp_use.agents.middleware import tool_error_handler
 
 # Import observability manager
 from mcp_use.agents.observability import ObservabilityManager
@@ -86,7 +87,6 @@ class MCPAgent:
         callbacks: list | None = None,
         chat_id: str | None = None,
         retry_on_error: bool = True,
-        max_retries_per_step: int = 2,
         metadata: dict[str] | None = None,
         message_id: str | None = None,
     ):
@@ -109,9 +109,10 @@ class MCPAgent:
             api_key: API key for remote execution. If None, checks MCP_USE_API_KEY env var.
             base_url: Base URL for remote API calls.
             callbacks: List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler.
-            retry_on_error: Whether to retry tool calls that fail due to validation errors.
-            max_retries_per_step: Maximum number of retries for validation errors per step.
-            metadata: Specific data to be passed to tools without passing through llm.
+            retry_on_error: Whether to enable automatic error handling for tool calls. When True, tool errors
+                (including validation errors) are caught and returned as messages to the LLM, allowing it to
+                retry with corrected input. When False, errors will halt execution immediately. Default: True.
+	        metadata: Specific data to be passed to tools without passing through llm.
             message_id: Unique Id to be passed to each message in a chat.
         """
         # Handle remote execution
@@ -144,7 +145,6 @@ class MCPAgent:
         self.verbose = verbose
         self.pretty_print = pretty_print
         self.retry_on_error = retry_on_error
-        self.max_retries_per_step = max_retries_per_step
         # System prompt configuration
         self.system_prompt = system_prompt  # User-provided full prompt override
         # User can provide a template override, otherwise use the imported default
@@ -316,9 +316,16 @@ class MCPAgent:
         tool_names = [tool.name for tool in self._tools]
         logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
 
-        # Create middleware to enforce max_steps
-        # ModelCallLimitMiddleware limits the number of model calls, which corresponds to agent steps
-        middleware = [ModelCallLimitMiddleware(run_limit=self.max_steps)]
+        # Create middleware stack
+        middleware = []
+
+        # Add tool error handler if retry_on_error is enabled
+        if self.retry_on_error:
+            middleware.append(tool_error_handler)
+            logger.debug("Tool error handler middleware enabled (retry_on_error=True)")
+
+        # Always add model call limit middleware
+        middleware.append(ModelCallLimitMiddleware(run_limit=self.max_steps))
 
         # Use the standard create_agent with middleware
         agent = create_agent(
@@ -975,7 +982,13 @@ class MCPAgent:
             if event.get("event") == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
                 if chunk and getattr(chunk, "content", None):
-                    ai_message_chunks.append(chunk.content)
+                    if isinstance(chunk.content, str):
+                        content = chunk.content
+                    elif hasattr(chunk.content, "__iter__"):
+                        content = "".join([item.get("text", "") for item in chunk.content])
+                    else:
+                        content = str(chunk.content)
+                    ai_message_chunks.append(content)
 
             yield event
 
@@ -1023,7 +1036,6 @@ class MCPAgent:
                 manage_connector=manage_connector,
                 external_history=external_history,
             ):
-                # print(chunk)
                 log_agent_stream(chunk, pretty_print=self.pretty_print)
                 chunk_count += 1
                 if isinstance(chunk, str):

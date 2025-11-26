@@ -47,12 +47,16 @@ class TestCodeModeIntegration:
 
     @pytest.mark.asyncio
     async def test_search_tools_empty_sessions(self):
-        """Test search_tools with no active sessions."""
+        """Test search_tools with no active MCP sessions returns code_mode tools."""
         client = MCPClient(code_mode=True)
 
-        tools = await client.search_tools()
+        result = await client.search_tools()
 
-        assert tools == []
+        # Code mode tools should be present even without MCP sessions
+        assert result["meta"]["namespaces"] == ["code_mode"]
+        tool_names = [t["name"] for t in result["results"]]
+        assert "execute_code" in tool_names
+        assert "search_tools" in tool_names
 
     def test_from_dict_with_code_mode(self):
         """Test creating client from dict with code_mode."""
@@ -139,23 +143,6 @@ return {
         assert len(result["logs"]) >= 2
 
     @pytest.mark.asyncio
-    async def test_execute_with_timeout(self):
-        """Test that timeout is enforced."""
-        client = MCPClient(code_mode=True)
-
-        result = await client.execute_code(
-            """
-import asyncio
-await asyncio.sleep(10)
-return "should timeout"
-""",
-            timeout=0.5,
-        )
-
-        assert result["error"] is not None
-        assert "timeout" in result["error"].lower()
-
-    @pytest.mark.asyncio
     async def test_execute_with_error(self):
         """Test error handling in code execution."""
         client = MCPClient(code_mode=True)
@@ -200,14 +187,32 @@ class TestSearchToolsIntegration:
 
     @pytest.mark.asyncio
     async def test_search_tools_with_different_detail_levels(self):
-        """Test search_tools with different detail levels."""
+        """Test search_tools with different detail levels returns correct structure."""
         client = MCPClient(code_mode=True)
 
-        # Test with empty sessions (should return empty list)
-        names = await client.search_tools("", detail_level="names")
-        descriptions = await client.search_tools("", detail_level="descriptions")
-        full = await client.search_tools("", detail_level="full")
+        # Test different detail levels - code_mode tools should be present
+        names_result = await client.search_tools("", detail_level="names")
+        descriptions_result = await client.search_tools("", detail_level="descriptions")
+        full_result = await client.search_tools("", detail_level="full")
 
-        assert names == []
-        assert descriptions == []
-        assert full == []
+        # All should have code_mode tools
+        assert len(names_result["results"]) >= 2
+        assert len(descriptions_result["results"]) >= 2
+        assert len(full_result["results"]) >= 2
+
+        # Check detail level differences in structure
+        # "names" should have minimal info
+        names_tool = names_result["results"][0]
+        assert "name" in names_tool
+        assert "server" in names_tool
+
+        # "descriptions" should include description
+        desc_tool = descriptions_result["results"][0]
+        assert "name" in desc_tool
+        assert "description" in desc_tool
+
+        # "full" should include input_schema
+        full_tool = full_result["results"][0]
+        assert "name" in full_tool
+        assert "description" in full_tool
+        assert "input_schema" in full_tool

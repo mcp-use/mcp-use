@@ -1,5 +1,5 @@
 import { TerminalIcon, TrashIcon } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/client/lib/utils";
 import { Button } from "./ui/button";
 import {
@@ -13,6 +13,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "./ui/sheet";
+import { Switch } from "./ui/switch";
+import { Label } from "./ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface IframeConsoleProps {
   iframeId?: string;
@@ -108,14 +111,37 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
   );
 }
 
+const PROXY_TOGGLE_KEY = "mcp-inspector-console-proxy-enabled";
+
 export function IframeConsole({
   iframeId,
   enabled = true,
 }: IframeConsoleProps) {
+  // Load proxy toggle state from localStorage
+  const [proxyToPageConsole, setProxyToPageConsole] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const stored = localStorage.getItem(PROXY_TOGGLE_KEY);
+      return stored === "true";
+    } catch {
+      return false;
+    }
+  });
+
   const { logs, clearLogs, isOpen, setIsOpen } = useIframeConsole({
     enabled,
+    proxyToPageConsole,
   });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Save proxy toggle state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(PROXY_TOGGLE_KEY, String(proxyToPageConsole));
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [proxyToPageConsole]);
 
   const errorCount = useMemo(
     () => logs.filter((log) => log.level === "error").length,
@@ -137,20 +163,31 @@ export function IframeConsole({
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-          onClick={() => setIsOpen(true)}
-        >
-          <TerminalIcon className="size-4 mr-2" />
-          <span className="hidden sm:inline">Console</span>
-          {(errorCount > 0 || warnCount > 0) && (
-            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-red-500 text-white font-semibold">
-              {errorCount + warnCount}
-            </span>
-          )}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+              onClick={() => setIsOpen(true)}
+            >
+              <TerminalIcon className="size-4" />
+              {(errorCount > 0 || warnCount > 0) && (
+                <span
+                  className={cn(
+                    "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
+                    errorCount > 0 ? "bg-red-500" : "bg-yellow-500"
+                  )}
+                >
+                  {errorCount + warnCount}
+                </span>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{errorCount + warnCount} console logs from the iframe</p>
+          </TooltipContent>
+        </Tooltip>
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[400px] flex flex-col p-0">
         <SheetHeader className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
@@ -164,7 +201,20 @@ export function IframeConsole({
                 </span>
               )}
             </SheetTitle>
-            <div className="flex items-center gap-2 pr-4">
+            <div className="flex items-center gap-4 pr-4">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="proxy-console-toggle"
+                  checked={proxyToPageConsole}
+                  onCheckedChange={setProxyToPageConsole}
+                />
+                <Label
+                  htmlFor="proxy-console-toggle"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Proxy logs to page console
+                </Label>
+              </div>
               {logs.length > 0 && (
                 <Button
                   variant="ghost"

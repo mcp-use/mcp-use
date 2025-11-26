@@ -6,7 +6,6 @@ import unittest
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 
-import aiohttp
 from mcp import McpError
 from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
 

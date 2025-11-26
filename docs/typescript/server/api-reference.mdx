@@ -595,9 +595,165 @@ server.tool({
 5. **Chain Methods** - Use fluent API for cleaner code
 6. **Document Tools** - Provide clear descriptions for all tools and resources
 
+## React Components & Hooks
+
+The `mcp-use/react` package provides React components and hooks for building OpenAI Apps SDK widgets.
+
+### Components
+
+#### `McpUseProvider`
+
+Unified provider component that combines all common React setup.
+
+```typescript
+import { McpUseProvider } from 'mcp-use/react';
+
+<McpUseProvider 
+  debugger={boolean}
+  viewControls={boolean | "pip" | "fullscreen"}
+  autoSize={boolean}
+>
+  {children}
+</McpUseProvider>
+```
+
+See [McpUseProvider documentation](./widget-components/mcpuseprovider) for details.
+
+#### `WidgetControls`
+
+Wrapper component that adds control buttons for widget debugging and view controls.
+
+```typescript
+import { WidgetControls } from 'mcp-use/react';
+
+<WidgetControls 
+  debugger={boolean}
+  viewControls={boolean | "pip" | "fullscreen"}
+  position="top-right"
+>
+  {children}
+</WidgetControls>
+```
+
+See [WidgetControls documentation](./widget-components/widgetcontrols) for details.
+
+#### `ErrorBoundary`
+
+Error boundary component for graceful error handling.
+
+```typescript
+import { ErrorBoundary } from 'mcp-use/react';
+
+<ErrorBoundary>
+  {children}
+</ErrorBoundary>
+```
+
+See [ErrorBoundary documentation](./widget-components/errorboundary) for details.
+
+#### `Image`
+
+Image component that handles both data URLs and public file paths.
+
+```typescript
+import { Image } from 'mcp-use/react';
+
+<Image src="/fruits/apple.png" alt="Apple" />
+```
+
+See [Image documentation](./widget-components/image) for details.
+
+#### `ThemeProvider`
+
+Theme provider for consistent theme management.
+
+```typescript
+import { ThemeProvider } from 'mcp-use/react';
+
+<ThemeProvider>
+  {children}
+</ThemeProvider>
+```
+
+See [ThemeProvider documentation](./widget-components/themeprovider) for details.
+
+### Hooks
+
+#### `useWidget<TProps, TOutput, TMetadata, TState>`
+
+Main hook providing type-safe access to all widget capabilities.
+
+```typescript
+import { useWidget } from 'mcp-use/react';
+
+const {
+  props,
+  output,
+  metadata,
+  state,
+  setState,
+  theme,
+  displayMode,
+  callTool,
+  sendFollowUpMessage,
+  openExternal,
+  requestDisplayMode,
+  notifyIntrinsicHeight,
+  isAvailable,
+} = useWidget<TProps, TOutput, TMetadata, TState>();
+```
+
+See [useWidget documentation](./widget-components/usewidget) for complete API reference.
+
+#### `useWidgetProps<TProps>`
+
+Get only the widget props.
+
+```typescript
+import { useWidgetProps } from 'mcp-use/react';
+
+const props = useWidgetProps<{ city: string }>();
+```
+
+#### `useWidgetTheme()`
+
+Get only the theme value.
+
+```typescript
+import { useWidgetTheme } from 'mcp-use/react';
+
+const theme = useWidgetTheme(); // 'light' | 'dark'
+```
+
+#### `useWidgetState<TState>`
+
+Get state management (state and setState).
+
+```typescript
+import { useWidgetState } from 'mcp-use/react';
+
+const [state, setState] = useWidgetState<string[]>([]);
+```
+
+### Type Exports
+
+```typescript
+import type {
+  UseMcpOptions,
+  UseMcpResult,
+  UseWidgetResult,
+  Theme,
+  DisplayMode,
+  SafeArea,
+  UserAgent,
+  CallToolResponse,
+} from 'mcp-use/react';
+```
+
 ## Next Steps
 
 - [Tools Guide](./tools) - Advanced tool patterns
 - [Resources Guide](./resources) - Resource management
 - [UI Widgets](./ui-widgets) - Building interactive widgets
+- [Widget Components](./widget-components/mcpuseprovider) - React components reference
 - [Examples](./examples) - Real-world implementations

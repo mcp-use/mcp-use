@@ -68,7 +68,7 @@ export function ListTabHeader({
   const isPrimaryTab = activeTab === primaryTabName;
 
   return (
-    <div className="flex flex-row items-center justify-between p-4 sm:p-4 py-3 border-r dark:border-zinc-700 gap-2">
+    <div className="flex flex-row items-center justify-between p-4 sm:p-4 py-3 gap-2">
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {!isSearchExpanded ? (
           <>

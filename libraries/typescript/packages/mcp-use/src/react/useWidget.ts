@@ -140,9 +140,13 @@ export function useWidget<
     return isOpenAiAvailable ? "openai" : "mcp-ui";
   }, [isOpenAiAvailable]);
 
+  // Extract search string to avoid dependency issues
+  const searchString =
+    typeof window !== "undefined" ? window.location.search : "";
+
   const urlParams = useMemo(() => {
     // check if it has mcpUseParams
-    const urlParams = new URLSearchParams(window?.location?.search);
+    const urlParams = new URLSearchParams(searchString);
     if (urlParams.has("mcpUseParams")) {
       return JSON.parse(urlParams.get("mcpUseParams") as string) as {
         toolInput: TProps;
@@ -155,7 +159,7 @@ export function useWidget<
       toolOutput: {} as TOutput,
       toolId: "",
     };
-  }, [window?.location?.search]);
+  }, [searchString]);
 
   // Subscribe to globals
   const toolInput =
@@ -180,6 +184,15 @@ export function useWidget<
   const maxHeight = useOpenAiGlobal("maxHeight") as number | undefined;
   const userAgent = useOpenAiGlobal("userAgent") as UserAgent | undefined;
   const locale = useOpenAiGlobal("locale") as string | undefined;
+
+  // Compute MCP server base URL from window.__mcpPublicUrl
+  const mcp_url = useMemo(() => {
+    if (typeof window !== "undefined" && window.__mcpPublicUrl) {
+      // Remove the /mcp-use/public suffix to get the base server URL
+      return window.__mcpPublicUrl.replace(/\/mcp-use\/public$/, "");
+    }
+    return "";
+  }, []);
 
   // Use local state for widget state with sync to window.openai
   const [localWidgetState, setLocalWidgetState] = useState<TState | null>(null);
@@ -236,17 +249,21 @@ export function useWidget<
     async (
       state: TState | ((prevState: TState | null) => TState)
     ): Promise<void> => {
-      const newState =
-        typeof state === "function" ? state(localWidgetState) : state;
-
       if (!window.openai?.setWidgetState) {
         throw new Error("window.openai.setWidgetState is not available");
       }
 
+      // Use functional update to always get latest state
+      // Prefer widgetState (from window.openai) over localWidgetState for most up-to-date value
+      const currentState =
+        widgetState !== undefined ? widgetState : localWidgetState;
+      const newState =
+        typeof state === "function" ? state(currentState) : state;
+
       setLocalWidgetState(newState);
       return window.openai.setWidgetState(newState);
     },
-    [localWidgetState]
+    [widgetState, localWidgetState]
   );
 
   return {
@@ -267,6 +284,7 @@ export function useWidget<
       capabilities: { hover: true, touch: false },
     },
     locale: locale || "en",
+    mcp_url,
 
     // Actions
     callTool,

@@ -439,6 +439,9 @@ export interface WidgetData {
     connect_domains?: string[];
     resource_domains?: string[];
   };
+  devWidgetUrl?: string;
+  devServerBaseUrl?: string;
+  theme?: "light" | "dark";
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -471,7 +474,9 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     toolOutput,
     resourceData,
     toolId,
-    widgetCSP,
+    widgetCSP: _widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   } = data;
 
   console.log("[Widget Store] Received request for toolId:", toolId);
@@ -481,7 +486,9 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     hasResourceData: !!resourceData,
     hasToolInput: !!toolInput,
     hasToolOutput: !!toolOutput,
-    hasWidgetCSP: !!widgetCSP,
+    hasWidgetCSP: !!_widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   });
 
   if (!serverId || !uri || !toolId || !resourceData) {
@@ -507,7 +514,9 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     resourceData,
     toolId,
     timestamp: Date.now(),
-    widgetCSP,
+    widgetCSP: _widgetCSP,
+    devWidgetUrl,
+    devServerBaseUrl,
   });
 
   console.log("[Widget Store] Data stored successfully for toolId:", toolId);
@@ -569,8 +578,17 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   html: string;
   error?: string;
 } {
-  const { serverId, uri, toolInput, toolOutput, resourceData, toolId } =
-    widgetData;
+  const {
+    serverId,
+    uri,
+    toolInput,
+    toolOutput,
+    resourceData,
+    toolId,
+    widgetCSP: _widgetCSP,
+    devServerBaseUrl,
+    theme,
+  } = widgetData;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
     serverId,
@@ -618,6 +636,8 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     .replace(/>/g, "\\u003e");
   const safeToolId = JSON.stringify(toolId);
   const safeWidgetStateKey = JSON.stringify(widgetStateKey);
+  // Safely serialize theme, defaulting to 'light' if not provided
+  const safeTheme = JSON.stringify(theme === "dark" ? "dark" : "light");
 
   // Inject window.openai API script
   const apiScript = `
@@ -626,9 +646,16 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
         'use strict';
 
         // Change URL to "/" for React Router compatibility
-        if (window.location.pathname !== '/') {
+        // Skip if running in Inspector dev-widget proxy to prevent redirecting iframe to Inspector home
+        if (window.location.pathname !== '/' && !window.location.pathname.includes('/dev-widget/')) {
           history.replaceState(null, '', '/');
         }
+
+        // Inject MCP widget utilities for Image component and file access
+        window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
+        window.__getFile = function(filename) {
+          return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
+        };
 
         const openaiAPI = {
           toolInput: ${safeToolInput},
@@ -636,7 +663,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           toolResponseMetadata: null,
           displayMode: 'inline',
           maxHeight: 600,
-          theme: 'dark',
+          theme: ${safeTheme},
           locale: 'en-US',
           safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
           userAgent: {},
@@ -731,6 +758,17 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           enumerable: true
         });
 
+        // Listen for widget state requests from inspector
+        window.addEventListener('message', (event) => {
+          if (event.data?.type === 'mcp-inspector:getWidgetState') {
+            window.parent.postMessage({
+              type: 'mcp-inspector:widgetStateResponse',
+              toolId: event.data.toolId,
+              state: openaiAPI.widgetState
+            }, '*');
+          }
+        });
+
         setTimeout(() => {
           try {
             const globalsEvent = new CustomEvent('openai:set_globals', {
@@ -795,10 +833,13 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 /**
  * Get security headers for widget content
  */
-export function getWidgetSecurityHeaders(widgetCSP?: {
-  connect_domains?: string[];
-  resource_domains?: string[];
-}): Record<string, string> {
+export function getWidgetSecurityHeaders(
+  widgetCSP?: {
+    connect_domains?: string[];
+    resource_domains?: string[];
+  },
+  devServerBaseUrl?: string
+): Record<string, string> {
   const trustedCdns = [
     "https://persistent.oaistatic.com",
     "https://*.oaistatic.com",
@@ -808,13 +849,44 @@ export function getWidgetSecurityHeaders(widgetCSP?: {
     "https://cdn.skypack.dev",
   ];
 
-  // Merge widget-specific resource domains with trusted CDNs
-  const allResourceDomains = [...trustedCdns];
+  // Merge widget-specific resource domains with trusted CDNs (production CSP)
+  const prodResourceDomains = [...trustedCdns];
   if (widgetCSP?.resource_domains) {
-    allResourceDomains.push(...widgetCSP.resource_domains);
+    prodResourceDomains.push(...widgetCSP.resource_domains);
+  }
+  const prodResourceDomainsStr = prodResourceDomains.join(" ");
+
+  // Add dev server origin for HMR scripts in development mode
+  let devServerOrigin: string | null = null;
+  const allResourceDomains = [...prodResourceDomains];
+  if (devServerBaseUrl) {
+    try {
+      devServerOrigin = new URL(devServerBaseUrl).origin;
+      allResourceDomains.push(devServerOrigin);
+    } catch (e) {
+      console.warn(`[CSP] Invalid devServerBaseUrl: ${devServerBaseUrl}`);
+    }
   }
 
   const resourceDomainsStr = allResourceDomains.join(" ");
+
+  // Build img-src with dev server origin for images in development mode
+  let imgSrc = "'self' data: https: blob:";
+  if (devServerOrigin) {
+    imgSrc = `'self' data: https: blob: ${devServerOrigin}`;
+  }
+
+  // Build media-src with dev server origin for media in development mode
+  let mediaSrc = "'self' data: https: blob:";
+  if (devServerOrigin) {
+    mediaSrc = `'self' data: https: blob: ${devServerOrigin}`;
+  }
+
+  // Build font-src - allow all http/https in dev mode for maximum compatibility
+  let fontSrc = `'self' data: ${resourceDomainsStr}`;
+  if (devServerOrigin) {
+    fontSrc = `'self' data: https: http: ${resourceDomainsStr}`;
+  }
 
   // Build connect-src with widget-specific domains
   let connectSrc = "'self' https: wss: ws:";
@@ -822,16 +894,16 @@ export function getWidgetSecurityHeaders(widgetCSP?: {
     connectSrc = `'self' ${widgetCSP.connect_domains.join(" ")} https: wss: ws:`;
   }
 
-  return {
+  const headers: Record<string, string> = {
     "Content-Security-Policy": [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${resourceDomainsStr}`,
       "worker-src 'self' blob:",
       "child-src 'self' blob:",
       `style-src 'self' 'unsafe-inline' ${resourceDomainsStr}`,
-      "img-src 'self' data: https: blob:",
-      "media-src 'self' data: https: blob:",
-      `font-src 'self' data: ${resourceDomainsStr}`,
+      `img-src ${imgSrc}`,
+      `media-src ${mediaSrc}`,
+      `font-src ${fontSrc}`,
       `connect-src ${connectSrc}`,
       "frame-ancestors 'self'",
     ].join("; "),
@@ -841,4 +913,24 @@ export function getWidgetSecurityHeaders(widgetCSP?: {
     Pragma: "no-cache",
     Expires: "0",
   };
+
+  // In dev mode, add a Report-Only CSP header with production rules
+  // This will warn about resources that would fail in production
+  if (devServerOrigin) {
+    const prodConnectSrc = "'self' https: wss: ws:";
+    headers["Content-Security-Policy-Report-Only"] = [
+      "default-src 'self'",
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${prodResourceDomainsStr}`,
+      "worker-src 'self' blob:",
+      "child-src 'self' blob:",
+      `style-src 'self' 'unsafe-inline' ${prodResourceDomainsStr}`,
+      "img-src 'self' data: https: blob:",
+      "media-src 'self' data: https: blob:",
+      `font-src 'self' data: ${prodResourceDomainsStr}`,
+      `connect-src ${prodConnectSrc}`,
+      "frame-ancestors 'self'",
+    ].join("; ");
+  }
+
+  return headers;
 }
