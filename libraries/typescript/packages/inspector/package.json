@@ -1,7 +1,6 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-<<<<<<< HEAD
   "version": "0.7.0",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
