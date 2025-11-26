@@ -2,7 +2,7 @@ import httpx
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
 
-CDN_BASE_URL = "https://unpkg.com/@mcp-use/inspector/dist/client"
+CDN_BASE_URL = "https://unpkg.com/@mcp-use/inspector@0.6.0/dist/client"
 INDEX_URL = f"{CDN_BASE_URL}/index.html"
 
 
