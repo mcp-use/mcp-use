@@ -494,19 +494,28 @@ if (container && Component) {
           // Note: __mcpPublicUrl uses standard format for useWidget to derive mcp_url
           // __mcpPublicAssetsUrl points to where public files are actually stored
           const injectionScript = `<script>window.__getFile = (filename) => { return "${mcpUrl}/${widgetName}/"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpUrl}/public";</script>`;
-          
+
           // Check if script tag already exists in head
           if (!html.includes("window.__mcpPublicUrl")) {
-            html = html.replace(/<head[^>]*>/i, `<head>\n    ${injectionScript}`);
+            html = html.replace(
+              /<head[^>]*>/i,
+              `<head>\n    ${injectionScript}`
+            );
           }
 
           // Update base href if it exists, or inject it
           if (/<base\s+[^>]*\/?>/i.test(html)) {
             // Replace existing base tag
-            html = html.replace(/<base\s+[^>]*\/?>/i, `<base href="${mcpServerUrl}">`);
+            html = html.replace(
+              /<base\s+[^>]*\/?>/i,
+              `<base href="${mcpServerUrl}">`
+            );
           } else {
             // Inject base tag after the injection script
-            html = html.replace(injectionScript, `${injectionScript}\n    <base href="${mcpServerUrl}">`);
+            html = html.replace(
+              injectionScript,
+              `${injectionScript}\n    <base href="${mcpServerUrl}">`
+            );
           }
 
           await fs.writeFile(htmlPath, html, "utf8");

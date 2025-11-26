@@ -15,7 +15,9 @@ export const Image: React.FC<
   // Prefer __mcpPublicAssetsUrl (for static deployments like Supabase) over __mcpPublicUrl
   const publicUrl =
     typeof window !== "undefined"
-      ? (window as any).__mcpPublicAssetsUrl || (window as any).__mcpPublicUrl || ""
+      ? (window as any).__mcpPublicAssetsUrl ||
+        (window as any).__mcpPublicUrl ||
+        ""
       : "";
 
   // Helper to resolve the source
