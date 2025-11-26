@@ -8,6 +8,7 @@
     "mcp-use": "1.5.0"
   },
   "changesets": [
+    "better-wasps-sip",
     "chilly-kids-joke",
     "funny-tigers-grin",
     "heavy-llamas-go",

@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.6.1-canary.0
+
+### Patch Changes
+
+- 12a88c7: fix versions
+
 ## 0.6.0
 
 ### Minor Changes
