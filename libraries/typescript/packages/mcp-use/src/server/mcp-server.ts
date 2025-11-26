@@ -2016,6 +2016,14 @@ if (container && Component) {
         ? new URL(this.getServerBaseUrl() || "").origin
         : null;
 
+      console.log("[CSP] mcp_connect_domain", mcp_connect_domain);
+
+      console.log("[CSP] this.getCSPUrls()", this.getCSPUrls());
+
+      console.log("[CSP] metadata.appsSdkMetadata", metadata.appsSdkMetadata);
+
+      console.log("[CSP] metadata._meta", metadata._meta);
+
       this.uiResource({
         name: widgetName,
         title: metadata.title || widgetName,
