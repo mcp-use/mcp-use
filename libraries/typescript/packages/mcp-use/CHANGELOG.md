@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.5.1-canary.3
+
+### Patch Changes
+
+- ccc2df3: Add csp_urls
+  - @mcp-use/cli@2.3.1-canary.3
+  - @mcp-use/inspector@0.7.1-canary.3
+
 ## 1.5.1-canary.2
 
 ### Patch Changes
