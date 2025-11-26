@@ -2001,43 +2001,35 @@ if (container && Component) {
       };
 
       // Create synthetic Express-like request/response for initialization
+      // Must include proper Accept header that the SDK expects
+      const syntheticHeaders: Record<string, string> = {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream", // SDK requires both!
+      };
       const syntheticReq: any = {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          accept: "application/json",
-        },
-        header: (name: string) => {
-          const headers: Record<string, string> = {
-            "content-type": "application/json",
-            accept: "application/json",
-          };
-          return headers[name.toLowerCase()];
-        },
+        headers: syntheticHeaders,
+        header: (name: string) => syntheticHeaders[name.toLowerCase()],
         body: initBody,
       };
 
-      let initComplete = false;
       const syntheticRes: any = {
         statusCode: 200,
-        setHeader: () => {},
+        setHeader: () => syntheticRes,
         writeHead: (code: number) => {
           syntheticRes.statusCode = code;
+          return syntheticRes; // Return this for chaining (e.g., res.writeHead(400).end(...))
         },
         write: () => true,
-        end: () => {
-          initComplete = true;
-        },
-        on: () => {},
-        once: () => {},
-        removeListener: () => {},
+        end: () => {},
+        on: () => syntheticRes,
+        once: () => syntheticRes,
+        removeListener: () => syntheticRes,
       };
 
       // Handle the initialize request
       await new Promise<void>((resolve) => {
-        const originalEnd = syntheticRes.end;
-        syntheticRes.end = (...args: any[]) => {
-          originalEnd.apply(syntheticRes, args);
+        syntheticRes.end = () => {
           resolve();
         };
         transport.handleRequest(syntheticReq, syntheticRes, initBody);
