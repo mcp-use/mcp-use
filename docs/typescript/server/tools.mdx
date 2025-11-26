@@ -289,6 +289,106 @@ server.tool({
 })
 ```
 
+### Automatic Progress in Sampling
+
+When using `ctx.sample()` for LLM sampling, progress notifications are automatically sent to prevent client-side timeouts. This is especially important for long-running operations that may exceed the default 60-second timeout.
+
+```typescript
+server.tool({
+  name: 'analyze-sentiment',
+  description: 'Analyze sentiment using client LLM',
+  inputs: [
+    { name: 'text', type: 'string', required: true }
+  ],
+  cb: async (params, ctx?: ToolContext) => {
+    if (!ctx) {
+      return {
+        content: [{ type: 'text', text: 'Sampling not available' }],
+        isError: true
+      }
+    }
+
+    // ctx.sample() automatically sends progress notifications every 5 seconds
+    // This prevents client timeouts when resetTimeoutOnProgress is enabled
+    const result = await ctx.sample({
+      messages: [{
+        role: 'user',
+        content: { type: 'text', text: `Analyze sentiment: ${params.text}` }
+      }],
+      modelPreferences: {
+        intelligencePriority: 0.8,
+        speedPriority: 0.5
+      }
+    })
+
+    return {
+      content: [{
+        type: 'text',
+        text: result.content.text || 'Unable to analyze'
+      }]
+    }
+  }
+})
+```
+
+#### Configuring Progress and Timeout
+
+You can customize the progress interval and timeout:
+
+```typescript
+const result = await ctx.sample(
+  {
+    messages: [{ role: 'user', content: { type: 'text', text: prompt } }]
+  },
+  {
+    // Optional: Set a timeout (default: Infinity - waits indefinitely)
+    timeout: 120000, // 2 minutes
+    
+    // Optional: Progress notification interval (default: 5000ms)
+    progressIntervalMs: 3000, // Every 3 seconds
+    
+    // Optional: Custom progress callback
+    onProgress: ({ progress, message }) => {
+      console.log(`[Progress] ${message}`)
+    }
+  }
+)
+```
+
+#### Manual Progress Reporting
+
+For non-sampling operations, you can manually send progress notifications:
+
+```typescript
+server.tool({
+  name: 'long_operation',
+  description: 'Long-running operation with manual progress',
+  inputs: [{ name: 'data', type: 'string', required: true }],
+  cb: async (params, ctx?: ToolContext) => {
+    if (ctx?.reportProgress) {
+      // Send progress updates manually
+      await ctx.reportProgress(0, 100, 'Starting processing...')
+      
+      // Do work...
+      await processData(params.data)
+      
+      await ctx.reportProgress(50, 100, 'Halfway done...')
+      
+      // More work...
+      await finalizeProcessing()
+      
+      await ctx.reportProgress(100, 100, 'Complete!')
+    }
+    
+    return {
+      content: [{ type: 'text', text: 'Operation complete' }]
+    }
+  }
+})
+```
+
+**Note**: Progress notifications only work if the client requested them by including a `progressToken` in the tool call request. The client must also have `resetTimeoutOnProgress: true` enabled to reset timeouts on progress notifications.
+
 ### Tool Composition
 
 Tools can work together:

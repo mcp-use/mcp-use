@@ -95,6 +95,80 @@ Notify clients when prompts have changed:
 await server.sendNotification("notifications/prompts/list_changed");
 ```
 
+### Progress Notifications
+
+Progress notifications (`notifications/progress`) are used to keep clients informed during long-running operations and prevent timeouts. When a client calls a tool with a `progressToken`, the server can send progress updates.
+
+**Automatic Progress in Sampling**
+
+When using `ctx.sample()` in tool callbacks, progress notifications are automatically sent every 5 seconds:
+
+```typescript
+server.tool({
+  name: 'long_llm_task',
+  cb: async (params, ctx?: ToolContext) => {
+    if (!ctx) return { content: [{ type: 'text', text: 'No context' }] }
+    
+    // Progress notifications are sent automatically every 5 seconds
+    const result = await ctx.sample({
+      messages: [{ role: 'user', content: { type: 'text', text: params.prompt } }]
+    })
+    
+    return { content: [{ type: 'text', text: result.content.text }] }
+  }
+})
+```
+
+**Manual Progress Reporting**
+
+You can also send progress notifications manually using `ctx.reportProgress()`:
+
+```typescript
+server.tool({
+  name: 'process_data',
+  cb: async (params, ctx?: ToolContext) => {
+    if (ctx?.reportProgress) {
+      await ctx.reportProgress(0, 100, 'Starting...')
+      
+      // Process data in stages
+      await processStage1()
+      await ctx.reportProgress(33, 100, 'Stage 1 complete')
+      
+      await processStage2()
+      await ctx.reportProgress(66, 100, 'Stage 2 complete')
+      
+      await processStage3()
+      await ctx.reportProgress(100, 100, 'Complete')
+    }
+    
+    return { content: [{ type: 'text', text: 'Done' }] }
+  }
+})
+```
+
+**How Progress Prevents Timeouts**
+
+According to the MCP specification, when a client has `resetTimeoutOnProgress: true` enabled:
+- Each progress notification resets the client's timeout counter
+- This allows operations to run indefinitely as long as progress is reported
+- The default timeout is 60 seconds, but with progress notifications, operations can take much longer
+
+**Progress Notification Format**
+
+Progress notifications follow this structure:
+
+```typescript
+{
+  method: "notifications/progress",
+  params: {
+    progressToken: number,  // Token from the original request
+    progress: number,       // Current progress value
+    total?: number,         // Total progress (if known)
+    message?: string        // Optional status message
+  }
+}
+```
+
 ## Custom Notifications
 
 You can send custom notifications with any method name and parameters:

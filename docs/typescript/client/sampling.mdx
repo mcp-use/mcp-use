@@ -99,6 +99,8 @@ Just output a single word - 'positive', 'negative', or 'neutral'.
 
 Text to analyze: ${params.text}`
 
+    // Request LLM analysis through sampling
+    // By default, this waits indefinitely and sends progress notifications every 5s
     const result = await ctx.sample({
       messages: [{
         role: 'user',
@@ -123,6 +125,32 @@ Text to analyze: ${params.text}`
     }
   }
 })
+```
+
+## Automatic Progress Reporting
+
+The `ctx.sample()` function automatically handles progress reporting to prevent client-side timeouts during long-running operations.
+
+- **Automatic Progress**: By default, it sends a progress notification every 5 seconds.
+- **Timeout Handling**: If the client has `resetTimeoutOnProgress: true` enabled, these notifications keep the connection alive indefinitely.
+- **Configuration**: You can customize the timeout and progress interval:
+
+```typescript
+const result = await ctx.sample(
+  {
+    messages: [{ role: 'user', content: { type: 'text', text: prompt } }]
+  },
+  {
+    // Optional: Limit wait time (default: Infinity)
+    timeout: 120000, // 2 minutes
+    
+    // Optional: Change progress interval (default: 5000ms)
+    progressIntervalMs: 2000,
+    
+    // Optional: Custom progress handling
+    onProgress: ({ progress, message }) => console.log(message)
+  }
+)
 ```
 
 ## Using createMessage Directly
