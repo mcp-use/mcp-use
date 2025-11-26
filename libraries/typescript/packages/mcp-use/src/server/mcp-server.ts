@@ -396,15 +396,15 @@ export class McpServer {
       console.log("[CSP] No CSP_URLS environment variable found");
       return [];
     }
-    
+
     console.log("[CSP] Found CSP_URLS environment variable:", cspUrlsEnv);
-    
+
     // Split by comma and trim whitespace
     const urls = cspUrlsEnv
-      .split(',')
-      .map(url => url.trim())
-      .filter(url => url.length > 0);
-    
+      .split(",")
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0);
+
     console.log("[CSP] Parsed CSP URLs:", urls);
     return urls;
   }
