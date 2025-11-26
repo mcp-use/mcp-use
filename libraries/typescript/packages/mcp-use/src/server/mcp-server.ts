@@ -386,6 +386,30 @@ export class McpServer {
   }
 
   /**
+   * Gets additional CSP URLs from environment variable
+   * Supports comma-separated list or single URL
+   * @returns Array of URLs to add to CSP resource_domains
+   */
+  private getCSPUrls(): string[] {
+    const cspUrlsEnv = getEnv("CSP_URLS");
+    if (!cspUrlsEnv) {
+      console.log("[CSP] No CSP_URLS environment variable found");
+      return [];
+    }
+    
+    console.log("[CSP] Found CSP_URLS environment variable:", cspUrlsEnv);
+    
+    // Split by comma and trim whitespace
+    const urls = cspUrlsEnv
+      .split(',')
+      .map(url => url.trim())
+      .filter(url => url.length > 0);
+    
+    console.log("[CSP] Parsed CSP URLs:", urls);
+    return urls;
+  }
+
+  /**
    * Define a static resource that can be accessed by clients
    *
    * Registers a resource with the MCP server that clients can access via HTTP.
@@ -1799,6 +1823,8 @@ if (container && Component) {
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
               ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              // add additional CSP URLs from environment variable
+              ...this.getCSPUrls(),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
@@ -2020,6 +2046,8 @@ if (container && Component) {
               "https://*.openai.com",
               // always also add the base url of the server
               ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              // add additional CSP URLs from environment variable
+              ...this.getCSPUrls(),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],

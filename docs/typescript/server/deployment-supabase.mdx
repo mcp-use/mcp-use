@@ -79,8 +79,9 @@ The deployment script automatically:
 3. ✅ Patches `config.toml` with your project ID
 4. ✅ Builds your MCP application with the correct `MCP_URL` and `MCP_SERVER_URL`
 5. ✅ Copies build artifacts to the function directory
-6. ✅ Deploys the function to Supabase Edge Functions
-7. ✅ Uploads widgets to the storage bucket
+6. ✅ Sets `MCP_URL` and `CSP_URLS` environment variables (before deployment)
+7. ✅ Deploys the function to Supabase Edge Functions
+8. ✅ Uploads widgets to the storage bucket
 
 <Note>
   **Prerequisites for the script** - Supabase CLI installed (`npm install -g
@@ -201,7 +202,27 @@ static_files = [ "./functions/mcp-server/dist/**/*.html", "./functions/mcp-serve
 ...
 ```
 
-### 8. Deploy the Function
+### 8. Set Environment Variables for CSP
+
+Set environment variables **before deploying** so the MCP server can configure Content Security Policy (CSP) to allow widgets to make API calls and load assets:
+
+```bash
+# MCP_URL: Server URL for API calls
+supabase secrets set MCP_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/mcp-server" --project-ref YOUR_PROJECT_REF
+
+# CSP_URLS: Additional domains for widget assets (storage bucket)
+supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co/storage/*" --project-ref YOUR_PROJECT_REF
+```
+
+<Note>
+**Environment Variables:**
+- `MCP_URL`: Whitelists the edge function domain for API calls from widgets
+- `CSP_URLS`: Whitelists additional domains for widget assets (JS/CSS). Required for Supabase since assets are served from storage bucket. Supports wildcards and comma-separated values.
+
+**Important**: Set these before deploying the function. If you set them after deployment, you must redeploy for the changes to take effect.
+</Note>
+
+### 9. Deploy the Function
 
 ```bash
 supabase functions deploy mcp-server --use-docker
@@ -295,6 +316,29 @@ See the [Supabase static files documentation](https://github.com/orgs/supabase/d
 - Ensure your CORS headers are correctly configured
 - Check that the Accept header is included in requests
 - Verify your Authorization header has the correct token
+
+### "Initialising login role..." Appears Multiple Times
+
+During deployment, you'll see `Initialising login role...` appear 2-3 times. This is **normal behavior** - the Supabase CLI authenticates separately for:
+1. Project linking
+2. Widget file upload to storage
+3. Public file upload to storage
+
+Each storage operation requires its own authentication.
+
+### Deployment Stuck on "Initialising login role..."
+
+If the deployment script **hangs** at `Initialising login role...` (no progress for several minutes) or you see authentication errors, Supabase may have temporarily banned your IP address. This is a [known issue tracked on GitHub](https://github.com/supabase/cli/issues/4419).
+
+**Solution:**
+1. Go to your database settings: `https://supabase.com/dashboard/project/{PROJECT_ID}/database/settings#banned-ips`
+2. Check if your IP is listed under "Banned IPs"
+3. Click "Unban" to restore access
+4. Retry the deployment
+
+<Note>
+This typically happens after multiple failed connection attempts or when the connection is interrupted unexpectedly. The ban is temporary and automatic.
+</Note>
 
 ## Learn More
 

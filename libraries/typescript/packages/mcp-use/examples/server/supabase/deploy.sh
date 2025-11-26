@@ -119,7 +119,11 @@ print_success "Authenticated with Supabase"
 
 # Check if project is linked
 print_info "Checking if project is linked..."
-LINKED_PROJECT=$(supabase status 2>&1 | grep "Project ID" | awk '{print $NF}' || echo "")
+LINKED_PROJECT=""
+if [ -f "supabase/config.toml" ]; then
+    LINKED_PROJECT=$(grep "^project_id = " supabase/config.toml | sed 's/project_id = "\(.*\)"/\1/' | tr -d '"' || echo "")
+fi
+
 if [ -z "$LINKED_PROJECT" ]; then
     print_warning "Project not linked. Linking to project: $PROJECT_ID"
     if ! supabase link --project-ref "$PROJECT_ID"; then
@@ -131,13 +135,27 @@ else
     print_success "Project already linked: $LINKED_PROJECT"
     if [ "$LINKED_PROJECT" != "$PROJECT_ID" ]; then
         print_warning "Linked project ($LINKED_PROJECT) differs from specified project ($PROJECT_ID)"
-        read -p "Continue with linked project? (y/N): " -n 1 -r </dev/tty
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        
+        # Check if linked project looks like a valid Supabase project ref (20 chars alphanumeric)
+        if [[ ! "$LINKED_PROJECT" =~ ^[a-z0-9]{20}$ ]]; then
+            print_warning "Linked project ID '$LINKED_PROJECT' doesn't look like a valid Supabase project ref"
             print_info "Relinking to $PROJECT_ID..."
             supabase unlink
             supabase link --project-ref "$PROJECT_ID"
             print_success "Relinked to project $PROJECT_ID"
+        else
+            read -p "Continue with linked project? (y/N): " -n 1 -r </dev/tty
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                # User wants to continue with the linked project, so use it
+                print_info "Using linked project: $LINKED_PROJECT"
+                PROJECT_ID="$LINKED_PROJECT"
+            else
+                print_info "Relinking to $PROJECT_ID..."
+                supabase unlink
+                supabase link --project-ref "$PROJECT_ID"
+                print_success "Relinked to project $PROJECT_ID"
+            fi
         fi
     fi
 fi
@@ -269,7 +287,26 @@ else
     fi
 fi
 
-# Deploy the function
+# Set environment variables BEFORE deploying the function
+print_info "Setting environment variables for edge function..."
+FUNCTION_BASE_URL="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}"
+CSP_URLS="https://${PROJECT_ID}.supabase.co/storage/*"
+
+# Set MCP_URL
+if supabase secrets set MCP_URL="$FUNCTION_BASE_URL" --project-ref "$PROJECT_ID"; then
+    print_success "MCP_URL environment variable set to: $FUNCTION_BASE_URL"
+else
+    print_warning "Failed to set MCP_URL environment variable"
+fi
+
+# Set CSP_URLS to allow widget assets from storage bucket
+if supabase secrets set CSP_URLS="$CSP_URLS" --project-ref "$PROJECT_ID"; then
+    print_success "CSP_URLS environment variable set to: $CSP_URLS"
+else
+    print_warning "Failed to set CSP_URLS environment variable"
+fi
+
+# Deploy the function (will pick up the environment variables set above)
 print_info "Deploying function to Supabase..."
 if ! supabase functions deploy "$FUNCTION_NAME" --use-docker; then
     print_error "Function deployment failed"
@@ -321,6 +358,46 @@ else
     echo "Skipping public files upload..."
 fi
 
+# Calculate URLs
+MCP_ENDPOINT="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}/mcp"
+FUNCTION_DASHBOARD="https://supabase.com/dashboard/project/${PROJECT_ID}/functions/${FUNCTION_NAME}"
+INSPECTOR_URL="https://inspector.mcp-use.com/inspector?autoConnect=$(echo -n "$MCP_ENDPOINT" | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read()))')"
+
+# Wait for the MCP server to be ready
+echo ""
+print_info "Waiting for MCP server to be ready..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+RETRY_DELAY=2
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    # Check if server responds (406 with MCP error is a valid "server is up" response)
+    RESPONSE=$(curl -s -w "\n%{http_code}" -m 5 "$MCP_ENDPOINT" 2>&1)
+    HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+    BODY=$(echo "$RESPONSE" | sed '$d')
+    
+    # MCP server returns 406 with "Not Acceptable: Client must accept text/event-stream"
+    # This means the server is up and working correctly
+    if [ "$HTTP_CODE" = "406" ] && echo "$BODY" | grep -q "text/event-stream"; then
+        print_success "MCP server is up and running!"
+        break
+    elif [ "$HTTP_CODE" = "200" ]; then
+        print_success "MCP server is up and running!"
+        break
+    fi
+    
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        echo -n "."
+        sleep $RETRY_DELAY
+    else
+        echo ""
+        print_warning "Server didn't respond after ${MAX_RETRIES} attempts, but deployment completed"
+        print_warning "It may take a few more moments to become available"
+    fi
+done
+echo ""
+
 # Print deployment summary
 echo ""
 print_success "========================================="
@@ -328,12 +405,11 @@ print_success "Deployment completed successfully!"
 print_success "========================================="
 echo ""
 
-# Calculate the MCP endpoint and inspector URL
-MCP_ENDPOINT="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}/mcp"
-INSPECTOR_URL="https://inspector.mcp-use.com/inspector?autoConnect=$(echo -n "$MCP_ENDPOINT" | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read()))')"
-
 print_info "MCP Endpoint:"
 echo "  $MCP_ENDPOINT"
+echo ""
+print_info "Function Dashboard:"
+echo "  $FUNCTION_DASHBOARD"
 echo ""
 print_info "Inspector:"
 echo "  $INSPECTOR_URL"
