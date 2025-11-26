@@ -1040,7 +1040,7 @@ MCP_URL=https://myserver.com
 
 # For Static Deployments (e.g., Supabase)
 MCP_SERVER_URL=https://myserver.com/functions/v1/my-function
-CSP_URLS=https://myserver.com/storage/*
+CSP_URLS=https://myserver.com
 
 # For Production
 NODE_ENV=production
@@ -1050,10 +1050,12 @@ NODE_ENV=production
 
 - `MCP_URL`: Base URL for widget assets and public files. Used by Vite's `base` option during build. Also used by the server to configure CSP.
 - `MCP_SERVER_URL`: (Optional) MCP server URL for API calls. When set, URLs are injected at build time for static deployments where widgets are served from storage rather than the MCP server.
-- `CSP_URLS`: (Optional) Additional domains to whitelist in widget Content Security Policy. Supports comma-separated list and wildcards (e.g., `https://*.supabase.co/storage/*`). Required for static deployments where widget assets are served from different domains.
+- `CSP_URLS`: (Optional) Additional domains to whitelist in widget Content Security Policy. Supports comma-separated list. For Supabase, use the base project URL without path (e.g., `https://nnpumlykjksvxivhywwo.supabase.co`). Required for static deployments where widget assets are served from different domains.
 
 <Note>
 **Static Deployments**: Set `MCP_URL` (for assets), `MCP_SERVER_URL` (for API calls), and `CSP_URLS` (for CSP whitelisting) when deploying to platforms like Supabase where widgets are served from static storage.
+
+**Alternative CSP Configuration**: Instead of using the global `CSP_URLS` environment variable, you can configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` (see [Apps SDK Metadata](#apps-sdk-metadata) section above).
 </Note>
 
 ## Best Practices

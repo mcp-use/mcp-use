@@ -391,13 +391,13 @@ export class McpServer {
    * @returns Array of URLs to add to CSP resource_domains
    */
   private getCSPUrls(): string[] {
+    console.log((globalThis as any).Deno.env.get("CSP_URLS"));
+
     const cspUrlsEnv = getEnv("CSP_URLS");
     if (!cspUrlsEnv) {
       console.log("[CSP] No CSP_URLS environment variable found");
       return [];
     }
-
-    console.log("[CSP] Found CSP_URLS environment variable:", cspUrlsEnv);
 
     // Split by comma and trim whitespace
     const urls = cspUrlsEnv
@@ -1785,6 +1785,10 @@ if (container && Component) {
       //   throw new Error(`Failed to fetch html template for widget ${widget.name}`)
       // }
 
+      const mcp_connect_domain = this.getServerBaseUrl()
+        ? new URL(this.getServerBaseUrl() || "").origin
+        : null;
+
       this.uiResource({
         name: widget.name,
         title: metadata.title || widget.name,
@@ -1814,7 +1818,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              ...(mcp_connect_domain ? [mcp_connect_domain] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -1822,7 +1826,7 @@ if (container && Component) {
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
-              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              ...(mcp_connect_domain ? [mcp_connect_domain] : []),
               // add additional CSP URLs from environment variable
               ...this.getCSPUrls(),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]

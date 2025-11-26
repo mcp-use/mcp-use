@@ -33,24 +33,41 @@ print_warning() {
 show_help() {
     echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
     echo ""
-    echo "Usage: ./deploy.sh [project-id] [function-name] [bucket-name]"
+    echo "Usage: ./deploy.sh [project-id] [function-name] [bucket-name] [--canary]"
     echo ""
     echo "Arguments (optional if run interactively):"
     echo "  project-id     : Your Supabase project ID"
     echo "  function-name  : Name of the edge function (default: mcp-server)"
     echo "  bucket-name    : Name of the storage bucket (default: widgets)"
     echo ""
+    echo "Flags:"
+    echo "  --canary       : Use @canary version instead of @latest"
+    echo ""
     echo "Examples:"
     echo "  ./deploy.sh                                      # Interactive mode"
     echo "  ./deploy.sh nnpumlykjksvxivhywwo                # With project ID"
     echo "  ./deploy.sh nnpumlykjksvxivhywwo my-function    # With custom function name"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo mcp-server widgets --canary  # Use canary version"
     echo ""
 }
 
-# Check for command-line arguments first
-PROJECT_ID="$1"
-FUNCTION_NAME="$2"
-BUCKET_NAME="$3"
+# Parse flags and arguments
+USE_CANARY=false
+PROJECT_ID=""
+FUNCTION_NAME=""
+BUCKET_NAME=""
+
+for arg in "$@"; do
+    if [ "$arg" = "--canary" ]; then
+        USE_CANARY=true
+    elif [ -z "$PROJECT_ID" ]; then
+        PROJECT_ID="$arg"
+    elif [ -z "$FUNCTION_NAME" ]; then
+        FUNCTION_NAME="$arg"
+    elif [ -z "$BUCKET_NAME" ]; then
+        BUCKET_NAME="$arg"
+    fi
+done
 
 # Interactive prompts if arguments not provided
 echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
@@ -77,12 +94,20 @@ if [ -z "$BUCKET_NAME" ]; then
     BUCKET_NAME="${BUCKET_NAME:-widgets}"
 fi
 
+# Set MCP-USE version based on flag
+if [ "$USE_CANARY" = true ]; then
+    MCP_USE_VERSION="canary"
+else
+    MCP_USE_VERSION="latest"
+fi
+
 print_info "Starting deployment to Supabase..."
 echo ""
 print_info "Configuration:"
 echo "  Project ID: $PROJECT_ID"
 echo "  Function Name: $FUNCTION_NAME"
 echo "  Bucket Name: $BUCKET_NAME"
+echo "  MCP-USE Version: @$MCP_USE_VERSION"
 echo ""
 
 # Check if supabase CLI is installed
@@ -260,37 +285,21 @@ if [ ! -f "$FUNCTION_DIR/index.ts" ]; then
     fi
 fi
 
-# Check for deno.json and populate with mcp-use dependency
-if [ ! -f "$FUNCTION_DIR/deno.json" ]; then
-    print_info "Creating deno.json with mcp-use dependency..."
-    cat > "$FUNCTION_DIR/deno.json" << 'EOF'
+# Create/override deno.json with mcp-use dependency
+print_info "Creating deno.json with mcp-use@$MCP_USE_VERSION dependency..."
+cat > "$FUNCTION_DIR/deno.json" << EOF
 {
   "imports": {
-    "mcp-use/": "https://esm.sh/mcp-use@latest/"
+    "mcp-use/": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/"
   }
 }
 EOF
-    print_success "Created deno.json with mcp-use dependency"
-else
-    # Update existing deno.json to include mcp-use dependency if not already present
-    if ! grep -q "mcp-use" "$FUNCTION_DIR/deno.json"; then
-        print_info "Updating deno.json with mcp-use dependency..."
-        # Use a temporary file for safer JSON manipulation
-        if command -v jq &> /dev/null; then
-            # Use jq if available for proper JSON handling
-            jq '.imports."mcp-use/" = "https://esm.sh/mcp-use@latest/"' "$FUNCTION_DIR/deno.json" > "$FUNCTION_DIR/deno.json.tmp"
-            mv "$FUNCTION_DIR/deno.json.tmp" "$FUNCTION_DIR/deno.json"
-            print_success "Updated deno.json with mcp-use dependency"
-        else
-            print_warning "jq not found, skipping deno.json update. Please manually add mcp-use dependency."
-        fi
-    fi
-fi
+print_success "Created deno.json with mcp-use@$MCP_USE_VERSION dependency"
 
 # Set environment variables BEFORE deploying the function
 print_info "Setting environment variables for edge function..."
 FUNCTION_BASE_URL="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}"
-CSP_URLS="https://${PROJECT_ID}.supabase.co/storage/*"
+CSP_URLS="https://${PROJECT_ID}.supabase.co"
 
 # Set MCP_URL
 if supabase secrets set MCP_URL="$FUNCTION_BASE_URL" --project-ref "$PROJECT_ID"; then
@@ -371,14 +380,20 @@ RETRY_COUNT=0
 RETRY_DELAY=2
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    # Check if server responds (406 with MCP error is a valid "server is up" response)
+    # Check if server responds (400, 406, or 200 are all valid "server is up" responses)
     RESPONSE=$(curl -s -w "\n%{http_code}" -m 5 "$MCP_ENDPOINT" 2>&1)
     HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
     BODY=$(echo "$RESPONSE" | sed '$d')
     
-    # MCP server returns 406 with "Not Acceptable: Client must accept text/event-stream"
-    # This means the server is up and working correctly
-    if [ "$HTTP_CODE" = "406" ] && echo "$BODY" | grep -q "text/event-stream"; then
+    # MCP server can return:
+    # - 400: Bad request (server is up but rejecting the request format)
+    # - 406: Not Acceptable (expects text/event-stream header)
+    # - 200: Success
+    # All indicate the server is functioning
+    if [ "$HTTP_CODE" = "400" ]; then
+        print_success "MCP server is up and running!"
+        break
+    elif [ "$HTTP_CODE" = "406" ] && echo "$BODY" | grep -q "text/event-stream"; then
         print_success "MCP server is up and running!"
         break
     elif [ "$HTTP_CODE" = "200" ]; then

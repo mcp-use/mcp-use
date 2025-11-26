@@ -79,7 +79,7 @@ The deployment script automatically:
 3. ✅ Patches `config.toml` with your project ID
 4. ✅ Builds your MCP application with the correct `MCP_URL` and `MCP_SERVER_URL`
 5. ✅ Copies build artifacts to the function directory
-6. ✅ Sets `MCP_URL` and `CSP_URLS` environment variables (before deployment)
+6. ✅ Sets `MCP_URL` and `CSP_URLS` (Supabase project URL) environment variables
 7. ✅ Deploys the function to Supabase Edge Functions
 8. ✅ Uploads widgets to the storage bucket
 
@@ -171,10 +171,16 @@ export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/wi
 
 # MCP_SERVER_URL: Where the MCP server runs (for API calls in widgets)
 export MCP_SERVER_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME"
+
+# CSP_URLS: Supabase project URL (for Content Security Policy)
+export CSP_URLS="https://YOUR_PROJECT_REF.supabase.co"
 ```
 
 <Note>
-**Two URLs Required**: Supabase deployments need both URLs because widget files are served from static storage while API calls go to the edge function. `MCP_SERVER_URL` enables build-time URL injection for static deployments.
+**URLs Required**: Supabase deployments need these URLs because widget files are served from static storage while API calls go to the edge function:
+- `MCP_URL`: Where widget assets are stored
+- `MCP_SERVER_URL`: Enables build-time URL injection for static deployments
+- `CSP_URLS`: Whitelists the Supabase project domain in the Content Security Policy (use base URL without path)
 </Note>
 
 ### 5. Build the mcp-use app
@@ -210,16 +216,18 @@ Set environment variables **before deploying** so the MCP server can configure C
 # MCP_URL: Server URL for API calls
 supabase secrets set MCP_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/mcp-server" --project-ref YOUR_PROJECT_REF
 
-# CSP_URLS: Additional domains for widget assets (storage bucket)
-supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co/storage/*" --project-ref YOUR_PROJECT_REF
+# CSP_URLS: Supabase project URL (without path) to allow storage and function access
+supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co" --project-ref YOUR_PROJECT_REF
 ```
 
 <Note>
 **Environment Variables:**
 - `MCP_URL`: Whitelists the edge function domain for API calls from widgets
-- `CSP_URLS`: Whitelists additional domains for widget assets (JS/CSS). Required for Supabase since assets are served from storage bucket. Supports wildcards and comma-separated values.
+- `CSP_URLS`: Whitelists the Supabase project URL (without path) for widget assets (JS/CSS) and storage access. Use the base project URL like `https://nnpumlykjksvxivhywwo.supabase.co` (no `/storage/*` or other paths needed). Supports comma-separated values for multiple domains.
 
 **Important**: Set these before deploying the function. If you set them after deployment, you must redeploy for the changes to take effect.
+
+**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` instead of using the global `CSP_URLS` environment variable. See [UI Widgets documentation](/typescript/server/ui-widgets#apps-sdk-metadata) for examples.
 </Note>
 
 ### 9. Deploy the Function
