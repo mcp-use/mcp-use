@@ -3,3 +3,185 @@ title: "Tools"
 description: "Define and expose tools from your MCP server"
 icon: "hammer"
 ---
+
+Tools are the primary way your MCP server exposes functionality to clients. They represent actions that an AI agent can invoke to perform tasks.
+
+## Basic Tool Definition
+
+Use the `@server.tool()` decorator to define a tool:
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="My Server")
+
+@server.tool()
+def greet(name: str) -> str:
+    """Greet someone by name."""
+    return f"Hello, {name}!"
+```
+
+The function's docstring becomes the tool's description, and type hints define the input schema.
+
+## Tool Options
+
+The `@server.tool()` decorator accepts several options:
+
+```python
+from mcp.types import ToolAnnotations
+
+@server.tool(
+    name="custom_name",           # Override the function name
+    title="Custom Title",         # Human-readable title
+    description="Custom desc",    # Override the docstring
+    annotations=ToolAnnotations(  # MCP tool annotations
+        destructiveHint=True,     # Tool may modify data
+        readOnlyHint=False,       # Tool is not read-only
+    ),
+)
+def my_tool(param: str) -> str:
+    return param
+```
+
+### Tool Annotations
+
+Tool annotations provide hints to clients about the tool's behavior:
+
+| Annotation | Description |
+|------------|-------------|
+| `destructiveHint` | Tool may modify or delete data |
+| `readOnlyHint` | Tool only reads data, no side effects |
+| `idempotentHint` | Calling multiple times has same effect as once |
+| `openWorldHint` | Tool interacts with external systems |
+
+## Async Tools
+
+Tools can be async for non-blocking I/O operations:
+
+```python
+import httpx
+
+@server.tool()
+async def fetch_url(url: str) -> str:
+    """Fetch content from a URL."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        return response.text
+```
+
+## Using Context
+
+Access the MCP context for advanced features like logging and progress reporting:
+
+```python
+from mcp.server.fastmcp import Context
+
+@server.tool()
+async def long_task(items: list[str], context: Context) -> str:
+    """Process items with progress reporting."""
+    results = []
+    for i, item in enumerate(items):
+        # Report progress
+        await context.report_progress(i, len(items))
+        results.append(f"Processed: {item}")
+    return "\n".join(results)
+```
+
+## Complex Input Types
+
+Use Pydantic models or dataclasses for complex inputs:
+
+```python
+from pydantic import BaseModel
+
+class SearchQuery(BaseModel):
+    query: str
+    max_results: int = 10
+    include_metadata: bool = False
+
+@server.tool()
+def search(params: SearchQuery) -> list[str]:
+    """Search with complex parameters."""
+    # params.query, params.max_results, etc.
+    return ["result1", "result2"]
+```
+
+## Return Types
+
+Tools can return various types:
+
+```python
+# String
+@server.tool()
+def text_tool() -> str:
+    return "Hello"
+
+# Dict (serialized to JSON)
+@server.tool()
+def json_tool() -> dict:
+    return {"key": "value", "count": 42}
+
+# List
+@server.tool()
+def list_tool() -> list[str]:
+    return ["a", "b", "c"]
+```
+
+## Error Handling
+
+Raise exceptions to indicate errors:
+
+```python
+@server.tool()
+def divide(a: float, b: float) -> float:
+    """Divide two numbers."""
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
+```
+
+The error message will be returned to the client.
+
+## Complete Example
+
+```python
+from datetime import datetime
+from mcp.server.fastmcp import Context
+from mcp.types import ToolAnnotations
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="Calculator Server", version="1.0.0")
+
+@server.tool()
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+@server.tool(
+    name="divide",
+    annotations=ToolAnnotations(readOnlyHint=True)
+)
+def safe_divide(a: float, b: float) -> float:
+    """Safely divide two numbers."""
+    if b == 0:
+        raise ValueError("Division by zero")
+    return a / b
+
+@server.tool()
+async def batch_calculate(
+    operations: list[dict],
+    context: Context
+) -> list[float]:
+    """Perform multiple calculations with progress."""
+    results = []
+    for i, op in enumerate(operations):
+        await context.report_progress(i, len(operations))
+        if op["type"] == "add":
+            results.append(op["a"] + op["b"])
+        elif op["type"] == "multiply":
+            results.append(op["a"] * op["b"])
+    return results
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", debug=True)
+```
