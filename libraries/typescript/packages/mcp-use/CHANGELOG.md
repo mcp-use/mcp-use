@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.5.1-canary.4
+
+### Patch Changes
+
+- a93befb: Fix connect domains
+  - @mcp-use/cli@2.3.1-canary.4
+  - @mcp-use/inspector@0.7.1-canary.4
+
 ## 1.5.1-canary.3
 
 ### Patch Changes
