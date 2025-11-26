@@ -488,8 +488,8 @@ jobs:
           if [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "✅ Changeset found"
             # Skip --since check for canary branch (it has its own changesets for canary releases)
-            # Check if we're on canary branch (push event) or PR to canary (pull_request event)
-            if [ "${{ github.ref }}" == "refs/heads/canary" ] || [ "${{ github.base_ref }}" == "canary" ] || [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref_name }}" == "canary" ]; then
+            # Check if we're on canary branch using grep to catch all scenarios
+            if echo "${{ github.ref }}" | grep -q "canary" || [ "${{ github.base_ref }}" == "canary" ]; then
               echo "ℹ️  On canary branch - skipping changeset status check (changesets will be used for canary release)"
             else
               pnpm changeset status --since=origin/main
