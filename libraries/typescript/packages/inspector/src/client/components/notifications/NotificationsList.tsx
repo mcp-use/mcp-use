@@ -1,6 +1,6 @@
 import type { MCPNotification } from "@/client/context/McpContext";
-import { Bell } from "lucide-react";
 import { ListItem } from "@/client/components/shared/ListItem";
+import { NotFound } from "@/client/components/ui/not-found";
 
 interface NotificationsListProps {
   notifications: MCPNotification[];
@@ -24,8 +24,7 @@ export function NotificationsList({
   if (notifications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <Bell className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
-        <p className="text-gray-500 dark:text-gray-400">No notifications yet</p>
+        <NotFound vertical noBorder message="No notifications yet" />
       </div>
     );
   }
