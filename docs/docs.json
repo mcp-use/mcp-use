@@ -111,7 +111,6 @@
               },
               {
                 "group": "MCP Server",
-                "hidden": true,
                 "icon": "server",
                 "tag": "Beta",
                 "pages": [
