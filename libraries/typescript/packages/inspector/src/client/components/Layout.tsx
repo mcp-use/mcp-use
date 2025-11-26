@@ -27,6 +27,7 @@ export function Layout({ children }: LayoutProps) {
     addConnection,
     removeConnection,
     updateConnectionConfig,
+    configLoaded,
   } = useMcpContext();
   const {
     selectedServerId,
@@ -69,6 +70,7 @@ export function Layout({ children }: LayoutProps) {
     connections,
     addConnection,
     removeConnection,
+    configLoaded,
   });
 
   // Track command palette open

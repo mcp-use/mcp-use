@@ -96,6 +96,7 @@ interface McpContextType {
   setAutoConnect: (enabled: boolean) => void;
   connectServer: (id: string) => void;
   disconnectServer: (id: string) => void;
+  configLoaded: boolean;
 }
 
 const McpContext = createContext<McpContextType | null>(null);
@@ -542,11 +543,51 @@ export function McpProvider({ children }: { children: ReactNode }) {
       },
       transportType?: "http" | "sse"
     ) => {
-      // Check if connection already exists
-      if (connectionConfigs.some((c) => c.url === url)) {
+      // Check if connection already exists in configs
+      const existingConfig = connectionConfigs.find((c) => c.url === url);
+      const existingConnection = connections.find((c) => c.url === url);
+
+      // If connection exists in both configs and connections, nothing to do
+      if (existingConfig && existingConnection) {
         return;
       }
 
+      // If connection exists in configs but not in connections, add it to connections
+      if (existingConfig && !existingConnection) {
+        setConnections((prev) => [
+          ...prev,
+          {
+            id: existingConfig.id || url,
+            url,
+            name: existingConfig.name || name || "MCP Server",
+            state: "connecting",
+            tools: [],
+            resources: [],
+            prompts: [],
+            error: null,
+            authUrl: null,
+            customHeaders: existingConfig.proxyConfig?.customHeaders || proxyConfig?.customHeaders,
+            transportType: existingConfig.transportType || transportType,
+            proxyConfig: existingConfig.proxyConfig || proxyConfig,
+            notifications: [],
+            unreadNotificationCount: 0,
+            markNotificationRead: () => {},
+            markAllNotificationsRead: () => {},
+            clearNotifications: () => {},
+            callTool: async () => {},
+            readResource: async () => {},
+            listPrompts: async () => {},
+            getPrompt: async () => {},
+            authenticate: () => {},
+            retry: () => {},
+            clearStorage: () => {},
+            client: null,
+          },
+        ]);
+        return;
+      }
+
+      // New connection - add to both configs and connections
       const newConfig = {
         id: url,
         url,
@@ -589,7 +630,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
         },
       ]);
     },
-    [connectionConfigs]
+    [connectionConfigs, connections]
   );
 
   const removeConnection = useCallback((id: string) => {
@@ -707,6 +748,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       setAutoConnect,
       connectServer,
       disconnectServer,
+      configLoaded,
     }),
     [
       connections,
@@ -716,6 +758,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       autoConnect,
       connectServer,
       disconnectServer,
+      configLoaded,
     ]
   );
 

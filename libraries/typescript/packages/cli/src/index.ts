@@ -59,14 +59,13 @@ async function waitForServer(
   for (let i = 0; i < maxAttempts; i++) {
     const controller = new AbortController();
     try {
-      const response = await fetch(`http://${host}:${port}/mcp`, {
-        headers: {
-          Accept: "text/event-stream",
-        },
+      // Use /inspector/health endpoint for cleaner health checks
+      // This avoids 400 errors from the MCP endpoint which requires session headers
+      const response = await fetch(`http://${host}:${port}/inspector/health`, {
         signal: controller.signal,
       });
 
-      if (response.status !== 404) {
+      if (response.ok) {
         return true;
       }
     } catch {

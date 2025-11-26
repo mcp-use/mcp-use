@@ -1890,27 +1890,8 @@ if (container && Component) {
 
     const idleTimeoutMs = this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
-    // Helper to create a new transport and session
-    const createNewTransport = async (
-      closeOldSessionId?: string
-    ): Promise<InstanceType<typeof StreamableHTTPServerTransport>> => {
-      // Close old session if it exists (cleanup)
-      if (closeOldSessionId && this.sessions.has(closeOldSessionId)) {
-        try {
-          this.sessions.get(closeOldSessionId)!.transport.close();
-        } catch (error) {
-          // Ignore errors when closing old session
-        }
-        this.sessions.delete(closeOldSessionId);
-      }
-
-      // Create new transport for initialization
-      // DNS rebinding protection behavior:
-      // - In development mode: Allow all origins (disable DNS rebinding protection)
-      //   This enables direct browser connections from any origin for easier development
-      // - In production mode: Only use explicitly configured allowedOrigins
-      //   If allowedOrigins is not set in production, DNS rebinding protection is disabled
-      //   (not recommended for production - should explicitly set allowedOrigins)
+    // Helper to get transport configuration options
+    const getTransportConfig = () => {
       const isProduction = this.isProductionMode();
       let allowedOrigins = this.config.allowedOrigins;
       let enableDnsRebindingProtection = false;
@@ -1928,6 +1909,26 @@ if (container && Component) {
         allowedOrigins = undefined;
         enableDnsRebindingProtection = false;
       }
+
+      return { allowedOrigins, enableDnsRebindingProtection };
+    };
+
+    // Helper to create a new transport and session
+    const createNewTransport = async (
+      closeOldSessionId?: string
+    ): Promise<InstanceType<typeof StreamableHTTPServerTransport>> => {
+      // Close old session if it exists (cleanup)
+      if (closeOldSessionId && this.sessions.has(closeOldSessionId)) {
+        try {
+          this.sessions.get(closeOldSessionId)!.transport.close();
+        } catch (error) {
+          // Ignore errors when closing old session
+        }
+        this.sessions.delete(closeOldSessionId);
+      }
+
+      const { allowedOrigins, enableDnsRebindingProtection } =
+        getTransportConfig();
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => generateUUID(),
@@ -1950,6 +1951,112 @@ if (container && Component) {
       });
 
       await this.server.connect(transport);
+      return transport;
+    };
+
+    // Helper to create and auto-initialize a transport for seamless reconnection
+    // This is used when autoCreateSessionOnInvalidId is true and client sends
+    // a non-initialize request with an invalid/expired session ID
+    const createAndAutoInitializeTransport = async (
+      oldSessionId: string
+    ): Promise<InstanceType<typeof StreamableHTTPServerTransport>> => {
+      const { allowedOrigins, enableDnsRebindingProtection } =
+        getTransportConfig();
+
+      // Create transport that reuses the OLD session ID
+      // This ensures the client's subsequent requests with this session ID will work
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => oldSessionId, // Reuse old session ID!
+        enableJsonResponse: true,
+        allowedOrigins: allowedOrigins,
+        enableDnsRebindingProtection: enableDnsRebindingProtection,
+        // We'll manually store the session, so don't rely on onsessioninitialized
+        onsessionclosed: (id) => {
+          if (id) {
+            this.sessions.delete(id);
+          }
+        },
+      });
+
+      await this.server.connect(transport);
+
+      // Manually store the transport with the old session ID BEFORE initialization
+      // This ensures subsequent requests find it
+      this.sessions.set(oldSessionId, {
+        transport,
+        lastAccessedAt: Date.now(),
+      });
+
+      // Auto-initialize the transport by sending a synthetic initialize request
+      // This makes the transport ready to handle other requests
+      const initBody = {
+        jsonrpc: "2.0",
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "mcp-use-auto-reconnect", version: "1.0.0" },
+        },
+        id: "__auto_init__",
+      };
+
+      // Create synthetic Express-like request/response for initialization
+      const syntheticReq: any = {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        header: (name: string) => {
+          const headers: Record<string, string> = {
+            "content-type": "application/json",
+            accept: "application/json",
+          };
+          return headers[name.toLowerCase()];
+        },
+        body: initBody,
+      };
+
+      let initComplete = false;
+      const syntheticRes: any = {
+        statusCode: 200,
+        setHeader: () => {},
+        writeHead: (code: number) => {
+          syntheticRes.statusCode = code;
+        },
+        write: () => true,
+        end: () => {
+          initComplete = true;
+        },
+        on: () => {},
+        once: () => {},
+        removeListener: () => {},
+      };
+
+      // Handle the initialize request
+      await new Promise<void>((resolve) => {
+        const originalEnd = syntheticRes.end;
+        syntheticRes.end = (...args: any[]) => {
+          originalEnd.apply(syntheticRes, args);
+          resolve();
+        };
+        transport.handleRequest(syntheticReq, syntheticRes, initBody);
+      });
+
+      if (syntheticRes.statusCode !== 200) {
+        console.error(
+          `[MCP] Auto-initialization failed with status ${syntheticRes.statusCode}`
+        );
+        // Clean up the failed session
+        this.sessions.delete(oldSessionId);
+        throw new Error(
+          `Auto-initialization failed: ${syntheticRes.statusCode}`
+        );
+      }
+
+      console.log(
+        `[MCP] Auto-initialized session ${oldSessionId} for seamless reconnection`
+      );
       return transport;
     };
 
@@ -1977,11 +2084,13 @@ if (container && Component) {
         const autoCreate = this.config.autoCreateSessionOnInvalidId ?? true;
 
         if (autoCreate) {
-          // Auto-create a new session to allow seamless reconnection
+          // Auto-create AND auto-initialize a new session for seamless reconnection
+          // This makes it compatible with non-compliant clients like ChatGPT
+          // that don't reinitialize when receiving 404 for invalid session IDs
           console.warn(
-            `[MCP] Session ${sessionId} not found (expired or invalid), auto-creating new session for seamless reconnection`
+            `[MCP] Session ${sessionId} not found (expired or invalid), auto-creating and initializing new session for seamless reconnection`
           );
-          return await createNewTransport(sessionId);
+          return await createAndAutoInitializeTransport(sessionId);
         } else {
           // Follow MCP protocol spec: return null to signal session not found
           // This will result in a 404 error response
