@@ -11,10 +11,9 @@ This example demonstrates all Context features available in mcp-use servers:
 import asyncio
 from datetime import datetime
 
-from mcp.server.fastmcp import Context
 from mcp.types import ToolAnnotations
 
-from mcp_use.server import MCPServer
+from mcp_use.server import Context, MCPServer
 
 server = MCPServer(
     name="Context Demo Server",
