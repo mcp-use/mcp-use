@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.5.1-canary.2
+
+### Patch Changes
+
+- e5e8e1b: Fix export of sampling types
+  - @mcp-use/cli@2.3.1-canary.2
+  - @mcp-use/inspector@0.7.1-canary.2
+
 ## 1.5.1-canary.1
 
 ### Patch Changes
