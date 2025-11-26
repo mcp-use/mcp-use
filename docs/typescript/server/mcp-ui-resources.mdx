@@ -1,0 +1,739 @@
+---
+title: "MCP-UI Primitives"
+description: "Build interactive UI widgets with MCP-UI framework"
+icon: "wallpaper"
+---
+
+# MCP-UI Resources
+
+MCP-UI Resources enable you to build rich, interactive user interfaces that work seamlessly with MCP servers. These widgets can be embedded in MCP-compatible clients to provide visual interfaces alongside your tools and resources.
+
+## Overview
+
+MCP-UI is a framework for creating interactive widgets that:
+- Render as web components in MCP clients
+- Communicate with MCP servers through tools
+- Support multiple rendering modes (iframe, inline, remote DOM)
+- Provide full React/JavaScript capabilities
+
+## Resource Types
+
+### 1. External URL Resources
+
+Iframe-based widgets served from your MCP server:
+
+:::warning Deprecated
+External URL resources are now built automatically by `mcp-use/server` `setupWidgetRoutes`. Consider using the newer widget approach instead.
+:::
+
+```typescript
+server.uiResource({
+  type: 'externalUrl',
+  name: 'dashboard',
+  widget: 'analytics-dashboard',
+  title: 'Analytics Dashboard',
+  description: 'Real-time analytics visualization',
+  props: {
+    timeRange: {
+      type: 'string',
+      description: 'Time range for data',
+      required: false,
+      default: '7d'
+    },
+    metric: {
+      type: 'string',
+      description: 'Metric to display',
+      required: false,
+      default: 'revenue'
+    }
+  },
+  size: ['800px', '600px'],
+  annotations: {
+    audience: ['user'],
+    priority: 0.9
+  }
+})
+```
+
+**Characteristics:**
+- Served as standalone HTML pages
+- Isolated in iframes for security
+- Can include external resources
+- Full JavaScript capabilities
+
+:::note
+External URLs are automatically built and configured by the `setupWidgetRoutes` function in `mcp-use/server`. Routes are generated based on your widget definitions without manual setup.
+:::
+
+### 2. Raw HTML Resources
+
+Inline HTML content rendered directly:
+
+```typescript
+server.uiResource({
+  type: 'rawHtml',
+  name: 'simple_form',
+  title: 'Contact Form',
+  description: 'Simple contact form',
+  htmlString: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: -apple-system, sans-serif;
+          padding: 20px;
+        }
+        .form-group {
+          margin-bottom: 15px;
+        }
+        input, textarea {
+          width: 100%;
+          padding: 8px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+        }
+        button {
+          background: #007bff;
+          color: white;
+          padding: 10px 20px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+      </style>
+    </head>
+    <body>
+      <h2>Contact Us</h2>
+      <form id="contactForm">
+        <div class="form-group">
+          <input type="text" placeholder="Name" required>
+        </div>
+        <div class="form-group">
+          <input type="email" placeholder="Email" required>
+        </div>
+        <div class="form-group">
+          <textarea placeholder="Message" rows="5" required></textarea>
+        </div>
+        <button type="submit">Send Message</button>
+      </form>
+      <script>
+        document.getElementById('contactForm').onsubmit = (e) => {
+          e.preventDefault();
+          alert('Message sent successfully!');
+        };
+      </script>
+    </body>
+    </html>
+  `,
+  size: ['400px', '500px']
+})
+```
+
+**Characteristics:**
+- Renders inline without iframe
+- Simpler but less isolated
+- Good for basic interactions
+- Limited external resource loading
+
+### 3. Remote DOM Resources
+
+JavaScript-driven dynamic interfaces:
+
+```typescript
+server.uiResource({
+  type: 'remoteDom',
+  name: 'interactive_chart',
+  title: 'Interactive Chart',
+  description: 'Dynamic data visualization',
+  remoteDomFramework: 'react',
+  remoteDomCode: `
+    function ChartWidget() {
+      const [data, setData] = React.useState([]);
+      const [loading, setLoading] = React.useState(true);
+
+      React.useEffect(() => {
+        // Fetch data from MCP server
+        fetch('/api/chart-data')
+          .then(res => res.json())
+          .then(data => {
+            setData(data);
+            setLoading(false);
+          });
+      }, []);
+
+      if (loading) {
+        return <div>Loading chart data...</div>;
+      }
+
+      return (
+        <div style={{ padding: '20px' }}>
+          <h2>Sales Dashboard</h2>
+          <div className="chart-container">
+            {data.map(item => (
+              <div key={item.id} style={{
+                height: item.value + 'px',
+                width: '50px',
+                background: '#007bff',
+                display: 'inline-block',
+                margin: '0 5px'
+              }}>
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<ChartWidget />, document.getElementById('root'));
+  `,
+  props: {
+    refreshInterval: {
+      type: 'number',
+      description: 'Refresh interval in seconds',
+      default: 60
+    }
+  }
+})
+```
+
+**Characteristics:**
+- Dynamic JavaScript execution
+- React/Vue/vanilla JS support
+- Real-time updates possible
+- More complex interactions
+
+## Building React Widgets
+
+### Project Structure
+
+```
+my-mcp-server/
+├── resources/
+│   ├── dashboard.tsx
+│   ├── kanban-board.tsx
+│   └── data-table.tsx
+├── src/
+│   └── server.ts
+└── dist/
+    └── resources/
+        └── mcp-use/
+            └── widgets/
+                ├── dashboard/
+                │   └── index.html
+                ├── kanban-board/
+                │   └── index.html
+                └── data-table/
+                    └── index.html
+```
+
+### Example: Kanban Board Widget
+
+```tsx
+// resources/kanban-board.tsx
+import React, { useState, useEffect } from 'react'
+import './kanban-board.css'
+
+interface Task {
+  id: string
+  title: string
+  description: string
+  status: 'todo' | 'in-progress' | 'done'
+  priority: 'low' | 'medium' | 'high'
+  assignee?: string
+}
+
+export default function KanbanBoard() {
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [draggedTask, setDraggedTask] = useState<string | null>(null)
+
+  // Parse URL parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const initialTasks = params.get('tasks')
+    if (initialTasks) {
+      try {
+        setTasks(JSON.parse(initialTasks))
+      } catch (e) {
+        console.error('Failed to parse initial tasks')
+      }
+    }
+  }, [])
+
+  const handleDragStart = (taskId: string) => {
+    setDraggedTask(taskId)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (e: React.DragEvent, newStatus: Task['status']) => {
+    e.preventDefault()
+    if (!draggedTask) return
+
+    setTasks(tasks.map(task =>
+      task.id === draggedTask
+        ? { ...task, status: newStatus }
+        : task
+    ))
+    setDraggedTask(null)
+  }
+
+  const columns: { status: Task['status']; title: string }[] = [
+    { status: 'todo', title: 'To Do' },
+    { status: 'in-progress', title: 'In Progress' },
+    { status: 'done', title: 'Done' }
+  ]
+
+  return (
+    <div className="kanban-board">
+      <h1>Project Tasks</h1>
+      <div className="columns">
+        {columns.map(column => (
+          <div
+            key={column.status}
+            className="column"
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, column.status)}
+          >
+            <h2>{column.title}</h2>
+            <div className="tasks">
+              {tasks
+                .filter(task => task.status === column.status)
+                .map(task => (
+                  <div
+                    key={task.id}
+                    className={`task priority-${task.priority}`}
+                    draggable
+                    onDragStart={() => handleDragStart(task.id)}
+                  >
+                    <h3>{task.title}</h3>
+                    <p>{task.description}</p>
+                    {task.assignee && (
+                      <span className="assignee">{task.assignee}</span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+### Widget Styling
+
+```css
+/* resources/kanban-board.css */
+.kanban-board {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 20px;
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+.columns {
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.column {
+  flex: 1;
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  min-height: 400px;
+}
+
+.column h2 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.task {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: move;
+  transition: transform 0.2s;
+}
+
+.task:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.task.priority-high {
+  border-left: 4px solid #f44336;
+}
+
+.task.priority-medium {
+  border-left: 4px solid #ff9800;
+}
+
+.task.priority-low {
+  border-left: 4px solid #4caf50;
+}
+
+.assignee {
+  display: inline-block;
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 8px;
+}
+```
+
+## Accessing MCP Tools from Widgets
+
+### Using PostMessage API
+
+Widgets can communicate with the MCP server:
+
+```javascript
+// In your widget
+function callMCPTool(toolName, params) {
+  return new Promise((resolve, reject) => {
+    const messageId = Math.random().toString(36)
+
+    // Listen for response
+    const handler = (event) => {
+      if (event.data.id === messageId) {
+        window.removeEventListener('message', handler)
+        if (event.data.error) {
+          reject(event.data.error)
+        } else {
+          resolve(event.data.result)
+        }
+      }
+    }
+
+    window.addEventListener('message', handler)
+
+    // Send request to parent
+    window.parent.postMessage({
+      type: 'mcp-tool-call',
+      id: messageId,
+      tool: toolName,
+      params: params
+    }, '*')
+  })
+}
+
+// Usage
+async function refreshData() {
+  try {
+    const data = await callMCPTool('get_tasks', {
+      project: 'my-project'
+    })
+    updateUI(data)
+  } catch (error) {
+    console.error('Failed to fetch tasks:', error)
+  }
+}
+```
+
+### Direct API Calls
+
+Widgets can also call server APIs directly:
+
+```javascript
+async function fetchData() {
+  try {
+    const response = await fetch('/api/widget-data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        widget: 'dashboard',
+        params: { timeRange: '7d' }
+      })
+    })
+
+    const data = await response.json()
+    updateDashboard(data)
+  } catch (error) {
+    console.error('API error:', error)
+  }
+}
+```
+
+## Widget Parameters
+
+### Defining Parameters
+
+```typescript
+server.uiResource({
+  type: 'externalUrl',
+  name: 'data_viewer',
+  widget: 'data-viewer',
+  props: {
+    // String parameter
+    title: {
+      type: 'string',
+      description: 'Widget title',
+      required: false,
+      default: 'Data Viewer'
+    },
+
+    // Number parameter
+    pageSize: {
+      type: 'number',
+      description: 'Items per page',
+      required: false,
+      default: 20
+    },
+
+    // Boolean parameter
+    showFilters: {
+      type: 'boolean',
+      description: 'Show filter controls',
+      required: false,
+      default: true
+    },
+
+    // Object parameter
+    config: {
+      type: 'object',
+      description: 'Widget configuration',
+      required: false
+    },
+
+    // Array parameter
+    data: {
+      type: 'array',
+      description: 'Initial data',
+      required: true
+    }
+  }
+})
+```
+
+### Accessing Parameters in Widgets
+
+```javascript
+// Parse URL parameters
+const params = new URLSearchParams(window.location.search)
+
+// Simple parameters
+const title = params.get('title') || 'Default Title'
+const pageSize = parseInt(params.get('pageSize') || '20')
+const showFilters = params.get('showFilters') === 'true'
+
+// Complex parameters (JSON)
+let config = {}
+let data = []
+
+try {
+  const configParam = params.get('config')
+  if (configParam) {
+    config = JSON.parse(configParam)
+  }
+
+  const dataParam = params.get('data')
+  if (dataParam) {
+    data = JSON.parse(dataParam)
+  }
+} catch (e) {
+  console.error('Failed to parse parameters:', e)
+}
+```
+
+## Development Workflow
+
+### 1. Setup Development Environment
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+### 2. Create Widget Component
+
+```tsx
+// resources/my-widget.tsx
+import React from 'react'
+
+export default function MyWidget() {
+  return (
+    <div>
+      <h1>My Widget</h1>
+      {/* Widget implementation */}
+    </div>
+  )
+}
+```
+
+### 3. Register Widget in Server
+
+```typescript
+// src/server.ts
+server.uiResource({
+  type: 'externalUrl',
+  name: 'my-widget',
+  widget: 'my-widget',
+  title: 'My Widget',
+  description: 'Custom widget implementation'
+})
+```
+
+### 4. Test with Inspector
+
+The widget will be available at:
+- Widget URL: `http://localhost:3000/mcp-use/widgets/my-widget`
+- Inspector: `http://localhost:3000/inspector`
+
+## Best Practices
+
+### 1. Performance Optimization
+
+```javascript
+// Debounce expensive operations
+function debounce(func, wait) {
+  let timeout
+  return function(...args) {
+    clearTimeout(timeout)
+    timeout = setTimeout(() => func.apply(this, args), wait)
+  }
+}
+
+const handleSearch = debounce((query) => {
+  searchData(query)
+}, 300)
+```
+
+### 2. Error Handling
+
+```javascript
+// Graceful error handling
+try {
+  const data = await fetchData()
+  renderWidget(data)
+} catch (error) {
+  console.error('Widget error:', error)
+  renderErrorState('Failed to load widget data')
+}
+```
+
+### 3. Responsive Design
+
+```css
+/* Mobile-first responsive design */
+.widget-container {
+  padding: 10px;
+}
+
+@media (min-width: 768px) {
+  .widget-container {
+    padding: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .widget-container {
+    padding: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+}
+```
+
+### 4. State Management
+
+```javascript
+// Use React hooks for state
+const [state, setState] = useState(initialState)
+const [loading, setLoading] = useState(false)
+const [error, setError] = useState(null)
+
+// Or use a state management library
+import { create } from 'zustand'
+
+const useStore = create((set) => ({
+  tasks: [],
+  addTask: (task) => set((state) => ({
+    tasks: [...state.tasks, task]
+  })),
+  updateTask: (id, updates) => set((state) => ({
+    tasks: state.tasks.map(task =>
+      task.id === id ? { ...task, ...updates } : task
+    )
+  }))
+}))
+```
+
+## Security Considerations
+
+### Content Security Policy
+
+```typescript
+// Configure CSP for widgets
+server.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", "data:", "https:"],
+    connectSrc: ["'self'"],
+    frameSrc: ["'self'"]
+  }
+}))
+```
+
+### Input Sanitization
+
+```javascript
+// Always sanitize user input
+function sanitizeHTML(str) {
+  const temp = document.createElement('div')
+  temp.textContent = str
+  return temp.innerHTML
+}
+
+// Use when displaying user content
+element.innerHTML = sanitizeHTML(userInput)
+```
+
+## Troubleshooting
+
+### Widget Not Loading
+
+1. Check server is running: `http://localhost:3000/health`
+2. Verify widget registration in server
+3. Check browser console for errors
+4. Ensure correct widget name in URL
+
+### Parameters Not Working
+
+1. Check parameter encoding in URL
+2. Verify parameter parsing in widget
+3. Check for JSON parsing errors
+4. Validate parameter types match definition
+
+### Styling Issues
+
+1. Check CSS file is imported
+2. Verify CSS specificity
+3. Check for conflicting styles
+4. Test in different browsers
+
+## Next Steps
+
+- [Apps SDK Resources](./apps-sdk-resources) - OpenAI Apps SDK integration
+- [UI Widgets](./ui-widgets) - General widget guide
+- [Templates](./templates) - Project templates overview
+- [Examples](./examples) - Complete implementations

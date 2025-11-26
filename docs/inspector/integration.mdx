@@ -1,0 +1,247 @@
+---
+title: "Integration"
+description: "Mount the inspector on Express or Hono applications"
+icon: "plug-2"
+---
+
+The MCP Inspector can be integrated directly into your Express or Hono applications, making it available at a custom path alongside your MCP server.
+
+## Auto-Mounting with mcp-use
+
+When using `mcp-use` to create your MCP server, the inspector is automatically available at `/inspector`.
+
+### Example
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+})
+
+// Add your tools, resources, prompts...
+server.addTool(/* ... */)
+
+// Start the server
+server.listen(3000)
+
+// 🎉 Inspector automatically available at http://localhost:3000/inspector
+```
+
+<Note>
+The inspector is automatically mounted when using `mcp-use/server`. No additional configuration needed.
+</Note>
+
+## Manual Integration
+
+### Express Integration
+
+Mount the inspector on an Express application:
+
+```typescript
+import express from 'express'
+import { mountInspector } from '@mcp-use/inspector'
+
+const app = express()
+
+// Your Express routes
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' })
+})
+
+// Mount inspector at /inspector
+mountInspector(app)
+
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000')
+  console.log('Inspector available at http://localhost:3000/inspector')
+})
+```
+
+### Hono Integration
+
+Mount the inspector on a Hono application:
+
+```typescript
+import { Hono } from 'hono'
+import { mountInspector } from '@mcp-use/inspector'
+
+const app = new Hono()
+
+// Your Hono routes
+app.get('/api/health', (c) => {
+  return c.json({ status: 'ok' })
+})
+
+// Mount inspector at /inspector
+mountInspector(app)
+
+// Start server with your Hono adapter
+export default app
+```
+
+## Path Customization
+
+The inspector is mounted at `/inspector` by default. To use a different path, you can use a path prefix with your framework:
+
+### Express with Custom Path
+
+```typescript
+import express from 'express'
+import { mountInspector } from '@mcp-use/inspector'
+
+const app = express()
+
+// Mount at custom path using Express router
+const inspectorRouter = express.Router()
+mountInspector(inspectorRouter)
+
+app.use('/debug', inspectorRouter)
+// Inspector now available at http://localhost:3000/debug/inspector
+```
+
+### Hono with Custom Path
+
+```typescript
+import { Hono } from 'hono'
+import { mountInspector } from '@mcp-use/inspector'
+
+const app = new Hono()
+
+// Create sub-app for inspector
+const inspectorApp = new Hono()
+mountInspector(inspectorApp)
+
+app.route('/debug', inspectorApp)
+// Inspector now available at http://localhost:3000/debug/inspector
+```
+
+## Configuration Options
+
+### Environment Detection
+
+The inspector automatically detects the framework:
+
+- **Express**: Detects Express app instance
+- **Hono**: Detects Hono app instance
+- **Auto-detection**: Works with both frameworks
+
+### Client Files
+
+The inspector includes built client files. If files are missing, you'll see a warning:
+
+```
+⚠️  MCP Inspector client files not found at /path/to/files
+   Run 'yarn build' in the inspector package to build the UI
+```
+
+**Solution:** Ensure the inspector package is properly built before mounting.
+
+## Best Practices
+
+### Development vs Production
+
+**Development:**
+- Mount inspector directly in development
+- Use default `/inspector` path
+- Enable hot reload for inspector UI
+
+**Production:**
+- Consider mounting only in staging environments
+- Use custom paths for security
+- Restrict access with authentication middleware
+
+### Security Considerations
+
+<Warning>
+The inspector provides full access to your MCP server. In production, consider:
+- Adding authentication middleware
+- Restricting to internal networks
+- Using custom paths
+- Disabling in production entirely
+</Warning>
+
+### Example with Authentication
+
+```typescript
+import express from 'express'
+import { mountInspector } from '@mcp-use/inspector'
+
+const app = express()
+
+// Authentication middleware
+const requireAuth = (req, res, next) => {
+  // Your auth logic
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  next()
+}
+
+// Mount inspector behind authentication
+app.use('/inspector', requireAuth)
+mountInspector(app)
+```
+
+### Multiple MCP Servers
+
+When mounting the inspector, it can connect to multiple MCP servers:
+
+1. Mount inspector once on your main application
+2. Connect to different MCP servers from the inspector UI
+3. Each server appears as a separate connection
+
+### CORS Configuration
+
+If your MCP server is on a different origin, configure CORS:
+
+```typescript
+import express from 'express'
+import cors from 'cors'
+import { mountInspector } from '@mcp-use/inspector'
+
+const app = express()
+
+// Configure CORS for inspector
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://your-domain.com'],
+  credentials: true
+}))
+
+mountInspector(app)
+```
+
+## Troubleshooting
+
+### Inspector Not Loading
+
+**Issue:** Inspector page shows blank or errors.
+
+**Solutions:**
+1. Check that client files are built: `yarn build` in inspector package
+2. Verify the mount path is correct
+3. Check browser console for errors
+4. Ensure no route conflicts with `/inspector`
+
+### Route Conflicts
+
+**Issue:** Your routes conflict with inspector paths.
+
+**Solution:** Use a custom path or ensure your routes don't overlap with `/inspector/*`.
+
+### Build Errors
+
+**Issue:** Inspector fails to mount with build errors.
+
+**Solutions:**
+1. Ensure `@mcp-use/inspector` is properly installed
+2. Check Node.js version compatibility
+3. Verify all dependencies are installed
+4. Rebuild the inspector package
+
+## Related Documentation
+
+- [Getting Started](/inspector/index) - Basic inspector usage
+- [CLI Usage](/inspector/cli) - Standalone inspector usage
+- [Self-Hosting](/inspector/self-hosting) - Docker deployment
+

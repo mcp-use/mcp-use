@@ -1,0 +1,198 @@
+---
+title: "Project Templates"
+description: "Ready-to-use templates for MCP servers with UI widgets"
+icon: "layout-template"
+---
+
+# Project Templates
+
+The `create-mcp-use-app` tool provides several project templates to help you get started quickly with different types of MCP servers. Each template is optimized for specific use cases and includes pre-configured examples.
+
+<CodeGroup>
+```bash npm
+npx create-mcp-use-app@latest my-mcp-server
+cd my-mcp-server
+npm run dev
+```
+
+```bash pnpm
+pnpm create mcp-use-app@latest my-mcp-server
+cd my-mcp-server
+pnpm dev
+```
+
+```bash yarn
+yarn create mcp-use-app@latest my-mcp-server
+cd my-mcp-server
+yarn dev
+```
+</CodeGroup>
+
+<Tip>
+To explore available templates and options, run:
+```bash
+npx create-mcp-use-app --help
+```
+</Tip>
+
+
+## Available Templates
+
+### 🚀 Starter Template (Default)
+
+The **starter** template is the most comprehensive option, showcasing all MCP features including tools, resources, prompts, and automatic UI widget registration for MCP-UI and OpenAI Apps SDK.
+
+**What's Included:**
+- Full MCP server setup with all primitive types:
+  - **Tools**: `fetch-weather` - fetches weather data for any city
+  - **Resources**: `config://settings` - server configuration example
+  - **Prompts**: `review-code` - code review prompt template
+- **Automatic UI Widget Registration** from `resources/` folder:
+  - `display-weather` - Weather visualization widget (OpenAI Apps SDK)
+  - `kanban-board` - Task management board (MCP-UI)
+- Hot reload development environment
+- Production build configuration
+
+**Best For:** Learning all MCP features, full-featured applications, production-ready servers
+
+**Quick Start:**
+```bash
+npx create-mcp-use-app my-server --template starter
+cd my-server
+npm run dev
+```
+
+**Example Usage:**
+```typescript
+// Fetch weather data
+const weather = await client.callTool('fetch-weather', { city: 'London' })
+
+// Display it in a beautiful widget
+const widget = await client.callTool('display-weather', { 
+  city: 'London',
+  temperature: '15',
+  condition: 'Partly Cloudy'
+})
+```
+
+---
+
+### ⚡ Apps SDK Template
+
+The **apps-sdk** template demonstrates how to build OpenAI Apps SDK compatible widgets for ChatGPT with official UI components integration.
+
+**What's Included:**
+- Lightweight MCP server setup
+- **Automatic UI Widget Registration** from `resources/` folder:
+  - `product-search-result` - Complete ecommerce widget example with carousel, accordion, and filtering
+- **Official UI Components**: Integrated [OpenAI Apps SDK UI components](https://openai.github.io/apps-sdk-ui/) for consistent, accessible widgets
+- **Fruits API**: Example API endpoint (`/api/fruits`) demonstrating data fetching
+- **React Query**: Integrated `@tanstack/react-query` for data fetching and caching
+- Example tool: `get-brand-info` - Returns brand information
+- **Public Assets**: 16 fruit product images in `public/fruits/` directory
+- **McpUseProvider**: Pre-configured with auto-sizing, debug controls, and view controls
+- Minimal configuration for fast development
+
+**Best For:** Quick prototypes, widget-focused apps, learning OpenAI Apps SDK patterns, ecommerce widgets
+
+**Quick Start:**
+```bash
+npx create-mcp-use-app my-server --template apps-sdk
+cd my-server
+npm run dev
+```
+
+**Example Usage:**
+```typescript
+// All React components in resources/ folder are automatically registered!
+// Just export widgetMetadata and mcp-use handles the rest
+
+// Call the brand info tool
+const brandInfo = await client.callTool('get-brand-info', {});
+
+// Display product search results widget
+const widget = await client.callTool('product-search-result', { 
+  query: 'fruits',
+  filters: { priceRange: [0, 50] }
+})
+```
+
+**Template Structure:**
+```
+apps-sdk/
+├── resources/
+│   └── product-search-result/    # Folder-based widget
+│       ├── widget.tsx             # Entry point
+│       ├── components/            # Sub-components
+│       │   ├── Accordion.tsx
+│       │   ├── AccordionItem.tsx
+│       │   ├── Carousel.tsx
+│       │   └── CarouselItem.tsx
+│       ├── hooks/
+│       │   └── useCarouselAnimation.ts
+│       ├── constants.ts
+│       └── types.ts
+├── public/
+│   └── fruits/                    # Static assets
+│       ├── apple.png
+│       ├── banana.png
+│       └── ... (16 fruit images)
+├── index.ts                       # Server entry point
+└── package.json
+```
+
+---
+
+### 🎨 MCP-UI Template
+
+The **mcp-ui** template demonstrates all three MCP-UI UIResource types with examples of each approach.
+
+**What's Included:**
+- **External URL (Iframe Widgets)**: 
+  - `kanban-board` - Complex interactive board served from filesystem
+  - Automatic static file serving
+  - Full asset support
+- **Raw HTML (Direct Rendering)**:
+  - `welcome-card` - Beautiful glass-morphic welcome card
+  - No iframe overhead
+  - Perfect for simple visualizations
+- **Remote DOM (React Components)**:
+  - `quick-poll` - Interactive polling widget
+  - Uses MCP-UI React components (`ui-stack`, `ui-button`, `ui-text`)
+  - Lightweight scripting approach
+- Traditional MCP tools and resources examples
+
+**Best For:** Understanding all UIResource types, complex UI requirements, MCP-UI specification compliance
+
+**Quick Start:**
+```bash
+npx create-mcp-use-app my-server --template mcp-ui
+cd my-server
+npm run dev
+```
+
+**Example Usage:**
+```typescript
+// External URL - Served via iframe with full interactivity
+await client.callTool('kanban-board', {
+  initialTasks: [{id: 1, title: 'Task 1'}],
+  theme: 'dark'
+})
+
+// Raw HTML - Direct rendering, no iframe
+await client.readResource('ui://widget/welcome-card')
+
+// Remote DOM - Interactive React components
+await client.callTool('quick-poll', {
+  question: 'Favorite color?',
+  options: ['Red', 'Blue', 'Green']
+})
+```
+---
+
+## Next Steps
+
+- [UI Widgets](./ui-widgets) - Deep dive into automatic UI widget registration
+- [Tools](./tools) - Learn about MCP tools
+- [Resources](./resources) - Understand MCP resources
+- [Prompts](./prompts) - Work with prompt templates

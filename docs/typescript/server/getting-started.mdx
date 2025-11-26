@@ -1,0 +1,453 @@
+---
+title: "Getting Started"
+description: "Set up your first MCP server with TypeScript"
+icon: "rocket"
+---
+
+# Getting Started
+
+This guide will walk you through creating your first MCP server using the `mcp-use/server` framework. We'll build a simple weather information server that demonstrates tools, resources, and UI widgets.
+
+## Prerequisites
+
+- Node.js 22+ and npm installed
+- Basic knowledge of TypeScript and async/await
+- Familiarity with Express.js (helpful but not required)
+
+## Project Setup
+
+### 1. Initialize Your Project
+
+Create a new directory and initialize a TypeScript project:
+
+```bash
+mkdir my-mcp-server
+cd my-mcp-server
+npm init -y
+npm install typescript @types/node tsx --save-dev
+```
+
+### 2. Install Dependencies
+
+Install the MCP server framework:
+
+```bash
+npm install mcp-use
+```
+
+For development, also install the inspector:
+
+```bash
+npm install --save-dev @mcp-use/inspector
+```
+
+### 3. Configure TypeScript
+
+Create a `tsconfig.json` file:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
+```
+
+### 4. Update Package.json
+
+Add scripts to your `package.json`:
+
+```json
+{
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  }
+}
+```
+
+## Creating Your First Server
+
+### Basic Server Structure
+
+Create `src/index.ts`:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+
+// Create the server instance
+const server = createMCPServer('weather-mcp-server', {
+  version: '1.0.0',
+  description: 'A weather information MCP server'
+})
+
+// Start the server
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000
+
+server.listen(PORT).then(() => {
+  console.log(`Server running on port ${PORT}`)
+})
+```
+
+### Adding Your First Tool
+
+Tools are functions that MCP clients can invoke. Let's add a weather lookup tool:
+
+```typescript
+// Mock weather data
+const weatherData: Record<string, any> = {
+  'new-york': { temp: 72, condition: 'Partly cloudy', humidity: 65 },
+  'london': { temp: 59, condition: 'Rainy', humidity: 80 },
+  'tokyo': { temp: 78, condition: 'Sunny', humidity: 55 },
+  'paris': { temp: 64, condition: 'Overcast', humidity: 70 }
+}
+
+// Define a weather lookup tool
+server.tool({
+  name: 'get_weather',
+  description: 'Get current weather for a city',
+  inputs: [
+    {
+      name: 'city',
+      type: 'string',
+      description: 'City name (e.g., new-york, london, tokyo, paris)',
+      required: true
+    },
+    {
+      name: 'units',
+      type: 'string',
+      description: 'Temperature units (fahrenheit or celsius)',
+      required: false,
+      default: 'fahrenheit'
+    }
+  ],
+  cb: async ({ city, units = 'fahrenheit' }) => {
+    const cityKey = city.toLowerCase().replace(' ', '-')
+    const data = weatherData[cityKey]
+
+    if (!data) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Weather data not available for ${city}`
+        }]
+      }
+    }
+
+    let temp = data.temp
+    if (units === 'celsius') {
+      temp = Math.round((temp - 32) * 5 / 9)
+    }
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Weather in ${city}:\n` +
+              `Temperature: ${temp}°${units === 'celsius' ? 'C' : 'F'}\n` +
+              `Condition: ${data.condition}\n` +
+              `Humidity: ${data.humidity}%`
+      }]
+    }
+  }
+})
+```
+
+### Adding Resources
+
+Resources provide static or dynamic content. Let's add a resource for weather alerts:
+
+```typescript
+// Weather alerts resource
+server.resource({
+  name: 'weather_alerts',
+  uri: 'weather://alerts',
+  title: 'Current Weather Alerts',
+  description: 'Active weather alerts and warnings',
+  mimeType: 'application/json',
+  annotations: {
+    audience: ['user'],
+    priority: 0.8
+  },
+  readCallback: async () => {
+    const alerts = [
+      {
+        id: 'ALT001',
+        type: 'warning',
+        title: 'Heavy Rain Warning',
+        areas: ['London', 'Manchester'],
+        validUntil: '2024-12-25T18:00:00Z'
+      },
+      {
+        id: 'ALT002',
+        type: 'advisory',
+        title: 'High Wind Advisory',
+        areas: ['New York', 'Boston'],
+        validUntil: '2024-12-25T12:00:00Z'
+      }
+    ]
+
+    return {
+      contents: [{
+        uri: 'weather://alerts',
+        mimeType: 'application/json',
+        text: JSON.stringify(alerts, null, 2)
+      }]
+    }
+  }
+})
+```
+
+### Adding Dynamic Resource Templates
+
+Resource templates allow dynamic content generation based on URI parameters:
+
+```typescript
+server.resourceTemplate({
+  name: 'city_weather',
+  resourceTemplate: {
+    uriTemplate: 'weather://city/{cityName}',
+    name: 'City Weather Data',
+    mimeType: 'application/json'
+  },
+  readCallback: async (uri, params) => {
+    const cityKey = params.cityName.toLowerCase().replace(' ', '-')
+    const data = weatherData[cityKey]
+
+    if (!data) {
+      return {
+        contents: [{
+          uri: uri.toString(),
+          mimeType: 'application/json',
+          text: JSON.stringify({ error: `No data for ${params.cityName}` })
+        }]
+      }
+    }
+
+    return {
+      contents: [{
+        uri: uri.toString(),
+        mimeType: 'application/json',
+        text: JSON.stringify({
+          city: params.cityName,
+          ...data,
+          timestamp: new Date().toISOString()
+        }, null, 2)
+      }]
+    }
+  }
+})
+```
+
+### Adding Prompts
+
+Prompts help generate structured inputs for AI models:
+
+```typescript
+server.prompt({
+  name: 'weather_analysis',
+  description: 'Generate a weather analysis prompt',
+  args: [
+    {
+      name: 'city',
+      type: 'string',
+      required: true
+    },
+    {
+      name: 'days',
+      type: 'number',
+      required: false
+    }
+  ],
+  cb: async ({ city, days = 7 }) => {
+    return {
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional meteorologist providing weather analysis.'
+        },
+        {
+          role: 'user',
+          content: `Please provide a detailed weather analysis for ${city} ` +
+                   `covering the next ${days} days. Include temperature trends, ` +
+                   `precipitation probability, and any notable weather patterns.`
+        }
+      ]
+    }
+  }
+})
+```
+
+## Adding Custom HTTP Routes
+
+The server includes full Express.js functionality:
+
+```typescript
+// Add a health check endpoint
+server.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    server: 'weather-mcp-server'
+  })
+})
+
+// Serve static files (if you have a public directory)
+server.use('/public', express.static('public'))
+
+// Custom API endpoint
+server.get('/api/cities', (req, res) => {
+  res.json(Object.keys(weatherData))
+})
+```
+
+## Testing Your Server
+
+### 1. Start the Development Server
+
+```bash
+npm run dev
+```
+
+Your server will start at:
+- MCP Endpoint: `http://localhost:3000/mcp`
+- Inspector UI: `http://localhost:3000/inspector`
+
+### 2. Using the Inspector
+
+Open your browser and navigate to `http://localhost:3000/inspector`. The inspector provides:
+
+- **Tools Testing**: Execute tools with parameters
+- **Resource Browsing**: View and read resources
+- **Prompt Testing**: Generate prompts with arguments
+- **Protocol Monitoring**: See raw MCP messages
+
+### 3. Connect an MCP Client
+
+Configure your MCP client to connect to `http://localhost:3000/mcp`. For example, in Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "weather-server": {
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+## Complete Example
+
+Here's the complete server code:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+import express from 'express'
+
+// Mock weather data
+const weatherData: Record<string, any> = {
+  'new-york': { temp: 72, condition: 'Partly cloudy', humidity: 65 },
+  'london': { temp: 59, condition: 'Rainy', humidity: 80 },
+  'tokyo': { temp: 78, condition: 'Sunny', humidity: 55 },
+  'paris': { temp: 64, condition: 'Overcast', humidity: 70 }
+}
+
+// Create server
+const server = createMCPServer('weather-mcp-server', {
+  version: '1.0.0',
+  description: 'A weather information MCP server'
+})
+
+// Add weather lookup tool
+server.tool({
+  name: 'get_weather',
+  description: 'Get current weather for a city',
+  inputs: [
+    {
+      name: 'city',
+      type: 'string',
+      description: 'City name',
+      required: true
+    }
+  ],
+  cb: async ({ city }) => {
+    const cityKey = city.toLowerCase().replace(' ', '-')
+    const data = weatherData[cityKey]
+
+    if (!data) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Weather data not available for ${city}`
+        }]
+      }
+    }
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Weather in ${city}:\n` +
+              `Temperature: ${data.temp}°F\n` +
+              `Condition: ${data.condition}\n` +
+              `Humidity: ${data.humidity}%`
+      }]
+    }
+  }
+})
+
+// Add alerts resource
+server.resource({
+  name: 'weather_alerts',
+  uri: 'weather://alerts',
+  title: 'Current Weather Alerts',
+  mimeType: 'application/json',
+  readCallback: async () => ({
+    contents: [{
+      uri: 'weather://alerts',
+      mimeType: 'application/json',
+      text: JSON.stringify([
+        {
+          type: 'warning',
+          title: 'Heavy Rain Warning',
+          areas: ['London']
+        }
+      ], null, 2)
+    }]
+  })
+})
+
+// Add health endpoint
+server.get('/health', (req, res) => {
+  res.json({ status: 'healthy' })
+})
+
+// Start server
+const PORT = 3000
+server.listen(PORT).then(() => {
+  console.log(`Weather MCP Server running on port ${PORT}`)
+  console.log(`MCP endpoint: http://localhost:${PORT}/mcp`)
+  console.log(`Inspector: http://localhost:${PORT}/inspector`)
+})
+```
+
+## Next Steps
+
+Now that you have a working server, explore:
+
+- [API Reference](./api-reference) - Detailed API documentation
+- [Tools Guide](./tools) - Advanced tool configurations
+- **[Deploy Your Server](./deployment-mcp-use)** - Deploy to production with one command
+- [Resources Guide](./resources) - Resource templates and annotations
+- [UI Widgets](./ui-widgets) - Creating interactive UI components
+- [Examples](./examples) - More complex server implementations

@@ -1,15 +1,24 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import type { InputDefinition } from './common.js'
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { InputDefinition } from "./common.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 
-export type ToolHandler = (params: Record<string, any>) => Promise<CallToolResult>
+export type ToolCallback = (
+  params: Record<string, any>
+) => Promise<CallToolResult>;
 
 export interface ToolDefinition {
   /** Unique identifier for the tool */
-  name: string
+  name: string;
+  /** Human-readable title for the tool (displayed in UI) */
+  title?: string;
   /** Description of what the tool does */
-  description?: string
+  description?: string;
   /** Input parameter definitions */
-  inputs?: InputDefinition[]
-  /** Async function that executes the tool */
-  fn: ToolHandler
+  inputs?: InputDefinition[];
+  /** Async callback function that executes the tool */
+  cb: ToolCallback;
+  /** Tool annotations */
+  annotations?: ToolAnnotations;
+  /** Metadata for the tool */
+  _meta?: Record<string, unknown>;
 }

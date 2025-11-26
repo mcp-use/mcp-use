@@ -1,15 +1,25 @@
-node_modules
-dist
-build
-coverage
-.next
-.turbo
-.vercel
+# Ignore markdown files
+*.md
+
+# Ignore JSON files
+*.json
+
+# Build outputs
+**/dist/**
+**/build/**
+**/.next/**
+**/coverage/**
+**/.turbo/**
+**/.vercel/**
+**/.tsup/**
+**/.vite/**
+**/.mcp-use/**
+
+
+# Dependencies
+**/node_modules/**
+
+# Lock files
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
-*.min.js
-*.min.css
-packages/*/dist
-packages/*/build
-packages/*/coverage

@@ -30,10 +30,10 @@ async def run_blender_example():
     client = MCPClient.from_dict(config)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+    llm = ChatAnthropic(model="claude-sonnet-4-5")
 
     # Create agent with the client
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
 
     try:
         # Run the query

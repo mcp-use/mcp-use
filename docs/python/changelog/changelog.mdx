@@ -4,6 +4,30 @@ description: "New updates and improvements"
 icon:  "history"
 ---
 
+<Update label="v1.4.1 - 2025‑11‑20">
+  ## Code Mode & Pretty Display
+  - **New**: Code Mode integration for direct code execution through MCP servers with isolated environments
+  - **New**: Pretty Display system with rich, colorful terminal output for agent interactions
+  - **New**: LangChain integration guide and example implementation
+  - **Enhancement**: SSL certificate verification control via `verify` parameter in MCPClient
+  - **Enhancement**: Enhanced schema handling for complex data structures with improved list support
+  - **Fix**: Recursion limit configuration in MCPAgent to prevent stack overflow errors
+  - **Fix**: Client info property in base connector for proper metadata reporting
+</Update>
+
+
+<Update label="v1.4.0 - 2025‑10‑27">
+  ## LangChain 1.0 & Provider Adapters
+  - **Major**: Upgraded to LangChain 1.0.0 for improved performance and simplified agent patterns
+  - **New**: Direct provider adapters for OpenAI, Anthropic, and Google - use MCP tools without MCPAgent
+  - **Enhancement**: Agent methods now leverage LangChain 1.0.0's `create_agent()` and internal `astream()` for better loop handling
+  - **Enhancement**: Dynamic tool updates during agent execution
+  - **Enhancement**: Enhanced step tracking and middleware support for better observability
+  - **Enhancement**: Remote mode query streaming delegation
+  - **Fix**: Improved streaming output reliability with proper null checking
+  - **Fix**: Automatic ToolMessage filtering from conversation history
+</Update>
+
 <Update label="v1.3.13 - 2025‑10‑18">
   ## Package Reorganization
   - **Refactor**: Reorganized package structure into `client.*` and `agents.*` namespaces for better discoverability

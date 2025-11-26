@@ -15,6 +15,9 @@ from mcp.types import (
     ReadResourceRequestParams,
     Resource,
 )
+from mcp.types import (
+    Tool as MCPTool,
+)
 from pydantic import BaseModel, Field, create_model
 
 from mcp_use.agents.adapters.base import BaseAdapter
@@ -35,32 +38,15 @@ class LangChainAdapter(BaseAdapter):
         """
         super().__init__(disallowed_tools)
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
+        self._connector_resource_map: dict[BaseConnector, list[BaseTool]] = {}
+        self._connector_prompt_map: dict[BaseConnector, list[BaseTool]] = {}
 
-    @telemetry("adapter_fix_schema")
-    def fix_schema(self, schema: dict) -> dict:
-        """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
-
-        Args:
-            schema: The JSON schema to fix.
-
-        Returns:
-            The fixed JSON schema.
-        """
-        if isinstance(schema, dict):
-            if "type" in schema and isinstance(schema["type"], list):
-                schema["anyOf"] = [{"type": t} for t in schema["type"]]
-                del schema["type"]  # Remove 'type' and standardize to 'anyOf'
-
-            # Fix enum handling - ensure enum fields are properly typed as strings
-            if "enum" in schema and "type" not in schema:
-                schema["type"] = "string"
-
-            for key, value in schema.items():
-                schema[key] = self.fix_schema(value)  # Apply recursively
-        return schema
+        self.tools: list[BaseTool] = []
+        self.resources: list[BaseTool] = []
+        self.prompts: list[BaseTool] = []
 
     @telemetry("adapter_convert_tool")
-    def _convert_tool(self, mcp_tool: dict[str, Any], connector: BaseConnector) -> BaseTool:
+    def _convert_tool(self, mcp_tool: MCPTool, connector: BaseConnector) -> BaseTool:
         """Convert an MCP tool to LangChain's tool format.
 
         Args:
@@ -116,6 +102,7 @@ class LangChainAdapter(BaseAdapter):
                 try:
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     try:
+                        # Use the helper function to parse the result
                         return str(tool_result.content)
                     except Exception as e:
                         # Log the exception for debugging

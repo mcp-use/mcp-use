@@ -16,6 +16,12 @@ MCP: Main integration module with customizable system prompt.
 This module provides the main MCPAgent class that integrates all components
 to provide a simple interface for using MCP tools with different LLMs.
 
+LangChain 1.0.0 Migration:
+- The agent uses create_agent() from langchain.agents which returns a CompiledStateGraph
+- New methods: astream_simplified() and run_v2() leverage the built-in astream() from
+  CompiledStateGraph which handles the agent loop internally
+- Legacy methods: stream() and run() use manual step-by-step execution for backward compatibility
+
 ## MCPAgent
 
 <div>
@@ -43,7 +49,7 @@ Initialize a new MCPAgent instance.
 **Parameters**
 ><ParamField body="llm" type="langchain_core.language_models.base.BaseLanguageModel | None" default="None" >   The LangChain LLM to use. Not required if agent_id is provided for remote execution. </ParamField>
 ><ParamField body="client" type="mcp_use.client.client.MCPClient | None" default="None" >   The MCPClient to use. If provided, connector is ignored. </ParamField>
-><ParamField body="connectors" type="list[mcp_use.connectors.base.BaseConnector] | None" default="None" >   A list of MCP connectors to use if client is not provided. </ParamField>
+><ParamField body="connectors" type="list[mcp_use.client.connectors.base.BaseConnector] | None" default="None" >   A list of MCP connectors to use if client is not provided. </ParamField>
 ><ParamField body="max_steps" type="int" default="5" >   The maximum number of steps to take. </ParamField>
 ><ParamField body="auto_initialize" type="bool" default="False" >   Whether to automatically initialize the agent when run is called. </ParamField>
 ><ParamField body="memory_enabled" type="bool" default="True" >   Whether to maintain conversation history for context. </ParamField>
@@ -53,19 +59,19 @@ Initialize a new MCPAgent instance.
 ><ParamField body="disallowed_tools" type="list[str] | None" default="None" >   List of tool names that should not be available to the agent. </ParamField>
 ><ParamField body="tools_used_names" type="list[str] | None" default="None" >   List of tools </ParamField>
 ><ParamField body="use_server_manager" type="bool" default="False" >   Whether to use server manager mode instead of exposing all tools. </ParamField>
-><ParamField body="server_manager" type="mcp_use.managers.base.BaseServerManager | None" default="None" >   Server name or configuration </ParamField>
+><ParamField body="server_manager" type="mcp_use.agents.managers.base.BaseServerManager | None" default="None" >   Server name or configuration </ParamField>
 ><ParamField body="verbose" type="bool" default="False" >   Enable debug/verbose mode </ParamField>
+><ParamField body="pretty_print" type="bool" default="False" >   Whether to pretty print the output. </ParamField>
 ><ParamField body="agent_id" type="str | None" default="None" >   Remote agent ID for remote execution. If provided, creates a remote agent. </ParamField>
 ><ParamField body="api_key" type="str | None" default="None" >   API key for remote execution. If None, checks MCP_USE_API_KEY env var. </ParamField>
 ><ParamField body="base_url" type="str" default='https://cloud.mcp-use.com' >   Base URL for remote API calls. </ParamField>
 ><ParamField body="callbacks" type="list | None" default="None" >   List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler. </ParamField>
 ><ParamField body="chat_id" type="str | None" default="None" >   String value </ParamField>
-><ParamField body="retry_on_error" type="bool" default="True" >   Whether to retry tool calls that fail due to validation errors. </ParamField>
-><ParamField body="max_retries_per_step" type="int" default="2" >   Maximum number of retries for validation errors per step. </ParamField>
+><ParamField body="retry_on_error" type="bool" default="True" >   Whether to enable automatic error handling for tool calls. When True, tool errors </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.client.MCPClient | None = None, connectors: list[mcp_use.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.managers.base.BaseServerManager | None = None, verbose: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True, max_retries_per_step: int = 2):
+def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.client.MCPClient | None = None, connectors: list[mcp_use.client.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.agents.managers.base.BaseServerManager | None = None, verbose: bool = False, pretty_print: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True):
 ```
 
 </Card>
@@ -179,11 +185,7 @@ def initialize():
 <Card type="info">
 ### `method` run
 
-Run a query using the MCP tools and return the final result.
-
-        This method uses the streaming implementation internally and returns
-        the final result after consuming all intermediate steps. If output_schema
-        is provided, the agent will be schema-aware and return structured output.
+Run a query using LangChain 1.0.0's agent and return the final result.
 
         Example:
             ```python
@@ -266,19 +268,36 @@ def set_system_message(message: str):
 <Card type="info">
 ### `method` stream
 
-Run the agent and yield intermediate steps as an async generator.
+Async generator using LangChain 1.0.0's create_agent and astream.
+
+        This method leverages the LangChain 1.0.0 API where create_agent returns
+        a CompiledStateGraph that handles the agent loop internally via astream.
+
+        **Tool Updates with Server Manager:**
+        When using server_manager mode, this method handles dynamic tool updates:
+        - **Before execution:** Updates are applied immediately to the new stream
+        - **During execution:** When tools change, we wait for a "safe restart point"
+          (after tool results complete), then interrupt the stream, recreate the agent
+          with new tools, and resume execution with accumulated messages.
+        - **Safe restart points:** Only restart after tool results to ensure message
+          pairs (tool_use + tool_result) are complete, satisfying LLM API requirements.
+        - **Max restarts:** Limited to 3 restarts to prevent infinite loops
+
+        This interrupt-and-restart approach ensures that tools added mid-execution
+        (e.g., via connect_to_mcp_server) are immediately available to the agent,
+        maintaining the same behavior as the legacy implementation while respecting
+        API constraints.
 
         Yields:
-            Intermediate steps as (AgentAction, str) tuples, followed by the final result.
-            If output_schema is provided, yields structured output as instance of the schema.
+            Intermediate steps and final result from the agent execution.
 
 
 **Parameters**
 ><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
-><ParamField body="max_steps" type="int | None" default="None" >   Optional maximum number of steps to take. </ParamField>
+><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
 ><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
-><ParamField body="track_execution" type="bool" default="True" >   Whether to track execution for telemetry. </ParamField>
+><ParamField body="track_execution" type="bool" default="True" >   Boolean flag </ParamField>
 ><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
 
 **Returns**

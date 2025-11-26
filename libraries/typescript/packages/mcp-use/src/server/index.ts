@@ -1,9 +1,6 @@
-export {
-  createMCPServer,
-  type McpServerInstance
-} from './mcp-server.js'
+export { createMCPServer, type McpServerInstance } from "./mcp-server.js";
 
-export * from './types/index.js'
+export * from "./types/index.js";
 
 // MCP-UI adapter utility functions
 export {
@@ -12,25 +9,33 @@ export {
   createRawHtmlResource,
   createRemoteDomResource,
   createUIResourceFromDefinition,
-  type UrlConfig
-} from './adapters/mcp-ui-adapter.js'
+  type UrlConfig,
+} from "./adapters/mcp-ui-adapter.js";
+
+// Middleware adapter utility functions
+export {
+  adaptConnectMiddleware,
+  adaptMiddleware,
+  isExpressMiddleware,
+} from "./connect-adapter.js";
 
 export type {
+  DiscoverWidgetsOptions,
+  ExternalUrlUIResource,
   InputDefinition,
+  PromptCallback,
   PromptDefinition,
-  PromptHandler,
+  RawHtmlUIResource,
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
+  RemoteDomUIResource,
   ResourceDefinition,
-  ResourceHandler,
   ServerConfig,
+  ToolCallback,
   ToolDefinition,
-  ToolHandler,
   // UIResource specific types
   UIResourceDefinition,
-  ExternalUrlUIResource,
-  RawHtmlUIResource,
-  RemoteDomUIResource,
-  WidgetProps,
   WidgetConfig,
   WidgetManifest,
-  DiscoverWidgetsOptions,
-} from './types/index.js'
+  WidgetProps,
+} from "./types/index.js";

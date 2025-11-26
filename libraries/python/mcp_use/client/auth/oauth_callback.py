@@ -1,9 +1,9 @@
 """OAuth callback server implementation."""
 
 import asyncio
+import html
 from dataclasses import dataclass
 
-import anyio
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -38,7 +38,6 @@ class OAuthCallbackServer:
         # Thread safe way to pass callback data to the main OAuth flow
         self.response_queue: asyncio.Queue[CallbackResponse] = asyncio.Queue(maxsize=1)
         self.server: uvicorn.Server | None = None
-        self._shutdown_event = anyio.Event()
 
     async def start(self) -> str:
         """Start the callback server and return the redirect URI."""
@@ -74,7 +73,6 @@ class OAuthCallbackServer:
 
     async def shutdown(self):
         """Shutdown the callback server."""
-        self._shutdown_event.set()
         if self.server:
             self.server.should_exit = True
             if hasattr(self, "_server_task"):
@@ -170,8 +168,8 @@ class OAuthCallbackServer:
 
     def _error_html(self, error: str | None, description: str | None) -> str:
         """HTML response for authorization error."""
-        error_msg = error or "Unknown error"
-        desc_msg = description or "Authorization was not completed successfully."
+        error_msg = html.escape(error or "Unknown error")
+        desc_msg = html.escape(description or "Authorization was not completed successfully.")
 
         return f"""
         <!DOCTYPE html>

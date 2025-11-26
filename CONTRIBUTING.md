@@ -32,7 +32,7 @@ Please read and follow our [Code of Conduct](./CODE_OF_CONDUCT.md) to ensure a w
 This is a monorepo containing both Python and TypeScript implementations:
 
 ```
-mcp-use-monorepo/
+mcp-use/
 ├── libraries/
 │   ├── python/        # Python implementation
 │   └── typescript/    # TypeScript implementation
@@ -47,7 +47,7 @@ mcp-use-monorepo/
 ```bash
 # Fork the repository on GitHub, then:
 git clone https://github.com/YOUR_USERNAME/mcp-use.git
-cd mcp-use-monorepo
+cd mcp-use
 ```
 
 ### 2. Install Dependencies
@@ -416,17 +416,49 @@ git push origin python-v1.2.3
 
 ### TypeScript Releases
 
+TypeScript releases use [Changesets](https://github.com/changesets/changesets) for version management:
+
+#### For Main Branch (Stable Releases)
+
 ```bash
-# Create changeset
+# 1. Create a changeset describing your changes
 cd libraries/typescript
 pnpm changeset
 
-# Version packages
-pnpm changeset version
-
-# Commit and push
-git commit -m "chore: version packages"
+# 2. Commit and push your changes with the changeset
+git add .
+git commit -m "feat: add new feature"
 git push
+
+# 3. When merged to main:
+#    - CI automatically creates/updates a "Version Packages" PR
+#    - Review and merge the Version PR to publish stable versions
+```
+
+#### For Canary Branch (Prereleases)
+
+```bash
+# 1. Create a changeset for your changes
+cd libraries/typescript
+pnpm changeset
+
+# 2. Push to canary branch
+git add .
+git commit -m "feat: experimental feature"
+git push origin canary
+
+# 3. CI automatically publishes as canary prerelease
+#    - Versions: x.y.z-canary.0, x.y.z-canary.1, etc.
+#    - Published with "canary" dist tag on npm
+```
+
+#### Installing Canary Versions
+
+Users can test canary releases by installing with the canary tag:
+
+```bash
+npm install mcp-use@canary
+npm install @mcp-use/cli@canary
 ```
 
 ## Getting Help

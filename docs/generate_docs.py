@@ -1681,9 +1681,12 @@ def scan_all_files_for_deprecated_items(package_dir: str) -> dict[str, list[str]
 
 def update_docs_json(docs_json_path: str, api_reference_dir: str) -> None:
     """Update docs.json with new API reference structure."""
-    # Read existing docs.json
+    # Read existing docs.json as text to preserve formatting
     with open(docs_json_path, encoding="utf-8") as f:
-        docs_config = json.load(f)
+        original_content = f.read()
+
+    # Parse JSON for updates
+    docs_config = json.loads(original_content)
 
     # Get all MDX files in api-reference directory
     api_ref_path = Path(api_reference_dir)
@@ -1700,11 +1703,15 @@ def update_docs_json(docs_json_path: str, api_reference_dir: str) -> None:
     api_groups = generate_api_reference_groups(packages)
 
     # Update the navigation structure
-    # Handle both "API Reference" and "Python API Reference" tab names
-    for tab in docs_config["navigation"]["tabs"]:
-        if "API Reference" in tab["tab"]:
-            tab["groups"] = api_groups
-            break
+    # Find the Python SDK product and then the API Reference tab within it.
+    for product in docs_config["navigation"]["products"]:
+        if product.get("product") == "Python SDK":
+            if "tabs" in product:
+                for tab in product["tabs"]:
+                    if "API Reference" in tab.get("tab", ""):
+                        tab["groups"] = api_groups
+                        break  # Found the tab, stop searching tabs
+            break  # Found the product, stop searching products
 
     # Write updated docs.json
     with open(docs_json_path, "w", encoding="utf-8") as f:
@@ -1768,6 +1775,25 @@ def main():
     exclude_patterns = ["telemetry"]
     modules = find_python_modules(package_dir, exclude_patterns)
     print(f"Found {len(modules)} modules (excluding: {', '.join(exclude_patterns)})")
+
+    # Step 1a: Remove stale documentation files
+    print("🔄 Checking for stale documentation files...")
+    existing_mdx_files = (
+        list(Path(output_dir).glob("*.mdx")) if os.path.exists(output_dir) else []
+    )
+    existing_module_names = {f.stem for f in existing_mdx_files}
+    expected_module_names = {module.replace(".", "_") for module in modules}
+
+    stale_files = existing_module_names - expected_module_names
+    if stale_files:
+        print(f"🗑️  Found {len(stale_files)} stale documentation file(s) to remove:")
+        for stale_name in sorted(stale_files):
+            stale_path = Path(output_dir) / f"{stale_name}.mdx"
+            if stale_path.exists():
+                stale_path.unlink()
+                print(f"   - Removed {stale_path}")
+    else:
+        print("✅ No stale documentation files found")
 
     # Generate docs for each module
     success_count = 0

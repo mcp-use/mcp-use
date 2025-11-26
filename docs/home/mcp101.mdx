@@ -1,0 +1,409 @@
+---
+title: "MCP 101"
+description: "Principles of MCP development with mcp-use"
+icon: "brain"
+---
+
+# Principles of MCP development with mcp-use
+
+## Overview and Purpose of MCP
+
+The **Model Context Protocol (MCP)** is a recently introduced open standard (late 2024 by Anthropic) for connecting AI models (especially Large Language Models, LLMs) to external tools, data sources, and environments.
+
+It addresses a key limitation of standalone AI models: their isolation from live data and services.
+
+Instead of requiring custom integrations for every new data source or API (a process that is difficult to scale and maintain), MCP provides a universal, standardized interface
+
+## MCP Architecture and Workflow
+
+MCP is designed with a clear **client-server architecture** that cleanly separates the AI agent (client side) from the external tools or data (server side). In an MCP deployment, the *AI-driven application* (often called the **MCP host**) runs an **MCP client** component, which is responsible for communicating with one or more **MCP servers.**
+
+MCP is built around three main elements:
+
+- **MCP Host**: This is the AI-powered application or platform where tasks are executed using the MCP client, **like your agentic product or custom AI agent.**
+Early products include general third-party tools like Claude Desktop or development utilities such as Cursor.
+- **MCP Client**: Operating within the host, the client acts as a bridge between the host and MCP servers. It manages communication by sending requests and querying available services. This exchange of information is handled securely over the transport layer.
+- **MCP Server**: This acts as the access point for the MCP client to carry out operations.
+
+This architecture allows a model to **autonomously maintain and switch context between multiple tools and data sources**.
+
+The MCP client can query servers to discover available tools and resources, and then invoke them by sending structured requests.
+
+## MCP Servers Primitives
+
+The MCP protocol defines three core primitives that servers can implement:
+
+| **Primitive** | **Control** | **Description** | **Example Use** |
+| --- | --- | --- | --- |
+| Prompts | User-controlled | Interactive templates invoked by user choice | Slash commands, menu options |
+| Resources | Application-controlled | Contextual data managed by the client application | File contents, API responses |
+| Tools | Model-controlled | Functions exposed to the LLM to take actions | API calls, data updates |
+
+### Tools
+
+Tools are operations or API calls that the server can execute on behalf of the model (e.g. invoking an external web service, running a computation, or controlling an IoT device)
+
+### Resources
+
+Resources are data sources that the server can provide access to.
+
+When the model needs specific data (say, customer logs or an internal knowledge base), the MCP server fetches or queries these resources and returns the information
+
+Resources are MCP's way of exposing read-only data to LLMs. A resource is anything that has content that can be read, such as:
+
+- Files on your computer
+- Database records
+- API responses
+- Application data
+- System information
+
+Each resource has:
+
+- A unique URI (like `file:///example.txt` or `database://users/123`)
+- A display name
+- Optional metadata (description, MIME type)
+- Content (text or binary data)
+
+### Prompts
+
+Prompts are templated instructions or contextual snippets managed by the server to help format or enrich the model's input. These can be reusable prompt templates that ensure consistency or provide the model with additional context for certain tasks.
+
+## MCP Clients Primitives
+
+The MCP protocol defines three core primitives that clients can implement:
+
+| **Primitive** | Flow | **Description** | **Example Use** |
+| --- | --- | --- | --- |
+| Elicitation | Server to user | Elicitation in MCP allows servers to implement interactive workflows by enabling user input requests to occur nested inside other MCP server features. | User in the loop. |
+| Sampling | Server to LLM | Sampling is a standardized way for servers to request LLM sampling ("completions" or "generations") from language models via clients.  | Tool requires an LLM to return the result.
+This way, MCP servers don't need to include an LLM. |
+| Roots | Server to filesystem | Roots in MCP are typically exposed through workspace or project configuration interfaces. For example, implementations could offer a workspace/project picker that allows users to select directories and files that the server should have access to. | Access files and directories. |
+
+## mcp-use SDK
+
+mcp-use is the easiest way to interact with MCP servers with custom agents.
+
+It supports **any MCP server**, allowing you to connect to a wide range of server implementations for different use cases.
+
+- Python library: [https://github.com/mcp-use/mcp-use](https://github.com/mcp-use/mcp-use)
+- TypeScript library: [https://github.com/mcp-use/mcp-use](https://github.com/mcp-use/mcp-use)
+- SDK documentation: [https://docs.mcp-use.com](https://docs.mcp-use.com/)
+
+### MCP Client
+
+The `MCPClient` class provides methods for managing connections to multiple MCP servers.
+
+- Great DX: Clean integration, no double async loops, no session management, what a developer wants.
+- Multi-Server Support Use multiple MCP servers simultaneously in a single agent.
+- Tool Restrictions: Reduce LLM hallucinations. Restrict potentially dangerous tools like file system or network access.
+
+### MCP Agent
+
+The `MCPAgent` class allows you to build an MCP-enabled Agent with just an LLM, system prompt and MCPClient configured with one or multiple MCP servers.
+
+- Ease of use: Create your first MCP capable agent you need only 6 lines of code.
+- LLM Agnostic: Works with any LLM, also local ones.
+- Dynamic Server Selection: Agents can dynamically choose the most appropriate MCP server for a given task from the available pool.
+
+#### Spin up your agent
+
+```python
+import asyncio
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def main():
+    # Load environment variables
+    load_dotenv()
+
+    # Create configuration dictionary
+    config = {
+      "mcpServers": {
+        "playwright": {
+          "command": "npx",
+          "args": ["@playwright/mcp@latest"],
+          "env": {
+            "DISPLAY": ":1"
+          }
+        }
+      }
+    }
+
+    # Create MCPClient from configuration dictionary
+    client = MCPClient.from_dict(config)
+
+    # Create LLM
+    llm = ChatOpenAI(model="gpt-4o")
+
+    # Create agent with the client
+    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+
+    # Run the query
+    result = await agent.run(
+        "Find the best restaurant in San Francisco",
+    )
+    print(f"\nResult: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### SDK Demo
+
+This video explains the origin of the mcp-use open source library. A library that lets you connect any LLM to any MCP server in just 6 lines of code.
+
+Then it provides a demo of an agent that combines browsing capabilities with linear capabilities to create a ticket which contains the best HN posts of the day.
+
+[https://www.youtube.com/watch?v=nL_B6LZAsp4](https://www.youtube.com/watch?v=nL_B6LZAsp4)
+
+## MCP-Enabled Agents Overview
+
+Software products are becoming agents.
+
+Agentic products interact with the world via MCP, not APIs.
+
+The current infrastructure is designed around APIs and falls short.
+
+Therefore, we need the infrastructure for MCP.
+
+### Problem
+
+As software becomes increasingly agent-driven, traditional infrastructure falls short.
+
+Dev teams are using MCP servers to build internal agents or make their products agentic.
+
+But they're spending their time on plumbing, not product.
+
+Dev teams aren't excited about managing more infrastructure and tooling.
+
+We solve this by providing the dedicated infrastructure needed to support MCP's rapid adoption.
+
+#### Solution
+
+Our cloud platform provides developers with a single, unified interface for MCP. They can configure multiple MCP servers into a single pool, creating agents tailored to their applications.
+
+Developers integrate these agents through our SDK with just one line of code and embed them into their products.
+
+We handle all the hosting and deployment complexities.
+
+Think of us as the Vercel and Next.js, but built for MCP development.
+
+## MCP Development Problems
+
+We found that teams building AI agents frequently faced major friction points: agents need modular, plug-and-play integrations with diverse services, but most teams were hand-coding these integrations. Without standardization, scaling agents became slow and error-prone.
+
+**Remote deployment and governance of MCP servers** in enterprise settings remain unsolved issues.
+
+Also, it's crucial to make MCP-enabled agents easily configurable, swappable, and loosely coupled.
+
+Let's go through the main challenges that we found when talking with hundreds of developers in both startups and big enterprises.
+
+### Problems
+
+- Correctly build and deploy MCP servers
+- Fragmented MCP server configs
+- Handle auth, access control, and audit logging
+- Reduce the number of tools exposed
+- Manage environments and governance
+- Observability gap
+- Agents are mostly running locally
+
+### Correctly build and deploy MCP servers
+
+Creating an MCP server might seem trivial especially by translating OpenAPI specs into MCP servers using automations, but this often leads to hallucination-prone agent behavior.
+
+AI agents using them often misinterpret capabilities or fail to handle error states.
+
+Without rigorous testing these "shallow wrappers" encourage brittle integrations that break silently.
+
+Additionally most MCP servers today lack formal versioning strategies, this can break downstream agentic workflows or lead to silent failure.
+
+### Fragmented MCP server configs
+
+The MCP ecosystem today looks like the early web: configs scattered across GitHub or registries.
+
+Organizations hardcode MCP server definitions into multiple internal systems or codebases, leading to duplicated logic and stale configs.
+
+Updating schemas or rotating credentials is rarely done.
+
+Configs in organizations are shared over Slack or copied and pasted into scripts.
+This makes collaboration between teams painful since there's no shared source of truth.
+
+### Handle auth, access control, and audit logging
+
+Companies are developing powerful internal agents, but their rollout is hindered by the lack of a clear approach to managing authentication and access control for these agents.
+
+Every MCP server has its own credentials hardcoded in the configs or via OAuth, which makes enforcing security and compliance difficult.
+
+Ideally, the agent should be considered an untrusted user, given limited privileges scoped only to the specific access they need to complete a task.
+
+What's missing is also a fine-grained access control management for tools and resources.
+
+Every tool invocation or data access via MCP should be continuously verified and authorized, rather than implicitly trusted.
+
+### Reduce the number of tools exposed
+
+Many MCP servers expose dozens of tools, assuming agents will pick the right one. This is a false assumption.
+
+LLMs degrade rapidly when overwhelmed with too many options.
+They hallucinate tool names, misuse similar interfaces, or generate ambiguous calls.
+
+The advice is to add a ceiling of ~10/20 tools per context window. Beyond that, performance and reliability drop significantly.
+
+### Manage environments and governance
+
+MCP sits at the intersection of AI autonomy and infrastructure control, which creates governance headaches.
+
+There's no easy way to manage different environments (prod, staging, dev) or permission scopes across teams.
+
+Without profiles, namespaces, or policy layers, developers resort to workarounds, such as maintaining separate config files or hardcoding server URIs.
+
+Furthermore, there's little organizational oversight: who owns an MCP server? Who approves a new tool being added? Governance is an afterthought
+
+### Observability gap
+
+Today, most MCP implementations offer little to no observability. You can't easily trace what the agent asked a tool to do, what the tool returned, or why a decision was made.
+
+### Agents are mostly running locally
+
+Despite MCP's vision of scalable, agentic infrastructure, most AI agents today are still running locally, inside closed-source apps like Claude Desktop or scripts on developer machines.
+
+For internal use-cases, these setups are hard to monitor and almost impossible to standardize across teams.
+
+Worse, local agents often have broad system access, which increases the blast radius of any misbehavior or compromised tool.
+
+Until agents move to a secure, server-based runtime with auditable execution and policy enforcement, companies will struggle to scale safe, compliant AI workflows.
+
+## mcp-use Platform
+
+mcp-use is the open-source dev tools and infrastructure for MCP to help dev teams quickly build and deploy custom AI agents with MCP servers.
+
+mcp-use SDK just crossed 150,000 downloads and 7,000 GitHub stars.
+
+Dev teams use us at a variety of companies, both startups and enterprises like NASA, NVIDIA, SAP, and many others to build agentic products or internal custom agents.
+
+- Website: [https://mcp-use.com/](https://mcp-use.com/)
+
+### The solution vertical for MCP development
+
+Dev teams can build application layer using our SDK which is deeply integrated with **mcp-use Platform,** the central control plane layer that acts like a gateway for all the MCP servers.
+
+mcp-use provides a vertical solution for MCP development with the following offering:
+
+- mcp-use SDK: Easily integrate MCP-enabled AI agents into your product or internal tools.
+- mcp-use Cloud Platform: The central control plane layer for MCP servers, managing configs, server selection, caching, metrics, and access control.
+- mcp-use Server Hosting: managed/self-hosted servers, third-party MCP servers, and short-lived stdio sandboxed servers.
+
+<img src="/images/mcp-useverticalsolution.png" alt="mcp-use vertical solution" />
+
+### Platform Demo
+
+[https://www.youtube.com/watch?v=BbgmUpaQC_s](https://www.youtube.com/watch?v=BbgmUpaQC_s)
+
+### Features
+
+- Centralized Server Config Management
+- Automated MCP Server Deployment
+- Profile-Based Access Control & Audit Logging
+- Tool Restrictions
+- Environment and Governance Profiles
+- Observability and Metrics for MCP Servers and Agents
+- Agent Execution Runtime
+
+### Centralized Server Config Management
+
+Manage all MCP server configurations centrally within the **mcp-use Cloud Platform**.
+
+Developers no longer have to hardcode configurations or share them manually.
+
+This single source of truth reduces duplication and stale configurations.
+
+It ensures everyone always work with the latest, standardized configurations.
+
+Configs are imported into software projects via our integrated SDK or via API in third-party MCP clients.
+
+### Automated MCP Server Deployment
+
+Use the **mcp-use GitHub app** to automatically build, deploy, and continuously update MCP servers directly from your repository commits.
+
+The **mcp-use Cloud Platform** handles versioning, canary rules and rollbacks.
+
+Schema validation and structured tool definitions helps you correctly design MCP servers and possibly reducing errors from auto-generated OpenAPI conversions and decreasing hallucination in agents.
+
+### Profile-Based Access Control & Audit Logging
+
+Leverage **Profile-Based Access** to granularly assign permissions through role-based profiles.
+
+Agents are treated as untrusted by default, with scoped privileges that restrict access to necessary resources.
+
+Every tool invocation or data access is continuously verified and logged.
+
+Built-in **Audit Logging** provides clear observability and compliance reporting, simplifying security management and ensuring rigorous enforcement of access policies.
+
+### Tool Restrictions
+
+Limit or disable specific MCP tools per MCP server through the **mcp-use Cloud Platform**.
+
+The SDK pull the config and hides blocked tools from the model, keeping the tool list lean.
+
+It minimizes agent confusion and hallucinations, improving reliability and performance.
+
+### Environment and Governance Profiles
+
+Effortlessly manage multiple environments (prod, staging, dev) using environment-specific profiles within the **mcp-use Cloud Platform.**
+
+For compliance assign explicit ownership and governance rules, ensuring each MCP server and its tools undergo proper approval, oversight, and visibility.
+
+### Observability and Metrics for MCP Servers and Agents
+
+The **mcp-use Cloud Platform** captures detailed metrics, logs, and traces for every MCP server interaction.
+
+Easily track exactly what an agent requested, what a tool returned, and how decisions were made, allowing rapid debugging, and compliance transparency.
+
+Enhanced observability transforms opaque agent workflows into fully auditable processes,  improving reliability and trust.
+
+### Agent Execution Runtime
+
+Agents are stateful and executed within sandboxed, isolated environments rather than local scripts or closed-source clients.
+
+In your product the agent result can be returned as structured output or streamed to a chat interface for your users.
+
+For internal agents the decoupled execution model ensures policy enforcement, scalable performance, and auditability across the entire organization.
+
+The **mcp-use Agent Execution Runtime** is available through managed cloud hosting or self-hosted infrastructure.
+
+## Conclusions
+
+The mcp-use platform delivers a comprehensive vertical solution for MCP, empowering development teams to seamlessly build, deploy, and manage AI agents at scale.
+
+With a robust SDK that simplifies integration into products and internal workflows, paired with a unified central control plane, mcp-use solves the most challenging aspects of MCP server management.
+
+Centralized configuration management, automated deployment, built-in versioning, and granular access control drastically reduce operational complexity and security risks.
+
+Advanced tool management and rich observability address agent reliability and auditability, overcoming traditional limitations inherent to MCP deployments. Additionally, moving agent execution from isolated, local environments to secure, managed runtimes ensures safe, compliant, and scalable workflows.
+
+Backed by significant adoption, with over 150,000 SDK downloads and trusted by organizations ranging from innovative startups to leading enterprises like NASA, NVIDIA, and SAP, **mcp-use** is uniquely positioned as the definitive infrastructure stack for MCP-driven AI applications.
+
+### References
+
+- Website: [https://mcp-use.com/](https://mcp-use.com/)
+- SDK demo: [https://www.youtube.com/watch?v=nL_B6LZAsp4](https://www.youtube.com/watch?v=nL_B6LZAsp4)
+- Platform demo: [https://www.youtube.com/watch?v=BbgmUpaQC_s](https://www.youtube.com/watch?v=BbgmUpaQC_s)
+
+### Contacts
+
+- Email: founders@mcp-use.com
+- Book a meeting: [https://cal.com/mcp-use/founders](https://cal.com/mcp-use/founders)
+
+### Socials
+
+- LinkedIn: [https://www.linkedin.com/company/mcp-use](https://www.linkedin.com/company/mcp-use)
+- X: [https://x.com/mcpuse](https://x.com/mcpuse)
+- Discord: [https://discord.gg/XkNkSkMz3V](https://discord.gg/XkNkSkMz3V)
+
+### Founders
+
+- Pietro Zullo: [https://www.linkedin.com/in/pietrozullo/](https://www.linkedin.com/in/pietrozullo/)
+- Luigi Pederzani: [https://www.linkedin.com/in/luigipederzani/](https://www.linkedin.com/in/luigipederzani/)

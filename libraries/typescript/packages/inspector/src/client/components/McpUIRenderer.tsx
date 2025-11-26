@@ -1,26 +1,32 @@
-import type { Resource } from '@modelcontextprotocol/sdk/types.js'
-import { UIResourceRenderer } from '@mcp-ui/client'
+import type { Resource } from "@modelcontextprotocol/sdk/types.js";
+import {
+  basicComponentLibrary,
+  remoteButtonDefinition,
+  remoteImageDefinition,
+  remoteStackDefinition,
+  remoteTextDefinition,
+  UIResourceRenderer,
+} from "@mcp-ui/client";
 
 interface McpUIRendererProps {
-  resource: Resource
-  onUIAction?: (action: any) => void
-  className?: string
+  resource: Resource;
+  onUIAction?: (action: any) => void;
+  className?: string;
 }
 
 /**
  * Helper function to check if a resource is an MCP UI resource
  */
 export function isMcpUIResource(resource: any): boolean {
-  if (!resource?.mimeType)
-    return false
+  if (!resource?.mimeType) return false;
 
-  const mimeType = resource.mimeType.toLowerCase()
+  const mimeType = resource.mimeType.toLowerCase();
   return (
-    mimeType === 'text/html'
-    || mimeType === 'text/html+skybridge'
-    || mimeType === 'text/uri-list'
-    || mimeType.startsWith('application/vnd.mcp-ui.remote-dom')
-  )
+    mimeType === "text/html" ||
+    mimeType === "text/html+skybridge" ||
+    mimeType === "text/uri-list" ||
+    mimeType.startsWith("application/vnd.mcp-ui.remote-dom")
+  );
 }
 
 /**
@@ -32,18 +38,22 @@ function convertToMcpUIResource(resource: Resource): any {
     mimeType: resource.mimeType,
     text: resource.text,
     blob: resource.blob,
-  }
+  };
 }
 
 /**
  * Component to render MCP UI resources
  */
-export function McpUIRenderer({ resource, onUIAction, className }: McpUIRendererProps) {
+export function McpUIRenderer({
+  resource,
+  onUIAction,
+  className,
+}: McpUIRendererProps) {
   const handleUIAction = async (action: any) => {
-    return onUIAction?.(action)
-  }
+    return onUIAction?.(action);
+  };
 
-  const uiResource = convertToMcpUIResource(resource)
+  const uiResource = convertToMcpUIResource(resource);
 
   return (
     <div className={className}>
@@ -53,11 +63,22 @@ export function McpUIRenderer({ resource, onUIAction, className }: McpUIRenderer
         htmlProps={{
           autoResizeIframe: { width: true, height: true },
           style: {
-            width: '100%',
-            minHeight: '200px',
+            width: "100%",
+            minHeight: "200px",
           },
+          sandboxPermissions:
+            "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
+        }}
+        remoteDomProps={{
+          remoteElements: [
+            remoteTextDefinition,
+            remoteButtonDefinition,
+            remoteStackDefinition,
+            remoteImageDefinition,
+          ],
+          library: basicComponentLibrary,
         }}
       />
     </div>
-  )
+  );
 }

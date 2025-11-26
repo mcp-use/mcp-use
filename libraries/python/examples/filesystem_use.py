@@ -37,13 +37,13 @@ async def main():
     # Create MCPClient from config file
     client = MCPClient.from_dict(config)
     # Create LLM
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatOpenAI(model="gpt-5")
     # llm = init_chat_model(model="llama-3.1-8b-instant", model_provider="groq")
     # llm = ChatAnthropic(model="claude-3-")
     # llm = ChatGroq(model="llama3-8b-8192")
 
     # Create agent with the client
-    agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
 
     # Run the query
     result = await agent.run(

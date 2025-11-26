@@ -7,27 +7,6 @@ __pycache__/
 # C extensions
 *.so
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# PyInstaller
-*.manifest
-*.spec
 
 # Installer logs
 pip-log.txt
@@ -189,3 +168,4 @@ conf.yaml
 .cursor
 .cursorrules
 .claude
+.mcp-use/

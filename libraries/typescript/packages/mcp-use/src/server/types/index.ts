@@ -6,13 +6,13 @@
 export {
   ServerConfig,
   InputDefinition,
-  ResourceAnnotations
-} from './common.js'
+  ResourceAnnotations,
+} from "./common.js";
 
 // Resource types including UIResource
 export {
-  ResourceHandler,
-  ResourceTemplateHandler,
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
   ResourceTemplateConfig,
   ResourceTemplateDefinition,
   ResourceDefinition,
@@ -25,19 +25,17 @@ export {
   ExternalUrlUIResource,
   RawHtmlUIResource,
   RemoteDomUIResource,
+  AppsSdkUIResource,
   WidgetConfig,
   WidgetManifest,
-  DiscoverWidgetsOptions
-} from './resource.js'
+  DiscoverWidgetsOptions,
+  // Apps SDK types
+  AppsSdkMetadata,
+  AppsSdkToolMetadata,
+} from "./resource.js";
 
 // Tool types
-export {
-  ToolHandler,
-  ToolDefinition
-} from './tool.js'
+export { ToolCallback, ToolDefinition } from "./tool.js";
 
 // Prompt types
-export {
-  PromptHandler,
-  PromptDefinition
-} from './prompt.js'
+export { PromptCallback, PromptDefinition } from "./prompt.js";

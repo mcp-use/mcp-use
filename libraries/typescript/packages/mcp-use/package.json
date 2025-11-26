@@ -1,18 +1,18 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.0.7",
+  "version": "1.5.0",
   "packageManager": "pnpm@10.6.1",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents and Clients + MCP Servers with support for MCP-UI.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
-  "homepage": "https://github.com/mcp-use/mcp-use-ts#readme",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcp-use/mcp-use-ts.git"
+    "url": "git+https://github.com/mcp-use/mcp-use.git"
   },
   "bugs": {
-    "url": "https://github.com/mcp-use/mcp-use-ts/issues"
+    "url": "https://github.com/mcp-use/mcp-use/issues"
   },
   "keywords": [
     "MCP",
@@ -30,6 +30,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./agent": {
+      "types": "./dist/src/agents/index.d.ts",
+      "import": "./dist/src/agents/index.js"
+    },
     "./browser": {
       "types": "./dist/src/browser.d.ts",
       "import": "./dist/src/browser.js"
@@ -46,6 +50,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "mcp-use": "./node_modules/@mcp-use/cli/dist/index.js"
+  },
   "files": [
     "dist"
   ],
@@ -57,11 +64,19 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsup index.ts src/browser.ts src/react/index.ts src/server/index.ts --format cjs,esm --out-dir dist --keep-names && tsc --emitDeclarationOnly --declaration",
+    "build": "rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:unit": "vitest run --exclude tests/integration/**",
     "test:simple": "vitest run tests/stream_events_simple.test.ts",
-    "test:integration": "vitest run tests/stream_events.test.ts",
+    "test:integration": "vitest run tests/integration",
+    "test:integration:agent": "vitest run tests/integration/agent",
+    "test:integration:run": "vitest run tests/integration/agent/test_agent_run.test.ts",
+    "test:integration:stream": "vitest run tests/integration/agent/test_agent_stream.test.ts",
+    "test:integration:streamevents": "vitest run tests/integration/agent/test_agent_stream_events.test.ts",
+    "test:integration:structured": "vitest run tests/integration/agent/test_agent_structured_output.test.ts",
+    "test:integration:manager": "vitest run tests/integration/agent/test_server_manager.test.ts",
+    "test:integration:observability": "vitest run tests/integration/agent/test_agent_observability.test.ts",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build",
@@ -85,24 +100,27 @@
     "example:blender": "tsx examples/client/blender_use.ts",
     "example:add_server": "tsx examples/client/add_server_tool.ts",
     "example:structured": "tsx examples/client/structured_output.ts",
-    "example:observability": "tsx examples/client/observability.ts"
+    "example:observability": "tsx examples/client/observability.ts",
+    "example:code_mode": "tsx examples/client/code_mode_example.ts",
+    "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts"
   },
   "peerDependencies": {
-    "@mcp-use/inspector": "^0.3.11",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "langfuse": "^3.32.0",
-    "langfuse-langchain": "^3.38.4",
-    "react": "^18.0.0 || ^19.0.0"
+    "@e2b/code-interpreter": "^2.2.0",
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/openai": "^1.0.0",
+    "langfuse": "^3.38.6",
+    "langfuse-langchain": "^3.38.6",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-router-dom": "^7.0.0"
   },
   "peerDependenciesMeta": {
-    "@mcp-use/inspector": {
+    "@e2b/code-interpreter": {
       "optional": true
     },
-    "cors": {
+    "@langchain/anthropic": {
       "optional": true
     },
-    "express": {
+    "@langchain/openai": {
       "optional": true
     },
     "langfuse": {
@@ -114,19 +132,25 @@
   },
   "dependencies": {
     "@dmitryrechkin/json-schema-to-zod": "^1.0.1",
-    "@langchain/anthropic": "^0.3.26",
-    "@langchain/core": "^0.3.72",
-    "@langchain/openai": "^0.6.9",
+    "@hono/node-server": "^1.13.0",
+    "@langchain/core": "^1.0.1",
     "@mcp-ui/server": "^5.12.0",
+    "@mcp-use/cli": "workspace:*",
+    "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/sdk": "1.20.0",
     "@scarf/scarf": "^1.4.0",
     "ai": "^4.3.19",
+    "chalk": "^5.6.2",
+    "cli-highlight": "^2.1.11",
     "commander": "^14.0.1",
     "dotenv": "^16.5.0",
-    "langchain": "^0.3.27",
+    "esbuild": ">=0.25.0",
+    "hono": "^4.6.0",
+    "langchain": "^1.0.1",
     "lodash-es": "^4.17.21",
     "posthog-node": "^5.1.1",
     "strict-url-sanitise": "^0.0.1",
+    "strip-ansi": "^7.1.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "uuid": "^11.1.0",
@@ -136,8 +160,17 @@
     "zod": "^3.25.48",
     "zod-to-json-schema": "^3.24.6"
   },
+  "optionalDependencies": {
+    "@tailwindcss/vite": "^4.1.15",
+    "@vitejs/plugin-react": "^5.0.4",
+    "connect": "^3.7.0",
+    "node-mocks-http": "^1.16.2",
+    "vite": ">=5.4.21"
+  },
   "devDependencies": {
     "@antfu/eslint-config": "^4.13.2",
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/openai": "^1.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/lodash-es": "^4.17.12",
@@ -151,8 +184,9 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "react": "^19.2.0",
+    "react-router-dom": "^7.9.5",
     "typescript": "^5.8.3",
-    "vitest": "^2.1.9"
+    "vitest": "^3.2.4"
   },
   "lint-staged": {
     "*.{js,ts}": [

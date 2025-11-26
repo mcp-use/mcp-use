@@ -1,0 +1,111 @@
+---
+title: "Image"
+description: "Image component that handles both data URLs and public file paths for widgets"
+icon: "image"
+---
+
+# Image
+
+The `Image` component automatically handles image sources, supporting both data URLs and public file paths. It automatically prefixes relative paths with the MCP public URL, making it easy to use images from your `public/` folder.
+
+## Import
+
+```typescript
+import { Image } from 'mcp-use/react';
+```
+
+## Props
+
+The `Image` component accepts all standard `img` HTML attributes, plus:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `src` | `string` | **required** | Image source URL or path |
+
+## Source Resolution
+
+The component handles different source formats:
+
+1. **Absolute URLs** (`http://`, `https://`): Used as-is
+2. **Data URLs** (`data:`): Used as-is
+3. **Relative paths** (`/fruits/apple.png`): Prefixed with MCP public URL
+
+## Basic Usage
+
+```tsx
+import { Image } from 'mcp-use/react';
+
+function MyWidget() {
+  return (
+    <div>
+      {/* Public folder image */}
+      <Image src="/fruits/apple.png" alt="Apple" />
+      
+      {/* Absolute URL */}
+      <Image src="https://example.com/image.jpg" alt="Example" />
+      
+      {/* Data URL */}
+      <Image src="data:image/png;base64,..." alt="Inline" />
+    </div>
+  );
+}
+```
+
+## Public Folder Images
+
+When using images from your `public/` folder, use paths relative to the public root:
+
+```tsx
+// public/fruits/apple.png
+<Image src="/fruits/apple.png" alt="Apple" />
+
+// public/logo.svg
+<Image src="/logo.svg" alt="Logo" />
+```
+
+The component automatically resolves these to the correct URL using `window.__mcpPublicUrl`.
+
+## Development vs Production
+
+- **Development**: Images are served from the dev server's `/mcp-use/public/` route
+- **Production**: Images are served from the built `dist/public/` folder
+
+The component handles both cases automatically.
+
+## Fallback Behavior
+
+If `window.__mcpPublicUrl` is not available (e.g., in standalone mode), the component falls back to using the source path as-is. This ensures the component works in all environments.
+
+## Example: Product Widget
+
+```tsx
+import { Image } from 'mcp-use/react';
+import { useWidget } from 'mcp-use/react';
+
+function ProductWidget() {
+  const { props } = useWidget<{ productId: string; imagePath: string }>();
+  
+  return (
+    <div>
+      <Image 
+        src={props.imagePath} 
+        alt={`Product ${props.productId}`}
+        className="w-full h-64 object-cover rounded-lg"
+      />
+    </div>
+  );
+}
+```
+
+## Related Utilities
+
+The component uses these window globals (injected by the MCP server):
+
+- `window.__mcpPublicUrl`: Base URL for public assets (e.g., `http://localhost:3000/mcp-use/public`)
+- `window.__getFile`: Helper function to get file URLs
+
+## Related Components
+
+- [`McpUseProvider`](./mcpuseprovider) - Unified provider for widgets
+- [`useWidget`](./usewidget) - Widget hook for accessing props
+

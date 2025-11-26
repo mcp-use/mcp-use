@@ -5,4 +5,10 @@
  * For standalone server usage, see standalone.ts
  */
 
-export { mountInspector } from './middleware.js'
+export { mountInspector } from "./middleware.js";
+
+// Export browser-compatible chat utilities for client-side usage
+export {
+  handleChatRequest,
+  handleChatRequestStream,
+} from "./shared-utils-browser.js";

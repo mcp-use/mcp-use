@@ -7,42 +7,60 @@ find the full documentation for it [in our repository](https://github.com/change
 We have a quick list of common questions to get you started engaging with this project in
 [our documentation](https://github.com/changesets/changesets/blob/main/docs/common-questions.md)
 
+## ⚠️ Important: Automated Workflows
+
+**Versioning and publishing are handled automatically by GitHub Actions workflows.**
+
+- ✅ **You should**: Create changesets for your changes
+- ❌ **Don't manually run**: `pnpm version` or `pnpm release`
+
+### How It Works
+
+#### Main Branch (Stable Releases)
+
+1. Create a changeset with `pnpm changeset`
+2. Push to main (via PR)
+3. CI automatically creates a "Version Packages" PR
+4. Merge the Version PR to publish stable versions
+
+#### Canary Branch (Prereleases)
+
+1. Create a changeset with `pnpm changeset`
+2. Push to canary branch
+3. CI automatically publishes as `x.y.z-canary.N`
+
+---
+
 ## Quick Start
 
-### Creating a Changeset
+### Creating a Changeset (Required for Contributors)
 
 ```bash
 pnpm changeset
 ```
 
 This will prompt you to:
+
 1. Select which packages have changes
 2. Choose the version bump type (major/minor/patch)
 3. Write a summary of the changes
 
-### Applying Changesets (Versioning)
+**Then commit and push the changeset file with your changes:**
 
 ```bash
-pnpm version
+git add .
+git commit -m "feat: your feature description"
+git push
 ```
 
-This will:
-- Apply all pending changesets
-- Update package versions
-- Generate/update CHANGELOG.md files
-- Update dependencies
+### ~~Applying Changesets (Versioning)~~ (Automated by CI)
 
-### Publishing to npm
+~~`pnpm version`~~ **⚠️ This is handled automatically by workflows. Do not run manually.**
 
-```bash
-pnpm release
-```
+### ~~Publishing to npm~~ (Automated by CI)
 
-This will:
-- Build all packages
-- Publish updated packages to npm
-- Create git tags
+~~`pnpm release`~~ **⚠️ This is handled automatically by workflows. Do not run manually.**
 
 ---
 
-For detailed documentation, see [VERSIONING.md](../VERSIONING.md) in the project root.
+For detailed documentation, see [CONTRIBUTING.md](../../CONTRIBUTING.md#typescript-releases) in the project root.

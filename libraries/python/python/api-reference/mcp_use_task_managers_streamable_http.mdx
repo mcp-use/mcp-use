@@ -1,0 +1,47 @@
+---
+title: "Streamable Http"
+description: "Streamable Http API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/task_managers/streamable_http.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/task_managers/streamable_http.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/task_managers/streamable_http.py</a>
+</Callout>
+
+## StreamableHttpConnectionManager
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> StreamableHttpConnectionManager</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.task_managers.streamable_http import StreamableHttpConnectionManager
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize a new streamable HTTP connection manager.
+
+
+**Parameters**
+><ParamField body="url" type="str" required="True" >   The HTTP endpoint URL </ParamField>
+><ParamField body="headers" type="dict[str, str] | None" default="None" >   Optional HTTP headers </ParamField>
+><ParamField body="timeout" type="float" default="5" >   Timeout for HTTP operations in seconds </ParamField>
+><ParamField body="read_timeout" type="float" default="300" >   Timeout for HTTP read operations in seconds </ParamField>
+><ParamField body="auth" type="httpx.Auth | None" default="None" >   Optional httpx.Auth instance for authentication </ParamField>
+><ParamField body="httpx_client_factory" type="mcp.shared._httpx_utils.McpHttpClientFactory | None" default="None" >   Custom HTTPX client factory for MCP </ParamField>
+
+**Signature**
+```python wrap
+def __init__(url: str, headers: dict[str, str] | None = None, timeout: float = 5, read_timeout: float = 300, auth: httpx.Auth | None = None, httpx_client_factory: mcp.shared._httpx_utils.McpHttpClientFactory | None = None):
+```
+
+</Card>
+</div>

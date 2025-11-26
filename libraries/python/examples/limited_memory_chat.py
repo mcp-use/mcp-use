@@ -27,13 +27,14 @@ async def run_limited_memory_chat():
     }
     # Create MCPClient from config file
     client = MCPClient(config=config)
-    llm = ChatOpenAI(model="gpt-4o-mini")
+    llm = ChatOpenAI(model="gpt-5")
     # Create agent with memory_enabled=False but pass external history
     agent = MCPAgent(
         llm=llm,
         client=client,
         max_steps=15,
         memory_enabled=True,  # Disable built-in memory, use external history
+        pretty_print=True,
     )
 
     # Configuration: Limited history mode

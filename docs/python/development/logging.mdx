@@ -66,15 +66,6 @@ mcp_use.set_debug(1)  # INFO level
 mcp_use.set_debug(2)  # DEBUG level (full verbose output)
 mcp_use.set_debug(0)  # Turn off debug (WARNING level)
 ```
-
-```typescript TypeScript
-import { logger } from 'mcp-use'
-
-// Set the logger level
-logger.level = 'info'   // INFO level
-logger.level = 'debug'  // DEBUG level (full verbose output)
-logger.level = 'warn'   // Turn off debug (WARNING level)
-```
 </CodeGroup>
 
 <Tip>
@@ -87,14 +78,6 @@ import mcp_use
 
 if os.getenv("ENVIRONMENT") == "development":
     mcp_use.set_debug(2)
-```
-
-```typescript TypeScript
-import { logger } from 'mcp-use'
-
-if (process.env.ENVIRONMENT === 'development') {
-    logger.level = 'debug'
-}
 ```
 </CodeGroup>
 </Tip>
@@ -141,17 +124,6 @@ agent = MCPAgent(
     client=your_client,
     verbose=True  # Only shows debug messages from the agent
 )
-```
-
-```typescript TypeScript
-import { MCPAgent } from 'mcp-use'
-
-// Create agent with increased verbosity
-const agent = new MCPAgent({
-    llm: yourLlm,
-    client: yourClient,
-    verbose: true  // Only shows debug messages from the agent
-})
 ```
 </CodeGroup>
 

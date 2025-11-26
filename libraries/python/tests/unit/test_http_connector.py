@@ -6,7 +6,6 @@ import unittest
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 
-import aiohttp
 from mcp import McpError
 from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
 
@@ -194,7 +193,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         await self.connector.connect()
 
         # Verify streamable HTTP connection manager was used
-        mock_cm_class.assert_called_once_with("http://localhost:8000", {}, 5, 300, auth=None)
+        mock_cm_class.assert_called_once_with("http://localhost:8000", {}, 5, 300, auth=None, httpx_client_factory=ANY)
         mock_cm_instance.start.assert_called_once()
 
         # Verify client session was created and initialized

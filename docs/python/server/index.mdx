@@ -3,16 +3,29 @@ title: "Introduction"
 description: "Build MCP servers with mcp-use's enhanced server framework"
 icon: "list-start"
 ---
+<Danger>
+Python Server is a work in progress.
+</Danger>
 
-<Card title="" img="./images/Server.jpg" horizontal="true"/>
+<Warning>
+The mcp-use server framework is currently a work in progress. Here we present some of the design decisions
+and features that we are including. This is currently being worked at and is not released.
+If you are interested in the latest updates, join our discord and let us know what you think.
+</Warning>
 
-# Server Framework
-
-<Info>
+<Card title="" img="./images/Server.jpg" horizontal="true">
 The mcp-use server framework extends the official MCP Python SDK with enhanced features for building production-ready MCP servers. It provides built-in documentation endpoints, inspector UI, improved logging, and seamless integration with the mcp-use ecosystem.
-</Info>
+</Card>
 
 ## Why mcp-use Server Framework?
+
+<Info>
+At mcp-use we spent a lot of time building MCP servers. The development experience was subpar in many respects.
+Since this was starting to slow us down a lot, we decided to expand in the server direction as well.
+
+We have many cool ideas and features that we want to add to the server framework.
+If you have any ideas, please let us know on Discord. 💜
+</Info>
 
 While the [official MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) provides the core functionality for building MCP servers, mcp-use enhances it with:
 <Columns cols={2}>
@@ -122,6 +135,7 @@ Build your first MCP server in minutes with this step-by-step guide:
     - **MCP endpoints**: `/mcp`
     - **OpenMCP metadata**: `/openmcp.json` (debug mode only)
     - **Documentation**: `/docs` (debug mode only)
+    - **Inspector UI**: `/inspector` (debug mode only)
   </Step>
 </Steps>
 
@@ -185,7 +199,6 @@ Debug mode provides:
 
 ## Next Steps
 
-- [Installation & Setup](/python/server/installation) - Detailed installation instructions
+- [Installation & Setup](/python/getting-started/installation) - Detailed installation instructions
 - [Running Your Server](/python/server/running) - Production deployment options
 - [Inspector UI](/python/server/inspector) - Monitor and debug your server
-- [API Reference](/python/api-reference/mcp_use_server) - Complete API documentation

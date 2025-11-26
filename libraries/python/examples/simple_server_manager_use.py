@@ -76,7 +76,7 @@ class SimpleServerManager(BaseServerManager):
 
 async def main():
     # Initialize the LLM
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatOpenAI(model="gpt-5")
 
     # Instantiate the custom server manager
     simple_server_manager = SimpleServerManager()
@@ -86,6 +86,7 @@ async def main():
         llm=llm,
         use_server_manager=True,
         server_manager=simple_server_manager,
+        pretty_print=True,
     )
 
     # Manually initialize the agent

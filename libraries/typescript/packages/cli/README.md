@@ -6,43 +6,43 @@
   </picture>
 </div>
 
-<h1 align="center">MCP-Use CLI</h1>
+<h1 align="center">mcp-use CLI</h1>
 
 <p align="center">
     <a href="https://www.npmjs.com/package/@mcp-use/cli" alt="NPM Downloads">
         <img src="https://img.shields.io/npm/dw/@mcp-use/cli.svg"/></a>
     <a href="https://www.npmjs.com/package/@mcp-use/cli" alt="NPM Version">
         <img src="https://img.shields.io/npm/v/@mcp-use/cli.svg"/></a>
-    <a href="https://github.com/mcp-use/mcp-use-ts/blob/main/LICENSE" alt="License">
+    <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/mcp-use/mcp-use-ts" /></a>
-    <a href="https://github.com/mcp-use/mcp-use-ts/stargazers" alt="GitHub stars">
+    <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/mcp-use/mcp-use-ts?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
 
-🛠️ **MCP-Use CLI** is a powerful build and development tool for creating MCP (Model Context Protocol) applications with integrated UI widgets. It enables developers to build MCP servers with custom React components that can be served alongside their MCP tools, providing rich visual interfaces for AI interactions.
+🛠️ **mcp-use CLI** is a powerful build and development tool for creating MCP (Model Context Protocol) applications with integrated UI widgets. It enables developers to build MCP servers with custom React components that can be served alongside their MCP tools, providing rich visual interfaces for AI interactions.
 
 ## 📦 Related Packages
 
-| Package | Description | Version |
-|---------|-------------|---------|
-| [mcp-use](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/mcp-use) | Core MCP framework | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use) |
-| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/inspector) | Web-based MCP inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
-| [create-mcp-use-app](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/create-mcp-use-app) | Create MCP apps | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| Package                                                                                           | Description             | Version                                                                                                         |
+| ------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/packages/mcp-use)                       | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
+| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)          | Web-based MCP inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 
 ## ✨ Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **🚀 Auto Inspector** | Automatically opens the MCP Inspector in your browser when development server starts |
-| **♻️ Hot Reload** | Development mode with automatic reloading for both server code and UI widgets |
-| **🎨 Widget Builder** | Compiles React components into standalone HTML pages with all dependencies bundled |
-| **📦 Production Ready** | Optimized production builds with hashed assets for caching |
-| **🛠️ TypeScript First** | Full TypeScript support with watch mode compilation |
-| **🖥️ Multi-Environment** | Separate commands for development, build, and production deployment |
+| Feature                  | Description                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| **🚀 Auto Inspector**    | Automatically opens the MCP Inspector in your browser when development server starts |
+| **♻️ Hot Reload**        | Development mode with automatic reloading for both server code and UI widgets        |
+| **🎨 Widget Builder**    | Compiles React components into standalone HTML pages with all dependencies bundled   |
+| **📦 Production Ready**  | Optimized production builds with hashed assets for caching                           |
+| **🛠️ TypeScript First**  | Full TypeScript support with watch mode compilation                                  |
+| **🖥️ Multi-Environment** | Separate commands for development, build, and production deployment                  |
 
 ---
 
@@ -72,6 +72,7 @@ mcp-use dev [options]
 ```
 
 **What happens in dev mode:**
+
 1. TypeScript files are compiled in watch mode
 2. UI widgets are built with hot reload
 3. Server runs with auto-restart on changes (via tsx)
@@ -79,6 +80,7 @@ mcp-use dev [options]
 5. MCP endpoint is available at `http://localhost:3000/mcp`
 
 **Options:**
+
 - `-p, --path <path>` - Project directory (default: current directory)
 - `--port <port>` - Server port (default: 3000)
 - `--no-open` - Don't auto-open inspector in browser
@@ -92,12 +94,14 @@ mcp-use build [options]
 ```
 
 **What happens during build:**
+
 1. TypeScript is compiled to JavaScript
 2. All `.tsx` files in `resources/` are bundled as standalone HTML pages
 3. Assets are hashed for optimal caching
 4. Output is optimized and minified
 
 **Options:**
+
 - `-p, --path <path>` - Project directory (default: current directory)
 
 ### Production Server
@@ -109,8 +113,46 @@ mcp-use start [options]
 ```
 
 **Options:**
+
 - `-p, --path <path>` - Project directory (default: current directory)
 - `--port <port>` - Server port (default: 3000)
+
+### Cloud Deployment
+
+Deploy your MCP server to mcp-use cloud:
+
+```bash
+# Login to mcp-use cloud
+mcp-use login
+
+# Check authentication status
+mcp-use whoami
+
+# Deploy your MCP server
+mcp-use deploy [options]
+
+# Logout
+mcp-use logout
+```
+
+**Deploy Options:**
+
+- `--name <name>` - Custom deployment name
+- `--port <port>` - Server port (default: 3000)
+- `--runtime <runtime>` - Runtime environment: "node" or "python"
+- `--open` - Open deployment in browser after success
+
+**Example:**
+
+```bash
+# Basic deployment
+mcp-use deploy
+
+# Deploy with custom options
+mcp-use deploy --name my-server --port 8000 --open
+```
+
+See [ENVIRONMENT.md](./ENVIRONMENT.md) for configuration options.
 
 ---
 
@@ -227,7 +269,7 @@ export default function TaskManager() {
 
     await callTool('create_task', {
       title: newTask,
-      status: 'pending'
+      status: 'pending',
     })
 
     setNewTask('')
@@ -258,7 +300,7 @@ export default function TaskManager() {
       </div>
 
       <ul className="space-y-2">
-        {tasks.map(task => (
+        {tasks.map((task) => (
           <li key={task.id} className="p-2 border rounded">
             {task.title}
           </li>
@@ -316,13 +358,38 @@ Add these scripts for convenience:
 
 ### Environment Variables
 
+#### Development & Build
+
 ```bash
 # Custom port via environment variable
 PORT=8080 mcp-use dev
 
 # Production build with custom output
 BUILD_DIR=./build mcp-use build
+
+# Custom MCP URL for widget asset paths
+MCP_URL=https://myserver.com mcp-use build
 ```
+
+#### Deployment & Cloud
+
+For deploying to mcp-use cloud, see [ENVIRONMENT.md](./ENVIRONMENT.md) for detailed configuration:
+
+```bash
+# Frontend URL (where /auth/cli page is)
+MCP_WEB_URL=https://mcp-use.com
+
+# Backend API URL (where /api/v1 endpoints are)
+MCP_API_URL=https://cloud.mcp-use.com
+
+# Example: Local development
+export MCP_WEB_URL=http://localhost:3000
+export MCP_API_URL=http://localhost:8000
+mcp-use login
+mcp-use deploy
+```
+
+See [ENVIRONMENT.md](./ENVIRONMENT.md) for more examples and configuration options.
 
 ### Docker Deployment
 
@@ -349,9 +416,10 @@ import path from 'path'
 const app = express()
 
 // Serve MCP widgets
-app.use('/widgets', express.static(
-  path.join(__dirname, '../dist/resources/mcp-use/widgets')
-))
+app.use(
+  '/widgets',
+  express.static(path.join(__dirname, '../dist/resources/mcp-use/widgets'))
+)
 
 // Your other routes...
 ```
@@ -363,12 +431,14 @@ app.use('/widgets', express.static(
 ### Common Issues
 
 **Port already in use:**
+
 ```bash
 # Use a different port
 mcp-use dev --port 3001
 ```
 
 **TypeScript compilation errors:**
+
 ```bash
 # Check your tsconfig.json
 # Ensure all dependencies are installed
@@ -376,11 +446,13 @@ npm install
 ```
 
 **Widgets not loading:**
+
 - Ensure `.tsx` files are in the `resources/` directory
 - Check that React dependencies are installed
 - Verify the build output in `dist/resources/mcp-use/widgets/`
 
 **Inspector not opening:**
+
 ```bash
 # Manually open http://localhost:3000/inspector
 # Or disable auto-open
@@ -391,13 +463,13 @@ mcp-use dev --no-open
 
 ## 📚 Learn More
 
-- [MCP-Use Documentation](https://github.com/mcp-use/mcp-use-ts)
+- [mcp-use Documentation](https://github.com/mcp-use/mcp-use)
 - [Model Context Protocol](https://modelcontextprotocol.io)
-- [Creating MCP Servers](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/mcp-use#-mcp-server-framework)
-- [MCP Inspector Guide](https://github.com/mcp-use/mcp-use-ts/tree/main/packages/inspector)
+- [Creating MCP Servers](https://github.com/mcp-use/mcp-use/tree/main/packages/mcp-use#-mcp-server-framework)
+- [MCP Inspector Guide](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)
 
 ---
 
 ## 📜 License
 
-MIT © [MCP-Use](https://github.com/mcp-use)
+MIT © [mcp-use](https://github.com/mcp-use)

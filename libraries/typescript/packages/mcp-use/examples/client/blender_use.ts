@@ -12,38 +12,39 @@
  * Special thanks to https://github.com/ahujasid/blender-mcp for the server.
  */
 
-import { ChatAnthropic } from '@langchain/anthropic'
-import { config } from 'dotenv'
-import { MCPAgent, MCPClient } from '../../index.js'
+import { ChatAnthropic } from "@langchain/anthropic";
+import { config } from "dotenv";
+import { MCPAgent, MCPClient } from "../../index.js";
 
 // Load environment variables from .env file
-config()
+config();
 
 async function runBlenderExample() {
   // Create MCPClient with Blender MCP configuration
-  const config = { mcpServers: { blender: { command: 'uvx', args: ['blender-mcp'] } } }
-  const client = MCPClient.fromDict(config)
+  const config = {
+    mcpServers: { blender: { command: "uvx", args: ["blender-mcp"] } },
+  };
+  const client = MCPClient.fromDict(config);
 
   // Create LLM
-  const llm = new ChatAnthropic({ model: 'claude-3-5-sonnet-20240620' })
+  const llm = new ChatAnthropic({ model: "claude-3-5-sonnet-20240620" });
 
   // Create agent with the client
-  const agent = new MCPAgent({ llm, client, maxSteps: 30 })
+  const agent = new MCPAgent({ llm, client, maxSteps: 30 });
 
   try {
     // Run the query
     const result = await agent.run(
-      'Create an inflatable cube with soft material and a plane as ground.',
-      30,
-    )
-    console.error(`\nResult: ${result}`)
-  }
-  finally {
+      "Create an inflatable cube with soft material and a plane as ground.",
+      30
+    );
+    console.error(`\nResult: ${result}`);
+  } finally {
     // Ensure we clean up resources properly
-    await client.closeAllSessions()
+    await client.closeAllSessions();
   }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runBlenderExample().catch(console.error)
+  runBlenderExample().catch(console.error);
 }

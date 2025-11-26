@@ -1,5 +1,5 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -7,6 +7,7 @@
   --font-family-ubuntu: Ubuntu, sans-serif;
 
   --animate-pulse: pulse var(--duration) ease-out infinite;
+  --animate-aurora: aurora 60s linear infinite;
 
   @keyframes pulse {
     0%,
@@ -15,6 +16,19 @@
     }
     50% {
       box-shadow: 0 0 0 8px var(--pulse-color);
+    }
+  }
+
+  @keyframes aurora {
+    from {
+      background-position:
+        50% 50%,
+        50% 50%;
+    }
+    to {
+      background-position:
+        350% 50%,
+        350% 50%;
     }
   }
 }
@@ -55,28 +69,31 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite
+    alternate;
   --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
   --animate-status-pulse: status-pulse 2s infinite;
   --animate-status-pulse-red: status-pulse-red 2s infinite;
   --animate-status-pulse-yellow: status-pulse-yellow 2s infinite;
   @keyframes shimmer-slide {
-  to {
-    transform: translate(calc(100cqw - 100%), 0);
+    to {
+      transform: translate(calc(100cqw - 100%), 0);
     }
   }
   @keyframes spin-around {
-  0% {
-    transform: translateZ(0) rotate(0);
+    0% {
+      transform: translateZ(0) rotate(0);
     }
-  15%, 35% {
-    transform: translateZ(0) rotate(90deg);
+    15%,
+    35% {
+      transform: translateZ(0) rotate(90deg);
     }
-  65%, 85% {
-    transform: translateZ(0) rotate(270deg);
+    65%,
+    85% {
+      transform: translateZ(0) rotate(270deg);
     }
-  100% {
-    transform: translateZ(0) rotate(360deg);
+    100% {
+      transform: translateZ(0) rotate(360deg);
     }
   }
   @keyframes status-pulse {
@@ -116,6 +133,7 @@
 
 :root {
   --radius: 0.625rem;
+  --cmdk-shadow: 0 16px 70px rgb(0 0 0 / 20%);
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -150,6 +168,7 @@
 }
 
 .dark {
+  --cmdk-shadow: 0 16px 70px rgb(0 0 0 / 50%);
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -195,5 +214,11 @@
   }
   .font-ubuntu {
     font-family: var(--font-family-ubuntu);
+  }
+}
+
+@layer utilities {
+  .\@lg\:flex-col {
+    @apply flex-col @lg:flex-row;
   }
 }

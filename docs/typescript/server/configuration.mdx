@@ -1,0 +1,707 @@
+---
+title: "Configuration"
+description: "Advanced configuration and deployment options"
+icon: "gear"
+---
+
+# Configuration
+
+This guide covers advanced configuration options, deployment strategies, and best practices for production MCP servers.
+
+## Server Configuration
+
+### Basic Configuration
+
+The server accepts configuration during initialization:
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+
+const server = createMCPServer('my-server', {
+  version: '1.0.0',              // Semantic version
+  description: 'Server purpose'   // Human-readable description
+  baseUrl: process.env.MCP_URL || "http://localhost:3000" // MCP Server production URL (needed for UI Widgets to work correctly)
+})
+```
+
+### Environment Variables
+
+Use environment variables for configuration:
+
+```typescript
+// .env file
+PORT=3000
+NODE_ENV=production
+LOG_LEVEL=info
+DATABASE_URL=postgresql://user:pass@localhost:5432/db
+API_KEY=your-secret-api-key
+MCP_URL=https://api.example.com
+
+// In your server
+import dotenv from 'dotenv'
+dotenv.config()
+
+const config = {
+  port: parseInt(process.env.PORT || '3000'),
+  environment: process.env.NODE_ENV || 'development',
+  logLevel: process.env.LOG_LEVEL || 'info',
+  database: process.env.DATABASE_URL,
+  apiKey: process.env.API_KEY,
+  baseUrl: process.env.MCP_URL
+}
+
+const server = createMCPServer('configured-server', {
+  version: '1.0.0',
+  description: `Server running in ${config.environment} mode`
+})
+
+// Use config throughout your server
+server.listen(config.port)
+```
+
+### Configuration File
+
+Load configuration from JSON or YAML:
+
+```typescript
+// config.json
+{
+  "server": {
+    "name": "my-mcp-server",
+    "version": "1.0.0",
+    "port": 3000
+  },
+  "features": {
+    "enableInspector": true,
+    "enableMetrics": true,
+    "enableCaching": true
+  },
+  "security": {
+    "corsOrigins": ["http://localhost:3000"],
+    "rateLimit": {
+      "windowMs": 900000,
+      "max": 100
+    }
+  }
+}
+
+// Load in server
+import config from './config.json'
+
+const server = createMCPServer(config.server.name, {
+  version: config.server.version
+})
+
+// Apply configuration
+if (config.features.enableInspector) {
+  // Inspector will auto-mount if available
+}
+
+server.listen(config.server.port)
+```
+
+## Express Middleware Configuration
+
+### CORS Configuration
+
+Configure Cross-Origin Resource Sharing:
+
+```typescript
+import cors from 'cors'
+
+// Custom CORS configuration
+server.use(cors({
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://app.example.com'
+    ]
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'mcp-protocol-version']
+}))
+```
+
+### Rate Limiting
+
+Implement rate limiting for API protection:
+
+```typescript
+import rateLimit from 'express-rate-limit'
+
+// General rate limiter
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP'
+})
+
+// Apply to all routes
+server.use('/api/', limiter)
+
+// Stricter limit for specific endpoints
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10
+})
+
+server.use('/api/expensive-operation', strictLimiter)
+```
+
+### Authentication Middleware
+
+Add authentication to your server:
+
+```typescript
+// Basic API key authentication
+function authenticateApiKey(req, res, next) {
+  const apiKey = req.headers['x-api-key']
+
+  if (!apiKey || apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+
+  next()
+}
+
+// Apply to specific routes
+server.use('/api/admin', authenticateApiKey)
+
+// JWT authentication
+import jwt from 'jsonwebtoken'
+
+function authenticateJWT(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1]
+
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' })
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    req.user = decoded
+    next()
+  } catch (error) {
+    return res.status(403).json({ error: 'Invalid token' })
+  }
+}
+
+// Protected routes
+server.get('/api/protected', authenticateJWT, (req, res) => {
+  res.json({ user: req.user })
+})
+```
+
+### Logging Configuration
+
+Set up comprehensive logging:
+
+```typescript
+import winston from 'winston'
+import morgan from 'morgan'
+
+// Configure Winston logger
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.simple()
+    }),
+    new winston.transports.File({
+      filename: 'error.log',
+      level: 'error'
+    }),
+    new winston.transports.File({
+      filename: 'combined.log'
+    })
+  ]
+})
+
+// HTTP request logging with Morgan
+const morganFormat = ':method :url :status :response-time ms - :res[content-length]'
+
+server.use(morgan(morganFormat, {
+  stream: {
+    write: (message) => logger.info(message.trim())
+  }
+}))
+
+// Use logger in tools
+server.tool({
+  name: 'example_tool',
+  cb: async (params) => {
+    logger.info('Tool executed', { tool: 'example_tool', params })
+
+    try {
+      // Tool logic
+      const result = await performOperation(params)
+      logger.debug('Tool result', { result })
+
+      return { content: [{ type: 'text', text: result }] }
+    } catch (error) {
+      logger.error('Tool error', { error: error.message, stack: error.stack })
+      throw error
+    }
+  }
+})
+```
+
+## Security Configuration
+
+### Input Validation
+
+Validate and sanitize all inputs:
+
+```typescript
+import validator from 'validator'
+import DOMPurify from 'isomorphic-dompurify'
+
+server.tool({
+  name: 'process_input',
+  inputs: [
+    { name: 'email', type: 'string', required: true },
+    { name: 'url', type: 'string', required: true },
+    { name: 'html', type: 'string', required: false }
+  ],
+  cb: async ({ email, url, html }) => {
+    // Validate email
+    if (!validator.isEmail(email)) {
+      return {
+        content: [{
+          type: 'text',
+          text: 'Invalid email address'
+        }]
+      }
+    }
+
+    // Validate URL
+    if (!validator.isURL(url, { require_protocol: true })) {
+      return {
+        content: [{
+          type: 'text',
+          text: 'Invalid URL'
+        }]
+      }
+    }
+
+    // Sanitize HTML if provided
+    const cleanHtml = html ? DOMPurify.sanitize(html) : ''
+
+    // Process validated inputs
+    return {
+      content: [{
+        type: 'text',
+        text: 'Inputs validated and processed'
+      }]
+    }
+  }
+})
+```
+
+### Secure Headers
+
+Add security headers:
+
+```typescript
+import helmet from 'helmet'
+
+// Basic security headers
+server.use(helmet())
+
+// Custom CSP for widgets
+server.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+    styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+    imgSrc: ["'self'", 'data:', 'https:'],
+    connectSrc: ["'self'"],
+    fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+    frameSrc: ["'self'"],
+    frameAncestors: ["'none'"]
+  }
+}))
+```
+
+## Performance Configuration
+
+### Caching
+
+Implement caching for expensive operations:
+
+```typescript
+import NodeCache from 'node-cache'
+
+const cache = new NodeCache({
+  stdTTL: 600,      // 10 minutes default TTL
+  checkperiod: 120, // Check for expired keys every 2 minutes
+  useClones: false  // Don't clone objects (better performance)
+})
+
+// Cache middleware
+function cacheMiddleware(key: string, ttl?: number) {
+  return (req, res, next) => {
+    const cacheKey = `${key}:${JSON.stringify(req.params)}:${JSON.stringify(req.query)}`
+    const cached = cache.get(cacheKey)
+
+    if (cached) {
+      return res.json(cached)
+    }
+
+    // Store original json method
+    const originalJson = res.json.bind(res)
+
+    // Override json method to cache response
+    res.json = (data) => {
+      cache.set(cacheKey, data, ttl)
+      return originalJson(data)
+    }
+
+    next()
+  }
+}
+
+// Use cache middleware
+server.get('/api/expensive',
+  cacheMiddleware('expensive-operation', 300),
+  async (req, res) => {
+    const result = await performExpensiveOperation()
+    res.json(result)
+  }
+)
+```
+
+### Database Connection Pooling
+
+Configure database connections efficiently:
+
+```typescript
+import { Pool } from 'pg'
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,                    // Maximum pool size
+  idleTimeoutMillis: 30000,   // Close idle clients after 30s
+  connectionTimeoutMillis: 2000, // Timeout after 2s
+})
+
+// Monitor pool health
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle client', err)
+})
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  await pool.end()
+  process.exit(0)
+})
+```
+
+## Deployment Configuration
+
+### Docker Configuration
+
+Create a Dockerfile for containerization:
+
+```dockerfile
+# Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY src ./src
+COPY dist ./dist
+
+# Build TypeScript
+RUN npm run build
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
+
+# Run server
+CMD ["node", "dist/index.js"]
+```
+
+Docker Compose configuration:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  mcp-server:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://user:pass@db:5432/mydb
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: mydb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+### PM2 Configuration
+
+Use PM2 for process management:
+
+```javascript
+// ecosystem.config.js
+module.exports = {
+  apps: [{
+    name: 'mcp-server',
+    script: './dist/index.js',
+    instances: 'max',  // Use all CPU cores
+    exec_mode: 'cluster',
+    watch: false,
+    max_memory_restart: '1G',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    error_file: './logs/err.log',
+    out_file: './logs/out.log',
+    log_file: './logs/combined.log',
+    time: true
+  }]
+}
+```
+
+Start with PM2:
+
+```bash
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
+```
+
+### Kubernetes Configuration
+
+Deploy to Kubernetes:
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mcp-server
+  template:
+    metadata:
+      labels:
+        app: mcp-server
+    spec:
+      containers:
+      - name: mcp-server
+        image: your-registry/mcp-server:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: mcp-secrets
+              key: database-url
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server
+spec:
+  selector:
+    app: mcp-server
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: LoadBalancer
+```
+
+## Monitoring and Metrics
+
+### Health Check Endpoint
+
+Implement comprehensive health checks:
+
+```typescript
+server.get('/health', async (req, res) => {
+  const health = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    service: 'mcp-server',
+    version: '1.0.0',
+    checks: {}
+  }
+
+  // Check database connection
+  try {
+    await pool.query('SELECT 1')
+    health.checks.database = 'healthy'
+  } catch (error) {
+    health.checks.database = 'unhealthy'
+    health.status = 'degraded'
+  }
+
+  // Check external API
+  try {
+    const response = await fetch('https://api.example.com/health')
+    health.checks.externalApi = response.ok ? 'healthy' : 'unhealthy'
+  } catch (error) {
+    health.checks.externalApi = 'unhealthy'
+    health.status = 'degraded'
+  }
+
+  // Return appropriate status code
+  const statusCode = health.status === 'healthy' ? 200 : 503
+  res.status(statusCode).json(health)
+})
+```
+
+### Metrics Collection
+
+Collect and expose metrics:
+
+```typescript
+import promClient from 'prom-client'
+
+// Create a Registry
+const register = new promClient.Registry()
+
+// Add default metrics
+promClient.collectDefaultMetrics({ register })
+
+// Custom metrics
+const httpRequestDuration = new promClient.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status'],
+  buckets: [0.1, 0.5, 1, 2, 5]
+})
+register.registerMetric(httpRequestDuration)
+
+// Middleware to track metrics
+server.use((req, res, next) => {
+  const start = Date.now()
+
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000
+    httpRequestDuration
+      .labels(req.method, req.route?.path || 'unknown', res.statusCode.toString())
+      .observe(duration)
+  })
+
+  next()
+})
+
+// Metrics endpoint
+server.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType)
+  const metrics = await register.metrics()
+  res.end(metrics)
+})
+```
+
+## Client Configuration
+
+### MCP Client Setup
+
+Configure MCP clients to connect to your server:
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer your-token",
+        "X-API-Key": "your-api-key"
+      },
+      "timeout": 30000,
+      "retryAttempts": 3
+    }
+  }
+}
+```
+
+## Best Practices
+
+1. **Use Environment Variables**: Never hardcode secrets
+2. **Implement Health Checks**: Monitor service health
+3. **Add Logging**: Log all important operations
+4. **Rate Limiting**: Protect against abuse
+5. **Input Validation**: Always validate user input
+6. **Error Handling**: Graceful error recovery
+7. **Caching**: Cache expensive operations
+8. **Security Headers**: Use Helmet.js
+9. **Process Management**: Use PM2 or similar
+10. **Monitoring**: Implement metrics and alerts
+
+## Next Steps
+
+- [Getting Started](./getting-started) - Initial setup
+- [API Reference](./api-reference) - Complete API docs
+- [Examples](./examples) - Real-world implementations
+- [UI Widgets](./ui-widgets) - Widget configuration

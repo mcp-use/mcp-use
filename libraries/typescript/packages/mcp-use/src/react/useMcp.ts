@@ -1,171 +1,238 @@
 // useMcp.ts
 import type {
-  JSONRPCMessage,
-  Tool,
+  Prompt,
   Resource,
   ResourceTemplate,
-  Prompt} from '@modelcontextprotocol/sdk/types.js';
-import {
-  CallToolResultSchema,
-  ListToolsResultSchema,
-  ListResourcesResultSchema,
-  ReadResourceResultSchema,
-  ListPromptsResultSchema,
-  GetPromptResultSchema
-} from '@modelcontextprotocol/sdk/types.js'
-import { useCallback, useEffect, useRef, useState } from 'react'
-// Import both transport types
-import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { auth, UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
-import { sanitizeUrl } from 'strict-url-sanitise'
-import { BrowserOAuthClientProvider } from '../auth/browser-provider.js'
-import { assert } from '../utils/assert.js'
-import type { UseMcpOptions, UseMcpResult } from './types.js'
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
+  Tool,
+} from "@modelcontextprotocol/sdk/types.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { sanitizeUrl } from "strict-url-sanitise";
+import { BrowserMCPClient } from "../client/browser.js";
+import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
+import { assert } from "../utils/assert.js";
+import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
-const DEFAULT_RECONNECT_DELAY = 3000
-const DEFAULT_RETRY_DELAY = 5000
-const AUTH_TIMEOUT = 5 * 60 * 1000
+const DEFAULT_RECONNECT_DELAY = 3000;
+const DEFAULT_RETRY_DELAY = 5000;
+const AUTH_TIMEOUT = 5 * 60 * 1000;
 
 // Define Transport types literal for clarity
-type TransportType = 'http' | 'sse'
+type TransportType = "http" | "sse";
 
+/**
+ * React hook for connecting to and interacting with MCP servers
+ *
+ * Provides a complete interface for MCP server connections including:
+ * - Automatic connection management with reconnection
+ * - OAuth authentication with automatic token refresh
+ * - Tool, resource, and prompt access
+ * - AI chat functionality with conversation memory
+ * - Multi-transport support (HTTP, SSE) with automatic fallback
+ *
+ * @param options - Configuration options for the MCP connection
+ * @returns MCP connection state and methods
+ *
+ * @example
+ * ```typescript
+ * const mcp = useMcp({
+ *   url: 'http://localhost:3000/mcp',
+ *   customHeaders: { Authorization: 'Bearer YOUR_API_KEY' }
+ * })
+ *
+ * // Wait for connection
+ * useEffect(() => {
+ *   if (mcp.state === 'ready') {
+ *     console.log('Connected!', mcp.tools)
+ *   }
+ * }, [mcp.state])
+ *
+ * // Call a tool
+ * const result = await mcp.callTool('send-email', { to: 'user@example.com' })
+ * ```
+ */
 export function useMcp(options: UseMcpOptions): UseMcpResult {
   const {
     url,
     enabled = true,
     clientName,
     clientUri,
-    callbackUrl = typeof window !== 'undefined'
-      ? sanitizeUrl(new URL('/oauth/callback', window.location.origin).toString())
-      : '/oauth/callback',
-    storageKeyPrefix = 'mcp:auth',
+    callbackUrl = typeof window !== "undefined"
+      ? sanitizeUrl(
+          new URL("/oauth/callback", window.location.origin).toString()
+        )
+      : "/oauth/callback",
+    storageKeyPrefix = "mcp:auth",
     clientConfig = {},
     customHeaders = {},
     debug: _debug = false,
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
-    transportType = 'auto',
+    transportType = "auto",
     preventAutoAuth = false,
     onPopupWindow,
-  } = options
+    timeout = 30000, // 30 seconds default for connection timeout
+    sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
+    wrapTransport,
+  } = options;
 
-  const [state, setState] = useState<UseMcpResult['state']>('discovering')
-  const [tools, setTools] = useState<Tool[]>([])
-  const [resources, setResources] = useState<Resource[]>([])
-  const [resourceTemplates, setResourceTemplates] = useState<ResourceTemplate[]>([])
-  const [prompts, setPrompts] = useState<Prompt[]>([])
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [log, setLog] = useState<UseMcpResult['log']>([])
-  const [authUrl, setAuthUrl] = useState<string | undefined>(undefined)
+  const [state, setState] = useState<UseMcpResult["state"]>("discovering");
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resourceTemplates, setResourceTemplates] = useState<
+    ResourceTemplate[]
+  >([]);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [serverInfo, setServerInfo] = useState<{
+    name: string;
+    version?: string;
+  }>();
+  const [capabilities, setCapabilities] = useState<Record<string, any>>();
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [log, setLog] = useState<UseMcpResult["log"]>([]);
+  const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
 
-  const clientRef = useRef<Client | null>(null)
-  const transportRef = useRef<Transport | null>(null)
-  const authProviderRef = useRef<BrowserOAuthClientProvider | null>(null)
-  const connectingRef = useRef<boolean>(false)
-  const isMountedRef = useRef<boolean>(true)
-  const connectAttemptRef = useRef<number>(0)
-  const authTimeoutRef = useRef<number | null>(null)
+  const clientRef = useRef<BrowserMCPClient | null>(null);
+  const authProviderRef = useRef<BrowserOAuthClientProvider | null>(null);
+  const connectingRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(true);
+  const connectAttemptRef = useRef<number>(0);
+  const authTimeoutRef = useRef<number | null>(null);
 
   // --- Refs for values used in callbacks ---
-  const stateRef = useRef(state)
-  const autoReconnectRef = useRef(autoReconnect)
-  const successfulTransportRef = useRef<TransportType | null>(null)
+  const stateRef = useRef(state);
+  const autoReconnectRef = useRef(autoReconnect);
+  const successfulTransportRef = useRef<TransportType | null>(null);
 
-  // --- Effect to keep refs updated ---
+  /**
+   * Effect: Keep refs in sync with state values
+   * Allows callbacks to access latest state without re-creating them
+   */
   useEffect(() => {
-    stateRef.current = state
-    autoReconnectRef.current = autoReconnect
-  }, [state, autoReconnect])
+    stateRef.current = state;
+    autoReconnectRef.current = autoReconnect;
+  }, [state, autoReconnect]);
 
   // --- Stable Callbacks ---
+  /**
+   * Add a log entry to the connection log
+   * @internal
+   */
   const addLog = useCallback(
-    (level: UseMcpResult['log'][0]['level'], message: string, ...args: unknown[]) => {
-      const fullMessage = args.length > 0 ? `${message} ${args.map((arg) => JSON.stringify(arg)).join(' ')}` : message
-      console[level](`[useMcp] ${fullMessage}`)
+    (
+      level: UseMcpResult["log"][0]["level"],
+      message: string,
+      ...args: unknown[]
+    ) => {
+      const fullMessage =
+        args.length > 0
+          ? `${message} ${args.map((arg) => JSON.stringify(arg)).join(" ")}`
+          : message;
+      console[level](`[useMcp] ${fullMessage}`);
       if (isMountedRef.current) {
-        setLog((prevLog) => [...prevLog.slice(-100), { level, message: fullMessage, timestamp: Date.now() }])
+        setLog((prevLog) => [
+          ...prevLog.slice(-100),
+          { level, message: fullMessage, timestamp: Date.now() },
+        ]);
       }
     },
-    [],
-  )
+    []
+  );
 
+  /**
+   * Disconnect from the MCP server and clean up resources
+   * @param quiet - If true, suppresses log messages
+   */
   const disconnect = useCallback(
     async (quiet = false) => {
-      if (!quiet) addLog('info', 'Disconnecting...')
-      connectingRef.current = false
-      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-      authTimeoutRef.current = null
+      if (!quiet) addLog("info", "Disconnecting...");
+      connectingRef.current = false;
+      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
+      authTimeoutRef.current = null;
 
-      const transport = transportRef.current
-      clientRef.current = null
-      transportRef.current = null
+      if (clientRef.current) {
+        try {
+          const serverName = "inspector-server";
+          await clientRef.current.closeSession(serverName);
+        } catch (err) {
+          if (!quiet) addLog("warn", "Error closing session:", err);
+        }
+      }
+      clientRef.current = null;
 
       if (isMountedRef.current && !quiet) {
-        setState('discovering')
-        setTools([])
-        setResources([])
-        setResourceTemplates([])
-        setPrompts([])
-        setError(undefined)
-        setAuthUrl(undefined)
-      }
-
-      if (transport) {
-        try {
-          await transport.close()
-          if (!quiet) addLog('debug', 'Transport closed')
-        } catch (err) {
-          if (!quiet) addLog('warn', 'Error closing transport:', err)
-        }
+        setState("discovering");
+        setTools([]);
+        setResources([]);
+        setResourceTemplates([]);
+        setPrompts([]);
+        setError(undefined);
+        setAuthUrl(undefined);
       }
     },
-    [addLog],
-  )
+    [addLog]
+  );
 
+  /**
+   * Mark connection as failed with an error message
+   * @internal
+   */
   const failConnection = useCallback(
     (errorMessage: string, connectionError?: Error) => {
-      addLog('error', errorMessage, connectionError ?? '')
+      addLog("error", errorMessage, connectionError ?? "");
       if (isMountedRef.current) {
-        setState('failed')
-        setError(errorMessage)
-        const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl()
+        setState("failed");
+        setError(errorMessage);
+        const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl();
         if (manualUrl) {
-          setAuthUrl(manualUrl)
-          addLog('info', 'Manual authentication URL may be available.', manualUrl)
+          setAuthUrl(manualUrl);
+          addLog(
+            "info",
+            "Manual authentication URL may be available.",
+            manualUrl
+          );
         }
       }
-      connectingRef.current = false
+      connectingRef.current = false;
     },
-    [addLog],
-  )
+    [addLog]
+  );
 
+  /**
+   * Connect to the MCP server
+   * Automatically retries with transport fallback (HTTP → SSE)
+   * @internal
+   */
   const connect = useCallback(async () => {
     // Don't connect if not enabled or no URL provided
     if (!enabled || !url) {
-      addLog('debug', enabled ? 'No server URL provided, skipping connection.' : 'Connection disabled via enabled flag.')
-      return
+      addLog(
+        "debug",
+        enabled
+          ? "No server URL provided, skipping connection."
+          : "Connection disabled via enabled flag."
+      );
+      return;
     }
 
     if (connectingRef.current) {
-      addLog('debug', 'Connection attempt already in progress.')
-      return
+      addLog("debug", "Connection attempt already in progress.");
+      return;
     }
     if (!isMountedRef.current) {
-      addLog('debug', 'Connect called after unmount, aborting.')
-      return
+      addLog("debug", "Connect called after unmount, aborting.");
+      return;
     }
 
-    connectingRef.current = true
-    connectAttemptRef.current += 1
-    setError(undefined)
-    setAuthUrl(undefined)
-    successfulTransportRef.current = null
-    setState('discovering')
-    addLog('info', `Connecting attempt #${connectAttemptRef.current} to ${url}...`)
+    connectingRef.current = true;
+    connectAttemptRef.current += 1;
+    setError(undefined);
+    setAuthUrl(undefined);
+    successfulTransportRef.current = null;
+    setState("discovering");
+    addLog(
+      "info",
+      `Connecting attempt #${connectAttemptRef.current} to ${url}...`
+    );
 
     if (!authProviderRef.current) {
       authProviderRef.current = new BrowserOAuthClientProvider(url, {
@@ -175,257 +242,180 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         callbackUrl,
         preventAutoAuth,
         onPopupWindow,
-      })
-      addLog('debug', 'BrowserOAuthClientProvider initialized in connect.')
+      });
+      addLog("debug", "BrowserOAuthClientProvider initialized in connect.");
     }
     if (!clientRef.current) {
-      clientRef.current = new Client(
-        { name: clientConfig.name || 'mcp-use', version: clientConfig.version || '0.1.0' },
-        { capabilities: {} },
-      )
-      addLog('debug', 'MCP Client initialized in connect.')
+      clientRef.current = new BrowserMCPClient();
+      addLog("debug", "BrowserMCPClient initialized in connect.");
     }
 
-    const tryConnectWithTransport = async (transportTypeParam: TransportType, isAuthRetry = false): Promise<'success' | 'fallback' | 'auth_redirect' | 'failed'> => {
-      addLog('info', `Attempting connection with ${transportTypeParam.toUpperCase()} transport${isAuthRetry ? ' (after auth)' : ''}...`)
-      if (stateRef.current !== 'authenticating') {
-        setState('connecting')
-      }
-
-      let transportInstance: Transport
-
-      try {
-        assert(authProviderRef.current, 'Auth Provider must be initialized')
-        assert(clientRef.current, 'Client must be initialized')
-
-        if (transportRef.current) {
-          await transportRef.current.close().catch((e) => addLog('warn', `Error closing previous transport: ${e.message}`))
-          transportRef.current = null
-        }
-
-        const commonOptions: SSEClientTransportOptions = {
-          authProvider: authProviderRef.current,
-          requestInit: {
-            headers: {
-              Accept: 'application/json, text/event-stream',
-              ...customHeaders,
-            },
-          },
-        }
-        const sanitizedUrl = sanitizeUrl(url)
-        const targetUrl = new URL(sanitizedUrl)
-
-        addLog('debug', `Creating ${transportTypeParam.toUpperCase()} transport for URL: ${targetUrl.toString()}`)
-
-        if (transportTypeParam === 'http') {
-          addLog('debug', 'Creating StreamableHTTPClientTransport...')
-          transportInstance = new StreamableHTTPClientTransport(targetUrl, commonOptions)
-          addLog('debug', 'StreamableHTTPClientTransport created successfully')
-        } else {
-          addLog('debug', 'Creating SSEClientTransport...')
-          transportInstance = new SSEClientTransport(targetUrl, commonOptions)
-          addLog('debug', 'SSEClientTransport created successfully')
-        }
-        transportRef.current = transportInstance
-        addLog('debug', `${transportTypeParam.toUpperCase()} transport created and assigned to ref.`)
-      } catch (err) {
-        failConnection(
-          `Failed to create ${transportTypeParam.toUpperCase()} transport: ${err instanceof Error ? err.message : String(err)}`,
-          err instanceof Error ? err : undefined,
-        )
-        return 'failed'
-      }
-
-      transportInstance.onmessage = (message: JSONRPCMessage) => {
-        addLog('debug', `[Transport] Received: ${JSON.stringify(message)}`)
-        // @ts-ignore
-        clientRef.current?.handleMessage?.(message)
-      }
-      transportInstance.onerror = (err: Error) => {
-        addLog('warn', `Transport error event (${transportTypeParam.toUpperCase()}):`, err)
-        failConnection(`Transport error (${transportTypeParam.toUpperCase()}): ${err.message}`, err)
-      }
-      transportInstance.onclose = () => {
-        if (!isMountedRef.current || connectingRef.current) return
-
-        addLog('info', `Transport connection closed (${successfulTransportRef.current || 'unknown'} type).`)
-        const currentState = stateRef.current
-        const currentAutoReconnect = autoReconnectRef.current
-
-        if (currentState === 'ready' && currentAutoReconnect) {
-          const delay = typeof currentAutoReconnect === 'number' ? currentAutoReconnect : DEFAULT_RECONNECT_DELAY
-          addLog('info', `Attempting to reconnect in ${delay}ms...`)
-          setState('connecting')
-          setTimeout(() => {
-            if (isMountedRef.current) {
-              connect()
-            }
-          }, delay)
-        } else if (currentState !== 'failed' && currentState !== 'authenticating') {
-          failConnection('Connection closed unexpectedly.')
-        }
-      }
+    const tryConnectWithTransport = async (
+      transportTypeParam: TransportType,
+      isAuthRetry = false
+    ): Promise<"success" | "fallback" | "auth_redirect" | "failed"> => {
+      addLog(
+        "info",
+        `Attempting connection with transport: ${transportTypeParam}`
+      );
 
       try {
-        addLog('info', `Connecting client via ${transportTypeParam.toUpperCase()}...`)
-        await clientRef.current!.connect(transportInstance)
+        const serverName = "inspector-server";
 
-        addLog('info', `Client connected via ${transportTypeParam.toUpperCase()}. Loading tools, resources, and prompts...`)
-        successfulTransportRef.current = transportTypeParam
-        setState('loading')
+        // Build server config
+        const serverConfig: any = {
+          url: url,
+          transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
+        };
 
-        const toolsResponse = await clientRef.current!.request({ method: 'tools/list' }, ListToolsResultSchema)
-
-        let resourcesResponse: { resources: Resource[]; resourceTemplates?: ResourceTemplate[] } = { resources: [], resourceTemplates: [] }
-        try {
-          resourcesResponse = await clientRef.current!.request({ method: 'resources/list' }, ListResourcesResultSchema)
-        } catch (err) {
-          addLog('debug', 'Server does not support resources/list method', err)
+        // Add custom headers if provided
+        if (customHeaders && Object.keys(customHeaders).length > 0) {
+          serverConfig.headers = customHeaders;
         }
 
-        let promptsResponse: { prompts: Prompt[] } = { prompts: [] }
-        try {
-          promptsResponse = await clientRef.current!.request({ method: 'prompts/list' }, ListPromptsResultSchema)
-        } catch (err) {
-          addLog('debug', 'Server does not support prompts/list method', err)
+        // Add OAuth token if available
+        if (authProviderRef.current) {
+          const tokens = await authProviderRef.current.tokens();
+          if (tokens?.access_token) {
+            serverConfig.headers = {
+              ...serverConfig.headers,
+              Authorization: `Bearer ${tokens.access_token}`,
+            };
+          }
         }
 
-        if (isMountedRef.current) {
-          setTools(toolsResponse.tools)
-          setResources(resourcesResponse.resources)
-          setResourceTemplates(Array.isArray(resourcesResponse.resourceTemplates) ? resourcesResponse.resourceTemplates : [])
-          setPrompts(promptsResponse.prompts)
-          const summary = [`Loaded ${toolsResponse.tools.length} tools`]
-          if (
-            resourcesResponse.resources.length > 0 ||
-            (resourcesResponse.resourceTemplates && resourcesResponse.resourceTemplates.length > 0)
-          ) {
-            summary.push(`${resourcesResponse.resources.length} resources`)
-            if (Array.isArray(resourcesResponse.resourceTemplates) && resourcesResponse.resourceTemplates.length > 0) {
-              summary.push(`${resourcesResponse.resourceTemplates.length} resource templates`)
-            }
-          }
-          if (promptsResponse.prompts.length > 0) {
-            summary.push(`${promptsResponse.prompts.length} prompts`)
-          }
-
-          addLog('info', summary.join(', ') + '.')
-          setState('ready')
-          connectAttemptRef.current = 0
-          return 'success'
-        } else {
-          return 'failed'
-        }
-      } catch (connectErr) {
-        addLog('debug', `Client connect error via ${transportTypeParam.toUpperCase()}:`, connectErr)
-        const errorInstance = connectErr instanceof Error ? connectErr : new Error(String(connectErr))
-
-        const errorMessage = errorInstance.message
-        const is404 = errorMessage.includes('404') || errorMessage.includes('Not Found')
-        const is405 = errorMessage.includes('405') || errorMessage.includes('Method Not Allowed')
-        const isLikelyCors =
-          errorMessage === 'Failed to fetch' ||
-          errorMessage === 'NetworkError when attempting to fetch resource.' ||
-          errorMessage === 'Load failed'
-
-        if (transportTypeParam === 'http' && (is404 || is405 || isLikelyCors)) {
-          addLog('warn', `HTTP transport failed (${isLikelyCors ? 'CORS' : is404 ? '404' : '405'}), will try fallback.`)
-          // Don't set error state here - we're falling back to SSE
-          return 'fallback'
-        }
-
-        if (errorInstance instanceof UnauthorizedError || errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
-          // Prevent infinite auth loops - only retry once after auth
-          if (isAuthRetry) {
-            addLog('error', 'Authentication failed even after successful token refresh. This may indicate a server issue.')
-            failConnection('Authentication loop detected - auth succeeded but connection still unauthorized.')
-            return 'failed'
-          }
-
-          addLog('info', 'Authentication required.')
-
-          assert(authProviderRef.current, 'Auth Provider not available for auth flow')
-          const existingTokens = await authProviderRef.current.tokens()
-
-          if (preventAutoAuth && !existingTokens) {
-            addLog('info', 'Authentication required but auto-auth prevented. User action needed.')
-            setState('pending_auth')
-            return 'auth_redirect'
-          }
-
-          if (stateRef.current !== 'authenticating' && stateRef.current !== 'pending_auth') {
-            setState('authenticating')
-            if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-            authTimeoutRef.current = setTimeout(() => {
-              if (isMountedRef.current) {
-                const currentState = stateRef.current
-                if (currentState === 'authenticating') {
-                  failConnection('Authentication timed out. Please try again.')
-                }
+        // Add server to client with OAuth provider
+        // Include wrapTransport if provided
+        clientRef.current!.addServer(serverName, {
+          ...serverConfig,
+          authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
+          wrapTransport: wrapTransport
+            ? (transport: any) => {
+                console.log(
+                  "[useMcp] Applying transport wrapper for server:",
+                  serverName,
+                  "url:",
+                  url
+                );
+                return wrapTransport(transport, url);
               }
-            }, AUTH_TIMEOUT) as any
-          }
+            : undefined,
+        });
 
-          try {
-            assert(url, 'Server URL is required for authentication')
-            const authResult = await auth(authProviderRef.current, { serverUrl: url })
+        // Create session (this connects to server)
+        const session = await clientRef.current!.createSession(serverName);
 
-            if (!isMountedRef.current) return 'failed'
+        // Initialize session (caches tools, resources, prompts)
+        await session.initialize();
 
-            if (authResult === 'AUTHORIZED') {
-              addLog('info', 'Authentication successful via existing token or refresh. Retrying transport connection...')
-              if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-              authTimeoutRef.current = null
-              // Retry the same transport type with isAuthRetry=true to prevent loops
-              return await tryConnectWithTransport(transportTypeParam, true)
-            } else if (authResult === 'REDIRECT') {
-              addLog('info', 'Redirecting for authentication. Waiting for callback...')
-              return 'auth_redirect'
-            }
-          } catch (sdkAuthError) {
-            if (!isMountedRef.current) return 'failed'
-            if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-            failConnection(
-              `Failed to initiate authentication: ${sdkAuthError instanceof Error ? sdkAuthError.message : String(sdkAuthError)}`,
-              sdkAuthError instanceof Error ? sdkAuthError : undefined,
-            )
-            return 'failed'
-          }
+        addLog("info", "✅ Successfully connected to MCP server");
+        addLog("info", "Server info:", session.connector.serverInfo);
+        addLog(
+          "info",
+          "Server capabilities:",
+          session.connector.serverCapabilities
+        );
+        console.log("[useMcp] Server info:", session.connector.serverInfo);
+        console.log(
+          "[useMcp] Server capabilities:",
+          session.connector.serverCapabilities
+        );
+        setState("ready");
+        successfulTransportRef.current = transportTypeParam;
+
+        // Get tools, resources, prompts from session connector
+        setTools(session.connector.tools || []);
+        const resourcesResult = await session.connector.listAllResources();
+        setResources(resourcesResult.resources || []);
+        const promptsResult = await session.connector.listPrompts();
+        setPrompts(promptsResult.prompts || []);
+
+        // Get serverInfo and capabilities from the connector (populated during initialize)
+        const serverInfo = session.connector.serverInfo;
+        const capabilities = session.connector.serverCapabilities;
+
+        if (serverInfo) {
+          console.log("[useMcp] Server info:", serverInfo);
+          setServerInfo(serverInfo);
         }
 
-        // Only call failConnection if this is SSE (no fallback available) or not in auto mode
-        // In auto mode with HTTP, we'll return 'fallback' above for common errors
-        failConnection(`Failed to connect via ${transportTypeParam.toUpperCase()}: ${errorMessage}`, errorInstance)
-        return 'failed'
+        if (capabilities) {
+          console.log("[useMcp] Server capabilities:", capabilities);
+          setCapabilities(capabilities);
+        }
+
+        return "success";
+      } catch (err: any) {
+        const errorMessage = err?.message || String(err);
+
+        // Handle 401 errors
+        // Note: OAuth is handled automatically by the SDK's authProvider if configured
+        if (
+          err.code === 401 ||
+          errorMessage.includes("401") ||
+          errorMessage.includes("Unauthorized")
+        ) {
+          // Check if custom headers were provided (invalid credentials)
+          if (customHeaders && Object.keys(customHeaders).length > 0) {
+            failConnection(
+              "Authentication failed: Server returned 401 Unauthorized. " +
+                "Check your Authorization header value is correct."
+            );
+            return "failed";
+          }
+
+          // No custom headers - suggest adding them
+          failConnection(
+            "Authentication required: Server returned 401 Unauthorized. " +
+              "Add an Authorization header in the Custom Headers section " +
+              "(e.g., Authorization: Bearer YOUR_API_KEY)."
+          );
+          return "failed";
+        }
+
+        // Handle other errors
+        failConnection(errorMessage, err);
+        return "failed";
       }
-    }
+    };
 
-    let finalStatus: 'success' | 'auth_redirect' | 'failed' | 'fallback' = 'failed'
+    let finalStatus: "success" | "auth_redirect" | "failed" | "fallback" =
+      "failed";
 
-    if (transportType === 'sse') {
-      addLog('debug', 'Using SSE-only transport mode')
-      finalStatus = await tryConnectWithTransport('sse')
-    } else if (transportType === 'http') {
-      addLog('debug', 'Using HTTP-only transport mode')
-      finalStatus = await tryConnectWithTransport('http')
+    if (transportType === "sse") {
+      addLog("debug", "Using SSE-only transport mode");
+      finalStatus = await tryConnectWithTransport("sse");
+    } else if (transportType === "http") {
+      addLog("debug", "Using HTTP-only transport mode");
+      finalStatus = await tryConnectWithTransport("http");
     } else {
-      addLog('debug', 'Using auto transport mode (HTTP with SSE fallback)')
-      const httpResult = await tryConnectWithTransport('http')
+      addLog("debug", "Using auto transport mode (HTTP with SSE fallback)");
+      const httpResult = await tryConnectWithTransport("http");
 
-      if (httpResult === 'fallback' && isMountedRef.current && stateRef.current !== 'authenticating') {
-        addLog('info', 'HTTP failed, attempting SSE fallback...')
-        const sseResult = await tryConnectWithTransport('sse')
-        finalStatus = sseResult
+      if (
+        httpResult === "fallback" &&
+        isMountedRef.current &&
+        stateRef.current !== "authenticating"
+      ) {
+        addLog("info", "HTTP failed, attempting SSE fallback...");
+        const sseResult = await tryConnectWithTransport("sse");
+        finalStatus = sseResult;
       } else {
-        finalStatus = httpResult
+        finalStatus = httpResult;
       }
     }
 
-    if (finalStatus === 'success' || finalStatus === 'failed') {
-      connectingRef.current = false
+    // Reset connecting flag for all terminal states and auth_redirect
+    // auth_redirect needs to reset the flag so the auth callback can reconnect
+    if (
+      finalStatus === "success" ||
+      finalStatus === "failed" ||
+      finalStatus === "auth_redirect"
+    ) {
+      connectingRef.current = false;
     }
 
-    addLog('debug', `Connection sequence finished with status: ${finalStatus}`)
+    addLog("debug", `Connection sequence finished with status: ${finalStatus}`);
   }, [
     addLog,
     failConnection,
@@ -442,283 +432,408 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     preventAutoAuth,
     onPopupWindow,
     enabled,
-  ])
+    timeout,
+    sseReadTimeout,
+  ]);
 
+  /**
+   * Call a tool on the connected MCP server
+   *
+   * @param name - Name of the tool to call
+   * @param args - Arguments to pass to the tool
+   * @returns Tool execution result
+   * @throws {Error} If client is not ready or tool call fails
+   *
+   * @example
+   * ```typescript
+   * const result = await mcp.callTool('send-email', {
+   *   to: 'user@example.com',
+   *   subject: 'Hello',
+   *   body: 'Test message'
+   * })
+   * ```
+   */
   const callTool = useCallback(
     async (name: string, args?: Record<string, unknown>) => {
-      if (stateRef.current !== 'ready' || !clientRef.current) {
-        throw new Error(`MCP client is not ready (current state: ${state}). Cannot call tool "${name}".`)
+      if (stateRef.current !== "ready" || !clientRef.current) {
+        throw new Error(
+          `MCP client is not ready (current state: ${state}). Cannot call tool "${name}".`
+        );
       }
-      addLog('info', `Calling tool: ${name}`, args)
+      addLog("info", `Calling tool: ${name}`, args);
       try {
-        const result = await clientRef.current.request({ method: 'tools/call', params: { name, arguments: args } }, CallToolResultSchema)
-        addLog('info', `Tool "${name}" call successful:`, result)
-        return result
+        const serverName = "inspector-server";
+        const session = clientRef.current.getSession(serverName);
+        if (!session) {
+          throw new Error("No active session found");
+        }
+        const result = await session.connector.callTool(name, args || {});
+        addLog("info", `Tool "${name}" call successful:`, result);
+        return result;
       } catch (err) {
-        addLog('error', `Error calling tool "${name}": ${err instanceof Error ? err.message : String(err)}`, err)
-        const errorInstance = err instanceof Error ? err : new Error(String(err))
-
-        if (
-          errorInstance instanceof UnauthorizedError ||
-          errorInstance.message.includes('Unauthorized') ||
-          errorInstance.message.includes('401')
-        ) {
-          addLog('warn', 'Tool call unauthorized, attempting re-authentication...')
-          setState('authenticating')
-          if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-          authTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current) {
-              const currentState = stateRef.current
-              if (currentState === 'authenticating') {
-                failConnection('Authentication timed out. Please try again.')
-              }
-            }
-          }, AUTH_TIMEOUT) as any
-
-          try {
-            assert(authProviderRef.current, 'Auth Provider not available for tool re-auth')
-            assert(url, 'Server URL is required for authentication')
-            const authResult = await auth(authProviderRef.current, { serverUrl: url })
-
-            if (!isMountedRef.current) return
-
-            if (authResult === 'AUTHORIZED') {
-              addLog('info', 'Re-authentication successful. Retrying tool call is recommended, or reconnecting.')
-              if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-              connectingRef.current = false
-              connect()
-            } else if (authResult === 'REDIRECT') {
-              addLog('info', 'Redirecting for re-authentication for tool call.')
-            }
-          } catch (sdkAuthError) {
-            if (!isMountedRef.current) return
-            if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-            failConnection(
-              `Re-authentication failed: ${sdkAuthError instanceof Error ? sdkAuthError.message : String(sdkAuthError)}`,
-              sdkAuthError instanceof Error ? sdkAuthError : undefined,
-            )
-          }
-        }
-        // Re-throw error if we're not currently waiting for authentication
-        // Type assertion needed because state can change during async execution
-        const currentState = stateRef.current as UseMcpResult['state']
-        if (currentState !== 'authenticating') {
-          throw err
-        }
-        return undefined
+        addLog("error", `Tool "${name}" call failed:`, err);
+        throw err;
       }
     },
-    [state, url, addLog, failConnection, connect],
-  )
+    [state]
+  );
 
+  /**
+   * Retry connection after failure
+   * Only works if current state is 'failed'
+   */
   const retry = useCallback(() => {
-    if (stateRef.current === 'failed') {
-      addLog('info', 'Retry requested...')
-      connect()
+    if (stateRef.current === "failed") {
+      addLog("info", "Retry requested...");
+      connect();
     } else {
-      addLog('warn', `Retry called but state is not 'failed' (state: ${stateRef.current}). Ignoring.`)
+      addLog(
+        "warn",
+        `Retry called but state is not 'failed' (state: ${stateRef.current}). Ignoring.`
+      );
     }
-  }, [addLog, connect])
+  }, [addLog, connect]);
 
+  /**
+   * Trigger manual OAuth authentication flow
+   *
+   * Opens OAuth popup for user authorization. Use when state is 'pending_auth'
+   * or to manually retry authentication.
+   *
+   * @example
+   * ```typescript
+   * if (mcp.state === 'pending_auth') {
+   *   mcp.authenticate()  // Opens OAuth popup
+   * }
+   * ```
+   */
   const authenticate = useCallback(async () => {
-    addLog('info', 'Manual authentication requested...')
-    const currentState = stateRef.current
+    addLog("info", "Manual authentication requested...");
+    const currentState = stateRef.current;
 
-    if (currentState === 'failed') {
-      addLog('info', 'Attempting to reconnect and authenticate via retry...')
-      retry()
-    } else if (currentState === 'pending_auth') {
-      addLog('info', 'Proceeding with authentication from pending state...')
-      setState('authenticating')
-      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
+    if (currentState === "failed") {
+      addLog("info", "Attempting to reconnect and authenticate via retry...");
+      retry();
+    } else if (currentState === "pending_auth") {
+      addLog("info", "Proceeding with authentication from pending state...");
+      setState("authenticating");
+      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       authTimeoutRef.current = setTimeout(() => {
         if (isMountedRef.current) {
-          const currentStateValue = stateRef.current
-          if (currentStateValue === 'authenticating') {
-            failConnection('Authentication timed out. Please try again.')
+          const currentStateValue = stateRef.current;
+          if (currentStateValue === "authenticating") {
+            failConnection("Authentication timed out. Please try again.");
           }
         }
-      }, AUTH_TIMEOUT) as any
+      }, AUTH_TIMEOUT) as any;
 
       try {
-        assert(authProviderRef.current, 'Auth Provider not available for manual auth')
-        assert(url, 'Server URL is required for authentication')
-        const authResult = await auth(authProviderRef.current, { serverUrl: url })
-
-        if (!isMountedRef.current) return
-
-        if (authResult === 'AUTHORIZED') {
-          addLog('info', 'Manual authentication successful. Re-attempting connection...')
-          if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-          connectingRef.current = false
-          connect()
-        } else if (authResult === 'REDIRECT') {
-          addLog('info', 'Redirecting for manual authentication. Waiting for callback...')
-        }
+        assert(
+          authProviderRef.current,
+          "Auth Provider not available for manual auth"
+        );
+        assert(url, "Server URL is required for authentication");
+        // OAuth handled via popup - just trigger reconnect after auth completes
+        // The auth callback will handle reconnection
+        addLog(
+          "info",
+          "Redirecting for manual authentication. Waiting for callback..."
+        );
       } catch (authError) {
-        if (!isMountedRef.current) return
-        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
+        if (!isMountedRef.current) return;
+        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
         failConnection(
           `Manual authentication failed: ${authError instanceof Error ? authError.message : String(authError)}`,
-          authError instanceof Error ? authError : undefined,
-        )
+          authError instanceof Error ? authError : undefined
+        );
       }
-    } else if (currentState === 'authenticating') {
-      addLog('warn', 'Already attempting authentication. Check for blocked popups or wait for timeout.')
-      const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl()
+    } else if (currentState === "authenticating") {
+      addLog(
+        "warn",
+        "Already attempting authentication. Check for blocked popups or wait for timeout."
+      );
+      const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl();
       if (manualUrl && !authUrl) {
-        setAuthUrl(manualUrl)
-        addLog('info', 'Manual authentication URL retrieved:', manualUrl)
+        setAuthUrl(manualUrl);
+        addLog("info", "Manual authentication URL retrieved:", manualUrl);
       }
     } else {
       addLog(
-        'info',
-        `Client not in a state requiring manual authentication trigger (state: ${currentState}). If needed, try disconnecting and reconnecting.`,
-      )
+        "info",
+        `Client not in a state requiring manual authentication trigger (state: ${currentState}). If needed, try disconnecting and reconnecting.`
+      );
     }
-  }, [addLog, retry, authUrl, url, failConnection, connect])
+  }, [addLog, retry, authUrl, url, failConnection, connect]);
 
+  /**
+   * Clear OAuth tokens from localStorage and disconnect
+   *
+   * Useful for logging out or resetting authentication state.
+   *
+   * @example
+   * ```typescript
+   * mcp.clearStorage()  // Removes tokens and disconnects
+   * ```
+   */
   const clearStorage = useCallback(() => {
     if (authProviderRef.current) {
-      const count = authProviderRef.current.clearStorage()
-      addLog('info', `Cleared ${count} item(s) from localStorage for ${url}.`)
-      setAuthUrl(undefined)
-      disconnect()
+      const count = authProviderRef.current.clearStorage();
+      addLog("info", `Cleared ${count} item(s) from localStorage for ${url}.`);
+      setAuthUrl(undefined);
+      disconnect();
     } else {
-      addLog('warn', 'Auth provider not initialized, cannot clear storage.')
+      addLog("warn", "Auth provider not initialized, cannot clear storage.");
     }
-  }, [url, addLog, disconnect])
+  }, [url, addLog, disconnect]);
 
+  /**
+   * Refresh the list of available resources from the server
+   *
+   * Updates the `resources` state with the latest resource list.
+   * Gracefully handles servers that don't support resources.
+   *
+   * @throws {Error} If client is not ready
+   *
+   * @example
+   * ```typescript
+   * await mcp.listResources()
+   * console.log(mcp.resources)  // Updated resource list
+   * ```
+   */
   const listResources = useCallback(async () => {
-    if (stateRef.current !== 'ready' || !clientRef.current) {
-      throw new Error(`MCP client is not ready (current state: ${state}). Cannot list resources.`)
+    if (stateRef.current !== "ready" || !clientRef.current) {
+      throw new Error(
+        `MCP client is not ready (current state: ${state}). Cannot list resources.`
+      );
     }
-    addLog('info', 'Listing resources...')
+    addLog("info", "Listing resources");
     try {
-      const resourcesResponse = await clientRef.current.request({ method: 'resources/list' }, ListResourcesResultSchema)
-      if (isMountedRef.current) {
-        setResources(resourcesResponse.resources)
-        setResourceTemplates(Array.isArray(resourcesResponse.resourceTemplates) ? resourcesResponse.resourceTemplates : [])
-        addLog(
-          'info',
-          `Listed ${resourcesResponse.resources.length} resources, ${Array.isArray(resourcesResponse.resourceTemplates) ? resourcesResponse.resourceTemplates.length : 0} resource templates.`,
-        )
+      const serverName = "inspector-server";
+      const session = clientRef.current.getSession(serverName);
+      if (!session) {
+        throw new Error("No active session found");
       }
+      const resourcesResult = await session.connector.listAllResources();
+      setResources(resourcesResult.resources || []);
+      addLog("info", "Resources listed successfully");
     } catch (err) {
-      addLog('error', `Error listing resources: ${err instanceof Error ? err.message : String(err)}`, err)
-      throw err
+      addLog("error", "List resources failed:", err);
+      throw err;
     }
-  }, [state, addLog])
+  }, [state]);
 
+  /**
+   * Read a resource from the MCP server by URI
+   *
+   * @param uri - Resource URI to read
+   * @returns Resource contents
+   * @throws {Error} If client is not ready or resource read fails
+   *
+   * @example
+   * ```typescript
+   * const resource = await mcp.readResource('file:///path/to/file.txt')
+   * console.log(resource.contents[0].text)
+   * ```
+   */
   const readResource = useCallback(
     async (uri: string) => {
-      if (stateRef.current !== 'ready' || !clientRef.current) {
-        throw new Error(`MCP client is not ready (current state: ${state}). Cannot read resource "${uri}".`)
+      if (stateRef.current !== "ready" || !clientRef.current) {
+        throw new Error(
+          `MCP client is not ready (current state: ${state}). Cannot read resource.`
+        );
       }
-      addLog('info', `Reading resource: ${uri}`)
+      addLog("info", `Reading resource: ${uri}`);
       try {
-        const result = await clientRef.current.request({ method: 'resources/read', params: { uri } }, ReadResourceResultSchema)
-        addLog('info', `Resource "${uri}" read successfully`)
-        return result
+        const serverName = "inspector-server";
+        const session = clientRef.current.getSession(serverName);
+        if (!session) {
+          throw new Error("No active session found");
+        }
+        const result = await session.connector.readResource(uri);
+        addLog("info", "Resource read successful:", result);
+        return result;
       } catch (err) {
-        addLog('error', `Error reading resource "${uri}": ${err instanceof Error ? err.message : String(err)}`, err)
-        throw err
+        addLog("error", "Resource read failed:", err);
+        throw err;
       }
     },
-    [state, addLog],
-  )
+    [state]
+  );
 
+  /**
+   * Refresh the list of available prompts from the server
+   *
+   * Updates the `prompts` state with the latest prompt templates.
+   * Gracefully handles servers that don't support prompts.
+   *
+   * @throws {Error} If client is not ready
+   *
+   * @example
+   * ```typescript
+   * await mcp.listPrompts()
+   * console.log(mcp.prompts)  // Updated prompt list
+   * ```
+   */
   const listPrompts = useCallback(async () => {
-    if (stateRef.current !== 'ready' || !clientRef.current) {
-      throw new Error(`MCP client is not ready (current state: ${state}). Cannot list prompts.`)
+    if (stateRef.current !== "ready" || !clientRef.current) {
+      throw new Error(
+        `MCP client is not ready (current state: ${state}). Cannot list prompts.`
+      );
     }
-    addLog('info', 'Listing prompts...')
+    addLog("info", "Listing prompts");
     try {
-      const promptsResponse = await clientRef.current.request({ method: 'prompts/list' }, ListPromptsResultSchema)
-      if (isMountedRef.current) {
-        setPrompts(promptsResponse.prompts)
-        addLog('info', `Listed ${promptsResponse.prompts.length} prompts.`)
+      const serverName = "inspector-server";
+      const session = clientRef.current.getSession(serverName);
+      if (!session) {
+        throw new Error("No active session found");
       }
+      const promptsResult = await session.connector.listPrompts();
+      setPrompts(promptsResult.prompts || []);
+      addLog("info", "Prompts listed successfully");
     } catch (err) {
-      addLog('error', `Error listing prompts: ${err instanceof Error ? err.message : String(err)}`, err)
-      throw err
+      addLog("error", "List prompts failed:", err);
+      throw err;
     }
-  }, [state, addLog])
+  }, [state]);
 
+  /**
+   * Get a prompt template with arguments
+   *
+   * @param name - Name of the prompt template
+   * @param args - Arguments to fill in the template
+   * @returns Prompt result with messages
+   * @throws {Error} If client is not ready or prompt retrieval fails
+   *
+   * @example
+   * ```typescript
+   * const prompt = await mcp.getPrompt('code-review', {
+   *   language: 'typescript',
+   *   focus: 'performance'
+   * })
+   * console.log(prompt.messages)
+   * ```
+   */
   const getPrompt = useCallback(
-    async (name: string, args?: Record<string, string>) => {
-      if (stateRef.current !== 'ready' || !clientRef.current) {
-        throw new Error(`MCP client is not ready (current state: ${state}). Cannot get prompt "${name}".`)
+    async (name: string, args?: Record<string, unknown>) => {
+      if (stateRef.current !== "ready" || !clientRef.current) {
+        throw new Error(
+          `MCP client is not ready (current state: ${state}). Cannot get prompt.`
+        );
       }
-      addLog('info', `Getting prompt: ${name}`, args)
+      addLog("info", `Getting prompt: ${name}`, args);
       try {
-        const result = await clientRef.current.request({ method: 'prompts/get', params: { name, arguments: args } }, GetPromptResultSchema)
-        addLog('info', `Prompt "${name}" retrieved successfully`)
-        return result
+        const serverName = "inspector-server";
+        const session = clientRef.current.getSession(serverName);
+        if (!session) {
+          throw new Error("No active session found");
+        }
+        const result = await session.connector.getPrompt(name, args || {});
+        addLog("info", `Prompt "${name}" retrieved successfully:`, result);
+        return result;
       } catch (err) {
-        addLog('error', `Error getting prompt "${name}": ${err instanceof Error ? err.message : String(err)}`, err)
-        throw err
+        addLog("error", `Prompt "${name}" retrieval failed:`, err);
+        throw err;
       }
     },
-    [state, addLog],
-  )
+    [state]
+  );
 
   // ===== Effects =====
 
-  // Keep refs up to date with latest callbacks to avoid effect dependencies
-  const connectRef = useRef(connect)
-  const failConnectionRef = useRef(failConnection)
-  
-  useEffect(() => {
-    connectRef.current = connect
-    failConnectionRef.current = failConnection
-  })
+  /**
+   * Effect: Keep callback refs up to date
+   * Prevents stale closures in event listeners
+   */
+  const connectRef = useRef(connect);
+  const failConnectionRef = useRef(failConnection);
 
+  useEffect(() => {
+    connectRef.current = connect;
+    failConnectionRef.current = failConnection;
+  });
+
+  /**
+   * Effect: Listen for OAuth callback messages from popup window
+   * Handles successful authentication and reconnection
+   */
   useEffect(() => {
     const messageHandler = (event: globalThis.MessageEvent) => {
-      if (event.origin !== window.location.origin) return
-      if (event.data?.type === 'mcp_auth_callback') {
-        addLog('info', 'Received auth callback message.', event.data)
-        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-        authTimeoutRef.current = null
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "mcp_auth_callback") {
+        addLog("info", "Received auth callback message.", event.data);
+        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
+        authTimeoutRef.current = null;
 
         if (event.data.success) {
-          addLog('info', 'Authentication successful via popup. Reconnecting client...')
-          // Ensure we're not already in a connection attempt to prevent loops
-          if (!connectingRef.current) {
-            connectingRef.current = false // Reset flag before connecting
-            connectRef.current()
-          } else {
-            addLog('warn', 'Connection already in progress, skipping reconnection from auth callback')
+          addLog(
+            "info",
+            "Authentication successful via popup. Reconnecting client..."
+          );
+
+          // Check if already connecting
+          if (connectingRef.current) {
+            addLog(
+              "debug",
+              "Connection attempt already in progress, resetting flag to allow reconnection."
+            );
           }
+
+          // Reset the connecting flag and reconnect since auth just succeeded
+          connectingRef.current = false;
+
+          // Small delay to ensure state is clean before reconnecting
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              addLog(
+                "debug",
+                "Initiating reconnection after successful auth callback."
+              );
+              connectRef.current();
+            }
+          }, 100);
         } else {
-          failConnectionRef.current(`Authentication failed in callback: ${event.data.error || 'Unknown reason.'}`)
+          failConnectionRef.current(
+            `Authentication failed in callback: ${event.data.error || "Unknown reason."}`
+          );
         }
       }
-    }
-    window.addEventListener('message', messageHandler)
-    addLog('debug', 'Auth callback message listener added.')
+    };
+    window.addEventListener("message", messageHandler);
+    addLog("debug", "Auth callback message listener added.");
     return () => {
-      window.removeEventListener('message', messageHandler)
-      addLog('debug', 'Auth callback message listener removed.')
-      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
-    }
-  }, [addLog])
+      window.removeEventListener("message", messageHandler);
+      addLog("debug", "Auth callback message listener removed.");
+      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
+    };
+  }, [addLog]);
 
+  /**
+   * Effect: Main connection lifecycle
+   *
+   * Runs on mount and when key connection parameters change.
+   * - Initializes OAuth provider
+   * - Initiates connection
+   * - Cleans up on unmount or when URL changes
+   */
   useEffect(() => {
-    isMountedRef.current = true
-    
+    isMountedRef.current = true;
+
     // Skip connection if disabled or no URL provided
     if (!enabled || !url) {
-      addLog('debug', enabled ? 'No server URL provided, skipping connection.' : 'Connection disabled via enabled flag.')
-      setState('discovering')
+      addLog(
+        "debug",
+        enabled
+          ? "No server URL provided, skipping connection."
+          : "Connection disabled via enabled flag."
+      );
+      setState("discovering");
       return () => {
-        isMountedRef.current = false
-      }
+        isMountedRef.current = false;
+      };
     }
-    
-    addLog('debug', 'useMcp mounted, initiating connection.')
-    connectAttemptRef.current = 0
+
+    addLog("debug", "useMcp mounted, initiating connection.");
+    connectAttemptRef.current = 0;
     if (!authProviderRef.current || authProviderRef.current.serverUrl !== url) {
       authProviderRef.current = new BrowserOAuthClientProvider(url, {
         storageKeyPrefix,
@@ -727,32 +842,51 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         callbackUrl,
         preventAutoAuth,
         onPopupWindow,
-      })
-      addLog('debug', 'BrowserOAuthClientProvider initialized/updated on mount/option change.')
+      });
+      addLog(
+        "debug",
+        "BrowserOAuthClientProvider initialized/updated on mount/option change."
+      );
     }
-    connect()
+    connect();
     return () => {
-      isMountedRef.current = false
-      addLog('debug', 'useMcp unmounting, disconnecting.')
-      disconnect(true)
-    }
-  }, [url, enabled, storageKeyPrefix, callbackUrl, clientName, clientUri, clientConfig.name, clientConfig.version])
+      isMountedRef.current = false;
+      addLog("debug", "useMcp unmounting, disconnecting.");
+      disconnect(true);
+    };
+  }, [
+    url,
+    enabled,
+    storageKeyPrefix,
+    callbackUrl,
+    clientName,
+    clientUri,
+    clientConfig.name,
+    clientConfig.version,
+  ]);
 
+  /**
+   * Effect: Auto-retry on failure
+   *
+   * If autoRetry is enabled and connection fails, automatically retries
+   * after the specified delay.
+   */
   useEffect(() => {
-    let retryTimeoutId: number | null = null
-    if (state === 'failed' && autoRetry && connectAttemptRef.current > 0) {
-      const delay = typeof autoRetry === 'number' ? autoRetry : DEFAULT_RETRY_DELAY
-      addLog('info', `Connection failed, auto-retrying in ${delay}ms...`)
+    let retryTimeoutId: number | null = null;
+    if (state === "failed" && autoRetry && connectAttemptRef.current > 0) {
+      const delay =
+        typeof autoRetry === "number" ? autoRetry : DEFAULT_RETRY_DELAY;
+      addLog("info", `Connection failed, auto-retrying in ${delay}ms...`);
       retryTimeoutId = setTimeout(() => {
-        if (isMountedRef.current && stateRef.current === 'failed') {
-          retry()
+        if (isMountedRef.current && stateRef.current === "failed") {
+          retry();
         }
-      }, delay) as any
+      }, delay) as any;
     }
     return () => {
-      if (retryTimeoutId) clearTimeout(retryTimeoutId)
-    }
-  }, [state, autoRetry, retry, addLog])
+      if (retryTimeoutId) clearTimeout(retryTimeoutId);
+    };
+  }, [state, autoRetry, retry, addLog]);
 
   return {
     state,
@@ -760,18 +894,20 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     resources,
     resourceTemplates,
     prompts,
+    serverInfo,
+    capabilities,
     error,
     log,
     authUrl,
+    client: clientRef.current,
     callTool,
-    listResources,
     readResource,
+    listResources,
     listPrompts,
     getPrompt,
     retry,
     disconnect,
     authenticate,
     clearStorage,
-  }
+  };
 }
-

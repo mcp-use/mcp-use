@@ -6,12 +6,12 @@
   </picture>
 </div>
 
-<h1 align="center">MCP-Use: The Complete TypeScript Framework for Model Context Protocol</h1>
+<h1 align="center">mcp-use: The Complete TypeScript Framework for Model Context Protocol</h1>
 
 <p align="center">
-    <a href="https://github.com/mcp-use/mcp-use-ts/stargazers" alt="GitHub stars">
+    <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
         <img src="https://img.shields.io/github/stars/mcp-use/mcp-use-ts?style=social" /></a>
-    <a href="https://github.com/mcp-use/mcp-use-ts/blob/main/LICENSE" alt="License">
+    <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/mcp-use/mcp-use-ts" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
@@ -21,17 +21,17 @@
   <strong>Build powerful AI agents, create MCP servers with UI widgets, and debug with built-in inspector - all in TypeScript</strong>
 </p>
 
-> **📦 Part of the [MCP-Use Monorepo](../../README.md)** - This is the TypeScript implementation. Also available in [Python](../python/README.md).
+> **📦 Part of the [mcp-use Monorepo](../../README.md)** - This is the TypeScript implementation. Also available in [Python](../python/README.md).
 
 ---
 
-## 🎯 What is MCP-Use?
+## 🎯 What is mcp-use?
 
-MCP-Use is a comprehensive TypeScript framework for building and using [Model Context Protocol (MCP)](https://modelcontextprotocol.io) applications. It provides everything you need to create AI agents that can use tools, build MCP servers with rich UI interfaces, and debug your applications with powerful developer tools.
+mcp-use is a comprehensive TypeScript framework for building and using [Model Context Protocol (MCP)](https://modelcontextprotocol.io) applications. It provides everything you need to create AI agents that can use tools, build MCP servers with rich UI interfaces, and debug your applications with powerful developer tools.
 
 ## 🏗️ What's Included
 
-MCP-Use for TypeScript provides the complete MCP stack:
+mcp-use for TypeScript provides the complete MCP stack:
 
 - **🤖 MCP Agent** - Build AI agents that can use tools and reason across multiple steps
 - **🔌 MCP Client** - Connect directly to MCP servers for programmatic tool access
@@ -43,7 +43,7 @@ MCP-Use for TypeScript provides the complete MCP stack:
 
 ## 📖 Quick Links
 
-- **[Main Repository](../../README.md)** - Overview of the entire MCP-Use ecosystem
+- **[Main Repository](../../README.md)** - Overview of the entire mcp-use ecosystem
 - **[Python Version](../python/README.md)** - Python implementation for agents and clients
 - **[Inspector Documentation](./packages/inspector/README.md)** - Debug your MCP servers
 - **[CLI Documentation](./packages/cli/README.md)** - Build tool for MCP apps
@@ -61,7 +61,7 @@ MCP-Use for TypeScript provides the complete MCP stack:
 
 ## 🚀 Quick Start
 
-Get started with MCP-Use in under a minute:
+Get started with mcp-use in under a minute:
 
 ```bash
 # Create a new MCP application
@@ -80,7 +80,7 @@ Your MCP server is now running at `http://localhost:3000` with the inspector aut
 
 ## 🎨 Build ChatGPT-Style Apps with MCP-UI Resources
 
-One of the most powerful features of MCP-Use is the ability to build **interactive UI widgets** that work alongside your MCP tools. Create ChatGPT-like experiences with custom React components that can call MCP tools and display rich, interactive content.
+One of the most powerful features of mcp-use is the ability to build **interactive UI widgets** that work alongside your MCP tools. Create ChatGPT-like experiences with custom React components that can call MCP tools and display rich, interactive content.
 
 ### Why MCP-UI Resources?
 
@@ -130,7 +130,7 @@ server.uiResource({
 **Learn More:**
 
 - [MCP-UI Resources Guide](#mcp-ui-resources) (detailed section below)
-- [Create MCP-Use App](./packages/create-mcp-use-app/README.md) - Scaffolding with UI examples
+- [Create mcp-use App](./packages/create-mcp-use-app/README.md) - Scaffolding with UI examples
 - [AI SDK Integration](#-ai-sdk-integration) - Build with Vercel AI SDK
 
 ---
@@ -139,7 +139,7 @@ server.uiResource({
 
 ### mcp-use: Core Framework
 
-The heart of the MCP-Use ecosystem - a powerful framework for building both MCP clients and servers.
+The heart of the mcp-use ecosystem - a powerful framework for building both MCP clients and servers.
 
 #### As an MCP Client
 
@@ -480,7 +480,7 @@ await dba.run('Optimize the slow queries in the performance log')
 
 ## 🏗️ Project Structure
 
-A typical MCP-Use project structure:
+A typical mcp-use project structure:
 
 ```
 my-mcp-app/
@@ -534,39 +534,54 @@ npm run start
 ## 🤝 Community & Support
 
 - **Discord**: [Join our community](https://discord.gg/XkNkSkMz3V)
-- **GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use-ts/issues)
-- **Documentation**: [Full docs](https://github.com/mcp-use/mcp-use-ts)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use/issues)
+- **Documentation**: [Full docs](https://github.com/mcp-use/mcp-use)
 
 ---
 
-## 📊 Publishing & Version Management
+## 📊 Version Management
 
-This monorepo uses modern tooling for package management:
+This monorepo uses [Changesets](https://github.com/changesets/changesets) for automated version management and publishing.
 
-### Using Changesets (Recommended)
+### For Contributors
+
+When making changes to TypeScript packages, create a changeset to describe your changes:
 
 ```bash
-# Create a changeset for your changes
+# Create a changeset
+cd libraries/typescript
 pnpm changeset
 
-# Version packages based on changesets
-pnpm changeset version
+# Follow the prompts to:
+# 1. Select which packages changed
+# 2. Choose the version bump type (major/minor/patch)
+# 3. Write a summary of changes
 
-# Publish all changed packages
-pnpm changeset publish
+# Commit the changeset with your code
+git add .
+git commit -m "feat: your feature description"
 ```
 
-### Manual Publishing
+### Release Channels
+
+#### Stable Releases (main branch)
+
+- Push changes with changesets to `main` branch
+- CI creates/updates a "Version Packages" PR automatically
+- Merge the Version PR to publish stable versions
+- Packages published with `latest` tag on npm
+
+#### Canary Prereleases (canary branch)
+
+- Push changes with changesets to `canary` branch
+- CI automatically publishes prerelease versions
+- Versions: `x.y.z-canary.0`, `x.y.z-canary.1`, etc.
+- Published with `canary` dist tag on npm
 
 ```bash
-# Publish individual packages
-pnpm --filter mcp-use publish --access public
-pnpm --filter @mcp-use/cli publish --access public
-pnpm --filter @mcp-use/inspector publish --access public
-pnpm --filter create-mcp-use-app publish --access public
-
-# Or publish all at once
-pnpm -r publish --access public
+# Install canary versions
+npm install mcp-use@canary
+npm install @mcp-use/cli@canary
 ```
 
 ---
@@ -579,7 +594,7 @@ We welcome contributions! Check out our [Contributing Guide](CONTRIBUTING.md) to
 
 ```bash
 # Clone the repository
-git clone https://github.com/mcp-use/mcp-use-ts.git
+git clone https://github.com/mcp-use/mcp-use.git
 cd mcp-use-ts
 
 # Install dependencies
@@ -599,10 +614,10 @@ pnpm dev
 
 ## 📜 License
 
-MIT © [MCP-Use](https://github.com/mcp-use)
+MIT © [mcp-use](https://github.com/mcp-use)
 
 ---
 
 <p align="center">
-  <strong>Built with ❤️ by the MCP-Use team</strong>
+  <strong>Built with ❤️ by the mcp-use team</strong>
 </p>

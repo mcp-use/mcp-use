@@ -1,0 +1,44 @@
+---
+title: "Utils"
+description: "Utils API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/utils.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/utils.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/utils.py</a>
+</Callout>
+
+
+## singleton
+<Card type="info">
+### `function` singleton
+
+A decorator that implements the singleton pattern for a class.
+
+    This decorator ensures that only one instance of a class is ever created.
+    Subsequent attempts to create a new instance will return the existing one.
+
+    Usage:
+        @singleton
+        class MySingletonClass:
+            def __init__(self):
+                # ... initialization ...
+                pass
+
+
+```python
+from mcp_use.utils import singleton
+```
+
+**Parameters**
+><ParamField body="cls" required="True" >   The class to be decorated. </ParamField>
+
+**Signature**
+```python wrap
+def singleton(cls):
+```
+
+</Card>

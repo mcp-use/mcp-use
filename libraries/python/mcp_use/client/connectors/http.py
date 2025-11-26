@@ -13,12 +13,11 @@ from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, Sa
 from mcp.shared.exceptions import McpError
 
 from mcp_use.client.auth.oauth import BearerAuth, OAuth, OAuthClientProvider
+from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.client.exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from mcp_use.client.middleware import CallbackClientSession, Middleware
 from mcp_use.client.task_managers import SseConnectionManager, StreamableHttpConnectionManager
 from mcp_use.logging import logger
-
-from .base import BaseConnector
 
 
 class HttpConnector(BaseConnector):
@@ -40,6 +39,7 @@ class HttpConnector(BaseConnector):
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
+        verify: bool | None = True,
     ):
         """Initialize a new HTTP connector.
 
@@ -68,6 +68,7 @@ class HttpConnector(BaseConnector):
         self.sse_read_timeout = sse_read_timeout
         self._auth: httpx.Auth | None = None
         self._oauth: OAuth | None = None
+        self.verify = verify
 
         # Handle authentication
         if auth is not None:
@@ -125,7 +126,7 @@ class HttpConnector(BaseConnector):
         if self._oauth:
             try:
                 # Create a temporary client for OAuth metadata discovery
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(verify=self.verify) as client:
                     bearer_auth = await self._oauth.initialize(client)
                     if not bearer_auth:
                         # Need to perform OAuth flow
@@ -149,11 +150,19 @@ class HttpConnector(BaseConnector):
         self.transport_type = None
         connection_manager = None
 
+        # Create custom httpx factory
+        httpx_client_factory = self._build_httpx_factory()
+
         try:
             # First, try the new streamable HTTP transport
             logger.debug(f"Attempting streamable HTTP connection to: {self.base_url}")
             connection_manager = StreamableHttpConnectionManager(
-                self.base_url, self.headers, self.timeout, self.sse_read_timeout, auth=self._auth
+                self.base_url,
+                self.headers,
+                self.timeout,
+                self.sse_read_timeout,
+                auth=self._auth,
+                httpx_client_factory=httpx_client_factory,
             )
 
             # Test if this is a streamable HTTP server by attempting initialization
@@ -250,7 +259,12 @@ class HttpConnector(BaseConnector):
                     # Fall back to the old SSE transport
                     logger.debug(f"Attempting SSE fallback connection to: {self.base_url}")
                     connection_manager = SseConnectionManager(
-                        self.base_url, self.headers, self.timeout, self.sse_read_timeout, auth=self._auth
+                        self.base_url,
+                        self.headers,
+                        self.timeout,
+                        self.sse_read_timeout,
+                        auth=self._auth,
+                        httpx_client_factory=httpx_client_factory,
                     )
 
                     read_stream, write_stream = await connection_manager.start()
@@ -296,6 +310,22 @@ class HttpConnector(BaseConnector):
         self._connection_manager = connection_manager
         self._connected = True
         logger.debug(f"Successfully connected to MCP implementation via {self.transport_type}: {self.base_url}")
+
+    def _build_httpx_factory(self):
+        verify = self.verify
+
+        def factory(
+            headers: dict[str, str] | None = None, timeout: httpx.Timeout | None = None, auth: httpx.Auth | None = None
+        ) -> httpx.AsyncClient:
+            return httpx.AsyncClient(
+                headers=headers,
+                timeout=timeout or httpx.Timeout(30.0),
+                auth=auth,
+                verify=verify,
+                follow_redirects=True,
+            )
+
+        return factory
 
     @property
     def public_identifier(self) -> str:

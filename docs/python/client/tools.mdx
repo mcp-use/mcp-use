@@ -58,41 +58,6 @@ async def list_tools():
 # Run the example
 asyncio.run(list_tools())
 ```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-async function listTools() {
-    // Initialize client with server configuration
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
-    }
-    const client = new MCPClient(config)
-
-    // Connect to servers
-    await client.createAllSessions()
-
-    // Get a session for a specific server
-    const session = client.getSession('my_server')
-
-    // List all available tools - always returns fresh data
-    const tools = await session.listTools()
-
-    for (const tool of tools) {
-        console.log(`Tool: ${tool.name}`)
-        console.log(`Description: ${tool.description}`)
-        console.log(`Schema: ${JSON.stringify(tool.inputSchema)}`)
-        console.log('---')
-    }
-
-    await client.closeAllSessions()
-}
-
-// Run the example
-listTools().catch(console.error)
-```
 </CodeGroup>
 
 ### Automatic Tool List Update
@@ -124,14 +89,6 @@ tools = await session.list_tools()
 
 # ⚠️ Deprecated - may return stale data
 # tools = session.tools
-```
-
-```typescript TypeScript
-// ✅ Recommended - always returns fresh data
-const tools = await session.listTools()
-
-// ⚠️ Deprecated - may return stale data
-// const tools = session.tools
 ```
 </CodeGroup>
 
@@ -172,42 +129,6 @@ async def call_tool_example():
 
 asyncio.run(call_tool_example())
 ```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-async function callToolExample() {
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
-    }
-    const client = new MCPClient(config)
-    await client.createAllSessions()
-
-    const session = client.getSession('filesystem_server')
-
-    // Call a tool with arguments
-    const result = await session.callTool(
-        'read_file',
-        {
-            path: '/path/to/file.txt',
-            encoding: 'utf-8'
-        }
-    )
-
-    // Handle the result
-    if (result.isError) {
-        console.error(`Error: ${result.content}`)
-    } else {
-        console.log(`File content: ${result.content}`)
-    }
-
-    await client.closeAllSessions()
-}
-
-callToolExample().catch(console.error)
-```
 </CodeGroup>
 
 ## Tool Results
@@ -229,20 +150,6 @@ else:
     for item in result.content:
         print(f"Found: {item}")
 ```
-
-```typescript TypeScript
-// Example of handling tool results
-const result = await session.callTool('search_web', { query: 'MCP protocol' })
-
-if (result.isError) {
-    console.error(`Tool execution failed: ${result.content}`)
-} else {
-    // Process successful result
-    for (const item of result.content) {
-        console.log(`Found: ${item}`)
-    }
-}
-```
 </CodeGroup>
 
 ## Error Handling
@@ -259,18 +166,5 @@ try:
         print(f"Success: {result.content}")
 except Exception as e:
     print(f"Connection or protocol error: {e}")
-```
-
-```typescript TypeScript
-try {
-    const result = await session.callTool('risky_operation', { param: 'value' })
-    if (result.isError) {
-        console.error(`Tool reported error: ${result.content}`)
-    } else {
-        console.log(`Success: ${result.content}`)
-    }
-} catch (error) {
-    console.error(`Connection or protocol error: ${error}`)
-}
 ```
 </CodeGroup>

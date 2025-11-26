@@ -24,11 +24,18 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:strict": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "dev": "pnpm run -r --parallel dev",
+    "prepare": "husky",
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
     "release": "pnpm build && changeset publish",
-    "version:check": "changeset status"
+    "version:check": "changeset status",
+    "test_app": "pnpm test_app:starter",
+    "test_app:starter": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template starter && cd test_app && pnpm install && pnpm dev",
+    "test_app:apps-sdk": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template apps-sdk && cd test_app && pnpm install && pnpm dev",
+    "test_app:mcp-ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
@@ -36,30 +43,40 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.28.0",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
+    "prettier": "^3.6.2",
     "tsup": "^8.5.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.20.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
+      "prettier --write",
       "eslint --fix"
     ]
   },
   "packageManager": "pnpm@10.6.1",
   "pnpm": {
-    "patchedDependencies": {
-    },
+    "patchedDependencies": {},
     "overrides": {
       "mcp-use": "workspace:*",
       "@mcp-use/inspector": "workspace:*",
       "@mcp-use/cli": "workspace:*",
       "create-mcp-use-app": "workspace:*",
+      "@langchain/core": "^1.0.1",
+      "@langchain/anthropic": "^1.0.0",
+      "@langchain/openai": "^1.0.0",
+      "langchain": "^1.0.1",
       "react": "^19.2.0",
-      "react-dom": "^19.2.0"
+      "react-dom": "^19.2.0",
+      "jsondiffpatch": ">=0.7.2",
+      "esbuild": ">=0.25.0",
+      "vite": ">=5.4.21",
+      "prismjs": ">=1.30.0"
     }
   },
   "dependencies": {

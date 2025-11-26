@@ -25,7 +25,7 @@ async def run_memory_chat():
     }
     # Create MCPClient from config file
     client = MCPClient(config=config)
-    llm = ChatOpenAI(model="gpt-4o-mini")
+    llm = ChatOpenAI(model="gpt-5")
 
     # Create agent with memory_enabled=True
     agent = MCPAgent(
@@ -33,6 +33,7 @@ async def run_memory_chat():
         client=client,
         max_steps=15,
         memory_enabled=True,  # Enable built-in conversation memory
+        pretty_print=True,
     )
 
     print("\n===== Interactive MCP Chat =====")
