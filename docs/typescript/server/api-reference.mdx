@@ -72,6 +72,7 @@ interface ServerConfig {
   baseUrl?: string    // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
   allowedOrigins?: string[] // Allowed origins for DNS rebinding protection
   sessionIdleTimeoutMs?: number // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
+  autoCreateSessionOnInvalidId?: boolean // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
 }
 ```
 
@@ -102,6 +103,37 @@ const server = createMCPServer('my-server', {
     'https://myapp.com',
     'https://app.myapp.com'
   ]
+})
+```
+
+**`autoCreateSessionOnInvalidId` Configuration:**
+
+The `autoCreateSessionOnInvalidId` option controls behavior when a client sends a request with an invalid or expired session ID:
+
+- **Default: `true`** (compatible with ChatGPT and other non-compliant clients)
+  - Server automatically creates a new session when invalid session ID is detected
+  - Allows seamless reconnection after server restarts
+  - Recommended for most use cases, especially when using ChatGPT or other OpenAI clients
+
+- **When set to `false`**:
+  - Server returns HTTP 404 Not Found for invalid session IDs (MCP protocol spec compliant)
+  - Clients must explicitly send a new `initialize` request
+  - Use only if you're certain all clients properly handle 404 errors by reinitializing
+
+**Note**: According to the [MCP protocol specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management), clients **MUST** start a new session by sending a new `InitializeRequest` when they receive HTTP 404 in response to a request containing an `MCP-Session-Id`. However, some clients (like ChatGPT) don't properly implement this behavior.
+
+**Example:**
+```typescript
+// Default behavior (compatible with ChatGPT)
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  autoCreateSessionOnInvalidId: true  // Default: true
+})
+
+// Strict MCP spec compliance (requires compliant clients)
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  autoCreateSessionOnInvalidId: false  // Strict spec compliance
 })
 ```
 
