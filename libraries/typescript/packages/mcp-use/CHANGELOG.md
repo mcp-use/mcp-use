@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.5.1-canary.1
+
+### Patch Changes
+
+- 4ca7772: - Fix session reinitialization by refactoring transport creation logic
+  - Add `autoCreateSessionOnInvalidId` config option (default: true) for seamless reconnection with non-compliant clients
+  - Add DEBUG mode logging with detailed request/response information via DEBUG environment variable
+  - Improve runtime detection for Deno and Node.js environments
+  - @mcp-use/cli@2.3.1-canary.1
+  - @mcp-use/inspector@0.7.1-canary.1
+
 ## 1.5.1-canary.0
 
 ### Patch Changes
