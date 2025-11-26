@@ -19,8 +19,13 @@ import { createMCPServer } from 'mcp-use/server'
 
 const server = createMCPServer('my-server', {
   version: '1.0.0',              // Semantic version
-  description: 'Server purpose'   // Human-readable description
-  baseUrl: process.env.MCP_URL || "http://localhost:3000" // MCP Server production URL (needed for UI Widgets to work correctly)
+  description: 'Server purpose',  // Human-readable description
+  host: 'localhost',             // Hostname (defaults to 'localhost')
+  baseUrl: process.env.MCP_URL || "http://localhost:3000", // MCP Server production URL (needed for UI Widgets to work correctly)
+  allowedOrigins: process.env.NODE_ENV === 'production' 
+    ? ['https://myapp.com']      // Production: explicit origins
+    : undefined,                 // Development: allows all origins
+  sessionIdleTimeoutMs: 300000   // Session idle timeout (default: 5 minutes)
 })
 ```
 
@@ -259,6 +264,64 @@ server.tool({
 ```
 
 ## Security Configuration
+
+### DNS Rebinding Protection
+
+The server supports DNS rebinding protection through the `allowedOrigins` configuration option. This is important for security when exposing MCP servers over HTTP.
+
+**Development vs Production Behavior:**
+
+- **Development mode** (NODE_ENV !== "production"):
+  - If `allowedOrigins` is not set: All origins are allowed (DNS rebinding protection disabled)
+  - This enables direct browser connections from any origin for easier development
+  - Perfect for local development with tools like the MCP Inspector
+
+- **Production mode** (NODE_ENV === "production"):
+  - If `allowedOrigins` is not set: DNS rebinding protection is disabled (not recommended)
+  - If set to empty array: DNS rebinding protection is disabled
+  - If set with origins: DNS rebinding protection is enabled with those specific origins
+  - **Always explicitly set allowed origins in production**
+
+**Example Configuration:**
+
+```typescript
+import { createMCPServer } from 'mcp-use/server'
+
+// Development: No configuration needed (allows all origins)
+const devServer = createMCPServer('dev-server', {
+  version: '1.0.0'
+})
+// Works with direct browser connections, inspector, etc.
+
+// Production: Explicitly set allowed origins
+const prodServer = createMCPServer('prod-server', {
+  version: '1.0.0',
+  allowedOrigins: [
+    'https://myapp.com',
+    'https://app.myapp.com',
+    'https://admin.myapp.com'
+  ]
+})
+// Only allows connections from these specific origins
+
+// Environment-based configuration
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  allowedOrigins: process.env.NODE_ENV === 'production'
+    ? process.env.ALLOWED_ORIGINS?.split(',') || []
+    : undefined // Development: allow all origins
+})
+```
+
+**Security Best Practices:**
+
+1. **Always set `allowedOrigins` in production** - Never leave it undefined in production environments
+2. **Use environment variables** - Store allowed origins in environment variables, not in code
+3. **Be specific** - Only include origins that actually need access
+4. **Include protocol** - Always specify the full origin including protocol (http/https)
+5. **Test in production mode** - Test your server with `NODE_ENV=production` to ensure proper origin validation
+
+**Note:** The server exposes MCP endpoints at both `/mcp` and `/sse` for compatibility. Both endpoints respect the same `allowedOrigins` configuration.
 
 ### Input Validation
 
