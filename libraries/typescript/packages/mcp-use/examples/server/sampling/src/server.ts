@@ -1,4 +1,7 @@
-import { createMCPServer, type ToolContext } from "../../../../dist/src/server/index.js";
+import {
+  createMCPServer,
+  type ToolContext,
+} from "../../../../dist/src/server/index.js";
 
 // Create an MCP server with sampling support
 const server = createMCPServer("sampling-example-server", {
@@ -10,7 +13,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
 /**
  * Example tool that uses sampling to analyze sentiment.
- * 
+ *
  * The ctx.sample() function automatically:
  * - Sends progress notifications every 5 seconds while waiting for the LLM
  * - Has no timeout by default (waits indefinitely)
@@ -65,8 +68,13 @@ Text to analyze: ${params.text}`;
         },
         {
           // Optional: custom progress handling
-          onProgress: ({ message }: { progress: number; total?: number; message: string }) =>
-            console.log(`[Progress] ${message}`),
+          onProgress: ({
+            message,
+          }: {
+            progress: number;
+            total?: number;
+            message: string;
+          }) => console.log(`[Progress] ${message}`),
           // Optional: custom progress interval (default: 5000ms)
           // progressIntervalMs: 3000,
           // Optional: timeout (default: no timeout)

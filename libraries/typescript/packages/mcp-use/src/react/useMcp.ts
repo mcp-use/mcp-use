@@ -499,7 +499,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         if (!session) {
           throw new Error("No active session found");
         }
-        const result = await session.connector.callTool(name, args || {}, options);
+        const result = await session.connector.callTool(
+          name,
+          args || {},
+          options
+        );
         addLog("info", `Tool "${name}" call successful:`, result);
         return result;
       } catch (err) {

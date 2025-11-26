@@ -658,7 +658,10 @@ export class McpServer {
               if (timeout && timeout !== Infinity) {
                 const timeoutPromise = new Promise<never>((_, reject) => {
                   setTimeout(
-                    () => reject(new Error(`Sampling timed out after ${timeout}ms`)),
+                    () =>
+                      reject(
+                        new Error(`Sampling timed out after ${timeout}ms`)
+                      ),
                     timeout
                   );
                 });
@@ -679,19 +682,20 @@ export class McpServer {
            * Send a progress notification to the client.
            * Only works if the client requested progress updates for this tool call.
            */
-          reportProgress: progressToken && extra?.sendNotification
-            ? async (progress: number, total?: number, message?: string) => {
-                await extra.sendNotification({
-                  method: "notifications/progress",
-                  params: {
-                    progressToken,
-                    progress,
-                    total,
-                    message,
-                  },
-                });
-              }
-            : undefined,
+          reportProgress:
+            progressToken && extra?.sendNotification
+              ? async (progress: number, total?: number, message?: string) => {
+                  await extra.sendNotification({
+                    method: "notifications/progress",
+                    params: {
+                      progressToken,
+                      progress,
+                      total,
+                      message,
+                    },
+                  });
+                }
+              : undefined,
         };
 
         // Pass context as second parameter if callback accepts it

@@ -578,7 +578,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
             prompts: [],
             error: null,
             authUrl: null,
-            customHeaders: existingConfig.proxyConfig?.customHeaders || proxyConfig?.customHeaders,
+            customHeaders:
+              existingConfig.proxyConfig?.customHeaders ||
+              proxyConfig?.customHeaders,
             transportType: existingConfig.transportType || transportType,
             proxyConfig: existingConfig.proxyConfig || proxyConfig,
             notifications: [],
