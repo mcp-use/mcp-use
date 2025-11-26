@@ -1,6 +1,6 @@
 ---
 title: "Notifications"
-description: "Send and receive real-time notifications with connected clients"
+description: "Send notifications to clients and receive notifications from clients"
 icon: "bell"
 ---
 
@@ -11,6 +11,10 @@ MCP supports bidirectional notifications between servers and clients. Notificati
 **Server → Client**: Send notifications to signal events, status changes, or broadcast messages.
 
 **Client → Server**: Receive notifications when clients update their roots or other state.
+
+<Note>
+For information on handling notifications in your client application, see [Client Notifications](/typescript/client/notifications).
+</Note>
 
 ## Understanding Notifications
 
@@ -332,7 +336,7 @@ if (sessions.length === 0) {
 
 ## Next Steps
 
-- [Client Notifications](/typescript/client/notifications) - Handle notifications in your client
+- [Client Notifications](/typescript/client/notifications) - Handle notifications in your client application
 - [Tools Guide](./tools) - Create tools that send notifications
 - [Configuration](./configuration) - Configure session management
 - [Examples](./examples) - More notification examples
