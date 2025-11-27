@@ -559,30 +559,101 @@ export function McpProvider({ children }: { children: ReactNode }) {
       const existingConfig = connectionConfigs.find((c) => c.url === url);
       const existingConnection = connections.find((c) => c.url === url);
 
-      // If connection exists in both configs and connections, nothing to do
+      // If connection exists in both configs and connections
       if (existingConfig && existingConnection) {
+        // Check if we're trying to update the proxy config (for autoConnect retry scenarios)
+        const proxyConfigChanged = JSON.stringify(existingConfig.proxyConfig) !== JSON.stringify(proxyConfig);
+        
+        if (proxyConfigChanged && proxyConfig) {
+          
+          // Remove the old connection completely
+          setConnectionConfigs((prev) => prev.filter((c) => c.url !== url));
+          setConnections((prev) => prev.filter((c) => c.url !== url));
+          
+          // Use setTimeout to ensure state updates complete before re-adding
+          setTimeout(() => {
+            const newConfig = {
+              id: url,
+              url,
+              name: name || existingConfig.name || "MCP Server",
+              proxyConfig,
+              transportType: transportType || existingConfig.transportType,
+            };
+            
+            setConnectionConfigs((prev) => [...prev, newConfig]);
+            
+            setConnections((prev) => [
+              ...prev,
+              {
+                id: url,
+                url,
+                name: name || existingConfig.name || "MCP Server",
+                state: "connecting",
+                tools: [],
+                resources: [],
+                prompts: [],
+                error: null,
+                authUrl: null,
+                customHeaders: proxyConfig?.customHeaders,
+                transportType: transportType || existingConfig.transportType,
+                proxyConfig,
+                notifications: [],
+                unreadNotificationCount: 0,
+                markNotificationRead: () => {},
+                markAllNotificationsRead: () => {},
+                clearNotifications: () => {},
+                callTool: async () => {},
+                readResource: async () => {},
+                listPrompts: async () => {},
+                getPrompt: async () => {},
+                authenticate: () => {},
+                retry: () => {},
+                clearStorage: () => {},
+                client: null,
+              },
+            ]);
+          }, 10);
+          return;
+        }
+        
         return;
       }
 
       // If connection exists in configs but not in connections, add it to connections
+      // Also update the config if new parameters are provided (for autoConnect retry scenarios)
       if (existingConfig && !existingConnection) {
+
+        // Update config if new proxy or transport settings are provided
+        if (proxyConfig || transportType) {
+          setConnectionConfigs((prev) =>
+            prev.map((c) =>
+              c.url === url
+                ? {
+                    ...c,
+                    proxyConfig: proxyConfig || c.proxyConfig,
+                    transportType: transportType || c.transportType,
+                    name: name || c.name,
+                  }
+                : c
+            )
+          );
+        }
+
         setConnections((prev) => [
           ...prev,
           {
             id: existingConfig.id || url,
             url,
-            name: existingConfig.name || name || "MCP Server",
+            name: name || existingConfig.name || "MCP Server",
             state: "connecting",
             tools: [],
             resources: [],
             prompts: [],
             error: null,
             authUrl: null,
-            customHeaders:
-              existingConfig.proxyConfig?.customHeaders ||
-              proxyConfig?.customHeaders,
-            transportType: existingConfig.transportType || transportType,
-            proxyConfig: existingConfig.proxyConfig || proxyConfig,
+            customHeaders: proxyConfig?.customHeaders || existingConfig.proxyConfig?.customHeaders,
+            transportType: transportType || existingConfig.transportType,
+            proxyConfig: proxyConfig || existingConfig.proxyConfig,
             notifications: [],
             unreadNotificationCount: 0,
             markNotificationRead: () => {},
@@ -667,7 +738,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
     }
 
     // Track removal
-    Telemetry.getInstance().track(new MCPServerRemovedEvent(id));
+    Telemetry.getInstance().capture(new MCPServerRemovedEvent({ serverId: id }));
   }, []);
 
   const updateConnectionConfig = useCallback(
@@ -782,18 +853,22 @@ export function McpProvider({ children }: { children: ReactNode }) {
       {/* Render a wrapper for each configured connection */}
       {configLoaded &&
         autoConnect &&
-        connectionConfigs.map((config) => (
-          <McpConnectionWrapper
-            key={config.id || config.url}
-            url={config.url}
-            name={config.name}
-            proxyConfig={config.proxyConfig}
-            transportType={config.transportType}
-            connectionId={config.id || config.url}
-            onUpdate={handleConnectionUpdate}
-            onRemove={() => removeConnection(config.id || config.url)}
-          />
-        ))}
+        connectionConfigs.map((config) => {
+          const wrapperKey = `${config.id || config.url}-${config.proxyConfig?.proxyAddress ? 'proxy' : 'direct'}`;
+          console.warn('[McpContext] Rendering McpConnectionWrapper with key:', wrapperKey, 'proxyConfig:', config.proxyConfig);
+          return (
+            <McpConnectionWrapper
+              key={wrapperKey}
+              url={config.url}
+              name={config.name}
+              proxyConfig={config.proxyConfig}
+              transportType={config.transportType}
+              connectionId={config.id || config.url}
+              onUpdate={handleConnectionUpdate}
+              onRemove={() => removeConnection(config.id || config.url)}
+            />
+          );
+        })}
     </McpContext.Provider>
   );
 }
