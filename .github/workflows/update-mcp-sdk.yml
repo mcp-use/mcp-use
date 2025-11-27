@@ -105,6 +105,28 @@ jobs:
           
           echo "✅ Updated package.json files"
 
+      - name: Create changeset file
+        if: steps.check-version.outputs.should_update == 'true'
+        run: |
+          LATEST_VERSION="${{ steps.check-version.outputs.latest_version }}"
+          CURRENT_VERSION="${{ steps.check-version.outputs.current_version }}"
+          TIMESTAMP=$(date +%s)
+          CHANGESET_FILE="libraries/typescript/.changeset/automated-mcp-sdk-update-${TIMESTAMP}.md"
+          
+          # Create changeset file
+          cat > "$CHANGESET_FILE" << EOF
+          ---
+          "mcp-use": patch
+          "@mcp-use/inspector": patch
+          ---
+          
+          chore(deps): update @modelcontextprotocol/sdk to ${LATEST_VERSION}
+          
+          Updated @modelcontextprotocol/sdk dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}.
+          EOF
+          
+          echo "✅ Created changeset file: $CHANGESET_FILE"
+
       - name: Install dependencies
         if: steps.check-version.outputs.should_update == 'true'
         working-directory: libraries/typescript
@@ -132,6 +154,7 @@ jobs:
           git add libraries/typescript/packages/mcp-use/package.json
           git add libraries/typescript/packages/inspector/package.json
           git add libraries/typescript/pnpm-lock.yaml
+          git add libraries/typescript/.changeset/*.md
           
           # Commit changes
           git commit -m "chore(deps): update @modelcontextprotocol/sdk to ${LATEST_VERSION}"
@@ -154,6 +177,7 @@ jobs:
           - \`libraries/typescript/packages/mcp-use/package.json\`
           - \`libraries/typescript/packages/inspector/package.json\`
           - \`libraries/typescript/pnpm-lock.yaml\`
+          - \`libraries/typescript/.changeset/automated-mcp-sdk-update-*.md\` (changeset file)
 
           ### 🔗 References
 
