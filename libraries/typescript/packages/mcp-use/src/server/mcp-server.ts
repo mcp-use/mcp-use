@@ -454,7 +454,6 @@ export class McpServer {
         title: resourceDefinition.title,
         description: resourceDefinition.description,
         mimeType: resourceDefinition.mimeType,
-        annotations: resourceDefinition.annotations,
         _meta: resourceDefinition._meta,
       },
       async () => {
