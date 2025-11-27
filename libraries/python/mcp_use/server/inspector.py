@@ -2,7 +2,7 @@ import httpx
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
 
-CDN_BASE_URL = "https://unpkg.com/@mcp-use/inspector@0.6.0/dist/client"
+CDN_BASE_URL = "https://unpkg.com/@mcp-use/inspector@latest/dist/client"
 INDEX_URL = f"{CDN_BASE_URL}/index.html"
 
 
@@ -11,12 +11,13 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
     # Get the server URL from the request
     server_url = f"{request.url.scheme}://{request.url.netloc}{mcp_path}"
 
-    # Check if server parameter is already present
+    # Check if server or autoConnect parameter is already present
     server_param = request.query_params.get("server")
+    autoconnect_param = request.query_params.get("autoConnect")
 
-    if not server_param:
-        # Redirect to add the server parameter
-        autoconnect_url = f"{request.url.scheme}://{request.url.netloc}/inspector?server={server_url}"
+    if not server_param and not autoconnect_param:
+        # Redirect to add the autoConnect parameter (note: capital C)
+        autoconnect_url = f"{request.url.scheme}://{request.url.netloc}/inspector?autoConnect={server_url}"
         return RedirectResponse(url=autoconnect_url, status_code=302)
 
     # Fetch the CDN file
@@ -28,8 +29,8 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
     except Exception:
         pass
 
-    # Fallback: redirect to autoconnect URL
-    autoconnect_url = f"{request.url.scheme}://{request.url.netloc}/inspector?server={server_url}"
+    # Fallback: redirect to autoconnect URL (note: capital C)
+    autoconnect_url = f"{request.url.scheme}://{request.url.netloc}/inspector?autoConnect={server_url}"
     return RedirectResponse(url=autoconnect_url, status_code=302)
 
 
