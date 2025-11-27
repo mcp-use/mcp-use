@@ -451,7 +451,6 @@ export class McpServer {
       resourceDefinition.name,
       resourceDefinition.uri,
       {
-        name: resourceDefinition.name,
         title: resourceDefinition.title,
         description: resourceDefinition.description,
         mimeType: resourceDefinition.mimeType,
@@ -512,9 +511,6 @@ export class McpServer {
 
     // Create metadata object with optional fields
     const metadata: any = {};
-    if (resourceTemplateDefinition.resourceTemplate.name) {
-      metadata.name = resourceTemplateDefinition.resourceTemplate.name;
-    }
     if (resourceTemplateDefinition.title) {
       metadata.title = resourceTemplateDefinition.title;
     }
