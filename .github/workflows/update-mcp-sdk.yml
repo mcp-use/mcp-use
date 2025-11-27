@@ -1,0 +1,206 @@
+name: Update MCP SDK
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual triggering via GitHub UI
+
+jobs:
+  update-mcp-sdk:
+    name: Check and Update @modelcontextprotocol/sdk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Check for new version
+        id: check-version
+        run: |
+          # Get current version from package.json
+          CURRENT_VERSION=$(node -p "require('./libraries/typescript/packages/mcp-use/package.json').dependencies['@modelcontextprotocol/sdk']")
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Fetch latest version from npm registry
+          LATEST_VERSION=$(npm view @modelcontextprotocol/sdk version)
+          echo "Latest version: $LATEST_VERSION"
+          
+          # Export versions
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if versions are different
+          if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+            echo "should_update=false" >> $GITHUB_OUTPUT
+            echo "✅ Already on latest version ($CURRENT_VERSION)"
+            exit 0
+          fi
+          
+          # Parse versions using semver comparison
+          CURRENT_MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
+          CURRENT_MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
+          LATEST_MAJOR=$(echo $LATEST_VERSION | cut -d. -f1)
+          LATEST_MINOR=$(echo $LATEST_VERSION | cut -d. -f2)
+          
+          # Check if it's a major version bump (skip major updates)
+          if [ "$LATEST_MAJOR" -gt "$CURRENT_MAJOR" ]; then
+            echo "should_update=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Major version bump detected ($CURRENT_VERSION → $LATEST_VERSION). Skipping auto-update."
+            echo "Please manually review and update for major version changes."
+            exit 0
+          fi
+          
+          # Check if PR already exists for this version
+          BRANCH_NAME="chore/update-mcp-sdk-${LATEST_VERSION}"
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
+            echo "should_update=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Branch $BRANCH_NAME already exists. Skipping."
+            exit 0
+          fi
+          
+          echo "should_update=true" >> $GITHUB_OUTPUT
+          echo "🚀 Update available: $CURRENT_VERSION → $LATEST_VERSION"
+
+      - name: Update package files
+        if: steps.check-version.outputs.should_update == 'true'
+        run: |
+          LATEST_VERSION="${{ steps.check-version.outputs.latest_version }}"
+          
+          # Update mcp-use package.json
+          node -e "
+          const fs = require('fs');
+          const path = './libraries/typescript/packages/mcp-use/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.dependencies['@modelcontextprotocol/sdk'] = '$LATEST_VERSION';
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          "
+          
+          # Update inspector package.json
+          node -e "
+          const fs = require('fs');
+          const path = './libraries/typescript/packages/inspector/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.dependencies['@modelcontextprotocol/sdk'] = '$LATEST_VERSION';
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          "
+          
+          echo "✅ Updated package.json files"
+
+      - name: Create changeset file
+        if: steps.check-version.outputs.should_update == 'true'
+        run: |
+          LATEST_VERSION="${{ steps.check-version.outputs.latest_version }}"
+          CURRENT_VERSION="${{ steps.check-version.outputs.current_version }}"
+          TIMESTAMP=$(date +%s)
+          CHANGESET_FILE="libraries/typescript/.changeset/automated-mcp-sdk-update-${TIMESTAMP}.md"
+          
+          # Create changeset file
+          cat > "$CHANGESET_FILE" << EOF
+          ---
+          "mcp-use": patch
+          "@mcp-use/inspector": patch
+          ---
+          
+          chore(deps): update @modelcontextprotocol/sdk to ${LATEST_VERSION}
+          
+          Updated @modelcontextprotocol/sdk dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}.
+          EOF
+          
+          echo "✅ Created changeset file: $CHANGESET_FILE"
+
+      - name: Install dependencies
+        if: steps.check-version.outputs.should_update == 'true'
+        working-directory: libraries/typescript
+        run: |
+          pnpm install --no-frozen-lockfile
+          echo "✅ Updated pnpm-lock.yaml"
+
+      - name: Create Pull Request
+        if: steps.check-version.outputs.should_update == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LATEST_VERSION="${{ steps.check-version.outputs.latest_version }}"
+          CURRENT_VERSION="${{ steps.check-version.outputs.current_version }}"
+          BRANCH_NAME="chore/update-mcp-sdk-${LATEST_VERSION}"
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # Create and checkout new branch
+          git checkout -b "$BRANCH_NAME"
+          
+          # Stage changes
+          git add libraries/typescript/packages/mcp-use/package.json
+          git add libraries/typescript/packages/inspector/package.json
+          git add libraries/typescript/pnpm-lock.yaml
+          git add libraries/typescript/.changeset/*.md
+          
+          # Commit changes
+          git commit -m "chore(deps): update @modelcontextprotocol/sdk to ${LATEST_VERSION}"
+          
+          # Push branch
+          git push origin "$BRANCH_NAME"
+          
+          # Create PR body
+          PR_BODY="## 🔄 Dependency Update
+
+          This PR updates \`@modelcontextprotocol/sdk\` from \`${CURRENT_VERSION}\` to \`${LATEST_VERSION}\`.
+
+          ### 📦 Changes
+
+          - **Version**: \`${CURRENT_VERSION}\` → \`${LATEST_VERSION}\`
+          - **Type**: $([ "${CURRENT_VERSION%.*}" = "${LATEST_VERSION%.*}" ] && echo "Patch" || echo "Minor") update
+
+          ### 📝 Updated Files
+
+          - \`libraries/typescript/packages/mcp-use/package.json\`
+          - \`libraries/typescript/packages/inspector/package.json\`
+          - \`libraries/typescript/pnpm-lock.yaml\`
+          - \`libraries/typescript/.changeset/automated-mcp-sdk-update-*.md\` (changeset file)
+
+          ### 🔗 References
+
+          - [npm Package](https://www.npmjs.com/package/@modelcontextprotocol/sdk/v/${LATEST_VERSION})
+          - [GitHub Repository](https://github.com/modelcontextprotocol/typescript-sdk)
+
+          ### ✅ Testing
+
+          Please verify that:
+          - [ ] All existing tests pass
+          - [ ] No breaking changes are introduced
+          - [ ] Documentation is updated if needed
+
+          ---
+
+          🤖 *This PR was automatically created by the [Update MCP SDK workflow](.github/workflows/update-mcp-sdk.yml)*"
+          
+          # Create PR
+          gh pr create \
+            --base canary \
+            --head "$BRANCH_NAME" \
+            --title "chore(deps): update @modelcontextprotocol/sdk to ${LATEST_VERSION}" \
+            --body "$PR_BODY"
+          
+          echo "✅ Created Pull Request: $BRANCH_NAME → canary"
+
