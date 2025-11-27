@@ -1,5 +1,18 @@
 # @mcp-use/cli
 
+## 2.4.1
+
+### Patch Changes
+
+- c8e30ec: chore: update patch
+- Updated dependencies [1a509bf]
+- Updated dependencies [c60c055]
+- Updated dependencies [4950e56]
+- Updated dependencies [1a509bf]
+- Updated dependencies [c8e30ec]
+  - mcp-use@1.6.1
+  - @mcp-use/inspector@0.8.1
+
 ## 2.4.1-canary.1
 
 ### Patch Changes
