@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from mcp.server.fastmcp import FastMCP
 
@@ -9,6 +9,9 @@ from mcp_use.server.logging import MCPLoggingMiddleware
 from mcp_use.server.routes import docs_ui, openmcp_json
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.signals import setup_signal_handlers
+
+if TYPE_CHECKING:
+    from mcp_use.server.router import MCPRouter
 
 TransportType = Literal["stdio", "streamable-http"]
 
@@ -102,6 +105,72 @@ class MCPServer(FastMCP):
         # Inspector routes
         self.custom_route(self.inspector_path, methods=["GET"])(_inspector_index)
         self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
+
+    def include_router(self, router: "MCPRouter", prefix: str = "", enabled: bool = True) -> None:
+        """
+        Include a router's tools, resources, and prompts into this server.
+
+        Similar to FastAPI's include_router, this allows you to organize your
+        MCP server into multiple files/modules.
+
+        Args:
+            router: The MCPRouter instance to include
+            prefix: Optional prefix to add to all tool names (e.g., "math" -> "math_add")
+            enabled: Whether to enable this router (default True). Set to False to skip registration.
+
+        Example:
+            ```python
+            from mcp_use.server import MCPServer, MCPRouter
+
+            # In routes/math.py
+            router = MCPRouter()
+
+            @router.tool()
+            def add(a: int, b: int) -> int:
+                return a + b
+
+            # In main.py
+            server = MCPServer(name="my-server")
+            server.include_router(router, prefix="math")  # Tool becomes "math_add"
+            server.include_router(other_router, enabled=False)  # Skip this router
+            ```
+        """
+        if not enabled:
+            return
+        # Register all tools from the router
+        for tool in router.tools:
+            tool_name = tool.name
+            if prefix:
+                tool_name = f"{prefix}_{tool_name}"
+
+            self.add_tool(
+                tool.fn,
+                name=tool_name,
+                title=tool.title,
+                description=tool.description,
+                annotations=tool.annotations,
+                structured_output=tool.structured_output,
+            )
+
+        # Register all resources from the router
+        for resource in router.resources:
+            self.resource(
+                uri=resource.uri,
+                name=resource.name,
+                description=resource.description,
+                mime_type=resource.mime_type,
+            )(resource.fn)
+
+        # Register all prompts from the router
+        for prompt in router.prompts:
+            prompt_name = prompt.name
+            if prefix:
+                prompt_name = f"{prefix}_{prompt_name}"
+
+            self.prompt(
+                name=prompt_name,
+                description=prompt.description,
+            )(prompt.fn)
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""

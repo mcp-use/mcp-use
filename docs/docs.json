@@ -137,6 +137,7 @@
                     "icon": "sparkle",
                     "pages": []
                   },
+                  "python/server/router",
                   "python/server/inspector",
                   "python/server/logging",
                   "python/server/openmcp"
