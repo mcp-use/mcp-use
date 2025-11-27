@@ -1,5 +1,22 @@
 # @mcp-use/inspector
 
+## 0.8.1-canary.0
+
+### Patch Changes
+
+- 9974d55: chore(deps): update @modelcontextprotocol/sdk to 1.23.0
+
+  Updated @modelcontextprotocol/sdk dependency from 1.20.0 to 1.23.0.
+
+- 299ce65: remove console
+- 0e77821: Fix new sdk types
+- Updated dependencies [9974d55]
+- Updated dependencies [e9e4075]
+- Updated dependencies [32c6790]
+- Updated dependencies [299ce65]
+- Updated dependencies [0e77821]
+  - mcp-use@1.6.1-canary.0
+
 ## 0.8.0
 
 ### Minor Changes

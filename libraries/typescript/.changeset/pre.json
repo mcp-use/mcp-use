@@ -7,5 +7,11 @@
     "@mcp-use/inspector": "0.8.0",
     "mcp-use": "1.6.0"
   },
-  "changesets": []
+  "changesets": [
+    "automated-mcp-sdk-update-1764246579",
+    "better-hairs-fly",
+    "curly-jokes-shout",
+    "ready-books-type",
+    "swift-brooms-clap"
+  ]
 }
