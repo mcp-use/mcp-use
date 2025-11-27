@@ -84,13 +84,20 @@ export function useAutoConnect({
   const [configLoaded, setConfigLoaded] = useState(false);
   const retryScheduledRef = useRef(false);
 
-  // Load auto-switch setting from localStorage
+  // Load auto-switch setting from localStorage, but override to true if autoConnect is active
   useEffect(() => {
-    const autoSwitchSetting = localStorage.getItem("mcp-inspector-auto-switch");
-    if (autoSwitchSetting !== null) {
-      setAutoSwitch(autoSwitchSetting === "true");
+    if (autoConnectConfig) {
+      // When using autoConnect, always enable auto-switch (proxy fallback)
+      setAutoSwitch(true);
+    } else {
+      const autoSwitchSetting = localStorage.getItem(
+        "mcp-inspector-auto-switch"
+      );
+      if (autoSwitchSetting !== null) {
+        setAutoSwitch(autoSwitchSetting === "true");
+      }
     }
-  }, []);
+  }, [autoConnectConfig]);
 
   // Unified connection attempt function
   const attemptConnection = useCallback(
@@ -243,7 +250,6 @@ export function useAutoConnect({
       if (autoConnectConfig.connectionType === "Direct") {
         // Failed with direct, try proxy
         toast.error("Direct connection failed, trying with proxy...");
-        setHasTriedBothModes(true);
         retryScheduledRef.current = true;
 
         // Defer state updates to avoid updating during render
@@ -268,16 +274,21 @@ export function useAutoConnect({
           }, 1000);
         });
       } else {
-        // Both modes failed - clear loading and reset state
-        toast.error("Proxy connection also failed");
-        setHasTriedBothModes(true);
+        // Both modes failed - clear loading, reset state, and navigate home
+        toast.error(
+          "Cannot connect to server. Please check the URL and try again."
+        );
 
         // Defer state updates to avoid updating during render
         queueMicrotask(() => {
           removeConnection(connection.id);
           setIsAutoConnecting(false);
           setAutoConnectConfig(null);
+          setHasTriedBothModes(true);
           retryScheduledRef.current = false;
+
+          // Navigate to home page after connection failure
+          navigate("/");
         });
       }
     }
