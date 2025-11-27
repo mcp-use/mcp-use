@@ -10,7 +10,7 @@ import os
 import sys
 import time
 
-import aiohttp
+import httpx
 from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
@@ -162,23 +162,23 @@ class SandboxConnector(BaseConnector):
         # Try to connect to the server
         while time.time() - start_time < timeout:
             try:
-                async with aiohttp.ClientSession() as session:
+                async with httpx.AsyncClient(timeout=2) as client:
                     try:
                         # First try the endpoint
-                        async with session.get(ping_url, timeout=2) as response:
-                            if response.status == 200:
-                                elapsed = time.time() - start_time
-                                logger.info(f"Server is ready! SSE endpoint responded with 200 after {elapsed:.1f}s")
-                                return True
+                        response = await client.get(ping_url)
+                        if response.status_code == 200:
+                            elapsed = time.time() - start_time
+                            logger.info(f"Server is ready! SSE endpoint responded with 200 after {elapsed:.1f}s")
+                            return True
                     except Exception:
                         # If sse endpoint doesn't work, try the base URL
-                        async with session.get(base_url, timeout=2) as response:
-                            if response.status < 500:  # Accept any non-server error
-                                elapsed = time.time() - start_time
-                                logger.info(
-                                    f"Server is ready! Base URL responded with {response.status} after {elapsed:.1f}s"
-                                )
-                                return True
+                        response = await client.get(base_url)
+                        if response.status_code < 500:  # Accept any non-server error
+                            elapsed = time.time() - start_time
+                            logger.info(
+                                f"Server is ready! Base URL responded with {response.status_code} after {elapsed:.1f}s"
+                            )
+                            return True
             except Exception:
                 # Wait a bit before trying again
                 await asyncio.sleep(0.5)

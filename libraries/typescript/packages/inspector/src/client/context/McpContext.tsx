@@ -11,6 +11,14 @@ import {
   useState,
 } from "react";
 
+export interface MCPNotification {
+  id: string;
+  method: string;
+  params?: Record<string, any>;
+  timestamp: number;
+  read: boolean;
+}
+
 export interface MCPConnection {
   id: string;
   url: string;
@@ -46,7 +54,21 @@ export interface MCPConnection {
     completions?: Record<string, any>;
     [key: string]: any;
   };
-  callTool: (toolName: string, args: any) => Promise<any>;
+  notifications: MCPNotification[];
+  unreadNotificationCount: number;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  clearNotifications: () => void;
+  callTool: (
+    toolName: string,
+    args: any,
+    options?: {
+      timeout?: number;
+      maxTotalTimeout?: number;
+      resetTimeoutOnProgress?: boolean;
+      signal?: AbortSignal;
+    }
+  ) => Promise<any>;
   readResource: (uri: string) => Promise<any>;
   listPrompts: (serverName?: string) => Promise<void>;
   getPrompt: (name: string, args: any) => Promise<any>;
@@ -68,11 +90,6 @@ interface McpContextType {
     transportType?: "http" | "sse"
   ) => void;
   removeConnection: (id: string) => void;
-  getConnection: (id: string) => MCPConnection | undefined;
-  autoConnect: boolean;
-  setAutoConnect: (autoConnect: boolean) => void;
-  connectServer: (id: string) => void;
-  disconnectServer: (id: string) => void;
   updateConnectionConfig: (
     id: string,
     config: {
@@ -84,19 +101,21 @@ interface McpContextType {
       transportType?: "http" | "sse";
     }
   ) => void;
+  autoConnect: boolean;
+  setAutoConnect: (enabled: boolean) => void;
+  connectServer: (id: string) => void;
+  disconnectServer: (id: string) => void;
+  configLoaded: boolean;
 }
 
-const McpContext = createContext<McpContextType | undefined>(undefined);
+const McpContext = createContext<McpContextType | null>(null);
 
-interface SavedConnection {
-  id: string;
-  url: string;
-  name: string;
-  proxyConfig?: {
-    proxyAddress?: string;
-    customHeaders?: Record<string, string>;
-  };
-  transportType?: "http" | "sse";
+export function useMcpContext() {
+  const context = use(McpContext);
+  if (!context) {
+    throw new Error("useMcpContext must be used within a McpProvider");
+  }
+  return context;
 }
 
 function McpConnectionWrapper({
@@ -104,6 +123,7 @@ function McpConnectionWrapper({
   name,
   proxyConfig,
   transportType,
+  connectionId,
   onUpdate,
   onRemove: _onRemove,
 }: {
@@ -114,6 +134,7 @@ function McpConnectionWrapper({
     customHeaders?: Record<string, string>;
   };
   transportType?: "http" | "sse";
+  connectionId: string;
   onUpdate: (connection: MCPConnection) => void;
   onRemove: () => void;
 }) {
@@ -146,13 +167,131 @@ function McpConnectionWrapper({
     customHeaders = { ...customHeaders, ...proxyConfig.customHeaders };
   }
 
+  // Import transport wrapper for RPC logging - load it immediately
+  // We need to load this BEFORE useMcp is called, so we use a ref to track readiness
+  const wrapTransportRef = useRef<
+    ((transport: any, serverId: string) => any) | null
+  >(null);
+  const [wrapTransportReady, setWrapTransportReady] = useState(false);
+  const wrapperLoadAttemptedRef = useRef(false);
+
+  // Load the transport wrapper immediately on mount - BEFORE useMcp connects
+  useEffect(() => {
+    if (typeof window !== "undefined" && !wrapperLoadAttemptedRef.current) {
+      wrapperLoadAttemptedRef.current = true;
+      import("../transport-wrapper-browser.js")
+        .then((module) => {
+          wrapTransportRef.current = module.wrapTransportForLogging;
+          setWrapTransportReady(true);
+          console.log("[McpContext] Transport wrapper loaded");
+        })
+        .catch((err) => {
+          console.error("[McpContext] Failed to load transport wrapper:", err);
+        });
+    }
+  }, []);
+
+  // Create a stable wrapper function that uses the connectionId as serverId
+  const wrapTransportFn = useMemo(() => {
+    if (!wrapTransportReady || !wrapTransportRef.current) {
+      return undefined;
+    }
+    return (transport: any, serverIdFromConnector: string) => {
+      // Use connectionId as serverId to match connection.id
+      const actualServerId = connectionId;
+      console.log(
+        "[McpContext] Applying transport wrapper, serverId:",
+        actualServerId,
+        "from connector:",
+        serverIdFromConnector
+      );
+      return wrapTransportRef.current!(transport, actualServerId);
+    };
+  }, [wrapTransportReady, connectionId]);
+
+  // Notification state management
+  const NOTIFICATIONS_STORAGE_KEY = `mcp-inspector-notifications-${connectionId}`;
+  const MAX_NOTIFICATIONS = 500;
+
+  const [notifications, setNotifications] = useState<MCPNotification[]>([]);
+
+  // Load notifications from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setNotifications(parsed);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load notifications from localStorage:", e);
+    }
+  }, [NOTIFICATIONS_STORAGE_KEY]);
+
+  // Save notifications to localStorage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        NOTIFICATIONS_STORAGE_KEY,
+        JSON.stringify(notifications)
+      );
+    } catch (e) {
+      console.error("Failed to save notifications to localStorage:", e);
+    }
+  }, [notifications, NOTIFICATIONS_STORAGE_KEY]);
+
+  // Notification handlers
+  const markNotificationRead = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
+
+  const onNotificationReceived = useCallback(
+    (notification: MCPNotification) => {
+      setNotifications((prev) => {
+        // Prune oldest if we exceed max
+        const updated = [notification, ...prev];
+        if (updated.length > MAX_NOTIFICATIONS) {
+          return updated.slice(0, MAX_NOTIFICATIONS);
+        }
+        return updated;
+      });
+    },
+    []
+  );
+
+  // Only enable useMcp connection after transport wrapper is ready
+  // This ensures RPC logging is active from the start
   const mcpHook = useMcp({
     url: finalUrl,
     callbackUrl,
     customHeaders:
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
     transportType: transportType || "http", // Default to 'http' for Streamable HTTP
+    enabled: wrapTransportReady, // Only connect when wrapper is ready
+    wrapTransport: wrapTransportFn,
+    onNotification: (notification) => {
+      onNotificationReceived({
+        id: globalThis.crypto.randomUUID(),
+        method: notification.method,
+        params: notification.params,
+        timestamp: Date.now(),
+        read: false,
+      });
+    },
   });
+
   const onUpdateRef = useRef(onUpdate);
   const prevConnectionRef = useRef<MCPConnection | null>(null);
 
@@ -176,8 +315,10 @@ function McpConnectionWrapper({
           );
         }
 
+        const unreadCount = notifications.filter((n) => !n.read).length;
+
         const connection: MCPConnection = {
-          id: url,
+          id: connectionId,
           url,
           name: mcpHook.serverInfo?.name || name, // Use server-provided name if available
           state: mcpHook.state,
@@ -191,6 +332,11 @@ function McpConnectionWrapper({
           proxyConfig,
           serverInfo: mcpHook.serverInfo,
           capabilities: mcpHook.capabilities,
+          notifications,
+          unreadNotificationCount: unreadCount,
+          markNotificationRead,
+          markAllNotificationsRead,
+          clearNotifications,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
@@ -214,6 +360,8 @@ function McpConnectionWrapper({
           prev.prompts.length !== connection.prompts.length ||
           prev.serverInfo !== connection.serverInfo ||
           prev.capabilities !== connection.capabilities ||
+          prev.notifications.length !== connection.notifications.length ||
+          prev.unreadNotificationCount !== connection.unreadNotificationCount ||
           !prev.client
         ) {
           prevConnectionRef.current = connection;
@@ -222,8 +370,10 @@ function McpConnectionWrapper({
       });
     } else {
       // Fallback for environments without queueMicrotask
+      const unreadCount = notifications.filter((n) => !n.read).length;
+
       const connection: MCPConnection = {
-        id: url,
+        id: connectionId,
         url,
         name: mcpHook.serverInfo?.name || name, // Use server-provided name if available
         state: mcpHook.state,
@@ -237,6 +387,11 @@ function McpConnectionWrapper({
         proxyConfig,
         serverInfo: mcpHook.serverInfo,
         capabilities: mcpHook.capabilities,
+        notifications,
+        unreadNotificationCount: unreadCount,
+        markNotificationRead,
+        markAllNotificationsRead,
+        clearNotifications,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
@@ -260,6 +415,8 @@ function McpConnectionWrapper({
         prev.prompts.length !== connection.prompts.length ||
         prev.serverInfo !== connection.serverInfo ||
         prev.capabilities !== connection.capabilities ||
+        prev.notifications.length !== connection.notifications.length ||
+        prev.unreadNotificationCount !== connection.unreadNotificationCount ||
         !prev.client
       ) {
         prevConnectionRef.current = connection;
@@ -271,6 +428,8 @@ function McpConnectionWrapper({
     name,
     transportType,
     proxyConfig,
+    customHeaders, // Added to dependency array
+    connectionId,
     mcpHook.state,
     mcpHook.tools,
     mcpHook.resources,
@@ -280,117 +439,111 @@ function McpConnectionWrapper({
     mcpHook.serverInfo,
     mcpHook.capabilities,
     mcpHook.client,
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    clearNotifications,
+    // Stable functions don't strictly need to be here but good practice
+    mcpHook.callTool,
+    mcpHook.readResource,
+    mcpHook.listPrompts,
+    mcpHook.getPrompt,
+    mcpHook.authenticate,
+    mcpHook.retry,
+    mcpHook.clearStorage,
   ]);
 
   return null;
 }
 
 export function McpProvider({ children }: { children: ReactNode }) {
-  const [savedConnections, setSavedConnections] = useState<SavedConnection[]>(
-    []
-  );
-  const [activeConnections, setActiveConnections] = useState<
-    Map<string, MCPConnection>
-  >(new Map());
-  const [connectionVersion, setConnectionVersion] = useState(0);
-  const [autoConnect, setAutoConnectState] = useState<boolean>(true);
-  const [manualConnections, setManualConnections] = useState<Set<string>>(
-    new Set()
-  );
+  // Load initial connections from localStorage
+  const [connections, setConnections] = useState<MCPConnection[]>([]);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [autoConnect, setAutoConnect] = useState(true);
 
-  // Load saved connections and auto-connect setting from localStorage on mount
+  // Store configs separately to persist across reloads
+  // This mirrors the connections state but contains only config data
+  const [connectionConfigs, setConnectionConfigs] = useState<
+    Array<{
+      id: string;
+      url: string;
+      name: string;
+      proxyConfig?: {
+        proxyAddress?: string;
+        customHeaders?: Record<string, string>;
+      };
+      transportType?: "http" | "sse";
+    }>
+  >([]);
+
+  // Initialize from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("mcp-inspector-connections");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Validate and filter out invalid connections
-        const validConnections = Array.isArray(parsed)
-          ? parsed
-              .filter((conn: any) => {
-                // Ensure connection has valid structure with string url and id
-                return (
-                  conn &&
-                  typeof conn === "object" &&
-                  typeof conn.id === "string" &&
-                  typeof conn.url === "string" &&
-                  typeof conn.name === "string"
-                );
-              })
-              .map((conn: any) => {
-                // Migrate existing connections to include transportType
-                if (!conn.transportType) {
-                  conn.transportType = "http"; // Default to 'http' for Streamable HTTP
-                }
-                return conn;
-              })
-          : [];
-
-        // If we filtered out any invalid connections or migrated transport types, update localStorage
-        const hasChanges =
-          validConnections.length !== parsed.length ||
-          validConnections.some(
-            (conn: any) =>
-              conn.transportType === "http" &&
-              !parsed.find((p: any) => p.id === conn.id && p.transportType)
-          );
-
-        if (hasChanges) {
-          console.warn(
-            "Updated connections in localStorage with transport type migration"
-          );
-          localStorage.setItem(
-            "mcp-inspector-connections",
-            JSON.stringify(validConnections)
+    try {
+      const savedConfigs = localStorage.getItem("mcp-inspector-connections");
+      if (savedConfigs) {
+        const parsed = JSON.parse(savedConfigs);
+        if (Array.isArray(parsed)) {
+          setConnectionConfigs(parsed);
+          // Initialize connections with loading state
+          setConnections(
+            parsed.map((config) => ({
+              id: config.id || config.url,
+              url: config.url,
+              name: config.name || "MCP Server",
+              state: "discovering",
+              tools: [],
+              resources: [],
+              prompts: [],
+              error: null,
+              authUrl: null,
+              customHeaders: config.proxyConfig?.customHeaders,
+              transportType: config.transportType,
+              proxyConfig: config.proxyConfig,
+              notifications: [],
+              unreadNotificationCount: 0,
+              markNotificationRead: () => {},
+              markAllNotificationsRead: () => {},
+              clearNotifications: () => {},
+              callTool: async () => {},
+              readResource: async () => {},
+              listPrompts: async () => {},
+              getPrompt: async () => {},
+              authenticate: () => {},
+              retry: () => {},
+              clearStorage: () => {},
+              client: null,
+            }))
           );
         }
-
-        setSavedConnections(validConnections);
-      } catch (error) {
-        console.error("Failed to parse saved connections:", error);
-        // Clear corrupted localStorage
-        localStorage.removeItem("mcp-inspector-connections");
       }
-    }
 
-    // Load auto-connect setting
-    const autoConnectSetting = localStorage.getItem(
-      "mcp-inspector-auto-connect"
-    );
-    if (autoConnectSetting !== null) {
-      setAutoConnectState(autoConnectSetting === "true");
-    }
-  }, []);
-
-  const updateConnection = useCallback((connection: MCPConnection) => {
-    setActiveConnections((prev) =>
-      new Map(prev).set(connection.id, connection)
-    );
-    setConnectionVersion((v) => v + 1);
-
-    // If the connection has serverInfo with a name, update the saved connection name
-    if (connection.serverInfo?.name && connection.state === "ready") {
-      setSavedConnections((prev) => {
-        const existingConnection = prev.find((c) => c.id === connection.id);
-        if (
-          existingConnection &&
-          existingConnection.name !== connection.serverInfo!.name
-        ) {
-          const updated = prev.map((c) =>
-            c.id === connection.id
-              ? { ...c, name: connection.serverInfo!.name }
-              : c
-          );
-          localStorage.setItem(
-            "mcp-inspector-connections",
-            JSON.stringify(updated)
-          );
-          return updated;
-        }
-        return prev;
-      });
+      const savedAutoConnect = localStorage.getItem(
+        "mcp-inspector-auto-connect"
+      );
+      if (savedAutoConnect !== null) {
+        setAutoConnect(savedAutoConnect === "true");
+      }
+    } catch (e) {
+      console.error("Failed to load connections from localStorage:", e);
+    } finally {
+      setConfigLoaded(true);
     }
   }, []);
+
+  // Save to localStorage whenever configs change
+  useEffect(() => {
+    if (!configLoaded) return;
+    localStorage.setItem(
+      "mcp-inspector-connections",
+      JSON.stringify(connectionConfigs)
+    );
+  }, [connectionConfigs, configLoaded]);
+
+  useEffect(() => {
+    if (!configLoaded) return;
+    localStorage.setItem("mcp-inspector-auto-connect", String(autoConnect));
+  }, [autoConnect, configLoaded]);
 
   const addConnection = useCallback(
     (
@@ -398,156 +551,198 @@ export function McpProvider({ children }: { children: ReactNode }) {
       name?: string,
       proxyConfig?: {
         proxyAddress?: string;
-        proxyToken?: string;
         customHeaders?: Record<string, string>;
       },
       transportType?: "http" | "sse"
     ) => {
-      const connectionName = name || url;
-      const newConnection: SavedConnection = {
+      // Check if connection already exists in configs
+      const existingConfig = connectionConfigs.find((c) => c.url === url);
+      const existingConnection = connections.find((c) => c.url === url);
+
+      // If connection exists in both configs and connections
+      if (existingConfig && existingConnection) {
+        // Check if we're trying to update the proxy config (for autoConnect retry scenarios)
+        const proxyConfigChanged =
+          JSON.stringify(existingConfig.proxyConfig) !==
+          JSON.stringify(proxyConfig);
+
+        if (proxyConfigChanged && proxyConfig) {
+          // Remove the old connection completely
+          setConnectionConfigs((prev) => prev.filter((c) => c.url !== url));
+          setConnections((prev) => prev.filter((c) => c.url !== url));
+
+          // Use setTimeout to ensure state updates complete before re-adding
+          setTimeout(() => {
+            const newConfig = {
+              id: url,
+              url,
+              name: name || existingConfig.name || "MCP Server",
+              proxyConfig,
+              transportType: transportType || existingConfig.transportType,
+            };
+
+            setConnectionConfigs((prev) => [...prev, newConfig]);
+
+            setConnections((prev) => [
+              ...prev,
+              {
+                id: url,
+                url,
+                name: name || existingConfig.name || "MCP Server",
+                state: "connecting",
+                tools: [],
+                resources: [],
+                prompts: [],
+                error: null,
+                authUrl: null,
+                customHeaders: proxyConfig?.customHeaders,
+                transportType: transportType || existingConfig.transportType,
+                proxyConfig,
+                notifications: [],
+                unreadNotificationCount: 0,
+                markNotificationRead: () => {},
+                markAllNotificationsRead: () => {},
+                clearNotifications: () => {},
+                callTool: async () => {},
+                readResource: async () => {},
+                listPrompts: async () => {},
+                getPrompt: async () => {},
+                authenticate: () => {},
+                retry: () => {},
+                clearStorage: () => {},
+                client: null,
+              },
+            ]);
+          }, 10);
+          return;
+        }
+
+        return;
+      }
+
+      // If connection exists in configs but not in connections, add it to connections
+      // Also update the config if new parameters are provided (for autoConnect retry scenarios)
+      if (existingConfig && !existingConnection) {
+        // Update config if new proxy or transport settings are provided
+        if (proxyConfig || transportType) {
+          setConnectionConfigs((prev) =>
+            prev.map((c) =>
+              c.url === url
+                ? {
+                    ...c,
+                    proxyConfig: proxyConfig || c.proxyConfig,
+                    transportType: transportType || c.transportType,
+                    name: name || c.name,
+                  }
+                : c
+            )
+          );
+        }
+
+        setConnections((prev) => [
+          ...prev,
+          {
+            id: existingConfig.id || url,
+            url,
+            name: name || existingConfig.name || "MCP Server",
+            state: "connecting",
+            tools: [],
+            resources: [],
+            prompts: [],
+            error: null,
+            authUrl: null,
+            customHeaders:
+              proxyConfig?.customHeaders ||
+              existingConfig.proxyConfig?.customHeaders,
+            transportType: transportType || existingConfig.transportType,
+            proxyConfig: proxyConfig || existingConfig.proxyConfig,
+            notifications: [],
+            unreadNotificationCount: 0,
+            markNotificationRead: () => {},
+            markAllNotificationsRead: () => {},
+            clearNotifications: () => {},
+            callTool: async () => {},
+            readResource: async () => {},
+            listPrompts: async () => {},
+            getPrompt: async () => {},
+            authenticate: () => {},
+            retry: () => {},
+            clearStorage: () => {},
+            client: null,
+          },
+        ]);
+        return;
+      }
+
+      // New connection - add to both configs and connections
+      const newConfig = {
         id: url,
         url,
-        name: connectionName,
+        name: name || "MCP Server",
         proxyConfig,
-        transportType: transportType || "http", // Default to 'http' for Streamable HTTP
+        transportType,
       };
 
-      setSavedConnections((prev) => {
-        // Check if connection already exists
-        if (prev.some((c) => c.id === url)) {
-          return prev;
-        }
-        const updated = [...prev, newConnection];
-        localStorage.setItem(
-          "mcp-inspector-connections",
-          JSON.stringify(updated)
-        );
-        return updated;
-      });
-    },
-    []
-  );
+      setConnectionConfigs((prev) => [...prev, newConfig]);
 
-  const removeConnection = useCallback((id: string) => {
-    // Track server removed
-    const telemetry = Telemetry.getInstance();
-    telemetry
-      .capture(
-        new MCPServerRemovedEvent({
-          serverId: id,
-        })
-      )
-      .catch(() => {
-        // Silently fail - telemetry should not break the application
-      });
-
-    setSavedConnections((prev) => {
-      const updated = prev.filter((c) => c.id !== id);
-      localStorage.setItem(
-        "mcp-inspector-connections",
-        JSON.stringify(updated)
-      );
-      return updated;
-    });
-
-    setActiveConnections((prev) => {
-      const next = new Map(prev);
-      const connection = next.get(id);
-      if (connection) {
-        // Clear storage and remove connection
-        try {
-          connection.clearStorage();
-        } catch (error) {
-          console.error("Failed to clear storage:", error);
-        }
-        next.delete(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const getConnection = useCallback(
-    (id: string) => {
-      // First check active connections
-      const activeConn = activeConnections.get(id);
-      if (activeConn) {
-        return activeConn;
-      }
-
-      // If not active, check if it's a saved connection and return placeholder
-      const savedConn = savedConnections.find((conn) => conn.id === id);
-      if (savedConn) {
-        return {
-          id: savedConn.id,
-          url: savedConn.url,
-          name: savedConn.name,
-          state: "disconnected" as const,
+      // Optimistically add connection
+      setConnections((prev) => [
+        ...prev,
+        {
+          id: url,
+          url,
+          name: name || "MCP Server",
+          state: "connecting",
           tools: [],
           resources: [],
           prompts: [],
           error: null,
           authUrl: null,
-          transportType: savedConn.transportType,
-          proxyConfig: savedConn.proxyConfig,
-          listPrompts: async (_serverName?: string) => {
-            throw new Error("Not connected");
-          },
-          getPrompt: async () => {
-            throw new Error("Not connected");
-          },
-          callTool: async () => {
-            throw new Error("Not connected");
-          },
-          readResource: async () => {
-            throw new Error("Not connected");
-          },
+          customHeaders: proxyConfig?.customHeaders,
+          transportType,
+          proxyConfig,
+          notifications: [],
+          unreadNotificationCount: 0,
+          markNotificationRead: () => {},
+          markAllNotificationsRead: () => {},
+          clearNotifications: () => {},
+          callTool: async () => {},
+          readResource: async () => {},
+          listPrompts: async () => {},
+          getPrompt: async () => {},
           authenticate: () => {},
           retry: () => {},
           clearStorage: () => {},
           client: null,
-        };
-      }
-
-      return undefined;
+        },
+      ]);
     },
-    [activeConnections, savedConnections]
+    [connectionConfigs, connections]
   );
 
-  const setAutoConnect = useCallback((value: boolean) => {
-    setAutoConnectState(value);
-    localStorage.setItem("mcp-inspector-auto-connect", String(value));
+  const removeConnection = useCallback((id: string) => {
+    setConnectionConfigs((prev) => prev.filter((c) => c.id !== id));
+    setConnections((prev) => prev.filter((c) => c.id !== id));
 
-    // If disabling auto-connect, clear manual connections
-    if (!value) {
-      setManualConnections(new Set());
-    }
-  }, []);
-
-  const connectServer = useCallback((id: string) => {
-    setManualConnections((prev) => new Set(prev).add(id));
-  }, []);
-
-  const disconnectServer = useCallback((id: string) => {
-    setManualConnections((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-
-    setActiveConnections((prev) => {
-      const next = new Map(prev);
-      const connection = next.get(id);
-      if (connection) {
-        // Clear storage and remove connection
-        try {
-          connection.clearStorage();
-        } catch (error) {
-          console.error("Failed to clear storage:", error);
-        }
-        next.delete(id);
+    // Also remove from localStorage immediately
+    const currentConfigs = localStorage.getItem("mcp-inspector-connections");
+    if (currentConfigs) {
+      try {
+        const parsed = JSON.parse(currentConfigs);
+        const filtered = parsed.filter((c: any) => (c.id || c.url) !== id);
+        localStorage.setItem(
+          "mcp-inspector-connections",
+          JSON.stringify(filtered)
+        );
+      } catch (e) {
+        console.error("Failed to update localStorage on remove:", e);
       }
-      return next;
-    });
+    }
+
+    // Track removal
+    Telemetry.getInstance().capture(
+      new MCPServerRemovedEvent({ serverId: id })
+    );
   }, []);
 
   const updateConnectionConfig = useCallback(
@@ -562,126 +757,127 @@ export function McpProvider({ children }: { children: ReactNode }) {
         transportType?: "http" | "sse";
       }
     ) => {
-      setSavedConnections((prev) => {
-        const updated = prev.map((conn) => {
-          if (conn.id === id) {
+      setConnectionConfigs((prev) =>
+        prev.map((c) => {
+          if (c.id === id || c.url === id) {
+            return { ...c, ...config };
+          }
+          return c;
+        })
+      );
+
+      // Also update active connection state to trigger reconnection with new settings
+      setConnections((prev) =>
+        prev.map((c) => {
+          if (c.id === id) {
             return {
-              ...conn,
-              name: config.name || conn.name,
-              proxyConfig: config.proxyConfig,
-              transportType: config.transportType || conn.transportType,
+              ...c,
+              ...config,
+              // Reset state to trigger reconnection in the wrapper
+              // state: "connecting",
             };
           }
-          return conn;
-        });
-        localStorage.setItem(
-          "mcp-inspector-connections",
-          JSON.stringify(updated)
-        );
-        return updated;
+          return c;
+        })
+      );
+    },
+    []
+  );
+
+  const handleConnectionUpdate = useCallback(
+    (updatedConnection: MCPConnection) => {
+      setConnections((prev) => {
+        const index = prev.findIndex((c) => c.id === updatedConnection.id);
+        if (index === -1) return prev;
+
+        // Check if actually changed to avoid loops
+        const current = prev[index];
+        if (
+          current.state === updatedConnection.state &&
+          current.tools === updatedConnection.tools &&
+          current.resources === updatedConnection.resources &&
+          current.prompts === updatedConnection.prompts &&
+          current.error === updatedConnection.error &&
+          current.serverInfo === updatedConnection.serverInfo &&
+          current.client === updatedConnection.client &&
+          current.notifications === updatedConnection.notifications &&
+          current.unreadNotificationCount ===
+            updatedConnection.unreadNotificationCount
+        ) {
+          return prev;
+        }
+
+        const newConnections = [...prev];
+        newConnections[index] = updatedConnection;
+        return newConnections;
       });
     },
     []
   );
 
-  // Use connectionVersion to force array recreation when connections update
-  const connections = useMemo(() => {
-    // Maintain order based on savedConnections, not activeConnections
-    // This ensures the order doesn't change when a server connects/disconnects
-    const conns = savedConnections.map((saved) => {
-      // Use active connection if it exists, otherwise create placeholder
-      const activeConn = activeConnections.get(saved.id);
-      if (activeConn) {
-        return activeConn;
-      }
+  const connectServer = useCallback((id: string) => {
+    // This is a no-op now as connections are auto-managed by the wrapper
+    // But we could implement manual retry here if needed
+    console.log("Connect requested for:", id);
+  }, []);
 
-      // Create a placeholder connection for disconnected servers
-      return {
-        id: saved.id,
-        url: saved.url,
-        name: saved.name,
-        state: "disconnected" as const,
-        tools: [],
-        resources: [],
-        prompts: [],
-        error: null,
-        authUrl: null,
-        transportType: saved.transportType,
-        proxyConfig: saved.proxyConfig,
-        callTool: async () => {
-          throw new Error("Not connected");
-        },
-        readResource: async () => {
-          throw new Error("Not connected");
-        },
-        listPrompts: async (_serverName?: string) => {
-          throw new Error("Not connected");
-        },
-        getPrompt: async () => {
-          throw new Error("Not connected");
-        },
-        authenticate: () => {},
-        retry: () => {},
-        clearStorage: () => {},
-        client: null,
-      };
-    });
+  const disconnectServer = useCallback((id: string) => {
+    // For now, removing the connection is the best way to disconnect
+    // Logic could be added to pause the connection instead
+    console.log("Disconnect requested for:", id);
+  }, []);
 
-    return conns;
-  }, [activeConnections, savedConnections, connectionVersion]);
-
-  // Memoize the context value to prevent unnecessary re-renders and HMR issues
   const contextValue = useMemo(
     () => ({
       connections,
       addConnection,
       removeConnection,
-      getConnection,
+      updateConnectionConfig,
       autoConnect,
       setAutoConnect,
       connectServer,
       disconnectServer,
-      updateConnectionConfig,
+      configLoaded,
     }),
     [
       connections,
       addConnection,
       removeConnection,
-      getConnection,
+      updateConnectionConfig,
       autoConnect,
-      setAutoConnect,
       connectServer,
       disconnectServer,
-      updateConnectionConfig,
+      configLoaded,
     ]
   );
 
   return (
-    <McpContext value={contextValue}>
-      {savedConnections
-        .filter((saved) => autoConnect || manualConnections.has(saved.id))
-        .map((saved) => (
-          <McpConnectionWrapper
-            key={`${saved.id}-${saved.transportType || "http"}-${
-              saved.proxyConfig?.proxyAddress || ""
-            }`}
-            url={saved.url}
-            name={saved.name}
-            proxyConfig={saved.proxyConfig}
-            transportType={saved.transportType}
-            onUpdate={updateConnection}
-            onRemove={() => removeConnection(saved.id)}
-          />
-        ))}
+    <McpContext.Provider value={contextValue}>
       {children}
-    </McpContext>
+      {/* Render a wrapper for each configured connection */}
+      {configLoaded &&
+        autoConnect &&
+        connectionConfigs.map((config) => {
+          const wrapperKey = `${config.id || config.url}-${config.proxyConfig?.proxyAddress ? "proxy" : "direct"}`;
+          console.warn(
+            "[McpContext] Rendering McpConnectionWrapper with key:",
+            wrapperKey,
+            "proxyConfig:",
+            config.proxyConfig
+          );
+          return (
+            <McpConnectionWrapper
+              key={wrapperKey}
+              url={config.url}
+              name={config.name}
+              proxyConfig={config.proxyConfig}
+              transportType={config.transportType}
+              connectionId={config.id || config.url}
+              onUpdate={handleConnectionUpdate}
+              onRemove={() => removeConnection(config.id || config.url)}
+            />
+          );
+        })}
+    </McpContext.Provider>
   );
-}
-
-export function useMcpContext() {
-  const context = use(McpContext);
-  if (!context) {
-    throw new Error("useMcpContext must be used within McpProvider");
-  }
-  return context;
 }

@@ -216,6 +216,34 @@ callToolExample().catch(console.error)
 ```
 </CodeGroup>
 
+## Timeout Configuration
+
+The MCP SDK uses a default timeout of 60 seconds for tool calls. For long-running operations, you can configure custom timeout settings:
+
+<CodeGroup>
+```typescript TypeScript
+// Tool call with extended timeout
+const result = await session.callTool('long_running_task', { data: '...' }, {
+    timeout: 300000, // 5 minutes
+})
+```
+
+```typescript TypeScript
+// Tool call with progress-based timeout reset
+// This allows the timeout to reset whenever the server sends a progress notification
+const result = await session.callTool('sampling_task', { prompt: '...' }, {
+    timeout: 60000, // 1 minute initial timeout
+    resetTimeoutOnProgress: true // Reset timeout when progress is received
+})
+```
+</CodeGroup>
+
+Available options:
+- **`timeout`**: Request timeout in milliseconds (default: 60000)
+- **`maxTotalTimeout`**: Maximum total time in milliseconds, even with progress resets
+- **`resetTimeoutOnProgress`**: If true, resets the timeout counter when a progress notification is received (default: false)
+- **`signal`**: An `AbortSignal` to programmatically cancel the request
+
 ## Tool Results
 
 Tool calls return a `CallToolResult` object with:

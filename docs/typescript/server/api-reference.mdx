@@ -29,9 +29,31 @@ function createMCPServer(
 
 **Example:**
 ```typescript
+// Basic usage
 const server = createMCPServer('my-server', {
   version: '1.0.0',
   description: 'My MCP server'
+})
+
+// With custom host (e.g., for Docker or remote access)
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  host: '0.0.0.0' // or 'myserver.com'
+})
+
+// With full base URL (e.g., behind a proxy or custom domain)
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  baseUrl: 'https://myserver.com' // or process.env.MCP_URL
+})
+
+// Production with explicit allowed origins
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  allowedOrigins: [
+    'https://myapp.com',
+    'https://app.myapp.com'
+  ]
 })
 ```
 
@@ -46,7 +68,73 @@ interface ServerConfig {
   name: string        // Server name
   version: string     // Server version (semver format)
   description?: string // Optional description
+  host?: string       // Hostname for widget URLs and server endpoints (defaults to 'localhost')
+  baseUrl?: string    // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
+  allowedOrigins?: string[] // Allowed origins for DNS rebinding protection
+  sessionIdleTimeoutMs?: number // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
+  autoCreateSessionOnInvalidId?: boolean // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
 }
+```
+
+**`allowedOrigins` Configuration:**
+
+The `allowedOrigins` option controls DNS rebinding protection behavior:
+
+- **Development mode** (NODE_ENV !== "production"):
+  - If not set: All origins are allowed (DNS rebinding protection disabled)
+  - This enables direct browser connections from any origin for easier development
+
+- **Production mode** (NODE_ENV === "production"):
+  - If not set: DNS rebinding protection is disabled (not recommended for production)
+  - If set to empty array: DNS rebinding protection is disabled
+  - If set with origins: DNS rebinding protection is enabled with those specific origins
+
+**Example:**
+```typescript
+// Development: No need to set (allows all origins)
+const server = createMCPServer('my-server', {
+  version: '1.0.0'
+})
+
+// Production: Explicitly set allowed origins
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  allowedOrigins: [
+    'https://myapp.com',
+    'https://app.myapp.com'
+  ]
+})
+```
+
+**`autoCreateSessionOnInvalidId` Configuration:**
+
+The `autoCreateSessionOnInvalidId` option controls behavior when a client sends a request with an invalid or expired session ID:
+
+- **Default: `true`** (compatible with ChatGPT and other non-compliant clients)
+  - Server automatically creates a new session when invalid session ID is detected
+  - Allows seamless reconnection after server restarts
+  - Recommended for most use cases, especially when using ChatGPT or other OpenAI clients
+
+- **When set to `false`**:
+  - Server returns HTTP 404 Not Found for invalid session IDs (MCP protocol spec compliant)
+  - Clients must explicitly send a new `initialize` request
+  - Use only if you're certain all clients properly handle 404 errors by reinitializing
+
+**Note**: According to the [MCP protocol specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management), clients **MUST** start a new session by sending a new `InitializeRequest` when they receive HTTP 404 in response to a request containing an `MCP-Session-Id`. However, some clients (like ChatGPT) don't properly implement this behavior.
+
+**Example:**
+```typescript
+// Default behavior (compatible with ChatGPT)
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  autoCreateSessionOnInvalidId: true  // Default: true
+})
+
+// Strict MCP spec compliance (requires compliant clients)
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  autoCreateSessionOnInvalidId: false  // Strict spec compliance
+})
 ```
 
 ## Core Server Methods
@@ -595,9 +683,165 @@ server.tool({
 5. **Chain Methods** - Use fluent API for cleaner code
 6. **Document Tools** - Provide clear descriptions for all tools and resources
 
+## React Components & Hooks
+
+The `mcp-use/react` package provides React components and hooks for building OpenAI Apps SDK widgets.
+
+### Components
+
+#### `McpUseProvider`
+
+Unified provider component that combines all common React setup.
+
+```typescript
+import { McpUseProvider } from 'mcp-use/react';
+
+<McpUseProvider 
+  debugger={boolean}
+  viewControls={boolean | "pip" | "fullscreen"}
+  autoSize={boolean}
+>
+  {children}
+</McpUseProvider>
+```
+
+See [McpUseProvider documentation](./widget-components/mcpuseprovider) for details.
+
+#### `WidgetControls`
+
+Wrapper component that adds control buttons for widget debugging and view controls.
+
+```typescript
+import { WidgetControls } from 'mcp-use/react';
+
+<WidgetControls 
+  debugger={boolean}
+  viewControls={boolean | "pip" | "fullscreen"}
+  position="top-right"
+>
+  {children}
+</WidgetControls>
+```
+
+See [WidgetControls documentation](./widget-components/widgetcontrols) for details.
+
+#### `ErrorBoundary`
+
+Error boundary component for graceful error handling.
+
+```typescript
+import { ErrorBoundary } from 'mcp-use/react';
+
+<ErrorBoundary>
+  {children}
+</ErrorBoundary>
+```
+
+See [ErrorBoundary documentation](./widget-components/errorboundary) for details.
+
+#### `Image`
+
+Image component that handles both data URLs and public file paths.
+
+```typescript
+import { Image } from 'mcp-use/react';
+
+<Image src="/fruits/apple.png" alt="Apple" />
+```
+
+See [Image documentation](./widget-components/image) for details.
+
+#### `ThemeProvider`
+
+Theme provider for consistent theme management.
+
+```typescript
+import { ThemeProvider } from 'mcp-use/react';
+
+<ThemeProvider>
+  {children}
+</ThemeProvider>
+```
+
+See [ThemeProvider documentation](./widget-components/themeprovider) for details.
+
+### Hooks
+
+#### `useWidget<TProps, TOutput, TMetadata, TState>`
+
+Main hook providing type-safe access to all widget capabilities.
+
+```typescript
+import { useWidget } from 'mcp-use/react';
+
+const {
+  props,
+  output,
+  metadata,
+  state,
+  setState,
+  theme,
+  displayMode,
+  callTool,
+  sendFollowUpMessage,
+  openExternal,
+  requestDisplayMode,
+  notifyIntrinsicHeight,
+  isAvailable,
+} = useWidget<TProps, TOutput, TMetadata, TState>();
+```
+
+See [useWidget documentation](./widget-components/usewidget) for complete API reference.
+
+#### `useWidgetProps<TProps>`
+
+Get only the widget props.
+
+```typescript
+import { useWidgetProps } from 'mcp-use/react';
+
+const props = useWidgetProps<{ city: string }>();
+```
+
+#### `useWidgetTheme()`
+
+Get only the theme value.
+
+```typescript
+import { useWidgetTheme } from 'mcp-use/react';
+
+const theme = useWidgetTheme(); // 'light' | 'dark'
+```
+
+#### `useWidgetState<TState>`
+
+Get state management (state and setState).
+
+```typescript
+import { useWidgetState } from 'mcp-use/react';
+
+const [state, setState] = useWidgetState<string[]>([]);
+```
+
+### Type Exports
+
+```typescript
+import type {
+  UseMcpOptions,
+  UseMcpResult,
+  UseWidgetResult,
+  Theme,
+  DisplayMode,
+  SafeArea,
+  UserAgent,
+  CallToolResponse,
+} from 'mcp-use/react';
+```
+
 ## Next Steps
 
 - [Tools Guide](./tools) - Advanced tool patterns
 - [Resources Guide](./resources) - Resource management
 - [UI Widgets](./ui-widgets) - Building interactive widgets
+- [Widget Components](./widget-components/mcpuseprovider) - React components reference
 - [Examples](./examples) - Real-world implementations

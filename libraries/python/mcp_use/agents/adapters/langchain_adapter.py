@@ -15,6 +15,9 @@ from mcp.types import (
     ReadResourceRequestParams,
     Resource,
 )
+from mcp.types import (
+    Tool as MCPTool,
+)
 from pydantic import BaseModel, Field, create_model
 
 from mcp_use.agents.adapters.base import BaseAdapter
@@ -43,7 +46,7 @@ class LangChainAdapter(BaseAdapter):
         self.prompts: list[BaseTool] = []
 
     @telemetry("adapter_convert_tool")
-    def _convert_tool(self, mcp_tool: dict[str, Any], connector: BaseConnector) -> BaseTool:
+    def _convert_tool(self, mcp_tool: MCPTool, connector: BaseConnector) -> BaseTool:
         """Convert an MCP tool to LangChain's tool format.
 
         Args:

@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - main
+      - canary
     paths:
       - "libraries/typescript/**"
+      - ".github/workflows/typescript-release.yml"
   workflow_dispatch:
     inputs:
       force_publish:
@@ -43,6 +45,9 @@ jobs:
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
           registry-url: "https://registry.npmjs.org"
 
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest
+
       - name: Install Dependencies
         working-directory: libraries/typescript
         run: pnpm install --no-frozen-lockfile
@@ -51,8 +56,135 @@ jobs:
         working-directory: libraries/typescript
         run: pnpm build
 
-      - name: Check if this is a release commit
-        id: check
+      # ============================================================================
+      # CANARY BRANCH: Prerelease workflow
+      # ============================================================================
+
+      - name: Enter Prerelease Mode (Canary)
+        if: github.ref == 'refs/heads/canary'
+        run: |
+          cd libraries/typescript
+          if [ ! -f .changeset/pre.json ]; then
+            echo "Entering canary prerelease mode..."
+            pnpm changeset pre enter canary
+            cd ../..
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add libraries/typescript/.changeset/pre.json
+            git commit -m "chore: enter canary prerelease mode" || echo "No changes to commit"
+            git push
+          else
+            echo "Already in prerelease mode"
+          fi
+
+      - name: Check for changesets (Canary)
+        if: github.ref == 'refs/heads/canary'
+        working-directory: libraries/typescript
+        id: has-changesets
+        run: |
+          if [ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ]; then
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+            echo "Found changesets to publish"
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+            echo "No changesets found"
+          fi
+
+      - name: Version packages (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        run: |
+          cd libraries/typescript
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pnpm changeset version
+          cd ../..
+          git add .
+          git commit -m "chore(typescript): version packages (canary)" || echo "No changes to commit"
+          git push
+
+      - name: Publish packages (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          # Using npm trusted publishing (OIDC) - no token needed
+          pnpm changeset publish
+          echo "✅ Published canary packages to npm using trusted publishing"
+
+      # ============================================================================
+      # MAIN BRANCH: Stable release workflow
+      # ============================================================================
+
+      - name: Check if in prerelease mode (Main)
+        if: github.ref == 'refs/heads/main'
+        working-directory: libraries/typescript
+        id: check-prerelease
+        run: |
+          if [ -f .changeset/pre.json ]; then
+            echo "in_prerelease=true" >> $GITHUB_OUTPUT
+            echo "🐤 Detected prerelease mode on main branch"
+          else
+            echo "in_prerelease=false" >> $GITHUB_OUTPUT
+            echo "ℹ️  Not in prerelease mode"
+          fi
+
+      - name: Create exit prerelease PR (Main)
+        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create new branch (from repo root)
+          BRANCH_NAME="release/exit-prerelease-$(date +%s)"
+          git checkout -b "$BRANCH_NAME"
+
+          # Exit prerelease mode
+          cd libraries/typescript
+          echo "Exiting prerelease mode..."
+          pnpm changeset pre exit
+
+          # Version packages
+          echo "Versioning packages..."
+          pnpm changeset version
+
+          # Go back to repo root for git operations
+          cd ../..
+
+          # Commit changes
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore(release): exit prerelease mode and version packages"
+
+          # Push branch
+          git push origin "$BRANCH_NAME"
+
+          # Create PR
+          gh pr create \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "release(typescript): Exit prerelease mode and version packages" \
+            --body "This PR exits prerelease mode and versions packages for stable release.
+
+          ## Changes:
+
+          - ✅ Exited prerelease mode (removed \`pre.json\`)
+          - ✅ Versioned packages to stable versions
+          - ✅ Updated CHANGELOGs
+
+          ## After merging:
+
+          - ✅ Packages will be automatically published to npm with \`latest\` tag
+          - ✅ Git tags will be pushed
+          - ✅ GitHub release will be created
+
+          ---
+
+          **This PR was automatically created after merging canary to main.**"
+
+          echo "✅ Created exit prerelease PR"
+
+      - name: Check if this is a release commit (Main)
+        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false'
+        id: check-release
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
 
@@ -64,27 +196,47 @@ jobs:
             echo "ℹ️  Not a release commit - skipping publish"
           fi
 
-      - name: Publish packages
-        if: steps.check.outputs.should_publish == 'true'
+      - name: Publish packages (Main)
+        if: github.ref == 'refs/heads/main' &&
+            github.event_name == 'push' &&
+            steps.check-prerelease.outputs.in_prerelease == 'false' &&
+            steps.check-release.outputs.should_publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Setup npm auth
+          # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
-          echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > .npmrc
-
-          # Publish to npm
           pnpm changeset publish
 
           # Push git tags from repo root
           cd ../..
           git push --follow-tags
 
-          echo "✅ Published packages to npm and pushed tags"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ORG }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "✅ Published packages to npm using trusted publishing and pushed tags"
 
-      - name: Create GitHub Release
-        if: steps.check.outputs.should_publish == 'true'
+      - name: Reset canary to main
+        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Fetch latest changes
+          git fetch origin
+
+          # Checkout canary and reset to main (clean slate with stable versions)
+          git checkout canary
+          git reset --hard origin/main
+
+          # Force push canary (since we did a reset)
+          git push --force origin canary
+
+          echo "✅ Reset canary to main (canary workflow will auto-enter prerelease mode)"
+
+      - name: Create GitHub Release (Main)
+        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -159,24 +311,3 @@ jobs:
             --latest || echo "⚠️  Failed to create release (may already exist)"
           
           echo "✅ Created consolidated GitHub release: $RELEASE_TITLE"
-
-      - name: Reset canary to main
-        if: steps.check.outputs.should_publish == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Fetch latest changes
-          git fetch origin
-
-          # Checkout canary and reset to main (clean slate with stable versions)
-          git checkout canary
-          git reset --hard origin/main
-
-          # Force push canary (since we did a reset)
-          git push --force origin canary
-
-          echo "✅ Reset canary to main (canary workflow will auto-enter prerelease mode)"

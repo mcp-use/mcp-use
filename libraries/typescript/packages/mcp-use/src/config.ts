@@ -1,4 +1,5 @@
 import type { BaseConnector } from "./connectors/base.js";
+import type { ConnectorInitOptions } from "./connectors/base.js";
 import { readFileSync } from "node:fs";
 import { HttpConnector } from "./connectors/http.js";
 import { StdioConnector } from "./connectors/stdio.js";
@@ -10,13 +11,15 @@ export function loadConfigFile(filepath: string): Record<string, any> {
 }
 
 export function createConnectorFromConfig(
-  serverConfig: Record<string, any>
+  serverConfig: Record<string, any>,
+  connectorOptions?: Partial<ConnectorInitOptions>
 ): BaseConnector {
   if ("command" in serverConfig && "args" in serverConfig) {
     return new StdioConnector({
       command: serverConfig.command,
       args: serverConfig.args,
       env: serverConfig.env,
+      ...connectorOptions,
     });
   }
 
@@ -29,6 +32,7 @@ export function createConnectorFromConfig(
       authToken: serverConfig.auth_token || serverConfig.authToken,
       // Only force SSE if explicitly requested
       preferSse: serverConfig.preferSse || transport === "sse",
+      ...connectorOptions,
     });
   }
 
@@ -36,6 +40,7 @@ export function createConnectorFromConfig(
     return new WebSocketConnector(serverConfig.ws_url, {
       headers: serverConfig.headers,
       authToken: serverConfig.auth_token,
+      ...connectorOptions,
     });
   }
 

@@ -190,6 +190,45 @@ if (result.isError) {
 ```
 </CodeGroup>
 
+## Timeout Configuration
+
+For long-running tools, especially those that trigger sampling or LLM operations, you may need to configure custom timeout settings:
+
+<CodeGroup>
+```typescript TypeScript
+// Extended timeout for long-running operations
+const result = await session.callTool(
+    'process_large_dataset',
+    { dataset: 'large-data.json' },
+    {
+        timeout: 300000, // 5 minutes
+    }
+)
+```
+
+```typescript TypeScript
+// Timeout with progress reset for operations that send progress notifications
+// This allows the timeout to reset whenever the server sends a progress update
+const result = await session.callTool(
+    'analyze_with_llm',
+    { text: 'Long text to analyze...' },
+    {
+        timeout: 60000, // 1 minute initial timeout
+        resetTimeoutOnProgress: true, // Reset timeout on progress notifications
+        maxTotalTimeout: 600000 // Maximum 10 minutes total
+    }
+)
+```
+</CodeGroup>
+
+Available timeout options:
+- **`timeout`**: Request timeout in milliseconds (default: 60000 / 60 seconds)
+- **`maxTotalTimeout`**: Maximum total time in milliseconds, even with progress resets
+- **`resetTimeoutOnProgress`**: If `true`, resets the timeout counter when a progress notification is received (default: `false`)
+- **`signal`**: An `AbortSignal` to programmatically cancel the request
+
+**Note**: When `resetTimeoutOnProgress` is enabled and the server sends progress notifications (like `ctx.sample()` does automatically), the operation can run indefinitely as long as progress is reported regularly.
+
 ## Multiple Server Example
 
 You can work with multiple MCP servers and call tools from each:

@@ -1,8 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { logger } from "../logging.js";
 import { SseConnectionManager } from "../task_managers/sse.js";
-import { StreamableHttpConnectionManager } from "../task_managers/streamable_http.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
@@ -23,6 +25,7 @@ export class HttpConnector extends BaseConnector {
   private readonly clientInfo: { name: string; version: string };
   private readonly preferSse: boolean;
   private transportType: "streamable-http" | "sse" | null = null;
+  private streamableTransport: StreamableHTTPClientTransport | null = null;
 
   constructor(baseUrl: string, opts: HttpConnectorOptions = {}) {
     super(opts);
@@ -154,39 +157,96 @@ export class HttpConnector extends BaseConnector {
 
   private async connectWithStreamableHttp(baseUrl: string): Promise<void> {
     try {
-      // Create and start the streamable HTTP connection manager
-      this.connectionManager = new StreamableHttpConnectionManager(baseUrl, {
-        authProvider: this.opts.authProvider, // ← Pass OAuth provider to SDK
-        requestInit: {
-          headers: this.headers,
-        },
-        // Pass through timeout and other options
-        reconnectionOptions: {
-          maxReconnectionDelay: 30000,
-          initialReconnectionDelay: 1000,
-          reconnectionDelayGrowFactor: 1.5,
-          maxRetries: 2,
-        },
-      });
-      const transport = await this.connectionManager.start();
+      // Create StreamableHTTPClientTransport directly
+      // The official SDK's StreamableHTTPClientTransport automatically handles session IDs
+      // when client.connect() is called - it sends initialize, gets session ID from response header,
+      // and opens the SSE stream with that session ID
+      const streamableTransport = new StreamableHTTPClientTransport(
+        new URL(baseUrl),
+        {
+          authProvider: this.opts.authProvider, // ← Pass OAuth provider to SDK
+          requestInit: {
+            headers: this.headers,
+          },
+          // Pass through reconnection options
+          reconnectionOptions: {
+            maxReconnectionDelay: 30000,
+            initialReconnectionDelay: 1000,
+            reconnectionDelayGrowFactor: 1.5,
+            maxRetries: 2,
+          },
+          // Don't pass sessionId - let the SDK generate it automatically during connect()
+        }
+      );
+
+      // Store transport for cleanup (we'll create ConnectionManager later if needed for reconnection)
+      // For now, we manage the transport directly like MCPJam does
+      let transport: StreamableHTTPClientTransport = streamableTransport;
+
+      // Wrap transport if wrapper is provided
+      if (this.opts.wrapTransport) {
+        const serverId = this.baseUrl; // Use URL as server ID for now
+        transport = this.opts.wrapTransport(
+          transport,
+          serverId
+        ) as StreamableHTTPClientTransport;
+      }
 
       // Create and connect the client
       // This performs both initialize AND initialized notification
-      this.client = new Client(this.clientInfo, this.opts.clientOptions);
+      // Always advertise roots capability - server may query roots/list even if client has no roots
+      const clientOptions = {
+        ...(this.opts.clientOptions || {}),
+        capabilities: {
+          ...(this.opts.clientOptions?.capabilities || {}),
+          roots: { listChanged: true }, // Always advertise roots capability
+          // Add sampling capability if callback is provided
+          ...(this.opts.samplingCallback ? { sampling: {} } : {}),
+        },
+      };
+      logger.debug(
+        `Creating Client with capabilities:`,
+        JSON.stringify(clientOptions.capabilities, null, 2)
+      );
+      this.client = new Client(this.clientInfo, clientOptions);
+
+      // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
+      // The server may call roots/list during initialization if it advertises roots capability
+      this.setupRootsHandler();
+      logger.debug("Roots handler registered before connect");
 
       try {
-        await this.client.connect(transport);
+        // Connect with timeout
+        // The SDK's StreamableHTTPClientTransport should automatically:
+        // 1. Send POST initialize request
+        // 2. Extract mcp-session-id from response header
+        // 3. Open GET SSE stream with that session ID in header
+        await this.client.connect(transport, {
+          timeout: Math.min(this.timeout, 3000),
+        });
+
+        // Verify session ID is available after connect
+        // The transport should have the session ID from the initialize response
+        const sessionId = streamableTransport.sessionId;
+        if (sessionId) {
+          logger.debug(`Session ID obtained: ${sessionId}`);
+        } else {
+          logger.warn(
+            "Session ID not available after connect - this may cause issues with SSE stream"
+          );
+        }
       } catch (connectErr) {
         // Check if the error is due to missing session ID during connection handshake
         if (connectErr instanceof Error) {
           const errMsg = connectErr.message || connectErr.toString();
           if (
             errMsg.includes("Missing session ID") ||
-            errMsg.includes("Bad Request: Missing session ID")
+            errMsg.includes("Bad Request: Missing session ID") ||
+            errMsg.includes("Mcp-Session-Id header is required")
           ) {
             // Wrap it in a more specific error so the outer catch can detect it
             const wrappedError = new Error(
-              `FastMCP session ID error: ${errMsg}`
+              `Session ID error: ${errMsg}. The SDK should automatically extract session ID from initialize response.`
             );
             wrappedError.cause = connectErr;
             throw wrappedError;
@@ -195,8 +255,28 @@ export class HttpConnector extends BaseConnector {
         throw connectErr;
       }
 
+      // Store the transport for later cleanup
+      this.streamableTransport = streamableTransport;
+      // Create a minimal connection manager wrapper for cleanup purposes
+      this.connectionManager = {
+        stop: async () => {
+          if (this.streamableTransport) {
+            try {
+              await this.streamableTransport.close();
+            } catch (e) {
+              logger.warn(`Error closing Streamable HTTP transport: ${e}`);
+            } finally {
+              this.streamableTransport = null;
+            }
+          }
+        },
+      } as any;
+
       this.connected = true;
       this.transportType = "streamable-http";
+      this.setupNotificationHandler();
+      this.setupSamplingHandler();
+      // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
       );
@@ -217,14 +297,43 @@ export class HttpConnector extends BaseConnector {
           headers: this.headers,
         },
       });
-      const transport = await this.connectionManager.start();
+      let transport = await this.connectionManager.start();
+
+      // Wrap transport if wrapper is provided
+      if (this.opts.wrapTransport) {
+        const serverId = this.baseUrl; // Use URL as server ID for now
+        transport = this.opts.wrapTransport(transport, serverId);
+      }
 
       // Create and connect the client
-      this.client = new Client(this.clientInfo, this.opts.clientOptions);
+      // Always advertise roots capability - server may query roots/list even if client has no roots
+      const clientOptions = {
+        ...(this.opts.clientOptions || {}),
+        capabilities: {
+          ...(this.opts.clientOptions?.capabilities || {}),
+          roots: { listChanged: true }, // Always advertise roots capability
+          // Add sampling capability if callback is provided
+          ...(this.opts.samplingCallback ? { sampling: {} } : {}),
+        },
+      };
+      logger.debug(
+        `Creating Client with capabilities (SSE):`,
+        JSON.stringify(clientOptions.capabilities, null, 2)
+      );
+      this.client = new Client(this.clientInfo, clientOptions);
+
+      // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
+      // The server may call roots/list during initialization if it advertises roots capability
+      this.setupRootsHandler();
+      logger.debug("Roots handler registered before connect (SSE)");
+
       await this.client.connect(transport);
 
       this.connected = true;
       this.transportType = "sse";
+      this.setupNotificationHandler();
+      this.setupSamplingHandler();
+      // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
       logger.debug(
         `Successfully connected to MCP implementation via HTTP/SSE: ${baseUrl}`
       );

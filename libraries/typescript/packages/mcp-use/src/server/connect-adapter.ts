@@ -136,7 +136,10 @@ export async function adaptConnectMiddleware(
     const mockRequest = createRequest({
       method: request.method.toUpperCase(),
       url: middlewarePathname + parsedURL.search,
-      headers: Object.fromEntries(request.headers.entries()),
+      headers:
+        request.headers && typeof request.headers.entries === "function"
+          ? Object.fromEntries(request.headers.entries())
+          : (request.headers as any),
       query,
       ...(request.body && { body: request.body }),
     });

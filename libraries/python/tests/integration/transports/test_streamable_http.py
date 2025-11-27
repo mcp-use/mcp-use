@@ -25,8 +25,8 @@ async def server_process():
         text=True,
     )
 
-    # Wait for server to start up
-    await asyncio.sleep(1)
+    # Wait for server to start up (CI Linux runners need more time)
+    await asyncio.sleep(3)
     server_url = "http://127.0.0.1:8000"
     yield server_url
 

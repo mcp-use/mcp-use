@@ -1,0 +1,73 @@
+---
+title: "Oauth Callback"
+description: "Oauth Callback API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/auth/oauth_callback.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/auth/oauth_callback.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/auth/oauth_callback.py</a>
+</Callout>
+
+## CallbackResponse
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> CallbackResponse</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.auth.oauth_callback import CallbackResponse
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="code" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="state" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error_description" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error_uri" type="str | None" default="None" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(code: str | None = None, state: str | None = None, error: str | None = None, error_description: str | None = None, error_uri: str | None = None):
+```
+
+</Card>
+</div>
+
+## OAuthCallbackServer
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> OAuthCallbackServer</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.auth.oauth_callback import OAuthCallbackServer
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize the callback server.
+
+
+**Parameters**
+><ParamField body="port" type="int" required="True" >   Port to listen on. </ParamField>
+
+**Signature**
+```python wrap
+def __init__(port: int):
+```
+
+</Card>
+</div>

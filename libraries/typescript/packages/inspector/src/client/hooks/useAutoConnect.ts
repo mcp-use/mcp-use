@@ -15,6 +15,7 @@ interface UseAutoConnectOptions {
     transportType?: "http" | "sse"
   ) => void;
   removeConnection: (id: string) => void;
+  configLoaded: boolean;
 }
 
 interface AutoConnectState {
@@ -72,6 +73,7 @@ export function useAutoConnect({
   connections,
   addConnection,
   removeConnection,
+  configLoaded: contextConfigLoaded,
 }: UseAutoConnectOptions): AutoConnectState {
   const navigate = useNavigate();
   const [isAutoConnecting, setIsAutoConnecting] = useState(false);
@@ -82,13 +84,20 @@ export function useAutoConnect({
   const [configLoaded, setConfigLoaded] = useState(false);
   const retryScheduledRef = useRef(false);
 
-  // Load auto-switch setting from localStorage
+  // Load auto-switch setting from localStorage, but override to true if autoConnect is active
   useEffect(() => {
-    const autoSwitchSetting = localStorage.getItem("mcp-inspector-auto-switch");
-    if (autoSwitchSetting !== null) {
-      setAutoSwitch(autoSwitchSetting === "true");
+    if (autoConnectConfig) {
+      // When using autoConnect, always enable auto-switch (proxy fallback)
+      setAutoSwitch(true);
+    } else {
+      const autoSwitchSetting = localStorage.getItem(
+        "mcp-inspector-auto-switch"
+      );
+      if (autoSwitchSetting !== null) {
+        setAutoSwitch(autoSwitchSetting === "true");
+      }
     }
-  }, []);
+  }, [autoConnectConfig]);
 
   // Unified connection attempt function
   const attemptConnection = useCallback(
@@ -117,9 +126,47 @@ export function useAutoConnect({
     [addConnection]
   );
 
+  // Helper to handle auto-connect for a config
+  const handleAutoConnectConfig = useCallback(
+    (config: ConnectionConfig) => {
+      const existing = connections.find((c) => c.url === config.url);
+
+      if (existing) {
+        // Connection already exists
+        if (existing.state === "ready") {
+          // Already connected - navigate immediately
+          console.warn(
+            "[useAutoConnect] Connection already ready, navigating to server"
+          );
+          const urlParams = new URLSearchParams(window.location.search);
+          const tunnelUrl = urlParams.get("tunnelUrl");
+          const newUrl = tunnelUrl
+            ? `/?server=${encodeURIComponent(existing.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+            : `/?server=${encodeURIComponent(existing.id)}`;
+          navigate(newUrl);
+        } else {
+          // Connection exists but not ready - track it for navigation when ready
+          console.warn(
+            "[useAutoConnect] Connection exists, waiting for ready state"
+          );
+          setAutoConnectConfig(config);
+          setIsAutoConnecting(true);
+        }
+      } else {
+        // No existing connection - create new one
+        setAutoConnectConfig(config);
+        setHasTriedBothModes(false);
+        setIsAutoConnecting(true);
+        attemptConnection(config);
+      }
+    },
+    [connections, navigate, attemptConnection]
+  );
+
   // Load config and initiate auto-connect
+  // Wait for context's configLoaded to ensure localStorage is loaded before attempting connections
   useEffect(() => {
-    if (configLoaded) return;
+    if (configLoaded || !contextConfigLoaded) return;
 
     // Check for autoConnect query parameter first
     const urlParams = new URLSearchParams(window.location.search);
@@ -129,13 +176,7 @@ export function useAutoConnect({
       const config = parseAutoConnectParam(queryAutoConnectParam);
 
       if (config) {
-        const existing = connections.find((c) => c.url === config.url);
-        if (!existing) {
-          setAutoConnectConfig(config);
-          setHasTriedBothModes(false);
-          setIsAutoConnecting(true);
-          attemptConnection(config);
-        }
+        handleAutoConnectConfig(config);
       }
 
       setConfigLoaded(true);
@@ -151,18 +192,12 @@ export function useAutoConnect({
           const config = parseAutoConnectParam(configData.autoConnectUrl);
 
           if (config) {
-            const existing = connections.find((c) => c.url === config.url);
-            if (!existing) {
-              setAutoConnectConfig(config);
-              setHasTriedBothModes(false);
-              setIsAutoConnecting(true);
-              attemptConnection(config);
-            }
+            handleAutoConnectConfig(config);
           }
         }
       })
       .catch(() => setConfigLoaded(true));
-  }, [configLoaded, connections, attemptConnection]);
+  }, [configLoaded, contextConfigLoaded, handleAutoConnectConfig]);
 
   // Auto-connect retry logic
   useEffect(() => {
@@ -215,7 +250,6 @@ export function useAutoConnect({
       if (autoConnectConfig.connectionType === "Direct") {
         // Failed with direct, try proxy
         toast.error("Direct connection failed, trying with proxy...");
-        setHasTriedBothModes(true);
         retryScheduledRef.current = true;
 
         // Defer state updates to avoid updating during render
@@ -240,16 +274,21 @@ export function useAutoConnect({
           }, 1000);
         });
       } else {
-        // Both modes failed - clear loading and reset state
-        toast.error("Proxy connection also failed");
-        setHasTriedBothModes(true);
+        // Both modes failed - clear loading, reset state, and navigate home
+        toast.error(
+          "Cannot connect to server. Please check the URL and try again."
+        );
 
         // Defer state updates to avoid updating during render
         queueMicrotask(() => {
           removeConnection(connection.id);
           setIsAutoConnecting(false);
           setAutoConnectConfig(null);
+          setHasTriedBothModes(true);
           retryScheduledRef.current = false;
+
+          // Navigate to home page after connection failure
+          navigate("/");
         });
       }
     }
@@ -275,6 +314,25 @@ export function useAutoConnect({
       }
     }
   }, [isAutoConnecting, connections, autoConnectConfig]);
+
+  // Safety timeout: clear isAutoConnecting if it's been true for too long without progress
+  useEffect(() => {
+    if (!isAutoConnecting) return;
+
+    const timeoutId = setTimeout(() => {
+      // If we've been auto-connecting for 30 seconds and still no connection,
+      // something is wrong - clear the loading state
+      if (isAutoConnecting) {
+        console.warn(
+          "[useAutoConnect] Auto-connect timeout - clearing loading state"
+        );
+        setIsAutoConnecting(false);
+        setAutoConnectConfig(null);
+      }
+    }, 30000); // 30 second timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [isAutoConnecting]);
 
   return { isAutoConnecting, autoConnectUrl: autoConnectConfig?.url || null };
 }

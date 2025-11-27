@@ -2,19 +2,31 @@ import {
   Activity,
   CheckCircle2,
   Database,
+  Info,
   Loader2,
   Server,
   Trash2,
   Zap,
 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
 import { useMcpContext } from "../../client/context/McpContext";
+import type { MCPConnection } from "../../client/context/McpContext";
+import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerIcon } from "./ServerIcon";
 
 export function ServerList() {
   const { connections, removeConnection } = useMcpContext();
+  const [capabilitiesModalOpen, setCapabilitiesModalOpen] = useState(false);
+  const [selectedConnection, setSelectedConnection] =
+    useState<MCPConnection | null>(null);
+
+  const handleOpenCapabilities = (connection: MCPConnection) => {
+    setSelectedConnection(connection);
+    setCapabilitiesModalOpen(true);
+  };
 
   const handleDeleteConnection = (id: string) => {
     removeConnection(id);
@@ -119,6 +131,16 @@ export function ServerList() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
+                    {connection.state === "ready" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenCapabilities(connection)}
+                        title="View server capabilities"
+                      >
+                        <Info className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button asChild variant="outline" size="sm">
                       <Link
                         to={`/?server=${encodeURIComponent(connection.id)}`}
@@ -140,6 +162,12 @@ export function ServerList() {
           ))}
         </div>
       )}
+
+      <ServerCapabilitiesModal
+        open={capabilitiesModalOpen}
+        onOpenChange={setCapabilitiesModalOpen}
+        connection={selectedConnection}
+      />
     </div>
   );
 }

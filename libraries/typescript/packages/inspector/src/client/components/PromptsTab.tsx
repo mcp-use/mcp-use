@@ -9,13 +9,14 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
+import type { ImperativePanelHandle } from "react-resizable-panels";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
 import {
@@ -25,6 +26,8 @@ import {
   PromptsTabHeader,
   SavedPromptsList,
 } from "./prompts";
+import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
+import { Badge } from "@/client/components/ui/badge";
 
 export interface PromptsTabRef {
   focusSearch: () => void;
@@ -68,6 +71,10 @@ export function PromptsTab({
   const [mobileView, setMobileView] = useState<"list" | "detail" | "response">(
     "list"
   );
+  const [rpcMessageCount, setRpcMessageCount] = useState(0);
+  const [rpcPanelCollapsed, setRpcPanelCollapsed] = useState(true);
+  const rpcPanelRef = useRef<ImperativePanelHandle>(null);
+  const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -574,37 +581,115 @@ export function PromptsTab({
         defaultSize={33}
         className="flex flex-col h-full relative"
       >
-        <PromptsTabHeader
-          activeTab={activeTab}
-          isSearchExpanded={isSearchExpanded}
-          searchQuery={searchQuery}
-          filteredPromptsCount={filteredPrompts.length}
-          savedPromptsCount={savedPrompts.length}
-          onSearchExpand={() => setIsSearchExpanded(true)}
-          onSearchChange={setSearchQuery}
-          onSearchBlur={handleSearchBlur}
-          onTabSwitch={() =>
-            setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
-          }
-          searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
-        />
+        <ResizablePanelGroup
+          direction="vertical"
+          className="h-full border-r dark:border-zinc-700"
+        >
+          <ResizablePanel defaultSize={75} minSize={30}>
+            <PromptsTabHeader
+              activeTab={activeTab}
+              isSearchExpanded={isSearchExpanded}
+              searchQuery={searchQuery}
+              filteredPromptsCount={filteredPrompts.length}
+              savedPromptsCount={savedPrompts.length}
+              onSearchExpand={() => setIsSearchExpanded(true)}
+              onSearchChange={setSearchQuery}
+              onSearchBlur={handleSearchBlur}
+              onTabSwitch={() =>
+                setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
+              }
+              searchInputRef={
+                searchInputRef as React.RefObject<HTMLInputElement>
+              }
+            />
 
-        {activeTab === "prompts" ? (
-          <PromptsList
-            prompts={filteredPrompts}
-            selectedPrompt={selectedPrompt}
-            onPromptSelect={handlePromptSelect}
-            focusedIndex={focusedIndex}
-          />
-        ) : (
-          <SavedPromptsList
-            savedPrompts={savedPrompts}
-            selectedPrompt={selectedSavedPrompt}
-            onLoadPrompt={loadSavedPrompt}
-            onDeletePrompt={deleteSavedPrompt}
-            focusedIndex={focusedIndex}
-          />
-        )}
+            {activeTab === "prompts" ? (
+              <PromptsList
+                prompts={filteredPrompts}
+                selectedPrompt={selectedPrompt}
+                onPromptSelect={handlePromptSelect}
+                focusedIndex={focusedIndex}
+              />
+            ) : (
+              <SavedPromptsList
+                savedPrompts={savedPrompts}
+                selectedPrompt={selectedSavedPrompt}
+                onLoadPrompt={loadSavedPrompt}
+                onDeletePrompt={deleteSavedPrompt}
+                focusedIndex={focusedIndex}
+              />
+            )}
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          <ResizablePanel
+            ref={rpcPanelRef}
+            defaultSize={0}
+            collapsible
+            minSize={5}
+            collapsedSize={6}
+            onCollapse={() => setRpcPanelCollapsed(true)}
+            onExpand={() => setRpcPanelCollapsed(false)}
+            className="flex flex-col border-t dark:border-zinc-700"
+          >
+            <div
+              className="group flex items-center justify-between p-3 shrink-0 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (rpcPanelCollapsed) {
+                  rpcPanelRef.current?.resize(25);
+                  setRpcPanelCollapsed(false);
+                } else {
+                  rpcPanelRef.current?.resize(5);
+                  setRpcPanelCollapsed(true);
+                }
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-medium">RPC Messages</h3>
+                {rpcMessageCount > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
+                  >
+                    {rpcMessageCount}
+                  </Badge>
+                )}
+                {rpcMessageCount > 0 && !rpcPanelCollapsed && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      clearRpcMessagesRef.current?.();
+                    }}
+                    className="h-6 w-6 p-0"
+                    title="Clear all messages"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform ${
+                  !rpcPanelCollapsed ? "" : "rotate-180"
+                }`}
+              />
+            </div>
+            {!rpcPanelCollapsed && (
+              <div className="flex-1 overflow-hidden min-h-0">
+                <JsonRpcLoggerView
+                  serverIds={[serverId]}
+                  onCountChange={setRpcMessageCount}
+                  onClearRef={clearRpcMessagesRef}
+                />
+              </div>
+            )}
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </ResizablePanel>
 
       <ResizableHandle withHandle />
@@ -625,7 +710,7 @@ export function PromptsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize={60}>
+          <ResizablePanel defaultSize={50}>
             <div className="flex flex-col h-full">
               <PromptResultDisplay
                 results={results}

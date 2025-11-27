@@ -1,0 +1,30 @@
+{
+  "name": "sampling-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server example demonstrating sampling capabilities",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "example",
+    "sampling"
+  ],
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@mcp-use/cli": "workspace:*",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+

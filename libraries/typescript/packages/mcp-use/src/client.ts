@@ -1,5 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import { BaseMCPClient } from "./client/base.js";
 import type { ExecutionResult } from "./client/codeExecutor.js";
 import {
@@ -41,6 +45,14 @@ export interface CodeModeConfig {
 
 export interface MCPClientOptions {
   codeMode?: boolean | CodeModeConfig;
+  /**
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
+  samplingCallback?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
 }
 
 // Export executor classes and utilities for external use
@@ -69,6 +81,9 @@ export class MCPClient extends BaseMCPClient {
     | CodeExecutorFunction
     | BaseCodeExecutor = "vm";
   private _executorOptions?: ExecutorOptions;
+  private _samplingCallback?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
 
   constructor(
     config?: string | Record<string, any>,
@@ -105,6 +120,7 @@ export class MCPClient extends BaseMCPClient {
     this.codeMode = codeModeEnabled;
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;
+    this._samplingCallback = options?.samplingCallback;
 
     if (this.codeMode) {
       this._setupCodeModeConnector();
@@ -143,7 +159,9 @@ export class MCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
-    return createConnectorFromConfig(serverConfig);
+    return createConnectorFromConfig(serverConfig, {
+      samplingCallback: this._samplingCallback,
+    });
   }
 
   private _setupCodeModeConnector(): void {
@@ -248,7 +266,7 @@ export class MCPClient extends BaseMCPClient {
   public async searchTools(
     query: string = "",
     detailLevel: "names" | "descriptions" | "full" = "full"
-  ): Promise<import("./client/codeExecutor.js").ToolSearchResult[]> {
+  ): Promise<import("./client/codeExecutor.js").ToolSearchResponse> {
     if (!this.codeMode) {
       throw new Error("Code execution mode is not enabled");
     }

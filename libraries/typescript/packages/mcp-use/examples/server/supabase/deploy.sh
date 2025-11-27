@@ -33,24 +33,47 @@ print_warning() {
 show_help() {
     echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
     echo ""
-    echo "Usage: ./deploy.sh [project-id] [function-name] [bucket-name]"
+    echo "Usage: ./deploy.sh [project-id] [function-name] [bucket-name] [--version VERSION]"
     echo ""
     echo "Arguments (optional if run interactively):"
     echo "  project-id     : Your Supabase project ID"
     echo "  function-name  : Name of the edge function (default: mcp-server)"
     echo "  bucket-name    : Name of the storage bucket (default: widgets)"
     echo ""
+    echo "Flags:"
+    echo "  --version      : Specify mcp-use version (default: latest)"
+    echo "                   Examples: latest, canary, 1.5.1, 1.5.1.canary.3"
+    echo ""
     echo "Examples:"
-    echo "  ./deploy.sh                                      # Interactive mode"
-    echo "  ./deploy.sh nnpumlykjksvxivhywwo                # With project ID"
-    echo "  ./deploy.sh nnpumlykjksvxivhywwo my-function    # With custom function name"
+    echo "  ./deploy.sh                                                    # Interactive mode"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo                              # With project ID"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo my-function                  # With custom function name"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo mcp-server widgets --version canary           # Use canary version"
+    echo "  ./deploy.sh nnpumlykjksvxivhywwo mcp-server widgets --version 1.5.1.canary.3   # Use specific version"
     echo ""
 }
 
-# Check for command-line arguments first
-PROJECT_ID="$1"
-FUNCTION_NAME="$2"
-BUCKET_NAME="$3"
+# Parse flags and arguments
+MCP_USE_VERSION="latest"
+PROJECT_ID=""
+FUNCTION_NAME=""
+BUCKET_NAME=""
+NEXT_IS_VERSION=false
+
+for arg in "$@"; do
+    if [ "$NEXT_IS_VERSION" = true ]; then
+        MCP_USE_VERSION="$arg"
+        NEXT_IS_VERSION=false
+    elif [ "$arg" = "--version" ]; then
+        NEXT_IS_VERSION=true
+    elif [ -z "$PROJECT_ID" ]; then
+        PROJECT_ID="$arg"
+    elif [ -z "$FUNCTION_NAME" ]; then
+        FUNCTION_NAME="$arg"
+    elif [ -z "$BUCKET_NAME" ]; then
+        BUCKET_NAME="$arg"
+    fi
+done
 
 # Interactive prompts if arguments not provided
 echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
@@ -83,6 +106,7 @@ print_info "Configuration:"
 echo "  Project ID: $PROJECT_ID"
 echo "  Function Name: $FUNCTION_NAME"
 echo "  Bucket Name: $BUCKET_NAME"
+echo "  MCP-USE Version: @$MCP_USE_VERSION"
 echo ""
 
 # Check if supabase CLI is installed
@@ -119,7 +143,11 @@ print_success "Authenticated with Supabase"
 
 # Check if project is linked
 print_info "Checking if project is linked..."
-LINKED_PROJECT=$(supabase status 2>&1 | grep "Project ID" | awk '{print $NF}' || echo "")
+LINKED_PROJECT=""
+if [ -f "supabase/config.toml" ]; then
+    LINKED_PROJECT=$(grep "^project_id = " supabase/config.toml | sed 's/project_id = "\(.*\)"/\1/' | tr -d '"' || echo "")
+fi
+
 if [ -z "$LINKED_PROJECT" ]; then
     print_warning "Project not linked. Linking to project: $PROJECT_ID"
     if ! supabase link --project-ref "$PROJECT_ID"; then
@@ -131,13 +159,27 @@ else
     print_success "Project already linked: $LINKED_PROJECT"
     if [ "$LINKED_PROJECT" != "$PROJECT_ID" ]; then
         print_warning "Linked project ($LINKED_PROJECT) differs from specified project ($PROJECT_ID)"
-        read -p "Continue with linked project? (y/N): " -n 1 -r </dev/tty
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        
+        # Check if linked project looks like a valid Supabase project ref (20 chars alphanumeric)
+        if [[ ! "$LINKED_PROJECT" =~ ^[a-z0-9]{20}$ ]]; then
+            print_warning "Linked project ID '$LINKED_PROJECT' doesn't look like a valid Supabase project ref"
             print_info "Relinking to $PROJECT_ID..."
             supabase unlink
             supabase link --project-ref "$PROJECT_ID"
             print_success "Relinked to project $PROJECT_ID"
+        else
+            read -p "Continue with linked project? (y/N): " -n 1 -r </dev/tty
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                # User wants to continue with the linked project, so use it
+                print_info "Using linked project: $LINKED_PROJECT"
+                PROJECT_ID="$LINKED_PROJECT"
+            else
+                print_info "Relinking to $PROJECT_ID..."
+                supabase unlink
+                supabase link --project-ref "$PROJECT_ID"
+                print_success "Relinked to project $PROJECT_ID"
+            fi
         fi
     fi
 fi
@@ -175,7 +217,7 @@ if [ -f "supabase/config.toml" ]; then
         echo "" >> supabase/config.toml
         echo "[functions.$FUNCTION_NAME]" >> supabase/config.toml
         echo "verify_jwt = false" >> supabase/config.toml
-        echo "static_files = [ \"./functions/$FUNCTION_NAME/dist/**/*.html\", \"./functions/$FUNCTION_NAME/dist/mcp-use.json\" ]" >> supabase/config.toml
+        echo "static_files = [ \"./functions/$FUNCTION_NAME/dist/**/*.html\", \"./functions/$FUNCTION_NAME/dist/mcp-use.json\", \"./functions/$FUNCTION_NAME/dist/public/**/*\" ]" >> supabase/config.toml
         print_success "Added function configuration to config.toml"
     fi
 else
@@ -185,9 +227,15 @@ fi
 
 # Build the project
 print_info "Building the project..."
+# MCP_URL: Where widget assets (JS/CSS) are stored (storage bucket)
 MCP_URL="https://${PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}"
 export MCP_URL
 print_info "Using MCP_URL: $MCP_URL"
+
+# MCP_SERVER_URL: Where the MCP server runs (edge function) for API calls
+MCP_SERVER_URL="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}"
+export MCP_SERVER_URL
+print_info "Using MCP_SERVER_URL: $MCP_SERVER_URL"
 
 if ! $PKG_MANAGER run build; then
     print_error "Build failed"
@@ -236,34 +284,37 @@ if [ ! -f "$FUNCTION_DIR/index.ts" ]; then
     fi
 fi
 
-# Check for deno.json and populate with mcp-use dependency
-if [ ! -f "$FUNCTION_DIR/deno.json" ]; then
-    print_info "Creating deno.json with mcp-use dependency..."
-    cat > "$FUNCTION_DIR/deno.json" << 'EOF'
+# Create/override deno.json with mcp-use dependency
+print_info "Creating deno.json with mcp-use@$MCP_USE_VERSION dependency..."
+cat > "$FUNCTION_DIR/deno.json" << EOF
 {
   "imports": {
-    "mcp-use/": "https://esm.sh/mcp-use@latest/"
+    "mcp-use/": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/"
   }
 }
 EOF
-    print_success "Created deno.json with mcp-use dependency"
+print_success "Created deno.json with mcp-use@$MCP_USE_VERSION dependency"
+
+# Set environment variables BEFORE deploying the function
+print_info "Setting environment variables for edge function..."
+FUNCTION_BASE_URL="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}"
+CSP_URLS="https://${PROJECT_ID}.supabase.co"
+
+# Set MCP_URL
+if supabase secrets set MCP_URL="$FUNCTION_BASE_URL" --project-ref "$PROJECT_ID"; then
+    print_success "MCP_URL environment variable set to: $FUNCTION_BASE_URL"
 else
-    # Update existing deno.json to include mcp-use dependency if not already present
-    if ! grep -q "mcp-use" "$FUNCTION_DIR/deno.json"; then
-        print_info "Updating deno.json with mcp-use dependency..."
-        # Use a temporary file for safer JSON manipulation
-        if command -v jq &> /dev/null; then
-            # Use jq if available for proper JSON handling
-            jq '.imports."mcp-use/" = "https://esm.sh/mcp-use@latest/"' "$FUNCTION_DIR/deno.json" > "$FUNCTION_DIR/deno.json.tmp"
-            mv "$FUNCTION_DIR/deno.json.tmp" "$FUNCTION_DIR/deno.json"
-            print_success "Updated deno.json with mcp-use dependency"
-        else
-            print_warning "jq not found, skipping deno.json update. Please manually add mcp-use dependency."
-        fi
-    fi
+    print_warning "Failed to set MCP_URL environment variable"
 fi
 
-# Deploy the function
+# Set CSP_URLS to allow widget assets from storage bucket
+if supabase secrets set CSP_URLS="$CSP_URLS" --project-ref "$PROJECT_ID"; then
+    print_success "CSP_URLS environment variable set to: $CSP_URLS"
+else
+    print_warning "Failed to set CSP_URLS environment variable"
+fi
+
+# Deploy the function (will pick up the environment variables set above)
 print_info "Deploying function to Supabase..."
 if ! supabase functions deploy "$FUNCTION_NAME" --use-docker; then
     print_error "Function deployment failed"
@@ -300,6 +351,67 @@ else
     echo "Skipping widget upload..."
 fi
 
+# Upload public files to storage
+if [ -d "dist/public" ]; then
+    print_info "Uploading public files to storage bucket: $BUCKET_NAME"
+    
+    if supabase storage cp -r dist/public/* "ss:///${BUCKET_NAME}/public/" --experimental 2>&1; then
+        print_success "Public files uploaded successfully"
+    else
+        print_warning "Public file upload failed"
+        echo "You may need to check your bucket permissions"
+    fi
+else
+    print_warning "No public directory found at dist/public"
+    echo "Skipping public files upload..."
+fi
+
+# Calculate URLs
+MCP_ENDPOINT="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}/mcp"
+FUNCTION_DASHBOARD="https://supabase.com/dashboard/project/${PROJECT_ID}/functions/${FUNCTION_NAME}"
+INSPECTOR_URL="https://inspector.mcp-use.com/inspector?autoConnect=$(echo -n "$MCP_ENDPOINT" | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read()))')"
+
+# Wait for the MCP server to be ready
+echo ""
+print_info "Waiting for MCP server to be ready..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+RETRY_DELAY=2
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    # Check if server responds (400, 406, or 200 are all valid "server is up" responses)
+    RESPONSE=$(curl -s -w "\n%{http_code}" -m 5 "$MCP_ENDPOINT" 2>&1)
+    HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+    BODY=$(echo "$RESPONSE" | sed '$d')
+    
+    # MCP server can return:
+    # - 400: Bad request (server is up but rejecting the request format)
+    # - 406: Not Acceptable (expects text/event-stream header)
+    # - 200: Success
+    # All indicate the server is functioning
+    if [ "$HTTP_CODE" = "400" ]; then
+        print_success "MCP server is up and running!"
+        break
+    elif [ "$HTTP_CODE" = "406" ] && echo "$BODY" | grep -q "text/event-stream"; then
+        print_success "MCP server is up and running!"
+        break
+    elif [ "$HTTP_CODE" = "200" ]; then
+        print_success "MCP server is up and running!"
+        break
+    fi
+    
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        echo -n "."
+        sleep $RETRY_DELAY
+    else
+        echo ""
+        print_warning "Server didn't respond after ${MAX_RETRIES} attempts, but deployment completed"
+        print_warning "It may take a few more moments to become available"
+    fi
+done
+echo ""
+
 # Print deployment summary
 echo ""
 print_success "========================================="
@@ -307,12 +419,11 @@ print_success "Deployment completed successfully!"
 print_success "========================================="
 echo ""
 
-# Calculate the MCP endpoint and inspector URL
-MCP_ENDPOINT="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}/mcp"
-INSPECTOR_URL="https://inspector.mcp-use.com/inspector?autoConnect=$(echo -n "$MCP_ENDPOINT" | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read()))')"
-
 print_info "MCP Endpoint:"
 echo "  $MCP_ENDPOINT"
+echo ""
+print_info "Function Dashboard:"
+echo "  $FUNCTION_DASHBOARD"
 echo ""
 print_info "Inspector:"
 echo "  $INSPECTOR_URL"
