@@ -1,5 +1,9 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { E2BExecutorOptions, MCPClient } from "../../client.js";
+import type {
+  E2BExecutorOptions,
+  MCPClient,
+  SemanticSearchConfig,
+} from "../../client.js";
 import { logger } from "../../logging.js";
 import { BaseCodeExecutor, type ExecutionResult } from "./base.js";
 
@@ -16,8 +20,12 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
   private SandboxClass: any = null;
   private timeoutMs: number;
 
-  constructor(client: MCPClient, options: E2BExecutorOptions) {
-    super(client);
+  constructor(
+    client: MCPClient,
+    options: E2BExecutorOptions,
+    semanticConfig?: SemanticSearchConfig
+  ) {
+    super(client, semanticConfig);
     this.e2bApiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 300000; // Default: 5 minutes
   }

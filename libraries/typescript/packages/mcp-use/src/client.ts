@@ -37,10 +37,18 @@ export interface E2BExecutorOptions {
 // Union type for executor options
 export type ExecutorOptions = VMExecutorOptions | E2BExecutorOptions;
 
+export type SemanticSearchMode = "string_match" | "fuzzy" | "embeddings";
+
+export interface SemanticSearchConfig {
+  mode?: SemanticSearchMode; // defaults to "string_match"
+  embeddingsUrl?: string; // Required for embeddings mode if OpenAI/Anthropic env vars not set
+}
+
 export interface CodeModeConfig {
   enabled: boolean;
   executor?: CodeExecutorType | CodeExecutorFunction | BaseCodeExecutor; // defaults to "vm"
   executorOptions?: ExecutorOptions; // Type-safe based on executor
+  semantic?: SemanticSearchConfig; // Semantic search configuration
 }
 
 export interface MCPClientOptions {
@@ -81,6 +89,7 @@ export class MCPClient extends BaseMCPClient {
     | CodeExecutorFunction
     | BaseCodeExecutor = "vm";
   private _executorOptions?: ExecutorOptions;
+  private _semanticConfig?: SemanticSearchConfig;
   private _samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
@@ -105,21 +114,24 @@ export class MCPClient extends BaseMCPClient {
       | CodeExecutorFunction
       | BaseCodeExecutor = "vm";
     let executorOptions: ExecutorOptions | undefined;
+    let semanticConfig: SemanticSearchConfig | undefined;
 
     if (options?.codeMode) {
       if (typeof options.codeMode === "boolean") {
         codeModeEnabled = options.codeMode;
-        // defaults: executor="vm", executorOptions=undefined
+        // defaults: executor="vm", executorOptions=undefined, semantic=undefined
       } else {
         codeModeEnabled = options.codeMode.enabled;
         executorConfig = options.codeMode.executor ?? "vm";
         executorOptions = options.codeMode.executorOptions;
+        semanticConfig = options.codeMode.semantic;
       }
     }
 
     this.codeMode = codeModeEnabled;
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;
+    this._semanticConfig = semanticConfig;
     this._samplingCallback = options?.samplingCallback;
 
     if (this.codeMode) {
@@ -180,6 +192,10 @@ export class MCPClient extends BaseMCPClient {
 
       if (config instanceof BaseCodeExecutor) {
         this._codeExecutor = config;
+        // Set semantic config if not already set
+        if (this._semanticConfig && "setSemanticConfig" in this._codeExecutor) {
+          (this._codeExecutor as any).setSemanticConfig(this._semanticConfig);
+        }
       } else if (typeof config === "function") {
         // Custom function - wrap it
         this._customCodeExecutor = config;
@@ -194,7 +210,8 @@ export class MCPClient extends BaseMCPClient {
           try {
             this._codeExecutor = new VMCodeExecutor(
               this,
-              this._executorOptions as VMExecutorOptions
+              this._executorOptions as VMExecutorOptions,
+              this._semanticConfig
             );
           } catch (error) {
             throw new Error(
@@ -203,14 +220,15 @@ export class MCPClient extends BaseMCPClient {
             );
           }
         } else {
-          this._codeExecutor = new E2BCodeExecutor(this, opts);
+          this._codeExecutor = new E2BCodeExecutor(this, opts, this._semanticConfig);
         }
       } else {
         // Default to VM, but fall back to E2B if VM is not available
         try {
           this._codeExecutor = new VMCodeExecutor(
             this,
-            this._executorOptions as VMExecutorOptions
+            this._executorOptions as VMExecutorOptions,
+            this._semanticConfig
           );
         } catch (error) {
           // VM not available (e.g., in Deno), try E2B fallback
@@ -226,7 +244,7 @@ export class MCPClient extends BaseMCPClient {
             this._codeExecutor = new E2BCodeExecutor(this, {
               ...e2bOpts,
               apiKey: e2bApiKey,
-            });
+            }, this._semanticConfig);
           } else {
             throw new Error(
               "VM executor is not available in this environment. " +

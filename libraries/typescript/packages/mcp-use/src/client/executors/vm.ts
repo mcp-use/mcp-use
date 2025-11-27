@@ -1,4 +1,8 @@
-import type { MCPClient, VMExecutorOptions } from "../../client.js";
+import type {
+  MCPClient,
+  SemanticSearchConfig,
+  VMExecutorOptions,
+} from "../../client.js";
 import { logger } from "../../logging.js";
 import { BaseCodeExecutor, type ExecutionResult } from "./base.js";
 
@@ -87,8 +91,12 @@ export class VMCodeExecutor extends BaseCodeExecutor {
   private defaultTimeout: number;
   private memoryLimitMb?: number;
 
-  constructor(client: MCPClient, options?: VMExecutorOptions) {
-    super(client);
+  constructor(
+    client: MCPClient,
+    options?: VMExecutorOptions,
+    semanticConfig?: SemanticSearchConfig
+  ) {
+    super(client, semanticConfig);
     this.defaultTimeout = options?.timeoutMs ?? 30000;
     this.memoryLimitMb = options?.memoryLimitMb;
 

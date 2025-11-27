@@ -8,6 +8,7 @@ direct tool calls.
 
 import asyncio
 import io
+import os
 import re
 import time
 from contextlib import redirect_stderr, redirect_stdout
@@ -16,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 from mcp_use.logging import logger
 
 if TYPE_CHECKING:
-    from mcp_use.client.client import MCPClient
+    from mcp_use.client.client import MCPClient, SemanticSearchConfig
 
 
 class CodeExecutor:
@@ -34,6 +35,10 @@ class CodeExecutor:
         """
         self.client = client
         self._tool_cache: dict[str, dict[str, Any]] = {}
+        self._semantic_config: SemanticSearchConfig | None = getattr(
+            client, "_semantic_config", None
+        )
+        self._tool_embeddings_cache: dict[str, list[float]] = {}
 
     async def execute(self, code: str, timeout: float = 30.0) -> dict[str, Any]:
         """Execute Python code with access to MCP tools.
@@ -328,16 +333,22 @@ class CodeExecutor:
                 except Exception as e:
                     logger.error(f"Failed to list tools for server {server_name}: {e}")
 
-            # Filter by query if provided
+            # Filter by query using the configured search mode
             filtered_tools = all_tools
             if query:
-                filtered_tools = []
-                for tool_info in all_tools:
-                    tool_name_match = query_lower in tool_info["name"].lower()
-                    desc_match = query_lower in tool_info.get("description", "").lower()
-                    server_match = query_lower in tool_info["server"].lower()
-                    if tool_name_match or desc_match or server_match:
-                        filtered_tools.append(tool_info)
+                search_mode = (
+                    self._semantic_config.mode
+                    if self._semantic_config
+                    else "string_match"
+                )
+                
+                if search_mode == "fuzzy":
+                    filtered_tools = await self._fuzzy_search(all_tools, query)
+                elif search_mode == "embeddings":
+                    filtered_tools = await self._embeddings_search(all_tools, query)
+                else:
+                    # string_match (default)
+                    filtered_tools = self._string_match_search(all_tools, query)
 
             # Return metadata along with results
             return {
@@ -350,3 +361,191 @@ class CodeExecutor:
             }
 
         return search_tools
+
+    def _string_match_search(
+        self, tools: list[dict[str, Any]], query: str
+    ) -> list[dict[str, Any]]:
+        """String match search (default, naive search)."""
+        query_lower = query.lower()
+        filtered = []
+        for tool_info in tools:
+            tool_name_match = query_lower in tool_info["name"].lower()
+            desc_match = query_lower in tool_info.get("description", "").lower()
+            server_match = query_lower in tool_info["server"].lower()
+            if tool_name_match or desc_match or server_match:
+                filtered.append(tool_info)
+        return filtered
+
+    async def _fuzzy_search(
+        self, tools: list[dict[str, Any]], query: str
+    ) -> list[dict[str, Any]]:
+        """Fuzzy search using fuse.js (via thefuzz library)."""
+        try:
+            from thefuzz import fuzz, process
+        except ImportError:
+            raise ImportError(
+                "thefuzz is required for fuzzy search mode. Install it with: pip install thefuzz[speedup]"
+            )
+
+        # Use thefuzz to find best matches
+        tool_strings = [
+            f"{tool['name']} {tool.get('description', '')} {tool['server']}"
+            for tool in tools
+        ]
+        results = process.extract(
+            query, tool_strings, limit=len(tools), scorer=fuzz.token_sort_ratio
+        )
+
+        # Filter by threshold (similarity > 40%)
+        filtered = []
+        for tool, score, _ in results:
+            if score > 40:
+                # Find the tool that matches this string
+                tool_index = tool_strings.index(tool)
+                filtered.append(tools[tool_index])
+
+        return filtered
+
+    async def _embeddings_search(
+        self, tools: list[dict[str, Any]], query: str
+    ) -> list[dict[str, Any]]:
+        """Embeddings-based semantic search."""
+        # Check for OpenAI or Anthropic API keys
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        embeddings_url = (
+            self._semantic_config.embeddings_url if self._semantic_config else None
+        )
+
+        if not openai_api_key and not anthropic_api_key and not embeddings_url:
+            raise ValueError(
+                "Embeddings search mode requires either:\n"
+                "  - OPENAI_API_KEY environment variable, or\n"
+                "  - ANTHROPIC_API_KEY environment variable, or\n"
+                "  - embeddings_url in semantic config"
+            )
+
+        # Get query embedding
+        if openai_api_key:
+            query_embedding = await self._get_openai_embedding(query, openai_api_key)
+        elif embeddings_url:
+            query_embedding = await self._get_custom_embedding(query, embeddings_url)
+        else:
+            # Anthropic doesn't have direct embeddings API
+            raise ValueError(
+                "Anthropic API doesn't provide direct embeddings. "
+                "Please use embeddings_url in semantic config with an OpenAI-compatible embeddings API."
+            )
+
+        # Get or compute tool embeddings
+        tool_embeddings = await self._get_tool_embeddings(
+            tools, openai_api_key, embeddings_url
+        )
+
+        # Calculate cosine similarity and sort
+        scored_tools = []
+        for tool, tool_embedding in zip(tools, tool_embeddings):
+            similarity = self._cosine_similarity(query_embedding, tool_embedding)
+            scored_tools.append((tool, similarity))
+
+        # Sort by similarity (highest first)
+        scored_tools.sort(key=lambda x: x[1], reverse=True)
+
+        # Return tools with similarity > 0.3 (threshold)
+        return [tool for tool, similarity in scored_tools if similarity > 0.3]
+
+    async def _get_openai_embedding(
+        self, text: str, api_key: str
+    ) -> list[float]:
+        """Get OpenAI embedding."""
+        try:
+            import httpx
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.openai.com/v1/embeddings",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {api_key}",
+                    },
+                    json={"model": "text-embedding-3-small", "input": text},
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data["data"][0]["embedding"]
+        except Exception as e:
+            raise RuntimeError(f"Failed to get OpenAI embedding: {e}") from e
+
+    async def _get_custom_embedding(
+        self, text: str, url: str
+    ) -> list[float]:
+        """Get embedding from custom OpenAI-compatible API."""
+        try:
+            import httpx
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    headers={"Content-Type": "application/json"},
+                    json={"model": "text-embedding-3-small", "input": text},
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+                # Support both OpenAI format and direct array format
+                if "data" in data and isinstance(data["data"], list) and data["data"]:
+                    return data["data"][0].get("embedding", data["data"][0])
+                elif "embedding" in data:
+                    return data["embedding"]
+                elif isinstance(data, list):
+                    return data
+                raise ValueError("Unexpected embeddings API response format")
+        except Exception as e:
+            raise RuntimeError(f"Failed to get custom embedding: {e}") from e
+
+    async def _get_tool_embeddings(
+        self,
+        tools: list[dict[str, Any]],
+        openai_api_key: str | None,
+        embeddings_url: str | None,
+    ) -> list[list[float]]:
+        """Get embeddings for all tools (with caching)."""
+        embeddings = []
+
+        for tool in tools:
+            # Create cache key from tool name and description
+            cache_key = f"{tool['name']}:{tool.get('description', '')}"
+
+            if cache_key in self._tool_embeddings_cache:
+                embeddings.append(self._tool_embeddings_cache[cache_key])
+                continue
+
+            # Create text representation for embedding
+            tool_text = f"{tool['name']} {tool.get('description', '')} {tool['server']}".strip()
+
+            if openai_api_key:
+                embedding = await self._get_openai_embedding(tool_text, openai_api_key)
+            elif embeddings_url:
+                embedding = await self._get_custom_embedding(tool_text, embeddings_url)
+            else:
+                raise ValueError("No embedding provider available")
+
+            self._tool_embeddings_cache[cache_key] = embedding
+            embeddings.append(embedding)
+
+        return embeddings
+
+    def _cosine_similarity(self, a: list[float], b: list[float]) -> float:
+        """Calculate cosine similarity between two vectors."""
+        if len(a) != len(b):
+            raise ValueError("Vectors must have the same length")
+
+        dot_product = sum(x * y for x, y in zip(a, b))
+        norm_a = sum(x * x for x in a) ** 0.5
+        norm_b = sum(x * x for x in b) ** 0.5
+
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+
+        return dot_product / (norm_a * norm_b)

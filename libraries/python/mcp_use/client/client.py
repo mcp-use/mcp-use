@@ -7,7 +7,7 @@ and sessions from configuration.
 
 import json
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 
@@ -20,6 +20,44 @@ from mcp_use.telemetry.telemetry import telemetry
 
 if TYPE_CHECKING:
     from mcp_use.client.code_executor import CodeExecutor
+
+SemanticSearchMode = Literal["string_match", "fuzzy", "embeddings"]
+
+
+class SemanticSearchConfig:
+    """Configuration for semantic search in code mode."""
+
+    def __init__(
+        self,
+        mode: SemanticSearchMode = "string_match",
+        embeddings_url: str | None = None,
+    ):
+        """Initialize semantic search configuration.
+
+        Args:
+            mode: Search mode to use. Defaults to "string_match".
+            embeddings_url: URL for embeddings API (required for embeddings mode if OpenAI/Anthropic env vars not set).
+        """
+        self.mode = mode
+        self.embeddings_url = embeddings_url
+
+
+class CodeModeConfig:
+    """Configuration for code mode."""
+
+    def __init__(
+        self,
+        enabled: bool = True,
+        semantic: SemanticSearchConfig | None = None,
+    ):
+        """Initialize code mode configuration.
+
+        Args:
+            enabled: Whether code mode is enabled.
+            semantic: Semantic search configuration.
+        """
+        self.enabled = enabled
+        self.semantic = semantic
 
 
 class MCPClient:
@@ -40,7 +78,7 @@ class MCPClient:
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
-        code_mode: bool = False,
+        code_mode: bool | CodeModeConfig = False,
         verify: bool | None = True,
     ) -> None:
         """Initialize a new MCP client.
@@ -51,7 +89,7 @@ class MCPClient:
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
             sampling_callback: Optional sampling callback function.
-            code_mode: Whether to enable code execution mode for tools.
+            code_mode: Whether to enable code execution mode for tools, or a CodeModeConfig object.
         """
         self.config: dict[str, Any] = {}
         self.allowed_servers: list[str] = allowed_servers
@@ -63,7 +101,18 @@ class MCPClient:
         self.elicitation_callback = elicitation_callback
         self.message_handler = message_handler
         self.logging_callback = logging_callback
-        self.code_mode = code_mode
+        
+        # Handle code_mode config
+        if isinstance(code_mode, bool):
+            self.code_mode = code_mode
+            self._semantic_config: SemanticSearchConfig | None = None
+        elif isinstance(code_mode, CodeModeConfig):
+            self.code_mode = code_mode.enabled
+            self._semantic_config = code_mode.semantic
+        else:
+            self.code_mode = False
+            self._semantic_config = None
+            
         self._code_executor: CodeExecutor | None = None
         # Add default logging middleware if no middleware provided, or prepend it to existing middleware
         default_middleware = [default_logging_middleware]
@@ -471,6 +520,9 @@ class MCPClient:
             from mcp_use.client.code_executor import CodeExecutor
 
             self._code_executor = CodeExecutor(self)
+            # Set semantic config if available
+            if self._semantic_config:
+                self._code_executor._semantic_config = self._semantic_config
 
         return await self._code_executor.execute(code, timeout)
 
