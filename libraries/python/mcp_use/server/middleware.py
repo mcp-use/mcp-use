@@ -4,6 +4,9 @@ import json
 import threading
 import time
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.syntax import Syntax
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
@@ -11,14 +14,19 @@ from starlette.responses import Response
 # Thread-local storage for MCP method info
 _thread_local = threading.local()
 
+# Rich console for formatted output
+_console = Console()
+CODE_THEME = "nord"
+
 
 class MCPLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware that extracts MCP method information from JSON-RPC requests."""
 
-    def __init__(self, app, debug_level: int = 0, mcp_path: str = "/mcp"):
+    def __init__(self, app, debug_level: int = 0, mcp_path: str = "/mcp", pretty_print_jsonrpc: bool = False):
         super().__init__(app)
         self.debug_level = debug_level
         self.mcp_path = mcp_path
+        self.pretty_print_jsonrpc = pretty_print_jsonrpc
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Only process POST requests to the MCP endpoint
@@ -88,29 +96,49 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         self, request: Request, method_info: dict, body_bytes: bytes, response: Response, start_time: float
     ):
         """Log detailed debug information."""
-        import logging
-
-        logger = logging.getLogger("mcp.debug")
-
         duration_ms = (time.time() - start_time) * 1000
+        display = method_info.get("display", "unknown")
 
-        # Log request (always in debug mode)
-        logger.debug(f"JSON-RPC Request: {body_bytes.decode('utf-8')}")
+        # Get raw request text
+        request_text = body_bytes.decode("utf-8", errors="replace")
 
-        # Log response (always in debug mode)
-        if hasattr(response, "body") and response.body:
-            logger.debug(f"JSON-RPC Response: {response.body.decode('utf-8')}")
+        if self.pretty_print_jsonrpc:
+            # Pretty print with Rich panels
+            try:
+                request_json = json.loads(request_text)
+                request_formatted = json.dumps(request_json, indent=2)
+            except json.JSONDecodeError:
+                request_formatted = request_text
+
+            syntax = Syntax(request_formatted, "json", theme=CODE_THEME)
+            _console.print(
+                Panel(
+                    syntax,
+                    title=f"[bold]{display}[/] Request",
+                    title_align="left",
+                    subtitle=f"{duration_ms:.1f}ms",
+                )
+            )
+
+            # Format and print response if available
+            if hasattr(response, "body") and response.body:
+                response_text = response.body.decode("utf-8", errors="replace")
+                try:
+                    response_json = json.loads(response_text)
+                    response_formatted = json.dumps(response_json, indent=2)
+                except json.JSONDecodeError:
+                    response_formatted = response_text
+                syntax = Syntax(response_formatted, "json", theme=CODE_THEME, background_color="dim")
+                _console.print(Panel(syntax, title=f"[bold cyan]{display}[/] Response", title_align="left"))
         else:
-            logger.debug("JSON-RPC Response: [streaming response]")
-
-        logger.debug(f"Duration: {duration_ms:.1f}ms")
+            # Plain text logging
+            print(f"\033[36mMCP:\033[0m  [{display}] Request ({duration_ms:.1f}ms): {request_text}")
+            if hasattr(response, "body") and response.body:
+                response_text = response.body.decode("utf-8", errors="replace")
+                print(f"\033[36mMCP:\033[0m  [{display}] Response: {response_text}")
 
     async def _log_access_info(self, request: Request, method_info: dict, response: Response, start_time: float):
         """Log access information with MCP method stub."""
-        import logging
-
-        logger = logging.getLogger("uvicorn.access")
-
         client_addr = f"{request.client.host}:{request.client.port}" if request.client else "unknown"
         method = request.method
         path = request.url.path
@@ -125,8 +153,8 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         # Pad HTTP method to align MCP methods
         padded_method = f"{method:<4}"  # Left-align with 4 characters width
 
-        # Log in the same format as Uvicorn access logs with log level
-        logger.info(f'{client_addr} - "{padded_method} {enhanced_path} HTTP/1.1" {status_code}')
+        # Print with MCP: prefix (green like INFO) - 2 spaces to align with "INFO: "
+        print(f'\033[32mMCP:\033[0m  {client_addr} - "{padded_method} {enhanced_path} HTTP/1.1" {status_code}')
 
     @staticmethod
     def get_method_info() -> dict | None:

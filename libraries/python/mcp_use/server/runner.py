@@ -35,7 +35,11 @@ class ServerRunner:
             port=port,
             log_level=self.server.settings.log_level.lower(),
             reload=reload,
-            log_config=get_logging_config(debug_level=self.server.debug_level),
+            log_config=get_logging_config(
+                debug_level=self.server.debug_level,
+                show_inspector_logs=self.server.show_inspector_logs,
+                inspector_path=self.server.inspector_path,
+            ),
             timeout_graceful_shutdown=0,  # Disable graceful shutdown
         )
 

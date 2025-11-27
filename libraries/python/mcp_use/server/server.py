@@ -23,6 +23,8 @@ class MCPServer(FastMCP):
         docs_path: str | None = "/docs",
         inspector_path: str | None = "/inspector",
         openmcp_path: str | None = "/openmcp.json",
+        show_inspector_logs: bool = False,
+        pretty_print_jsonrpc: bool = False,
     ):
         self._start_time = time.time()
         super().__init__(name=name or "mcp-use server", instructions=instructions)
@@ -44,6 +46,8 @@ class MCPServer(FastMCP):
         self.docs_path = docs_path
         self.inspector_path = inspector_path
         self.openmcp_path = openmcp_path
+        self.show_inspector_logs = show_inspector_logs
+        self.pretty_print_jsonrpc = pretty_print_jsonrpc
 
         # Add dev routes only in DEBUG=1 and above
         if self.debug_level >= 1:
@@ -96,7 +100,12 @@ class MCPServer(FastMCP):
         app = super().streamable_http_app()
 
         # Add MCP logging middleware
-        app.add_middleware(MCPLoggingMiddleware, debug_level=self.debug_level, mcp_path=self.mcp_path)
+        app.add_middleware(
+            MCPLoggingMiddleware,
+            debug_level=self.debug_level,
+            mcp_path=self.mcp_path,
+            pretty_print_jsonrpc=self.pretty_print_jsonrpc,
+        )
 
         return app
 

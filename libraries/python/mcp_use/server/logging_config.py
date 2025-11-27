@@ -1,14 +1,36 @@
 """Configurable logging setup for MCP servers."""
 
+import logging
+
 from mcp_use.server.formatters import ColoredFormatter, MCPAccessFormatter, MCPErrorFormatter
 
 
-def setup_logging(debug_level: int = 0, log_level: str = "INFO") -> dict:
+class InspectorLogFilter(logging.Filter):
+    """Filter that hides inspector-related access logs."""
+
+    def __init__(self, inspector_path: str = "/inspector"):
+        super().__init__()
+        self.inspector_path = inspector_path
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Check if args contain a path that starts with inspector_path
+        if hasattr(record, "args") and len(record.args) >= 3:
+            path = record.args[2]
+            if isinstance(path, str) and self.inspector_path in path:
+                return False
+        return True
+
+
+def setup_logging(
+    debug_level: int = 0, log_level: str = "INFO", show_inspector_logs: bool = False, inspector_path: str = "/inspector"
+) -> dict:
     """Set up logging configuration for MCP server.
 
     Args:
         debug_level: Debug level (0: production, 1: debug+routes, 2: debug+routes+jsonrpc)
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
+        show_inspector_logs: Whether to show inspector-related access logs (default: False)
+        inspector_path: Path prefix for inspector routes
 
     Returns:
         Uvicorn logging configuration dict
@@ -42,9 +64,24 @@ def setup_logging(debug_level: int = 0, log_level: str = "INFO") -> dict:
     if debug_level >= 2:
         loggers["mcp.debug"] = {"handlers": ["debug"], "level": "DEBUG", "propagate": False}
 
+    # Build filters
+    filters = {}
+    if not show_inspector_logs:
+        filters["inspector_filter"] = {"()": InspectorLogFilter, "inspector_path": inspector_path}
+
+    # Build access handler with optional filter
+    access_handler = {
+        "formatter": "access",
+        "class": "logging.StreamHandler",
+        "stream": "ext://sys.stdout",
+    }
+    if not show_inspector_logs:
+        access_handler["filters"] = ["inspector_filter"]
+
     return {
         "version": 1,
         "disable_existing_loggers": False,
+        "filters": filters,
         "formatters": {
             "access": {
                 "()": MCPAccessFormatter,
@@ -61,11 +98,7 @@ def setup_logging(debug_level: int = 0, log_level: str = "INFO") -> dict:
             },
         },
         "handlers": {
-            "access": {
-                "formatter": "access",
-                "class": "logging.StreamHandler",
-                "stream": "ext://sys.stdout",
-            },
+            "access": access_handler,
             "error": {
                 "formatter": "error",
                 "class": "logging.StreamHandler",
