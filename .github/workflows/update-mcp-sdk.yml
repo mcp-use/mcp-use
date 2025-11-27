@@ -176,9 +176,7 @@ jobs:
             --base canary \
             --head "$BRANCH_NAME" \
             --title "chore(deps): update @modelcontextprotocol/sdk to ${LATEST_VERSION}" \
-            --body "$PR_BODY" \
-            --label "dependencies" \
-            --label "automated"
+            --body "$PR_BODY"
           
           echo "✅ Created Pull Request: $BRANCH_NAME → canary"
 
