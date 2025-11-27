@@ -391,8 +391,6 @@ export class McpServer {
    * @returns Array of URLs to add to CSP resource_domains
    */
   private getCSPUrls(): string[] {
-    console.log((globalThis as any).Deno.env.get("CSP_URLS"));
-
     const cspUrlsEnv = getEnv("CSP_URLS");
     if (!cspUrlsEnv) {
       console.log("[CSP] No CSP_URLS environment variable found");
