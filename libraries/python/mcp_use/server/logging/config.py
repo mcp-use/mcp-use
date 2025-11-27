@@ -2,7 +2,7 @@
 
 import logging
 
-from mcp_use.server.formatters import ColoredFormatter, MCPAccessFormatter, MCPErrorFormatter
+from mcp_use.server.logging.formatters import ColoredFormatter, MCPAccessFormatter, MCPErrorFormatter
 
 
 class InspectorLogFilter(logging.Filter):

@@ -5,6 +5,8 @@ import re
 
 from uvicorn.logging import AccessFormatter
 
+from mcp_use.server.logging.state import get_method_info
+
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter with ANSI color codes matching the documentation format."""
@@ -54,9 +56,7 @@ class MCPAccessFormatter(AccessFormatter):
 
             if "/mcp" in path and method == "POST":  # TODO: Make this configurable
                 # Get MCP method info from thread-local storage
-                from mcp_use.server.middleware import MCPLoggingMiddleware
-
-                mcp_info = MCPLoggingMiddleware.get_method_info()
+                mcp_info = get_method_info()
                 if mcp_info:
                     session_id = mcp_info.get("session_id")
                     display = mcp_info.get("display", "unknown")

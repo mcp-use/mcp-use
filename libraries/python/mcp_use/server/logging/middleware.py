@@ -1,7 +1,6 @@
-"""Middleware for MCP-specific logging."""
+"""MCP logging middleware."""
 
 import json
-import threading
 import time
 
 from rich.console import Console
@@ -11,8 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-# Thread-local storage for MCP method info
-_thread_local = threading.local()
+from mcp_use.server.logging.state import get_method_info, set_method_info
 
 # Rich console for formatted output
 _console = Console()
@@ -41,7 +39,7 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
 
         # Store method info for access logger
         if method_info:
-            _thread_local.mcp_method_info = method_info
+            set_method_info(method_info)
 
         # Create new request with body
         async def receive():
@@ -159,4 +157,4 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
     @staticmethod
     def get_method_info() -> dict | None:
         """Get method info for current thread."""
-        return getattr(_thread_local, "mcp_method_info", None)
+        return get_method_info()

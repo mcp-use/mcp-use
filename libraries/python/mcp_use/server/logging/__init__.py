@@ -1,10 +1,9 @@
-"""Simplified logging system for MCP servers."""
+"""Logging system for MCP servers."""
 
-from mcp_use.server.logging_config import setup_logging
-from mcp_use.server.middleware import MCPLoggingMiddleware
-
-# Backward compatibility
-MCPLoggingMiddleware = MCPLoggingMiddleware
+from mcp_use.server.logging.config import setup_logging
+from mcp_use.server.logging.formatters import ColoredFormatter, MCPAccessFormatter, MCPErrorFormatter
+from mcp_use.server.logging.middleware import MCPLoggingMiddleware
+from mcp_use.server.logging.state import get_method_info, set_method_info
 
 
 def get_logging_config(
@@ -27,3 +26,15 @@ def get_logging_config(
 
 # Legacy constant for backward compatibility
 MCP_LOGGING_CONFIG = get_logging_config()
+
+__all__ = [
+    "MCPLoggingMiddleware",
+    "get_logging_config",
+    "get_method_info",
+    "set_method_info",
+    "setup_logging",
+    "ColoredFormatter",
+    "MCPAccessFormatter",
+    "MCPErrorFormatter",
+    "MCP_LOGGING_CONFIG",
+]
