@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.8.1",
     "mcp-use": "1.6.1"
   },
-  "changesets": []
+  "changesets": [
+    "whole-mugs-dig"
+  ]
 }
