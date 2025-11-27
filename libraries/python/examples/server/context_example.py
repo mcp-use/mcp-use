@@ -20,6 +20,7 @@ server = MCPServer(
     version="1.0.0",
     instructions="A server demonstrating all Context features",
     debug=True,
+    pretty_print_jsonrpc=True,
 )
 
 
