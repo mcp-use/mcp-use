@@ -145,7 +145,7 @@
     "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/sdk": "1.22.0",
     "@scarf/scarf": "^1.4.0",
-    "ai": "^4.3.19",
+    "ai": "^5.0.52",
     "chalk": "^5.6.2",
     "cli-highlight": "^2.1.11",
     "commander": "^14.0.1",
