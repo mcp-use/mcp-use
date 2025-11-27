@@ -51,15 +51,35 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         response = await call_next(request_with_body)
 
+        # Capture response body for logging (need to read and reconstruct)
+        response_body: bytes | None = None
+        if self.debug_level >= 2 and method_info:
+            response_body = b"".join([chunk async for chunk in response.body_iterator])
+            # Reconstruct response with captured body
+            response = Response(
+                content=response_body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type,
+            )
+
         # Log access info with MCP method stub
         if method_info:
             await self._log_access_info(request, method_info, response, start_time)
 
         # Log debug info only in DEBUG=2 mode
         if self.debug_level >= 2 and method_info:
-            await self._log_debug_info(request, method_info, body_bytes, response, start_time)
+            await self._log_debug_info(request, method_info, body_bytes, response_body, start_time)
 
         return response
+
+    def _extract_sse_data(self, text: str) -> str:
+        """Extract JSON data from SSE format (event: message\\ndata: {...})."""
+        for line in text.split("\n"):
+            line = line.strip()
+            if line.startswith("data:"):
+                return line[5:].strip()
+        return text
 
     def _parse_mcp_method(self, body_bytes: bytes) -> dict | None:
         """Parse JSON-RPC body to extract MCP method information."""
@@ -91,14 +111,19 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
             return None
 
     async def _log_debug_info(
-        self, request: Request, method_info: dict, body_bytes: bytes, response: Response, start_time: float
+        self,
+        request: Request,
+        method_info: dict,
+        request_body: bytes,
+        response_body: bytes | None,
+        start_time: float,
     ):
         """Log detailed debug information."""
         duration_ms = (time.time() - start_time) * 1000
         display = method_info.get("display", "unknown")
 
         # Get raw request text
-        request_text = body_bytes.decode("utf-8", errors="replace")
+        request_text = request_body.decode("utf-8", errors="replace")
 
         if self.pretty_print_jsonrpc:
             # Pretty print with Rich panels
@@ -119,22 +144,20 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
             )
 
             # Format and print response if available
-            body = getattr(response, "body", None)
-            if body is not None and isinstance(body, bytes):
-                response_text = body.decode("utf-8", errors="replace")
+            if response_body:
+                response_text = self._extract_sse_data(response_body.decode("utf-8", errors="replace"))
                 try:
                     response_json = json.loads(response_text)
                     response_formatted = json.dumps(response_json, indent=2)
                 except json.JSONDecodeError:
                     response_formatted = response_text
-                syntax = Syntax(response_formatted, "json", theme=CODE_THEME, background_color="dim")
+                syntax = Syntax(response_formatted, "json", theme=CODE_THEME)
                 _console.print(Panel(syntax, title=f"[bold cyan]{display}[/] Response", title_align="left"))
         else:
             # Plain text logging
             print(f"\033[36mMCP:\033[0m  [{display}] Request ({duration_ms:.1f}ms): {request_text}")
-            body = getattr(response, "body", None)
-            if body is not None and isinstance(body, bytes):
-                response_text = body.decode("utf-8", errors="replace")
+            if response_body:
+                response_text = self._extract_sse_data(response_body.decode("utf-8", errors="replace"))
                 print(f"\033[36mMCP:\033[0m  [{display}] Response: {response_text}")
 
     async def _log_access_info(self, request: Request, method_info: dict, response: Response, start_time: float):
