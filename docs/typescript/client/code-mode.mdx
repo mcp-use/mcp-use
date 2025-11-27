@@ -93,6 +93,35 @@ const client = new MCPClient(
 );
 ```
 
+### Semantic Search Configuration
+
+Configure how `search_tools` finds relevant tools:
+
+```typescript
+const client = new MCPClient(
+  {
+    /* server config */
+  },
+  {
+    codeMode: {
+      enabled: true,
+      semantic: {
+        mode: "embeddings", // "string_match" (default), "fuzzy", or "embeddings"
+        embeddingsUrl: "https://api.example.com/v1/embeddings", // Optional: for embeddings mode
+      },
+    },
+  }
+);
+```
+
+**Search Modes:**
+
+- **`string_match`** (default): Simple substring matching - fast, no dependencies
+- **`fuzzy`**: Fuzzy string matching using `fuse.js` - better for typos and partial matches
+  - Requires: `yarn add fuse.js`
+- **`embeddings`**: Semantic search using embeddings - best for semantic similarity
+  - Requires: `OPENAI_API_KEY` environment variable OR `embeddingsUrl` pointing to OpenAI-compatible API
+
 ## Architecture
 
 Code Mode uses a layered architecture to provide flexible code execution with MCP tool access:
@@ -453,6 +482,90 @@ console.log("Available servers:", __tool_namespaces);
 // ["github", "filesystem", "slack"]
 ```
 
+### Semantic Search Modes
+
+The `search_tools` function supports different search modes for finding relevant tools:
+
+#### String Match (Default)
+
+Simple substring matching - fast and requires no dependencies:
+
+```typescript
+const client = new MCPClient(config, {
+  codeMode: {
+    enabled: true,
+    semantic: {
+      mode: "string_match", // Default
+    },
+  },
+});
+```
+
+**Example:**
+```javascript
+// Finds tools containing "repo" or "list" in name/description
+const result = await search_tools("repo list");
+// Returns: list_repositories, search_repositories, list_repos, etc.
+```
+
+#### Fuzzy Search
+
+Fuzzy string matching for better handling of typos and partial matches:
+
+```typescript
+const client = new MCPClient(config, {
+  codeMode: {
+    enabled: true,
+    semantic: {
+      mode: "fuzzy",
+    },
+  },
+});
+```
+
+**Requirements:** `yarn add fuse.js`
+
+**Example:**
+```javascript
+// Finds tools even with typos or partial matches
+const result = await search_tools("repo list repositories");
+// Better matches for: list_repositories, search_repositories
+```
+
+#### Embeddings Search
+
+Semantic search using embeddings for finding tools by meaning:
+
+```typescript
+const client = new MCPClient(config, {
+  codeMode: {
+    enabled: true,
+    semantic: {
+      mode: "embeddings",
+      // Option 1: Use OpenAI API (requires OPENAI_API_KEY env var)
+      // embeddingsUrl: undefined
+      
+      // Option 2: Use custom OpenAI-compatible API
+      embeddingsUrl: "https://api.example.com/v1/embeddings",
+    },
+  },
+});
+```
+
+**Requirements:**
+- `OPENAI_API_KEY` environment variable, OR
+- `embeddingsUrl` pointing to OpenAI-compatible embeddings API
+
+**Example:**
+```javascript
+// Finds semantically similar tools even without exact keyword matches
+const result = await search_tools("repo list repositories");
+// Returns: list_repositories, search_repositories, list_repos
+// Even if they don't contain all the exact words
+```
+
+**Note:** Embeddings are cached per tool to improve performance on subsequent searches.
+
 ### Resource Cleanup
 
 Always clean up resources when done:
@@ -543,6 +656,17 @@ interface CodeModeConfig {
 
   // Executor-specific options (type-safe based on executor choice)
   executorOptions?: VMExecutorOptions | E2BExecutorOptions;
+
+  // Semantic search configuration for search_tools
+  semantic?: SemanticSearchConfig;
+}
+
+interface SemanticSearchConfig {
+  // Search mode: "string_match" (default), "fuzzy", or "embeddings"
+  mode?: "string_match" | "fuzzy" | "embeddings";
+
+  // URL for embeddings API (required for embeddings mode if OPENAI_API_KEY not set)
+  embeddingsUrl?: string;
 }
 
 // VM executor options

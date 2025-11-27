@@ -234,12 +234,27 @@ return {"renamed": len(file_list), "total_files": len(lines)}
 
 ### MCPClient
 
-#### `__init__(code_mode=True)`
+#### `__init__(code_mode=True | CodeModeConfig)`
 
 ```python
+from mcp_use.client.client import CodeModeConfig, SemanticSearchConfig
+
+# Simple boolean (defaults to string_match search)
 client = MCPClient(
     config="config.json",
-    code_mode=True  # Enable code execution mode
+    code_mode=True
+)
+
+# With semantic search configuration
+client = MCPClient(
+    config="config.json",
+    code_mode=CodeModeConfig(
+        enabled=True,
+        semantic=SemanticSearchConfig(
+            mode="embeddings",  # "string_match", "fuzzy", or "embeddings"
+            embeddings_url="https://api.example.com/v1/embeddings"  # Optional
+        )
+    )
 )
 ```
 
@@ -259,13 +274,21 @@ Execute Python code with MCP tool access.
 
 #### `search_tools(query: str = "", detail_level: str = "full")`
 
-Search available tools across all servers.
+Search available tools across all servers using the configured search mode.
 
 **Returns:** Dictionary with:
 - `meta`: Dictionary containing `total_tools`, `namespaces`, and `result_count`
 - `results`: List of tool information dictionaries matching the query
 
 **Detail levels:** `"names"`, `"descriptions"`, `"full"`
+
+**Search Modes:**
+
+- **`string_match`** (default): Simple substring matching - fast, no dependencies
+- **`fuzzy`**: Fuzzy string matching using `thefuzz` - better for typos
+  - Requires: `pip install thefuzz[speedup]`
+- **`embeddings`**: Semantic search using embeddings - best for semantic similarity
+  - Requires: `OPENAI_API_KEY` environment variable OR `embeddings_url` in config
 
 ## What's Available in Code
 
@@ -373,6 +396,54 @@ Additional instructions...
 - [Anthropic: Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
 - [Cloudflare: Building AI Agents](https://blog.cloudflare.com/building-ai-agents-with-workers-ai-and-cloudflare-workers/)
 - [UTCP: Code Mode Library](https://github.com/universal-tool-calling-protocol/code-mode)
+
+## Semantic Search Configuration
+
+Configure how `search_tools` finds relevant tools:
+
+```python
+from mcp_use.client.client import CodeModeConfig, SemanticSearchConfig
+
+# String match (default) - simple substring matching
+client = MCPClient(
+    config="config.json",
+    code_mode=CodeModeConfig(
+        enabled=True,
+        semantic=SemanticSearchConfig(mode="string_match")
+    )
+)
+
+# Fuzzy search - better for typos and partial matches
+client = MCPClient(
+    config="config.json",
+    code_mode=CodeModeConfig(
+        enabled=True,
+        semantic=SemanticSearchConfig(mode="fuzzy")
+    )
+)
+# Requires: pip install thefuzz[speedup]
+
+# Embeddings search - semantic similarity
+client = MCPClient(
+    config="config.json",
+    code_mode=CodeModeConfig(
+        enabled=True,
+        semantic=SemanticSearchConfig(
+            mode="embeddings",
+            embeddings_url="https://api.example.com/v1/embeddings"  # Optional
+        )
+    )
+)
+# Requires: OPENAI_API_KEY env var OR embeddings_url
+```
+
+**Example Usage:**
+
+```python
+# With embeddings mode, semantic queries work better
+result = await client.search_tools("repo list repositories")
+# Returns semantically similar tools even without exact keyword matches
+```
 
 ## See Also
 
