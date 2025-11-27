@@ -49,7 +49,12 @@ export function ServerDetail() {
     setIsExecuting(true);
     try {
       const inputArgs = JSON.parse(toolInput);
-      const result = await connection.callTool(toolName, inputArgs);
+      // Use a 10 minute timeout for tool calls, as tools may trigger sampling
+      // which can take a long time (waiting for LLM responses or human input)
+      const result = await connection.callTool(toolName, inputArgs, {
+        timeout: 600000, // 10 minutes
+        resetTimeoutOnProgress: true,
+      });
       setToolResult({
         tool: toolName,
         input: inputArgs,

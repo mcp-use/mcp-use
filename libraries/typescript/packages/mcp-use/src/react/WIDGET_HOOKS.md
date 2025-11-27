@@ -126,7 +126,7 @@ const MyWidget: React.FC = () => {
 ```tsx
 import React from 'react';
 import { z } from 'zod';
-import { useWidget } from 'mcp-use/react';
+import { useWidget, type WidgetMetadata } from 'mcp-use/react';
 
 const propSchema = z.object({
   city: z.string().describe('The city to display weather for'),
@@ -134,7 +134,7 @@ const propSchema = z.object({
   temperature: z.number().min(-20).max(50),
 });
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather for a city',
   inputs: propSchema,
 }

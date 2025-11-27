@@ -1,5 +1,70 @@
 # @mcp-use/cli
 
+## 2.3.1-canary.7
+
+### Patch Changes
+
+- Updated dependencies [94b9824]
+  - @mcp-use/inspector@0.7.1-canary.7
+  - mcp-use@1.5.1-canary.7
+
+## 2.3.1-canary.6
+
+### Patch Changes
+
+- Updated dependencies [a3295a0]
+  - mcp-use@1.5.1-canary.6
+  - @mcp-use/inspector@0.7.1-canary.6
+
+## 2.3.1-canary.5
+
+### Patch Changes
+
+- Updated dependencies [95fa604]
+  - mcp-use@1.5.1-canary.5
+  - @mcp-use/inspector@0.7.1-canary.5
+
+## 2.3.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [a93befb]
+  - mcp-use@1.5.1-canary.4
+  - @mcp-use/inspector@0.7.1-canary.4
+
+## 2.3.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [ccc2df3]
+  - mcp-use@1.5.1-canary.3
+  - @mcp-use/inspector@0.7.1-canary.3
+
+## 2.3.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [e5e8e1b]
+  - mcp-use@1.5.1-canary.2
+  - @mcp-use/inspector@0.7.1-canary.2
+
+## 2.3.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [4ca7772]
+  - mcp-use@1.5.1-canary.1
+  - @mcp-use/inspector@0.7.1-canary.1
+
+## 2.3.1-canary.0
+
+### Patch Changes
+
+- 12a88c7: fix versions
+- Updated dependencies [12a88c7]
+  - @mcp-use/inspector@0.7.1-canary.0
+  - mcp-use@1.5.1-canary.0
+
 ## 2.3.0
 
 ### Minor Changes
@@ -388,14 +453,6 @@
 - Updated dependencies [fc64bd7]
   - @mcp-use/inspector@0.7.0-canary.1
   - mcp-use@1.5.0-canary.1
-
-## 2.2.6-canary.0
-
-### Patch Changes
-
-- Updated dependencies [abf15ba]
-  - mcp-use@1.5.0-canary.0
-  - @mcp-use/inspector@0.6.2-canary.0
 
 ## 2.2.5
 

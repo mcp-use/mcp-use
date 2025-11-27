@@ -1,5 +1,84 @@
 # mcp-use
 
+## 1.5.1-canary.7
+
+### Patch Changes
+
+- 94b9824: **Bug Fixes:**
+  - Fixed auto-connect proxy fallback behavior - now properly retries with proxy when direct connection fails
+  - Fixed connection config updates not applying when connection already exists
+  - Fixed connection wrapper not re-rendering when proxy config changes
+
+  **Improvements:**
+  - Auto-switch (proxy fallback) now automatically enabled during auto-connect flow
+  - Added automatic navigation to home page after connection failures
+  - Improved error messages for connection failures
+  - Enhanced state cleanup on connection retry and failure scenarios
+
+- Updated dependencies [94b9824]
+  - @mcp-use/inspector@0.7.1-canary.7
+  - @mcp-use/cli@2.3.1-canary.7
+
+## 1.5.1-canary.6
+
+### Patch Changes
+
+- a3295a0: Add log of csp
+  - @mcp-use/cli@2.3.1-canary.6
+  - @mcp-use/inspector@0.7.1-canary.6
+
+## 1.5.1-canary.5
+
+### Patch Changes
+
+- 95fa604: Fix conenct domains prod
+  - @mcp-use/cli@2.3.1-canary.5
+  - @mcp-use/inspector@0.7.1-canary.5
+
+## 1.5.1-canary.4
+
+### Patch Changes
+
+- a93befb: Fix connect domains
+  - @mcp-use/cli@2.3.1-canary.4
+  - @mcp-use/inspector@0.7.1-canary.4
+
+## 1.5.1-canary.3
+
+### Patch Changes
+
+- ccc2df3: Add csp_urls
+  - @mcp-use/cli@2.3.1-canary.3
+  - @mcp-use/inspector@0.7.1-canary.3
+
+## 1.5.1-canary.2
+
+### Patch Changes
+
+- e5e8e1b: Fix export of sampling types
+  - @mcp-use/cli@2.3.1-canary.2
+  - @mcp-use/inspector@0.7.1-canary.2
+
+## 1.5.1-canary.1
+
+### Patch Changes
+
+- 4ca7772: - Fix session reinitialization by refactoring transport creation logic
+  - Add `autoCreateSessionOnInvalidId` config option (default: true) for seamless reconnection with non-compliant clients
+  - Add DEBUG mode logging with detailed request/response information via DEBUG environment variable
+  - Improve runtime detection for Deno and Node.js environments
+  - @mcp-use/cli@2.3.1-canary.1
+  - @mcp-use/inspector@0.7.1-canary.1
+
+## 1.5.1-canary.0
+
+### Patch Changes
+
+- 12a88c7: fix versions
+- Updated dependencies [12a88c7]
+  - @mcp-use/inspector@0.7.1-canary.0
+  - @mcp-use/cli@2.3.1-canary.0
+
 ## 1.5.0
 
 ### Minor Changes
@@ -393,17 +472,6 @@
 - Updated dependencies [fc64bd7]
   - @mcp-use/inspector@0.7.0-canary.1
   - @mcp-use/cli@2.3.0-canary.1
-
-## 1.5.0-canary.0
-
-### Minor Changes
-
-- abf15ba: Enhance search_tools to return metadata (total_tools, namespaces, result_count) along with results to provide better context for model decision-making
-
-### Patch Changes
-
-- @mcp-use/cli@2.2.6-canary.0
-- @mcp-use/inspector@0.6.2-canary.0
 
 ## 1.4.1
 

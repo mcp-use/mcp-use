@@ -2,10 +2,108 @@ import {
   McpServer as OfficialMcpServer,
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+  GetPromptResult,
+} from "@modelcontextprotocol/sdk/types.js";
+
+/**
+ * Options for the sample() function in tool context.
+ */
+export interface SampleOptions {
+  /**
+   * Timeout in milliseconds for the sampling request.
+   * Default: no timeout (Infinity) - waits indefinitely for the LLM response.
+   * Set this if you want to limit how long to wait for sampling.
+   */
+  timeout?: number;
+
+  /**
+   * Interval in milliseconds between progress notifications.
+   * Default: 5000 (5 seconds).
+   * Progress notifications are sent to the client to prevent timeout
+   * when the client has resetTimeoutOnProgress enabled.
+   */
+  progressIntervalMs?: number;
+
+  /**
+   * Optional callback called each time a progress notification is sent.
+   * Useful for logging or custom progress handling.
+   */
+  onProgress?: (progress: {
+    progress: number;
+    total?: number;
+    message: string;
+  }) => void;
+}
+
+/**
+ * Context object passed to tool callbacks.
+ * Provides access to sampling and progress reporting capabilities.
+ */
+export interface ToolContext {
+  /**
+   * Request sampling from the client's LLM with automatic progress notifications.
+   *
+   * Progress notifications are sent every 5 seconds (configurable) while waiting
+   * for the sampling response. This prevents client-side timeouts when the client
+   * has `resetTimeoutOnProgress: true` enabled.
+   *
+   * By default, there is no timeout - the function waits indefinitely for the
+   * LLM response. Set `options.timeout` to limit the wait time.
+   *
+   * @param params - Sampling parameters (messages, model preferences, etc.)
+   * @param options - Optional configuration for timeout and progress
+   * @returns The sampling result from the client's LLM
+   *
+   * @example
+   * ```typescript
+   * // Basic usage - waits indefinitely with automatic progress notifications
+   * const result = await ctx.sample({
+   *   messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+   * });
+   *
+   * // With timeout and custom progress handling
+   * const result = await ctx.sample(
+   *   { messages: [...] },
+   *   {
+   *     timeout: 120000, // 2 minute timeout
+   *     progressIntervalMs: 3000, // Report progress every 3 seconds
+   *     onProgress: ({ progress, message }) => console.log(message),
+   *   }
+   * );
+   * ```
+   */
+  sample: (
+    params: CreateMessageRequest["params"],
+    options?: SampleOptions
+  ) => Promise<CreateMessageResult>;
+
+  /**
+   * Send a progress notification to the client.
+   * Only available if the client requested progress updates for this tool call.
+   *
+   * @param progress - Current progress value (should increase with each call)
+   * @param total - Total progress value if known
+   * @param message - Optional message describing current progress
+   */
+  reportProgress?: (
+    progress: number,
+    total?: number,
+    message?: string
+  ) => Promise<void>;
+}
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
+
+// UUID generation helper (works in Node.js, Deno, and browsers)
+// Uses the Web Crypto API which is available globally
+function generateUUID(): string {
+  return (globalThis.crypto as any).randomUUID();
+}
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -145,6 +243,15 @@ export class McpServer {
   private registeredTools: string[] = [];
   private registeredPrompts: string[] = [];
   private registeredResources: string[] = [];
+  private buildId?: string;
+  private sessions = new Map<
+    string,
+    {
+      transport: any; // StreamableHTTPServerTransport
+      lastAccessedAt: number;
+    }
+  >();
+  private idleCleanupInterval?: NodeJS.Timeout;
 
   /**
    * Creates a new MCP server instance with Hono integration
@@ -181,6 +288,8 @@ export class McpServer {
           "X-Proxy-Token",
           "X-Target-URL",
         ],
+        // Expose mcp-session-id so browser clients can read it from responses
+        exposeHeaders: ["mcp-session-id"],
       })
     );
 
@@ -274,6 +383,30 @@ export class McpServer {
     }
     // Finally fall back to host:port
     return `http://${this.serverHost}:${this.serverPort}`;
+  }
+
+  /**
+   * Gets additional CSP URLs from environment variable
+   * Supports comma-separated list or single URL
+   * @returns Array of URLs to add to CSP resource_domains
+   */
+  private getCSPUrls(): string[] {
+    console.log((globalThis as any).Deno.env.get("CSP_URLS"));
+
+    const cspUrlsEnv = getEnv("CSP_URLS");
+    if (!cspUrlsEnv) {
+      console.log("[CSP] No CSP_URLS environment variable found");
+      return [];
+    }
+
+    // Split by comma and trim whitespace
+    const urls = cspUrlsEnv
+      .split(",")
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0);
+
+    console.log("[CSP] Parsed CSP URLs:", urls);
+    return urls;
   }
 
   /**
@@ -469,7 +602,131 @@ export class McpServer {
         annotations: toolDefinition.annotations,
         _meta: toolDefinition._meta,
       },
-      async (params: any) => {
+      async (params: any, extra?: any) => {
+        // Extract progress token from request metadata
+        const progressToken = extra?._meta?.progressToken;
+
+        // Create context object with sample method that automatically sends progress
+        const context: ToolContext = {
+          /**
+           * Request sampling from the client's LLM with automatic progress notifications.
+           *
+           * Progress notifications are sent every 5 seconds (configurable) while waiting
+           * for the sampling response. This prevents client-side timeouts when
+           * resetTimeoutOnProgress is enabled.
+           *
+           * @param params - Sampling parameters (messages, model preferences, etc.)
+           * @param options - Optional configuration
+           * @param options.timeout - Timeout in milliseconds (default: no timeout / Infinity)
+           * @param options.progressIntervalMs - Interval between progress notifications (default: 5000ms)
+           * @param options.onProgress - Optional callback called each time progress is reported
+           * @returns The sampling result from the client's LLM
+           */
+          sample: async (
+            sampleParams: CreateMessageRequest["params"],
+            options?: SampleOptions
+          ): Promise<CreateMessageResult> => {
+            const {
+              timeout,
+              progressIntervalMs = 5000,
+              onProgress,
+            } = options ?? {};
+
+            let progressCount = 0;
+            let completed = false;
+            let progressInterval: ReturnType<typeof setInterval> | null = null;
+
+            // Set up progress notifications if we have a progress token
+            if (progressToken && extra?.sendNotification) {
+              progressInterval = setInterval(async () => {
+                if (completed) return;
+
+                progressCount++;
+                const progressData = {
+                  progress: progressCount,
+                  total: undefined as number | undefined,
+                  message: `Waiting for LLM response... (${progressCount * Math.round(progressIntervalMs / 1000)}s elapsed)`,
+                };
+
+                // Call user's progress callback if provided
+                if (onProgress) {
+                  try {
+                    onProgress(progressData);
+                  } catch {
+                    // Ignore errors in progress callback
+                  }
+                }
+
+                // Send progress notification to client
+                try {
+                  await extra.sendNotification({
+                    method: "notifications/progress",
+                    params: {
+                      progressToken,
+                      progress: progressData.progress,
+                      total: progressData.total,
+                      message: progressData.message,
+                    },
+                  });
+                } catch {
+                  // Ignore errors - request might have completed
+                }
+              }, progressIntervalMs);
+            }
+
+            try {
+              // Create the sampling promise
+              const samplePromise = this.createMessage(sampleParams);
+
+              // If timeout is specified, race against it
+              if (timeout && timeout !== Infinity) {
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                  setTimeout(
+                    () =>
+                      reject(
+                        new Error(`Sampling timed out after ${timeout}ms`)
+                      ),
+                    timeout
+                  );
+                });
+                return await Promise.race([samplePromise, timeoutPromise]);
+              }
+
+              // No timeout - wait indefinitely
+              return await samplePromise;
+            } finally {
+              completed = true;
+              if (progressInterval) {
+                clearInterval(progressInterval);
+              }
+            }
+          },
+
+          /**
+           * Send a progress notification to the client.
+           * Only works if the client requested progress updates for this tool call.
+           */
+          reportProgress:
+            progressToken && extra?.sendNotification
+              ? async (progress: number, total?: number, message?: string) => {
+                  await extra.sendNotification({
+                    method: "notifications/progress",
+                    params: {
+                      progressToken,
+                      progress,
+                      total,
+                      message,
+                    },
+                  });
+                }
+              : undefined,
+        };
+
+        // Pass context as second parameter if callback accepts it
+        // Check if callback signature accepts 2 parameters
+        if (toolDefinition.cb.length >= 2) {
+          return await (toolDefinition.cb as any)(params, context);
+        }
         return await toolDefinition.cb(params);
       }
     );
@@ -526,6 +783,52 @@ export class McpServer {
     );
     this.registeredPrompts.push(promptDefinition.name);
     return this;
+  }
+
+  /**
+   * Request LLM sampling from connected clients.
+   *
+   * This method allows server tools to request LLM completions from clients
+   * that support the sampling capability. The client will handle model selection,
+   * user approval (human-in-the-loop), and return the generated response.
+   *
+   * @param params - Sampling request parameters including messages, model preferences, etc.
+   * @param options - Optional request options (timeouts, cancellation, etc.)
+   * @returns Promise resolving to the generated message from the client's LLM
+   *
+   * @example
+   * ```typescript
+   * // In a tool callback
+   * server.tool({
+   *   name: 'analyze-sentiment',
+   *   description: 'Analyze sentiment using LLM',
+   *   inputs: [{ name: 'text', type: 'string', required: true }],
+   *   cb: async (params, ctx) => {
+   *     const result = await ctx.sample({
+   *       messages: [{
+   *         role: 'user',
+   *         content: { type: 'text', text: `Analyze sentiment: ${params.text}` }
+   *       }],
+   *       modelPreferences: {
+   *         intelligencePriority: 0.8,
+   *         speedPriority: 0.5
+   *       }
+   *     });
+   *     return {
+   *       content: [{ type: 'text', text: result.content.text }]
+   *     };
+   *   }
+   * })
+   * ```
+   */
+  async createMessage(
+    params: CreateMessageRequest["params"],
+    options?: RequestOptions
+  ): Promise<CreateMessageResult> {
+    console.log("createMessage", params, options);
+    // The official SDK's McpServer has a `server` property which is the Server instance
+    // The Server instance has the createMessage method
+    return await this.server.server.createMessage(params, options);
   }
 
   /**
@@ -604,19 +907,19 @@ export class McpServer {
 
     switch (definition.type) {
       case "externalUrl":
-        resourceUri = `ui://widget/${definition.widget}`;
+        resourceUri = this.generateWidgetUri(definition.widget);
         mimeType = "text/uri-list";
         break;
       case "rawHtml":
-        resourceUri = `ui://widget/${definition.name}`;
+        resourceUri = this.generateWidgetUri(definition.name);
         mimeType = "text/html";
         break;
       case "remoteDom":
-        resourceUri = `ui://widget/${definition.name}`;
+        resourceUri = this.generateWidgetUri(definition.name);
         mimeType = "application/vnd.mcp-ui.remote-dom+javascript";
         break;
       case "appsSdk":
-        resourceUri = `ui://widget/${definition.name}.html`;
+        resourceUri = this.generateWidgetUri(definition.name, ".html");
         mimeType = "text/html+skybridge";
         break;
       default:
@@ -643,6 +946,9 @@ export class McpServer {
 
         const uiResource = this.createWidgetUIResource(definition, params);
 
+        // Ensure the resource content URI matches the registered URI (with build ID)
+        uiResource.resource.uri = resourceUri;
+
         return {
           contents: [uiResource.resource],
         };
@@ -651,10 +957,14 @@ export class McpServer {
 
     // For Apps SDK, also register a resource template to handle dynamic URIs with random IDs
     if (definition.type === "appsSdk") {
+      // Build URI template with build ID if available
+      const buildIdPart = this.buildId ? `-${this.buildId}` : "";
+      const uriTemplate = `ui://widget/${definition.name}${buildIdPart}-{id}.html`;
+
       this.resourceTemplate({
         name: `${definition.name}-dynamic`,
         resourceTemplate: {
-          uriTemplate: `ui://widget/${definition.name}-{id}.html`,
+          uriTemplate,
           name: definition.title || definition.name,
           description: definition.description,
           mimeType,
@@ -666,6 +976,9 @@ export class McpServer {
         readCallback: async (uri, params) => {
           // Use empty params for Apps SDK since structuredContent is passed separately
           const uiResource = this.createWidgetUIResource(definition, {});
+
+          // Ensure the resource content URI matches the template URI (with build ID)
+          uiResource.resource.uri = uri.toString();
 
           return {
             contents: [uiResource.resource],
@@ -711,7 +1024,11 @@ export class McpServer {
         if (definition.type === "appsSdk") {
           // Generate a unique URI with random ID for each invocation
           const randomId = Math.random().toString(36).substring(2, 15);
-          const uniqueUri = `ui://widget/${definition.name}-${randomId}.html`;
+          const uniqueUri = this.generateWidgetUri(
+            definition.name,
+            ".html",
+            randomId
+          );
 
           // Update toolMetadata with the unique URI
           const uniqueToolMetadata = {
@@ -783,6 +1100,7 @@ export class McpServer {
     const urlConfig: UrlConfig = {
       baseUrl: configBaseUrl,
       port: configPort,
+      buildId: this.buildId,
     };
 
     const uiResource = createUIResourceFromDefinition(
@@ -801,6 +1119,36 @@ export class McpServer {
     }
 
     return uiResource;
+  }
+
+  /**
+   * Generate a widget URI with optional build ID for cache busting
+   *
+   * @private
+   * @param widgetName - Widget name/identifier
+   * @param extension - Optional file extension (e.g., '.html')
+   * @param suffix - Optional suffix (e.g., random ID for dynamic URIs)
+   * @returns Widget URI with build ID if available
+   */
+  private generateWidgetUri(
+    widgetName: string,
+    extension: string = "",
+    suffix: string = ""
+  ): string {
+    const parts = [widgetName];
+
+    // Add build ID if available (for cache busting)
+    if (this.buildId) {
+      parts.push(this.buildId);
+    }
+
+    // Add suffix if provided (e.g., random ID for dynamic URIs)
+    if (suffix) {
+      parts.push(suffix);
+    }
+
+    // Construct URI: ui://widget/name-buildId-suffix.extension
+    return `ui://widget/${parts.join("-")}${extension}`;
   }
 
   /**
@@ -1437,6 +1785,10 @@ if (container && Component) {
       //   throw new Error(`Failed to fetch html template for widget ${widget.name}`)
       // }
 
+      const mcp_connect_domain = this.getServerBaseUrl()
+        ? new URL(this.getServerBaseUrl() || "").origin
+        : null;
+
       this.uiResource({
         name: widget.name,
         title: metadata.title || widget.name,
@@ -1466,7 +1818,7 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              ...(mcp_connect_domain ? [mcp_connect_domain] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
@@ -1474,7 +1826,9 @@ if (container && Component) {
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
               // always also add the base url of the server
-              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              ...(mcp_connect_domain ? [mcp_connect_domain] : []),
+              // add additional CSP URLs from environment variable
+              ...this.getCSPUrls(),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
@@ -1524,6 +1878,12 @@ if (container && Component) {
         "utf8"
       );
       const manifest = JSON.parse(manifestContent);
+
+      // Store build ID from manifest for use in widget URIs
+      if (manifest.buildId && typeof manifest.buildId === "string") {
+        this.buildId = manifest.buildId;
+        console.log(`[WIDGETS] Build ID: ${this.buildId}`);
+      }
 
       if (
         manifest.widgets &&
@@ -1652,6 +2012,18 @@ if (container && Component) {
         props = metadata.inputs;
       }
 
+      const mcp_connect_domain = this.getServerBaseUrl()
+        ? new URL(this.getServerBaseUrl() || "").origin
+        : null;
+
+      console.log("[CSP] mcp_connect_domain", mcp_connect_domain);
+
+      console.log("[CSP] this.getCSPUrls()", this.getCSPUrls());
+
+      console.log("[CSP] metadata.appsSdkMetadata", metadata.appsSdkMetadata);
+
+      console.log("[CSP] metadata._meta", metadata._meta);
+
       this.uiResource({
         name: widgetName,
         title: metadata.title || widgetName,
@@ -1680,15 +2052,18 @@ if (container && Component) {
           "openai/widgetCSP": {
             connect_domains: [
               // always also add the base url of the server
-              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              ...(mcp_connect_domain ? [mcp_connect_domain] : []),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.connect_domains || []),
             ],
             resource_domains: [
               "https://*.oaistatic.com",
               "https://*.oaiusercontent.com",
+              "https://*.openai.com",
               // always also add the base url of the server
-              ...(this.getServerBaseUrl() ? [this.getServerBaseUrl()] : []),
+              ...(mcp_connect_domain ? [mcp_connect_domain] : []),
+              // add additional CSP URLs from environment variable
+              ...this.getCSPUrls(),
               ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
                 ?.resource_domains || []),
             ],
@@ -1728,12 +2103,11 @@ if (container && Component) {
   }
 
   /**
-   * Mount MCP server endpoints at /mcp
+   * Mount MCP server endpoints at /mcp and /sse
    *
    * Sets up the HTTP transport layer for the MCP server, creating endpoints for
    * Server-Sent Events (SSE) streaming, POST message handling, and DELETE session cleanup.
-   * Each request gets its own transport instance to prevent state conflicts between
-   * concurrent client connections.
+   * Transports are reused per session ID to maintain state across requests.
    *
    * This method is called automatically when the server starts listening and ensures
    * that MCP clients can communicate with the server over HTTP.
@@ -1743,9 +2117,9 @@ if (container && Component) {
    *
    * @example
    * Endpoints created:
-   * - GET /mcp - SSE streaming endpoint for real-time communication
-   * - POST /mcp - Message handling endpoint for MCP protocol messages
-   * - DELETE /mcp - Session cleanup endpoint
+   * - GET /mcp, GET /sse - SSE streaming endpoint for real-time communication
+   * - POST /mcp, POST /sse - Message handling endpoint for MCP protocol messages
+   * - DELETE /mcp, DELETE /sse - Session cleanup endpoint
    */
   private async mountMcp(): Promise<void> {
     if (this.mcpMounted) return;
@@ -1754,7 +2128,228 @@ if (container && Component) {
       "@modelcontextprotocol/sdk/server/streamableHttp.js"
     );
 
-    const endpoint = "/mcp";
+    const idleTimeoutMs = this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
+
+    // Helper to get transport configuration options
+    const getTransportConfig = () => {
+      const isProduction = this.isProductionMode();
+      let allowedOrigins = this.config.allowedOrigins;
+      let enableDnsRebindingProtection = false;
+
+      if (isProduction) {
+        // Production mode: Only use explicitly configured origins
+        if (allowedOrigins !== undefined) {
+          enableDnsRebindingProtection = allowedOrigins.length > 0;
+        }
+        // If not set in production, DNS rebinding protection is disabled
+        // (undefined allowedOrigins = no protection)
+      } else {
+        // Development mode: Allow all origins (disable DNS rebinding protection)
+        // This makes it easy to connect from browser dev tools, inspector, etc.
+        allowedOrigins = undefined;
+        enableDnsRebindingProtection = false;
+      }
+
+      return { allowedOrigins, enableDnsRebindingProtection };
+    };
+
+    // Helper to create a new transport and session
+    const createNewTransport = async (
+      closeOldSessionId?: string
+    ): Promise<InstanceType<typeof StreamableHTTPServerTransport>> => {
+      // Close old session if it exists (cleanup)
+      if (closeOldSessionId && this.sessions.has(closeOldSessionId)) {
+        try {
+          this.sessions.get(closeOldSessionId)!.transport.close();
+        } catch (error) {
+          // Ignore errors when closing old session
+        }
+        this.sessions.delete(closeOldSessionId);
+      }
+
+      const { allowedOrigins, enableDnsRebindingProtection } =
+        getTransportConfig();
+
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => generateUUID(),
+        enableJsonResponse: true,
+        allowedOrigins: allowedOrigins,
+        enableDnsRebindingProtection: enableDnsRebindingProtection,
+        onsessioninitialized: (id) => {
+          if (id) {
+            this.sessions.set(id, {
+              transport,
+              lastAccessedAt: Date.now(),
+            });
+          }
+        },
+        onsessionclosed: (id) => {
+          if (id) {
+            this.sessions.delete(id);
+          }
+        },
+      });
+
+      await this.server.connect(transport);
+      return transport;
+    };
+
+    // Helper to create and auto-initialize a transport for seamless reconnection
+    // This is used when autoCreateSessionOnInvalidId is true and client sends
+    // a non-initialize request with an invalid/expired session ID
+    const createAndAutoInitializeTransport = async (
+      oldSessionId: string
+    ): Promise<InstanceType<typeof StreamableHTTPServerTransport>> => {
+      const { allowedOrigins, enableDnsRebindingProtection } =
+        getTransportConfig();
+
+      // Create transport that reuses the OLD session ID
+      // This ensures the client's subsequent requests with this session ID will work
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => oldSessionId, // Reuse old session ID!
+        enableJsonResponse: true,
+        allowedOrigins: allowedOrigins,
+        enableDnsRebindingProtection: enableDnsRebindingProtection,
+        // We'll manually store the session, so don't rely on onsessioninitialized
+        onsessionclosed: (id) => {
+          if (id) {
+            this.sessions.delete(id);
+          }
+        },
+      });
+
+      await this.server.connect(transport);
+
+      // Manually store the transport with the old session ID BEFORE initialization
+      // This ensures subsequent requests find it
+      this.sessions.set(oldSessionId, {
+        transport,
+        lastAccessedAt: Date.now(),
+      });
+
+      // Auto-initialize the transport by sending a synthetic initialize request
+      // This makes the transport ready to handle other requests
+      const initBody = {
+        jsonrpc: "2.0",
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "mcp-use-auto-reconnect", version: "1.0.0" },
+        },
+        id: "__auto_init__",
+      };
+
+      // Create synthetic Express-like request/response for initialization
+      // Must include proper Accept header that the SDK expects
+      const syntheticHeaders: Record<string, string> = {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream", // SDK requires both!
+      };
+      const syntheticReq: any = {
+        method: "POST",
+        headers: syntheticHeaders,
+        header: (name: string) => syntheticHeaders[name.toLowerCase()],
+        body: initBody,
+      };
+
+      const syntheticRes: any = {
+        statusCode: 200,
+        setHeader: () => syntheticRes,
+        writeHead: (code: number) => {
+          syntheticRes.statusCode = code;
+          return syntheticRes; // Return this for chaining (e.g., res.writeHead(400).end(...))
+        },
+        write: () => true,
+        end: () => {},
+        on: () => syntheticRes,
+        once: () => syntheticRes,
+        removeListener: () => syntheticRes,
+      };
+
+      // Handle the initialize request
+      await new Promise<void>((resolve) => {
+        syntheticRes.end = () => {
+          resolve();
+        };
+        transport.handleRequest(syntheticReq, syntheticRes, initBody);
+      });
+
+      if (syntheticRes.statusCode !== 200) {
+        console.error(
+          `[MCP] Auto-initialization failed with status ${syntheticRes.statusCode}`
+        );
+        // Clean up the failed session
+        this.sessions.delete(oldSessionId);
+        throw new Error(
+          `Auto-initialization failed: ${syntheticRes.statusCode}`
+        );
+      }
+
+      console.log(
+        `[MCP] Auto-initialized session ${oldSessionId} for seamless reconnection`
+      );
+      return transport;
+    };
+
+    // Helper to get or create a transport for a session
+    const getOrCreateTransport = async (
+      sessionId?: string,
+      isInit = false
+    ): Promise<InstanceType<typeof StreamableHTTPServerTransport> | null> => {
+      // For initialize requests, always create a new session (ignore any provided session ID)
+      if (isInit) {
+        return await createNewTransport(sessionId);
+      }
+
+      // For non-init requests, reuse existing transport for session
+      if (sessionId && this.sessions.has(sessionId)) {
+        const session = this.sessions.get(sessionId)!;
+        // Update last accessed time immediately to prevent cleanup during request processing
+        session.lastAccessedAt = Date.now();
+        return session.transport;
+      }
+
+      // For non-init requests with an invalid session ID
+      if (sessionId) {
+        // Check if auto-create is enabled (default: true for compatibility with non-compliant clients)
+        const autoCreate = this.config.autoCreateSessionOnInvalidId ?? true;
+
+        if (autoCreate) {
+          // Auto-create AND auto-initialize a new session for seamless reconnection
+          // This makes it compatible with non-compliant clients like ChatGPT
+          // that don't reinitialize when receiving 404 for invalid session IDs
+          console.warn(
+            `[MCP] Session ${sessionId} not found (expired or invalid), auto-creating and initializing new session for seamless reconnection`
+          );
+          return await createAndAutoInitializeTransport(sessionId);
+        } else {
+          // Follow MCP protocol spec: return null to signal session not found
+          // This will result in a 404 error response
+          return null;
+        }
+      }
+
+      // No session ID provided for non-init request
+      return null;
+    };
+
+    // Start idle cleanup interval if timeout is configured
+    if (idleTimeoutMs > 0 && !this.idleCleanupInterval) {
+      this.idleCleanupInterval = setInterval(() => {
+        const now = Date.now();
+        for (const [sessionId, session] of this.sessions.entries()) {
+          if (now - session.lastAccessedAt > idleTimeoutMs) {
+            try {
+              session.transport.close();
+            } catch (error) {
+              // Ignore errors when closing expired sessions
+            }
+            this.sessions.delete(sessionId);
+          }
+        }
+      }, 60000); // Check every minute
+    }
 
     // Helper to create Express-like req/res from Hono context for MCP SDK
     const createExpressLikeObjects = (c: Context) => {
@@ -1883,223 +2478,346 @@ if (container && Component) {
       };
     };
 
-    // POST endpoint for messages
-    // Create a new transport for each request to support multiple concurrent clients
-    this.app.post(endpoint, async (c: Context) => {
-      const { expressReq, expressRes, getResponse } =
-        createExpressLikeObjects(c);
+    // Helper function to mount endpoints for a given path
+    const mountEndpoint = (endpoint: string) => {
+      // POST endpoint for messages
+      this.app.post(endpoint, async (c: Context) => {
+        const { expressReq, expressRes, getResponse } =
+          createExpressLikeObjects(c);
 
-      // Get request body
-      try {
-        expressReq.body = await c.req.json();
-      } catch {
-        expressReq.body = {};
-      }
+        // Get request body
+        let body: any = {};
+        try {
+          body = await c.req.json();
+          expressReq.body = body;
+        } catch {
+          expressReq.body = {};
+        }
 
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
+        // Check if this is an initialization request
+        const isInit = body?.method === "initialize";
+        const sessionId = c.req.header("mcp-session-id");
+
+        // Get or create transport for this session
+        const transport = await getOrCreateTransport(sessionId, isInit);
+
+        // Handle missing or invalid session
+        if (!transport) {
+          if (sessionId) {
+            // Session ID was provided but not found (expired or invalid)
+            // Per MCP spec: "The server MAY terminate the session at any time, after which
+            // it MUST respond to requests containing that session ID with HTTP 404 Not Found."
+            // This happens when autoCreateSessionOnInvalidId is false (default behavior)
+            return c.json(
+              {
+                jsonrpc: "2.0",
+                error: {
+                  code: -32000,
+                  message: "Session not found or expired",
+                },
+                // Notifications don't have an id, but we include null for consistency
+                id: body?.id ?? null,
+              },
+              404
+            );
+          } else {
+            // No session ID for non-init request
+            // Per MCP spec: "Servers that require a session ID SHOULD respond to requests
+            // without an MCP-Session-Id header (other than initialization) with HTTP 400 Bad Request."
+            // For notifications without session ID, we return 202 Accepted if we accept them,
+            // or 400 Bad Request if we require session ID. Since we use sessions, we require it.
+            return c.json(
+              {
+                jsonrpc: "2.0",
+                error: {
+                  code: -32000,
+                  message: "Bad Request: Mcp-Session-Id header is required",
+                },
+                id: body?.id ?? null,
+              },
+              400
+            );
+          }
+        }
+
+        // Note: lastAccessedAt is already updated in getOrCreateTransport when session is found
+        // This redundant update is kept for safety but should not be necessary
+        if (sessionId && this.sessions.has(sessionId)) {
+          this.sessions.get(sessionId)!.lastAccessedAt = Date.now();
+        }
+
+        // Handle close event
+        if (expressRes._closeHandler) {
+          // Note: In web-standard Request/Response, we use AbortController
+          // For now, we'll call close when response is done
+          c.req.raw.signal?.addEventListener("abort", () => {
+            transport.close();
+          });
+        }
+
+        // Wait for handleRequest to complete and for response to be written
+        await this.waitForRequestComplete(
+          transport,
+          expressReq,
+          expressRes,
+          expressReq.body
+        );
+
+        const response = getResponse();
+        if (response) {
+          return response;
+        }
+
+        // If no response was written, return empty response
+        return c.text("", 200);
       });
 
-      // Handle close event
-      if (expressRes._closeHandler) {
-        // Note: In web-standard Request/Response, we use AbortController
-        // For now, we'll call close when response is done
+      // GET endpoint for SSE streaming
+      this.app.get(endpoint, async (c: Context) => {
+        const sessionId = c.req.header("mcp-session-id");
+
+        // Get or create transport for this session
+        // GET requests require a session ID (SDK will validate this)
+        const transport = await getOrCreateTransport(sessionId, false);
+
+        // Handle missing or invalid session
+        if (!transport) {
+          if (sessionId) {
+            // Session ID was provided but not found (expired or invalid)
+            // Per MCP spec: return 404 when session not found
+            return c.json(
+              {
+                jsonrpc: "2.0",
+                error: {
+                  code: -32000,
+                  message: "Session not found or expired",
+                },
+                id: null,
+              },
+              404
+            );
+          } else {
+            // No session ID for SSE request
+            return c.json(
+              {
+                jsonrpc: "2.0",
+                error: {
+                  code: -32000,
+                  message: "Bad Request: Mcp-Session-Id header is required",
+                },
+                id: null,
+              },
+              400
+            );
+          }
+        }
+
+        // Update last accessed time if session exists
+        if (sessionId && this.sessions.has(sessionId)) {
+          this.sessions.get(sessionId)!.lastAccessedAt = Date.now();
+        }
+
+        // Handle close event
         c.req.raw.signal?.addEventListener("abort", () => {
           transport.close();
         });
-      }
 
-      await this.server.connect(transport);
+        // For streaming, we need to return a Response with a ReadableStream immediately
+        // Use globalThis to access TransformStream (available in Node 18+ and modern browsers)
+        const { readable, writable } = new (
+          globalThis as any
+        ).TransformStream();
+        const writer = writable.getWriter();
+        const encoder = new TextEncoder();
 
-      // Wait for handleRequest to complete and for response to be written
-      await this.waitForRequestComplete(
-        transport,
-        expressReq,
-        expressRes,
-        expressReq.body
-      );
+        // Create a promise to track when headers are received
+        let resolveResponse: (res: Response) => void;
+        const responsePromise = new Promise<Response>((resolve) => {
+          resolveResponse = resolve;
+        });
 
-      const response = getResponse();
-      if (response) {
-        return response;
-      }
+        let headersSent = false;
+        const headers: Record<string, string> = {};
+        let statusCode = 200;
 
-      // If no response was written, return empty response
-      return c.text("", 200);
-    });
+        const expressRes: any = {
+          statusCode: 200,
+          headersSent: false,
+          status: (code: number) => {
+            statusCode = code;
+            expressRes.statusCode = code;
+            return expressRes;
+          },
+          setHeader: (name: string, value: string | string[]) => {
+            if (!headersSent) {
+              headers[name] = Array.isArray(value) ? value.join(", ") : value;
+            }
+          },
+          getHeader: (name: string) => headers[name],
+          write: (chunk: any) => {
+            if (!headersSent) {
+              headersSent = true;
+              resolveResponse(
+                new Response(readable, {
+                  status: statusCode,
+                  headers,
+                })
+              );
+            }
+            const data =
+              typeof chunk === "string"
+                ? encoder.encode(chunk)
+                : chunk instanceof Uint8Array
+                  ? chunk
+                  : Buffer.from(chunk);
+            writer.write(data);
+            return true;
+          },
+          end: (chunk?: any) => {
+            if (chunk) {
+              expressRes.write(chunk);
+            }
+            if (!headersSent) {
+              headersSent = true;
+              // Empty body case
+              resolveResponse(
+                new Response(null, {
+                  status: statusCode,
+                  headers,
+                })
+              );
+              writer.close();
+            } else {
+              writer.close();
+            }
+          },
+          on: (event: string, handler: any) => {
+            if (event === "close") {
+              expressRes._closeHandler = handler;
+            }
+          },
+          once: () => {},
+          removeListener: () => {},
+          writeHead: (code: number, _headers?: any) => {
+            statusCode = code;
+            expressRes.statusCode = code;
+            if (_headers) {
+              Object.assign(headers, _headers);
+            }
+            // Don't resolve yet, wait for first write or end?
+            // Usually writeHead is followed by write or end
+            // If we resolve here, we start the stream
+            if (!headersSent) {
+              headersSent = true;
+              resolveResponse(
+                new Response(readable, {
+                  status: statusCode,
+                  headers,
+                })
+              );
+            }
+            return expressRes;
+          },
+          flushHeaders: () => {
+            // No-op - headers are flushed on first write
+          },
+        };
 
-    // GET endpoint for SSE streaming
-    this.app.get(endpoint, async (c: Context) => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
+        // Mock expressReq
+        // Hono's c.req.header() returns Record<string, string> which is compatible
+        const expressReq: any = {
+          ...c.req.raw,
+          url: new URL(c.req.url).pathname + new URL(c.req.url).search,
+          path: new URL(c.req.url).pathname,
+          query: Object.fromEntries(new URL(c.req.url).searchParams),
+          headers: c.req.header(),
+          method: c.req.method,
+        };
 
-      // Handle close event
-      c.req.raw.signal?.addEventListener("abort", () => {
-        transport.close();
-      });
+        // Note: We don't call this.server.connect() here because the transport
+        // is already connected (either from getOrCreateTransport for new transports,
+        // or it was already connected when retrieved from the session)
 
-      // For streaming, we need to return a Response with a ReadableStream immediately
-      // Use globalThis to access TransformStream (available in Node 18+ and modern browsers)
-      const { readable, writable } = new (globalThis as any).TransformStream();
-      const writer = writable.getWriter();
-      const encoder = new TextEncoder();
-
-      // Create a promise to track when headers are received
-      let resolveResponse: (res: Response) => void;
-      const responsePromise = new Promise<Response>((resolve) => {
-        resolveResponse = resolve;
-      });
-
-      let headersSent = false;
-      const headers: Record<string, string> = {};
-      let statusCode = 200;
-
-      const expressRes: any = {
-        statusCode: 200,
-        headersSent: false,
-        status: (code: number) => {
-          statusCode = code;
-          expressRes.statusCode = code;
-          return expressRes;
-        },
-        setHeader: (name: string, value: string | string[]) => {
-          if (!headersSent) {
-            headers[name] = Array.isArray(value) ? value.join(", ") : value;
-          }
-        },
-        getHeader: (name: string) => headers[name],
-        write: (chunk: any) => {
-          if (!headersSent) {
-            headersSent = true;
-            resolveResponse(
-              new Response(readable, {
-                status: statusCode,
-                headers,
-              })
-            );
-          }
-          const data =
-            typeof chunk === "string"
-              ? encoder.encode(chunk)
-              : chunk instanceof Uint8Array
-                ? chunk
-                : Buffer.from(chunk);
-          writer.write(data);
-          return true;
-        },
-        end: (chunk?: any) => {
-          if (chunk) {
-            expressRes.write(chunk);
-          }
-          if (!headersSent) {
-            headersSent = true;
-            // Empty body case
-            resolveResponse(
-              new Response(null, {
-                status: statusCode,
-                headers,
-              })
-            );
+        // Start handling the request
+        // We don't await this because it blocks for SSE
+        transport.handleRequest(expressReq, expressRes).catch((err) => {
+          console.error("MCP Transport error:", err);
+          try {
             writer.close();
+          } catch {
+            // Ignore errors when closing writer
+          }
+        });
+
+        // Wait for headers to be sent (or timeout?)
+        // If handleRequest fails synchronously or writes nothing, this might hang?
+        // But MCP transport usually writes headers immediately for SSE
+        return responsePromise;
+      });
+
+      // DELETE endpoint for session cleanup
+      this.app.delete(endpoint, async (c: Context) => {
+        const { expressReq, expressRes, getResponse } =
+          createExpressLikeObjects(c);
+
+        const sessionId = c.req.header("mcp-session-id");
+
+        // Get transport for this session (DELETE requires session ID)
+        // The SDK will handle validation and cleanup via onsessionclosed callback
+        const transport = await getOrCreateTransport(sessionId, false);
+
+        // Handle missing or invalid session
+        if (!transport) {
+          if (sessionId) {
+            return c.json(
+              {
+                jsonrpc: "2.0",
+                error: {
+                  code: -32000,
+                  message: "Session not found or expired",
+                },
+                id: null,
+              },
+              404
+            );
           } else {
-            writer.close();
-          }
-        },
-        on: (event: string, handler: any) => {
-          if (event === "close") {
-            expressRes._closeHandler = handler;
-          }
-        },
-        once: () => {},
-        removeListener: () => {},
-        writeHead: (code: number, _headers?: any) => {
-          statusCode = code;
-          expressRes.statusCode = code;
-          if (_headers) {
-            Object.assign(headers, _headers);
-          }
-          // Don't resolve yet, wait for first write or end?
-          // Usually writeHead is followed by write or end
-          // If we resolve here, we start the stream
-          if (!headersSent) {
-            headersSent = true;
-            resolveResponse(
-              new Response(readable, {
-                status: statusCode,
-                headers,
-              })
+            return c.json(
+              {
+                jsonrpc: "2.0",
+                error: {
+                  code: -32000,
+                  message: "Bad Request: Mcp-Session-Id header is required",
+                },
+                id: null,
+              },
+              400
             );
           }
-          return expressRes;
-        },
-        flushHeaders: () => {
-          // No-op - headers are flushed on first write
-        },
-      };
-
-      // Mock expressReq
-      // Hono's c.req.header() returns Record<string, string> which is compatible
-      const expressReq: any = {
-        ...c.req.raw,
-        url: new URL(c.req.url).pathname + new URL(c.req.url).search,
-        path: new URL(c.req.url).pathname,
-        query: Object.fromEntries(new URL(c.req.url).searchParams),
-        headers: c.req.header(),
-        method: c.req.method,
-      };
-
-      await this.server.connect(transport);
-
-      // Start handling the request
-      // We don't await this because it blocks for SSE
-      transport.handleRequest(expressReq, expressRes).catch((err) => {
-        console.error("MCP Transport error:", err);
-        try {
-          writer.close();
-        } catch {
-          // Ignore errors when closing writer
         }
+
+        // Handle close event
+        c.req.raw.signal?.addEventListener("abort", () => {
+          transport.close();
+        });
+
+        // Wait for handleRequest to complete and for response to be written
+        await this.waitForRequestComplete(transport, expressReq, expressRes);
+
+        const response = getResponse();
+        if (response) {
+          return response;
+        }
+
+        return c.text("", 200);
       });
+    };
 
-      // Wait for headers to be sent (or timeout?)
-      // If handleRequest fails synchronously or writes nothing, this might hang?
-      // But MCP transport usually writes headers immediately for SSE
-      return responsePromise;
-    });
-
-    // DELETE endpoint for session cleanup
-    this.app.delete(endpoint, async (c: Context) => {
-      const { expressReq, expressRes, getResponse } =
-        createExpressLikeObjects(c);
-
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
-
-      // Handle close event
-      c.req.raw.signal?.addEventListener("abort", () => {
-        transport.close();
-      });
-
-      await this.server.connect(transport);
-
-      // Wait for handleRequest to complete and for response to be written
-      await this.waitForRequestComplete(transport, expressReq, expressRes);
-
-      const response = getResponse();
-      if (response) {
-        return response;
-      }
-
-      return c.text("", 200);
-    });
+    // Mount endpoints for both /mcp and /sse
+    mountEndpoint("/mcp");
+    mountEndpoint("/sse");
 
     this.mcpMounted = true;
-    console.log(`[MCP] Server mounted at ${endpoint}`);
+    console.log(`[MCP] Server mounted at /mcp and /sse`);
   }
 
   /**
@@ -2109,7 +2827,7 @@ if (container && Component) {
    * the inspector UI (if available), and starting the server to listen
    * for incoming connections. This is the main entry point for running the server.
    *
-   * The server will be accessible at the specified port with MCP endpoints at /mcp
+   * The server will be accessible at the specified port with MCP endpoints at /mcp and /sse
    * and inspector UI at /inspector (if the inspector package is installed).
    *
    * @param port - Port number to listen on (defaults to 3001 if not specified)
@@ -2119,7 +2837,7 @@ if (container && Component) {
    * ```typescript
    * await server.listen(8080)
    * // Server now running at http://localhost:8080 (or configured host)
-   * // MCP endpoints: http://localhost:8080/mcp
+   * // MCP endpoints: http://localhost:8080/mcp and http://localhost:8080/sse
    * // Inspector UI: http://localhost:8080/inspector
    * ```
    */
@@ -2251,7 +2969,7 @@ if (container && Component) {
             `[SERVER] Listening on http://${this.serverHost}:${this.serverPort}`
           );
           console.log(
-            `[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp`
+            `[MCP] Endpoints: http://${this.serverHost}:${this.serverPort}/mcp and http://${this.serverHost}:${this.serverPort}/sse`
           );
         }
       );
@@ -2359,6 +3077,225 @@ if (container && Component) {
   }
 
   /**
+   * Get array of active session IDs
+   *
+   * Returns an array of all currently active session IDs. This is useful for
+   * sending targeted notifications to specific clients or iterating over
+   * connected clients.
+   *
+   * Note: This only works in stateful mode. In stateless mode (edge environments),
+   * this will return an empty array.
+   *
+   * @returns Array of active session ID strings
+   *
+   * @example
+   * ```typescript
+   * const sessions = server.getActiveSessions();
+   * console.log(`${sessions.length} clients connected`);
+   *
+   * // Send notification to first connected client
+   * if (sessions.length > 0) {
+   *   server.sendNotificationToSession(sessions[0], "custom/hello", { message: "Hi!" });
+   * }
+   * ```
+   */
+  getActiveSessions(): string[] {
+    return Array.from(this.sessions.keys());
+  }
+
+  /**
+   * Send a notification to all connected clients
+   *
+   * Broadcasts a JSON-RPC notification to all active sessions. Notifications are
+   * one-way messages that do not expect a response from the client.
+   *
+   * Note: This only works in stateful mode with active sessions. If no sessions
+   * are connected, the notification is silently discarded (per MCP spec: "server MAY send").
+   *
+   * @param method - The notification method name (e.g., "custom/my-notification")
+   * @param params - Optional parameters to include in the notification
+   *
+   * @example
+   * ```typescript
+   * // Send a simple notification to all clients
+   * server.sendNotification("custom/server-status", {
+   *   status: "ready",
+   *   timestamp: new Date().toISOString()
+   * });
+   *
+   * // Notify all clients that resources have changed
+   * server.sendNotification("notifications/resources/list_changed");
+   * ```
+   */
+  async sendNotification(
+    method: string,
+    params?: Record<string, unknown>
+  ): Promise<void> {
+    const notification = {
+      jsonrpc: "2.0" as const,
+      method,
+      ...(params && { params }),
+    };
+
+    // Send to all active sessions
+    for (const [sessionId, session] of this.sessions.entries()) {
+      try {
+        await session.transport.send(notification);
+      } catch (error) {
+        console.warn(
+          `[MCP] Failed to send notification to session ${sessionId}:`,
+          error
+        );
+      }
+    }
+  }
+
+  /**
+   * Send a notification to a specific client session
+   *
+   * Sends a JSON-RPC notification to a single client identified by their session ID.
+   * This allows sending customized notifications to individual clients.
+   *
+   * Note: This only works in stateful mode. If the session ID doesn't exist,
+   * the notification is silently discarded.
+   *
+   * @param sessionId - The target session ID (from getActiveSessions())
+   * @param method - The notification method name (e.g., "custom/my-notification")
+   * @param params - Optional parameters to include in the notification
+   * @returns true if the notification was sent, false if session not found
+   *
+   * @example
+   * ```typescript
+   * const sessions = server.getActiveSessions();
+   *
+   * // Send different messages to different clients
+   * sessions.forEach((sessionId, index) => {
+   *   server.sendNotificationToSession(sessionId, "custom/welcome", {
+   *     message: `Hello client #${index + 1}!`,
+   *     clientNumber: index + 1
+   *   });
+   * });
+   * ```
+   */
+  async sendNotificationToSession(
+    sessionId: string,
+    method: string,
+    params?: Record<string, unknown>
+  ): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+
+    const notification = {
+      jsonrpc: "2.0" as const,
+      method,
+      ...(params && { params }),
+    };
+
+    try {
+      await session.transport.send(notification);
+      return true;
+    } catch (error) {
+      console.warn(
+        `[MCP] Failed to send notification to session ${sessionId}:`,
+        error
+      );
+      return false;
+    }
+  }
+
+  // Store the roots changed callback
+  private onRootsChangedCallback?: (
+    roots: Array<{ uri: string; name?: string }>
+  ) => void | Promise<void>;
+
+  /**
+   * Register a callback for when a client's roots change
+   *
+   * When a client sends a `notifications/roots/list_changed` notification,
+   * the server will automatically request the updated roots list and call
+   * this callback with the new roots.
+   *
+   * @param callback - Function called with the updated roots array
+   *
+   * @example
+   * ```typescript
+   * server.onRootsChanged(async (roots) => {
+   *   console.log("Client roots updated:", roots);
+   *   roots.forEach(root => {
+   *     console.log(`  - ${root.name || "unnamed"}: ${root.uri}`);
+   *   });
+   * });
+   * ```
+   */
+  onRootsChanged(
+    callback: (
+      roots: Array<{ uri: string; name?: string }>
+    ) => void | Promise<void>
+  ): this {
+    this.onRootsChangedCallback = callback;
+    return this;
+  }
+
+  /**
+   * Request the current roots list from a specific client session
+   *
+   * This sends a `roots/list` request to the client and returns
+   * the list of roots the client has configured.
+   *
+   * @param sessionId - The session ID of the client to query
+   * @returns Array of roots, or null if the session doesn't exist or request fails
+   *
+   * @example
+   * ```typescript
+   * const sessions = server.getActiveSessions();
+   * if (sessions.length > 0) {
+   *   const roots = await server.listRoots(sessions[0]);
+   *   if (roots) {
+   *     console.log(`Client has ${roots.length} roots:`);
+   *     roots.forEach(r => console.log(`  - ${r.uri}`));
+   *   }
+   * }
+   * ```
+   */
+  async listRoots(
+    sessionId: string
+  ): Promise<Array<{ uri: string; name?: string }> | null> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return null;
+    }
+
+    try {
+      // Send roots/list request to the client
+      const request = {
+        jsonrpc: "2.0" as const,
+        id: generateUUID(),
+        method: "roots/list",
+        params: {},
+      };
+
+      // The transport handles the request-response flow
+      const response = await session.transport.send(request);
+
+      // The response should contain the roots array
+      if (response && typeof response === "object" && "roots" in response) {
+        return (response as { roots: Array<{ uri: string; name?: string }> })
+          .roots;
+      }
+
+      return [];
+    } catch (error) {
+      console.warn(
+        `[MCP] Failed to list roots from session ${sessionId}:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
    * Mount MCP Inspector UI at /inspector
    *
    * Dynamically loads and mounts the MCP Inspector UI package if available, providing
@@ -2374,7 +3311,7 @@ if (container && Component) {
    * @example
    * If @mcp-use/inspector is installed:
    * - Inspector UI available at http://localhost:PORT/inspector
-   * - Automatically connects to http://localhost:PORT/mcp
+   * - Automatically connects to http://localhost:PORT/mcp (or /sse)
    *
    * If not installed:
    * - Server continues to function normally
@@ -2400,8 +3337,16 @@ if (container && Component) {
     try {
       // @ts-ignore - Optional peer dependency, may not be installed during build
       const { mountInspector } = await import("@mcp-use/inspector");
-      // Auto-connect to the local MCP server at /mcp
-      mountInspector(this.app);
+      // Auto-connect to the local MCP server at /mcp (SSE endpoint)
+      // Use JSON config to specify SSE transport type
+      const mcpUrl = `http://${this.serverHost}:${this.serverPort}/mcp`; // Also available at /sse
+      const autoConnectConfig = JSON.stringify({
+        url: mcpUrl,
+        name: "Local MCP Server",
+        transportType: "sse",
+        connectionType: "Direct",
+      });
+      mountInspector(this.app, { autoConnectUrl: autoConnectConfig });
       this.inspectorMounted = true;
       console.log(
         `[INSPECTOR] UI available at http://${this.serverHost}:${this.serverPort}/inspector`
@@ -2845,14 +3790,28 @@ export type McpServerInstance = Omit<McpServer, keyof HonoType> &
  * @param config.description - Server description
  * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
  * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
+ * @param config.allowedOrigins - Allowed origins for DNS rebinding protection
+ *   - **Development mode** (NODE_ENV !== "production"): If not set, all origins are allowed
+ *   - **Production mode** (NODE_ENV === "production"): Only uses explicitly configured origins
+ *   - See {@link ServerConfig.allowedOrigins} for detailed documentation
+ * @param config.sessionIdleTimeoutMs - Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
  * @returns McpServerInstance with both MCP and Hono methods
  *
  * @example
  * ```typescript
- * // Basic usage
+ * // Basic usage (development mode - allows all origins)
  * const server = createMCPServer('my-server', {
  *   version: '1.0.0',
  *   description: 'My MCP server'
+ * })
+ *
+ * // Production mode with explicit allowed origins
+ * const server = createMCPServer('my-server', {
+ *   version: '1.0.0',
+ *   allowedOrigins: [
+ *     'https://myapp.com',
+ *     'https://app.myapp.com'
+ *   ]
  * })
  *
  * // With custom host (e.g., for Docker or remote access)
@@ -2878,6 +3837,8 @@ export function createMCPServer(
     description: config.description,
     host: config.host,
     baseUrl: config.baseUrl,
+    allowedOrigins: config.allowedOrigins,
+    sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
   });
   return instance as unknown as McpServerInstance;
 }

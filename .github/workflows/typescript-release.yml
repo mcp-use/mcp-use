@@ -211,6 +211,27 @@ jobs:
 
           echo "✅ Published packages to npm using trusted publishing and pushed tags"
 
+      - name: Reset canary to main
+        if: steps.check-release.outputs.should_publish == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Fetch latest changes
+          git fetch origin
+
+          # Checkout canary and reset to main (clean slate with stable versions)
+          git checkout canary
+          git reset --hard origin/main
+
+          # Force push canary (since we did a reset)
+          git push --force origin canary
+
+          echo "✅ Reset canary to main (canary workflow will auto-enter prerelease mode)"
+
       - name: Create GitHub Release (Main)
         if: github.ref == 'refs/heads/main' && steps.check-release.outputs.should_publish == 'true'
         env:

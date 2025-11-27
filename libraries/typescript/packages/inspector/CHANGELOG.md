@@ -1,5 +1,73 @@
 # @mcp-use/inspector
 
+## 0.7.1-canary.7
+
+### Patch Changes
+
+- 94b9824: **Bug Fixes:**
+  - Fixed auto-connect proxy fallback behavior - now properly retries with proxy when direct connection fails
+  - Fixed connection config updates not applying when connection already exists
+  - Fixed connection wrapper not re-rendering when proxy config changes
+
+  **Improvements:**
+  - Auto-switch (proxy fallback) now automatically enabled during auto-connect flow
+  - Added automatic navigation to home page after connection failures
+  - Improved error messages for connection failures
+  - Enhanced state cleanup on connection retry and failure scenarios
+
+- Updated dependencies [94b9824]
+  - mcp-use@1.5.1-canary.7
+
+## 0.7.1-canary.6
+
+### Patch Changes
+
+- Updated dependencies [a3295a0]
+  - mcp-use@1.5.1-canary.6
+
+## 0.7.1-canary.5
+
+### Patch Changes
+
+- Updated dependencies [95fa604]
+  - mcp-use@1.5.1-canary.5
+
+## 0.7.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [a93befb]
+  - mcp-use@1.5.1-canary.4
+
+## 0.7.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [ccc2df3]
+  - mcp-use@1.5.1-canary.3
+
+## 0.7.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [e5e8e1b]
+  - mcp-use@1.5.1-canary.2
+
+## 0.7.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [4ca7772]
+  - mcp-use@1.5.1-canary.1
+
+## 0.7.1-canary.0
+
+### Patch Changes
+
+- 12a88c7: fix versions
+- Updated dependencies [12a88c7]
+  - mcp-use@1.5.1-canary.0
+
 ## 0.7.0
 
 ### Minor Changes
@@ -389,13 +457,6 @@
 
 - Updated dependencies [fc64bd7]
   - mcp-use@1.5.0-canary.1
-
-## 0.6.2-canary.0
-
-### Patch Changes
-
-- Updated dependencies [abf15ba]
-  - mcp-use@1.5.0-canary.0
 
 ## 0.6.1
 

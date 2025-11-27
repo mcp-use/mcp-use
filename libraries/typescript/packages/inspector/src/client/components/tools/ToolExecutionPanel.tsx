@@ -56,7 +56,7 @@ export function ToolExecutionPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 p-3 sm:p-6 pt-3 pb-4 pr-3">
+      <div className="flex-shrink-0 p-3 sm:p-5 pt-3 sm:pt-4 pb-4 sm:pr-4">
         <div>
           <div className="flex flex-row items-center justify-between mb-0 gap-2">
             <h3 className="text-base sm:text-lg font-semibold">
