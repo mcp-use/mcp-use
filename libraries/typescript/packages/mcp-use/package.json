@@ -143,7 +143,7 @@
     "@mcp-ui/server": "^5.12.0",
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.23.0",
+    "@modelcontextprotocol/sdk": "1.22.0",
     "@scarf/scarf": "^1.4.0",
     "ai": "^4.3.19",
     "chalk": "^5.6.2",
