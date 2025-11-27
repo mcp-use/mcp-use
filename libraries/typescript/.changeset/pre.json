@@ -1,0 +1,18 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.4.0",
+    "create-mcp-use-app": "0.7.0",
+    "@mcp-use/inspector": "0.8.0",
+    "mcp-use": "1.6.0"
+  },
+  "changesets": [
+    "automated-mcp-sdk-update-1764246579",
+    "better-hairs-fly",
+    "curly-jokes-shout",
+    "easy-steaks-smell",
+    "ready-books-type",
+    "swift-brooms-clap"
+  ]
+}
