@@ -338,10 +338,10 @@ importers:
         version: 1.1.0(@langchain/core@1.0.4(@opentelemetry/api@1.9.0)(openai@6.8.1(ws@8.18.3)(zod@4.1.12)))(ws@8.18.3)
       '@mcp-ui/client':
         specifier: ^5.12.1
-        version: 5.14.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod@4.1.12)
+        version: 5.14.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@modelcontextprotocol/sdk':
-        specifier: 1.23.0
-        version: 1.23.0(@cfworker/json-schema@4.1.1)(zod@4.1.12)
+        specifier: 1.22.0
+        version: 1.22.0(@cfworker/json-schema@4.1.1)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.3))(@types/react@19.2.3)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -510,7 +510,7 @@ importers:
         version: 1.0.4(@opentelemetry/api@1.9.0)(openai@6.8.1(ws@8.18.3)(zod@3.25.76))
       '@mcp-ui/server':
         specifier: ^5.12.0
-        version: 5.13.1(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+        version: 5.13.1(@cfworker/json-schema@4.1.1)
       '@mcp-use/cli':
         specifier: workspace:*
         version: link:../cli
@@ -518,8 +518,8 @@ importers:
         specifier: workspace:*
         version: link:../inspector
       '@modelcontextprotocol/sdk':
-        specifier: 1.23.0
-        version: 1.23.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+        specifier: 1.22.0
+        version: 1.22.0(@cfworker/json-schema@4.1.1)
       '@scarf/scarf':
         specifier: ^1.4.0
         version: 1.4.0
@@ -1503,12 +1503,11 @@ packages:
   '@mcp-ui/server@5.13.1':
     resolution: {integrity: sha512-jTHy8MTa+Cppw80mFID5ranw+CrmePpncIub726PGg38WETGR8tg7CW0mD9YS6pBdRL+A+EDNCiGbVlPjDfQHA==}
 
-  '@modelcontextprotocol/sdk@1.23.0':
-    resolution: {integrity: sha512-MCGd4K9aZKvuSqdoBkdMvZNcYXCkZRYVs/Gh92mdV5IHbctX9H9uIvd4X93+9g8tBbXv08sxc/QHXTzf8y65bA==}
+  '@modelcontextprotocol/sdk@1.22.0':
+    resolution: {integrity: sha512-VUpl106XVTCpDmTBil2ehgJZjhyLY2QZikzF8NvTXtLRF1CvO5iEE2UNZdVIUer35vFOwMKYeUGbjJtvPWan3g==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
-      zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
@@ -7530,14 +7529,14 @@ snapshots:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.8(zod@3.25.76)
       zod: 3.25.76
-      zod-to-json-schema: 3.24.6(zod@3.25.76)
+      zod-to-json-schema: 3.25.0(zod@3.25.76)
 
   '@ai-sdk/ui-utils@1.2.11(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.8(zod@4.1.12)
       zod: 4.1.12
-      zod-to-json-schema: 3.24.6(zod@4.1.12)
+      zod-to-json-schema: 3.25.0(zod@4.1.12)
 
   '@alloc/quick-lru@5.2.0': {}
 
@@ -8471,9 +8470,9 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 1.1.0
 
-  '@mcp-ui/client@5.14.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod@4.1.12)':
+  '@mcp-ui/client@5.14.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.23.0(@cfworker/json-schema@4.1.1)(zod@4.1.12)
+      '@modelcontextprotocol/sdk': 1.22.0(@cfworker/json-schema@4.1.1)
       '@quilted/threads': 3.3.1(@preact/signals-core@1.12.1)
       '@r2wc/react-to-web-component': 2.1.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@remote-dom/core': 1.10.1(@preact/signals-core@1.12.1)
@@ -8485,17 +8484,15 @@ snapshots:
       - '@preact/signals-core'
       - preact
       - supports-color
-      - zod
 
-  '@mcp-ui/server@5.13.1(@cfworker/json-schema@4.1.1)(zod@3.25.76)':
+  '@mcp-ui/server@5.13.1(@cfworker/json-schema@4.1.1)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.23.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.22.0(@cfworker/json-schema@4.1.1)
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - supports-color
-      - zod
 
-  '@modelcontextprotocol/sdk@1.23.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)':
+  '@modelcontextprotocol/sdk@1.22.0(@cfworker/json-schema@4.1.1)':
     dependencies:
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
@@ -8510,26 +8507,6 @@ snapshots:
       raw-body: 3.0.1
       zod: 3.25.76
       zod-to-json-schema: 3.25.0(zod@3.25.76)
-    optionalDependencies:
-      '@cfworker/json-schema': 4.1.1
-    transitivePeerDependencies:
-      - supports-color
-
-  '@modelcontextprotocol/sdk@1.23.0(@cfworker/json-schema@4.1.1)(zod@4.1.12)':
-    dependencies:
-      ajv: 8.17.1
-      ajv-formats: 3.0.1(ajv@8.17.1)
-      content-type: 1.0.5
-      cors: 2.8.5
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.6
-      express: 5.1.0
-      express-rate-limit: 7.5.1(express@5.1.0)
-      pkce-challenge: 5.0.0
-      raw-body: 3.0.1
-      zod: 4.1.12
-      zod-to-json-schema: 3.25.0(zod@4.1.12)
     optionalDependencies:
       '@cfworker/json-schema': 4.1.1
     transitivePeerDependencies:
@@ -15432,10 +15409,6 @@ snapshots:
   zod-to-json-schema@3.24.6(zod@3.25.76):
     dependencies:
       zod: 3.25.76
-
-  zod-to-json-schema@3.24.6(zod@4.1.12):
-    dependencies:
-      zod: 4.1.12
 
   zod-to-json-schema@3.25.0(zod@3.25.76):
     dependencies:
