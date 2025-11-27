@@ -562,14 +562,15 @@ export function McpProvider({ children }: { children: ReactNode }) {
       // If connection exists in both configs and connections
       if (existingConfig && existingConnection) {
         // Check if we're trying to update the proxy config (for autoConnect retry scenarios)
-        const proxyConfigChanged = JSON.stringify(existingConfig.proxyConfig) !== JSON.stringify(proxyConfig);
-        
+        const proxyConfigChanged =
+          JSON.stringify(existingConfig.proxyConfig) !==
+          JSON.stringify(proxyConfig);
+
         if (proxyConfigChanged && proxyConfig) {
-          
           // Remove the old connection completely
           setConnectionConfigs((prev) => prev.filter((c) => c.url !== url));
           setConnections((prev) => prev.filter((c) => c.url !== url));
-          
+
           // Use setTimeout to ensure state updates complete before re-adding
           setTimeout(() => {
             const newConfig = {
@@ -579,9 +580,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
               proxyConfig,
               transportType: transportType || existingConfig.transportType,
             };
-            
+
             setConnectionConfigs((prev) => [...prev, newConfig]);
-            
+
             setConnections((prev) => [
               ...prev,
               {
@@ -615,14 +616,13 @@ export function McpProvider({ children }: { children: ReactNode }) {
           }, 10);
           return;
         }
-        
+
         return;
       }
 
       // If connection exists in configs but not in connections, add it to connections
       // Also update the config if new parameters are provided (for autoConnect retry scenarios)
       if (existingConfig && !existingConnection) {
-
         // Update config if new proxy or transport settings are provided
         if (proxyConfig || transportType) {
           setConnectionConfigs((prev) =>
@@ -651,7 +651,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
             prompts: [],
             error: null,
             authUrl: null,
-            customHeaders: proxyConfig?.customHeaders || existingConfig.proxyConfig?.customHeaders,
+            customHeaders:
+              proxyConfig?.customHeaders ||
+              existingConfig.proxyConfig?.customHeaders,
             transportType: transportType || existingConfig.transportType,
             proxyConfig: proxyConfig || existingConfig.proxyConfig,
             notifications: [],
@@ -738,7 +740,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
     }
 
     // Track removal
-    Telemetry.getInstance().capture(new MCPServerRemovedEvent({ serverId: id }));
+    Telemetry.getInstance().capture(
+      new MCPServerRemovedEvent({ serverId: id })
+    );
   }, []);
 
   const updateConnectionConfig = useCallback(
@@ -854,8 +858,13 @@ export function McpProvider({ children }: { children: ReactNode }) {
       {configLoaded &&
         autoConnect &&
         connectionConfigs.map((config) => {
-          const wrapperKey = `${config.id || config.url}-${config.proxyConfig?.proxyAddress ? 'proxy' : 'direct'}`;
-          console.warn('[McpContext] Rendering McpConnectionWrapper with key:', wrapperKey, 'proxyConfig:', config.proxyConfig);
+          const wrapperKey = `${config.id || config.url}-${config.proxyConfig?.proxyAddress ? "proxy" : "direct"}`;
+          console.warn(
+            "[McpContext] Rendering McpConnectionWrapper with key:",
+            wrapperKey,
+            "proxyConfig:",
+            config.proxyConfig
+          );
           return (
             <McpConnectionWrapper
               key={wrapperKey}

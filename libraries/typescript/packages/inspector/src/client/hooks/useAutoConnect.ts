@@ -90,7 +90,9 @@ export function useAutoConnect({
       // When using autoConnect, always enable auto-switch (proxy fallback)
       setAutoSwitch(true);
     } else {
-      const autoSwitchSetting = localStorage.getItem("mcp-inspector-auto-switch");
+      const autoSwitchSetting = localStorage.getItem(
+        "mcp-inspector-auto-switch"
+      );
       if (autoSwitchSetting !== null) {
         setAutoSwitch(autoSwitchSetting === "true");
       }
@@ -273,7 +275,9 @@ export function useAutoConnect({
         });
       } else {
         // Both modes failed - clear loading, reset state, and navigate home
-        toast.error("Cannot connect to server. Please check the URL and try again.");
+        toast.error(
+          "Cannot connect to server. Please check the URL and try again."
+        );
 
         // Defer state updates to avoid updating during render
         queueMicrotask(() => {
@@ -282,9 +286,9 @@ export function useAutoConnect({
           setAutoConnectConfig(null);
           setHasTriedBothModes(true);
           retryScheduledRef.current = false;
-          
+
           // Navigate to home page after connection failure
-          navigate('/');
+          navigate("/");
         });
       }
     }
