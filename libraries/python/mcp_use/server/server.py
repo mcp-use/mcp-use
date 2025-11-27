@@ -1,5 +1,6 @@
 import os
 import time
+from typing import Literal, cast
 
 from mcp.server.fastmcp import FastMCP
 
@@ -8,6 +9,8 @@ from mcp_use.server.logging import MCPLoggingMiddleware
 from mcp_use.server.routes import docs_ui, openmcp_json
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.signals import setup_signal_handlers
+
+TransportType = Literal["stdio", "streamable-http"]
 
 
 class MCPServer(FastMCP):
@@ -19,10 +22,10 @@ class MCPServer(FastMCP):
         version: str | None = None,
         instructions: str | None = None,
         debug: bool = False,
-        mcp_path: str | None = "/mcp",
-        docs_path: str | None = "/docs",
-        inspector_path: str | None = "/inspector",
-        openmcp_path: str | None = "/openmcp.json",
+        mcp_path: str = "/mcp",
+        docs_path: str = "/docs",
+        inspector_path: str = "/inspector",
+        openmcp_path: str = "/openmcp.json",
         show_inspector_logs: bool = False,
         pretty_print_jsonrpc: bool = False,
     ):
@@ -57,6 +60,11 @@ class MCPServer(FastMCP):
 
         # Set up signal handlers for immediate shutdown
         setup_signal_handlers()
+
+    @property
+    def debug(self) -> bool:
+        """Whether debug mode is enabled."""
+        return self.debug_level >= 1
 
     def _parse_debug_level(self) -> int:
         """Parse DEBUG environment variable to get debug level.
@@ -99,9 +107,9 @@ class MCPServer(FastMCP):
         """Override to add our custom middleware."""
         app = super().streamable_http_app()
 
-        # Add MCP logging middleware
+        # Add MCP logging middleware (cast to satisfy type checker)
         app.add_middleware(
-            MCPLoggingMiddleware,
+            cast(type, MCPLoggingMiddleware),
             debug_level=self.debug_level,
             mcp_path=self.mcp_path,
             pretty_print_jsonrpc=self.pretty_print_jsonrpc,
@@ -109,13 +117,13 @@ class MCPServer(FastMCP):
 
         return app
 
-    def run(
+    def run(  # type: ignore[override]
         self,
-        transport: str = "stdio",
+        transport: TransportType = "stdio",
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
-        debug: bool = False,
+        run_debug: bool = False,
     ) -> None:
         """Run the MCP server.
 
@@ -124,7 +132,7 @@ class MCPServer(FastMCP):
             host: Host to bind to
             port: Port to bind to
             reload: Whether to enable auto-reload
-            debug: Whether to enable debug mode (adds /docs and /openmcp.json endpoints)
+            run_debug: Whether to enable debug mode (adds /docs and /openmcp.json endpoints)
         """
         runner = ServerRunner(self)
-        runner.run(transport=transport, host=host, port=port, reload=reload, debug=debug)
+        runner.run(transport=transport, host=host, port=port, reload=reload, debug=run_debug)

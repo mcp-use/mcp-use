@@ -38,7 +38,7 @@ class ServerRunner:
             log_config=get_logging_config(
                 debug_level=self.server.debug_level,
                 show_inspector_logs=self.server.show_inspector_logs,
-                inspector_path=self.server.inspector_path,
+                inspector_path=self.server.inspector_path or "/inspector",
             ),
             timeout_graceful_shutdown=0,  # Disable graceful shutdown
         )

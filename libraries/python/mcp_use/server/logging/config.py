@@ -14,8 +14,9 @@ class InspectorLogFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         # Check if args contain a path that starts with inspector_path
-        if hasattr(record, "args") and len(record.args) >= 3:
-            path = record.args[2]
+        args = record.args
+        if args is not None and isinstance(args, tuple) and len(args) >= 3:
+            path = args[2]
             if isinstance(path, str) and self.inspector_path in path:
                 return False
         return True

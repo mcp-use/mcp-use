@@ -119,8 +119,9 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
             )
 
             # Format and print response if available
-            if hasattr(response, "body") and response.body:
-                response_text = response.body.decode("utf-8", errors="replace")
+            body = getattr(response, "body", None)
+            if body is not None and isinstance(body, bytes):
+                response_text = body.decode("utf-8", errors="replace")
                 try:
                     response_json = json.loads(response_text)
                     response_formatted = json.dumps(response_json, indent=2)
@@ -131,8 +132,9 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         else:
             # Plain text logging
             print(f"\033[36mMCP:\033[0m  [{display}] Request ({duration_ms:.1f}ms): {request_text}")
-            if hasattr(response, "body") and response.body:
-                response_text = response.body.decode("utf-8", errors="replace")
+            body = getattr(response, "body", None)
+            if body is not None and isinstance(body, bytes):
+                response_text = body.decode("utf-8", errors="replace")
                 print(f"\033[36mMCP:\033[0m  [{display}] Response: {response_text}")
 
     async def _log_access_info(self, request: Request, method_info: dict, response: Response, start_time: float):

@@ -2,95 +2,130 @@
 
 import logging
 import re
+from dataclasses import dataclass
 
 from uvicorn.logging import AccessFormatter
 
 from mcp_use.server.logging.state import get_method_info
 
+# ANSI escape codes
+BOLD = "\033[1m"
+RESET = "\033[0m"
+GREEN = "\033[32m"
+RED = "\033[31m"
+YELLOW = "\033[33m"
+CYAN = "\033[36m"
+MAGENTA = "\033[35m"
+
+
+@dataclass
+class UvicornAccessArgs:
+    """
+    Uvicorn access logs use a tuple format: (client_addr, method, path, ...).
+
+    This class provides named access to make the code more readable.
+    See: https://github.com/encode/uvicorn/blob/master/uvicorn/logging.py
+    """
+
+    client_addr: str
+    method: str
+    path: str
+    extra: tuple
+
+    @classmethod
+    def from_record_args(cls, args: tuple) -> "UvicornAccessArgs | None":
+        """Parse Uvicorn's access log args tuple into named fields."""
+        if len(args) < 3:
+            return None
+        return cls(
+            client_addr=str(args[0]),
+            method=str(args[1]),
+            path=str(args[2]),
+            extra=args[3:],
+        )
+
+    def is_mcp_request(self, mcp_path: str = "/mcp") -> bool:
+        """Check if this is a POST request to the MCP endpoint."""
+        return self.method == "POST" and mcp_path in self.path
+
+    def to_tuple(self, path_override: str | None = None, method_override: str | None = None) -> tuple:
+        """Convert back to tuple format for Uvicorn's formatter."""
+        return (
+            self.client_addr,
+            method_override or self.method,
+            path_override or self.path,
+        ) + self.extra
+
 
 class ColoredFormatter(logging.Formatter):
-    """Custom formatter with ANSI color codes matching the documentation format."""
+    """Custom formatter with ANSI color codes."""
 
-    # ANSI color codes matching the Steps documentation
     COLORS = {
-        "DEBUG": "\033[36m",  # Cyan (#06b6d4)
-        "INFO": "\033[32m",  # Green (#10b981)
-        "WARNING": "\033[33m",  # Yellow (#f59e0b)
-        "ERROR": "\033[31m",  # Red (#ef4444)
-        "CRITICAL": "\033[35m",  # Magenta (#ec4899)
-        "RESET": "\033[0m",  # Reset
+        "DEBUG": CYAN,
+        "INFO": GREEN,
+        "WARNING": YELLOW,
+        "ERROR": RED,
+        "CRITICAL": MAGENTA,
     }
 
     def __init__(self, fmt=None, datefmt=None):
         super().__init__(fmt, datefmt)
 
     def format(self, record):
-        # Add color to levelname based on documentation colors
         if record.levelname in self.COLORS:
-            record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{self.COLORS['RESET']}"
-
+            color = self.COLORS[record.levelname]
+            record.levelname = f"{color}{record.levelname}{RESET}"
         return super().format(record)
 
 
 class MCPAccessFormatter(AccessFormatter):
-    """Enhanced access formatter that shows MCP method information."""
+    """
+    Enhanced Uvicorn access formatter that shows MCP method information.
+
+    For MCP requests, enhances the log with JSON-RPC method info from thread-local storage.
+    """
 
     def __init__(self, **kwargs):
         super().__init__()
 
     def formatMessage(self, record):
-        # Handle custom MCP logs that don't have args
-        if not hasattr(record, "args") or len(record.args) == 0:
-            # This is a custom log from our middleware, just return the message
+        args = record.args
+
+        # Non-Uvicorn logs (e.g., from our middleware) don't have args
+        if args is None or not isinstance(args, tuple) or len(args) == 0:
             return record.getMessage()
 
-        # Let Uvicorn's AccessFormatter do most of the work
+        # Parse Uvicorn's access log format
+        access_args = UvicornAccessArgs.from_record_args(args)
+        if access_args is None:
+            return record.getMessage()
+
+        # Pad HTTP method for visual alignment (GET, POST, PUT, etc.)
+        padded_method = f"{access_args.method:<4}"
+
+        # Enhance MCP requests with JSON-RPC method info
+        final_path = access_args.path
+        if access_args.is_mcp_request():
+            mcp_info = get_method_info()
+            if mcp_info:
+                display = mcp_info.get("display", "unknown")
+                final_path = f"{access_args.path} [{BOLD}{display}{RESET}]"
+
+        # Update record with formatted args
         recordcopy = logging.makeLogRecord(record.__dict__)
+        recordcopy.args = access_args.to_tuple(path_override=final_path, method_override=padded_method)
 
-        # Check if this is an MCP POST request and enhance it
-        if len(record.args) >= 3:
-            client_addr, method, path = record.args[0], record.args[1], record.args[2]
-
-            # Pad HTTP method for alignment
-            padded_method = f"{method:<4}"
-
-            if "/mcp" in path and method == "POST":  # TODO: Make this configurable
-                # Get MCP method info from thread-local storage
-                mcp_info = get_method_info()
-                if mcp_info:
-                    session_id = mcp_info.get("session_id")
-                    display = mcp_info.get("display", "unknown")
-
-                    # Enhance the path with MCP method info - bold the method
-                    enhanced_path = f"{path}"
-                    if session_id:
-                        enhanced_path += f" [{session_id}]"
-                    enhanced_path += f" [\033[1m{display}\033[0m]"
-
-                    # Update the record args with padded method
-                    recordcopy.args = (client_addr, padded_method, enhanced_path) + record.args[3:]
-                else:
-                    # Update the record args with padded method
-                    recordcopy.args = (client_addr, padded_method, path) + record.args[3:]
-            else:
-                # Update the record args with padded method for non-MCP requests
-                recordcopy.args = (client_addr, padded_method, path) + record.args[3:]
-
-        # Format with log level prefix and colors
+        # Format and add colored level prefix
         formatted = super().formatMessage(recordcopy)
-        levelname = record.levelname
+        return self._add_level_prefix(record.levelname, formatted)
 
-        # Apply colors based on log level
-        if levelname == "INFO":
-            return f"\033[32m{levelname}:\033[0m {formatted}"
-        elif levelname == "ERROR":
-            return f"\033[31m{levelname}:\033[0m {formatted}"
-        elif levelname == "WARNING":
-            return f"\033[33m{levelname}:\033[0m {formatted}"
-        elif levelname == "DEBUG":
-            return f"\033[36m{levelname}:\033[0m {formatted}"
-        else:
-            return f"{levelname}: {formatted}"
+    def _add_level_prefix(self, levelname: str, message: str) -> str:
+        """Add colored level prefix to the message."""
+        colors = {"INFO": GREEN, "ERROR": RED, "WARNING": YELLOW, "DEBUG": CYAN}
+        color = colors.get(levelname, "")
+        if color:
+            return f"{color}{levelname}:{RESET} {message}"
+        return f"{levelname}: {message}"
 
 
 class MCPErrorFormatter(logging.Formatter):

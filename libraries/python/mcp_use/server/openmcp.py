@@ -12,9 +12,9 @@ if TYPE_CHECKING:
 class OpenMCPInfo:
     """OpenMCP server info structure."""
 
-    def __init__(self, title: str, version: str, description: str | None = None):
+    def __init__(self, title: str, version: str | None = None, description: str | None = None):
         self.title = title
-        self.version = version
+        self.version = version or "0.0.0"
         self.description = description
 
 
@@ -110,7 +110,7 @@ async def get_openmcp_json(server: "MCPServer") -> JSONResponse:
             logger.debug("Successfully retrieved server capabilities")
         except Exception as e:
             logger.error(f"Failed to retrieve capabilities: {e}")
-            capabilities = {}
+            capabilities = ServerCapabilities()
 
         try:
             prompts = await server.list_prompts()
