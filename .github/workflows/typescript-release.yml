@@ -183,7 +183,7 @@ jobs:
           echo "✅ Created exit prerelease PR"
 
       - name: Check if this is a release commit (Main)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false'
         id: check-release
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
@@ -197,7 +197,10 @@ jobs:
           fi
 
       - name: Publish packages (Main)
-        if: github.ref == 'refs/heads/main' && steps.check-release.outputs.should_publish == 'true'
+        if: github.ref == 'refs/heads/main' &&
+            github.event_name == 'push' &&
+            steps.check-prerelease.outputs.in_prerelease == 'false' &&
+            steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -212,7 +215,7 @@ jobs:
           echo "✅ Published packages to npm using trusted publishing and pushed tags"
 
       - name: Reset canary to main
-        if: steps.check-release.outputs.should_publish == 'true'
+        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -233,7 +236,7 @@ jobs:
           echo "✅ Reset canary to main (canary workflow will auto-enter prerelease mode)"
 
       - name: Create GitHub Release (Main)
-        if: github.ref == 'refs/heads/main' && steps.check-release.outputs.should_publish == 'true'
+        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
