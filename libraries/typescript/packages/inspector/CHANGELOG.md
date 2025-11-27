@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.8.2
+
+### Patch Changes
+
+- 7e7c9a5: Downgrade mcp sdk to 22 due to https://github.com/modelcontextprotocol/typescript-sdk/issues/1182
+- Updated dependencies [7e7c9a5]
+  - mcp-use@1.6.2
+
 ## 0.8.2-canary.0
 
 ### Patch Changes
