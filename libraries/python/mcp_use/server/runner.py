@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
 from mcp_use.server.signals import setup_signal_handlers
 
+VALID_TRANSPORTS = ("stdio", "streamable-http")
+
 
 class ServerRunner:
     """Handles running the server with different transport types."""
@@ -67,8 +69,7 @@ class ServerRunner:
             reload: Whether to enable auto-reload
             debug: Whether to enable debug mode
         """
-        TRANSPORTS = Literal["stdio", "streamable-http"]
-        if transport not in TRANSPORTS.__args__:  # type: ignore
+        if transport not in VALID_TRANSPORTS:
             raise ValueError(f"Unknown transport: {transport}")
 
         try:
