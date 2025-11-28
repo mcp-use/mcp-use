@@ -139,7 +139,7 @@ class MCPServer(FastMCP):
             return
         # Register all tools from the router
         for tool in router.tools:
-            tool_name = tool.name
+            tool_name = tool.name or tool.fn.__name__
             if prefix:
                 tool_name = f"{prefix}_{tool_name}"
 
@@ -154,6 +154,9 @@ class MCPServer(FastMCP):
 
         # Register all resources from the router
         for resource in router.resources:
+            resource_name = resource.name or resource.fn.__name__
+            if prefix:
+                resource_name = f"{prefix}_{resource_name}"
             self.resource(
                 uri=resource.uri,
                 name=resource.name,
@@ -163,7 +166,7 @@ class MCPServer(FastMCP):
 
         # Register all prompts from the router
         for prompt in router.prompts:
-            prompt_name = prompt.name
+            prompt_name = prompt.name or prompt.fn.__name__
             if prefix:
                 prompt_name = f"{prefix}_{prompt_name}"
 
