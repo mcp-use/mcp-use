@@ -9,7 +9,7 @@ from mcp_use import MCPClient
 
 @pytest.fixture
 async def server_process():
-    """Start the streamableHttp server process for testing"""
+    """Start the Streamable HTTP server process for testing"""
     server_path = Path(__file__).parent.parent / "servers_for_testing" / "simple_server.py"
 
     print(f"Starting server: python {server_path}")
@@ -25,7 +25,7 @@ async def server_process():
         text=True,
     )
 
-    # Wait for server to start up (CI Linux runners need more time)
+    # Give the server time to start (CI Linux runners need more time)
     await asyncio.sleep(3)
     server_url = "http://127.0.0.1:8000"
     yield server_url
@@ -37,23 +37,20 @@ async def server_process():
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            print("Process didn't terminate gracefully, killing it")
             process.kill()
             process.wait()
-
-    print("Server cleanup complete")
 
 
 @pytest.mark.asyncio
 async def test_streamable_http_connection(server_process):
-    """Test that we can connect to streamableHttp MCP server and retrieve tools"""
+    """Test that we can connect to Streamable HTTP MCP server and retrieve tools"""
     server_url = server_process
-    config = {"mcpServers": {"streamableHttp": {"url": f"{server_url}/mcp"}}}
-    print(config)
+    config = {"mcpServers": {"streamable_http": {"url": f"{server_url}/mcp"}}}
+
     client = MCPClient(config=config)
     try:
         await client.create_all_sessions()
-        session = client.get_session("streamableHttp")
+        session = client.get_session("streamable_http")
 
         # Verify session was created
         assert session is not None, "Session should be created"
