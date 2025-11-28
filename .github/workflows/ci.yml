@@ -38,8 +38,10 @@ name: CI
 #    │  - Tests starter, mcp-ui, apps-sdk templates
 #    │  - Collapsed into one expandable job for clean UI
 #    ├─ create-mcp-use-app-e2e-npm: E2E test with npm (Ubuntu only)
+#    │  - Matrix: [starter, mcp-ui, apps-sdk] templates
 #    │  - Creates app, installs with npm, runs dev (kills), builds
 #    └─ create-mcp-use-app-e2e-yarn: E2E test with yarn (Ubuntu only)
+#       - Matrix: [starter, mcp-ui, apps-sdk] templates
 #       - Creates app, installs with yarn, runs dev (kills), builds
 #
 
@@ -605,8 +607,12 @@ jobs:
   create-mcp-use-app-e2e-npm:
     needs: [detect-changes, create-mcp-use-app-build]
     if: needs.detect-changes.outputs.create-mcp-use-app == 'true'
-    name: "typescript/create-app-e2e/npm"
+    name: "typescript/create-app-e2e/npm/${{ matrix.template }}"
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [starter, mcp-ui, apps-sdk]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -623,16 +629,16 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
-          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm --template starter --no-install
-          echo "✅ Project created successfully"
+          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }} --no-install
+          echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Install dependencies with npm
-        working-directory: test-app-npm
+        working-directory: test-app-npm-${{ matrix.template }}
         shell: bash
         run: |
           npm install
           echo "✅ Dependencies installed with npm"
       - name: Run dev server and kill it
-        working-directory: test-app-npm
+        working-directory: test-app-npm-${{ matrix.template }}
         shell: bash
         run: |
           npm run dev &
@@ -642,13 +648,13 @@ jobs:
           wait $DEV_PID 2>/dev/null || true
           echo "✅ Dev server started and stopped"
       - name: Build project
-        working-directory: test-app-npm
+        working-directory: test-app-npm-${{ matrix.template }}
         shell: bash
         run: |
           npm run build
           echo "✅ Build completed successfully"
       # - name: Deploy project
-      #   working-directory: test-app-npm
+      #   working-directory: test-app-npm-${{ matrix.template }}
       #   shell: bash
       #   run: |
       #     npm run deploy
@@ -657,8 +663,12 @@ jobs:
   create-mcp-use-app-e2e-yarn:
     needs: [detect-changes, create-mcp-use-app-build]
     if: needs.detect-changes.outputs.create-mcp-use-app == 'true'
-    name: "typescript/create-app-e2e/yarn"
+    name: "typescript/create-app-e2e/yarn/${{ matrix.template }}"
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [starter, mcp-ui, apps-sdk]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -677,16 +687,16 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
-          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn --template starter --no-install
-          echo "✅ Project created successfully"
+          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }} --no-install
+          echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Install dependencies with yarn
-        working-directory: test-app-yarn
+        working-directory: test-app-yarn-${{ matrix.template }}
         shell: bash
         run: |
           yarn install
           echo "✅ Dependencies installed with yarn"
       - name: Run dev server and kill it
-        working-directory: test-app-yarn
+        working-directory: test-app-yarn-${{ matrix.template }}
         shell: bash
         run: |
           yarn dev &
@@ -696,13 +706,13 @@ jobs:
           wait $DEV_PID 2>/dev/null || true
           echo "✅ Dev server started and stopped"
       - name: Build project
-        working-directory: test-app-yarn
+        working-directory: test-app-yarn-${{ matrix.template }}
         shell: bash
         run: |
           yarn build
           echo "✅ Build completed successfully"
       # - name: Deploy project
-      #   working-directory: test-app-yarn
+      #   working-directory: test-app-yarn-${{ matrix.template }}
       #   shell: bash
       #   run: |
       #     yarn deploy
