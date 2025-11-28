@@ -91,5 +91,5 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
 
-[tool.ty]
+[tool.ty.environment]
 python-version = "3.11"
