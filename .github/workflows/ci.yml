@@ -141,7 +141,6 @@ jobs:
 
   python-ty-check:
     needs: python-lint
-    if: needs.python-lint.outputs.ty == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
