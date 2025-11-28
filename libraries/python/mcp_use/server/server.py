@@ -102,8 +102,11 @@ class MCPServer(FastMCP):
         # Documentation UI
         self.custom_route(self.docs_path, methods=["GET"])(docs_ui)
 
-        # Inspector routes
-        self.custom_route(self.inspector_path, methods=["GET"])(_inspector_index)
+        # Inspector routes - wrap to pass mcp_path
+        async def inspector_index_handler(request):
+            return await _inspector_index(request, mcp_path=self.mcp_path)
+
+        self.custom_route(self.inspector_path, methods=["GET"])(inspector_index_handler)
         self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
 
     def include_router(self, router: "MCPRouter", prefix: str = "", enabled: bool = True) -> None:
@@ -139,7 +142,7 @@ class MCPServer(FastMCP):
             return
         # Register all tools from the router
         for tool in router.tools:
-            tool_name = tool.name or tool.fn.__name__
+            tool_name = tool.name or getattr(tool.fn, "__name__", "unknown")
             if prefix:
                 tool_name = f"{prefix}_{tool_name}"
 
@@ -154,7 +157,7 @@ class MCPServer(FastMCP):
 
         # Register all resources from the router
         for resource in router.resources:
-            resource_name = resource.name or resource.fn.__name__
+            resource_name = resource.name or getattr(resource.fn, "__name__", "unknown")
             if prefix:
                 resource_name = f"{prefix}_{resource_name}"
             self.resource(
@@ -166,7 +169,7 @@ class MCPServer(FastMCP):
 
         # Register all prompts from the router
         for prompt in router.prompts:
-            prompt_name = prompt.name or prompt.fn.__name__
+            prompt_name = prompt.name or getattr(prompt.fn, "__name__", "unknown")
             if prefix:
                 prompt_name = f"{prefix}_{prompt_name}"
 
