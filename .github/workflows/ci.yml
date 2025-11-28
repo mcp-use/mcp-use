@@ -315,22 +315,13 @@ jobs:
             
             const overallStatus = allPassed ? '✅ All transport tests passed!' : '❌ Some transport tests failed';
             
-            const comment = `## 🚀 Python Transport Tests Results
+            const comment = `## Python Transport Tests Results
             
             ${overallStatus}
             
             | Transport | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
-            
-            <details>
-            <summary>📋 Test Details</summary>
-            
-            - **stdio**: Standard input/output transport
-            - **sse**: Server-Sent Events transport  
-            - **streamable_http**: HTTP streaming transport
-            
-            </details>`;
             
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -341,7 +332,7 @@ jobs:
             
             const botComment = comments.find(c => 
               c.user.type === 'Bot' && 
-              c.body.includes('## 🚀 Python Transport Tests Results')
+              c.body.includes('## Python Transport Tests Results')
             );
             
             if (botComment) {
@@ -487,26 +478,13 @@ jobs:
             
             const overallStatus = allPassed ? '✅ All primitive tests passed!' : '❌ Some primitive tests failed';
             
-            const comment = `## 🧪 Python Primitive Tests Results
+            const comment = `## Python Primitive Tests Results
             
             ${overallStatus}
             
             | Primitive | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
-            
-            <details>
-            <summary>📋 Test Details</summary>
-            
-            - **sampling**: MCP sampling primitive tests
-            - **tools**: MCP tools primitive tests
-            - **resources**: MCP resources primitive tests
-            - **prompts**: MCP prompts primitive tests
-            - **elicitation**: MCP elicitation primitive tests
-            - **notifications**: MCP notifications primitive tests
-            - **auth**: MCP authentication primitive tests
-            
-            </details>`;
             
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -517,7 +495,7 @@ jobs:
             
             const botComment = comments.find(c => 
               c.user.type === 'Bot' && 
-              c.body.includes('## 🧪 Python Primitive Tests Results')
+              c.body.includes('## Python Primitive Tests Results')
             );
             
             if (botComment) {
