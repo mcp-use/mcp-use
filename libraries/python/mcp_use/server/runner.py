@@ -14,6 +14,8 @@ from mcp_use.server.types import TransportType
 if TYPE_CHECKING:
     from mcp_use.server.server import MCPServer
 
+from starlette.applications import Starlette
+
 from mcp_use.server.signals import setup_signal_handlers
 
 
@@ -23,13 +25,11 @@ class ServerRunner:
     def __init__(self, server: "MCPServer"):
         self.server = server
 
-    async def run_streamable_http_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
-        """Run the server using StreamableHTTP transport."""
-        starlette_app = self.server.streamable_http_app()
-
+    async def server_starlette_app(
+        self, starlette_app: Starlette, host: str = "127.0.0.1", port: int = 8000, reload: bool = False
+    ) -> None:
         # Display startup information
         await display_startup_info(self.server, host, port, self.server._start_time)
-
         config = uvicorn.Config(
             starlette_app,
             host=host,
@@ -43,13 +43,20 @@ class ServerRunner:
             ),
             timeout_graceful_shutdown=0,  # Disable graceful shutdown
         )
-
         server = uvicorn.Server(config)
-
         # Set up signal handlers before starting server
         setup_signal_handlers()
-
         await server.serve()
+
+    async def run_streamable_http_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
+        """Run the server using StreamableHTTP transport."""
+        starlette_app = self.server.streamable_http_app()
+        await self.server_starlette_app(starlette_app, host, port, reload)
+
+    async def run_sse_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
+        """Run the server using SSE transport."""
+        starlette_app = self.server.sse_app(self.server.mcp_path)
+        await self.server_starlette_app(starlette_app, host, port, reload)
 
     def run(
         self,
@@ -81,6 +88,8 @@ class ServerRunner:
                         self.server._add_dev_routes()
                         self.server.app = self.server.streamable_http_app()
                     anyio.run(partial(self.run_streamable_http_async, host=host, port=port, reload=reload))
+                case "sse":
+                    anyio.run(partial(self.run_sse_async, host=host, port=port, reload=reload))
         except KeyboardInterrupt:
             print("\n⏹  Shutting down gracefully...", file=sys.stderr)
             sys.exit(0)
