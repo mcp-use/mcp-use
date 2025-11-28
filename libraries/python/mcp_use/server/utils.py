@@ -1,6 +1,9 @@
 import inspect
+import logging
 import socket
 from typing import Any, get_type_hints
+
+logger = logging.getLogger(__name__)
 
 
 def estimate_tokens(text: str) -> int:
@@ -15,7 +18,8 @@ def get_local_network_ip() -> str | None:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("8.8.8.8", 80))
             return s.getsockname()[0]
-    except Exception:
+    except OSError as exc:
+        logger.debug("Failed to determine local network IP: %s", exc)
         return None
 
 
