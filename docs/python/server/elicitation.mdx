@@ -1,0 +1,118 @@
+---
+title: "Elicitation"
+description: "Request additional information from users"
+icon: "check"
+---
+
+Elicitation allows your MCP server tools to request additional information from users during execution. This enables tools to gather structured or unstructured input when needed, creating interactive and dynamic workflows.
+
+## How It Works
+
+When a tool needs user input, it can use the `Context` to send an elicitation request to the client. The client displays the request to the user and returns their response to the tool. The user can accept (provide data), decline (skip), or cancel the operation.
+
+## Basic Usage
+
+Use the `elicit()` method on the context object to request user input:
+
+```python
+from dataclasses import dataclass
+from mcp_use.server import Context, MCPServer
+
+server = MCPServer(name="My Server")
+
+@dataclass
+class UserInfo:
+    name: str
+    email: str
+
+@server.tool()
+async def collect_contact(ctx: Context) -> str:
+    """Collect user contact information."""
+    result = await ctx.elicit(
+        message="Please provide your contact details",
+        schema=UserInfo
+    )
+
+    if result.action == "accept":
+        info = result.data
+        return f"Thank you, {info.name}! We'll contact you at {info.email}"
+    elif result.action == "decline":
+        return "No contact information provided"
+    else:
+        return "Operation cancelled"
+```
+
+## Structured Input
+
+Define schemas using dataclasses or Pydantic models for structured data collection:
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class PurchaseInfo:
+    quantity: int
+    unit: str
+    item_name: str
+
+@server.tool()
+async def purchase_item(ctx: Context) -> str:
+    """Purchase an item with user-provided details."""
+    result = await ctx.elicit(
+        message="Please provide purchase details",
+        schema=PurchaseInfo
+    )
+
+    if result.action == "accept":
+        data = result.data
+        return f"Purchasing {data.quantity} {data.unit} of {data.item_name}"
+    elif result.action == "decline":
+        return "Purchase declined by user"
+    else:
+        return "Purchase cancelled"
+```
+
+## Response Actions
+
+Elicitation responses use a three-action model:
+
+- **accept**: User provided valid input - the `data` field contains their response
+- **decline**: User chose not to provide the information
+- **cancel**: User cancelled the entire operation
+
+## Use Case Example
+
+A task management server that collects task details from users:
+
+```python
+@dataclass
+class TaskDetails:
+    title: str
+    priority: str  # "high", "medium", "low"
+    due_date: str
+
+@server.tool()
+async def create_task(ctx: Context) -> str:
+    """Create a new task with user input."""
+    result = await ctx.elicit(
+        message="Enter task details to create",
+        schema=TaskDetails
+    )
+    if result.action == "accept":
+        task = result.data
+        return f"Created {task.priority} priority task: {task.title} (due: {task.due_date})"
+    return "Task creation cancelled"
+```
+
+## Important Notes
+
+- The client must provide an `elicitation_callback` to handle elicitation requests
+- If no callback is configured, elicitation requests will fail
+- Use dataclasses or Pydantic models for type-safe structured input
+- Handle all three response actions (`accept`, `decline`, `cancel`) appropriately
+
+## Next Steps
+
+- See [Context API](/python/api-reference/mcp_use_server_context) for more context methods
+- Learn about [Sampling](/python/server/sampling) for requesting LLM completions
+
