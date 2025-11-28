@@ -1,9 +1,15 @@
+from __future__ import annotations
+
+import inspect
+import logging
 import os
 import time
 from typing import TYPE_CHECKING, cast
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import AnyFunction
 
+from mcp_use.server.context import Context as MCPContext
 from mcp_use.server.logging import MCPLoggingMiddleware
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
@@ -12,7 +18,12 @@ from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.server.utils.signals import setup_signal_handlers
 
 if TYPE_CHECKING:
+    from mcp.server.session import ServerSession
+
     from mcp_use.server.router import MCPRouter
+
+
+logger = logging.getLogger(__name__)
 
 
 class MCPServer(FastMCP):
@@ -108,7 +119,7 @@ class MCPServer(FastMCP):
         self.custom_route(self.inspector_path, methods=["GET"])(inspector_index_handler)
         self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
 
-    def include_router(self, router: "MCPRouter", prefix: str = "", enabled: bool = True) -> None:
+    def include_router(self, router: MCPRouter, prefix: str = "", enabled: bool = True) -> None:
         """
         Include a router's tools, resources, and prompts into this server.
 
@@ -210,3 +221,25 @@ class MCPServer(FastMCP):
         """
         runner = ServerRunner(self)
         runner.run(transport=transport, host=host, port=port, reload=reload, debug=run_debug)
+
+    def get_context(self) -> MCPContext:  # type: ignore[override]
+        """Use the extended MCP-Use context that adds convenience helpers."""
+        return MCPContext(request_context=self._get_request_context(), fastmcp=self)  # type: ignore[override]
+
+    def _resource_is_template(self, fn: AnyFunction, uri: str) -> bool:
+        has_uri_params = "{" in uri and "}" in uri
+        if has_uri_params:
+            return True
+        return bool(inspect.signature(fn).parameters)
+
+    def _current_session(self) -> ServerSession | None:
+        request_context = self._get_request_context()
+        if request_context is None:
+            return None
+        return request_context.session
+
+    def _get_request_context(self):
+        try:
+            return self._mcp_server.request_context
+        except LookupError:
+            return None
