@@ -30,7 +30,19 @@ config = {
 async def main():
     """Example 5: AI Agent using code mode (requires OpenAI API key)."""
 
-    client = MCPClient(config=config, code_mode=True)
+    # You can configure semantic search mode:
+    # - "string_match" (default): Simple substring matching
+    # - "fuzzy": Fuzzy search (requires thefuzz)
+    # - "embeddings": Semantic search (requires OPENAI_API_KEY or embeddings_url)
+    from mcp_use.client.client import CodeModeConfig, SemanticSearchConfig
+
+    client = MCPClient(
+        config=config,
+        code_mode=CodeModeConfig(
+            enabled=True,
+            semantic=SemanticSearchConfig(mode="string_match")
+        ),
+    )
 
     # Create LLM
     llm = ChatAnthropic(model="claude-haiku-4-5-20251001")

@@ -36,7 +36,18 @@ const config = {
 
 async function main() {
   // Initialize client with code mode enabled
-  const client = new MCPClient(config, { codeMode: true });
+  // You can configure semantic search mode:
+  // - "string_match" (default): Simple substring matching
+  // - "fuzzy": Fuzzy search (requires fuse.js)
+  // - "embeddings": Semantic search (requires OPENAI_API_KEY or embeddingsUrl)
+  const client = new MCPClient(config, {
+    codeMode: {
+      enabled: true,
+      semantic: {
+        mode: "string_match", // Change to "fuzzy" or "embeddings" as needed
+      },
+    },
+  });
 
   // Create LLM
   const llm = new ChatAnthropic({

@@ -114,6 +114,7 @@
     "@e2b/code-interpreter": "^2.2.0",
     "@langchain/anthropic": "^1.0.0",
     "@langchain/openai": "^1.0.0",
+    "fuse.js": "^7.0.0",
     "langfuse": "^3.38.6",
     "langfuse-langchain": "^3.38.6",
     "react": "^18.0.0 || ^19.0.0",
@@ -127,6 +128,9 @@
       "optional": true
     },
     "@langchain/openai": {
+      "optional": true
+    },
+    "fuse.js": {
       "optional": true
     },
     "langfuse": {

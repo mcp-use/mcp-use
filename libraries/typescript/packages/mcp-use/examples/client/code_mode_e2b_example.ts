@@ -56,6 +56,10 @@ async function main() {
   console.log("🚀 Initializing E2B Code Execution Mode...\n");
 
   // Initialize client with E2B code mode enabled
+  // You can configure semantic search mode:
+  // - "string_match" (default): Simple substring matching
+  // - "fuzzy": Fuzzy search (requires fuse.js)
+  // - "embeddings": Semantic search (requires OPENAI_API_KEY or embeddingsUrl)
   const client = new MCPClient(config, {
     codeMode: {
       enabled: true,
@@ -63,6 +67,9 @@ async function main() {
       executorOptions: {
         apiKey: e2bApiKey,
         timeoutMs: 300000, // 5 minutes
+      },
+      semantic: {
+        mode: "string_match", // Change to "fuzzy" or "embeddings" as needed
       },
     },
   });

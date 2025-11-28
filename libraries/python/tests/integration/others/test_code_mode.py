@@ -6,7 +6,7 @@ These tests verify the end-to-end functionality of code mode with MCPClient.
 
 import pytest
 
-from mcp_use.client.client import MCPClient
+from mcp_use.client.client import CodeModeConfig, MCPClient, SemanticSearchConfig
 
 
 class TestCodeModeIntegration:
@@ -18,6 +18,18 @@ class TestCodeModeIntegration:
 
         assert client.code_mode is True
         assert client._code_executor is None  # Lazy initialization
+
+    def test_client_initialization_with_code_mode_config(self):
+        """Test that MCPClient can be initialized with CodeModeConfig."""
+        config = CodeModeConfig(
+            enabled=True,
+            semantic=SemanticSearchConfig(mode="string_match"),
+        )
+        client = MCPClient(code_mode=config)
+
+        assert client.code_mode is True
+        assert client._semantic_config is not None
+        assert client._semantic_config.mode == "string_match"
 
     def test_client_initialization_without_code_mode(self):
         """Test that MCPClient defaults to code_mode=False."""
@@ -216,3 +228,36 @@ class TestSearchToolsIntegration:
         assert "name" in full_tool
         assert "description" in full_tool
         assert "input_schema" in full_tool
+
+    @pytest.mark.asyncio
+    async def test_search_tools_with_semantic_config(self):
+        """Test search_tools with semantic search configuration."""
+        # Test string_match mode (default)
+        client = MCPClient(
+            code_mode=CodeModeConfig(
+                enabled=True, semantic=SemanticSearchConfig(mode="string_match")
+            )
+        )
+
+        result = await client.search_tools("", detail_level="names")
+        assert result["meta"] is not None
+        assert result["results"] is not None
+
+        # Test fuzzy mode configuration (will fail if thefuzz not installed, but config should work)
+        client_fuzzy = MCPClient(
+            code_mode=CodeModeConfig(
+                enabled=True, semantic=SemanticSearchConfig(mode="fuzzy")
+            )
+        )
+        assert client_fuzzy.code_mode is True
+
+        # Test embeddings mode configuration
+        client_embeddings = MCPClient(
+            code_mode=CodeModeConfig(
+                enabled=True,
+                semantic=SemanticSearchConfig(
+                    mode="embeddings", embeddings_url="https://api.example.com/v1/embeddings"
+                ),
+            )
+        )
+        assert client_embeddings.code_mode is True

@@ -13,6 +13,21 @@ describe("Code Mode Integration", () => {
     );
   });
 
+  it("enables code mode with semantic config", () => {
+    const client = new MCPClient(
+      {},
+      {
+        codeMode: {
+          enabled: true,
+          semantic: {
+            mode: "string_match",
+          },
+        },
+      }
+    );
+    expect(client.codeMode).toBe(true);
+  });
+
   it("executes code through client method", async () => {
     const client = new MCPClient({}, { codeMode: true });
 
@@ -32,5 +47,45 @@ describe("Code Mode Integration", () => {
     expect(result.meta.total_tools).toBe(0);
     expect(result.meta.namespaces).toEqual([]);
     expect(result.meta.result_count).toBe(0);
+  });
+
+  it("uses string_match search mode by default", async () => {
+    const client = new MCPClient({}, { codeMode: true });
+
+    // String match should work without any dependencies
+    const result = await client.searchTools("test", "names");
+    expect(result.meta).toBeDefined();
+    expect(result.results).toBeDefined();
+  });
+
+  it("supports fuzzy search mode configuration", () => {
+    const client = new MCPClient(
+      {},
+      {
+        codeMode: {
+          enabled: true,
+          semantic: {
+            mode: "fuzzy",
+          },
+        },
+      }
+    );
+    expect(client.codeMode).toBe(true);
+  });
+
+  it("supports embeddings search mode configuration", () => {
+    const client = new MCPClient(
+      {},
+      {
+        codeMode: {
+          enabled: true,
+          semantic: {
+            mode: "embeddings",
+            embeddingsUrl: "https://api.example.com/v1/embeddings",
+          },
+        },
+      }
+    );
+    expect(client.codeMode).toBe(true);
   });
 });
