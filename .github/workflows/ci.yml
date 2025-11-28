@@ -322,6 +322,7 @@ jobs:
             | Transport | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
+            `;
             
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -485,6 +486,7 @@ jobs:
             | Primitive | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
+            `;
             
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
