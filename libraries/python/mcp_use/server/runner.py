@@ -1,5 +1,6 @@
 """Server runner for different transport types."""
 
+import logging
 import sys
 from functools import partial
 from typing import TYPE_CHECKING, get_args
@@ -17,6 +18,8 @@ if TYPE_CHECKING:
 from starlette.applications import Starlette
 
 from mcp_use.server.utils.signals import setup_signal_handlers
+
+logger = logging.getLogger(__name__)
 
 
 class ServerRunner:
@@ -94,7 +97,7 @@ class ServerRunner:
                         self.server.app = self.server.streamable_http_app()
                     anyio.run(partial(self.run_streamable_http_async, host=host, port=port, reload=reload))
                 case "sse":
-                    anyio.run(partial(self.run_sse_async, host=host, port=port, reload=reload))
+                    logger.warning("SSE transport is not supported anymore. Use streamable-http instead.")
         except KeyboardInterrupt:
             print("\n⏹  Shutting down gracefully...", file=sys.stderr)
             sys.exit(0)
