@@ -42,28 +42,18 @@ class OpenMCPResponse:
         self.resources_templates = resources_templates
         self.prompts = prompts
 
-    def serialize_resource(self, resource: Resource) -> dict[str, Any]:
-        return {
-            "uri": str(resource.uri),
-            "description": resource.description,
-            "mimeType": resource.mimeType,
-            "size": resource.size,
-            "icons": resource.icons,
-            "annotations": resource.annotations,
-            "meta": resource.meta,
-            "model_config": resource.model_config,
-        }
-
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "openmcp": self.openmcp,
             "info": self.info,
-            "capabilities": self.capabilities.model_dump(),
-            "tools": [tool.model_dump() for tool in self.tools],
-            "resources": [self.serialize_resource(resource) for resource in self.resources],
-            "resources_templates": [resource_template.model_dump() for resource_template in self.resources_templates],
-            "prompts": [prompt.model_dump() for prompt in self.prompts],
+            "capabilities": self.capabilities.model_dump(mode="json"),
+            "tools": [tool.model_dump(mode="json") for tool in self.tools],
+            "resources": [resource.model_dump(mode="json") for resource in self.resources],
+            "resources_templates": [
+                resource_template.model_dump(mode="json") for resource_template in self.resources_templates
+            ],
+            "prompts": [prompt.model_dump(mode="json") for prompt in self.prompts],
         }
 
 
