@@ -1,14 +1,16 @@
 import json
 from dataclasses import dataclass
 
-from fastmcp import Context, FastMCP
+from mcp.types import SamplingMessage, TextContent
+
+from mcp_use.server import Context, MCPServer
 
 # 1. Create a server instance
-mcp = FastMCP(name="PrimitiveServer")
+mcp = MCPServer(name="PrimitiveServer")
 
 
 # 2. Add a Tool
-@mcp.tool
+@mcp.tool()
 def add(a: int, b: int) -> int:
     """Adds two integers together."""
     return a + b
@@ -16,20 +18,20 @@ def add(a: int, b: int) -> int:
 
 # 3. Add a Resource
 @mcp.resource("data://config")
-def get_config() -> dict:
+def get_config() -> str:
     """Returns the application configuration."""
     return json.dumps({"version": "1.0", "status": "ok"})
 
 
 # 4. Add a Resource Template
 @mcp.resource("users://{user_id}/profile")
-def get_user_profile(user_id: int) -> dict:
+def get_user_profile(user_id: int) -> str:
     """Retrieves a user's profile by ID."""
     return json.dumps({"id": user_id, "name": f"User {user_id}"})
 
 
 # 5. Add a Prompt
-@mcp.prompt
+@mcp.prompt()
 def summarize_text(text: str) -> str:
     """Creates a prompt to summarize text."""
     return f"Please summarize the following text: {text}"
@@ -67,46 +69,47 @@ async def logging_tool(ctx: Context) -> str:
     return "Logging tool completed"
 
 
-@mcp.tool()
-async def tool_to_disable():
-    """A tool to disable."""
-    return "Tool to disable"
+# TODO: Enable these once server supports it.
+# @mcp.tool()
+# async def tool_to_disable():
+#     """A tool to disable."""
+#     return "Tool to disable"
+
+
+# @mcp.tool()
+# async def change_tools(ctx: Context) -> str:
+#     """Disable the logging_tool."""
+#     await tool_to_disable.disable()
+#     return "Tools disabled"
+
+
+# @mcp.resource("data://mock")
+# def resource_to_disable():
+#     """A resource to disable."""
+#     pass
+
+
+# @mcp.tool()
+# async def change_resources(ctx: Context) -> str:
+#     """Disable the get_config resource."""
+#     await resource_to_disable.disable()
+#     return "Resources disabled"
+
+
+# @mcp.prompt()
+# def prompt_to_disable():
+#     """A prompt to disable."""
+#     pass
+
+
+# @mcp.tool()
+# async def change_prompts(ctx: Context) -> str:
+#     """Disable the summarize_text prompt."""
+#     await prompt_to_disable.disable()
+#     return "Prompts disabled"
 
 
 @mcp.tool()
-async def change_tools(ctx: Context) -> str:
-    """Disable the logging_tool."""
-    await tool_to_disable.disable()
-    return "Tools disabled"
-
-
-@mcp.resource("data://mock")
-def resource_to_disable():
-    """A resource to disable."""
-    pass
-
-
-@mcp.tool()
-async def change_resources(ctx: Context) -> str:
-    """Disable the get_config resource."""
-    await resource_to_disable.disable()
-    return "Resources disabled"
-
-
-@mcp.prompt()
-def prompt_to_disable():
-    """A prompt to disable."""
-    pass
-
-
-@mcp.tool()
-async def change_prompts(ctx: Context) -> str:
-    """Disable the summarize_text prompt."""
-    await prompt_to_disable.disable()
-    return "Prompts disabled"
-
-
-@mcp.tool
 async def analyze_sentiment(text: str, ctx: Context) -> str:
     """Analyze the sentiment of text using the client's LLM."""
     prompt = f"""Analyze the sentiment of the following text as positive, negative, or neutral.
@@ -114,10 +117,14 @@ async def analyze_sentiment(text: str, ctx: Context) -> str:
 
     Text to analyze: {text}"""
 
-    # Request LLM analysis
-    response = await ctx.sample(prompt)
+    message = SamplingMessage(role="user", content=TextContent(type="text", text=prompt))
 
-    return response.text.strip()
+    # Request LLM analysis
+    response = await ctx.sample(messages=[message])
+
+    if isinstance(response.content, TextContent):
+        return response.content.text.strip()
+    return ""
 
 
 @dataclass
@@ -126,10 +133,10 @@ class Info:
     unit: str
 
 
-@mcp.tool
+@mcp.tool()
 async def purchase_item(ctx: Context) -> str:
     """Elicit the user to provide information about a purchase."""
-    result = await ctx.elicit(message="Please provide your information", response_type=Info)
+    result = await ctx.elicit(message="Please provide your information", schema=Info)
     if result.action == "accept":
         info = result.data
         return f"You are buying {info.quantity} {info.unit} of the item"

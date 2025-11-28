@@ -1,0 +1,222 @@
+<!doctype html>
+<html>
+<head>
+    <title>MCP Docs</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            line-height: 1.6;
+            color: #333;
+            padding: 2em;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 1em;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.9em;
+        }
+        h1, h2, h3 {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.5em;
+        }
+        details {
+            margin-bottom: 1em;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        summary {
+            padding: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #f9f9f9;
+        }
+        .content {
+            padding: 1em;
+        }
+        .card {
+            border: 1px solid #eee;
+            border-radius: 5px;
+            margin-bottom: 1em;
+        }
+        .card-header {
+            background-color: #f4f4f4;
+            padding: 0.5em 1em;
+            font-weight: bold;
+            border-bottom: 1px solid #eee;
+        }
+        .card-body {
+            padding: 1em;
+        }
+        .card-body p {
+            margin-top: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>MCP Server Specification</h1>
+    <div id="docs-container">Loading...</div>
+    <script>
+        function renderCapabilities(data) {
+            const container = document.createElement('div');
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr>
+                    <th>Capability</th>
+                    <th>Details</th>
+                </tr>
+            `;
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            for (const [name, details] of Object.entries(data)) {
+                const row = document.createElement('tr');
+                const detailsText = details ? JSON.stringify(details, null, 2) : '<em>Not enabled</em>';
+                row.innerHTML = `
+                    <td><code>${name}</code></td>
+                    <td><pre>${detailsText}</pre></td>
+                `;
+                tbody.appendChild(row);
+            }
+            table.appendChild(tbody);
+            container.appendChild(table);
+            return container;
+        }
+
+        function renderSchema(schema, title) {
+            if (!schema || !schema.properties) return document.createElement('div');
+
+            const container = document.createElement('div');
+            const heading = document.createElement('h3');
+            heading.textContent = title;
+            container.appendChild(heading);
+
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Required</th>
+                </tr>
+            `;
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            for (const [name, details] of Object.entries(schema.properties)) {
+                const isRequired = schema.required && schema.required.includes(name);
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><code>${name}</code></td>
+                    <td>${details.type}</td>
+                    <td>${details.description || ''}</td>
+                    <td>${isRequired ? '<strong>Yes</strong>' : 'No'}</td>
+                `;
+                tbody.appendChild(row);
+            }
+            table.appendChild(tbody);
+            container.appendChild(table);
+            return container;
+        }
+
+        function renderSection(container, title, data) {
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                return;
+            }
+
+            const details = document.createElement('details');
+            if (title === 'Info' || title === 'Tools' || title === 'Capabilities') {
+                details.open = true;
+            }
+
+            const summary = document.createElement('summary');
+            const count = Array.isArray(data) ? `(${data.length})` : '';
+            summary.textContent = `${title} ${count}`;
+            details.appendChild(summary);
+
+            const content = document.createElement('div');
+            content.className = 'content';
+
+            if (title === 'Capabilities') {
+                content.appendChild(renderCapabilities(data));
+            } else if (Array.isArray(data)) {
+                data.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    const cardHeader = document.createElement('div');
+                    cardHeader.className = 'card-header';
+                    cardHeader.textContent = item.name || item.title || 'Item';
+                    card.appendChild(cardHeader);
+
+                    const cardBody = document.createElement('div');
+                    cardBody.className = 'card-body';
+
+                    if(item.description) {
+                        const desc = document.createElement('p');
+                        desc.textContent = item.description;
+                        cardBody.appendChild(desc);
+                    }
+
+                    if (item.inputSchema) {
+                        cardBody.appendChild(renderSchema(item.inputSchema, 'Input Schema'));
+                    }
+                    if (item.outputSchema) {
+                        cardBody.appendChild(renderSchema(item.outputSchema, 'Output Schema'));
+                    }
+
+                    if (!item.inputSchema && !item.outputSchema) {
+                        const pre = document.createElement('pre');
+                        pre.textContent = JSON.stringify(item, null, 2);
+                        cardBody.appendChild(pre);
+                    }
+
+                    card.appendChild(cardBody);
+                    content.appendChild(card);
+                });
+            } else {
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(data, null, 2);
+                content.appendChild(pre);
+            }
+            details.appendChild(content);
+            container.appendChild(details);
+        }
+
+        fetch('/openmcp.json')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('docs-container');
+                container.innerHTML = '';
+
+                renderSection(container, 'Info', data.info);
+                renderSection(container, 'Capabilities', data.capabilities);
+                renderSection(container, 'Tools', data.tools);
+                renderSection(container, 'Resources', data.resources);
+                renderSection(container, 'Prompts', data.prompts);
+            })
+            .catch(error => {
+                const container = document.getElementById('docs-container');
+                container.textContent = 'Error loading spec: ' + error;
+            });
+    </script>
+</body>
+</html>

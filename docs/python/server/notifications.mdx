@@ -1,0 +1,115 @@
+---
+title: "Notifications"
+description: "Send real-time updates to clients"
+icon: "bell-ring"
+---
+
+Notifications allow your MCP server to send real-time updates to clients about events, progress, or changes in server state. This enables clients to stay synchronized with the server and provide responsive user experiences.
+
+## How It Works
+
+Tools can send notifications through the `Context` object to inform clients about various events such as progress updates, list changes (tools, resources, prompts), or custom events.
+
+## Progress Notifications
+
+Report progress during long-running operations:
+
+```python
+from mcp_use.server import Context, MCPServer
+
+server = MCPServer(name="My Server")
+
+@server.tool()
+async def process_batch(items: list[str], ctx: Context) -> str:
+    """Process items with progress reporting."""
+    total = len(items)
+
+    for i, item in enumerate(items):
+        # Process the item
+        await process_item(item)
+
+        # Report progress
+        await ctx.report_progress(
+            progress=(i + 1) / total,
+            total=1.0,
+            message=f"Processed {i + 1}/{total} items"
+        )
+
+    return f"Processed {total} items successfully"
+```
+
+## List Change Notifications
+
+Notify clients when server capabilities change:
+
+```python
+@server.tool()
+async def add_new_tool(tool_name: str, ctx: Context) -> str:
+    """Dynamically add a new tool and notify clients."""
+    # Add the tool dynamically
+    register_new_tool(tool_name)
+
+    # Notify clients that the tool list has changed
+    await ctx.send_tool_list_changed()
+
+    return f"Added tool: {tool_name}"
+
+@server.tool()
+async def refresh_resources(ctx: Context) -> str:
+    """Refresh available resources and notify clients."""
+    # Update resources
+    update_resource_cache()
+
+    # Notify clients
+    await ctx.send_resource_list_changed()
+
+    return "Resources refreshed"
+```
+
+## All Notification Types
+
+The context provides these notification methods:
+
+- `report_progress()` - Send progress updates for long-running operations
+- `send_tool_list_changed()` - Notify when available tools change
+- `send_resource_list_changed()` - Notify when available resources change
+- `send_prompt_list_changed()` - Notify when available prompts change
+
+## Use Case Example
+
+A data processing server that provides real-time feedback:
+
+```python
+@server.tool()
+async def analyze_dataset(file_path: str, ctx: Context) -> str:
+    """Analyze a dataset with progress notifications."""
+    await ctx.info(f"Starting analysis of {file_path}")
+
+    steps = ["Loading data", "Cleaning", "Analyzing", "Generating report"]
+
+    for i, step in enumerate(steps):
+        await ctx.report_progress(
+            progress=(i + 1) / len(steps),
+            total=1.0,
+            message=step
+        )
+        await perform_step(step, file_path)
+
+    return "Analysis complete"
+```
+
+This allows clients to display progress bars, status messages, or other UI feedback in real-time as the tool executes.
+
+## Important Notes
+
+- Notifications are fire-and-forget; they don't return responses
+- Clients should handle notifications asynchronously to avoid blocking
+- Progress values should be between 0.0 and 1.0
+- List change notifications prompt clients to refresh their cached lists
+
+## Next Steps
+
+- See [Logging](/python/server/logging) for structured logging
+- Learn about [Sampling](/python/server/sampling) for requesting LLM completions
+- Check the [Context API](/python/api-reference/mcp_use_server_context) for all available methods
+

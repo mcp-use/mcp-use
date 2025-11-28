@@ -111,7 +111,6 @@
               },
               {
                 "group": "MCP Server",
-                "hidden": true,
                 "icon": "server",
                 "tag": "Beta",
                 "pages": [
@@ -125,19 +124,18 @@
                     ]
                   },
                   {
-                    "group": "Core Features",
+                    "group": "Features",
                     "icon": "list-plus",
                     "pages": [
                       "python/server/tools",
                       "python/server/resources",
-                      "python/server/prompts"
+                      "python/server/prompts",
+                      "python/server/sampling",
+                      "python/server/elicitation",
+                      "python/server/notifications"
                     ]
                   },
-                  {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
-                    "pages": []
-                  },
+                  "python/server/router",
                   "python/server/inspector",
                   "python/server/logging",
                   "python/server/openmcp"

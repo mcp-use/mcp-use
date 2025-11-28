@@ -4,6 +4,215 @@ description: "Define and expose resources from your MCP server"
 icon: "file"
 ---
 
-<Danger>
-Python Server is a work in progress.
-</Danger>
+Resources expose data to MCP clients. Unlike tools (which perform actions), resources provide read-only access to content like files, database records, or live data.
+
+## Basic Resource Definition
+
+Use the `@server.resource()` decorator to define a resource:
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="My Server")
+
+@server.resource(uri="config://app")
+def app_config() -> str:
+    """Application configuration."""
+    return '{"debug": true, "version": "1.0.0"}'
+```
+
+## Resource Options
+
+The `@server.resource()` decorator accepts several options:
+
+```python
+@server.resource(
+    uri="data://users",           # Unique resource identifier
+    name="users_list",            # Internal name
+    title="User List",            # Human-readable title
+    description="All users",      # Resource description
+    mime_type="application/json", # Content type
+)
+def get_users() -> str:
+    return '[{"id": 1, "name": "Alice"}]'
+```
+
+### Common MIME Types
+
+| MIME Type | Use Case |
+|-----------|----------|
+| `text/plain` | Plain text content |
+| `application/json` | JSON data |
+| `text/markdown` | Markdown documents |
+| `text/html` | HTML content |
+
+## Static Resources
+
+For simple static content:
+
+```python
+from datetime import datetime
+
+@server.resource(
+    uri="time://current",
+    name="current_time",
+    title="Current Time",
+    mime_type="text/plain"
+)
+def current_time() -> str:
+    """Returns the current server time."""
+    return datetime.now().isoformat()
+```
+
+## Resource Templates
+
+Use URI templates to create dynamic resources with parameters:
+
+```python
+@server.resource(
+    uri="user://{user_id}",
+    name="user_profile",
+    title="User Profile",
+    description="Get a user's profile by ID",
+    mime_type="application/json"
+)
+def get_user(user_id: str) -> str:
+    """Fetch user profile by ID."""
+    # user_id is extracted from the URI
+    users = {"1": "Alice", "2": "Bob"}
+    name = users.get(user_id, "Unknown")
+    return f'{{"id": "{user_id}", "name": "{name}"}}'
+```
+
+Clients can request `user://123` and the function receives `user_id="123"`.
+
+### Multiple Parameters
+
+Templates support multiple parameters:
+
+```python
+@server.resource(
+    uri="file://{folder}/{filename}",
+    name="file_content",
+    mime_type="text/plain"
+)
+def get_file(folder: str, filename: str) -> str:
+    """Read a file from a folder."""
+    # folder and filename extracted from URI
+    return f"Content of {folder}/{filename}"
+```
+
+## Async Resources
+
+Resources can be async for I/O operations:
+
+```python
+import httpx
+
+@server.resource(
+    uri="api://weather",
+    mime_type="application/json"
+)
+async def weather_data() -> str:
+    """Fetch current weather data."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://api.weather.com/current")
+        return response.text
+```
+
+## Binary Resources
+
+Return bytes for binary content:
+
+```python
+@server.resource(
+    uri="image://logo",
+    mime_type="image/png"
+)
+def logo_image() -> bytes:
+    """Return the application logo."""
+    with open("logo.png", "rb") as f:
+        return f.read()
+```
+
+## File System Resources
+
+Expose files from the filesystem:
+
+```python
+from pathlib import Path
+
+@server.resource(
+    uri="docs://{path:path}",
+    name="documentation",
+    mime_type="text/markdown"
+)
+def read_docs(path: str) -> str:
+    """Read documentation files."""
+    docs_dir = Path("./docs")
+    file_path = docs_dir / path
+
+    # Security: ensure path is within docs directory
+    if not file_path.resolve().is_relative_to(docs_dir.resolve()):
+        raise ValueError("Access denied")
+
+    return file_path.read_text()
+```
+
+## Complete Example
+
+```python
+from datetime import datetime
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="Data Server", version="1.0.0")
+
+# Static resource
+@server.resource(
+    uri="status://health",
+    name="health_check",
+    title="Health Status",
+    mime_type="application/json"
+)
+def health_status() -> str:
+    """Server health status."""
+    return '{"status": "healthy", "uptime": "99.9%"}'
+
+# Dynamic resource with template
+@server.resource(
+    uri="config://{section}",
+    name="config_section",
+    title="Configuration Section",
+    description="Get configuration by section name",
+    mime_type="application/json"
+)
+def get_config(section: str) -> str:
+    """Get configuration for a specific section."""
+    configs = {
+        "database": '{"host": "localhost", "port": 5432}',
+        "cache": '{"enabled": true, "ttl": 3600}',
+        "logging": '{"level": "INFO", "format": "json"}'
+    }
+    return configs.get(section, '{"error": "Section not found"}')
+
+# Time-based resource
+@server.resource(
+    uri="time://current",
+    name="current_time",
+    mime_type="text/plain"
+)
+def current_time() -> str:
+    return datetime.now().isoformat()
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", debug=True)
+```
+
+## Resources vs Tools
+
+| Aspect | Resources | Tools |
+|--------|-----------|-------|
+| Purpose | Expose data | Perform actions |
+| Side effects | None (read-only) | May modify state |
+| Caching | Can be cached | Generally not cached |
+| Use case | Configuration, files, status | Operations, calculations |

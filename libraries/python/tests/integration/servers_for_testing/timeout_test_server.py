@@ -13,10 +13,10 @@ import time
 from datetime import datetime
 from typing import Any
 
-from fastmcp import FastMCP
+from mcp_use import MCPServer
 
-# Create FastMCP server instance
-mcp = FastMCP(name="TimeoutTestServer")
+# Create MCP server instance
+mcp = MCPServer(name="TimeoutTestServer")
 
 # Track connection times for timeout logic
 connection_times: dict[str, float] = {}
@@ -147,5 +147,5 @@ if __name__ == "__main__":
     print("   - Error handling for disconnected sessions")
     print("⚡ Starting server on port 8081...")
 
-    # Run the FastMCP server with SSE transport
-    mcp.run(transport="sse", host="0.0.0.0", port=8081, log_level="info")
+    # Run the MCP server with streamable HTTP transport (SSE available at /sse)
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8081)

@@ -3,9 +3,6 @@ title: "Official SDK Compatibility"
 description: "Full compatibility with the official MCP Python SDK"
 icon: "check"
 ---
-
-# Official SDK Compatibility
-
 <Card title="" img="./images/MCP.jpg" horizontal="true"/>
 
 <Info>
@@ -40,26 +37,11 @@ mcp-use extends the official MCP Python SDK rather than replacing it, ensuring:
 
 If you have an existing MCP server built with FastMCP, migration is as simple as changing the import:
 
-#### Before (FastMCP)
-
-```python highlight={1,5}
-from mcp.server import FastMCP
-
-mcp = FastMCP()
-
-@mcp.tool()
-def add(a: int, b: int) -> int:
-    """Add two numbers"""
-    return a + b
-
-if __name__ == "__main__":
-    mcp.run(transport="streamable-http", port=8000)
-```
-
-#### After (mcp-use)
-
-```python highlight={1,5}
-from mcp_use.server import FastMCP
+#### Migrating
+It literally cannot be easier to migrate from FastMCP to mcp-use. You just need to add `_use` to your import.
+```python
+from mcp.server import FastMCP #[!code --]
+from mcp_use.server import FastMCP #[!code ++]
 
 mcp = FastMCP()
 

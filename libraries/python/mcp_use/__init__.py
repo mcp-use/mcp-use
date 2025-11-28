@@ -18,6 +18,7 @@ from .client import MCPClient
 from .client.prompts import CODE_MODE_AGENT_PROMPT
 from .config import load_config_file
 from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
+from .server import MCPServer
 from .session import MCPSession
 
 __version__ = version("mcp-use")
@@ -26,6 +27,7 @@ __all__ = [
     "MCPAgent",
     "MCPClient",
     "MCPSession",
+    "MCPServer",
     "BaseConnector",
     "StdioConnector",
     "WebSocketConnector",
