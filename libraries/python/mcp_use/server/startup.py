@@ -4,13 +4,16 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 import mcp_use
+from mcp_use.server.types import TransportType
 from mcp_use.server.utils import estimate_tokens, get_local_network_ip
 
 if TYPE_CHECKING:
     from mcp_use.server.server import MCPServer
 
 
-async def display_startup_info(server: "MCPServer", host: str, port: int, start_time: float) -> None:
+async def display_startup_info(
+    server: "MCPServer", host: str, port: int, transport: TransportType | None = None, start_time: float = 0.0
+) -> None:
     """Display Next.js-style startup information for the MCP server."""
     console = Console()
     startup_time = time.time() - start_time  # ty error: assigning float to str
@@ -33,6 +36,7 @@ async def display_startup_info(server: "MCPServer", host: str, port: int, start_
     stats = f"Tools: {len(tools)} | Resources: {len(resources)} | Prompts: {len(prompts)} | Tokens: {total_tokens}"
     console.print(f"[bright_black]{stats}[/bright_black]")
     console.print()
+    console.print(f"- Transport:    {transport or 'Unknown'}")
     console.print(f"- Local:        http://{host}:{port}")
     console.print(f"- MCP:          http://{host}:{port}{server.mcp_path}")
     if network_ip and network_ip != host and host == "0.0.0.0":

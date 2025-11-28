@@ -26,10 +26,15 @@ class ServerRunner:
         self.server = server
 
     async def server_starlette_app(
-        self, starlette_app: Starlette, host: str = "127.0.0.1", port: int = 8000, reload: bool = False
+        self,
+        starlette_app: Starlette,
+        host: str = "127.0.0.1",
+        port: int = 8000,
+        transport: TransportType | None = None,
+        reload: bool = False,
     ) -> None:
         # Display startup information
-        await display_startup_info(self.server, host, port, self.server._start_time)
+        await display_startup_info(self.server, host, port, transport, self.server._start_time)
         config = uvicorn.Config(
             starlette_app,
             host=host,
@@ -51,12 +56,12 @@ class ServerRunner:
     async def run_streamable_http_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
         """Run the server using StreamableHTTP transport."""
         starlette_app = self.server.streamable_http_app()
-        await self.server_starlette_app(starlette_app, host, port, reload)
+        await self.server_starlette_app(starlette_app, host, port, "streamable-http", reload)
 
     async def run_sse_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
         """Run the server using SSE transport."""
         starlette_app = self.server.sse_app(self.server.mcp_path)
-        await self.server_starlette_app(starlette_app, host, port, reload)
+        await self.server_starlette_app(starlette_app, host, port, "sse", reload)
 
     def run(
         self,
