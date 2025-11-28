@@ -16,7 +16,7 @@ async def elicitation_callback(ctx: RequestContext, params: ElicitRequestParams)
 @pytest.mark.asyncio
 async def test_elicitation(primitive_server):
     config = {"mcpServers": {"PrimitiveServer": {"url": f"{primitive_server}/mcp"}}}
-    client = MCPClient(config, elicitation_callback=elicitation_callback)
+    client = MCPClient(config, elicitation_callback=elicitation_callback)  # type: ignore[invalid-argument-type]
     try:
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")

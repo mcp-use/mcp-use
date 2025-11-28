@@ -227,7 +227,7 @@ jobs:
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
-          pytest -vv tests/integration/transports/test_${{ matrix.transport }}.py \
+          pytest -vv tests/integration/client/transports/test_${{ matrix.transport }}.py \
             --junit-xml=test-results-${{ matrix.transport }}.xml || true
           # Check if tests passed
           if grep -q 'failures="0"' test-results-${{ matrix.transport }}.xml && \
@@ -391,7 +391,7 @@ jobs:
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
-          pytest -vv tests/integration/primitives/test_${{ matrix.primitive }}.py \
+          pytest -vv tests/integration/client/primitives/test_${{ matrix.primitive }}.py \
             --junit-xml=test-results-${{ matrix.primitive }}.xml || true
           # Check if tests passed
           if grep -q 'failures="0"' test-results-${{ matrix.primitive }}.xml && \
@@ -540,7 +540,7 @@ jobs:
       - name: Run other integration tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pytest -vv tests/integration/others/
+        run: pytest -vv tests/integration/client/others/
 
   python-agent-tests:
     needs: python-lint

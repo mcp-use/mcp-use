@@ -92,3 +92,6 @@ line-ending = "auto"
 
 [tool.ty.environment]
 python-version = "3.11"
+
+[tool.ty.rules]
+possibly-missing-attribute = "ignore"

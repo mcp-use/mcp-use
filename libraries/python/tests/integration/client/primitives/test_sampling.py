@@ -21,7 +21,7 @@ async def sampling_callback(
 @pytest.mark.asyncio
 async def test_sampling(primitive_server):
     config = {"mcpServers": {"PrimitiveServer": {"url": f"{primitive_server}/mcp"}}}
-    client = MCPClient(config, sampling_callback=sampling_callback)
+    client = MCPClient(config, sampling_callback=sampling_callback)  # type: ignore[invalid-argument-type]
     try:
         await client.create_all_sessions()
         session = client.get_session("PrimitiveServer")
