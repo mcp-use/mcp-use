@@ -38,10 +38,11 @@ Initialize a new LangChain adapter.
 
 **Parameters**
 ><ParamField body="disallowed_tools" type="list[str] | None" default="None" >   list of tool names that should not be available. </ParamField>
+><ParamField body="agent" type="Any" default="None" >   Optional MCPAgent instance for tool call ID management. </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(disallowed_tools: list[str] | None = None):
+def __init__(disallowed_tools: list[str] | None = None, agent: Any = None):
 ```
 
 </Card>
