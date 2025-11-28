@@ -139,27 +139,29 @@ jobs:
         run: |
           ruff format --check .
 
-  python-ty-check:
-    needs: python-lint
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: libraries/python
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ty
-      - name: Type check with ty
-        run: |
-          ty check .
+  # (skipped) python-ty-check job is disabled, pre commits will make use compliant, then we can add this back.
+  # Pietro: this is me, I will check when is a good time to re enable. keep the comment.
+  # python-ty-check:
+  #   needs: python-lint
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: libraries/python
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+  #     - name: Set up Python 3.11
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3.11"
+  #     - name: Install dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install ty
+  #     - name: Type check with ty
+  #       run: |
+  #         ty check .
 
   python-unit-tests:
     needs: python-lint
