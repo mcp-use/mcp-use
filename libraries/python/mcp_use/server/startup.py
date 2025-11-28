@@ -36,7 +36,7 @@ async def display_startup_info(server: "MCPServer", host: str, port: int, start_
     console.print(f"- Local:        http://{host}:{port}")
     console.print(f"- MCP:          http://{host}:{port}{server.mcp_path}")
     if network_ip and network_ip != host and host == "0.0.0.0":
-        console.print(f"- Network:      http://{get_local_network_ip()}:{port}")
+        console.print(f"- Network:      http://{network_ip}:{port}")
 
     if server.debug_level >= 1:
         console.print(f"- Docs:         http://{host}:{port}{server.docs_path}")
