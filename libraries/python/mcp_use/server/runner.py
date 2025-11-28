@@ -2,20 +2,19 @@
 
 import sys
 from functools import partial
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, get_args
 
 import anyio
 import uvicorn
 
 from mcp_use.server.logging import get_logging_config
 from mcp_use.server.startup import display_startup_info
+from mcp_use.server.types import TransportType
 
 if TYPE_CHECKING:
     from mcp_use.server.server import MCPServer
 
 from mcp_use.server.signals import setup_signal_handlers
-
-VALID_TRANSPORTS = ("stdio", "streamable-http")
 
 
 class ServerRunner:
@@ -54,7 +53,7 @@ class ServerRunner:
 
     def run(
         self,
-        transport: Literal["stdio", "streamable-http"] = "stdio",
+        transport: TransportType = "stdio",
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
@@ -69,7 +68,8 @@ class ServerRunner:
             reload: Whether to enable auto-reload
             debug: Whether to enable debug mode
         """
-        if transport not in VALID_TRANSPORTS:
+
+        if transport not in get_args(TransportType):
             raise ValueError(f"Unknown transport: {transport}")
 
         try:

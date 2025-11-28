@@ -1,6 +1,6 @@
 import os
 import time
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, cast
 
 from mcp.server.fastmcp import FastMCP
 
@@ -9,11 +9,10 @@ from mcp_use.server.logging import MCPLoggingMiddleware
 from mcp_use.server.routes import docs_ui, openmcp_json
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.signals import setup_signal_handlers
+from mcp_use.server.types import TransportType
 
 if TYPE_CHECKING:
     from mcp_use.server.router import MCPRouter
-
-TransportType = Literal["stdio", "streamable-http"]
 
 
 class MCPServer(FastMCP):
