@@ -1,16 +1,22 @@
 repos:
 -   repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.3.2
+    rev: v0.11.12
     hooks:
     -   id: ruff
         args: [--fix, --exit-non-zero-on-fix]
-        types: [python]
     -   id: ruff-format
+
+-   repo: local
+    hooks:
+    -   id: ty
+        name: ty check
+        entry: ty check
+        language: system
         types: [python]
+        pass_filenames: false
 
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
     -   id: trailing-whitespace
     -   id: end-of-file-fixer
@@ -18,6 +24,5 @@ repos:
     -   id: check-added-large-files
     -   id: debug-statements
 
-# Define configuration for the Python checks
 default_language_version:
     python: python3.11
