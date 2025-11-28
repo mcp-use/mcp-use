@@ -66,6 +66,7 @@ async def test_oauth_provider(mock_callback_server_class, mock_webbrowser_open, 
                             "authorization_endpoint": "http://127.0.0.1:8081/oauth/authorize",
                             "token_endpoint": "http://127.0.0.1:8081/oauth/token",
                             "registration_endpoint": "http://127.0.0.1:8081/oauth/register",
+                            "code_challenge_methods_supported": ["S256"],
                         },
                     }
                 },

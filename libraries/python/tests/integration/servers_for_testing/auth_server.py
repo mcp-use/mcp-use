@@ -26,6 +26,14 @@ OAUTH_METADATA_RESPONSE = {
     "token_endpoint_auth_methods_supported": ["client_secret_basic", "none"],
     "claims_supported": ["bla", "blabla"],
     "code_challenge_methods_supported": ["S256", "plain"],
+    "client_id_metadata_document_supported": True,
+}
+
+PRM_RESPONSE = {
+    "resource": "http://127.0.0.1:8081/mcp",
+    "authorization_servers": ["http://127.0.0.1:8081"],
+    # Optional but nice for testing
+    "scopes_supported": ["openid", "profile", "email"],
 }
 
 DCR_RESPONSE = {
@@ -71,8 +79,14 @@ def verify_auth(ctx: Context) -> str:
 
 @mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
 async def oauth_metadata(request: Request) -> JSONResponse:
-    """Serve OAuth 2.0 Authorization Server Metadata."""
+    """Serve OAuth 2.1 Authorization Server Metadata."""
     return JSONResponse(OAUTH_METADATA_RESPONSE)
+
+
+@mcp.custom_route("/.well-known/oauth-protected-resource", methods=["GET"])
+async def oauth_prm(request: Request) -> JSONResponse:
+    """Serve OAuth Protected Resource Metadata (PRM)."""
+    return JSONResponse(PRM_RESPONSE)
 
 
 @mcp.custom_route("/.well-known/openid-configuration", methods=["GET"])
@@ -92,7 +106,7 @@ async def oauth_authorize(request: Request) -> RedirectResponse:
     """OAuth authorization endpoint - returns pre-created authorization code"""
     # Get the redirect_uri and state from query params
     params = dict(request.query_params)
-    redirect_uri = params.get("redirect_uri", "http://127.0.0.1:8080/callback")
+    redirect_uri = params.get("redirect_uri", "http://127.0.0.1:8081/callback")
     state = params.get("state")
 
     # Redirect with pre-created authorization code

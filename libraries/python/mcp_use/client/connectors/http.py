@@ -99,6 +99,7 @@ class HttpConnector(BaseConnector):
                     client_id=auth.get("client_id"),
                     client_secret=auth.get("client_secret"),
                     callback_port=auth.get("callback_port"),
+                    client_metadata_url=auth.get("client_metadata_url"),
                     oauth_provider=oauth_provider,
                 )
                 self._oauth_config = auth
@@ -109,6 +110,7 @@ class HttpConnector(BaseConnector):
                     client_id=auth.get("client_id"),
                     client_secret=auth.get("client_secret"),
                     callback_port=auth.get("callback_port"),
+                    client_metadata_url=auth.get("client_metadata_url"),
                 )
                 self._oauth_config = auth
         elif isinstance(auth, httpx.Auth):
