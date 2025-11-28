@@ -2,6 +2,8 @@
 
 import json
 import time
+from collections.abc import AsyncIterator
+from typing import cast
 
 from rich.console import Console
 from rich.panel import Panel
@@ -52,16 +54,30 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request_with_body)
 
         # Capture response body for logging (need to read and reconstruct)
+        # Limit to 1MB to prevent memory issues with large responses
+        max_body_size = 1024 * 1024
         response_body: bytes | None = None
+        response_too_large = False
         if self.debug_level >= 2 and method_info:
-            response_body = b"".join([chunk async for chunk in response.body_iterator])
-            # Reconstruct response with captured body
-            response = Response(
-                content=response_body,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type,
-            )
+            body_iterator = getattr(response, "body_iterator", None)
+            if body_iterator is not None:
+                chunks = []
+                total_size = 0
+                iterator = cast(AsyncIterator[bytes], body_iterator)
+                async for chunk in iterator:
+                    chunks.append(chunk)
+                    total_size += len(chunk)
+                if total_size > max_body_size:
+                    response_too_large = True
+                else:
+                    response_body = b"".join(chunks)
+                # Reconstruct response with captured body
+                response = Response(
+                    content=b"".join(chunks),
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type,
+                )
 
         # Log access info with MCP method stub
         if method_info:
@@ -69,7 +85,7 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
 
         # Log debug info only in DEBUG=2 mode
         if self.debug_level >= 2 and method_info:
-            await self._log_debug_info(request, method_info, body_bytes, response_body, start_time)
+            await self._log_debug_info(request, method_info, body_bytes, response_body, start_time, response_too_large)
 
         return response
 
@@ -117,6 +133,7 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         request_body: bytes,
         response_body: bytes | None,
         start_time: float,
+        response_too_large: bool = False,
     ):
         """Log detailed debug information."""
         duration_ms = (time.time() - start_time) * 1000
@@ -153,12 +170,16 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
                     response_formatted = response_text
                 syntax = Syntax(response_formatted, "json", theme=CODE_THEME)
                 _console.print(Panel(syntax, title=f"[bold cyan]{display}[/] Response", title_align="left"))
+            elif response_too_large:
+                _console.print(f"[dim]{display} Response: <response too large to display>[/dim]")
         else:
             # Plain text logging
             print(f"\033[36mMCP:\033[0m  [{display}] Request ({duration_ms:.1f}ms): {request_text}")
             if response_body:
                 response_text = self._extract_sse_data(response_body.decode("utf-8", errors="replace"))
                 print(f"\033[36mMCP:\033[0m  [{display}] Response: {response_text}")
+            elif response_too_large:
+                print(f"\033[36mMCP:\033[0m  [{display}] Response: <response too large to display>")
 
     async def _log_access_info(self, request: Request, method_info: dict, response: Response, start_time: float):
         """Log access information with MCP method stub."""
