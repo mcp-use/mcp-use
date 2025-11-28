@@ -8,7 +8,7 @@ import anyio
 import uvicorn
 
 from mcp_use.server.logging import get_logging_config
-from mcp_use.server.startup import display_startup_info
+from mcp_use.server.logging.startup import display_startup_info
 from mcp_use.server.types import TransportType
 
 if TYPE_CHECKING:
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 from starlette.applications import Starlette
 
-from mcp_use.server.signals import setup_signal_handlers
+from mcp_use.server.utils.signals import setup_signal_handlers
 
 
 class ServerRunner:

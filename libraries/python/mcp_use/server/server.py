@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING, cast
 
 from mcp.server.fastmcp import FastMCP
 
-from mcp_use.server.inspector import _inspector_index, _inspector_static
 from mcp_use.server.logging import MCPLoggingMiddleware
-from mcp_use.server.routes import docs_ui, openmcp_json
 from mcp_use.server.runner import ServerRunner
-from mcp_use.server.signals import setup_signal_handlers
 from mcp_use.server.types import TransportType
+from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
+from mcp_use.server.utils.routes import docs_ui, openmcp_json
+from mcp_use.server.utils.signals import setup_signal_handlers
 
 if TYPE_CHECKING:
     from mcp_use.server.router import MCPRouter

@@ -5,7 +5,7 @@ from rich.console import Console
 
 import mcp_use
 from mcp_use.server.types import TransportType
-from mcp_use.server.utils import estimate_tokens, get_local_network_ip
+from mcp_use.server.utils.utils import estimate_tokens, get_local_network_ip
 
 if TYPE_CHECKING:
     from mcp_use.server.server import MCPServer

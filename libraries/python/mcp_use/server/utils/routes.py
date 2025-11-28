@@ -5,7 +5,7 @@ import os
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
 
-from mcp_use.server.openmcp import get_openmcp_json
+from mcp_use.server.utils.openmcp import get_openmcp_json
 
 
 async def docs_ui(request: Request) -> HTMLResponse:
