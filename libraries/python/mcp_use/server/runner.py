@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Literal
 import anyio
 import uvicorn
 
-from mcp_use.server.cli import display_startup_info
 from mcp_use.server.logging import get_logging_config
+from mcp_use.server.startup import display_startup_info
 
 if TYPE_CHECKING:
     from mcp_use.server.server import MCPServer
