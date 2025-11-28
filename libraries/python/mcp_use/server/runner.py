@@ -25,7 +25,7 @@ class ServerRunner:
     def __init__(self, server: "MCPServer"):
         self.server = server
 
-    async def server_starlette_app(
+    async def serve_starlette_app(
         self,
         starlette_app: Starlette,
         host: str = "127.0.0.1",
@@ -56,16 +56,16 @@ class ServerRunner:
     async def run_streamable_http_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
         """Run the server using StreamableHTTP transport."""
         starlette_app = self.server.streamable_http_app()
-        await self.server_starlette_app(starlette_app, host, port, "streamable-http", reload)
+        await self.serve_starlette_app(starlette_app, host, port, "streamable-http", reload)
 
     async def run_sse_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
         """Run the server using SSE transport."""
         starlette_app = self.server.sse_app(self.server.mcp_path)
-        await self.server_starlette_app(starlette_app, host, port, "sse", reload)
+        await self.serve_starlette_app(starlette_app, host, port, "sse", reload)
 
     def run(
         self,
-        transport: TransportType = "stdio",
+        transport: TransportType = "streamable-http",
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
@@ -74,7 +74,7 @@ class ServerRunner:
         """Run the MCP server.
 
         Args:
-            transport: Transport protocol to use ("stdio" or "streamable-http")
+            transport: Transport protocol to use ("stdio", "streamable-http" or "sse")
             host: Host to bind to
             port: Port to bind to
             reload: Whether to enable auto-reload

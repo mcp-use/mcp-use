@@ -193,7 +193,7 @@ class MCPServer(FastMCP):
 
     def run(  # type: ignore[override]
         self,
-        transport: TransportType = "stdio",
+        transport: TransportType = "streamable-http",
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
@@ -202,7 +202,7 @@ class MCPServer(FastMCP):
         """Run the MCP server.
 
         Args:
-            transport: Transport protocol to use ("stdio" or "streamable-http")
+            transport: Transport protocol to use ("stdio", "streamable-http" or "sse")
             host: Host to bind to
             port: Port to bind to
             reload: Whether to enable auto-reload
