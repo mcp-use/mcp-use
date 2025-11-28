@@ -27,6 +27,7 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
             if response.status_code == 200:
                 return HTMLResponse(response.text)
     except Exception:
+        # Network errors or CDN unavailable - fall through to redirect fallback
         pass
 
     # Fallback: redirect to autoconnect URL (note: capital C)
@@ -44,6 +45,7 @@ async def _inspector_static(request: Request):
             response = await client.get(cdn_url, follow_redirects=True)
             return HTMLResponse(content=response.content, media_type=response.headers.get("Content-Type", "text/plain"))
     except Exception:
+        # Network errors or CDN unavailable - fall through to 404
         pass
 
     return HTMLResponse("File not found", status_code=404)
