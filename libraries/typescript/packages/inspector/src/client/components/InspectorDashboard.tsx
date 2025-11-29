@@ -58,28 +58,44 @@ function ConnectionTester({
       ? new URL("/inspector/oauth/callback", window.location.origin).toString()
       : "/inspector/oauth/callback";
 
-  // Apply proxy configuration
+  // Validate and apply proxy configuration
   let finalUrl = config.url;
   let customHeaders: Record<string, string> = {};
+  let urlError: string | null = null;
 
-  if (config.proxyConfig?.proxyAddress) {
-    const proxyUrl = new URL(config.proxyConfig.proxyAddress);
-    const originalUrl = new URL(config.url);
-    finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${originalUrl.pathname}${originalUrl.search}`;
+  try {
+    if (config.proxyConfig?.proxyAddress) {
+      const proxyUrl = new URL(config.proxyConfig.proxyAddress);
+      const originalUrl = new URL(config.url);
+      finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${originalUrl.pathname}${originalUrl.search}`;
 
-    customHeaders["X-Target-URL"] = config.url;
+      customHeaders["X-Target-URL"] = config.url;
+    } else {
+      // Validate the URL even if not using proxy
+      new URL(config.url);
+    }
+  } catch (err) {
+    urlError = `Invalid URL format. Please include the protocol (http:// or https://).\nExample: https://${config.url}`;
   }
 
   if (config.proxyConfig?.customHeaders) {
     customHeaders = { ...customHeaders, ...config.proxyConfig.customHeaders };
   }
 
+  // Show error immediately if URL is invalid
+  useEffect(() => {
+    if (urlError) {
+      onFailure(urlError);
+    }
+  }, [urlError, onFailure]);
+
   const mcpHook = useMcp({
-    url: finalUrl,
+    url: urlError ? undefined : finalUrl, // Don't connect if URL is invalid
     callbackUrl,
     customHeaders:
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
     transportType: config.transportType || "http",
+    enabled: !urlError, // Disable connection if URL is invalid
   });
 
   const hasCalledRef = useRef(false);
@@ -807,27 +823,45 @@ export function InspectorDashboard() {
                       </DropdownMenu>
                     </div>
                   </div>
-                  {connection.state === "pending_auth" &&
-                    connection.authUrl && (
-                      <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={connection.authenticate}
-                        >
-                          Authenticate
-                        </Button>{" "}
-                        or{" "}
-                        <a
-                          href={connection.authUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline"
-                        >
-                          open auth page
-                        </a>
-                      </div>
-                    )}
+                  {(connection.state === "pending_auth" ||
+                    connection.state === "authenticating") && (
+                    <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
+                      <Button
+                        size="sm"
+                        className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                        variant="outline"
+                        onClick={(e) =>
+                          handleActionClick(e, connection.authenticate)
+                        }
+                        disabled={connection.state === "authenticating"}
+                      >
+                        {connection.state === "authenticating" ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Authenticating...
+                          </>
+                        ) : (
+                          "Authenticate"
+                        )}
+                      </Button>
+                      {connection.authUrl &&
+                        connection.state === "pending_auth" && (
+                          <>
+                            {" "}
+                            or{" "}
+                            <a
+                              href={connection.authUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              open auth page
+                            </a>
+                          </>
+                        )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

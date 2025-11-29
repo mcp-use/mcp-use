@@ -34,6 +34,10 @@
       "types": "./dist/src/agents/index.d.ts",
       "import": "./dist/src/agents/index.js"
     },
+    "./auth": {
+      "types": "./dist/src/auth/index.d.ts",
+      "import": "./dist/src/auth/index.js"
+    },
     "./browser": {
       "types": "./dist/src/browser.d.ts",
       "import": "./dist/src/browser.js"
@@ -105,10 +109,14 @@
     "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts",
     "example:server:notification": "tsx examples/server/notification-example/src/server.ts",
     "example:client:notification": "tsx examples/client/notification-client.ts",
-    "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/notification-example/src/server.ts & sleep 3 && tsx examples/client/notification-client.ts",
+    "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/notifications/src/server.ts & sleep 3 && tsx examples/client/notification-client.ts",
     "example:server:sampling": "tsx examples/server/sampling/src/server.ts",
     "example:client:sampling": "tsx examples/client/sampling-client.ts",
-    "example:sampling": "lsof -ti:3001 | xargs kill -9 2>/dev/null; tsx examples/server/sampling/src/server.ts & sleep 3 && tsx examples/client/sampling-client.ts"
+    "example:sampling": "lsof -ti:3001 | xargs kill -9 2>/dev/null; tsx examples/server/sampling/src/server.ts & sleep 3 && tsx examples/client/sampling-client.ts",
+    "example:server:oauth:supabase": "tsx examples/server/oauth/supabase/src/server.ts",
+    "example:client:oauth:auth0": "tsx examples/server/oauth/auth0/src/server.ts",
+    "example:client:oauth:workos": "tsx examples/server/oauth/workos/src/server.ts",
+    "example:client:oauth:keycloak": "tsx examples/server/oauth/keycloak/src/server.ts"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.2.0",
@@ -152,6 +160,7 @@
     "dotenv": "^16.5.0",
     "esbuild": ">=0.25.0",
     "hono": "^4.6.0",
+    "jose": "^6.1.2",
     "langchain": "^1.0.1",
     "lodash-es": "^4.17.21",
     "posthog-node": "^5.1.1",
@@ -193,6 +202,7 @@
     "react-router-dom": "^7.9.5",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
+    
   },
   "lint-staged": {
     "*.{js,ts}": [

@@ -108,7 +108,8 @@ interface UseMcpOptions {
   clientName?: string                      // OAuth client name
   clientUri?: string                       // OAuth client URI
   callbackUrl?: string                     // OAuth callback URL
-  preventAutoAuth?: boolean                // Prevent automatic OAuth popup
+  preventAutoAuth?: boolean                // Prevent automatic OAuth (show auth button)
+  useRedirectFlow?: boolean                // Use redirect instead of popup (default: false)
   onPopupWindow?: (win: Window) => void    // OAuth popup window handler
   storageKeyPrefix?: string                // localStorage key prefix
 
@@ -139,11 +140,18 @@ const mcp = useMcp({
 
 ### OAuth Authentication
 
+mcp-use supports two OAuth flow modes:
+
+#### Popup Flow (Default)
+
+Opens OAuth in a popup window. Best for web applications.
+
 ```typescript
 const mcp = useMcp({
   url: 'https://mcp.linear.app/mcp',
   clientName: 'My App',
   callbackUrl: window.location.origin + '/oauth/callback',
+  // Popup flow is default
   onPopupWindow: (popup) => {
     // Track popup for UX
     console.log('OAuth popup opened:', popup)
@@ -151,40 +159,99 @@ const mcp = useMcp({
 })
 
 // OAuth handled automatically:
-// 1. Server returns 401
+// 1. Server returns 401 with WWW-Authenticate
 // 2. SDK triggers OAuth popup
-// 3. User authorizes
-// 4. Popup sends callback
+// 3. User authorizes in popup
+// 4. Popup redirects to callback
 // 5. Connection retries with token
+```
+
+#### Redirect Flow
+
+Redirects the main window. Best for mobile or when popups are blocked.
+
+```typescript
+const mcp = useMcp({
+  url: 'https://mcp.linear.app/mcp',
+  clientName: 'My App',
+  callbackUrl: window.location.origin + '/oauth/callback',
+  useRedirectFlow: true // Enable redirect flow
+})
+```
+
+#### Manual Authentication Trigger
+
+Prevent automatic OAuth and show a manual login button:
+
+```typescript
+function MyComponent() {
+  const mcp = useMcp({
+    url: 'https://mcp.linear.app/mcp',
+    preventAutoAuth: true // Don't auto-trigger OAuth
+  })
+
+  if (mcp.state === 'pending_auth') {
+    return (
+      <button onClick={mcp.authenticate}>
+        Sign in to Linear
+      </button>
+    )
+  }
+
+  if (mcp.state === 'authenticating') {
+    return <div>Authenticating...</div>
+  }
+
+  // ... rest of component
+}
 ```
 
 ### OAuth Callback Page
 
-Create an OAuth callback route to handle redirects:
+Create an OAuth callback route to handle OAuth redirects:
 
 ```typescript
-// /oauth/callback route
-import { useEffect } from 'react'
+// app/oauth/callback/page.tsx (Next.js App Router)
+// or pages/oauth/callback.tsx (Next.js Pages Router)
+import { onMcpAuthorization } from 'mcp-use/auth'
+import { useEffect, useState } from 'react'
 
-export function OAuthCallback() {
+export default function OAuthCallback() {
+  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
+  const [error, setError] = useState<string>('')
+
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
-    const error = params.get('error')
-
-    if (window.opener) {
-      window.opener.postMessage({
-        type: 'mcp_auth_callback',
-        success: !error,
-        code: code,
-        error: error
-      }, window.location.origin)
-
-      window.close()
-    }
+    onMcpAuthorization()
+      .then(() => {
+        setStatus('success')
+        // Redirect back to app after brief delay
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 1000)
+      })
+      .catch((err) => {
+        setStatus('error')
+        setError(err.message)
+      })
   }, [])
 
-  return <div>Authentication successful. You can close this window.</div>
+  if (status === 'processing') {
+    return <div>Completing authentication...</div>
+  }
+
+  if (status === 'success') {
+    return <div>✅ Authentication successful! Redirecting...</div>
+  }
+
+  return (
+    <div>
+      <h1>❌ Authentication Failed</h1>
+      <p>{error}</p>
+      <button onClick={() => window.location.href = '/'}>
+        Return to app
+      </button>
+    </div>
+  )
 }
 ```
 
