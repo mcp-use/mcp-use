@@ -1,7 +1,7 @@
 import type { StreamEvent } from "@langchain/core/tracers/log_stream";
+import { stripVTControlCharacters } from "node:util";
 import chalk from "chalk";
 import { highlight } from "cli-highlight";
-import stripAnsiLib from "strip-ansi";
 
 /**
  * Helper functions for pretty-printing code mode tool executions
@@ -16,9 +16,9 @@ interface ExecuteCodeResult {
   execution_time: number;
 }
 
-// Remove ANSI color codes for length calculation using the strip-ansi library
+// Remove ANSI color codes for length calculation using Node.js built-in util
 function stripAnsi(str: string): string {
-  return stripAnsiLib(str);
+  return stripVTControlCharacters(str);
 }
 
 // wrap lines correctly, preserving ANSI codes

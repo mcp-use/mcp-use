@@ -6,7 +6,7 @@ import type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { sanitizeUrl } from "strict-url-sanitise";
+import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { BrowserMCPClient } from "../client/browser.js";
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
 import { assert } from "../utils/assert.js";

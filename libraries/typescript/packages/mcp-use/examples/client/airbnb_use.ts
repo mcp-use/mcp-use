@@ -5,14 +5,13 @@
  * to perform tasks like searching for accommodations.
  *
  * Special Thanks to https://github.com/openbnb-org/mcp-server-airbnb for the server.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: OPENAI_API_KEY
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 async function runAirbnbExample() {
   // Create MCPClient with Airbnb configuration

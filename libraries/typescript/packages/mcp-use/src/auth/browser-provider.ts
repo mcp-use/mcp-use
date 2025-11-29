@@ -5,7 +5,7 @@ import type {
   OAuthClientMetadata,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import { sanitizeUrl } from "strict-url-sanitise";
+import { sanitizeUrl } from "../utils/url-sanitize.js";
 // Assuming StoredState is defined in ./types.js and includes fields for provider options
 import type { StoredState } from "./types.js"; // Adjust path if necessary
 
