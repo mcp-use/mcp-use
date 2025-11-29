@@ -92,14 +92,19 @@ export async function adaptConnectMiddleware(
   let createResponse: any;
 
   try {
+    // @ts-expect-error - node-mocks-http is an optional dependency
     const httpMocks = await import("node-mocks-http");
     createRequest = httpMocks.createRequest;
     createResponse = httpMocks.createResponse;
   } catch (error) {
-    console.error(
-      "[WIDGETS] node-mocks-http not available. Install connect and node-mocks-http for Vite middleware support."
+    throw new Error(
+      "❌ Widget middleware dependencies not installed!\n\n" +
+        "To use Connect middleware adapters with MCP widgets, you need to install:\n\n" +
+        "  npm install node-mocks-http\n" +
+        "  # or\n" +
+        "  pnpm add node-mocks-http\n\n" +
+        "This dependency is automatically included in projects created with 'create-mcp-use-app'."
     );
-    throw error;
   }
 
   // Normalize middleware path: remove trailing * and /

@@ -3,7 +3,7 @@ import type {
   ReadResourceResult,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { v4 as uuidv4 } from "uuid";
+import { generateUUID } from "../server/utils/runtime.js";
 import { logger } from "../logging.js";
 import { WebSocketConnectionManager } from "../task_managers/websocket.js";
 
@@ -73,7 +73,7 @@ export class WebSocketConnector extends BaseConnector {
     params: Record<string, any> | null = null
   ): Promise<T> {
     if (!this.ws) throw new Error("WebSocket is not connected");
-    const id = uuidv4();
+    const id = generateUUID();
     const payload = JSON.stringify({ id, method, params: params ?? {} });
 
     return new Promise<T>((resolve, reject) => {

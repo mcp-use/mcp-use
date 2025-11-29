@@ -804,7 +804,7 @@ export class McpServer<HasOAuth extends boolean = false> {
       {
         title: promptDefinition.title,
         description: promptDefinition.description ?? "",
-        argsSchema,
+        argsSchema: argsSchema as any, // Type assertion for Zod v4 compatibility
       },
       async (params: any): Promise<GetPromptResult> => {
         return await promptDefinition.cb(params);
@@ -1393,13 +1393,15 @@ export class McpServer<HasOAuth extends boolean = false> {
       )();
       tailwindcss = tailwindModule.default;
     } catch (error) {
-      console.error(
-        "[WIDGETS] Dev dependencies not available. Install vite, @vitejs/plugin-react, and @tailwindcss/vite for widget development."
+      throw new Error(
+        "❌ Widget dependencies not installed!\n\n" +
+          "To use MCP widgets with resources folder, you need to install the required dependencies:\n\n" +
+          "  npm install vite @vitejs/plugin-react @tailwindcss/vite\n" +
+          "  # or\n" +
+          "  pnpm add vite @vitejs/plugin-react @tailwindcss/vite\n\n" +
+          "These dependencies are automatically included in projects created with 'create-mcp-use-app'.\n" +
+          "For production, pre-build your widgets using 'mcp-use build'."
       );
-      console.error(
-        "[WIDGETS] For production, use 'mcp-use build' to pre-build widgets."
-      );
-      return;
     }
 
     const widgets = entries.map((entry) => {

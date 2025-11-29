@@ -1,8 +1,28 @@
 import React, { StrictMode, useCallback, useEffect, useRef } from "react";
-import { BrowserRouter } from "react-router-dom";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { ThemeProvider } from "./ThemeProvider.js";
 import { WidgetControls } from "./WidgetControls.js";
+
+// Dynamically import react-router-dom (template dependency)
+let BrowserRouter: any = null;
+let routerError: Error | null = null;
+
+// Attempt to load react-router-dom on module initialization
+(async () => {
+  try {
+    const routerModule = await import("react-router-dom");
+    BrowserRouter = routerModule.BrowserRouter;
+  } catch (error) {
+    routerError = new Error(
+      "❌ react-router-dom not installed!\n\n" +
+        "To use MCP widgets with McpUseProvider, you need to install:\n\n" +
+        "  npm install react-router-dom\n" +
+        "  # or\n" +
+        "  pnpm add react-router-dom\n\n" +
+        "This dependency is automatically included in projects created with 'create-mcp-use-app'."
+    );
+  }
+})();
 
 /**
  * Calculate basename for proper routing in both dev proxy and production
@@ -179,7 +199,13 @@ export function McpUseProvider({
     );
   }
 
-  // BrowserRouter wraps everything
+  // BrowserRouter wraps everything (check if available)
+  if (routerError) {
+    throw routerError;
+  }
+  if (!BrowserRouter) {
+    throw new Error("react-router-dom is still loading, please try again.");
+  }
   content = <BrowserRouter basename={basename}>{content}</BrowserRouter>;
 
   // ThemeProvider wraps BrowserRouter

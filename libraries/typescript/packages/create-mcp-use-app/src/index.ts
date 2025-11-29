@@ -94,14 +94,14 @@ function getInstallArgs(packageManager: string): string[] {
   switch (packageManager) {
     case "yarn":
       // Yarn: prefer offline cache, skip audit (faster, but less secure)
-      return ["install", "--prefer-offline", "--no-audit"];
+      return ["install"];
     case "pnpm":
       // pnpm: prefer offline cache, skip audit
-      return ["install", "--prefer-offline", "--no-audit"];
+      return ["install"];
     case "npm":
     default:
       // npm: prefer offline cache, skip audit and funding messages
-      return ["install", "--prefer-offline", "--no-audit", "--no-fund"];
+      return ["install"];
   }
 }
 

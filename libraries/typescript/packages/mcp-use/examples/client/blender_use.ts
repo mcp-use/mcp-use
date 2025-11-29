@@ -10,14 +10,13 @@
  * server is running before executing this script.
  *
  * Special thanks to https://github.com/ahujasid/blender-mcp for the server.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: ANTHROPIC_API_KEY
  */
 
 import { ChatAnthropic } from "@langchain/anthropic";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 async function runBlenderExample() {
   // Create MCPClient with Blender MCP configuration

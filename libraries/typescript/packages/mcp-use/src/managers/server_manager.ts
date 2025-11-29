@@ -4,13 +4,55 @@ import type { MCPClient } from "../client.js";
 import type { BaseConnector } from "../connectors/base.js";
 import type { MCPSession } from "../session.js";
 import type { IServerManager } from "./types.js";
-import { isEqual } from "lodash-es";
 import { logger } from "../logging.js";
 import { AcquireActiveMCPServerTool } from "./tools/acquire_active_mcp_server.js";
 import { AddMCPServerFromConfigTool } from "./tools/add_server_from_config.js";
 import { ConnectMCPServerTool } from "./tools/connect_mcp_server.js";
 import { ListMCPServersTool } from "./tools/list_mcp_servers.js";
 import { ReleaseMCPServerConnectionTool } from "./tools/release_mcp_server_connection.js";
+
+/**
+ * Deep equality check for comparing objects and arrays
+ * Handles nested structures, primitives, arrays, and objects
+ */
+function isEqual(a: any, b: any): boolean {
+  // Handle identical references and primitives
+  if (a === b) return true;
+
+  // Handle null/undefined cases
+  if (a == null || b == null) return false;
+
+  // Handle different types
+  if (typeof a !== typeof b) return false;
+
+  // Handle Date objects
+  if (a instanceof Date && b instanceof Date) {
+    return a.getTime() === b.getTime();
+  }
+
+  // Handle arrays
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((item, index) => isEqual(item, b[index]));
+  }
+
+  // Handle objects
+  if (typeof a === "object" && typeof b === "object") {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    if (keysA.length !== keysB.length) return false;
+
+    return keysA.every((key) => {
+      return (
+        Object.prototype.hasOwnProperty.call(b, key) && isEqual(a[key], b[key])
+      );
+    });
+  }
+
+  // For primitives that aren't strictly equal
+  return false;
+}
 
 export class ServerManager implements IServerManager {
   public readonly initializedServers: Record<string, boolean> = {};
