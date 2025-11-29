@@ -438,21 +438,21 @@ export function ResourcesTab({
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
-            <ResourcesTabHeader
-              activeTab={activeTab}
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              filteredResourcesCount={filteredResources.length}
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              onTabSwitch={() => {}}
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+            <div className="flex flex-col h-full overflow-hidden">
+              <ResourcesTabHeader
+                activeTab={activeTab}
+                isSearchExpanded={isSearchExpanded}
+                searchQuery={searchQuery}
+                filteredResourcesCount={filteredResources.length}
+                onSearchExpand={() => setIsSearchExpanded(true)}
+                onSearchChange={setSearchQuery}
+                onSearchBlur={handleSearchBlur}
+                onTabSwitch={() => {}}
+                searchInputRef={
+                  searchInputRef as React.RefObject<HTMLInputElement>
+                }
+              />
 
-            <div className="flex flex-col h-full">
               <ResourcesList
                 resources={filteredResources}
                 selectedResource={selectedResource}

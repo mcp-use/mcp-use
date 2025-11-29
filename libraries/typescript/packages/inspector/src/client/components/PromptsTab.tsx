@@ -586,39 +586,41 @@ export function PromptsTab({
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
-            <PromptsTabHeader
-              activeTab={activeTab}
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              filteredPromptsCount={filteredPrompts.length}
-              savedPromptsCount={savedPrompts.length}
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              onTabSwitch={() =>
-                setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
-              }
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+            <div className="flex flex-col h-full overflow-hidden">
+              <PromptsTabHeader
+                activeTab={activeTab}
+                isSearchExpanded={isSearchExpanded}
+                searchQuery={searchQuery}
+                filteredPromptsCount={filteredPrompts.length}
+                savedPromptsCount={savedPrompts.length}
+                onSearchExpand={() => setIsSearchExpanded(true)}
+                onSearchChange={setSearchQuery}
+                onSearchBlur={handleSearchBlur}
+                onTabSwitch={() =>
+                  setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
+                }
+                searchInputRef={
+                  searchInputRef as React.RefObject<HTMLInputElement>
+                }
+              />
 
-            {activeTab === "prompts" ? (
-              <PromptsList
-                prompts={filteredPrompts}
-                selectedPrompt={selectedPrompt}
-                onPromptSelect={handlePromptSelect}
-                focusedIndex={focusedIndex}
-              />
-            ) : (
-              <SavedPromptsList
-                savedPrompts={savedPrompts}
-                selectedPrompt={selectedSavedPrompt}
-                onLoadPrompt={loadSavedPrompt}
-                onDeletePrompt={deleteSavedPrompt}
-                focusedIndex={focusedIndex}
-              />
-            )}
+              {activeTab === "prompts" ? (
+                <PromptsList
+                  prompts={filteredPrompts}
+                  selectedPrompt={selectedPrompt}
+                  onPromptSelect={handlePromptSelect}
+                  focusedIndex={focusedIndex}
+                />
+              ) : (
+                <SavedPromptsList
+                  savedPrompts={savedPrompts}
+                  selectedPrompt={selectedSavedPrompt}
+                  onLoadPrompt={loadSavedPrompt}
+                  onDeletePrompt={deleteSavedPrompt}
+                  focusedIndex={focusedIndex}
+                />
+              )}
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
