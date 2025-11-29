@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.9.0-canary.4
+
+### Patch Changes
+
+- f44e60f: Fix padding of rpc panels
+  - mcp-use@1.7.0-canary.4
+
 ## 0.9.0-canary.3
 
 ### Patch Changes
