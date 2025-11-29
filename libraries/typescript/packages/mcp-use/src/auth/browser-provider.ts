@@ -174,9 +174,10 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       // Store flow type so callback knows how to handle the response
       flowType: this.useRedirectFlow ? "redirect" : "popup",
       // Store current URL for redirect flow so we can return to it
-      returnUrl: this.useRedirectFlow && typeof window !== "undefined" 
-        ? window.location.href 
-        : undefined,
+      returnUrl:
+        this.useRedirectFlow && typeof window !== "undefined"
+          ? window.location.href
+          : undefined,
     };
     localStorage.setItem(stateKey, JSON.stringify(stateData));
 

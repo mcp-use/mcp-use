@@ -1,13 +1,13 @@
 /**
  * OAuth mode determines how the MCP server handles OAuth requests
  */
-export type OAuthMode = 
-  | 'direct'  // Clients communicate directly with auth server (e.g., WorkOS)
-  | 'proxy';  // MCP server proxies OAuth requests (legacy mode)
+export type OAuthMode =
+  | "direct" // Clients communicate directly with auth server (e.g., WorkOS)
+  | "proxy"; // MCP server proxies OAuth requests (legacy mode)
 
 /**
  * OAuth Provider Interface
- * 
+ *
  * Defines the contract that all OAuth providers must implement
  * to provide authentication and authorization services.
  */
@@ -98,7 +98,7 @@ export interface BaseOAuthConfig {
  * Supabase OAuth provider configuration
  */
 export interface SupabaseOAuthConfig extends BaseOAuthConfig {
-  provider: 'supabase';
+  provider: "supabase";
   projectId: string;
   jwtSecret?: string;
   skipVerification?: boolean;
@@ -108,7 +108,7 @@ export interface SupabaseOAuthConfig extends BaseOAuthConfig {
  * Auth0 OAuth provider configuration
  */
 export interface Auth0OAuthConfig extends BaseOAuthConfig {
-  provider: 'auth0';
+  provider: "auth0";
   domain: string;
   audience: string;
   verifyJwt?: boolean;
@@ -118,7 +118,7 @@ export interface Auth0OAuthConfig extends BaseOAuthConfig {
  * Keycloak OAuth provider configuration
  */
 export interface KeycloakOAuthConfig extends BaseOAuthConfig {
-  provider: 'keycloak';
+  provider: "keycloak";
   serverUrl: string;
   realm: string;
   clientId?: string;
@@ -129,7 +129,7 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
  * WorkOS OAuth provider configuration
  */
 export interface WorkOSOAuthConfig extends BaseOAuthConfig {
-  provider: 'workos';
+  provider: "workos";
   subdomain: string;
   clientId?: string;
   apiKey?: string;
@@ -140,7 +140,7 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
  * Custom OAuth provider configuration
  */
 export interface CustomOAuthConfig extends BaseOAuthConfig {
-  provider: 'custom';
+  provider: "custom";
   issuer: string;
   jwksUrl: string;
   authEndpoint: string;
@@ -160,4 +160,3 @@ export type OAuthConfig =
   | KeycloakOAuthConfig
   | WorkOSOAuthConfig
   | CustomOAuthConfig;
-

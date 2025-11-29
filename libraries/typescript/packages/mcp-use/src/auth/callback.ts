@@ -92,13 +92,11 @@ export async function onMcpAuthorization() {
     });
 
     if (authResult === "AUTHORIZED") {
-      console.log(
-        `${logPrefix} Authorization successful via SDK auth().`
-      );
-      
+      console.log(`${logPrefix} Authorization successful via SDK auth().`);
+
       // Check if this was a redirect flow (has returnUrl) or popup flow
       const isRedirectFlow = storedStateData.flowType === "redirect";
-      
+
       if (isRedirectFlow && storedStateData.returnUrl) {
         // Redirect flow: navigate back to the original page
         console.log(
@@ -108,9 +106,7 @@ export async function onMcpAuthorization() {
         window.location.href = storedStateData.returnUrl;
       } else if (window.opener && !window.opener.closed) {
         // Popup flow: notify opener and close
-        console.log(
-          `${logPrefix} Popup flow complete. Notifying opener...`
-        );
+        console.log(`${logPrefix} Popup flow complete. Notifying opener...`);
         window.opener.postMessage(
           { type: "mcp_auth_callback", success: true },
           window.location.origin

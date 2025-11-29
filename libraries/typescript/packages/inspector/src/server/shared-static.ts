@@ -77,7 +77,7 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
       </html>
     `);
   });
-  
+
   // Catch-all for any /inspector/* routes (for React Router SPA routing)
   // Handle both GET and POST since some OAuth flows use POST
   const handleInspectorRoute = (c: any) => {
@@ -88,10 +88,10 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
     }
     return c.notFound();
   };
-  
+
   app.get("/inspector/*", handleInspectorRoute);
   app.post("/inspector/*", handleInspectorRoute);
-  
+
   // Final catch-all for root and other routes
   app.get("*", (c) => {
     const indexPath = join(distPath, "index.html");

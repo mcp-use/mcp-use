@@ -1,12 +1,17 @@
 /**
  * Supabase OAuth Provider
- * 
+ *
  * Implements OAuth authentication for Supabase projects.
  * Supports both HS256 (legacy) and ES256 (new ECC) signing algorithms.
  */
 
-import { jwtVerify, createRemoteJWKSet, decodeProtectedHeader, decodeJwt } from 'jose';
-import type { OAuthProvider, UserInfo, SupabaseOAuthConfig } from './types.js';
+import {
+  jwtVerify,
+  createRemoteJWKSet,
+  decodeProtectedHeader,
+  decodeJwt,
+} from "jose";
+import type { OAuthProvider, UserInfo, SupabaseOAuthConfig } from "./types.js";
 
 export class SupabaseOAuthProvider implements OAuthProvider {
   private config: SupabaseOAuthConfig;
@@ -34,8 +39,12 @@ export class SupabaseOAuthProvider implements OAuthProvider {
   async verifyToken(token: string): Promise<any> {
     // Skip verification in development mode if configured
     if (this.config.skipVerification) {
-      console.warn('[Supabase OAuth] ⚠️  SKIPPING VERIFICATION (DEVELOPMENT MODE)');
-      console.warn('[Supabase OAuth]     This is NOT secure! Only use for testing!');
+      console.warn(
+        "[Supabase OAuth] ⚠️  SKIPPING VERIFICATION (DEVELOPMENT MODE)"
+      );
+      console.warn(
+        "[Supabase OAuth]     This is NOT secure! Only use for testing!"
+      );
       const payload = decodeJwt(token);
       return { payload, protectedHeader: decodeProtectedHeader(token) };
     }
@@ -43,27 +52,27 @@ export class SupabaseOAuthProvider implements OAuthProvider {
     try {
       // Decode header to check which algorithm is used
       const header = decodeProtectedHeader(token);
-      
-      if (header.alg === 'HS256') {
+
+      if (header.alg === "HS256") {
         // HS256 uses symmetric key
         if (!this.config.jwtSecret) {
           throw new Error(
-            'JWT Secret is required for HS256 tokens. ' +
-            'Get it from: Supabase Dashboard → Project Settings → API → JWT Settings'
+            "JWT Secret is required for HS256 tokens. " +
+              "Get it from: Supabase Dashboard → Project Settings → API → JWT Settings"
           );
         }
-        
+
         const secret = new TextEncoder().encode(this.config.jwtSecret);
         const result = await jwtVerify(token, secret, {
           issuer: this.issuer,
-          audience: 'authenticated'
+          audience: "authenticated",
         });
         return result;
-      } else if (header.alg === 'ES256') {
+      } else if (header.alg === "ES256") {
         // ES256 uses asymmetric key - JWK Set
         const result = await jwtVerify(token, this.getJWKS(), {
           issuer: this.issuer,
-          audience: 'authenticated'
+          audience: "authenticated",
         });
         return result;
       } else {
@@ -107,7 +116,6 @@ export class SupabaseOAuthProvider implements OAuthProvider {
   }
 
   getGrantTypesSupported(): string[] {
-    return ['authorization_code', 'refresh_token'];
+    return ["authorization_code", "refresh_token"];
   }
 }
-

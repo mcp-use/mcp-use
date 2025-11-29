@@ -1,18 +1,23 @@
 /**
  * WorkOS OAuth Provider
- * 
+ *
  * Implements OAuth authentication for WorkOS AuthKit.
  * Supports JWKS-based JWT verification with Dynamic Client Registration.
- * 
+ *
  * WorkOS uses "direct" mode where MCP clients communicate directly with
  * WorkOS for OAuth flows (registration, authorization, token exchange).
  * The MCP server only verifies tokens issued by WorkOS.
- * 
+ *
  * Learn more: https://workos.com/docs/authkit/mcp
  */
 
-import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
-import type { OAuthProvider, UserInfo, WorkOSOAuthConfig, OAuthMode } from './types.js';
+import { jwtVerify, createRemoteJWKSet, decodeJwt } from "jose";
+import type {
+  OAuthProvider,
+  UserInfo,
+  WorkOSOAuthConfig,
+  OAuthMode,
+} from "./types.js";
 
 export class WorkOSOAuthProvider implements OAuthProvider {
   private config: WorkOSOAuthConfig;
@@ -26,9 +31,7 @@ export class WorkOSOAuthProvider implements OAuthProvider {
 
   private getJWKS(): ReturnType<typeof createRemoteJWKSet> {
     if (!this.jwks) {
-      this.jwks = createRemoteJWKSet(
-        new URL(`${this.issuer}/oauth2/jwks`)
-      );
+      this.jwks = createRemoteJWKSet(new URL(`${this.issuer}/oauth2/jwks`));
     }
     return this.jwks;
   }
@@ -36,13 +39,13 @@ export class WorkOSOAuthProvider implements OAuthProvider {
   async verifyToken(token: string): Promise<any> {
     // Skip verification in development mode if configured
     if (this.config.verifyJwt === false) {
-      console.warn('[WorkOS OAuth] ⚠️  JWT verification is disabled');
-      console.warn('[WorkOS OAuth]     Enable verifyJwt: true for production');
-      
+      console.warn("[WorkOS OAuth] ⚠️  JWT verification is disabled");
+      console.warn("[WorkOS OAuth]     Enable verifyJwt: true for production");
+
       // Decode without verification
-      const parts = token.split('.');
+      const parts = token.split(".");
       if (parts.length !== 3) {
-        throw new Error('Invalid JWT format');
+        throw new Error("Invalid JWT format");
       }
       const payload = decodeJwt(token);
       return { payload };
@@ -69,7 +72,7 @@ export class WorkOSOAuthProvider implements OAuthProvider {
       permissions: payload.permissions || [],
       roles: payload.roles || [],
       // Include scope as well
-      scopes: payload.scope ? payload.scope.split(' ') : [],
+      scopes: payload.scope ? payload.scope.split(" ") : [],
       // Additional WorkOS-specific claims
       email_verified: payload.email_verified,
       organization_id: payload.org_id,
@@ -90,22 +93,24 @@ export class WorkOSOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ['email', 'offline_access', 'openid', 'profile'];
+    return ["email", "offline_access", "openid", "profile"];
   }
 
   getGrantTypesSupported(): string[] {
-    return ['authorization_code', 'refresh_token'];
+    return ["authorization_code", "refresh_token"];
   }
 
   getMode(): OAuthMode {
     // If a client_id is configured, use proxy mode so we can inject it
     // Otherwise use direct mode with Dynamic Client Registration
     if (this.config.clientId) {
-      console.log('[WorkOS OAuth] Using proxy mode (pre-registered client)');
-      return 'proxy';
+      console.log("[WorkOS OAuth] Using proxy mode (pre-registered client)");
+      return "proxy";
     }
-    console.log('[WorkOS OAuth] Using direct mode (Dynamic Client Registration)');
-    return 'direct';
+    console.log(
+      "[WorkOS OAuth] Using direct mode (Dynamic Client Registration)"
+    );
+    return "direct";
   }
 
   getRegistrationEndpoint(): string | undefined {
@@ -116,4 +121,3 @@ export class WorkOSOAuthProvider implements OAuthProvider {
     return `${this.issuer}/oauth2/register`;
   }
 }
-

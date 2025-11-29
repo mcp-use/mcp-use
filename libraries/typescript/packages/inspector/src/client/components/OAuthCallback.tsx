@@ -4,18 +4,20 @@ import { Loader2 } from "lucide-react";
 
 /**
  * OAuth Callback Page
- * 
+ *
  * Handles the OAuth redirect after user authorizes the app.
  * Exchanges the authorization code for tokens and redirects back to the app.
  */
 export function OAuthCallback() {
-  const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
+  const [status, setStatus] = useState<"processing" | "success" | "error">(
+    "processing"
+  );
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
     console.log("[OAuthCallback] Component mounted, handling authorization...");
     console.log("[OAuthCallback] Current URL:", window.location.href);
-    
+
     // Run the OAuth callback handler
     onMcpAuthorization()
       .then(() => {
@@ -73,4 +75,3 @@ export function OAuthCallback() {
     </div>
   );
 }
-

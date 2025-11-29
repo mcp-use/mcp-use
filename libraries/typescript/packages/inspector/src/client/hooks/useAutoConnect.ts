@@ -233,7 +233,10 @@ export function useAutoConnect({
 
     // Handle authentication states - clear loading overlay so user can authenticate
     // But DON'T navigate yet - wait for them to complete auth
-    if (connection?.state === "pending_auth" || connection?.state === "authenticating") {
+    if (
+      connection?.state === "pending_auth" ||
+      connection?.state === "authenticating"
+    ) {
       console.warn(
         "[useAutoConnect] Connection requires authentication, clearing loading overlay"
       );

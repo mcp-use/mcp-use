@@ -5,16 +5,18 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
  * to match a specific type T. Used for output schema validation.
  * T must be a record type (object) to match the SDK's CallToolResult interface.
  */
-export interface TypedCallToolResult<T extends Record<string, unknown> = Record<string, unknown>> extends Omit<CallToolResult, 'structuredContent'> {
+export interface TypedCallToolResult<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> extends Omit<CallToolResult, "structuredContent"> {
   structuredContent?: T;
 }
 
 /**
  * Create a text content response for MCP tools
- * 
+ *
  * @param content - The text content to return
  * @returns CallToolResult with text content
- * 
+ *
  * @example
  * ```typescript
  * server.tool({
@@ -37,11 +39,11 @@ export function text(content: string): CallToolResult {
 
 /**
  * Create an image content response for MCP tools
- * 
+ *
  * @param data - The image data (data URL or base64)
  * @param mimeType - MIME type (e.g., 'image/png', defaults to 'image/png')
  * @returns CallToolResult with image content
- * 
+ *
  * @example
  * ```typescript
  * server.tool({
@@ -50,7 +52,10 @@ export function text(content: string): CallToolResult {
  * })
  * ```
  */
-export function image(data: string, mimeType: string = "image/png"): CallToolResult {
+export function image(
+  data: string,
+  mimeType: string = "image/png"
+): CallToolResult {
   return {
     content: [
       {
@@ -64,12 +69,12 @@ export function image(data: string, mimeType: string = "image/png"): CallToolRes
 
 /**
  * Create a resource content response for MCP tools
- * 
+ *
  * @param uri - The resource URI
  * @param mimeType - Optional MIME type
  * @param text - Optional text content for the resource
  * @returns CallToolResult with resource content
- * 
+ *
  * @example
  * ```typescript
  * server.tool({
@@ -78,7 +83,11 @@ export function image(data: string, mimeType: string = "image/png"): CallToolRes
  * })
  * ```
  */
-export function resource(uri: string, mimeType?: string, text?: string): CallToolResult {
+export function resource(
+  uri: string,
+  mimeType?: string,
+  text?: string
+): CallToolResult {
   const resourceContent: any = {
     type: "resource",
     resource: {
@@ -95,10 +104,10 @@ export function resource(uri: string, mimeType?: string, text?: string): CallToo
 
 /**
  * Create an error response for MCP tools
- * 
+ *
  * @param message - The error message
  * @returns CallToolResult marked as error
- * 
+ *
  * @example
  * ```typescript
  * server.tool({
@@ -126,10 +135,10 @@ export function error(message: string): CallToolResult {
 
 /**
  * Create a JSON object response for MCP tools
- * 
+ *
  * @param data - The object to return as JSON
  * @returns TypedCallToolResult with JSON text content and typed structuredContent
- * 
+ *
  * @example
  * ```typescript
  * server.tool({
@@ -141,20 +150,25 @@ export function error(message: string): CallToolResult {
  * })
  * ```
  */
-export function object<T extends Record<string, any>>(data: T): TypedCallToolResult<T> {
-  return Array.isArray(data) ? array(data) as any : {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(data, null, 2),
-      },
-    ],
-    structuredContent: data,
-  };
+export function object<T extends Record<string, any>>(
+  data: T
+): TypedCallToolResult<T> {
+  return Array.isArray(data)
+    ? (array(data) as any)
+    : {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2),
+          },
+        ],
+        structuredContent: data,
+      };
 }
 
-
-export function array<T extends any[]>(data: T): TypedCallToolResult<{data: T}> {
+export function array<T extends any[]>(
+  data: T
+): TypedCallToolResult<{ data: T }> {
   return {
     content: [
       {
@@ -162,11 +176,9 @@ export function array<T extends any[]>(data: T): TypedCallToolResult<{data: T}> 
         text: JSON.stringify(data, null, 2),
       },
     ],
-    structuredContent: {data: data},
+    structuredContent: { data: data },
   };
 }
-
-
 
 /**
  * Configuration for widget response utility
@@ -192,16 +204,16 @@ export interface WidgetResponseConfig {
 
 /**
  * Create a widget response for MCP tools
- * 
+ *
  * Returns a complete tool result configured to display an OpenAI Apps SDK widget.
  * This allows any tool to return a widget, not just auto-registered widget tools.
- * 
+ *
  * The widget must exist in your resources folder and be registered with the server
  * using `server.uiResource()`.
- * 
+ *
  * @param config - Widget response configuration
  * @returns CallToolResult with widget metadata and structured content
- * 
+ *
  * @example
  * ```typescript
  * server.tool({
@@ -267,16 +279,31 @@ export function widget(config: WidgetResponseConfig): CallToolResult {
   };
 }
 
-
 export function mix(...results: CallToolResult[]): CallToolResult {
-  const structuredContent = results.find(result => result.structuredContent) && results.filter(result => result.structuredContent).map(result => result.structuredContent).reduce((acc, result) => {
-    return { ...acc, ...result };
-  }, {} as Record<string, unknown>);
-  const _meta = results.find(result => result._meta) && results.filter(result => result._meta).map(result => result._meta).reduce((acc, result) => {
-    return { ...acc, ...result };
-  }, {} as Record<string, unknown>);    
+  const structuredContent =
+    results.find((result) => result.structuredContent) &&
+    results
+      .filter((result) => result.structuredContent)
+      .map((result) => result.structuredContent)
+      .reduce(
+        (acc, result) => {
+          return { ...acc, ...result };
+        },
+        {} as Record<string, unknown>
+      );
+  const _meta =
+    results.find((result) => result._meta) &&
+    results
+      .filter((result) => result._meta)
+      .map((result) => result._meta)
+      .reduce(
+        (acc, result) => {
+          return { ...acc, ...result };
+        },
+        {} as Record<string, unknown>
+      );
   return {
-    content: results.flatMap(result => result.content),
+    content: results.flatMap((result) => result.content),
     ...(structuredContent && { structuredContent }),
     ...(_meta && { _meta }),
   };

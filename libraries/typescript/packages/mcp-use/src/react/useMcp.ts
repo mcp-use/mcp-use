@@ -14,7 +14,6 @@ import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
-const AUTH_TIMEOUT = 5 * 60 * 1000;
 
 // Define Transport types literal for clarity
 type TransportType = "http" | "sse";
@@ -69,7 +68,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     autoReconnect = DEFAULT_RECONNECT_DELAY,
     transportType = "auto",
     preventAutoAuth = false, // Default to false for backward compatibility (auto-trigger OAuth)
-    useRedirectFlow = false, // Default to false for backward compatibility (use popup)  
+    useRedirectFlow = false, // Default to false for backward compatibility (use popup)
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
@@ -374,27 +373,39 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // Check if OAuth provider is configured
           if (authProviderRef.current) {
             // OAuth is configured - enter pending_auth state
-            addLog("info", "Authentication required. OAuth provider available.");
-            
+            addLog(
+              "info",
+              "Authentication required. OAuth provider available."
+            );
+
             // Generate auth URL manually since SDK didn't trigger it
             // This happens because 401 occurs before OAuth flow starts
             try {
-              const { auth } = await import("@modelcontextprotocol/sdk/client/auth.js");
+              const { auth } = await import(
+                "@modelcontextprotocol/sdk/client/auth.js"
+              );
               const baseUrl = new URL(url).origin;
-              
+
               // Trigger auth to generate the URL, but it will be blocked by preventAutoAuth
               // This ensures the URL gets prepared and stored
-              auth(authProviderRef.current, { serverUrl: baseUrl }).catch(() => {
-                // Expected to fail/stop - we just want the URL prepared
-              });
-              
+              auth(authProviderRef.current, { serverUrl: baseUrl }).catch(
+                () => {
+                  // Expected to fail/stop - we just want the URL prepared
+                }
+              );
+
               // Give it a moment to prepare the URL
               setTimeout(() => {
                 if (isMountedRef.current) {
-                  const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl();
+                  const manualUrl =
+                    authProviderRef.current?.getLastAttemptedAuthUrl();
                   if (manualUrl) {
                     setAuthUrl(manualUrl);
-                    addLog("info", "Manual authentication URL available:", manualUrl);
+                    addLog(
+                      "info",
+                      "Manual authentication URL available:",
+                      manualUrl
+                    );
                   } else {
                     addLog("warn", "Could not generate authentication URL");
                   }
@@ -403,14 +414,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             } catch (authGenError) {
               addLog("warn", "Error generating auth URL:", authGenError);
             }
-            
+
             if (isMountedRef.current) {
               setState("pending_auth");
             }
             connectingRef.current = false;
             return "auth_redirect";
           }
-          
+
           // Check if custom headers were provided (invalid credentials)
           if (customHeaders && Object.keys(customHeaders).length > 0) {
             failConnection(
@@ -594,20 +605,20 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       retry();
     } else if (currentState === "pending_auth") {
       addLog("info", "Proceeding with authentication from pending state...");
-      
+
       try {
         assert(
           authProviderRef.current,
           "Auth Provider not available for manual auth"
         );
         assert(url, "Server URL is required for authentication");
-        
+
         // Clear ALL stale OAuth state from previous attempts
         addLog("info", "Clearing all OAuth state and initiating fresh flow...");
-        
+
         // Clear all OAuth-related keys for this server
         const hashPrefix = `${storageKeyPrefix}:${authProviderRef.current.serverUrlHash}`;
-        Object.keys(localStorage).forEach(key => {
+        Object.keys(localStorage).forEach((key) => {
           // Remove all keys for this server's hash
           if (key.startsWith(hashPrefix)) {
             addLog("debug", `Removing stale OAuth key: ${key}`);
@@ -619,10 +630,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             localStorage.removeItem(key);
           }
         });
-        
+
         // Update state to authenticating before redirect
         setState("authenticating");
-        
+
         // Recreate the auth provider WITHOUT preventAutoAuth
         const freshAuthProvider = new BrowserOAuthClientProvider(url, {
           storageKeyPrefix,
@@ -633,16 +644,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           useRedirectFlow,
           onPopupWindow,
         });
-        
+
         // Replace the auth provider
         authProviderRef.current = freshAuthProvider;
-        
+
         addLog("info", "Triggering fresh OAuth authorization...");
-        
+
         // Generate a fresh authorization URL and redirect immediately
         // We need to manually trigger what the SDK would do
-        const { auth } = await import("@modelcontextprotocol/sdk/client/auth.js");
-        
+        const { auth } = await import(
+          "@modelcontextprotocol/sdk/client/auth.js"
+        );
+
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
         const baseUrl = new URL(url).origin;
@@ -650,9 +663,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           serverUrl: baseUrl,
         }).catch((err) => {
           // This is expected to "fail" with redirect - the auth flow continues in the popup/redirect
-          addLog("info", "OAuth flow initiated:", err?.message || "Redirecting...");
+          addLog(
+            "info",
+            "OAuth flow initiated:",
+            err?.message || "Redirecting..."
+          );
         });
-        
       } catch (authError) {
         if (!isMountedRef.current) return;
         setState("pending_auth"); // Go back to pending state on error
@@ -677,7 +693,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         `Client not in a state requiring manual authentication trigger (state: ${currentState}). If needed, try disconnecting and reconnecting.`
       );
     }
-  }, [addLog, retry, authUrl, url, useRedirectFlow, onPopupWindow, storageKeyPrefix, clientName, clientUri, callbackUrl]);
+  }, [
+    addLog,
+    retry,
+    authUrl,
+    url,
+    useRedirectFlow,
+    onPopupWindow,
+    storageKeyPrefix,
+    clientName,
+    clientUri,
+    callbackUrl,
+  ]);
 
   /**
    * Clear OAuth tokens from localStorage and disconnect

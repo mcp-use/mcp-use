@@ -1,9 +1,9 @@
 /**
  * AsyncLocalStorage-based context management for HTTP requests
- * 
+ *
  * This module provides a way to pass HTTP request context (Hono Context)
  * through async call chains without explicit parameter passing.
- * 
+ *
  * This is particularly useful for:
  * - Passing authentication info from middleware to tool callbacks
  * - Accessing request headers, user data, etc. in deeply nested functions
@@ -21,11 +21,11 @@ const requestContextStorage = new AsyncLocalStorage<Context>();
 
 /**
  * Execute a function with a request context stored in AsyncLocalStorage
- * 
+ *
  * @param context - Hono Context object to store
  * @param fn - Function to execute within this context
  * @returns Promise resolving to the function's return value
- * 
+ *
  * @example
  * ```typescript
  * app.post('/mcp', async (c) => {
@@ -46,9 +46,9 @@ export async function runWithContext<T>(
 
 /**
  * Get the current request context from AsyncLocalStorage
- * 
+ *
  * @returns The Hono Context for the current async operation, or undefined if not in a request context
- * 
+ *
  * @example
  * ```typescript
  * // Inside a tool callback
@@ -65,10 +65,9 @@ export function getRequestContext(): Context | undefined {
 
 /**
  * Check if currently executing within a request context
- * 
+ *
  * @returns true if a request context is available
  */
 export function hasRequestContext(): boolean {
   return requestContextStorage.getStore() !== undefined;
 }
-

@@ -729,48 +729,53 @@ export function McpProvider({ children }: { children: ReactNode }) {
     [connectionConfigs, connections]
   );
 
-  const removeConnection = useCallback((id: string) => {
-    // Find the connection and properly clean it up
-    const connection = connections.find((c) => c.id === id);
-    if (connection) {
-      console.log(`[McpContext] Cleaning up connection: ${id}`);
-      
-      // First disconnect from the server (closes MCP session)
-      if (connection.disconnect) {
-        console.log(`[McpContext] Disconnecting from server: ${id}`);
-        connection.disconnect();
-      }
-      
-      // Then clear OAuth storage (tokens, client info, etc.)
-      if (connection.clearStorage) {
-        console.log(`[McpContext] Clearing OAuth storage for connection: ${id}`);
-        connection.clearStorage();
-      }
-    }
-    
-    setConnectionConfigs((prev) => prev.filter((c) => c.id !== id));
-    setConnections((prev) => prev.filter((c) => c.id !== id));
+  const removeConnection = useCallback(
+    (id: string) => {
+      // Find the connection and properly clean it up
+      const connection = connections.find((c) => c.id === id);
+      if (connection) {
+        console.log(`[McpContext] Cleaning up connection: ${id}`);
 
-    // Also remove from localStorage immediately
-    const currentConfigs = localStorage.getItem("mcp-inspector-connections");
-    if (currentConfigs) {
-      try {
-        const parsed = JSON.parse(currentConfigs);
-        const filtered = parsed.filter((c: any) => (c.id || c.url) !== id);
-        localStorage.setItem(
-          "mcp-inspector-connections",
-          JSON.stringify(filtered)
-        );
-      } catch (e) {
-        console.error("Failed to update localStorage on remove:", e);
-      }
-    }
+        // First disconnect from the server (closes MCP session)
+        if (connection.disconnect) {
+          console.log(`[McpContext] Disconnecting from server: ${id}`);
+          connection.disconnect();
+        }
 
-    // Track removal
-    Telemetry.getInstance().capture(
-      new MCPServerRemovedEvent({ serverId: id })
-    );
-  }, [connections]);
+        // Then clear OAuth storage (tokens, client info, etc.)
+        if (connection.clearStorage) {
+          console.log(
+            `[McpContext] Clearing OAuth storage for connection: ${id}`
+          );
+          connection.clearStorage();
+        }
+      }
+
+      setConnectionConfigs((prev) => prev.filter((c) => c.id !== id));
+      setConnections((prev) => prev.filter((c) => c.id !== id));
+
+      // Also remove from localStorage immediately
+      const currentConfigs = localStorage.getItem("mcp-inspector-connections");
+      if (currentConfigs) {
+        try {
+          const parsed = JSON.parse(currentConfigs);
+          const filtered = parsed.filter((c: any) => (c.id || c.url) !== id);
+          localStorage.setItem(
+            "mcp-inspector-connections",
+            JSON.stringify(filtered)
+          );
+        } catch (e) {
+          console.error("Failed to update localStorage on remove:", e);
+        }
+      }
+
+      // Track removal
+      Telemetry.getInstance().capture(
+        new MCPServerRemovedEvent({ serverId: id })
+      );
+    },
+    [connections]
+  );
 
   const updateConnectionConfig = useCallback(
     (

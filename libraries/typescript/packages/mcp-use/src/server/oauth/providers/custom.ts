@@ -1,11 +1,11 @@
 /**
  * Custom OAuth Provider
- * 
+ *
  * Allows users to implement custom OAuth providers with their own
  * JWT verification logic and user info extraction.
  */
 
-import type { OAuthProvider, UserInfo, CustomOAuthConfig } from './types.js';
+import type { OAuthProvider, UserInfo, CustomOAuthConfig } from "./types.js";
 
 export class CustomOAuthProvider implements OAuthProvider {
   private config: CustomOAuthConfig;
@@ -39,7 +39,7 @@ export class CustomOAuthProvider implements OAuthProvider {
       picture: payload.picture || payload.avatar_url,
       roles: payload.roles || [],
       permissions: payload.permissions || [],
-      scopes: payload.scope ? payload.scope.split(' ') : [],
+      scopes: payload.scope ? payload.scope.split(" ") : [],
     };
   }
 
@@ -56,11 +56,12 @@ export class CustomOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return this.config.scopesSupported || ['openid', 'profile', 'email'];
+    return this.config.scopesSupported || ["openid", "profile", "email"];
   }
 
   getGrantTypesSupported(): string[] {
-    return this.config.grantTypesSupported || ['authorization_code', 'refresh_token'];
+    return (
+      this.config.grantTypesSupported || ["authorization_code", "refresh_token"]
+    );
   }
 }
-

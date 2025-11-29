@@ -1,12 +1,12 @@
 /**
  * Keycloak OAuth Provider
- * 
+ *
  * Implements OAuth authentication for Keycloak servers.
  * Supports realm roles, client roles, and resource access.
  */
 
-import { jwtVerify, createRemoteJWKSet } from 'jose';
-import type { OAuthProvider, UserInfo, KeycloakOAuthConfig } from './types.js';
+import { jwtVerify, createRemoteJWKSet } from "jose";
+import type { OAuthProvider, UserInfo, KeycloakOAuthConfig } from "./types.js";
 
 export class KeycloakOAuthProvider implements OAuthProvider {
   private config: KeycloakOAuthConfig;
@@ -16,7 +16,7 @@ export class KeycloakOAuthProvider implements OAuthProvider {
   constructor(config: KeycloakOAuthConfig) {
     this.config = config;
     // Remove trailing slash from serverUrl if present
-    const serverUrl = config.serverUrl.replace(/\/$/, '');
+    const serverUrl = config.serverUrl.replace(/\/$/, "");
     this.issuer = `${serverUrl}/realms/${config.realm}`;
   }
 
@@ -32,16 +32,18 @@ export class KeycloakOAuthProvider implements OAuthProvider {
   async verifyToken(token: string): Promise<any> {
     // Skip verification in development mode if configured
     if (this.config.verifyJwt === false) {
-      console.warn('[Keycloak OAuth] ⚠️  JWT verification is disabled');
-      console.warn('[Keycloak OAuth]     Enable verifyJwt: true for production');
-      
+      console.warn("[Keycloak OAuth] ⚠️  JWT verification is disabled");
+      console.warn(
+        "[Keycloak OAuth]     Enable verifyJwt: true for production"
+      );
+
       // Decode without verification
-      const parts = token.split('.');
+      const parts = token.split(".");
       if (parts.length !== 3) {
-        throw new Error('Invalid JWT format');
+        throw new Error("Invalid JWT format");
       }
       const payload = JSON.parse(
-        Buffer.from(parts[1], 'base64url').toString('utf8')
+        Buffer.from(parts[1], "base64url").toString("utf8")
       );
       return { payload };
     }
@@ -62,23 +64,28 @@ export class KeycloakOAuthProvider implements OAuthProvider {
   getUserInfo(payload: any): UserInfo {
     // Extract realm roles
     const realmRoles = payload.realm_access?.roles || [];
-    
+
     // Extract client roles (if clientId is specified)
-    const clientRoles = this.config.clientId && payload.resource_access?.[this.config.clientId]?.roles || [];
-    
+    const clientRoles =
+      (this.config.clientId &&
+        payload.resource_access?.[this.config.clientId]?.roles) ||
+      [];
+
     // Combine all roles
     const allRoles = [...realmRoles, ...clientRoles];
-    
+
     // Extract resource access for permissions
     const permissions: string[] = [];
     if (payload.resource_access) {
-      Object.entries(payload.resource_access).forEach(([resource, access]: [string, any]) => {
-        if (access.roles) {
-          access.roles.forEach((role: string) => {
-            permissions.push(`${resource}:${role}`);
-          });
+      Object.entries(payload.resource_access).forEach(
+        ([resource, access]: [string, any]) => {
+          if (access.roles) {
+            access.roles.forEach((role: string) => {
+              permissions.push(`${resource}:${role}`);
+            });
+          }
         }
-      });
+      );
     }
 
     return {
@@ -91,7 +98,7 @@ export class KeycloakOAuthProvider implements OAuthProvider {
       roles: allRoles,
       permissions,
       // Include scope as well
-      scopes: payload.scope ? payload.scope.split(' ') : [],
+      scopes: payload.scope ? payload.scope.split(" ") : [],
       // Keycloak-specific claims
       email_verified: payload.email_verified,
       given_name: payload.given_name,
@@ -114,11 +121,10 @@ export class KeycloakOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ['openid', 'profile', 'email', 'offline_access', 'roles'];
+    return ["openid", "profile", "email", "offline_access", "roles"];
   }
 
   getGrantTypesSupported(): string[] {
-    return ['authorization_code', 'refresh_token', 'client_credentials'];
+    return ["authorization_code", "refresh_token", "client_credentials"];
   }
 }
-

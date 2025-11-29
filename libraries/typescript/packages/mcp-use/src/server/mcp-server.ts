@@ -100,7 +100,6 @@ import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import { cors } from "hono/cors";
 import { runWithContext, getRequestContext } from "./context-storage.js";
 
-
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -125,10 +124,16 @@ import type {
   InferToolOutput,
 } from "./types/index.js";
 import type { WidgetMetadata } from "./types/widget.js";
-import { isDeno, getEnv, pathHelpers, fsHelpers, generateUUID, getCwd } from "./utils/runtime.js";
+import {
+  isDeno,
+  getEnv,
+  pathHelpers,
+  fsHelpers,
+  generateUUID,
+  getCwd,
+} from "./utils/runtime.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
-
 
 export class McpServer<HasOAuth extends boolean = false> {
   private server: OfficialMcpServer;
@@ -318,10 +323,10 @@ export class McpServer<HasOAuth extends boolean = false> {
 
   /**
    * Setup OAuth authentication
-   * 
+   *
    * Initializes OAuth provider, creates bearer auth middleware,
    * sets up OAuth routes, and applies auth to /mcp endpoints.
-   * 
+   *
    * @private
    */
   private async setupOAuth(oauthProvider: any): Promise<void> {
@@ -330,10 +335,9 @@ export class McpServer<HasOAuth extends boolean = false> {
     }
 
     // Dynamically import OAuth utilities
-    const { 
-      setupOAuthRoutes, 
-      createBearerAuthMiddleware 
-    } = await import('./oauth/index.js');
+    const { setupOAuthRoutes, createBearerAuthMiddleware } = await import(
+      "./oauth/index.js"
+    );
 
     // Store the provider (already created by factory function)
     this.oauthProvider = oauthProvider;
@@ -343,19 +347,26 @@ export class McpServer<HasOAuth extends boolean = false> {
     const baseUrl = this.getServerBaseUrl();
 
     // Create bearer auth middleware with baseUrl for WWW-Authenticate header
-    this.oauthMiddleware = createBearerAuthMiddleware(this.oauthProvider, baseUrl);
+    this.oauthMiddleware = createBearerAuthMiddleware(
+      this.oauthProvider,
+      baseUrl
+    );
     setupOAuthRoutes(this.app, this.oauthProvider, baseUrl);
-    const mode = this.oauthProvider.getMode?.() || 'proxy';
-    if (mode === 'direct') {
-      console.log('[OAuth] Direct mode: Clients will authenticate with provider directly');
-      console.log('[OAuth] Metadata endpoints: /.well-known/*');
+    const mode = this.oauthProvider.getMode?.() || "proxy";
+    if (mode === "direct") {
+      console.log(
+        "[OAuth] Direct mode: Clients will authenticate with provider directly"
+      );
+      console.log("[OAuth] Metadata endpoints: /.well-known/*");
     } else {
-      console.log('[OAuth] Proxy mode: Routes at /authorize, /token, /.well-known/*');
+      console.log(
+        "[OAuth] Proxy mode: Routes at /authorize, /token, /.well-known/*"
+      );
     }
 
     // Apply bearer auth to all /mcp routes
-    this.app.use('/mcp/*', this.oauthMiddleware);
-    console.log('[OAuth] Bearer authentication enabled on /mcp routes');
+    this.app.use("/mcp/*", this.oauthMiddleware);
+    console.log("[OAuth] Bearer authentication enabled on /mcp routes");
 
     this.oauthSetupComplete = true;
   }
@@ -533,14 +544,14 @@ export class McpServer<HasOAuth extends boolean = false> {
    *     return text(`Result: ${result.toFixed(precision)}`)
    *   }
    * })
-   * 
+   *
    * // Using legacy inputs array
    * server.tool({
    *   name: 'greet',
    *   inputs: [{ name: 'name', type: 'string', required: true }],
    *   cb: async ({ name }) => text(`Hello, ${name}!`)
    * })
-   * 
+   *
    * // With separate callback for better typing
    * server.tool({
    *   name: 'add',
@@ -553,12 +564,10 @@ export class McpServer<HasOAuth extends boolean = false> {
     toolDefinition: T,
     callback: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
   ): this;
-  
+
   // Overload for inline callback
-  tool<T extends ToolDefinition<any, any, HasOAuth>>(
-    toolDefinition: T
-  ): this;
-  
+  tool<T extends ToolDefinition<any, any, HasOAuth>>(toolDefinition: T): this;
+
   // Implementation
   tool<T extends ToolDefinition<any, any, HasOAuth>>(
     toolDefinition: T,
@@ -566,14 +575,16 @@ export class McpServer<HasOAuth extends boolean = false> {
   ): this {
     // Determine which callback to use
     const actualCallback = callback || toolDefinition.cb;
-    
+
     if (!actualCallback) {
-      throw new Error(`Tool '${toolDefinition.name}' must have either a cb property or a callback parameter`);
+      throw new Error(
+        `Tool '${toolDefinition.name}' must have either a cb property or a callback parameter`
+      );
     }
 
     // Determine input schema - prefer schema over inputs
     let inputSchema: Record<string, z.ZodSchema>;
-    
+
     if (toolDefinition.schema) {
       // Use Zod schema if provided
       inputSchema = this.convertZodSchemaToParams(toolDefinition.schema);
@@ -598,7 +609,7 @@ export class McpServer<HasOAuth extends boolean = false> {
         // Get the HTTP request context from AsyncLocalStorage
         // If not available (SDK broke async chain), try to find it from active sessions
         let requestContext = getRequestContext();
-        
+
         if (!requestContext) {
           // Fallback: Find context from any active session
           // In practice, there's usually only one active request at a time per session
@@ -615,8 +626,10 @@ export class McpServer<HasOAuth extends boolean = false> {
 
         // Create enhanced context that combines ToolContext methods with Hono request context
         // This provides a unified interface with sample(), reportProgress(), auth, req, etc.
-        const enhancedContext = requestContext ? Object.create(requestContext) : {};
-        
+        const enhancedContext = requestContext
+          ? Object.create(requestContext)
+          : {};
+
         /**
          * Request sampling from the client's LLM with automatic progress notifications.
          *
@@ -692,9 +705,7 @@ export class McpServer<HasOAuth extends boolean = false> {
               const timeoutPromise = new Promise<never>((_, reject) => {
                 setTimeout(
                   () =>
-                    reject(
-                      new Error(`Sampling timed out after ${timeout}ms`)
-                    ),
+                    reject(new Error(`Sampling timed out after ${timeout}ms`)),
                   timeout
                 );
               });
@@ -744,7 +755,7 @@ export class McpServer<HasOAuth extends boolean = false> {
         if (requestContext) {
           return await runWithContext(requestContext, executeCallback);
         }
-        
+
         return await executeCallback();
       }
     );
@@ -1168,7 +1179,6 @@ export class McpServer<HasOAuth extends boolean = false> {
     // Construct URI: ui://widget/name-buildId-suffix.extension
     return `ui://widget/${parts.join("-")}${extension}`;
   }
-
 
   /**
    * Convert widget props definition to tool input schema
@@ -3560,14 +3570,15 @@ if (container && Component) {
     });
   }
 
-
   /**
    * Convert a Zod object schema to the internal Record<string, z.ZodSchema> format
-   * 
+   *
    * @param zodSchema - Zod object schema to convert
    * @returns Object mapping parameter names to Zod validation schemas
    */
-  private convertZodSchemaToParams(zodSchema: z.ZodObject<any>): Record<string, z.ZodSchema> {
+  private convertZodSchemaToParams(
+    zodSchema: z.ZodObject<any>
+  ): Record<string, z.ZodSchema> {
     // Validate that it's a ZodObject
     if (!(zodSchema instanceof z.ZodObject)) {
       throw new Error("schema must be a Zod object schema (z.object({...}))");
@@ -3651,9 +3662,6 @@ if (container && Component) {
     return schema;
   }
 
-
-
-
   /**
    * Parse parameter values from a URI based on a template
    *
@@ -3700,7 +3708,10 @@ if (container && Component) {
   }
 }
 
-export type McpServerInstance<HasOAuth extends boolean = false> = Omit<McpServer<HasOAuth>, keyof HonoType> &
+export type McpServerInstance<HasOAuth extends boolean = false> = Omit<
+  McpServer<HasOAuth>,
+  keyof HonoType
+> &
   HonoType & {
     getHandler: (options?: {
       provider?: "supabase" | "cloudflare" | "deno-deploy";
@@ -3755,18 +3766,21 @@ export type McpServerInstance<HasOAuth extends boolean = false> = Omit<McpServer
  */
 
 // Overload: when OAuth is configured
+
 export function createMCPServer(
   name: string,
-  config: Partial<ServerConfig> & { oauth: NonNullable<ServerConfig['oauth']> }
+  config: Partial<ServerConfig> & { oauth: NonNullable<ServerConfig["oauth"]> }
 ): McpServerInstance<true>;
 
 // Overload: when OAuth is not configured
+// eslint-disable-next-line no-redeclare
 export function createMCPServer(
   name: string,
   config?: Partial<ServerConfig>
 ): McpServerInstance<false>;
 
 // Implementation
+// eslint-disable-next-line no-redeclare
 export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> = {}
@@ -3782,6 +3796,6 @@ export function createMCPServer(
     autoCreateSessionOnInvalidId: config.autoCreateSessionOnInvalidId,
     oauth: config.oauth,
   }) as any;
-  
+
   return instance as unknown as McpServerInstance<boolean>;
 }

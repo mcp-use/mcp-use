@@ -39,13 +39,13 @@ export type UseMcpOptions = {
   popupFeatures?: string;
   /** Transport type preference: 'auto' (HTTP with SSE fallback), 'http' (HTTP only), 'sse' (SSE only) */
   transportType?: "auto" | "http" | "sse";
-  /** 
+  /**
    * Prevent automatic authentication popup/redirect on initial connection (default: false)
    * When true, the connection will enter 'pending_auth' state and wait for user to call authenticate()
    * Set to true to show a modal/button before triggering OAuth instead of auto-redirecting
    */
   preventAutoAuth?: boolean;
-  /** 
+  /**
    * Use full-page redirect for OAuth instead of popup window (default: false)
    * Redirect flow avoids popup blockers and provides better UX on mobile.
    * Set to true to use redirect flow instead of popup.

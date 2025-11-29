@@ -38,7 +38,13 @@ export {
 } from "./resource.js";
 
 // Tool types
-export { ToolCallback, ToolDefinition, InferToolInput, InferToolOutput, EnhancedToolContext } from "./tool.js";
+export {
+  ToolCallback,
+  ToolDefinition,
+  InferToolInput,
+  InferToolOutput,
+  EnhancedToolContext,
+} from "./tool.js";
 
 // Prompt types
 export { PromptCallback, PromptDefinition } from "./prompt.js";
