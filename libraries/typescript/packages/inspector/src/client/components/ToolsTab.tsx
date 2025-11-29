@@ -911,7 +911,7 @@ export function ToolsTab({
             defaultSize={0}
             collapsible
             minSize={5}
-            collapsedSize={6}
+            collapsedSize={5}
             onCollapse={() => {
               setRpcPanelCollapsed(true);
             }}
