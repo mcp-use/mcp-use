@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.9.0-canary.2
+
+### Patch Changes
+
+- 1ca9801: Optimized dependencies
+- Updated dependencies [1ca9801]
+  - mcp-use@1.7.0-canary.2
+
 ## 0.9.0-canary.1
 
 ### Minor Changes
