@@ -1,4 +1,10 @@
-import React, { StrictMode, useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  StrictMode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { ThemeProvider } from "./ThemeProvider.js";
 import { WidgetControls } from "./WidgetControls.js";
@@ -75,7 +81,7 @@ export function McpUseProvider({
   const lastHeightRef = useRef<number>(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const notificationInProgressRef = useRef<boolean>(false);
-  
+
   // State for dynamic router loading
   const [BrowserRouter, setBrowserRouter] = useState<any>(null);
   const [routerError, setRouterError] = useState<Error | null>(null);
@@ -84,7 +90,7 @@ export function McpUseProvider({
   // Load react-router-dom dynamically on mount
   useEffect(() => {
     let mounted = true;
-    
+
     (async () => {
       try {
         const routerModule = await import("react-router-dom");
@@ -108,7 +114,7 @@ export function McpUseProvider({
         }
       }
     })();
-    
+
     return () => {
       mounted = false;
     };
@@ -205,9 +211,7 @@ export function McpUseProvider({
     return (
       <StrictMode>
         <ThemeProvider>
-          <div style={{ padding: "20px", textAlign: "center" }}>
-            Loading...
-          </div>
+          <div style={{ padding: "20px", textAlign: "center" }}>Loading...</div>
         </ThemeProvider>
       </StrictMode>
     );

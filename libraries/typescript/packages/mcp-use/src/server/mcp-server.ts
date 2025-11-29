@@ -1382,7 +1382,7 @@ export class McpServer<HasOAuth extends boolean = false> {
       // instead of from the mcp-use package location
       const { createRequire } = await import("node:module");
       const { pathToFileURL } = await import("node:url");
-      
+
       // Create a require function that resolves from the user's project directory
       const userProjectRequire = createRequire(
         pathToFileURL(pathHelpers.join(getCwd(), "package.json")).href

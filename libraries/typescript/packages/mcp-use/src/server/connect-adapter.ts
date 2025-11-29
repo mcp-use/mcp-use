@@ -96,7 +96,7 @@ export async function adaptConnectMiddleware(
     // Use createRequire to resolve modules from the user's project directory
     const { createRequire } = await import("node:module");
     const { pathToFileURL } = await import("node:url");
-    
+
     // Create a require function that resolves from the user's project directory
     const userProjectRequire = createRequire(
       pathToFileURL(
