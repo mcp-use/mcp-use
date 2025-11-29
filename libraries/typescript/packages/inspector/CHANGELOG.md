@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.8.3-canary.0
+
+### Patch Changes
+
+- 041da75: Fix scrolls in tools, resources, and prompts tab
+- 041da75: Feat: added enum input display for tools
+  - mcp-use@1.6.3-canary.0
+
 ## 0.8.2
 
 ### Patch Changes
