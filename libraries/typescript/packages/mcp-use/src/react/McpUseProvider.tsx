@@ -1,4 +1,4 @@
-import React, { StrictMode, useCallback, useEffect, useRef, useState } from "react";
+import React, { StrictMode, useCallback, useEffect, useRef } from "react";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { ThemeProvider } from "./ThemeProvider.js";
 import { WidgetControls } from "./WidgetControls.js";
@@ -15,11 +15,11 @@ let routerError: Error | null = null;
   } catch (error) {
     routerError = new Error(
       "❌ react-router-dom not installed!\n\n" +
-      "To use MCP widgets with McpUseProvider, you need to install:\n\n" +
-      "  npm install react-router-dom\n" +
-      "  # or\n" +
-      "  pnpm add react-router-dom\n\n" +
-      "This dependency is automatically included in projects created with 'create-mcp-use-app'."
+        "To use MCP widgets with McpUseProvider, you need to install:\n\n" +
+        "  npm install react-router-dom\n" +
+        "  # or\n" +
+        "  pnpm add react-router-dom\n\n" +
+        "This dependency is automatically included in projects created with 'create-mcp-use-app'."
     );
   }
 })();

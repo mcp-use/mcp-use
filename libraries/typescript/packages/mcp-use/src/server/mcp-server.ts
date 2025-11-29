@@ -1395,12 +1395,12 @@ export class McpServer<HasOAuth extends boolean = false> {
     } catch (error) {
       throw new Error(
         "❌ Widget dependencies not installed!\n\n" +
-        "To use MCP widgets with resources folder, you need to install the required dependencies:\n\n" +
-        "  npm install vite @vitejs/plugin-react @tailwindcss/vite\n" +
-        "  # or\n" +
-        "  pnpm add vite @vitejs/plugin-react @tailwindcss/vite\n\n" +
-        "These dependencies are automatically included in projects created with 'create-mcp-use-app'.\n" +
-        "For production, pre-build your widgets using 'mcp-use build'."
+          "To use MCP widgets with resources folder, you need to install the required dependencies:\n\n" +
+          "  npm install vite @vitejs/plugin-react @tailwindcss/vite\n" +
+          "  # or\n" +
+          "  pnpm add vite @vitejs/plugin-react @tailwindcss/vite\n\n" +
+          "These dependencies are automatically included in projects created with 'create-mcp-use-app'.\n" +
+          "For production, pre-build your widgets using 'mcp-use build'."
       );
     }
 

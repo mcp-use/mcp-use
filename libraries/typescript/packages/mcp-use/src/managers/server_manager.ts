@@ -43,8 +43,10 @@ function isEqual(a: any, b: any): boolean {
 
     if (keysA.length !== keysB.length) return false;
 
-    return keysA.every(key => {
-      return Object.prototype.hasOwnProperty.call(b, key) && isEqual(a[key], b[key]);
+    return keysA.every((key) => {
+      return (
+        Object.prototype.hasOwnProperty.call(b, key) && isEqual(a[key], b[key])
+      );
     });
   }
 

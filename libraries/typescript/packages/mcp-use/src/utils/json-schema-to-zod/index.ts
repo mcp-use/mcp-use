@@ -1,3 +1,2 @@
-export * from './JSONSchemaToZod.js';
-export * from './Type.js';
-
+export * from "./JSONSchemaToZod.js";
+export * from "./Type.js";

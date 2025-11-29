@@ -99,11 +99,11 @@ export async function adaptConnectMiddleware(
   } catch (error) {
     throw new Error(
       "❌ Widget middleware dependencies not installed!\n\n" +
-      "To use Connect middleware adapters with MCP widgets, you need to install:\n\n" +
-      "  npm install node-mocks-http\n" +
-      "  # or\n" +
-      "  pnpm add node-mocks-http\n\n" +
-      "This dependency is automatically included in projects created with 'create-mcp-use-app'."
+        "To use Connect middleware adapters with MCP widgets, you need to install:\n\n" +
+        "  npm install node-mocks-http\n" +
+        "  # or\n" +
+        "  pnpm add node-mocks-http\n\n" +
+        "This dependency is automatically included in projects created with 'create-mcp-use-app'."
     );
   }
 

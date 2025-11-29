@@ -23,30 +23,30 @@ const isNode = typeof process !== "undefined" && process.versions?.node;
       // node:util not available, will use plain text fallback
     }
   }
-  
+
   try {
     const chalkModule = await import("chalk");
     chalk = chalkModule.default;
   } catch {
     // chalk not available, will use plain text
   }
-  
+
   try {
     const cliHighlightModule = await import("cli-highlight");
     highlight = cliHighlightModule.highlight;
   } catch {
     // cli-highlight not available, will use plain text
   }
-  
+
   // Show warning if packages are missing (only once, and only in Node.js)
   if (isNode && (!chalk || !highlight)) {
     if (!displayPackagesWarned) {
       displayPackagesWarned = true;
       console.warn(
         "\n✨ For enhanced console output with colors and syntax highlighting, install:\n\n" +
-        "  npm install chalk cli-highlight\n" +
-        "  # or\n" +
-        "  pnpm add chalk cli-highlight\n"
+          "  npm install chalk cli-highlight\n" +
+          "  # or\n" +
+          "  pnpm add chalk cli-highlight\n"
       );
     }
   }
@@ -80,7 +80,10 @@ function highlightCode(content: string, language?: string): string {
     return content; // Plain text fallback
   }
   try {
-    return highlight(content, { language: language ?? "javascript", ignoreIllegals: true });
+    return highlight(content, {
+      language: language ?? "javascript",
+      ignoreIllegals: true,
+    });
   } catch {
     return content; // Fallback on error
   }
@@ -93,7 +96,7 @@ function stripAnsi(str: string): string {
   }
   // Fallback: Simple regex to strip ANSI codes (for non-Node.js environments)
   // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[0-9;]*m/g, '');
+  return str.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
 // wrap lines correctly, preserving ANSI codes
@@ -539,7 +542,12 @@ export function handleToolEnd(event: StreamEvent) {
         }
 
         if (execResult.error) {
-          printBox(execResult.error, chalkHelper.red("Error"), undefined, false);
+          printBox(
+            execResult.error,
+            chalkHelper.red("Error"),
+            undefined,
+            false
+          );
         }
         return;
       }
