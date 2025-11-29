@@ -262,6 +262,9 @@ export class HttpConnector extends BaseConnector {
         stop: async () => {
           if (this.streamableTransport) {
             try {
+              // First terminate the session per MCP spec (sends DELETE request)
+              await this.streamableTransport.terminateSession();
+              // Then close the transport
               await this.streamableTransport.close();
             } catch (e) {
               logger.warn(`Error closing Streamable HTTP transport: ${e}`);
