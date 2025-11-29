@@ -1372,25 +1372,35 @@ export class McpServer<HasOAuth extends boolean = false> {
     await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
     // Import dev dependencies - these are optional and only needed for dev mode
-    // Using dynamic string-based imports to prevent static analysis by bundlers
+    // Using dynamic imports with createRequire to resolve from user's project directory
     let createServer: any;
     let react: any;
     let tailwindcss: any;
 
     try {
-      // Use Function constructor to create truly dynamic imports that can't be statically analyzed
-      // eslint-disable-next-line no-new-func
-      const viteModule = await new Function('return import("vite")')();
+      // Use createRequire to resolve modules from the user's project directory (getCwd())
+      // instead of from the mcp-use package location
+      const { createRequire } = await import("node:module");
+      const { pathToFileURL } = await import("node:url");
+
+      // Create a require function that resolves from the user's project directory
+      const userProjectRequire = createRequire(
+        pathToFileURL(pathHelpers.join(getCwd(), "package.json")).href
+      );
+
+      // Resolve the actual module paths from the user's project
+      const vitePath = userProjectRequire.resolve("vite");
+      const reactPluginPath = userProjectRequire.resolve(
+        "@vitejs/plugin-react"
+      );
+      const tailwindPath = userProjectRequire.resolve("@tailwindcss/vite");
+
+      // Now import using the resolved paths
+      const viteModule = await import(vitePath);
       createServer = viteModule.createServer;
-      // eslint-disable-next-line no-new-func
-      const reactModule = await new Function(
-        'return import("@vitejs/plugin-react")'
-      )();
+      const reactModule = await import(reactPluginPath);
       react = reactModule.default;
-      // eslint-disable-next-line no-new-func
-      const tailwindModule = await new Function(
-        'return import("@tailwindcss/vite")'
-      )();
+      const tailwindModule = await import(tailwindPath);
       tailwindcss = tailwindModule.default;
     } catch (error) {
       throw new Error(
