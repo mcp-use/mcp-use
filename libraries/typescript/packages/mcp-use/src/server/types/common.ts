@@ -2,6 +2,8 @@
  * Common type definitions shared across different MCP components
  */
 
+import type { OAuthProvider } from '../oauth/providers/types.js';
+
 export interface ServerConfig {
   name: string;
   version: string;
@@ -67,6 +69,52 @@ export interface ServerConfig {
    * ```
    */
   autoCreateSessionOnInvalidId?: boolean; // Default: true (compatible with non-compliant clients)
+  /**
+   * OAuth authentication configuration
+   * 
+   * When provided, automatically sets up OAuth authentication for the server including:
+   * - OAuth routes (/authorize, /token, .well-known/*)
+   * - JWT verification middleware
+   * - Bearer token authentication on all /mcp routes
+   * - User information extraction and context attachment
+   * 
+   * Use provider factory functions for type-safe configuration:
+   * - oauthSupabaseProvider() - Supabase OAuth
+   * - oauthAuth0Provider() - Auth0 OAuth
+   * - oauthKeycloakProvider() - Keycloak OAuth
+   * - oauthCustomProvider() - Custom OAuth implementation
+   * 
+   * @example
+   * ```typescript
+   * import { createMCPServer, oauthSupabaseProvider } from 'mcp-use/server';
+   * 
+   * // Supabase OAuth
+   * const server = createMCPServer('my-server', {
+   *   oauth: oauthSupabaseProvider({
+   *     projectId: 'my-project',
+   *     jwtSecret: process.env.SUPABASE_JWT_SECRET
+   *   })
+   * });
+   * 
+   * // Auth0 OAuth
+   * const server = createMCPServer('my-server', {
+   *   oauth: oauthAuth0Provider({
+   *     domain: 'my-tenant.auth0.com',
+   *     audience: 'https://my-api.com'
+   *   })
+   * });
+   * 
+   * // Keycloak OAuth
+   * const server = createMCPServer('my-server', {
+   *   oauth: oauthKeycloakProvider({
+   *     serverUrl: 'https://keycloak.example.com',
+   *     realm: 'my-realm',
+   *     clientId: 'my-client'
+   *   })
+   * });
+   * ```
+   */
+  oauth?: OAuthProvider;
 }
 
 export interface InputDefinition {

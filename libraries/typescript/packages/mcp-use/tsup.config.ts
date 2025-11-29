@@ -4,6 +4,7 @@ export default defineConfig({
   entry: [
     "index.ts",
     "src/agents/index.ts",
+    "src/auth/index.ts",
     "src/browser.ts",
     "src/react/index.ts",
     "src/server/index.ts",

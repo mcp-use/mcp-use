@@ -7,6 +7,48 @@ export {
 
 export * from "./types/index.js";
 
+// Context storage utilities for accessing HTTP request context in tools
+export {
+  getRequestContext,
+  runWithContext,
+  hasRequestContext,
+} from "./context-storage.js";
+
+// Response helper utilities for tool results
+export {
+  text,
+  image,
+  resource,
+  error,
+  object,
+  array,
+  widget,
+  type WidgetResponseConfig,
+  type TypedCallToolResult,
+} from "./utils/response-helpers.js";
+
+// OAuth utilities for authentication and authorization
+export {
+  getAuth,
+  hasScope,
+  hasAnyScope,
+  requireScope,
+  requireAnyScope,
+  oauthSupabaseProvider,
+  oauthAuth0Provider,
+  oauthKeycloakProvider,
+  oauthWorkOSProvider,
+  oauthCustomProvider,
+  type AuthInfo,
+  type OAuthProvider,
+  type UserInfo,
+  type SupabaseProviderConfig,
+  type Auth0ProviderConfig,
+  type KeycloakProviderConfig,
+  type WorkOSProviderConfig,
+  type CustomProviderConfig,
+} from "./oauth/index.js";
+
 // MCP-UI adapter utility functions
 export {
   buildWidgetUrl,
@@ -28,6 +70,7 @@ export type {
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
   InputDefinition,
+  McpContext,
   PromptCallback,
   PromptDefinition,
   RawHtmlUIResource,

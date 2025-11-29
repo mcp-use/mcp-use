@@ -293,6 +293,7 @@ export class HttpConnector extends BaseConnector {
       // Note: The MCP SDK's SSEClientTransport doesn't expose timeout configuration directly
       // Timeout handling is managed by the underlying EventSource and fetch implementations
       this.connectionManager = new SseConnectionManager(baseUrl, {
+        authProvider: this.opts.authProvider, // ← Pass OAuth provider to SDK (same as streamable HTTP)
         requestInit: {
           headers: this.headers,
         },

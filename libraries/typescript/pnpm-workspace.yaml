@@ -6,6 +6,10 @@ packages:
   - packages/create-mcp-use-app/src/templates/starter
   - packages/create-mcp-use-app/src/templates/mcp-ui
   - packages/create-mcp-use-app/src/templates/apps-sdk
+  - packages/mcp-use/examples/server/oauth/supabase
+  - packages/mcp-use/examples/server/oauth/auth0
+  - packages/mcp-use/examples/server/oauth/workos
+  - packages/mcp-use/examples/server/oauth/keycloak
 onlyBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild

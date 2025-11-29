@@ -544,6 +544,9 @@ importers:
       hono:
         specifier: ^4.6.0
         version: 4.10.5
+      jose:
+        specifier: ^6.1.2
+        version: 6.1.2
       langchain:
         specifier: ^1.0.1
         version: 1.0.4(@langchain/core@1.0.4(@opentelemetry/api@1.9.0)(openai@6.8.1(ws@8.18.3)(zod@3.25.76)))(@opentelemetry/api@1.9.0)(openai@6.8.1(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.24.6(zod@3.25.76))
@@ -700,6 +703,36 @@ importers:
       vite:
         specifier: '>=5.4.21'
         version: 7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/mcp-use/examples/server/oauth/auth0:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+    devDependencies:
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+
+  packages/mcp-use/examples/server/oauth/supabase:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+    devDependencies:
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+
+  packages/mcp-use/examples/server/oauth/workos:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+    devDependencies:
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
 
   packages/mcp-use/examples/server/simple:
     dependencies:
@@ -5074,6 +5107,9 @@ packages:
   jiti@2.6.1:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
     hasBin: true
+
+  jose@6.1.2:
+    resolution: {integrity: sha512-MpcPtHLE5EmztuFIqB0vzHAWJPpmN1E6L4oo+kze56LIs3MyXIj9ZHMDxqOvkP38gBR7K1v3jqd4WU2+nrfONQ==}
 
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
@@ -12478,6 +12514,8 @@ snapshots:
       '@isaacs/cliui': 8.0.2
 
   jiti@2.6.1: {}
+
+  jose@6.1.2: {}
 
   joycon@3.1.1: {}
 
