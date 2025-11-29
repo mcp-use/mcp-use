@@ -42,7 +42,16 @@ export interface ToolsTabRef {
 
 interface ToolsTabProps {
   tools: Tool[];
-  callTool: (name: string, args?: Record<string, unknown>) => Promise<any>;
+  callTool: (
+    name: string,
+    args?: Record<string, unknown>,
+    options?: {
+      timeout?: number;
+      maxTotalTimeout?: number;
+      resetTimeoutOnProgress?: boolean;
+      signal?: AbortSignal;
+    }
+  ) => Promise<any>;
   readResource: (uri: string) => Promise<any>;
   serverId: string;
   isConnected: boolean;
@@ -399,7 +408,12 @@ export function ToolsTab({
         );
       }
 
-      const result = await callTool(selectedTool.name, parsedArgs);
+      // Use a 10 minute timeout for tool calls, as tools may trigger sampling
+      // which can take a long time (waiting for LLM responses or human input)
+      const result = await callTool(selectedTool.name, parsedArgs, {
+        timeout: 600000, // 10 minutes
+        resetTimeoutOnProgress: true, // Reset timeout when progress is received
+      });
       const duration = Date.now() - startTime;
 
       // Track successful tool execution
@@ -895,7 +909,7 @@ export function ToolsTab({
             defaultSize={0}
             collapsible
             minSize={5}
-            collapsedSize={5}
+            collapsedSize={6}
             onCollapse={() => {
               setRpcPanelCollapsed(true);
             }}

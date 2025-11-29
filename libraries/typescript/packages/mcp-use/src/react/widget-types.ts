@@ -106,6 +106,7 @@ declare global {
     openai?: API<any> & OpenAiGlobals<any, any, any, any>;
     __getFile?: (filename: string) => string;
     __mcpPublicUrl?: string;
+    __mcpPublicAssetsUrl?: string;
   }
 
   interface WindowEventMap {

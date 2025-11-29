@@ -11,6 +11,14 @@ import {
   useState,
 } from "react";
 
+export interface MCPNotification {
+  id: string;
+  method: string;
+  params?: Record<string, any>;
+  timestamp: number;
+  read: boolean;
+}
+
 export interface MCPConnection {
   id: string;
   url: string;
@@ -46,7 +54,21 @@ export interface MCPConnection {
     completions?: Record<string, any>;
     [key: string]: any;
   };
-  callTool: (toolName: string, args: any) => Promise<any>;
+  notifications: MCPNotification[];
+  unreadNotificationCount: number;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  clearNotifications: () => void;
+  callTool: (
+    toolName: string,
+    args: any,
+    options?: {
+      timeout?: number;
+      maxTotalTimeout?: number;
+      resetTimeoutOnProgress?: boolean;
+      signal?: AbortSignal;
+    }
+  ) => Promise<any>;
   readResource: (uri: string) => Promise<any>;
   listPrompts: (serverName?: string) => Promise<void>;
   getPrompt: (name: string, args: any) => Promise<any>;
@@ -83,6 +105,7 @@ interface McpContextType {
   setAutoConnect: (enabled: boolean) => void;
   connectServer: (id: string) => void;
   disconnectServer: (id: string) => void;
+  configLoaded: boolean;
 }
 
 const McpContext = createContext<McpContextType | null>(null);
@@ -100,6 +123,7 @@ function McpConnectionWrapper({
   name,
   proxyConfig,
   transportType,
+  connectionId,
   onUpdate,
   onRemove: _onRemove,
 }: {
@@ -110,6 +134,7 @@ function McpConnectionWrapper({
     customHeaders?: Record<string, string>;
   };
   transportType?: "http" | "sse";
+  connectionId: string;
   onUpdate: (connection: MCPConnection) => void;
   onRemove: () => void;
 }) {
@@ -166,14 +191,14 @@ function McpConnectionWrapper({
     }
   }, []);
 
-  // Create a stable wrapper function that uses the original URL as serverId
+  // Create a stable wrapper function that uses the connectionId as serverId
   const wrapTransportFn = useMemo(() => {
     if (!wrapTransportReady || !wrapTransportRef.current) {
       return undefined;
     }
     return (transport: any, serverIdFromConnector: string) => {
-      // Use original URL (not finalUrl) as serverId to match connection.id
-      const actualServerId = url;
+      // Use connectionId as serverId to match connection.id
+      const actualServerId = connectionId;
       console.log(
         "[McpContext] Applying transport wrapper, serverId:",
         actualServerId,
@@ -182,7 +207,69 @@ function McpConnectionWrapper({
       );
       return wrapTransportRef.current!(transport, actualServerId);
     };
-  }, [wrapTransportReady, url]);
+  }, [wrapTransportReady, connectionId]);
+
+  // Notification state management
+  const NOTIFICATIONS_STORAGE_KEY = `mcp-inspector-notifications-${connectionId}`;
+  const MAX_NOTIFICATIONS = 500;
+
+  const [notifications, setNotifications] = useState<MCPNotification[]>([]);
+
+  // Load notifications from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setNotifications(parsed);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load notifications from localStorage:", e);
+    }
+  }, [NOTIFICATIONS_STORAGE_KEY]);
+
+  // Save notifications to localStorage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        NOTIFICATIONS_STORAGE_KEY,
+        JSON.stringify(notifications)
+      );
+    } catch (e) {
+      console.error("Failed to save notifications to localStorage:", e);
+    }
+  }, [notifications, NOTIFICATIONS_STORAGE_KEY]);
+
+  // Notification handlers
+  const markNotificationRead = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
+
+  const onNotificationReceived = useCallback(
+    (notification: MCPNotification) => {
+      setNotifications((prev) => {
+        // Prune oldest if we exceed max
+        const updated = [notification, ...prev];
+        if (updated.length > MAX_NOTIFICATIONS) {
+          return updated.slice(0, MAX_NOTIFICATIONS);
+        }
+        return updated;
+      });
+    },
+    []
+  );
 
   // Only enable useMcp connection after transport wrapper is ready
   // This ensures RPC logging is active from the start
@@ -194,6 +281,15 @@ function McpConnectionWrapper({
     transportType: transportType || "http", // Default to 'http' for Streamable HTTP
     enabled: wrapTransportReady, // Only connect when wrapper is ready
     wrapTransport: wrapTransportFn,
+    onNotification: (notification) => {
+      onNotificationReceived({
+        id: globalThis.crypto.randomUUID(),
+        method: notification.method,
+        params: notification.params,
+        timestamp: Date.now(),
+        read: false,
+      });
+    },
   });
 
   const onUpdateRef = useRef(onUpdate);
@@ -219,8 +315,10 @@ function McpConnectionWrapper({
           );
         }
 
+        const unreadCount = notifications.filter((n) => !n.read).length;
+
         const connection: MCPConnection = {
-          id: url,
+          id: connectionId,
           url,
           name: mcpHook.serverInfo?.name || name, // Use server-provided name if available
           state: mcpHook.state,
@@ -234,6 +332,11 @@ function McpConnectionWrapper({
           proxyConfig,
           serverInfo: mcpHook.serverInfo,
           capabilities: mcpHook.capabilities,
+          notifications,
+          unreadNotificationCount: unreadCount,
+          markNotificationRead,
+          markAllNotificationsRead,
+          clearNotifications,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
@@ -257,6 +360,8 @@ function McpConnectionWrapper({
           prev.prompts.length !== connection.prompts.length ||
           prev.serverInfo !== connection.serverInfo ||
           prev.capabilities !== connection.capabilities ||
+          prev.notifications.length !== connection.notifications.length ||
+          prev.unreadNotificationCount !== connection.unreadNotificationCount ||
           !prev.client
         ) {
           prevConnectionRef.current = connection;
@@ -265,8 +370,10 @@ function McpConnectionWrapper({
       });
     } else {
       // Fallback for environments without queueMicrotask
+      const unreadCount = notifications.filter((n) => !n.read).length;
+
       const connection: MCPConnection = {
-        id: url,
+        id: connectionId,
         url,
         name: mcpHook.serverInfo?.name || name, // Use server-provided name if available
         state: mcpHook.state,
@@ -280,6 +387,11 @@ function McpConnectionWrapper({
         proxyConfig,
         serverInfo: mcpHook.serverInfo,
         capabilities: mcpHook.capabilities,
+        notifications,
+        unreadNotificationCount: unreadCount,
+        markNotificationRead,
+        markAllNotificationsRead,
+        clearNotifications,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
@@ -303,6 +415,8 @@ function McpConnectionWrapper({
         prev.prompts.length !== connection.prompts.length ||
         prev.serverInfo !== connection.serverInfo ||
         prev.capabilities !== connection.capabilities ||
+        prev.notifications.length !== connection.notifications.length ||
+        prev.unreadNotificationCount !== connection.unreadNotificationCount ||
         !prev.client
       ) {
         prevConnectionRef.current = connection;
@@ -315,6 +429,7 @@ function McpConnectionWrapper({
     transportType,
     proxyConfig,
     customHeaders, // Added to dependency array
+    connectionId,
     mcpHook.state,
     mcpHook.tools,
     mcpHook.resources,
@@ -324,6 +439,10 @@ function McpConnectionWrapper({
     mcpHook.serverInfo,
     mcpHook.capabilities,
     mcpHook.client,
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    clearNotifications,
     // Stable functions don't strictly need to be here but good practice
     mcpHook.callTool,
     mcpHook.readResource,
@@ -381,6 +500,11 @@ export function McpProvider({ children }: { children: ReactNode }) {
               customHeaders: config.proxyConfig?.customHeaders,
               transportType: config.transportType,
               proxyConfig: config.proxyConfig,
+              notifications: [],
+              unreadNotificationCount: 0,
+              markNotificationRead: () => {},
+              markAllNotificationsRead: () => {},
+              clearNotifications: () => {},
               callTool: async () => {},
               readResource: async () => {},
               listPrompts: async () => {},
@@ -431,11 +555,126 @@ export function McpProvider({ children }: { children: ReactNode }) {
       },
       transportType?: "http" | "sse"
     ) => {
-      // Check if connection already exists
-      if (connectionConfigs.some((c) => c.url === url)) {
+      // Check if connection already exists in configs
+      const existingConfig = connectionConfigs.find((c) => c.url === url);
+      const existingConnection = connections.find((c) => c.url === url);
+
+      // If connection exists in both configs and connections
+      if (existingConfig && existingConnection) {
+        // Check if we're trying to update the proxy config (for autoConnect retry scenarios)
+        const proxyConfigChanged =
+          JSON.stringify(existingConfig.proxyConfig) !==
+          JSON.stringify(proxyConfig);
+
+        if (proxyConfigChanged && proxyConfig) {
+          // Remove the old connection completely
+          setConnectionConfigs((prev) => prev.filter((c) => c.url !== url));
+          setConnections((prev) => prev.filter((c) => c.url !== url));
+
+          // Use setTimeout to ensure state updates complete before re-adding
+          setTimeout(() => {
+            const newConfig = {
+              id: url,
+              url,
+              name: name || existingConfig.name || "MCP Server",
+              proxyConfig,
+              transportType: transportType || existingConfig.transportType,
+            };
+
+            setConnectionConfigs((prev) => [...prev, newConfig]);
+
+            setConnections((prev) => [
+              ...prev,
+              {
+                id: url,
+                url,
+                name: name || existingConfig.name || "MCP Server",
+                state: "connecting",
+                tools: [],
+                resources: [],
+                prompts: [],
+                error: null,
+                authUrl: null,
+                customHeaders: proxyConfig?.customHeaders,
+                transportType: transportType || existingConfig.transportType,
+                proxyConfig,
+                notifications: [],
+                unreadNotificationCount: 0,
+                markNotificationRead: () => {},
+                markAllNotificationsRead: () => {},
+                clearNotifications: () => {},
+                callTool: async () => {},
+                readResource: async () => {},
+                listPrompts: async () => {},
+                getPrompt: async () => {},
+                authenticate: () => {},
+                retry: () => {},
+                clearStorage: () => {},
+                client: null,
+              },
+            ]);
+          }, 10);
+          return;
+        }
+
         return;
       }
 
+      // If connection exists in configs but not in connections, add it to connections
+      // Also update the config if new parameters are provided (for autoConnect retry scenarios)
+      if (existingConfig && !existingConnection) {
+        // Update config if new proxy or transport settings are provided
+        if (proxyConfig || transportType) {
+          setConnectionConfigs((prev) =>
+            prev.map((c) =>
+              c.url === url
+                ? {
+                    ...c,
+                    proxyConfig: proxyConfig || c.proxyConfig,
+                    transportType: transportType || c.transportType,
+                    name: name || c.name,
+                  }
+                : c
+            )
+          );
+        }
+
+        setConnections((prev) => [
+          ...prev,
+          {
+            id: existingConfig.id || url,
+            url,
+            name: name || existingConfig.name || "MCP Server",
+            state: "connecting",
+            tools: [],
+            resources: [],
+            prompts: [],
+            error: null,
+            authUrl: null,
+            customHeaders:
+              proxyConfig?.customHeaders ||
+              existingConfig.proxyConfig?.customHeaders,
+            transportType: transportType || existingConfig.transportType,
+            proxyConfig: proxyConfig || existingConfig.proxyConfig,
+            notifications: [],
+            unreadNotificationCount: 0,
+            markNotificationRead: () => {},
+            markAllNotificationsRead: () => {},
+            clearNotifications: () => {},
+            callTool: async () => {},
+            readResource: async () => {},
+            listPrompts: async () => {},
+            getPrompt: async () => {},
+            authenticate: () => {},
+            retry: () => {},
+            clearStorage: () => {},
+            client: null,
+          },
+        ]);
+        return;
+      }
+
+      // New connection - add to both configs and connections
       const newConfig = {
         id: url,
         url,
@@ -462,6 +701,11 @@ export function McpProvider({ children }: { children: ReactNode }) {
           customHeaders: proxyConfig?.customHeaders,
           transportType,
           proxyConfig,
+          notifications: [],
+          unreadNotificationCount: 0,
+          markNotificationRead: () => {},
+          markAllNotificationsRead: () => {},
+          clearNotifications: () => {},
           callTool: async () => {},
           readResource: async () => {},
           listPrompts: async () => {},
@@ -473,7 +717,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
         },
       ]);
     },
-    [connectionConfigs]
+    [connectionConfigs, connections]
   );
 
   const removeConnection = useCallback((id: string) => {
@@ -496,7 +740,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
     }
 
     // Track removal
-    Telemetry.getInstance().track(new MCPServerRemovedEvent(id));
+    Telemetry.getInstance().capture(
+      new MCPServerRemovedEvent({ serverId: id })
+    );
   }, []);
 
   const updateConnectionConfig = useCallback(
@@ -553,7 +799,10 @@ export function McpProvider({ children }: { children: ReactNode }) {
           current.prompts === updatedConnection.prompts &&
           current.error === updatedConnection.error &&
           current.serverInfo === updatedConnection.serverInfo &&
-          current.client === updatedConnection.client
+          current.client === updatedConnection.client &&
+          current.notifications === updatedConnection.notifications &&
+          current.unreadNotificationCount ===
+            updatedConnection.unreadNotificationCount
         ) {
           return prev;
         }
@@ -588,6 +837,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       setAutoConnect,
       connectServer,
       disconnectServer,
+      configLoaded,
     }),
     [
       connections,
@@ -597,6 +847,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       autoConnect,
       connectServer,
       disconnectServer,
+      configLoaded,
     ]
   );
 
@@ -606,17 +857,27 @@ export function McpProvider({ children }: { children: ReactNode }) {
       {/* Render a wrapper for each configured connection */}
       {configLoaded &&
         autoConnect &&
-        connectionConfigs.map((config) => (
-          <McpConnectionWrapper
-            key={config.id || config.url}
-            url={config.url}
-            name={config.name}
-            proxyConfig={config.proxyConfig}
-            transportType={config.transportType}
-            onUpdate={handleConnectionUpdate}
-            onRemove={() => removeConnection(config.id || config.url)}
-          />
-        ))}
+        connectionConfigs.map((config) => {
+          const wrapperKey = `${config.id || config.url}-${config.proxyConfig?.proxyAddress ? "proxy" : "direct"}`;
+          console.warn(
+            "[McpContext] Rendering McpConnectionWrapper with key:",
+            wrapperKey,
+            "proxyConfig:",
+            config.proxyConfig
+          );
+          return (
+            <McpConnectionWrapper
+              key={wrapperKey}
+              url={config.url}
+              name={config.name}
+              proxyConfig={config.proxyConfig}
+              transportType={config.transportType}
+              connectionId={config.id || config.url}
+              onUpdate={handleConnectionUpdate}
+              onRemove={() => removeConnection(config.id || config.url)}
+            />
+          );
+        })}
     </McpContext.Provider>
   );
 }

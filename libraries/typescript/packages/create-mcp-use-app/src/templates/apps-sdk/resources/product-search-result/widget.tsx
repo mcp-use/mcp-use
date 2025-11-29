@@ -1,6 +1,6 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { McpUseProvider, useWidget } from "mcp-use/react";
+import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { Link } from "react-router";
 import { Accordion } from "./components/Accordion";
@@ -8,9 +8,9 @@ import { Carousel } from "./components/Carousel";
 import { queryClient } from "./constants";
 import type { ProductSearchResultProps } from "./types";
 import { propSchema } from "./types";
-import "../../styles.css";
+import "../styles.css";
 
-export const widgetMetadata = {
+export const widgetMetadata: WidgetMetadata = {
   description:
     "Display product search results with filtering, state management, and tool interactions",
   inputs: propSchema,
@@ -32,7 +32,7 @@ const ProductSearchResult: React.FC = () => {
   return (
     <McpUseProvider debugger viewControls autoSize>
       <AppsSDKUIProvider linkComponent={Link}>
-        <div className="relative bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-3xl">
+        <div className="relative bg-surface-elevated border border-default rounded-3xl">
           <div className="p-8">
             <h5 className="text-secondary mb-1">Apps SDK Template</h5>
             <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>

@@ -12,9 +12,12 @@ export const Image: React.FC<
   React.ImgHTMLAttributes<globalThis.HTMLImageElement>
 > = ({ src, ...props }) => {
   // Get the public URL from the window global injected by the MCP server
+  // Prefer __mcpPublicAssetsUrl (for static deployments like Supabase) over __mcpPublicUrl
   const publicUrl =
-    typeof window !== "undefined" && (window as any).__mcpPublicUrl
-      ? (window as any).__mcpPublicUrl
+    typeof window !== "undefined"
+      ? (window as any).__mcpPublicAssetsUrl ||
+        (window as any).__mcpPublicUrl ||
+        ""
       : "";
 
   // Helper to resolve the source

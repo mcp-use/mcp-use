@@ -1,0 +1,415 @@
+---
+title: "Notifications"
+description: "Send notifications to clients and receive notifications from clients"
+icon: "bell"
+---
+
+MCP supports bidirectional notifications between servers and clients. Notifications are one-way JSON-RPC messages that don't expect a response.
+
+**Server → Client**: Send notifications to signal events, status changes, or broadcast messages.
+
+**Client → Server**: Receive notifications when clients update their roots or other state.
+
+<Note>
+For information on handling notifications in your client application, see [Client Notifications](/typescript/client/notifications).
+</Note>
+
+## Understanding Notifications
+
+Notifications in MCP are:
+- **One-way**: Messages sent without expecting a response
+- **Stateful**: Require an active session (stateful mode)
+- **JSON-RPC compliant**: Follow the JSON-RPC 2.0 notification format (no `id` field)
+- **Fire-and-forget**: No delivery confirmation
+
+<Note>
+Notifications only work in **stateful mode** where clients maintain persistent sessions. In stateless edge environments, notifications are not supported.
+</Note>
+
+## Notification Methods
+
+### Broadcasting to All Clients
+
+Send a notification to all connected clients:
+
+```typescript
+import { createMCPServer } from "mcp-use/server";
+
+const server = createMCPServer("my-server");
+
+// Later, send to all connected clients
+await server.sendNotification("custom/status-update", {
+  status: "ready",
+  timestamp: Date.now()
+});
+```
+
+### Sending to a Specific Client
+
+Send a notification to a specific session:
+
+```typescript
+// Get all active session IDs
+const sessions = server.getActiveSessions();
+console.log(`${sessions.length} clients connected`);
+
+// Send to a specific session
+if (sessions.length > 0) {
+  const success = await server.sendNotificationToSession(
+    sessions[0],
+    "custom/welcome",
+    { message: "Hello, client!" }
+  );
+  
+  if (!success) {
+    console.log("Session not found or expired");
+  }
+}
+```
+
+## Built-in Notification Types
+
+MCP defines standard notification methods that clients may handle:
+
+### Tools List Changed
+
+Notify clients when the available tools have changed:
+
+```typescript
+await server.sendNotification("notifications/tools/list_changed");
+```
+
+### Resources List Changed
+
+Notify clients when resources have been updated:
+
+```typescript
+await server.sendNotification("notifications/resources/list_changed");
+```
+
+### Prompts List Changed
+
+Notify clients when prompts have changed:
+
+```typescript
+await server.sendNotification("notifications/prompts/list_changed");
+```
+
+### Progress Notifications
+
+Progress notifications (`notifications/progress`) are used to keep clients informed during long-running operations and prevent timeouts. When a client calls a tool with a `progressToken`, the server can send progress updates.
+
+**Automatic Progress in Sampling**
+
+When using `ctx.sample()` in tool callbacks, progress notifications are automatically sent every 5 seconds:
+
+```typescript
+server.tool({
+  name: 'long_llm_task',
+  cb: async (params, ctx?: ToolContext) => {
+    if (!ctx) return { content: [{ type: 'text', text: 'No context' }] }
+    
+    // Progress notifications are sent automatically every 5 seconds
+    const result = await ctx.sample({
+      messages: [{ role: 'user', content: { type: 'text', text: params.prompt } }]
+    })
+    
+    return { content: [{ type: 'text', text: result.content.text }] }
+  }
+})
+```
+
+**Manual Progress Reporting**
+
+You can also send progress notifications manually using `ctx.reportProgress()`:
+
+```typescript
+server.tool({
+  name: 'process_data',
+  cb: async (params, ctx?: ToolContext) => {
+    if (ctx?.reportProgress) {
+      await ctx.reportProgress(0, 100, 'Starting...')
+      
+      // Process data in stages
+      await processStage1()
+      await ctx.reportProgress(33, 100, 'Stage 1 complete')
+      
+      await processStage2()
+      await ctx.reportProgress(66, 100, 'Stage 2 complete')
+      
+      await processStage3()
+      await ctx.reportProgress(100, 100, 'Complete')
+    }
+    
+    return { content: [{ type: 'text', text: 'Done' }] }
+  }
+})
+```
+
+**How Progress Prevents Timeouts**
+
+According to the MCP specification, when a client has `resetTimeoutOnProgress: true` enabled:
+- Each progress notification resets the client's timeout counter
+- This allows operations to run indefinitely as long as progress is reported
+- The default timeout is 60 seconds, but with progress notifications, operations can take much longer
+
+**Progress Notification Format**
+
+Progress notifications follow this structure:
+
+```typescript
+{
+  method: "notifications/progress",
+  params: {
+    progressToken: number,  // Token from the original request
+    progress: number,       // Current progress value
+    total?: number,         // Total progress (if known)
+    message?: string        // Optional status message
+  }
+}
+```
+
+## Custom Notifications
+
+You can send custom notifications with any method name and parameters:
+
+```typescript
+// Use a namespace prefix for custom notifications
+await server.sendNotification("custom/user-joined", {
+  userId: "user-123",
+  username: "alice",
+  joinedAt: new Date().toISOString()
+});
+
+await server.sendNotification("custom/data-updated", {
+  resourceId: "res-456",
+  changes: ["field1", "field2"]
+});
+```
+
+## Practical Examples
+
+### Heartbeat Notifications
+
+Send periodic heartbeat messages to all clients:
+
+```typescript
+const server = createMCPServer("heartbeat-server");
+
+let heartbeatCount = 0;
+setInterval(async () => {
+  const sessions = server.getActiveSessions();
+  if (sessions.length > 0) {
+    heartbeatCount++;
+    await server.sendNotification("custom/heartbeat", {
+      count: heartbeatCount,
+      connectedClients: sessions.length,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`Heartbeat #${heartbeatCount} sent to ${sessions.length} client(s)`);
+  }
+}, 10000); // Every 10 seconds
+```
+
+### Welcome Messages
+
+Send personalized welcome messages to new clients:
+
+```typescript
+const server = createMCPServer("welcome-server");
+
+// Track sessions we've welcomed
+const welcomedSessions = new Set<string>();
+
+// Check for new clients periodically
+setInterval(async () => {
+  const sessions = server.getActiveSessions();
+  
+  for (const sessionId of sessions) {
+    if (!welcomedSessions.has(sessionId)) {
+      welcomedSessions.add(sessionId);
+      
+      await server.sendNotificationToSession(sessionId, "custom/welcome", {
+        message: "Welcome to the server!",
+        serverTime: new Date().toISOString(),
+        availableTools: server.listTools().length
+      });
+      
+      console.log(`Welcomed new client: ${sessionId.slice(0, 8)}...`);
+    }
+  }
+}, 1000);
+```
+
+### Event Broadcasting
+
+Broadcast events from tools to all connected clients:
+
+```typescript
+const server = createMCPServer("event-server");
+
+server.tool({
+  name: "create_item",
+  description: "Create a new item and notify all clients",
+  inputs: [
+    { name: "name", type: "string", required: true }
+  ],
+  cb: async ({ name }) => {
+    // Create the item
+    const item = { id: crypto.randomUUID(), name, createdAt: Date.now() };
+    
+    // Broadcast to all clients
+    await server.sendNotification("custom/item-created", {
+      item
+    });
+    
+    return {
+      content: [{
+        type: "text",
+        text: `Created item: ${item.id}`
+      }]
+    };
+  }
+});
+```
+
+## Session Management
+
+### Getting Active Sessions
+
+```typescript
+// Get all connected session IDs
+const sessions = server.getActiveSessions();
+
+console.log(`Active sessions: ${sessions.length}`);
+for (const sessionId of sessions) {
+  console.log(`  - ${sessionId}`);
+}
+```
+
+### Checking Session Validity
+
+```typescript
+const sessionId = "some-session-id";
+const sessions = server.getActiveSessions();
+
+if (sessions.includes(sessionId)) {
+  // Session is still active
+  await server.sendNotificationToSession(sessionId, "custom/ping", {});
+} else {
+  // Session has expired or disconnected
+  console.log("Session no longer active");
+}
+```
+
+## Receiving Notifications (Client → Server)
+
+### Roots Changed
+
+Clients can notify the server when their available roots (directories/files) change. Register a handler to respond to these changes:
+
+```typescript
+import { createMCPServer } from "mcp-use/server";
+
+const server = createMCPServer("my-server");
+
+// Handle roots/list_changed from clients
+server.onRootsChanged(async (roots) => {
+  console.log(`Client updated roots: ${roots.length} root(s)`);
+  
+  roots.forEach(root => {
+    console.log(`  - ${root.name || "unnamed"}: ${root.uri}`);
+  });
+  
+  // You can use the new roots to adjust server behavior
+  // For example, update which files the server can access
+});
+```
+
+### Requesting Roots from a Client
+
+You can also request the current roots from a specific client session:
+
+```typescript
+const sessions = server.getActiveSessions();
+
+if (sessions.length > 0) {
+  const roots = await server.listRoots(sessions[0]);
+  
+  if (roots) {
+    console.log(`Client has ${roots.length} roots:`);
+    roots.forEach(r => console.log(`  - ${r.uri}`));
+  }
+}
+```
+
+### Root Type
+
+```typescript
+interface Root {
+  uri: string;      // Must start with "file://"
+  name?: string;    // Optional human-readable name
+}
+```
+
+## Error Handling
+
+Notification delivery is fire-and-forget, but you can handle errors:
+
+```typescript
+try {
+  await server.sendNotification("custom/update", { data: "value" });
+} catch (error) {
+  // Individual session failures are logged but don't throw
+  // This catch is for unexpected errors
+  console.error("Unexpected error sending notification:", error);
+}
+
+// For targeted notifications, check the return value
+const success = await server.sendNotificationToSession(
+  sessionId,
+  "custom/message",
+  { text: "Hello" }
+);
+
+if (!success) {
+  console.log("Failed to send - session may have disconnected");
+}
+```
+
+## Best Practices
+
+1. **Use Namespaced Methods**: Prefix custom notifications with a namespace like `custom/` to avoid conflicts with standard MCP notifications.
+
+2. **Keep Payloads Small**: Notifications should be lightweight. For large data, send a reference and let clients fetch the full data.
+
+3. **Handle Disconnections Gracefully**: Clients may disconnect at any time. Don't rely on notification delivery for critical operations.
+
+4. **Rate Limit**: Avoid sending too many notifications too quickly. Consider debouncing or batching updates.
+
+5. **Document Your Notifications**: Let clients know what custom notifications your server sends and their payload formats.
+
+## Stateful Mode Requirement
+
+Notifications require stateful mode because they depend on persistent client sessions. In stateless/edge environments:
+
+- Sessions are not maintained between requests
+- There's no way to push notifications to clients
+- Use polling or webhooks instead
+
+To verify your server supports notifications:
+
+```typescript
+const sessions = server.getActiveSessions();
+if (sessions.length === 0) {
+  console.log("No active sessions - notifications won't be delivered");
+}
+```
+
+## Next Steps
+
+- [Client Notifications](/typescript/client/notifications) - Handle notifications in your client application
+- [Tools Guide](./tools) - Create tools that send notifications
+- [Configuration](./configuration) - Configure session management
+- [Examples](./examples) - More notification examples
+

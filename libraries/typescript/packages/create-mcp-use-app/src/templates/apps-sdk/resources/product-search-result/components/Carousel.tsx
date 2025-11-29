@@ -46,7 +46,7 @@ export const Carousel: React.FC<CarouselProps> = ({ mcpUrl }) => {
           </div>
         ) : error ? (
           <div className="flex items-center justify-center p-8">
-            <p className="text-red-500">Failed to load fruits</p>
+            <p className="text-danger">Failed to load fruits</p>
           </div>
         ) : (
           <Animate className="flex gap-4">

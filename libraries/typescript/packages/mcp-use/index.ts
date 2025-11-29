@@ -14,12 +14,14 @@ import { RemoteAgent } from "./src/agents/remote.js";
 import { MCPClient } from "./src/client.js";
 import { loadConfigFile } from "./src/config.js";
 import { BaseConnector } from "./src/connectors/base.js";
+import type { NotificationHandler } from "./src/connectors/base.js";
 import { HttpConnector } from "./src/connectors/http.js";
 import { StdioConnector } from "./src/connectors/stdio.js";
 import { WebSocketConnector } from "./src/connectors/websocket.js";
 
 import { Logger, logger } from "./src/logging.js";
-import { MCPSession } from "./src/session.js";
+import { MCPSession, Notification, Root } from "./src/session.js";
+import type { CreateMessageRequest } from "@modelcontextprotocol/sdk/types.js";
 
 export { BaseAdapter, LangChainAdapter } from "./src/adapters/index.js";
 // Export AI SDK utilities
@@ -79,10 +81,15 @@ export {
   MCPAgent,
   MCPClient,
   MCPSession,
+  Notification,
   RemoteAgent,
+  Root,
   StdioConnector,
   WebSocketConnector,
 };
+
+// Export notification types for handling server notifications
+export type { NotificationHandler };
 
 // Export code execution types and classes
 export type {
@@ -106,3 +113,15 @@ export type {
   ToolNamespaceInfo,
   ToolSearchResult,
 } from "./src/client/codeExecutor.js";
+
+// Export sampling types for LLM sampling capabilities
+export type {
+  CreateMessageRequest,
+  CreateMessageResult,
+} from "@modelcontextprotocol/sdk/types.js";
+
+/**
+ * Type alias for the params property of CreateMessageRequest.
+ * Convenience type for sampling callback functions.
+ */
+export type CreateMessageRequestParams = CreateMessageRequest["params"];

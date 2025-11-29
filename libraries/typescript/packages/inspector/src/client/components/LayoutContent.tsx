@@ -1,6 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import type { MCPConnection } from "@/client/context/McpContext";
 import { ChatTab } from "./ChatTab";
+import { NotificationsTab } from "./NotificationsTab";
 import { PromptsTab } from "./PromptsTab";
 import { ResourcesTab } from "./ResourcesTab";
 import { ToolsTab } from "./ToolsTab";
@@ -74,6 +75,18 @@ export function LayoutContent({
           connection={selectedServer}
           isConnected={selectedServer.state === "ready"}
           readResource={selectedServer.readResource}
+        />
+      );
+    case "notifications":
+      return (
+        <NotificationsTab
+          notifications={selectedServer.notifications}
+          unreadCount={selectedServer.unreadNotificationCount}
+          markNotificationRead={selectedServer.markNotificationRead}
+          markAllNotificationsRead={selectedServer.markAllNotificationsRead}
+          clearNotifications={selectedServer.clearNotifications}
+          serverId={selectedServer.id}
+          isConnected={selectedServer.state === "ready"}
         />
       );
     default:
