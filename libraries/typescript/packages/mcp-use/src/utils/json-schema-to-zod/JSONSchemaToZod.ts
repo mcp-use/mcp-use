@@ -1,5 +1,6 @@
-import { z, ZodSchema, type ZodTypeAny } from 'zod';
-import { type JSONSchema, type JSONValue, type JSONObject } from './Type.js';
+import type { ZodSchema} from 'zod';
+import { z, type ZodTypeAny } from 'zod';
+import type { JSONSchema, JSONValue, JSONObject } from './Type.js';
 
 export class JSONSchemaToZod
 {
@@ -370,7 +371,7 @@ export class JSONSchemaToZod
 	 */
 	private static parseNumberSchema(schema: JSONSchema): ZodTypeAny
 	{
-		let numberSchema = z.number();
+		const numberSchema = z.number();
 
 		// Apply all number validations
 		let result: z.ZodTypeAny = numberSchema;
@@ -486,7 +487,7 @@ export class JSONSchemaToZod
 	 */
 	private static parseString(schema: JSONSchema): ZodTypeAny
 	{
-		let stringSchema = z.string();
+		const stringSchema = z.string();
 		let result: z.ZodTypeAny = stringSchema;
 
 		// Apply all string validations
@@ -565,7 +566,7 @@ export class JSONSchemaToZod
 	 */
 	private static applyStringLength(stringSchema: z.ZodString, schema: JSONSchema): z.ZodTypeAny
 	{
-		let result = stringSchema;
+		const result = stringSchema;
 
 		if (schema['minLength'] !== undefined)
 		{
@@ -617,7 +618,7 @@ export class JSONSchemaToZod
 
 		// Create regular array schema
 		const itemSchema = schema.items ? this.parseSchema(schema.items) : z.any();
-		let arraySchema = z.array(itemSchema);
+		const arraySchema = z.array(itemSchema);
 
 		// Apply array constraints
 		let result: z.ZodTypeAny = arraySchema;
@@ -750,7 +751,7 @@ export class JSONSchemaToZod
 		return zodObject.superRefine((data, ctx) =>
 		{
 			// Apply default values to data for condition checking
-			const dataWithDefaults = this.applyDefaultValues(data, schema);
+			const dataWithDefaults = this.applyDefaultValues(data as JSONValue, schema);
 
 			// Apply appropriate validation based on condition
 			if (this.matchesCondition(dataWithDefaults, ifCondition))
