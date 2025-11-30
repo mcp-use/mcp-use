@@ -629,7 +629,7 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
-          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }} --no-install
+          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }}
           echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Install dependencies with npm
         working-directory: test-app-npm-${{ matrix.template }}
@@ -687,7 +687,7 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
-          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }} --no-install
+          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }}
           echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Install dependencies with yarn
         working-directory: test-app-yarn-${{ matrix.template }}
