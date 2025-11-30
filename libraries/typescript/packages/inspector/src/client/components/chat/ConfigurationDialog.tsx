@@ -1,7 +1,15 @@
-import { Key, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Eye, EyeOff, Key, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/client/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/client/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -12,12 +20,19 @@ import {
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/client/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/client/components/ui/select";
+
+import { cn } from "@/client/lib/utils";
 
 interface ModelOption {
   id: string;
@@ -166,6 +181,8 @@ export function ConfigurationDialog({
   const [models, setModels] = useState<ModelOption[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Fetch models when API key is set and provider is selected
   useEffect(() => {
@@ -286,13 +303,27 @@ export function ConfigurationDialog({
 
           <div className="space-y-2">
             <Label>API Key</Label>
-            <div className="flex gap-2">
+            <div className="relative">
               <Input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={tempApiKey}
                 onChange={(e) => onApiKeyChange(e.target.value)}
                 placeholder="Enter your API key"
+                className="pr-10"
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
             </div>
             <p className="text-xs text-muted-foreground">
               Your API key is stored locally and never sent to our servers
@@ -310,18 +341,59 @@ export function ConfigurationDialog({
               ) : modelError ? (
                 <div className="text-sm text-destructive">{modelError}</div>
               ) : models.length > 0 ? (
-                <Select value={tempModel} onValueChange={onModelChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {models.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.displayName || model.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={comboboxOpen} modal={true} onOpenChange={setComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={comboboxOpen}
+                      className="w-full justify-between rounded-md"
+                    >
+                      {tempModel
+                        ? models.find((model) => model.id === tempModel)
+                            ?.displayName ||
+                          models.find((model) => model.id === tempModel)?.id ||
+                          "Select a model..."
+                        : "Select a model..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search models..."
+                        className="h-9"
+                      />
+                      <CommandList>
+                        <CommandEmpty>No model found.</CommandEmpty>
+                        <CommandGroup>
+                          {models.map((model) => (
+                            <CommandItem
+                              key={model.id}
+                              value={model.id}
+                              onSelect={(currentValue) => {
+                                onModelChange(
+                                  currentValue === tempModel ? "" : currentValue
+                                );
+                                setComboboxOpen(false);
+                              }}
+                            >
+                              {model.displayName || model.id}
+                              <Check
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  tempModel === model.id
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               ) : (
                 <Input
                   value={tempModel}
