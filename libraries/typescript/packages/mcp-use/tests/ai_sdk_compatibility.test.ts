@@ -2,12 +2,12 @@
  * Tests for AI SDK compatibility with MCPAgent streamEvents()
  *
  * These tests verify that streamEvents() can be used with the AI SDK's
- * LangChainAdapter for creating data stream responses compatible with
+ * createTextStreamResponse for creating data stream responses compatible with
  * Vercel AI SDK hooks like useCompletion and useChat.
  */
 
 import type { StreamEvent } from "../index.js";
-import { LangChainAdapter } from "ai";
+import { createTextStreamResponse } from "ai";
 import { describe, expect, it } from "vitest";
 
 // Mock an async generator that simulates our streamEvents output
@@ -105,7 +105,7 @@ describe("aI SDK Compatibility", () => {
     expect(tokens).toEqual(["Hello", " world", "!"]);
   });
 
-  it("should work with LangChainAdapter.toDataStreamResponse", async () => {
+  it("should work with createTextStreamResponse from AI SDK v5", async () => {
     const mockEvents = mockStreamEvents();
     const aiSDKStream = streamEventsToAISDK(mockEvents);
 
@@ -123,13 +123,29 @@ describe("aI SDK Compatibility", () => {
       },
     });
 
-    // Test that we can create a data stream response
-    const response = LangChainAdapter.toDataStreamResponse(readableStream);
+    // Test that we can create a text stream response
+    const response = createTextStreamResponse({ textStream: readableStream });
 
     expect(response).toBeInstanceOf(Response);
     expect(response.headers.get("Content-Type")).toBe(
       "text/plain; charset=utf-8"
     );
+
+    // Actually consume and validate the stream to ensure data flows correctly
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      fullText += decoder.decode(value, { stream: true });
+    }
+
+    // Verify the content made it through the AI SDK transformation
+    expect(fullText).toContain("Hello");
+    expect(fullText).toContain(" world");
+    expect(fullText).toContain("!");
   });
 
   it("should convert streamEvents to complete content stream", async () => {
@@ -240,6 +256,217 @@ describe("aI SDK Compatibility", () => {
 
     expect(chunks).toEqual(["Hello", " world", "!"]);
   });
+
+  it("should maintain data integrity through AI SDK transformation", async () => {
+    const mockEvents = mockStreamEvents();
+    const aiSDKStream = streamEventsToAISDK(mockEvents);
+
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const token of aiSDKStream) {
+            controller.enqueue(token);
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+    });
+
+    const response = createTextStreamResponse({ textStream: readableStream });
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+
+    // Collect all chunks to verify order and completeness
+    const chunks: string[] = [];
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      chunks.push(chunk);
+      fullText += chunk;
+    }
+
+    // Verify data order is maintained
+    expect(chunks.length).toBeGreaterThan(0);
+
+    // Verify complete content is present
+    expect(fullText).toBe("Hello world!");
+
+    // Verify no data corruption
+    expect(fullText).not.toContain("undefined");
+    expect(fullText).not.toContain("null");
+  });
+
+  it("should handle stream errors gracefully", async () => {
+    async function* errorStreamEvents(): AsyncGenerator<
+      StreamEvent,
+      void,
+      void
+    > {
+      yield {
+        event: "on_chat_model_stream",
+        name: "ChatModel",
+        data: { chunk: { content: "Start" } },
+      } as StreamEvent;
+
+      // Simulate an error mid-stream
+      throw new Error("Stream error");
+    }
+
+    const aiSDKStream = streamEventsToAISDK(errorStreamEvents());
+
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const token of aiSDKStream) {
+            controller.enqueue(token);
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+    });
+
+    const response = createTextStreamResponse({ textStream: readableStream });
+    const reader = response.body!.getReader();
+
+    // Should get partial data before error
+    const { value } = await reader.read();
+    expect(new TextDecoder().decode(value)).toBe("Start");
+
+    // Should propagate the error
+    await expect(reader.read()).rejects.toThrow();
+  });
+
+  it("should support incremental consumption pattern used by useCompletion", async () => {
+    const mockEvents = mockStreamEvents();
+    const aiSDKStream = streamEventsToAISDK(mockEvents);
+
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const token of aiSDKStream) {
+            controller.enqueue(token);
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+    });
+
+    const response = createTextStreamResponse({ textStream: readableStream });
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+
+    // Simulate how useCompletion consumes incrementally
+    const receivedChunks: string[] = [];
+    let accumulatedText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      receivedChunks.push(chunk);
+      accumulatedText += chunk;
+
+      // Verify each chunk is immediately available (no buffering delays)
+      expect(chunk.length).toBeGreaterThan(0);
+    }
+
+    // Verify incremental updates were provided
+    expect(receivedChunks.length).toBeGreaterThan(0);
+
+    // Verify final accumulated text is correct
+    expect(accumulatedText).toBe("Hello world!");
+  });
+
+  // Optional integration test with real LLM
+  it.skipIf(!process.env.OPENAI_API_KEY)(
+    "should work end-to-end with real MCPAgent and OpenAI",
+    async () => {
+      // Dynamic imports to avoid loading dependencies if test is skipped
+      const { MCPAgent, MCPClient } = await import("../index.js");
+      const { ChatOpenAI } = await import("@langchain/openai");
+
+      // Create a minimal MCP setup for testing
+      const client = new MCPClient({
+        mcpServers: {
+          // Use a simple echo server or no server for basic LLM testing
+        },
+      });
+
+      const llm = new ChatOpenAI({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        streaming: true,
+      });
+
+      const agent = new MCPAgent({
+        llm,
+        client,
+        maxSteps: 5, // Allows recursionLimit of 15 (5 * 3)
+        verbose: false,
+      });
+
+      try {
+        // Simple query that doesn't require tools
+        const streamEvents = agent.streamEvents(
+          "Say 'Hello from OpenAI' and nothing else"
+        );
+
+        // Convert to AI SDK format
+        const aiSDKStream = streamEventsToAISDK(streamEvents);
+        const readableStream = new ReadableStream({
+          async start(controller) {
+            try {
+              for await (const token of aiSDKStream) {
+                controller.enqueue(token);
+              }
+              controller.close();
+            } catch (error) {
+              controller.error(error);
+            }
+          },
+        });
+
+        // Create AI SDK response
+        const response = createTextStreamResponse({
+          textStream: readableStream,
+        });
+
+        expect(response).toBeInstanceOf(Response);
+        expect(response.headers.get("Content-Type")).toBe(
+          "text/plain; charset=utf-8"
+        );
+
+        // Consume the stream
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let fullText = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullText += decoder.decode(value, { stream: true });
+        }
+
+        // Verify we got a response from OpenAI
+        expect(fullText.length).toBeGreaterThan(0);
+        expect(fullText.toLowerCase()).toContain("hello");
+      } finally {
+        await agent.close();
+        await client.closeAllSessions();
+      }
+    },
+    30000 // 30 second timeout for real API call
+  );
 });
 
 // Convert async generator to ReadableStream for AI SDK compatibility
