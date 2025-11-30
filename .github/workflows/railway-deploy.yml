@@ -34,8 +34,28 @@ jobs:
           echo "packages_published=true" >> $GITHUB_OUTPUT
           echo "✅ Manual deployment triggered for branch: $BRANCH"
 
-      - name: Check for deployment marker (automatic trigger)
+      - name: Validate workflow run source (automatic trigger)
         if: github.event_name == 'workflow_run'
+        uses: actions/github-script@v7
+        id: validate-source
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            // Validate that the workflow_run is from the same repository (not a fork)
+            const workflowRun = context.payload.workflow_run;
+            const isSameRepo = workflowRun.repository.full_name === `${context.repo.owner}/${context.repo.repo}`;
+            
+            if (!isSameRepo) {
+              core.setFailed(`❌ Security: Workflow run is from a different repository (${workflowRun.repository.full_name}). Only runs from ${context.repo.owner}/${context.repo.repo} are allowed.`);
+              return;
+            }
+            
+            core.info(`✅ Workflow run validated: ${workflowRun.repository.full_name}`);
+            core.setOutput('is_valid', 'true');
+
+      - name: Check for deployment marker (automatic trigger)
+        if: github.event_name == 'workflow_run' && steps.validate-source.outputs.is_valid == 'true'
         uses: actions/github-script@v7
         id: check-marker
         env:
@@ -104,7 +124,7 @@ jobs:
         id: config
         if: |
           (github.event_name == 'workflow_dispatch') ||
-          (github.event_name == 'workflow_run' && steps.check-marker.outputs.packages_published == 'true')
+          (github.event_name == 'workflow_run' && steps.validate-source.outputs.is_valid == 'true' && steps.check-marker.outputs.packages_published == 'true')
         run: |
           # Get branch from either manual trigger or automatic trigger
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -132,7 +152,9 @@ jobs:
         if: steps.config.outputs.should_deploy == 'true'
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.event.workflow_run.head_branch }}
+          # For manual trigger: use input branch (already validated as canary/main)
+          # For automatic trigger: use branch from validated marker (not workflow_run.head_branch for security)
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || steps.marker-info.outputs.branch }}
           fetch-depth: 0
 
       - name: Deploy to Railway
