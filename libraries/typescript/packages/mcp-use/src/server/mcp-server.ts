@@ -335,9 +335,8 @@ export class McpServer<HasOAuth extends boolean = false> {
     }
 
     // Dynamically import OAuth utilities
-    const { setupOAuthRoutes, createBearerAuthMiddleware } = await import(
-      "./oauth/index.js"
-    );
+    const { setupOAuthRoutes, createBearerAuthMiddleware } =
+      await import("./oauth/index.js");
 
     // Store the provider (already created by factory function)
     this.oauthProvider = oauthProvider;
@@ -2131,9 +2130,8 @@ if (container && Component) {
   private async mountMcp(): Promise<void> {
     if (this.mcpMounted) return;
 
-    const { StreamableHTTPServerTransport } = await import(
-      "@modelcontextprotocol/sdk/server/streamableHttp.js"
-    );
+    const { StreamableHTTPServerTransport } =
+      await import("@modelcontextprotocol/sdk/server/streamableHttp.js");
 
     const idleTimeoutMs = this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
