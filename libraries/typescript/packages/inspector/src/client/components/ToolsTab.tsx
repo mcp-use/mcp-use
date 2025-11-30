@@ -867,39 +867,41 @@ export function ToolsTab({
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
-            <ToolsTabHeader
-              activeTab={activeTab}
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              filteredToolsCount={filteredTools.length}
-              savedRequestsCount={savedRequests.length}
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              onTabSwitch={() =>
-                setActiveTab(activeTab === "tools" ? "saved" : "tools")
-              }
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+            <div className="flex flex-col h-full overflow-hidden">
+              <ToolsTabHeader
+                activeTab={activeTab}
+                isSearchExpanded={isSearchExpanded}
+                searchQuery={searchQuery}
+                filteredToolsCount={filteredTools.length}
+                savedRequestsCount={savedRequests.length}
+                onSearchExpand={() => setIsSearchExpanded(true)}
+                onSearchChange={setSearchQuery}
+                onSearchBlur={handleSearchBlur}
+                onTabSwitch={() =>
+                  setActiveTab(activeTab === "tools" ? "saved" : "tools")
+                }
+                searchInputRef={
+                  searchInputRef as React.RefObject<HTMLInputElement>
+                }
+              />
 
-            {activeTab === "tools" ? (
-              <ToolsList
-                tools={filteredTools}
-                selectedTool={selectedTool}
-                onToolSelect={handleToolSelect}
-                focusedIndex={focusedIndex}
-              />
-            ) : (
-              <SavedRequestsList
-                savedRequests={savedRequests}
-                selectedRequest={selectedSavedRequest}
-                onLoadRequest={loadSavedRequest}
-                onDeleteRequest={deleteSavedRequest}
-                focusedIndex={focusedIndex}
-              />
-            )}
+              {activeTab === "tools" ? (
+                <ToolsList
+                  tools={filteredTools}
+                  selectedTool={selectedTool}
+                  onToolSelect={handleToolSelect}
+                  focusedIndex={focusedIndex}
+                />
+              ) : (
+                <SavedRequestsList
+                  savedRequests={savedRequests}
+                  selectedRequest={selectedSavedRequest}
+                  onLoadRequest={loadSavedRequest}
+                  onDeleteRequest={deleteSavedRequest}
+                  focusedIndex={focusedIndex}
+                />
+              )}
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
@@ -909,7 +911,7 @@ export function ToolsTab({
             defaultSize={0}
             collapsible
             minSize={5}
-            collapsedSize={6}
+            collapsedSize={5}
             onCollapse={() => {
               setRpcPanelCollapsed(true);
             }}

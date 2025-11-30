@@ -2,22 +2,21 @@
  * AI SDK Integration Example
  *
  * This example demonstrates how to use MCPAgent's streamEvents() method
- * with Vercel AI SDK's LangChainAdapter for building streaming UIs.
+ * with Vercel AI SDK v5's createTextStreamResponse for building streaming UIs.
  *
  * This pattern is useful for:
  * - Next.js API routes with useCompletion/useChat hooks
  * - Real-time streaming applications
  * - Building chat interfaces with token-by-token updates
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: ANTHROPIC_API_KEY
  */
 
 import type { StreamEvent } from "../../index.js";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { LangChainAdapter } from "ai";
-import { config } from "dotenv";
+import { createTextStreamResponse } from "ai";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables
-config();
 
 // Utility function to convert streamEvents to AI SDK compatible stream
 async function* streamEventsToAISDK(
@@ -112,8 +111,8 @@ async function createApiHandler() {
       const aiSDKStream = streamEventsToAISDK(streamEvents);
       const readableStream = createReadableStreamFromGenerator(aiSDKStream);
 
-      // Use LangChainAdapter to create a Response compatible with AI SDK
-      return LangChainAdapter.toDataStreamResponse(readableStream);
+      // Use createTextStreamResponse to create a Response compatible with AI SDK v5
+      return createTextStreamResponse({ textStream: readableStream });
     } catch (error) {
       console.error("Error in API handler:", error);
       throw error;
@@ -155,7 +154,7 @@ async function createEnhancedApiHandler() {
       const enhancedStream = streamEventsToAISDKWithTools(streamEvents);
       const readableStream = createReadableStreamFromGenerator(enhancedStream);
 
-      return LangChainAdapter.toDataStreamResponse(readableStream);
+      return createTextStreamResponse({ textStream: readableStream });
     } catch (error) {
       console.error("Error in enhanced API handler:", error);
       throw error;

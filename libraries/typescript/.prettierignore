@@ -10,7 +10,6 @@
 **/.next/**
 **/coverage/**
 **/.turbo/**
-**/.vercel/**
 **/.tsup/**
 **/.vite/**
 **/.mcp-use/**

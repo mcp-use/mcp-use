@@ -1,14 +1,13 @@
 /**
  * This example shows how to test the different functionalities of MCPs using the MCP server from
  * anthropic.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: OPENAI_API_KEY
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 const everythingServer = {
   mcpServers: {

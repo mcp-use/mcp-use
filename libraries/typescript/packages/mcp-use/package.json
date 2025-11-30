@@ -1,9 +1,9 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.6.2",
+  "version": "1.7.0-canary.8",
   "packageManager": "pnpm@10.6.1",
-  "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents and Clients + MCP Servers with support for MCP-UI.",
+  "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents, Clients and Servers with support for ChatGPT Apps, Code Mode, OAuth, Notifications, Sampling, Observability and more.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
   "homepage": "https://github.com/mcp-use/mcp-use#readme",
@@ -16,12 +16,17 @@
   },
   "keywords": [
     "MCP",
+    "mcp-use",
     "Model Context Protocol",
-    "Zod",
-    "schema",
+    "ChatGPT Apps",
+    "Code Mode",
+    "OAuth",
+    "Notifications",
+    "Sampling",
     "SDK",
-    "eventsource",
-    "AI",
+    "mcp-ui",
+    "mcp-inspector",
+    "ai",
     "utility",
     "typescript"
   ],
@@ -33,6 +38,10 @@
     "./agent": {
       "types": "./dist/src/agents/index.d.ts",
       "import": "./dist/src/agents/index.js"
+    },
+    "./auth": {
+      "types": "./dist/src/auth/index.d.ts",
+      "import": "./dist/src/auth/index.js"
     },
     "./browser": {
       "types": "./dist/src/browser.d.ts",
@@ -105,15 +114,20 @@
     "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts",
     "example:server:notification": "tsx examples/server/notification-example/src/server.ts",
     "example:client:notification": "tsx examples/client/notification-client.ts",
-    "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/notification-example/src/server.ts & sleep 3 && tsx examples/client/notification-client.ts",
+    "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/notifications/src/server.ts & sleep 3 && tsx examples/client/notification-client.ts",
     "example:server:sampling": "tsx examples/server/sampling/src/server.ts",
     "example:client:sampling": "tsx examples/client/sampling-client.ts",
-    "example:sampling": "lsof -ti:3001 | xargs kill -9 2>/dev/null; tsx examples/server/sampling/src/server.ts & sleep 3 && tsx examples/client/sampling-client.ts"
+    "example:sampling": "lsof -ti:3001 | xargs kill -9 2>/dev/null; tsx examples/server/sampling/src/server.ts & sleep 3 && tsx examples/client/sampling-client.ts",
+    "example:server:oauth:supabase": "tsx examples/server/oauth/supabase/src/server.ts",
+    "example:client:oauth:auth0": "tsx examples/server/oauth/auth0/src/server.ts",
+    "example:client:oauth:workos": "tsx examples/server/oauth/workos/src/server.ts",
+    "example:client:oauth:keycloak": "tsx examples/server/oauth/keycloak/src/server.ts"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.2.0",
     "@langchain/anthropic": "^1.0.0",
     "@langchain/openai": "^1.0.0",
+    "ai": "^4.0.0 || ^5.0.0",
     "langfuse": "^3.38.6",
     "langfuse-langchain": "^3.38.6",
     "react": "^18.0.0 || ^19.0.0",
@@ -129,6 +143,9 @@
     "@langchain/openai": {
       "optional": true
     },
+    "ai": {
+      "optional": true
+    },
     "langfuse": {
       "optional": true
     },
@@ -137,60 +154,39 @@
     }
   },
   "dependencies": {
-    "@dmitryrechkin/json-schema-to-zod": "^1.0.1",
     "@hono/node-server": "^1.13.0",
     "@langchain/core": "^1.0.1",
     "@mcp-ui/server": "^5.12.0",
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.22.0",
-    "@scarf/scarf": "^1.4.0",
-    "ai": "^4.3.19",
-    "chalk": "^5.6.2",
-    "cli-highlight": "^2.1.11",
-    "commander": "^14.0.1",
-    "dotenv": "^16.5.0",
-    "esbuild": ">=0.25.0",
+    "@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194",
     "hono": "^4.6.0",
+    "jose": "^6.1.2",
     "langchain": "^1.0.1",
-    "lodash-es": "^4.17.21",
     "posthog-node": "^5.1.1",
-    "strict-url-sanitise": "^0.0.1",
-    "strip-ansi": "^7.1.0",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.20.6",
-    "uuid": "^11.1.0",
-    "winston": "^3.17.0",
-    "winston-transport-browserconsole": "^1.0.5",
     "ws": "^8.18.2",
-    "zod": "^3.25.48",
-    "zod-to-json-schema": "^3.24.6"
+    "zod": "^4.1.13"
   },
   "optionalDependencies": {
-    "@tailwindcss/vite": "^4.1.15",
-    "@vitejs/plugin-react": "^5.0.4",
-    "connect": "^3.7.0",
-    "node-mocks-http": "^1.16.2",
-    "vite": ">=5.4.21"
+    "chalk": "^5.6.2",
+    "cli-highlight": "^2.1.11",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.13.2",
     "@langchain/anthropic": "^1.0.0",
     "@langchain/openai": "^1.0.0",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.19.8",
     "@types/react": "^19.2.2",
     "@types/ws": "^8.18.1",
-    "cors": "^2.8.5",
+    "ai": "^5.0.104",
+    "esbuild": ">=0.25.0",
     "eslint": "^9.28.0",
     "eslint-plugin-format": "^1.0.1",
-    "express": "^4.18.2",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "react": "^19.2.0",
-    "react-router-dom": "^7.9.5",
+    "tsx": "^4.20.6",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },

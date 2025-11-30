@@ -14,7 +14,6 @@ export default [
       "**/coverage/**",
       "**/*.min.js",
       "**/.turbo/**",
-      "**/.vercel/**",
       "**/.tsup/**",
       "packages/*/dist/**",
       "packages/*/build/**",

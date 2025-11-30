@@ -4,15 +4,14 @@
  * This example demonstrates intelligent structured output by researching the mcp-use library.
  * The agent becomes schema-aware and will intelligently retry to gather missing
  * information until all required fields can be populated.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: ANTHROPIC_API_KEY
  */
 
 import { ChatAnthropic } from "@langchain/anthropic";
-import { config } from "dotenv";
 import { z } from "zod";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 // Define the structured output schema using Zod
 const RepoInfoSchema = z.object({

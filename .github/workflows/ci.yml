@@ -1,4 +1,6 @@
 name: CI
+permissions:
+  contents: read
 
 # ============================================================================
 # CI Workflow Overview
@@ -460,6 +462,66 @@ jobs:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter @mcp-use/cli --if-present test
 
+  typescript-deno-test:
+    needs: [detect-changes, typescript-build]
+    if: needs.detect-changes.outputs.typescript == 'true'
+    name: "typescript/deno"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Build mcp-use Package
+        run: pnpm --filter mcp-use build
+      - name: Pack mcp-use for Deno Testing
+        run: |
+          cd packages/mcp-use
+          pnpm pack
+          echo "MCP_USE_PACKAGE=$(ls mcp-use-*.tgz)" >> $GITHUB_ENV
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify Deno Runtime Compatibility
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: |
+          cd packages/mcp-use
+          echo "Testing Deno compatibility with locally built package..."
+          PACKAGE_FILE=$(ls mcp-use-*.tgz)
+          echo "Package: $PACKAGE_FILE"
+          echo ""
+          # Create a test directory and install the local package
+          mkdir -p deno-test-temp
+          cd deno-test-temp
+          # Create package.json for Deno to recognize npm dependencies
+          cat > package.json << EOF
+          {
+            "type": "module",
+            "dependencies": {
+              "mcp-use": "file:../$PACKAGE_FILE"
+            }
+          }
+          EOF
+          pnpm install
+          # Run Deno tests from this directory
+          # --no-check: Skip type checking (runtime verification only)
+          # --node-modules-dir: Use node_modules for npm: imports
+          deno test --no-check --node-modules-dir --allow-net --allow-read --allow-env ../tests/deno/basic-server.test.ts
+
   typescript-changeset-check:
     needs: detect-changes
     if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && needs.detect-changes.outputs.typescript == 'true') }}
@@ -629,7 +691,7 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
-          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }} --no-install
+          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }}
           echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Install dependencies with npm
         working-directory: test-app-npm-${{ matrix.template }}
@@ -687,7 +749,7 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
-          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }} --no-install
+          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }}
           echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Install dependencies with yarn
         working-directory: test-app-yarn-${{ matrix.template }}

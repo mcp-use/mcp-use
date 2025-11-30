@@ -64,10 +64,6 @@ run_test() {
     
     # Build command
     local cmd=""
-    local install_flag=""
-    if [ "$install" != "yes" ]; then
-        install_flag="--no-install"
-    fi
     
     case "$pm" in
         npm)

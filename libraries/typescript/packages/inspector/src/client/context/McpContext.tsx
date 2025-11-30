@@ -75,6 +75,7 @@ export interface MCPConnection {
   authenticate: () => void;
   retry: () => void;
   clearStorage: () => void;
+  disconnect: () => void;
   client: any;
 }
 
@@ -279,6 +280,8 @@ function McpConnectionWrapper({
     customHeaders:
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
     transportType: transportType || "http", // Default to 'http' for Streamable HTTP
+    preventAutoAuth: true, // Show auth button instead of auto-triggering OAuth
+    useRedirectFlow: true, // Use redirect instead of popup for better UX
     enabled: wrapTransportReady, // Only connect when wrapper is ready
     wrapTransport: wrapTransportFn,
     onNotification: (notification) => {
@@ -344,6 +347,7 @@ function McpConnectionWrapper({
           authenticate: mcpHook.authenticate,
           retry: mcpHook.retry,
           clearStorage: mcpHook.clearStorage,
+          disconnect: mcpHook.disconnect,
           client: mcpHook.client,
         };
 
@@ -399,6 +403,7 @@ function McpConnectionWrapper({
         authenticate: mcpHook.authenticate,
         retry: mcpHook.retry,
         clearStorage: mcpHook.clearStorage,
+        disconnect: mcpHook.disconnect,
         client: mcpHook.client,
       };
 
@@ -512,6 +517,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
               authenticate: () => {},
               retry: () => {},
               clearStorage: () => {},
+              disconnect: () => {},
               client: null,
             }))
           );
@@ -610,6 +616,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
                 authenticate: () => {},
                 retry: () => {},
                 clearStorage: () => {},
+                disconnect: () => {},
                 client: null,
               },
             ]);
@@ -668,6 +675,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
             authenticate: () => {},
             retry: () => {},
             clearStorage: () => {},
+            disconnect: () => {},
             client: null,
           },
         ]);
@@ -713,6 +721,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
           authenticate: () => {},
           retry: () => {},
           clearStorage: () => {},
+          disconnect: () => {},
           client: null,
         },
       ]);
@@ -720,30 +729,53 @@ export function McpProvider({ children }: { children: ReactNode }) {
     [connectionConfigs, connections]
   );
 
-  const removeConnection = useCallback((id: string) => {
-    setConnectionConfigs((prev) => prev.filter((c) => c.id !== id));
-    setConnections((prev) => prev.filter((c) => c.id !== id));
+  const removeConnection = useCallback(
+    (id: string) => {
+      // Find the connection and properly clean it up
+      const connection = connections.find((c) => c.id === id);
+      if (connection) {
+        console.log(`[McpContext] Cleaning up connection: ${id}`);
 
-    // Also remove from localStorage immediately
-    const currentConfigs = localStorage.getItem("mcp-inspector-connections");
-    if (currentConfigs) {
-      try {
-        const parsed = JSON.parse(currentConfigs);
-        const filtered = parsed.filter((c: any) => (c.id || c.url) !== id);
-        localStorage.setItem(
-          "mcp-inspector-connections",
-          JSON.stringify(filtered)
-        );
-      } catch (e) {
-        console.error("Failed to update localStorage on remove:", e);
+        // First disconnect from the server (closes MCP session)
+        if (connection.disconnect) {
+          console.log(`[McpContext] Disconnecting from server: ${id}`);
+          connection.disconnect();
+        }
+
+        // Then clear OAuth storage (tokens, client info, etc.)
+        if (connection.clearStorage) {
+          console.log(
+            `[McpContext] Clearing OAuth storage for connection: ${id}`
+          );
+          connection.clearStorage();
+        }
       }
-    }
 
-    // Track removal
-    Telemetry.getInstance().capture(
-      new MCPServerRemovedEvent({ serverId: id })
-    );
-  }, []);
+      setConnectionConfigs((prev) => prev.filter((c) => c.id !== id));
+      setConnections((prev) => prev.filter((c) => c.id !== id));
+
+      // Also remove from localStorage immediately
+      const currentConfigs = localStorage.getItem("mcp-inspector-connections");
+      if (currentConfigs) {
+        try {
+          const parsed = JSON.parse(currentConfigs);
+          const filtered = parsed.filter((c: any) => (c.id || c.url) !== id);
+          localStorage.setItem(
+            "mcp-inspector-connections",
+            JSON.stringify(filtered)
+          );
+        } catch (e) {
+          console.error("Failed to update localStorage on remove:", e);
+        }
+      }
+
+      // Track removal
+      Telemetry.getInstance().capture(
+        new MCPServerRemovedEvent({ serverId: id })
+      );
+    },
+    [connections]
+  );
 
   const updateConnectionConfig = useCallback(
     (

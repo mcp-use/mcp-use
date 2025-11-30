@@ -1,5 +1,100 @@
 # @mcp-use/inspector
 
+## 0.9.0-canary.8
+
+### Patch Changes
+
+- mcp-use@1.7.0-canary.8
+
+## 0.9.0-canary.7
+
+### Patch Changes
+
+- caf8c7c: Fix: switched to https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194 instead of @modelcontextprotocol/sdk to fix zod errors on deno runtime
+- Updated dependencies [caf8c7c]
+- Updated dependencies [caf8c7c]
+- Updated dependencies [caf8c7c]
+  - mcp-use@1.7.0-canary.7
+
+## 0.9.0-canary.6
+
+### Patch Changes
+
+- 38da68d: Fix: fix models and apikeys box in inspector chat
+- 38da68d: Fix: rendering of table, inline-code, code and images of inspector chat
+  - mcp-use@1.7.0-canary.6
+
+## 0.9.0-canary.5
+
+### Patch Changes
+
+- 4b917e0: feat: enable bundle minification 9.7mb -> 4.2 mb
+  - mcp-use@1.7.0-canary.5
+
+## 0.9.0-canary.4
+
+### Patch Changes
+
+- f44e60f: Fix padding of rpc panels
+  - mcp-use@1.7.0-canary.4
+
+## 0.9.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [0c8cb1a]
+  - mcp-use@1.7.0-canary.3
+
+## 0.9.0-canary.2
+
+### Patch Changes
+
+- 1ca9801: Optimized dependencies
+- Updated dependencies [1ca9801]
+  - mcp-use@1.7.0-canary.2
+
+## 0.9.0-canary.1
+
+### Minor Changes
+
+- 6bb0f3d: ## New Features
+  - **OAuth Authentication System**: Complete OAuth 2.0 support with built-in providers (Auth0, WorkOS, Supabase, Keycloak) and custom provider configuration
+  - **OAuth Middleware & Routes**: Server-side OAuth flow handling with automatic token management and session persistence
+  - **OAuth Callback Component**: Inspector now includes OAuth callback handling for authentication flows
+  - **Context Storage**: New async local storage system for request-scoped context in servers
+  - **Response Helpers**: Utility functions for standardized HTTP responses and error handling
+  - **Runtime Detection**: Auto-detection utilities for Node.js, Bun, and Deno environments
+  - **Server Authentication Examples**: Added OAuth examples for Auth0, WorkOS, and Supabase
+
+  ## Improvements
+  - **Enhanced useMcp Hook**: Improved connection management with better state handling and OAuth support
+  - **Enhanced Inspector Dashboard**: Added OAuth configuration UI and connection status indicators
+  - **Enhanced Browser Provider**: Better authentication flow handling with OAuth integration
+  - **Improved Auto-Connect**: Enhanced connection recovery and auto-reconnect logic
+  - **Enhanced Authentication Docs**: Comprehensive server-side authentication guide with OAuth setup instructions
+  - **Renamed Notification Example**: Cleaner naming convention (notification-example → notifications)
+  - **Enhanced Tool Types**: Improved type definitions for server-side tool handlers with context support
+  - **Enhanced HTTP Connectors**: Added OAuth token handling in HTTP transport layer
+
+  ## Documentation
+  - Added server authentication guide
+  - Enhanced client authentication documentation with OAuth flows
+  - Added notification examples and usage patterns
+  - Updated useMcp hook documentation with OAuth configuration
+
+### Patch Changes
+
+- Updated dependencies [6bb0f3d]
+  - mcp-use@1.7.0-canary.1
+
+## 0.8.3-canary.0
+
+### Patch Changes
+
+- 041da75: Fix scrolls in tools, resources, and prompts tab
+- 041da75: Feat: added enum input display for tools
+  - mcp-use@1.6.3-canary.0
+
 ## 0.8.2
 
 ### Patch Changes

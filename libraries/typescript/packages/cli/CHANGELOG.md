@@ -1,5 +1,82 @@
 # @mcp-use/cli
 
+## 2.4.3-canary.8
+
+### Patch Changes
+
+- 0daae72: chore: fixed readme of package.json
+  - mcp-use@1.7.0-canary.8
+  - @mcp-use/inspector@0.9.0-canary.8
+
+## 2.4.3-canary.7
+
+### Patch Changes
+
+- Updated dependencies [caf8c7c]
+- Updated dependencies [caf8c7c]
+- Updated dependencies [caf8c7c]
+  - @mcp-use/inspector@0.9.0-canary.7
+  - mcp-use@1.7.0-canary.7
+
+## 2.4.3-canary.6
+
+### Patch Changes
+
+- Updated dependencies [38da68d]
+- Updated dependencies [38da68d]
+  - @mcp-use/inspector@0.9.0-canary.6
+  - mcp-use@1.7.0-canary.6
+
+## 2.4.3-canary.5
+
+### Patch Changes
+
+- Updated dependencies [4b917e0]
+  - @mcp-use/inspector@0.9.0-canary.5
+  - mcp-use@1.7.0-canary.5
+
+## 2.4.3-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f44e60f]
+  - @mcp-use/inspector@0.9.0-canary.4
+  - mcp-use@1.7.0-canary.4
+
+## 2.4.3-canary.3
+
+### Patch Changes
+
+- Updated dependencies [0c8cb1a]
+  - mcp-use@1.7.0-canary.3
+  - @mcp-use/inspector@0.9.0-canary.3
+
+## 2.4.3-canary.2
+
+### Patch Changes
+
+- 1ca9801: Optimized dependencies
+- Updated dependencies [1ca9801]
+  - @mcp-use/inspector@0.9.0-canary.2
+  - mcp-use@1.7.0-canary.2
+
+## 2.4.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [6bb0f3d]
+  - @mcp-use/inspector@0.9.0-canary.1
+  - mcp-use@1.7.0-canary.1
+
+## 2.4.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [041da75]
+- Updated dependencies [041da75]
+  - @mcp-use/inspector@0.8.3-canary.0
+  - mcp-use@1.6.3-canary.0
+
 ## 2.4.2
 
 ### Patch Changes

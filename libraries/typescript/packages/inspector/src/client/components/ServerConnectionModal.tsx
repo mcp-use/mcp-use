@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/client/components/ui/dialog";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
+import { toast } from "sonner";
 
 interface ServerConnectionModalProps {
   connection: MCPConnection | null;
@@ -87,6 +88,26 @@ export function ServerConnectionModal({
 
   const handleConnect = () => {
     if (!url.trim()) return;
+
+    // Validate URL format before attempting connection
+    try {
+      const parsedUrl = new URL(url.trim());
+      const isValid =
+        parsedUrl.protocol === "http:" ||
+        parsedUrl.protocol === "https:" ||
+        parsedUrl.protocol === "ws:" ||
+        parsedUrl.protocol === "wss:";
+
+      if (!isValid) {
+        toast.error(
+          "Invalid URL protocol. Please use http://, https://, ws://, or wss://"
+        );
+        return;
+      }
+    } catch (error) {
+      toast.error("Invalid URL format. Please enter a valid URL.");
+      return;
+    }
 
     // Prepare proxy configuration if "Via Proxy" is selected
     const proxyConfig =
