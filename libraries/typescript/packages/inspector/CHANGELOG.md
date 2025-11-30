@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.9.0-canary.6
+
+### Patch Changes
+
+- 38da68d: Fix: fix models and apikeys box in inspector chat
+- 38da68d: Fix: rendering of table, inline-code, code and images of inspector chat
+  - mcp-use@1.7.0-canary.6
+
 ## 0.9.0-canary.5
 
 ### Patch Changes
