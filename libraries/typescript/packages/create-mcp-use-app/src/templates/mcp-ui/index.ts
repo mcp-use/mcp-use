@@ -8,7 +8,7 @@ const server = createMCPServer("uiresource-mcp-server", {
   baseUrl: process.env.MCP_URL, // Full base URL (e.g., https://myserver.com)
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 /**
  * ════════════════════════════════════════════════════════════════════
