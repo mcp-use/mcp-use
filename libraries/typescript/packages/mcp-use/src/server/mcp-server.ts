@@ -7,6 +7,7 @@ import type {
   CreateMessageResult,
   GetPromptResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 
 /**
  * Options for the sample() function in tool context.
@@ -97,13 +98,8 @@ export interface ToolContext {
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import { cors } from "hono/cors";
-import { z } from "zod";
+import { runWithContext, getRequestContext } from "./context-storage.js";
 
-// UUID generation helper (works in Node.js, Deno, and browsers)
-// Uses the Web Crypto API which is available globally
-function generateUUID(): string {
-  return (globalThis.crypto as any).randomUUID();
-}
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -120,118 +116,26 @@ import type {
   ResourceTemplateDefinition,
   ServerConfig,
   ToolDefinition,
+  ToolCallback,
   UIResourceContent,
   UIResourceDefinition,
   WidgetProps,
+  InferToolInput,
+  InferToolOutput,
 } from "./types/index.js";
 import type { WidgetMetadata } from "./types/widget.js";
+import {
+  isDeno,
+  getEnv,
+  pathHelpers,
+  fsHelpers,
+  generateUUID,
+  getCwd,
+} from "./utils/runtime.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
 
-// Runtime detection
-const isDeno = typeof (globalThis as any).Deno !== "undefined";
-
-// Helper to get environment variable
-function getEnv(key: string): string | undefined {
-  if (isDeno) {
-    return (globalThis as any).Deno.env.get(key);
-  }
-  return process.env[key];
-}
-
-// Helper to get current working directory
-function getCwd(): string {
-  if (isDeno) {
-    return (globalThis as any).Deno.cwd();
-  }
-  return process.cwd();
-}
-
-// Runtime-aware file system helpers
-const fsHelpers = {
-  async readFileSync(path: string, encoding: string = "utf8"): Promise<string> {
-    if (isDeno) {
-      return await (globalThis as any).Deno.readTextFile(path);
-    }
-    const { readFileSync } = await import("node:fs");
-    const result = readFileSync(path, encoding as any);
-    return typeof result === "string"
-      ? result
-      : result.toString(encoding as any);
-  },
-
-  async readFile(path: string): Promise<ArrayBuffer> {
-    if (isDeno) {
-      const data = await (globalThis as any).Deno.readFile(path);
-      return data.buffer;
-    }
-    const { readFileSync } = await import("node:fs");
-    const buffer = readFileSync(path);
-    return buffer.buffer.slice(
-      buffer.byteOffset,
-      buffer.byteOffset + buffer.byteLength
-    );
-  },
-
-  async existsSync(path: string): Promise<boolean> {
-    if (isDeno) {
-      try {
-        await (globalThis as any).Deno.stat(path);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    const { existsSync } = await import("node:fs");
-    return existsSync(path);
-  },
-
-  async readdirSync(path: string): Promise<string[]> {
-    if (isDeno) {
-      const entries = [];
-      for await (const entry of (globalThis as any).Deno.readDir(path)) {
-        entries.push(entry.name);
-      }
-      return entries;
-    }
-    const { readdirSync } = await import("node:fs");
-    return readdirSync(path);
-  },
-};
-
-// Runtime-aware path helpers
-const pathHelpers = {
-  join(...paths: string[]): string {
-    if (isDeno) {
-      // Use simple path joining for Deno (web-standard approach)
-      return paths.join("/").replace(/\/+/g, "/");
-    }
-    // For Node, we need to use the sync version or cache the import
-    // We'll use a simple implementation that works for both
-    return paths.join("/").replace(/\/+/g, "/");
-  },
-
-  relative(from: string, to: string): string {
-    // Simple relative path calculation
-    const fromParts = from.split("/").filter((p) => p);
-    const toParts = to.split("/").filter((p) => p);
-
-    let i = 0;
-    while (
-      i < fromParts.length &&
-      i < toParts.length &&
-      fromParts[i] === toParts[i]
-    ) {
-      i++;
-    }
-
-    const upCount = fromParts.length - i;
-    const relativeParts = [...Array(upCount).fill(".."), ...toParts.slice(i)];
-    return relativeParts.join("/");
-  },
-};
-
-export class McpServer {
+export class McpServer<HasOAuth extends boolean = false> {
   private server: OfficialMcpServer;
   private config: ServerConfig;
   private app: HonoType;
@@ -249,9 +153,14 @@ export class McpServer {
     {
       transport: any; // StreamableHTTPServerTransport
       lastAccessedAt: number;
+      context?: Context; // Store Hono context for this session
     }
   >();
   private idleCleanupInterval?: NodeJS.Timeout;
+  private oauthProvider?: any; // OAuthProvider from oauth/index.js
+  private oauthMiddleware?: any; // Bearer auth middleware
+  private oauthConfig?: any; // Store OAuth config for lazy initialization
+  private oauthSetupComplete = false;
 
   /**
    * Creates a new MCP server instance with Hono integration
@@ -295,6 +204,11 @@ export class McpServer {
 
     // Request logging middleware
     this.app.use("*", requestLogger);
+
+    // Store OAuth config for lazy initialization (will be setup in listen/getHandler)
+    if (config.oauth) {
+      this.oauthConfig = config.oauth;
+    }
 
     // Proxy all Hono methods to the underlying app with special handling for 'use'
     return new Proxy(this, {
@@ -364,7 +278,7 @@ export class McpServer {
         const value = (target.app as any)[prop];
         return typeof value === "function" ? value.bind(target.app) : value;
       },
-    }) as McpServer;
+    }) as McpServer<HasOAuth>;
   }
 
   /**
@@ -405,6 +319,56 @@ export class McpServer {
 
     console.log("[CSP] Parsed CSP URLs:", urls);
     return urls;
+  }
+
+  /**
+   * Setup OAuth authentication
+   *
+   * Initializes OAuth provider, creates bearer auth middleware,
+   * sets up OAuth routes, and applies auth to /mcp endpoints.
+   *
+   * @private
+   */
+  private async setupOAuth(oauthProvider: any): Promise<void> {
+    if (this.oauthSetupComplete) {
+      return; // Already setup
+    }
+
+    // Dynamically import OAuth utilities
+    const { setupOAuthRoutes, createBearerAuthMiddleware } = await import(
+      "./oauth/index.js"
+    );
+
+    // Store the provider (already created by factory function)
+    this.oauthProvider = oauthProvider;
+    console.log(`[OAuth] OAuth provider initialized`);
+
+    // Setup OAuth routes (will be mounted immediately)
+    const baseUrl = this.getServerBaseUrl();
+
+    // Create bearer auth middleware with baseUrl for WWW-Authenticate header
+    this.oauthMiddleware = createBearerAuthMiddleware(
+      this.oauthProvider,
+      baseUrl
+    );
+    setupOAuthRoutes(this.app, this.oauthProvider, baseUrl);
+    const mode = this.oauthProvider.getMode?.() || "proxy";
+    if (mode === "direct") {
+      console.log(
+        "[OAuth] Direct mode: Clients will authenticate with provider directly"
+      );
+      console.log("[OAuth] Metadata endpoints: /.well-known/*");
+    } else {
+      console.log(
+        "[OAuth] Proxy mode: Routes at /authorize, /token, /.well-known/*"
+      );
+    }
+
+    // Apply bearer auth to all /mcp routes
+    this.app.use("/mcp/*", this.oauthMiddleware);
+    console.log("[OAuth] Bearer authentication enabled on /mcp routes");
+
+    this.oauthSetupComplete = true;
   }
 
   /**
@@ -556,35 +520,81 @@ export class McpServer {
    *
    * @param toolDefinition - Configuration object containing tool metadata and handler function
    * @param toolDefinition.name - Unique identifier for the tool
-   * @param toolDefinition.description - Human-readable description of what the tool does
-   * @param toolDefinition.inputs - Array of input parameter definitions with types and validation
+   * @param toolDefinition.description - Optional human-readable description of what the tool does
+   * @param toolDefinition.inputs - Array of input parameter definitions (legacy, use schema instead)
+   * @param toolDefinition.schema - Zod object schema for input validation (preferred)
+   * @param toolDefinition.outputSchema - Zod object schema for structured output validation
    * @param toolDefinition.cb - Async callback function that executes the tool logic with provided parameters
    * @param toolDefinition._meta - Optional metadata for the tool (e.g. Apps SDK metadata)
+   * @param callback - Optional separate callback function (alternative to cb property)
    * @returns The server instance for method chaining
    *
    * @example
    * ```typescript
+   * // Using Zod schema (preferred)
    * server.tool({
    *   name: 'calculate',
    *   description: 'Performs mathematical calculations',
-   *   inputs: [
-   *     { name: 'expression', type: 'string', required: true },
-   *     { name: 'precision', type: 'number', required: false }
-   *   ],
+   *   schema: z.object({
+   *     expression: z.string(),
+   *     precision: z.number().optional()
+   *   }),
    *   cb: async ({ expression, precision = 2 }) => {
    *     const result = eval(expression)
-   *     return { result: Number(result.toFixed(precision)) }
-   *   },
-   *   _meta: {
-   *     'openai/outputTemplate': 'ui://widgets/calculator',
-   *     'openai/toolInvocation/invoking': 'Calculating...',
-   *     'openai/toolInvocation/invoked': 'Calculation complete'
+   *     return text(`Result: ${result.toFixed(precision)}`)
    *   }
    * })
+   *
+   * // Using legacy inputs array
+   * server.tool({
+   *   name: 'greet',
+   *   inputs: [{ name: 'name', type: 'string', required: true }],
+   *   cb: async ({ name }) => text(`Hello, ${name}!`)
+   * })
+   *
+   * // With separate callback for better typing
+   * server.tool({
+   *   name: 'add',
+   *   schema: z.object({ a: z.number(), b: z.number() })
+   * }, async ({ a, b }) => text(`${a + b}`))
    * ```
    */
-  tool(toolDefinition: ToolDefinition): this {
-    const inputSchema = this.createParamsSchema(toolDefinition.inputs || []);
+  // Overload for separate callback with automatic type inference
+  tool<T extends ToolDefinition<any, any, HasOAuth>>(
+    toolDefinition: T,
+    callback: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
+  ): this;
+
+  // Overload for inline callback
+  tool<T extends ToolDefinition<any, any, HasOAuth>>(toolDefinition: T): this;
+
+  // Implementation
+  tool<T extends ToolDefinition<any, any, HasOAuth>>(
+    toolDefinition: T,
+    callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
+  ): this {
+    // Determine which callback to use
+    const actualCallback = callback || toolDefinition.cb;
+
+    if (!actualCallback) {
+      throw new Error(
+        `Tool '${toolDefinition.name}' must have either a cb property or a callback parameter`
+      );
+    }
+
+    // Determine input schema - prefer schema over inputs
+    let inputSchema: Record<string, z.ZodSchema>;
+
+    if (toolDefinition.schema) {
+      // Use Zod schema if provided
+      inputSchema = this.convertZodSchemaToParams(toolDefinition.schema);
+    } else if (toolDefinition.inputs && toolDefinition.inputs.length > 0) {
+      // Fall back to inputs array for backward compatibility
+      inputSchema = this.createParamsSchema(toolDefinition.inputs);
+    } else {
+      // No schema defined - empty schema
+      inputSchema = {};
+    }
 
     this.server.registerTool(
       toolDefinition.name,
@@ -596,131 +606,157 @@ export class McpServer {
         _meta: toolDefinition._meta,
       },
       async (params: any, extra?: any) => {
+        // Get the HTTP request context from AsyncLocalStorage
+        // If not available (SDK broke async chain), try to find it from active sessions
+        let requestContext = getRequestContext();
+
+        if (!requestContext) {
+          // Fallback: Find context from any active session
+          // In practice, there's usually only one active request at a time per session
+          for (const [, session] of this.sessions.entries()) {
+            if (session.context) {
+              requestContext = session.context;
+              break;
+            }
+          }
+        }
+
         // Extract progress token from request metadata
         const progressToken = extra?._meta?.progressToken;
 
-        // Create context object with sample method that automatically sends progress
-        const context: ToolContext = {
-          /**
-           * Request sampling from the client's LLM with automatic progress notifications.
-           *
-           * Progress notifications are sent every 5 seconds (configurable) while waiting
-           * for the sampling response. This prevents client-side timeouts when
-           * resetTimeoutOnProgress is enabled.
-           *
-           * @param params - Sampling parameters (messages, model preferences, etc.)
-           * @param options - Optional configuration
-           * @param options.timeout - Timeout in milliseconds (default: no timeout / Infinity)
-           * @param options.progressIntervalMs - Interval between progress notifications (default: 5000ms)
-           * @param options.onProgress - Optional callback called each time progress is reported
-           * @returns The sampling result from the client's LLM
-           */
-          sample: async (
-            sampleParams: CreateMessageRequest["params"],
-            options?: SampleOptions
-          ): Promise<CreateMessageResult> => {
-            const {
-              timeout,
-              progressIntervalMs = 5000,
-              onProgress,
-            } = options ?? {};
+        // Create enhanced context that combines ToolContext methods with Hono request context
+        // This provides a unified interface with sample(), reportProgress(), auth, req, etc.
+        const enhancedContext = requestContext
+          ? Object.create(requestContext)
+          : {};
 
-            let progressCount = 0;
-            let completed = false;
-            let progressInterval: ReturnType<typeof setInterval> | null = null;
+        /**
+         * Request sampling from the client's LLM with automatic progress notifications.
+         *
+         * Progress notifications are sent every 5 seconds (configurable) while waiting
+         * for the sampling response. This prevents client-side timeouts when
+         * resetTimeoutOnProgress is enabled.
+         *
+         * @param params - Sampling parameters (messages, model preferences, etc.)
+         * @param options - Optional configuration
+         * @param options.timeout - Timeout in milliseconds (default: no timeout / Infinity)
+         * @param options.progressIntervalMs - Interval between progress notifications (default: 5000ms)
+         * @param options.onProgress - Optional callback called each time progress is reported
+         * @returns The sampling result from the client's LLM
+         */
+        enhancedContext.sample = async (
+          sampleParams: CreateMessageRequest["params"],
+          options?: SampleOptions
+        ): Promise<CreateMessageResult> => {
+          const {
+            timeout,
+            progressIntervalMs = 5000,
+            onProgress,
+          } = options ?? {};
 
-            // Set up progress notifications if we have a progress token
-            if (progressToken && extra?.sendNotification) {
-              progressInterval = setInterval(async () => {
-                if (completed) return;
+          let progressCount = 0;
+          let completed = false;
+          let progressInterval: ReturnType<typeof setInterval> | null = null;
 
-                progressCount++;
-                const progressData = {
-                  progress: progressCount,
-                  total: undefined as number | undefined,
-                  message: `Waiting for LLM response... (${progressCount * Math.round(progressIntervalMs / 1000)}s elapsed)`,
-                };
+          // Set up progress notifications if we have a progress token
+          if (progressToken && extra?.sendNotification) {
+            progressInterval = setInterval(async () => {
+              if (completed) return;
 
-                // Call user's progress callback if provided
-                if (onProgress) {
-                  try {
-                    onProgress(progressData);
-                  } catch {
-                    // Ignore errors in progress callback
-                  }
-                }
+              progressCount++;
+              const progressData = {
+                progress: progressCount,
+                total: undefined as number | undefined,
+                message: `Waiting for LLM response... (${progressCount * Math.round(progressIntervalMs / 1000)}s elapsed)`,
+              };
 
-                // Send progress notification to client
+              // Call user's progress callback if provided
+              if (onProgress) {
                 try {
-                  await extra.sendNotification({
-                    method: "notifications/progress",
-                    params: {
-                      progressToken,
-                      progress: progressData.progress,
-                      total: progressData.total,
-                      message: progressData.message,
-                    },
-                  });
+                  onProgress(progressData);
                 } catch {
-                  // Ignore errors - request might have completed
+                  // Ignore errors in progress callback
                 }
-              }, progressIntervalMs);
-            }
+              }
 
-            try {
-              // Create the sampling promise
-              const samplePromise = this.createMessage(sampleParams);
-
-              // If timeout is specified, race against it
-              if (timeout && timeout !== Infinity) {
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                  setTimeout(
-                    () =>
-                      reject(
-                        new Error(`Sampling timed out after ${timeout}ms`)
-                      ),
-                    timeout
-                  );
+              // Send progress notification to client
+              try {
+                await extra.sendNotification({
+                  method: "notifications/progress",
+                  params: {
+                    progressToken,
+                    progress: progressData.progress,
+                    total: progressData.total,
+                    message: progressData.message,
+                  },
                 });
-                return await Promise.race([samplePromise, timeoutPromise]);
+              } catch {
+                // Ignore errors - request might have completed
               }
+            }, progressIntervalMs);
+          }
 
-              // No timeout - wait indefinitely
-              return await samplePromise;
-            } finally {
-              completed = true;
-              if (progressInterval) {
-                clearInterval(progressInterval);
-              }
+          try {
+            // Create the sampling promise
+            const samplePromise = this.createMessage(sampleParams);
+
+            // If timeout is specified, race against it
+            if (timeout && timeout !== Infinity) {
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(
+                  () =>
+                    reject(new Error(`Sampling timed out after ${timeout}ms`)),
+                  timeout
+                );
+              });
+              return await Promise.race([samplePromise, timeoutPromise]);
             }
-          },
 
-          /**
-           * Send a progress notification to the client.
-           * Only works if the client requested progress updates for this tool call.
-           */
-          reportProgress:
-            progressToken && extra?.sendNotification
-              ? async (progress: number, total?: number, message?: string) => {
-                  await extra.sendNotification({
-                    method: "notifications/progress",
-                    params: {
-                      progressToken,
-                      progress,
-                      total,
-                      message,
-                    },
-                  });
-                }
-              : undefined,
+            // No timeout - wait indefinitely
+            return await samplePromise;
+          } finally {
+            completed = true;
+            if (progressInterval) {
+              clearInterval(progressInterval);
+            }
+          }
         };
 
-        // Pass context as second parameter if callback accepts it
-        // Check if callback signature accepts 2 parameters
-        if (toolDefinition.cb.length >= 2) {
-          return await (toolDefinition.cb as any)(params, context);
+        /**
+         * Send a progress notification to the client.
+         * Only works if the client requested progress updates for this tool call.
+         */
+        enhancedContext.reportProgress =
+          progressToken && extra?.sendNotification
+            ? async (progress: number, total?: number, message?: string) => {
+                await extra.sendNotification({
+                  method: "notifications/progress",
+                  params: {
+                    progressToken,
+                    progress,
+                    total,
+                    message,
+                  },
+                });
+              }
+            : undefined;
+
+        // Wrap callback execution with context to ensure AsyncLocalStorage works
+        const executeCallback = async () => {
+          if (actualCallback.length >= 2) {
+            // Pass the enhanced context that includes sample, reportProgress, auth, req, etc.
+            return await (actualCallback as any)(params, enhancedContext);
+          }
+          // Single parameter callback - just input
+          return await (actualCallback as any)(params);
+        };
+
+        // If we have a request context, wrap execution with it
+        if (requestContext) {
+          return await runWithContext(requestContext, executeCallback);
         }
-        return await toolDefinition.cb(params);
+
+        return await executeCallback();
       }
     );
     this.registeredTools.push(toolDefinition.name);
@@ -768,7 +804,7 @@ export class McpServer {
       {
         title: promptDefinition.title,
         description: promptDefinition.description ?? "",
-        argsSchema,
+        argsSchema: argsSchema as any, // Type assertion for Zod v4 compatibility
       },
       async (params: any): Promise<GetPromptResult> => {
         return await promptDefinition.cb(params);
@@ -1009,7 +1045,7 @@ export class McpServer {
       description: definition.description,
       inputs: this.convertPropsToInputs(definition.props),
       _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
-      cb: async (params) => {
+      cb: async (params: any) => {
         // Create the UIResource with user-provided params
         const uiResource = this.createWidgetUIResource(definition, params);
 
@@ -1033,7 +1069,7 @@ export class McpServer {
             _meta: uniqueToolMetadata,
             content: [
               {
-                type: "text",
+                type: "text" as const,
                 text: `Displaying ${displayName}`,
               },
             ],
@@ -1046,7 +1082,7 @@ export class McpServer {
         return {
           content: [
             {
-              type: "text",
+              type: "text" as const,
               text: `Displaying ${displayName}`,
               description: `Show MCP-UI widget for ${displayName}`,
             },
@@ -1142,40 +1178,6 @@ export class McpServer {
 
     // Construct URI: ui://widget/name-buildId-suffix.extension
     return `ui://widget/${parts.join("-")}${extension}`;
-  }
-
-  /**
-   * Build a complete URL for a widget including query parameters
-   *
-   * Constructs the full URL to access a widget's iframe, encoding any provided
-   * parameters as query string parameters. Complex objects are JSON-stringified
-   * for transmission.
-   *
-   * @private
-   * @param widget - Widget name/identifier
-   * @param params - Parameters to encode in the URL
-   * @returns Complete URL with encoded parameters
-   */
-  private buildWidgetUrl(widget: string, params: Record<string, any>): string {
-    const baseUrl = `http://${this.serverHost}:${this.serverPort}/mcp-use/widgets/${widget}`;
-
-    if (Object.keys(params).length === 0) {
-      return baseUrl;
-    }
-
-    const queryParams = new URLSearchParams();
-
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null) {
-        if (typeof value === "object") {
-          queryParams.append(key, JSON.stringify(value));
-        } else {
-          queryParams.append(key, String(value));
-        }
-      }
-    }
-
-    return `${baseUrl}?${queryParams.toString()}`;
   }
 
   /**
@@ -1370,34 +1372,46 @@ export class McpServer {
     await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
     // Import dev dependencies - these are optional and only needed for dev mode
-    // Using dynamic string-based imports to prevent static analysis by bundlers
+    // Using dynamic imports with createRequire to resolve from user's project directory
     let createServer: any;
     let react: any;
     let tailwindcss: any;
 
     try {
-      // Use Function constructor to create truly dynamic imports that can't be statically analyzed
-      // eslint-disable-next-line no-new-func
-      const viteModule = await new Function('return import("vite")')();
+      // Use createRequire to resolve modules from the user's project directory (getCwd())
+      // instead of from the mcp-use package location
+      const { createRequire } = await import("node:module");
+      const { pathToFileURL } = await import("node:url");
+
+      // Create a require function that resolves from the user's project directory
+      const userProjectRequire = createRequire(
+        pathToFileURL(pathHelpers.join(getCwd(), "package.json")).href
+      );
+
+      // Resolve the actual module paths from the user's project
+      const vitePath = userProjectRequire.resolve("vite");
+      const reactPluginPath = userProjectRequire.resolve(
+        "@vitejs/plugin-react"
+      );
+      const tailwindPath = userProjectRequire.resolve("@tailwindcss/vite");
+
+      // Now import using the resolved paths
+      const viteModule = await import(vitePath);
       createServer = viteModule.createServer;
-      // eslint-disable-next-line no-new-func
-      const reactModule = await new Function(
-        'return import("@vitejs/plugin-react")'
-      )();
+      const reactModule = await import(reactPluginPath);
       react = reactModule.default;
-      // eslint-disable-next-line no-new-func
-      const tailwindModule = await new Function(
-        'return import("@tailwindcss/vite")'
-      )();
+      const tailwindModule = await import(tailwindPath);
       tailwindcss = tailwindModule.default;
     } catch (error) {
-      console.error(
-        "[WIDGETS] Dev dependencies not available. Install vite, @vitejs/plugin-react, and @tailwindcss/vite for widget development."
+      throw new Error(
+        "❌ Widget dependencies not installed!\n\n" +
+          "To use MCP widgets with resources folder, you need to install the required dependencies:\n\n" +
+          "  npm install vite @vitejs/plugin-react @tailwindcss/vite\n" +
+          "  # or\n" +
+          "  pnpm add vite @vitejs/plugin-react @tailwindcss/vite\n\n" +
+          "These dependencies are automatically included in projects created with 'create-mcp-use-app'.\n" +
+          "For production, pre-build your widgets using 'mcp-use build'."
       );
-      console.error(
-        "[WIDGETS] For production, use 'mcp-use build' to pre-build widgets."
-      );
-      return;
     }
 
     const widgets = entries.map((entry) => {
@@ -2535,8 +2549,11 @@ if (container && Component) {
 
         // Note: lastAccessedAt is already updated in getOrCreateTransport when session is found
         // This redundant update is kept for safety but should not be necessary
+        // Also store the request context for this session
         if (sessionId && this.sessions.has(sessionId)) {
-          this.sessions.get(sessionId)!.lastAccessedAt = Date.now();
+          const session = this.sessions.get(sessionId)!;
+          session.lastAccessedAt = Date.now();
+          session.context = c; // Store the Hono context
         }
 
         // Handle close event
@@ -2548,13 +2565,17 @@ if (container && Component) {
           });
         }
 
-        // Wait for handleRequest to complete and for response to be written
-        await this.waitForRequestComplete(
-          transport,
-          expressReq,
-          expressRes,
-          expressReq.body
-        );
+        // Wrap the request handling in AsyncLocalStorage context
+        // This makes the Hono context available to tool callbacks via getRequestContext()
+        await runWithContext(c, async () => {
+          // Wait for handleRequest to complete and for response to be written
+          await this.waitForRequestComplete(
+            transport,
+            expressReq,
+            expressRes,
+            expressReq.body
+          );
+        });
 
         const response = getResponse();
         if (response) {
@@ -2871,6 +2892,11 @@ if (container && Component) {
       this.serverHost = hostEnv;
     }
 
+    // Setup OAuth before mounting widgets/MCP (if configured)
+    if (this.oauthConfig && !this.oauthSetupComplete) {
+      await this.setupOAuth(this.oauthConfig);
+    }
+
     await this.mountWidgets({
       baseRoute: "/mcp-use/widgets",
       resourcesDir: "resources",
@@ -3005,6 +3031,11 @@ if (container && Component) {
   async getHandler(options?: {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
+    // Setup OAuth before mounting widgets/MCP (if configured)
+    if (this.oauthConfig && !this.oauthSetupComplete) {
+      await this.setupOAuth(this.oauthConfig);
+    }
+
     console.log("[MCP] Mounting widgets");
     await this.mountWidgets({
       baseRoute: "/mcp-use/widgets",
@@ -3552,30 +3583,29 @@ if (container && Component) {
   }
 
   /**
-   * Create input schema for resource templates
+   * Convert a Zod object schema to the internal Record<string, z.ZodSchema> format
    *
-   * Parses a URI template string to extract parameter names and generates a Zod
-   * validation schema for those parameters. Used internally for validating resource
-   * template parameters before processing requests.
-   *
-   * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
-   * @returns Object mapping parameter names to Zod string schemas
-   *
-   * @example
-   * ```typescript
-   * const schema = this.createInputSchema("/users/{id}/posts/{postId}")
-   * // Returns: { id: z.string(), postId: z.string() }
-   * ```
+   * @param zodSchema - Zod object schema to convert
+   * @returns Object mapping parameter names to Zod validation schemas
    */
-  private createInputSchema(uriTemplate: string): Record<string, z.ZodSchema> {
-    const params = this.extractTemplateParams(uriTemplate);
-    const schema: Record<string, z.ZodSchema> = {};
+  private convertZodSchemaToParams(
+    zodSchema: z.ZodObject<any>
+  ): Record<string, z.ZodSchema> {
+    // Validate that it's a ZodObject
+    if (!(zodSchema instanceof z.ZodObject)) {
+      throw new Error("schema must be a Zod object schema (z.object({...}))");
+    }
 
-    params.forEach((param) => {
-      schema[param] = z.string();
-    });
+    // Extract the shape from the Zod object schema
+    const shape = zodSchema.shape;
+    const params: Record<string, z.ZodSchema> = {};
 
-    return schema;
+    // Convert each property in the shape
+    for (const [key, value] of Object.entries(shape)) {
+      params[key] = value as z.ZodSchema;
+    }
+
+    return params;
   }
 
   /**
@@ -3645,83 +3675,6 @@ if (container && Component) {
   }
 
   /**
-   * Create arguments schema for prompts
-   *
-   * Converts prompt argument definitions into Zod validation schemas for runtime validation.
-   * Supports common data types (string, number, boolean, object, array) and optional
-   * parameters. Used internally when registering prompt templates with the MCP server.
-   *
-   * @param inputs - Array of argument definitions with name, type, and optional flag
-   * @returns Object mapping argument names to Zod validation schemas
-   *
-   * @example
-   * ```typescript
-   * const schema = this.createPromptArgsSchema([
-   *   { name: 'topic', type: 'string', required: true },
-   *   { name: 'style', type: 'string', required: false }
-   * ])
-   * // Returns: { topic: z.string(), style: z.string().optional() }
-   * ```
-   */
-  private createPromptArgsSchema(
-    inputs: Array<{ name: string; type: string; required?: boolean }>
-  ): Record<string, z.ZodSchema> {
-    const schema: Record<string, z.ZodSchema> = {};
-
-    inputs.forEach((input) => {
-      let zodType: z.ZodSchema;
-      switch (input.type) {
-        case "string":
-          zodType = z.string();
-          break;
-        case "number":
-          zodType = z.number();
-          break;
-        case "boolean":
-          zodType = z.boolean();
-          break;
-        case "object":
-          zodType = z.object({});
-          break;
-        case "array":
-          zodType = z.array(z.any());
-          break;
-        default:
-          zodType = z.any();
-      }
-
-      if (!input.required) {
-        zodType = zodType.optional();
-      }
-
-      schema[input.name] = zodType;
-    });
-
-    return schema;
-  }
-
-  /**
-   * Extract parameter names from URI template
-   *
-   * Parses a URI template string to extract parameter names enclosed in curly braces.
-   * Used internally to identify dynamic parameters in resource templates and generate
-   * appropriate validation schemas.
-   *
-   * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
-   * @returns Array of parameter names found in the template
-   *
-   * @example
-   * ```typescript
-   * const params = this.extractTemplateParams("/users/{id}/posts/{postId}")
-   * // Returns: ["id", "postId"]
-   * ```
-   */
-  private extractTemplateParams(uriTemplate: string): string[] {
-    const matches = uriTemplate.match(/\{([^}]+)\}/g);
-    return matches ? matches.map((match) => match.slice(1, -1)) : [];
-  }
-
-  /**
    * Parse parameter values from a URI based on a template
    *
    * Extracts parameter values from an actual URI by matching it against a URI template.
@@ -3767,7 +3720,10 @@ if (container && Component) {
   }
 }
 
-export type McpServerInstance = Omit<McpServer, keyof HonoType> &
+export type McpServerInstance<HasOAuth extends boolean = false> = Omit<
+  McpServer<HasOAuth>,
+  keyof HonoType
+> &
   HonoType & {
     getHandler: (options?: {
       provider?: "supabase" | "cloudflare" | "deno-deploy";
@@ -3820,10 +3776,27 @@ export type McpServerInstance = Omit<McpServer, keyof HonoType> &
  * })
  * ```
  */
+
+// Overload: when OAuth is configured
+
+export function createMCPServer(
+  name: string,
+  config: Partial<ServerConfig> & { oauth: NonNullable<ServerConfig["oauth"]> }
+): McpServerInstance<true>;
+
+// Overload: when OAuth is not configured
+// eslint-disable-next-line no-redeclare
+export function createMCPServer(
+  name: string,
+  config?: Partial<ServerConfig>
+): McpServerInstance<false>;
+
+// Implementation
+// eslint-disable-next-line no-redeclare
 export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> = {}
-): McpServerInstance {
+): McpServerInstance<boolean> {
   const instance = new McpServer({
     name,
     version: config.version || "1.0.0",
@@ -3832,6 +3805,9 @@ export function createMCPServer(
     baseUrl: config.baseUrl,
     allowedOrigins: config.allowedOrigins,
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
-  });
-  return instance as unknown as McpServerInstance;
+    autoCreateSessionOnInvalidId: config.autoCreateSessionOnInvalidId,
+    oauth: config.oauth,
+  }) as any;
+
+  return instance as unknown as McpServerInstance<boolean>;
 }

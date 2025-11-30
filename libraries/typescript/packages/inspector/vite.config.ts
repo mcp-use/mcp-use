@@ -93,7 +93,7 @@ export default defineConfig({
     noExternal: ["react-syntax-highlighter", "refractor"],
   },
   build: {
-    minify: false, // Disable minification for debugging
+    minify: true,
     outDir: "dist/client",
     rollupOptions: {
       external: ["langfuse-langchain", "langfuse", "@e2b/code-interpreter"],

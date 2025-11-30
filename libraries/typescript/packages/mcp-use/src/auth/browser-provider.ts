@@ -5,7 +5,7 @@ import type {
   OAuthClientMetadata,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import { sanitizeUrl } from "strict-url-sanitise";
+import { sanitizeUrl } from "../utils/url-sanitize.js";
 // Assuming StoredState is defined in ./types.js and includes fields for provider options
 import type { StoredState } from "./types.js"; // Adjust path if necessary
 
@@ -20,6 +20,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   readonly clientUri: string;
   readonly callbackUrl: string;
   private preventAutoAuth?: boolean;
+  private useRedirectFlow?: boolean;
   readonly onPopupWindow:
     | ((
         url: string,
@@ -36,6 +37,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       clientUri?: string;
       callbackUrl?: string;
       preventAutoAuth?: boolean;
+      useRedirectFlow?: boolean;
       onPopupWindow?: (
         url: string,
         features: string,
@@ -57,6 +59,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           : "/oauth/callback")
     );
     this.preventAutoAuth = options.preventAutoAuth;
+    this.useRedirectFlow = options.useRedirectFlow;
     this.onPopupWindow = options.onPopupWindow;
   }
 
@@ -168,6 +171,13 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         clientUri: this.clientUri,
         callbackUrl: this.callbackUrl,
       },
+      // Store flow type so callback knows how to handle the response
+      flowType: this.useRedirectFlow ? "redirect" : "popup",
+      // Store current URL for redirect flow so we can return to it
+      returnUrl:
+        this.useRedirectFlow && typeof window !== "undefined"
+          ? window.location.href
+          : undefined,
     };
     localStorage.setItem(stateKey, JSON.stringify(stateData));
 
@@ -190,14 +200,28 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * @param authorizationUrl The fully constructed authorization URL from the SDK.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    // Ideally we should catch things before we get here, but if we don't, let's not show everyone we are dum
-    if (this.preventAutoAuth) return;
-
-    // Prepare the authorization URL with state
+    // Always prepare the authorization URL with state (stores it for manual auth)
     const sanitizedAuthUrl =
       await this.prepareAuthorizationUrl(authorizationUrl);
 
-    // Attempt to open the popup
+    // If auto-auth is prevented, just store the URL but don't redirect/popup
+    if (this.preventAutoAuth) {
+      console.info(
+        `[${this.storageKeyPrefix}] Auto-auth prevented. Authorization URL stored for manual trigger.`
+      );
+      return;
+    }
+
+    // Use redirect flow if enabled (avoids popup blockers)
+    if (this.useRedirectFlow) {
+      console.info(
+        `[${this.storageKeyPrefix}] Redirecting to authorization URL (full-page redirect).`
+      );
+      window.location.href = sanitizedAuthUrl;
+      return;
+    }
+
+    // Otherwise, use popup flow (legacy behavior)
     const popupFeatures =
       "width=600,height=700,resizable=yes,scrollbars=yes,status=yes"; // Make configurable if needed
     try {

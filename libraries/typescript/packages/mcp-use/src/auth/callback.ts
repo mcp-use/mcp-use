@@ -92,20 +92,33 @@ export async function onMcpAuthorization() {
     });
 
     if (authResult === "AUTHORIZED") {
-      console.log(
-        `${logPrefix} Authorization successful via SDK auth(). Notifying opener...`
-      );
-      // --- Notify Opener and Close (Success) ---
-      if (window.opener && !window.opener.closed) {
+      console.log(`${logPrefix} Authorization successful via SDK auth().`);
+
+      // Check if this was a redirect flow (has returnUrl) or popup flow
+      const isRedirectFlow = storedStateData.flowType === "redirect";
+
+      if (isRedirectFlow && storedStateData.returnUrl) {
+        // Redirect flow: navigate back to the original page
+        console.log(
+          `${logPrefix} Redirect flow complete. Returning to: ${storedStateData.returnUrl}`
+        );
+        localStorage.removeItem(stateKey);
+        window.location.href = storedStateData.returnUrl;
+      } else if (window.opener && !window.opener.closed) {
+        // Popup flow: notify opener and close
+        console.log(`${logPrefix} Popup flow complete. Notifying opener...`);
         window.opener.postMessage(
           { type: "mcp_auth_callback", success: true },
           window.location.origin
         );
+        localStorage.removeItem(stateKey);
         window.close();
       } else {
+        // Fallback: no opener and no return URL, redirect to root
         console.warn(
-          `${logPrefix} No opener window detected. Redirecting to root.`
+          `${logPrefix} No opener window or return URL detected. Redirecting to root.`
         );
+        localStorage.removeItem(stateKey);
         // Try to determine the base path from the current URL
         // e.g., if we're at /inspector/oauth/callback, redirect to /inspector
         const pathParts = window.location.pathname.split("/").filter(Boolean);
@@ -115,8 +128,6 @@ export async function onMcpAuthorization() {
             : "/";
         window.location.href = basePath || "/";
       }
-      // Clean up state ONLY on success and after notifying opener
-      localStorage.removeItem(stateKey);
     } else {
       // This case shouldn't happen if `authorizationCode` is provided to `auth()`
       console.warn(

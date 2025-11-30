@@ -130,7 +130,7 @@ server.tool({
       required: true,
     },
   ],
-  cb: async ({ message }) => {
+  cb: async ({ message }: { message: string }) => {
     const sessions = server.getActiveSessions();
 
     await server.sendNotification("custom/broadcast", {

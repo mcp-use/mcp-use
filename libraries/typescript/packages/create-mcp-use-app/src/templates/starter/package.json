@@ -30,8 +30,10 @@
     "cors": "^2.8.5",
     "express": "^4.18.0",
     "mcp-use": "workspace:*",
+    "node-mocks-http": "^1.16.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.5",
     "tailwindcss": "^4.0.0",
     "zod": "^4.1.12"
   },

@@ -5,16 +5,15 @@
  * to connect any LLM to MCP tools through a unified interface.
  *
  * Special thanks to https://github.com/microsoft/playwright-mcp for the server.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: OPENAI_API_KEY
  */
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChatOpenAI } from "@langchain/openai";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

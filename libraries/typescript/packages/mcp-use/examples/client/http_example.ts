@@ -13,14 +13,13 @@
  * Of course you can run this with any server you want at any URL.
  *
  * Special thanks to https://github.com/microsoft/playwright-mcp for the server.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: OPENAI_API_KEY
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 async function main() {
   const config = { mcpServers: { http: { url: "https://gitmcp.io/docs" } } };

@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.7.1-canary.0
+
+### Patch Changes
+
+- 1ca9801: Optimized dependencies
+
 ## 0.7.0
 
 ### Minor Changes

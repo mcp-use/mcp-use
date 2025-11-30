@@ -3,16 +3,16 @@
  *
  * This example demonstrates how to equip an MCPAgent with a tool
  * to dynamically add and connect to MCP servers during a run.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: OPENAI_API_KEY
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
 import { LangChainAdapter } from "../../src/adapters/langchain_adapter.js";
 import { ServerManager } from "../../src/managers/server_manager.js";
 import { AddMCPServerFromConfigTool } from "../../src/managers/tools/add_server_from_config.js";
-// Load environment variables from .env file
-config();
 
 async function main() {
   // Create an empty MCPClient. It has no servers to start with.

@@ -88,18 +88,38 @@ export async function adaptConnectMiddleware(
   middlewarePath: string
 ): Promise<MiddlewareHandler> {
   // Dynamically import required modules (optional dependencies)
+  // Use createRequire to resolve from user's project directory
   let createRequest: any;
   let createResponse: any;
 
   try {
-    const httpMocks = await import("node-mocks-http");
+    // Use createRequire to resolve modules from the user's project directory
+    const { createRequire } = await import("node:module");
+    const { pathToFileURL } = await import("node:url");
+
+    // Create a require function that resolves from the user's project directory
+    const userProjectRequire = createRequire(
+      pathToFileURL(
+        // Use process.cwd() since this is a runtime utility that should work from user's project
+        process.cwd() + "/package.json"
+      ).href
+    );
+
+    // Resolve the actual module path from the user's project
+    const httpMocksPath = userProjectRequire.resolve("node-mocks-http");
+
+    const httpMocks = await import(httpMocksPath);
     createRequest = httpMocks.createRequest;
     createResponse = httpMocks.createResponse;
   } catch (error) {
-    console.error(
-      "[WIDGETS] node-mocks-http not available. Install connect and node-mocks-http for Vite middleware support."
+    throw new Error(
+      "❌ Widget middleware dependencies not installed!\n\n" +
+        "To use Connect middleware adapters with MCP widgets, you need to install:\n\n" +
+        "  npm install node-mocks-http\n" +
+        "  # or\n" +
+        "  pnpm add node-mocks-http\n\n" +
+        "This dependency is automatically included in projects created with 'create-mcp-use-app'."
     );
-    throw error;
   }
 
   // Normalize middleware path: remove trailing * and /

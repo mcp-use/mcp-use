@@ -1,14 +1,14 @@
 /**
  * This example shows how to test the different functionalities of MCPs using the MCP server from
  * anthropic.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * You can use dotenv, or set them directly in your environment.
+ * Example: OPENAI_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { config } from "dotenv";
 import { Logger, MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 // Enable debug logging to see observability messages
 Logger.setDebug(true);

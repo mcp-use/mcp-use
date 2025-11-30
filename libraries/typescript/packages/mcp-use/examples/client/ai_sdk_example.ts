@@ -8,16 +8,15 @@
  * - Next.js API routes with useCompletion/useChat hooks
  * - Real-time streaming applications
  * - Building chat interfaces with token-by-token updates
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: ANTHROPIC_API_KEY
  */
 
 import type { StreamEvent } from "../../index.js";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { LangChainAdapter } from "ai";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables
-config();
 
 // Utility function to convert streamEvents to AI SDK compatible stream
 async function* streamEventsToAISDK(

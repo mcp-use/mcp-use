@@ -1,11 +1,10 @@
 packages:
   - packages/*
+  # examples
+  - packages/mcp-use/examples/**/*
+  - packages/create-mcp-use-app/src/templates/**/*
+  # tests
   - test_app
-  - packages/mcp-use/examples/client/react
-  - packages/mcp-use/examples/server/simple
-  - packages/create-mcp-use-app/src/templates/starter
-  - packages/create-mcp-use-app/src/templates/mcp-ui
-  - packages/create-mcp-use-app/src/templates/apps-sdk
 onlyBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild

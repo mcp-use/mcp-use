@@ -262,6 +262,9 @@ export class HttpConnector extends BaseConnector {
         stop: async () => {
           if (this.streamableTransport) {
             try {
+              // First terminate the session per MCP spec (sends DELETE request)
+              await this.streamableTransport.terminateSession();
+              // Then close the transport
               await this.streamableTransport.close();
             } catch (e) {
               logger.warn(`Error closing Streamable HTTP transport: ${e}`);
@@ -293,6 +296,7 @@ export class HttpConnector extends BaseConnector {
       // Note: The MCP SDK's SSEClientTransport doesn't expose timeout configuration directly
       // Timeout handling is managed by the underlying EventSource and fetch implementations
       this.connectionManager = new SseConnectionManager(baseUrl, {
+        authProvider: this.opts.authProvider, // ← Pass OAuth provider to SDK (same as streamable HTTP)
         requestInit: {
           headers: this.headers,
         },

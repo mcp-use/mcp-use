@@ -7,14 +7,13 @@
  *
  * This example also demonstrates the streamEvents method which yields
  * LangChain StreamEvent objects for more granular, token-level streaming.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: ANTHROPIC_API_KEY
  */
 
 import { ChatAnthropic } from "@langchain/anthropic";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 const everythingServer = {
   mcpServers: {

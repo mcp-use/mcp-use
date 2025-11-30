@@ -448,7 +448,15 @@
                       "typescript/server/tools",
                       "typescript/server/resources",
                       "typescript/server/prompts",
+                      "typescript/server/notifications",
                       "typescript/server/api-reference"
+                    ]
+                  },
+                  {
+                    "group": "Advanced Features",
+                    "icon": "sparkle",
+                    "pages": [
+                      "typescript/server/authentication"
                     ]
                   },
                   {

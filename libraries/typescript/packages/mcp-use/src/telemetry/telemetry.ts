@@ -6,7 +6,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { PostHog } from "posthog-node";
-import { v4 as uuidv4 } from "uuid";
+import { generateUUID } from "../server/utils/runtime.js";
 import { logger } from "../logging.js";
 import { MCPAgentExecutionEvent } from "./events.js";
 import { getPackageVersion } from "./utils.js";
@@ -232,7 +232,7 @@ export class Telemetry {
       if (isFirstTime) {
         logger.debug(`Creating user ID path: ${this.USER_ID_PATH}`);
         fs.mkdirSync(path.dirname(this.USER_ID_PATH), { recursive: true });
-        const newUserId = uuidv4();
+        const newUserId = generateUUID();
         fs.writeFileSync(this.USER_ID_PATH, newUserId);
         this._currUserId = newUserId;
         logger.debug(`User ID path created: ${this.USER_ID_PATH}`);

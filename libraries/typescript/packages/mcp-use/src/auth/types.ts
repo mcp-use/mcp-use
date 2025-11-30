@@ -1,7 +1,7 @@
 import type { OAuthMetadata } from "@modelcontextprotocol/sdk/shared/auth.js";
 
 /**
- * Internal type for storing OAuth state in localStorage during the popup flow.
+ * Internal type for storing OAuth state in localStorage during the OAuth flow.
  * @internal
  */
 export interface StoredState {
@@ -16,4 +16,8 @@ export interface StoredState {
     clientUri: string;
     callbackUrl: string;
   };
+  // Track which flow was used (popup vs redirect)
+  flowType?: "popup" | "redirect";
+  // Store the original page URL for redirect flow so we can return to it
+  returnUrl?: string;
 }

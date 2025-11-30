@@ -33,12 +33,16 @@ export class StreamableHttpConnectionManager extends ConnectionManager<Streamabl
 
   /**
    * Close the underlying transport and clean up resources.
+   * Per MCP specification, terminates the session with DELETE request before closing.
    */
   protected async closeConnection(
     _connection: StreamableHTTPClientTransport
   ): Promise<void> {
     if (this._transport) {
       try {
+        // First terminate the session per MCP spec (sends DELETE request)
+        await this._transport.terminateSession();
+        // Then close the transport
         await this._transport.close();
       } catch (e) {
         logger.warn(`Error closing Streamable HTTP transport: ${e}`);

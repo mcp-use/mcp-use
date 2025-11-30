@@ -3,7 +3,7 @@
  */
 
 import type { ZodSchema } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { toJSONSchema } from "zod";
 import { logger } from "../logging.js";
 import type { BaseMessage } from "./types.js";
 
@@ -37,7 +37,7 @@ export class RemoteAgent {
     /**
      * Convert a Zod schema to JSON schema for API transmission.
      */
-    return zodToJsonSchema(schema);
+    return toJSONSchema(schema);
   }
 
   private parseStructuredResponse<T>(
