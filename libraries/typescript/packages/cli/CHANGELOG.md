@@ -1,5 +1,26 @@
 # @mcp-use/cli
 
+## 2.4.3
+
+### Patch Changes
+
+- 2730902: Optimized dependencies
+- 2730902: chore: fixed readme of package.json
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+  - @mcp-use/inspector@0.9.0
+  - mcp-use@1.7.0
+
 ## 2.4.3-canary.8
 
 ### Patch Changes
