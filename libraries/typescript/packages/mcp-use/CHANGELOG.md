@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.7.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [0daae72]
+  - @mcp-use/cli@2.4.3-canary.8
+  - @mcp-use/inspector@0.9.0-canary.8
+
 ## 1.7.0-canary.7
 
 ### Patch Changes
