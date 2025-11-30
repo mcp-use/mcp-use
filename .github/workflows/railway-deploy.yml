@@ -5,17 +5,37 @@ on:
     workflows: ["TypeScript Release"]
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy from (canary or main)'
+        required: true
+        type: choice
+        options:
+          - canary
+          - main
 
 jobs:
   deploy:
     name: Deploy to Railway
     runs-on: ubuntu-latest
-    # Only run if the release workflow completed successfully
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # For workflow_run: only run if the release workflow completed successfully
+    # For workflow_dispatch: always run
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       actions: read
     steps:
-      - name: Check for deployment marker
+      - name: Determine branch (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        id: branch-info
+        run: |
+          BRANCH="${{ github.event.inputs.branch }}"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "packages_published=true" >> $GITHUB_OUTPUT
+          echo "✅ Manual deployment triggered for branch: $BRANCH"
+
+      - name: Check for deployment marker (automatic trigger)
+        if: github.event_name == 'workflow_run'
         uses: actions/github-script@v7
         id: check-marker
         env:
@@ -40,8 +60,8 @@ jobs:
             core.setOutput('artifact_id', marker.id);
             core.info('✅ Deployment marker found - packages were published');
 
-      - name: Download and parse marker file
-        if: steps.check-marker.outputs.packages_published == 'true'
+      - name: Download and parse marker file (automatic trigger)
+        if: github.event_name == 'workflow_run' && steps.check-marker.outputs.packages_published == 'true'
         uses: actions/github-script@v7
         id: marker-info
         env:
@@ -81,10 +101,17 @@ jobs:
             core.info(`📦 Branch from marker: ${branch}`);
 
       - name: Determine Service ID
-        if: steps.check-marker.outputs.packages_published == 'true'
         id: config
+        if: |
+          (github.event_name == 'workflow_dispatch') ||
+          (github.event_name == 'workflow_run' && steps.check-marker.outputs.packages_published == 'true')
         run: |
-          BRANCH="${{ steps.marker-info.outputs.branch }}"
+          # Get branch from either manual trigger or automatic trigger
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BRANCH="${{ steps.branch-info.outputs.branch }}"
+          else
+            BRANCH="${{ steps.marker-info.outputs.branch }}"
+          fi
           
           if [ "$BRANCH" = "canary" ]; then
             echo "service_id=${{ secrets.RAILWAY_SERVICE_ID_CANARY }}" >> $GITHUB_OUTPUT
@@ -105,7 +132,7 @@ jobs:
         if: steps.config.outputs.should_deploy == 'true'
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.event.workflow_run.head_branch }}
           fetch-depth: 0
 
       - name: Deploy to Railway
@@ -116,7 +143,12 @@ jobs:
             exit 0
           fi
           
-          echo "🚀 Deploying to Railway (${{ steps.config.outputs.environment }})..."
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "🚀 Manually deploying to Railway (${{ steps.config.outputs.environment }}) from latest commit on ${{ github.event.inputs.branch }}..."
+          else
+            echo "🚀 Deploying to Railway (${{ steps.config.outputs.environment }}) after package publish..."
+          fi
+          
           docker run --rm \
             -e RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}" \
             -v "$PWD:/workspace" \
@@ -124,4 +156,3 @@ jobs:
             ghcr.io/railwayapp/cli:latest \
             railway up --service=${{ steps.config.outputs.service_id }}
           echo "✅ Successfully deployed to Railway"
-
