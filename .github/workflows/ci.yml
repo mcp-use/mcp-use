@@ -486,44 +486,16 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Build mcp-use Package
         run: pnpm --filter mcp-use build
-      - name: Pack mcp-use for Deno Testing
-        run: |
-          cd packages/mcp-use
-          pnpm pack
-          echo "MCP_USE_PACKAGE=$(ls mcp-use-*.tgz)" >> $GITHUB_ENV
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Verify Deno Runtime Compatibility
+      - name: Run Deno Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
           cd packages/mcp-use
-          echo "Testing Deno compatibility with locally built package..."
-          PACKAGE_FILE=$(ls mcp-use-*.tgz)
-          echo "Package: $PACKAGE_FILE"
-          echo ""
-          # Create a test directory and install the local package
-          mkdir -p deno-test-temp
-          cd deno-test-temp
-          # Create package.json for Deno to recognize npm dependencies
-          cat > package.json << EOF
-          {
-            "type": "module",
-            "dependencies": {
-              "mcp-use": "file:../$PACKAGE_FILE"
-            }
-          }
-          EOF
-          pnpm install
-          # Patch the installed package.json to replace pkg.pr.new URL with npm version
-          # This is necessary because Deno rejects external URLs for security reasons
-          sed -i 's|"@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194"|"@modelcontextprotocol/sdk": "^1.23.0"|g' node_modules/mcp-use/package.json
-          # Run Deno tests from this directory
-          # --no-check: Skip type checking (runtime verification only)
-          # --node-modules-dir: Use node_modules for npm: imports
-          deno test --no-check --node-modules-dir --allow-net --allow-read --allow-env ../tests/deno/basic-server.test.ts
+          bash test-deno.sh
 
   typescript-changeset-check:
     needs: detect-changes

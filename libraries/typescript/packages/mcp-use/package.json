@@ -77,6 +77,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:unit": "vitest run --exclude tests/integration/**",
+    "test:deno": "bash test-deno.sh",
     "test:simple": "vitest run tests/stream_events_simple.test.ts",
     "test:integration": "vitest run tests/integration",
     "test:integration:agent": "vitest run tests/integration/agent",
