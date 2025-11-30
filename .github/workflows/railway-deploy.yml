@@ -1,0 +1,127 @@
+name: Railway Deploy
+
+on:
+  workflow_run:
+    workflows: ["TypeScript Release"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    # Only run if the release workflow completed successfully
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      actions: read
+    steps:
+      - name: Check for deployment marker
+        uses: actions/github-script@v7
+        id: check-marker
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id,
+            });
+            
+            const marker = artifacts.artifacts.find(a => a.name === 'railway-deploy-marker');
+            
+            if (!marker) {
+              core.setOutput('packages_published', 'false');
+              core.info('⚠️ No deployment marker found - packages were not published, skipping deployment');
+              return;
+            }
+            
+            core.setOutput('packages_published', 'true');
+            core.setOutput('artifact_id', marker.id);
+            core.info('✅ Deployment marker found - packages were published');
+
+      - name: Download and parse marker file
+        if: steps.check-marker.outputs.packages_published == 'true'
+        uses: actions/github-script@v7
+        id: marker-info
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_ID: ${{ steps.check-marker.outputs.artifact_id }}
+        with:
+          script: |
+            const { data: download } = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: parseInt(process.env.ARTIFACT_ID),
+              archive_format: 'zip',
+            });
+            
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            const path = require('path');
+            
+            // Save zip file
+            const zipPath = path.join(process.env.RUNNER_TEMP, 'marker.zip');
+            fs.writeFileSync(zipPath, Buffer.from(download));
+            
+            // Extract zip using unzip command
+            const extractPath = path.join(process.env.RUNNER_TEMP, 'marker');
+            fs.mkdirSync(extractPath, { recursive: true });
+            execSync(`unzip -q "${zipPath}" -d "${extractPath}"`);
+            
+            // Read marker file
+            const markerPath = path.join(extractPath, '.railway-deploy-marker');
+            const markerContent = fs.readFileSync(markerPath, 'utf8');
+            
+            // Parse branch from marker
+            const branchMatch = markerContent.match(/branch=(.+)/);
+            const branch = branchMatch ? branchMatch[1].trim() : null;
+            
+            core.setOutput('branch', branch);
+            core.info(`📦 Branch from marker: ${branch}`);
+
+      - name: Determine Service ID
+        if: steps.check-marker.outputs.packages_published == 'true'
+        id: config
+        run: |
+          BRANCH="${{ steps.marker-info.outputs.branch }}"
+          
+          if [ "$BRANCH" = "canary" ]; then
+            echo "service_id=${{ secrets.RAILWAY_SERVICE_ID_CANARY }}" >> $GITHUB_OUTPUT
+            echo "environment=canary" >> $GITHUB_OUTPUT
+          elif [ "$BRANCH" = "main" ]; then
+            echo "service_id=${{ secrets.RAILWAY_SERVICE_ID_PROD }}" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Unknown branch: $BRANCH, skipping deployment"
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+          echo "✅ Will deploy to ${{ steps.config.outputs.environment }} (branch: $BRANCH)"
+
+      - name: Checkout Repo
+        if: steps.config.outputs.should_deploy == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+
+      - name: Deploy to Railway
+        if: steps.config.outputs.should_deploy == 'true'
+        run: |
+          if [ -z "${{ steps.config.outputs.service_id }}" ]; then
+            echo "⚠️ Service ID not configured for ${{ steps.config.outputs.environment }}, skipping deployment"
+            exit 0
+          fi
+          
+          echo "🚀 Deploying to Railway (${{ steps.config.outputs.environment }})..."
+          docker run --rm \
+            -e RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}" \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            ghcr.io/railwayapp/cli:latest \
+            railway up --service=${{ steps.config.outputs.service_id }}
+          echo "✅ Successfully deployed to Railway"
+

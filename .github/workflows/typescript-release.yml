@@ -110,6 +110,20 @@ jobs:
           pnpm changeset publish
           echo "✅ Published canary packages to npm using trusted publishing"
 
+      - name: Create deployment marker (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        run: |
+          echo "packages_published=true" > .railway-deploy-marker
+          echo "branch=canary" >> .railway-deploy-marker
+
+      - name: Upload deployment marker (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: railway-deploy-marker
+          path: .railway-deploy-marker
+          retention-days: 1
+
       # ============================================================================
       # MAIN BRANCH: Stable release workflow
       # ============================================================================
@@ -213,6 +227,26 @@ jobs:
           git push --follow-tags
 
           echo "✅ Published packages to npm using trusted publishing and pushed tags"
+
+      - name: Create deployment marker (Main)
+        if: github.ref == 'refs/heads/main' &&
+            github.event_name == 'push' &&
+            steps.check-prerelease.outputs.in_prerelease == 'false' &&
+            steps.check-release.outputs.should_publish == 'true'
+        run: |
+          echo "packages_published=true" > .railway-deploy-marker
+          echo "branch=main" >> .railway-deploy-marker
+
+      - name: Upload deployment marker (Main)
+        if: github.ref == 'refs/heads/main' &&
+            github.event_name == 'push' &&
+            steps.check-prerelease.outputs.in_prerelease == 'false' &&
+            steps.check-release.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: railway-deploy-marker
+          path: .railway-deploy-marker
+          retention-days: 1
 
       - name: Reset canary to main
         if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
