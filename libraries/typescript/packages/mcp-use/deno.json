@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "test:deno": "npm pack && mkdir -p deno-test-temp && cd deno-test-temp && npm init -y && npm install --legacy-peer-deps ../mcp-use-*.tgz && deno test --allow-net --allow-read --allow-env ../tests/deno/basic-server.test.ts"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window", "deno.unstable"]
+  }
+}
+
