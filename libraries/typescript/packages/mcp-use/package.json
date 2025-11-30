@@ -60,7 +60,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "mcp-use": "./node_modules/@mcp-use/cli/dist/index.js"
+    "mcp-use": "./dist/src/bin.js"
   },
   "files": [
     "dist"
