@@ -487,8 +487,8 @@ jobs:
       - name: Build mcp-use Package
         run: pnpm --filter mcp-use build
       - name: Pack mcp-use for Deno Testing
-        working-directory: packages/mcp-use
         run: |
+          cd packages/mcp-use
           npm pack
           echo "MCP_USE_PACKAGE=$(ls mcp-use-*.tgz)" >> $GITHUB_ENV
       - name: Setup Deno
@@ -498,8 +498,8 @@ jobs:
       - name: Verify Deno Runtime Compatibility
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        working-directory: packages/mcp-use
         run: |
+          cd packages/mcp-use
           echo "Testing Deno compatibility with locally built package..."
           echo "Package: ${{ env.MCP_USE_PACKAGE }}"
           echo ""
