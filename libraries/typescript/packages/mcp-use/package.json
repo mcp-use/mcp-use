@@ -127,6 +127,7 @@
     "@e2b/code-interpreter": "^2.2.0",
     "@langchain/anthropic": "^1.0.0",
     "@langchain/openai": "^1.0.0",
+    "ai": "^4.0.0 || ^5.0.0",
     "langfuse": "^3.38.6",
     "langfuse-langchain": "^3.38.6",
     "react": "^18.0.0 || ^19.0.0",
@@ -140,6 +141,9 @@
       "optional": true
     },
     "@langchain/openai": {
+      "optional": true
+    },
+    "ai": {
       "optional": true
     },
     "langfuse": {
@@ -156,7 +160,6 @@
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/sdk": "1.23.0",
-    "ai": "^4.3.19",
     "hono": "^4.6.0",
     "jose": "^6.1.2",
     "langchain": "^1.0.1",
@@ -176,6 +179,7 @@
     "@types/node": "^20.19.8",
     "@types/react": "^19.2.2",
     "@types/ws": "^8.18.1",
+    "ai": "^5.0.104",
     "esbuild": ">=0.25.0",
     "eslint": "^9.28.0",
     "eslint-plugin-format": "^1.0.1",
