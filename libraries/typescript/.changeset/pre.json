@@ -8,6 +8,7 @@
     "mcp-use": "1.7.0"
   },
   "changesets": [
-    "cute-swans-double"
+    "cute-swans-double",
+    "neat-lies-drive"
   ]
 }

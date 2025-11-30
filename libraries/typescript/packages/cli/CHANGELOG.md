@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.4.4-canary.1
+
+### Patch Changes
+
+- c9cb2db: fix lint & format
+- Updated dependencies [c9cb2db]
+  - @mcp-use/inspector@0.9.1-canary.1
+  - mcp-use@1.7.1-canary.1
+
 ## 2.4.4-canary.0
 
 ### Patch Changes
