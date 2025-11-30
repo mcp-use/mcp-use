@@ -489,7 +489,7 @@ jobs:
       - name: Pack mcp-use for Deno Testing
         run: |
           cd packages/mcp-use
-          npm pack
+          pnpm pack
           echo "MCP_USE_PACKAGE=$(ls mcp-use-*.tgz)" >> $GITHUB_ENV
       - name: Setup Deno
         uses: denoland/setup-deno@v2
