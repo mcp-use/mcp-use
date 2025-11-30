@@ -1,5 +1,15 @@
 # @mcp-use/cli
 
+## 2.4.4
+
+### Patch Changes
+
+- f6f2b61: fix lint & format
+- Updated dependencies [f6f2b61]
+- Updated dependencies [f6f2b61]
+  - @mcp-use/inspector@0.9.1
+  - mcp-use@1.7.1
+
 ## 2.4.4-canary.1
 
 ### Patch Changes
