@@ -1,5 +1,21 @@
 # mcp-use
 
+## 1.7.1
+
+### Patch Changes
+
+- f6f2b61: ### Bug Fixes
+  - **Fixed bin entry issue (#536)**: Resolved pnpm installation warning where bin entry referenced non-existent `./node_modules/@mcp-use/cli/dist/index.js` path. Created proper bin forwarding script at `./dist/src/bin.js` that allows users to run `mcp-use` CLI commands (dev, build, etc.) after installing the package.
+
+  ### Improvements
+  - Standardized import statement formatting across multiple files for improved code consistency and readability
+
+- f6f2b61: fix lint & format
+- Updated dependencies [f6f2b61]
+- Updated dependencies [f6f2b61]
+  - @mcp-use/inspector@0.9.1
+  - @mcp-use/cli@2.4.4
+
 ## 1.7.1-canary.1
 
 ### Patch Changes
