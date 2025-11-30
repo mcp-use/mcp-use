@@ -341,7 +341,11 @@ export function ConfigurationDialog({
               ) : modelError ? (
                 <div className="text-sm text-destructive">{modelError}</div>
               ) : models.length > 0 ? (
-                <Popover open={comboboxOpen} modal={true} onOpenChange={setComboboxOpen}>
+                <Popover
+                  open={comboboxOpen}
+                  modal={true}
+                  onOpenChange={setComboboxOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
