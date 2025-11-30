@@ -508,22 +508,18 @@ jobs:
           mkdir -p deno-test-temp
           cd deno-test-temp
           # Create package.json for Deno to recognize npm dependencies
-          # Note: pnpm.overrides ensures Deno sees a valid npm specifier for @modelcontextprotocol/sdk
-          # (Deno rejects pkg.pr.new URLs for security reasons)
           cat > package.json << EOF
           {
             "type": "module",
             "dependencies": {
               "mcp-use": "file:../$PACKAGE_FILE"
-            },
-            "pnpm": {
-              "overrides": {
-                "@modelcontextprotocol/sdk": "^1.23.0"
-              }
             }
           }
           EOF
           pnpm install
+          # Patch the installed package.json to replace pkg.pr.new URL with npm version
+          # This is necessary because Deno rejects external URLs for security reasons
+          sed -i 's|"@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194"|"@modelcontextprotocol/sdk": "^1.23.0"|g' node_modules/mcp-use/package.json
           # Run Deno tests from this directory
           # --no-check: Skip type checking (runtime verification only)
           # --node-modules-dir: Use node_modules for npm: imports
