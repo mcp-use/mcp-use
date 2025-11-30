@@ -1956,7 +1956,12 @@ if (container && Component) {
         const mcpUrl = this.getServerBaseUrl();
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
-          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
+          let htmlWithoutComments = html;
+          let prevHtmlWithoutComments;
+          do {
+            prevHtmlWithoutComments = htmlWithoutComments;
+            htmlWithoutComments = htmlWithoutComments.replace(/<!--[\s\S]*?-->/g, "");
+          } while (prevHtmlWithoutComments !== htmlWithoutComments);
 
           // Try to replace existing base tag (only if not in comments)
           const baseTagRegex = /<base\s+[^>]*\/?>/i;
