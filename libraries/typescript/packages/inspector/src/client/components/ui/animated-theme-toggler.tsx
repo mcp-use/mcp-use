@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/client/lib/utils";
 
-interface AnimatedThemeTogglerProps extends React.ComponentPropsWithoutRef<"button"> {
+interface AnimatedThemeTogglerProps
+  extends React.ComponentPropsWithoutRef<"button"> {
   duration?: number;
 }
 
