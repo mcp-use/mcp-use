@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.9.0-canary.7
+
+### Patch Changes
+
+- caf8c7c: Fix: switched to https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194 instead of @modelcontextprotocol/sdk to fix zod errors on deno runtime
+- Updated dependencies [caf8c7c]
+- Updated dependencies [caf8c7c]
+- Updated dependencies [caf8c7c]
+  - mcp-use@1.7.0-canary.7
+
 ## 0.9.0-canary.6
 
 ### Patch Changes

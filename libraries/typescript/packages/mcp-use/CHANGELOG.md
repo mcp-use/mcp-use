@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.7.0-canary.7
+
+### Patch Changes
+
+- caf8c7c: Fix: switched to https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194 instead of @modelcontextprotocol/sdk to fix zod errors on deno runtime
+- caf8c7c: Moved ai sdk dep to optional since it's only used in test and example
+- caf8c7c: chore: update ai sdk from v4 to v5 and fixed integration tests
+- Updated dependencies [caf8c7c]
+  - @mcp-use/inspector@0.9.0-canary.7
+  - @mcp-use/cli@2.4.3-canary.7
+
 ## 1.7.0-canary.6
 
 ### Patch Changes
