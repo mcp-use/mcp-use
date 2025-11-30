@@ -501,15 +501,26 @@ jobs:
         run: |
           cd packages/mcp-use
           echo "Testing Deno compatibility with locally built package..."
-          echo "Package: ${{ env.MCP_USE_PACKAGE }}"
+          PACKAGE_FILE=$(ls mcp-use-*.tgz)
+          echo "Package: $PACKAGE_FILE"
           echo ""
           # Create a test directory and install the local package
           mkdir -p deno-test-temp
           cd deno-test-temp
-          npm init -y
-          npm install --legacy-peer-deps ../mcp-use-*.tgz
-          # Run Deno tests from this directory so it finds the local node_modules
-          deno test --allow-net --allow-read --allow-env ../tests/deno/basic-server.test.ts
+          # Create package.json for Deno to recognize npm dependencies
+          cat > package.json << EOF
+          {
+            "type": "module",
+            "dependencies": {
+              "mcp-use": "file:../$PACKAGE_FILE"
+            }
+          }
+          EOF
+          pnpm install
+          # Run Deno tests from this directory
+          # --no-check: Skip type checking (runtime verification only)
+          # --node-modules-dir: Use node_modules for npm: imports
+          deno test --no-check --node-modules-dir --allow-net --allow-read --allow-env ../tests/deno/basic-server.test.ts
 
   typescript-changeset-check:
     needs: detect-changes

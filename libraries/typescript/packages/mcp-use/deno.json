@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "test:deno": "npm pack && mkdir -p deno-test-temp && cd deno-test-temp && npm init -y && npm install --legacy-peer-deps ../mcp-use-*.tgz && deno test --allow-net --allow-read --allow-env ../tests/deno/basic-server.test.ts"
+    "test:deno": "pnpm pack && mkdir -p deno-test-temp && cd deno-test-temp && echo '{\"type\":\"module\",\"dependencies\":{\"mcp-use\":\"file:../mcp-use-1.7.0-canary.6.tgz\"}}' > package.json && pnpm install && deno test --no-check --node-modules-dir --allow-net --allow-read --allow-env ../tests/deno/basic-server.test.ts"
   },
   "compilerOptions": {
     "lib": ["deno.window", "deno.unstable"]
