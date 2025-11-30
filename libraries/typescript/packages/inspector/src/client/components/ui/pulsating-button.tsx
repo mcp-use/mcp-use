@@ -2,7 +2,8 @@ import React from "react";
 
 import { cn } from "@/client/lib/utils";
 
-interface PulsatingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface PulsatingButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   pulseColor?: string;
   duration?: string;
 }

@@ -57,8 +57,9 @@ export class ObservabilityManager {
 
     // Import handlers lazily to avoid circular imports
     try {
-      const { langfuseHandler, langfuseInitPromise } =
-        await import("./langfuse.js");
+      const { langfuseHandler, langfuseInitPromise } = await import(
+        "./langfuse.js"
+      );
 
       // If we have an agent ID, metadata, or providers, we need to reinitialize Langfuse
       if (
