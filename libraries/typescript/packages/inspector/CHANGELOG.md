@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.9.0-canary.5
+
+### Patch Changes
+
+- 4b917e0: feat: enable bundle minification 9.7mb -> 4.2 mb
+  - mcp-use@1.7.0-canary.5
+
 ## 0.9.0-canary.4
 
 ### Patch Changes
