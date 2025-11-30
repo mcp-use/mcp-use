@@ -5,6 +5,10 @@ ARG VERSION=latest
 
 WORKDIR /app
 
+# Cache bust by checking the latest version from npm
+# This layer will be invalidated when a new version is published
+RUN npm view @mcp-use/inspector version
+
 # Install the inspector package from npm
 RUN npm install -g @mcp-use/inspector@${VERSION}
 
