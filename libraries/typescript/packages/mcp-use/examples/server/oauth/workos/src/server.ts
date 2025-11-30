@@ -108,6 +108,6 @@ server.listen().then(() => {
   const subdomain = process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN;
   console.log("WorkOS OAuth MCP Server Running");
   if (subdomain) {
-    console.log(`Subdomain: ${subdomain}.authkit.app`);
+    // [SECURITY] Subdomain value is not logged to avoid leaking sensitive information.
   }
 });
