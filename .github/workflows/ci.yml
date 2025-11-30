@@ -1,4 +1,6 @@
 name: CI
+permissions:
+  contents: read
 
 # ============================================================================
 # CI Workflow Overview
