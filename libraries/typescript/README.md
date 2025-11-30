@@ -248,7 +248,7 @@ server.listen(3000)
 
 ```typescript
 import { streamEventsToAISDKWithTools } from 'mcp-use'
-import { LangChainAdapter } from 'ai'
+import { createTextStreamResponse } from 'ai'
 
 // In your Next.js API route
 export async function POST(req: Request) {
@@ -258,7 +258,7 @@ export async function POST(req: Request) {
   const enhancedStream = streamEventsToAISDKWithTools(streamEvents)
   const readableStream = createReadableStreamFromGenerator(enhancedStream)
 
-  return LangChainAdapter.toDataStreamResponse(readableStream)
+  return createTextStreamResponse({ textStream: readableStream })
 }
 ```
 
