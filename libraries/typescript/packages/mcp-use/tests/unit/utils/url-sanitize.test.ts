@@ -95,6 +95,7 @@ describe("sanitizeUrl", () => {
     });
 
     it("should throw error for javascript: protocol", () => {
+      // eslint-disable-next-line no-script-url
       expect(() => sanitizeUrl("javascript:alert('xss')")).toThrow("Invalid url to pass to open()");
     });
 
