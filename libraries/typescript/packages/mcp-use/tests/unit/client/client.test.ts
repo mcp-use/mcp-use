@@ -29,7 +29,11 @@ describe("MCPClient Core Functionality", () => {
       fs.unlinkSync(tempConfigFile);
     }
     if (fs.existsSync(tempConfigDir)) {
-      fs.rmdirSync(tempConfigDir);
+      try {
+        fs.rmSync(tempConfigDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
     }
   });
 

@@ -19,6 +19,20 @@ describe("Error Handling and Edge Cases", () => {
     tempConfigFile = path.join(tempConfigDir, "test-config.json");
   });
 
+  afterEach(async () => {
+    // Clean up test config files
+    if (fs.existsSync(tempConfigFile)) {
+      fs.unlinkSync(tempConfigFile);
+    }
+    if (fs.existsSync(tempConfigDir)) {
+      try {
+        fs.rmSync(tempConfigDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  });
+
   describe("config file loading edge cases", () => {
     it("handles config file with missing mcpServers key", () => {
       const config = {};
@@ -59,6 +73,11 @@ describe("Error Handling and Edge Cases", () => {
     });
 
     it("handles very large config file", () => {
+      // Ensure directory exists
+      if (!fs.existsSync(tempConfigDir)) {
+        fs.mkdirSync(tempConfigDir, { recursive: true });
+      }
+
       const largeConfig = {
         mcpServers: {},
       };
@@ -80,9 +99,15 @@ describe("Error Handling and Edge Cases", () => {
     it("handles code execution timeout", async () => {
       const client = new MCPClient({}, { codeMode: true });
       const result = await client.executeCode(
-        "await new Promise(resolve => setTimeout(resolve, 2000)); return 'done';",
+        // Use a busy loop to ensure timeout triggers
+        `const start = Date.now();
+        while (Date.now() - start < 2000) {
+          // Busy wait
+        }
+        return "done";`,
         100 // Very short timeout
       );
+      // VM timeout should catch busy loops
       expect(result.error).toBeTruthy();
       expect(result.error).toContain("timed out");
     }, 10000);
@@ -162,7 +187,7 @@ describe("Error Handling and Edge Cases", () => {
 
     it("handles executeCode with very long code", async () => {
       const client = new MCPClient({}, { codeMode: true });
-      const longCode = "return " + '"' + "x".repeat(10000) + '";';
+      const longCode = `return "${"x".repeat(10000)}";`;
       const result = await client.executeCode(longCode);
       expect(result.result).toBe("x".repeat(10000));
     });
