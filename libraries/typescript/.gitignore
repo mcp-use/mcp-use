@@ -66,3 +66,7 @@ test_app
 
 # MCP-Use
 .mcp-use
+
+# Deno test artifacts
+deno-test-temp
+*.tgz

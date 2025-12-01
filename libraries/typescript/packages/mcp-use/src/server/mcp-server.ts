@@ -342,9 +342,8 @@ export class McpServer<HasOAuth extends boolean = false> {
     }
 
     // Dynamically import OAuth utilities
-    const { setupOAuthRoutes, createBearerAuthMiddleware } = await import(
-      "./oauth/index.js"
-    );
+    const { setupOAuthRoutes, createBearerAuthMiddleware } =
+      await import("./oauth/index.js");
 
     // Store the provider (already created by factory function)
     this.oauthProvider = oauthProvider;
@@ -2019,7 +2018,12 @@ if (container && Component) {
         const mcpUrl = this.getServerBaseUrl();
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
-          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
+          let htmlWithoutComments = html;
+          let prevHtmlWithoutComments;
+          do {
+            prevHtmlWithoutComments = htmlWithoutComments;
+            htmlWithoutComments = htmlWithoutComments.replace(/<!--[\s\S]*?-->/g, "");
+          } while (prevHtmlWithoutComments !== htmlWithoutComments);
 
           // Try to replace existing base tag (only if not in comments)
           const baseTagRegex = /<base\s+[^>]*\/?>/i;
@@ -2194,9 +2198,8 @@ if (container && Component) {
   private async mountMcp(): Promise<void> {
     if (this.mcpMounted) return;
 
-    const { StreamableHTTPServerTransport } = await import(
-      "@modelcontextprotocol/sdk/server/streamableHttp.js"
-    );
+    const { StreamableHTTPServerTransport } =
+      await import("@modelcontextprotocol/sdk/server/streamableHttp.js");
 
     const idleTimeoutMs = this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 

@@ -1,5 +1,23 @@
 # @mcp-use/cli
 
+## 2.4.5
+
+### Patch Changes
+
+- a4341d5: chore: update deps
+- Updated dependencies [a4341d5]
+  - @mcp-use/inspector@0.9.2
+  - mcp-use@1.7.2
+
+## 2.4.5-canary.0
+
+### Patch Changes
+
+- c1d7378: chore: update deps
+- Updated dependencies [c1d7378]
+  - @mcp-use/inspector@0.9.2-canary.0
+  - mcp-use@1.7.2-canary.0
+
 ## 2.4.4
 
 ### Patch Changes
