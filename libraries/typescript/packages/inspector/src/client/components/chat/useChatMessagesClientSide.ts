@@ -93,9 +93,8 @@ export function useChatMessagesClientSide({
               apiKey: llmConfig.apiKey,
             });
           } else if (llmConfig.provider === "google") {
-            const { ChatGoogleGenerativeAI } = await import(
-              "@langchain/google-genai"
-            );
+            const { ChatGoogleGenerativeAI } =
+              await import("@langchain/google-genai");
             llm = new ChatGoogleGenerativeAI({
               model: llmConfig.model,
               apiKey: llmConfig.apiKey,

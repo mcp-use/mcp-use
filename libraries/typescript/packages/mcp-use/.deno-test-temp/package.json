@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "dependencies": {
+    "mcp-use": "file:../mcp-use-1.7.1.tgz"
+  }
+}

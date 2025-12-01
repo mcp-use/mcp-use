@@ -38,20 +38,20 @@
     "test_app:mcp-ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.29.7",
-    "@types/node": "^20.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "eslint": "^9.28.0",
+    "@changesets/cli": "^2.29.8",
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
-    "lint-staged": "^15.2.11",
-    "prettier": "^3.6.2",
-    "tsup": "^8.5.0",
-    "typescript": "^5.0.0",
-    "typescript-eslint": "^8.20.0"
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -81,6 +81,6 @@
     }
   },
   "dependencies": {
-    "@eslint/js": "^9.37.0"
+    "@eslint/js": "^9.39.1"
   }
 }
