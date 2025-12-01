@@ -16,6 +16,7 @@ from mcp_use.server.types import TransportType
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
 from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.server.utils.signals import setup_signal_handlers
+from mcp_use.telemetry.telemetry import Telemetry, telemetry
 
 if TYPE_CHECKING:
     from mcp.server.session import ServerSession
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+_telemetry = Telemetry()
 
 
 class MCPServer(FastMCP):
@@ -119,6 +121,7 @@ class MCPServer(FastMCP):
         self.custom_route(self.inspector_path, methods=["GET"])(inspector_index_handler)
         self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
 
+    @telemetry("server_router_used")
     def include_router(self, router: MCPRouter, prefix: str = "", enabled: bool = True) -> None:
         """
         Include a router's tools, resources, and prompts into this server.
@@ -219,6 +222,25 @@ class MCPServer(FastMCP):
             reload: Whether to enable auto-reload
             run_debug: Whether to enable debug mode (adds /docs and /openmcp.json endpoints)
         """
+        # Track server run with configuration (non-private parameters)
+        _telemetry.telemetry(
+            feature_name="server_run",
+            class_name="MCPServer",
+            method_name="run",
+            success=True,
+            additional_properties={
+                "transport": transport,
+                "debug": self.debug or run_debug,
+                "reload": reload,
+                "pretty_print_jsonrpc": self.pretty_print_jsonrpc,
+                "show_inspector_logs": self.show_inspector_logs,
+                # Count tools, resources, prompts
+                "tool_count": len(list(self._tool_manager._tools)),
+                "resource_count": len(list(self._resource_manager._resources)),
+                "prompt_count": len(list(self._prompt_manager._prompts)),
+            },
+        )
+
         runner = ServerRunner(self)
         runner.run(transport=transport, host=host, port=port, reload=reload, debug=run_debug)
 

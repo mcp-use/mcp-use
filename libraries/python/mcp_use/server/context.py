@@ -10,8 +10,11 @@ from mcp.types import CreateMessageResult, ModelPreferences, SamplingMessage, Te
 from pydantic import BaseModel, Field, create_model
 from starlette.requests import Request
 
+from mcp_use.telemetry.telemetry import telemetry
+
 
 class Context(FastMCPContext):
+    @telemetry("context_sample_used")
     async def sample(
         self,
         messages: str | SamplingMessage | Sequence[SamplingMessage | str],
@@ -41,7 +44,6 @@ class Context(FastMCPContext):
             raw: When ``True`` returns the full ``CreateMessageResult`` instead of
                 just the ``TextContent`` convenience wrapper.
         """
-
         result = await self.session.create_message(
             messages=messages,
             max_tokens=max_tokens,
@@ -74,6 +76,7 @@ class Context(FastMCPContext):
             return None
         return cast(Request, request)
 
+    @telemetry("context_elicit_used")
     async def elicit(
         self,
         message: str,
