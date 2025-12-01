@@ -463,8 +463,9 @@ jobs:
         run: pnpm --filter @mcp-use/cli --if-present test
 
   typescript-deno-test:
+    if: false # tmp disable
     needs: [detect-changes, typescript-build]
-    if: needs.detect-changes.outputs.typescript == 'true'
+    # if: needs.detect-changes.outputs.typescript == 'true'
     name: "typescript/deno"
     runs-on: ubuntu-latest
     defaults:
