@@ -36,7 +36,11 @@ describe("Error Handling and Edge Cases", () => {
   describe("config file loading edge cases", () => {
     it("handles config file with missing mcpServers key", () => {
       const config = {};
-      fs.writeFileSync(tempConfigFile, JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        tempConfigFile,
+        JSON.stringify(config, null, 2),
+        "utf-8"
+      );
 
       const client = MCPClient.fromConfigFile(tempConfigFile);
       expect(client.getServerNames()).toEqual([]);
@@ -44,7 +48,11 @@ describe("Error Handling and Edge Cases", () => {
 
     it("handles config file with null mcpServers", () => {
       const config = { mcpServers: null };
-      fs.writeFileSync(tempConfigFile, JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        tempConfigFile,
+        JSON.stringify(config, null, 2),
+        "utf-8"
+      );
 
       // Should handle gracefully
       expect(() => {
@@ -60,12 +68,16 @@ describe("Error Handling and Edge Cases", () => {
           },
         },
       };
-      fs.writeFileSync(tempConfigFile, JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        tempConfigFile,
+        JSON.stringify(config, null, 2),
+        "utf-8"
+      );
 
       // Should create client but fail when trying to create session
       const client = MCPClient.fromConfigFile(tempConfigFile);
       expect(client.getServerNames()).toContain("invalid");
-      
+
       // Creating session should fail
       expect(async () => {
         await client.createSession("invalid");
@@ -88,7 +100,11 @@ describe("Error Handling and Edge Cases", () => {
           args: ["server.js"],
         };
       }
-      fs.writeFileSync(tempConfigFile, JSON.stringify(largeConfig, null, 2), "utf-8");
+      fs.writeFileSync(
+        tempConfigFile,
+        JSON.stringify(largeConfig, null, 2),
+        "utf-8"
+      );
 
       const client = MCPClient.fromConfigFile(tempConfigFile);
       expect(client.getServerNames().length).toBe(100);
@@ -145,7 +161,10 @@ describe("Error Handling and Edge Cases", () => {
     });
 
     it("handles closing already-closed session", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -195,43 +214,52 @@ describe("Error Handling and Edge Cases", () => {
 
   describe("executor options edge cases", () => {
     it("handles VM executor with custom timeout", () => {
-      const client = new MCPClient({}, {
-        codeMode: {
-          enabled: true,
-          executor: "vm",
-          executorOptions: {
-            timeoutMs: 60000,
+      const client = new MCPClient(
+        {},
+        {
+          codeMode: {
+            enabled: true,
+            executor: "vm",
+            executorOptions: {
+              timeoutMs: 60000,
+            },
           },
-        },
-      });
+        }
+      );
       expect(client.codeMode).toBe(true);
     });
 
     it("handles VM executor with memory limit", () => {
-      const client = new MCPClient({}, {
-        codeMode: {
-          enabled: true,
-          executor: "vm",
-          executorOptions: {
-            timeoutMs: 30000,
-            memoryLimitMb: 128,
+      const client = new MCPClient(
+        {},
+        {
+          codeMode: {
+            enabled: true,
+            executor: "vm",
+            executorOptions: {
+              timeoutMs: 30000,
+              memoryLimitMb: 128,
+            },
           },
-        },
-      });
+        }
+      );
       expect(client.codeMode).toBe(true);
     });
 
     it("handles E2B executor configuration", () => {
-      const client = new MCPClient({}, {
-        codeMode: {
-          enabled: true,
-          executor: "e2b",
-          executorOptions: {
-            apiKey: "test-key",
-            timeoutMs: 300000,
+      const client = new MCPClient(
+        {},
+        {
+          codeMode: {
+            enabled: true,
+            executor: "e2b",
+            executorOptions: {
+              apiKey: "test-key",
+              timeoutMs: 300000,
+            },
           },
-        },
-      });
+        }
+      );
       expect(client.codeMode).toBe(true);
     });
   });

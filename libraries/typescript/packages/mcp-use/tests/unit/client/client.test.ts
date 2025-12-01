@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 import { MCPClient } from "../../../src/client.js";
 import { BaseCodeExecutor } from "../../../src/client/codeExecutor.js";
 import { CodeModeConnector } from "../../../src/client/connectors/codeMode.js";
-import type { CreateMessageRequest, CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+} from "@modelcontextprotocol/sdk/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,8 +62,12 @@ describe("MCPClient Core Functionality", () => {
       };
       const client = MCPClient.fromDict(config);
       expect(client.getServerNames()).toEqual(["server1", "server2"]);
-      expect(client.getServerConfig("server1")).toEqual(config.mcpServers.server1);
-      expect(client.getServerConfig("server2")).toEqual(config.mcpServers.server2);
+      expect(client.getServerConfig("server1")).toEqual(
+        config.mcpServers.server1
+      );
+      expect(client.getServerConfig("server2")).toEqual(
+        config.mcpServers.server2
+      );
     });
 
     it("creates client from dict with code mode enabled", () => {
@@ -85,11 +92,13 @@ describe("MCPClient Core Functionality", () => {
 
     it("creates client from dict with sampling callback", async () => {
       const config = { mcpServers: {} };
-      const samplingCallback = vi.fn(async (params: CreateMessageRequest["params"]) => {
-        return {
-          content: [{ type: "text", text: "test response" }],
-        } as CreateMessageResult;
-      });
+      const samplingCallback = vi.fn(
+        async (params: CreateMessageRequest["params"]) => {
+          return {
+            content: [{ type: "text", text: "test response" }],
+          } as CreateMessageResult;
+        }
+      );
       const client = MCPClient.fromDict(config, { samplingCallback });
       expect(client).toBeInstanceOf(MCPClient);
       // Sampling callback is stored internally, verify it's set by checking connector creation
@@ -108,7 +117,11 @@ describe("MCPClient Core Functionality", () => {
           },
         },
       };
-      fs.writeFileSync(tempConfigFile, JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        tempConfigFile,
+        JSON.stringify(config, null, 2),
+        "utf-8"
+      );
 
       const client = MCPClient.fromConfigFile(tempConfigFile);
       expect(client).toBeInstanceOf(MCPClient);
@@ -117,9 +130,15 @@ describe("MCPClient Core Functionality", () => {
 
     it("creates client from config file with code mode", () => {
       const config = { mcpServers: {} };
-      fs.writeFileSync(tempConfigFile, JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        tempConfigFile,
+        JSON.stringify(config, null, 2),
+        "utf-8"
+      );
 
-      const client = MCPClient.fromConfigFile(tempConfigFile, { codeMode: true });
+      const client = MCPClient.fromConfigFile(tempConfigFile, {
+        codeMode: true,
+      });
       expect(client.codeMode).toBe(true);
     });
 
@@ -139,7 +158,11 @@ describe("MCPClient Core Functionality", () => {
 
     it("handles config file with empty mcpServers", () => {
       const config = { mcpServers: {} };
-      fs.writeFileSync(tempConfigFile, JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        tempConfigFile,
+        JSON.stringify(config, null, 2),
+        "utf-8"
+      );
 
       const client = MCPClient.fromConfigFile(tempConfigFile);
       expect(client.getServerNames()).toEqual([]);
@@ -153,10 +176,18 @@ describe("MCPClient Core Functionality", () => {
           server3: { ws_url: "ws://localhost:3001" },
         },
       };
-      fs.writeFileSync(tempConfigFile, JSON.stringify(config, null, 2), "utf-8");
+      fs.writeFileSync(
+        tempConfigFile,
+        JSON.stringify(config, null, 2),
+        "utf-8"
+      );
 
       const client = MCPClient.fromConfigFile(tempConfigFile);
-      expect(client.getServerNames()).toEqual(["server1", "server2", "server3"]);
+      expect(client.getServerNames()).toEqual([
+        "server1",
+        "server2",
+        "server3",
+      ]);
     });
   });
 
@@ -172,11 +203,16 @@ describe("MCPClient Core Functionality", () => {
       const client = new MCPClient({}, { codeMode: true });
       const sessions = client.getAllActiveSessions();
       expect(sessions["code_mode"]).toBeDefined();
-      expect(sessions["code_mode"].connector.publicIdentifier.name).toBe("code_mode");
+      expect(sessions["code_mode"].connector.publicIdentifier.name).toBe(
+        "code_mode"
+      );
     });
 
     it("returns all active sessions after creation", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -186,17 +222,20 @@ describe("MCPClient Core Functionality", () => {
         },
       };
       const client = MCPClient.fromDict(config);
-      
+
       // Create session
       await client.createSession("simple");
-      
+
       const sessions = client.getAllActiveSessions();
       expect(sessions["simple"]).toBeDefined();
       expect(Object.keys(sessions)).toContain("simple");
     });
 
     it("excludes closed sessions", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -206,11 +245,11 @@ describe("MCPClient Core Functionality", () => {
         },
       };
       const client = MCPClient.fromDict(config);
-      
+
       await client.createSession("simple");
       let sessions = client.getAllActiveSessions();
       expect(sessions["simple"]).toBeDefined();
-      
+
       await client.closeSession("simple");
       sessions = client.getAllActiveSessions();
       expect(sessions["simple"]).toBeUndefined();
@@ -219,7 +258,10 @@ describe("MCPClient Core Functionality", () => {
 
   describe("createAllSessions()", () => {
     it("creates all sessions from config", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           server1: {
@@ -233,13 +275,13 @@ describe("MCPClient Core Functionality", () => {
         },
       };
       const client = MCPClient.fromDict(config);
-      
+
       const sessions = await client.createAllSessions();
-      
+
       expect(Object.keys(sessions)).toHaveLength(2);
       expect(sessions["server1"]).toBeDefined();
       expect(sessions["server2"]).toBeDefined();
-      
+
       // Clean up
       await client.closeAllSessions();
     }, 30000);
@@ -251,7 +293,10 @@ describe("MCPClient Core Functionality", () => {
     });
 
     it("creates sessions without auto-initialization when specified", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -261,14 +306,14 @@ describe("MCPClient Core Functionality", () => {
         },
       };
       const client = MCPClient.fromDict(config);
-      
+
       const sessions = await client.createAllSessions(false);
       expect(sessions["simple"]).toBeDefined();
-      
+
       // Session should exist but may not be initialized
       const session = client.getSession("simple");
       expect(session).toBeDefined();
-      
+
       // Clean up
       await client.closeAllSessions();
     }, 30000);
@@ -276,7 +321,10 @@ describe("MCPClient Core Functionality", () => {
 
   describe("closeAllSessions()", () => {
     it("closes all active sessions", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           server1: {
@@ -290,10 +338,12 @@ describe("MCPClient Core Functionality", () => {
         },
       };
       const client = MCPClient.fromDict(config);
-      
+
       await client.createAllSessions();
-      expect(Object.keys(client.getAllActiveSessions()).length).toBeGreaterThan(0);
-      
+      expect(Object.keys(client.getAllActiveSessions()).length).toBeGreaterThan(
+        0
+      );
+
       await client.closeAllSessions();
       expect(Object.keys(client.getAllActiveSessions())).toHaveLength(0);
     }, 30000);
@@ -304,7 +354,10 @@ describe("MCPClient Core Functionality", () => {
     });
 
     it("handles errors gracefully when closing sessions", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -314,19 +367,21 @@ describe("MCPClient Core Functionality", () => {
         },
       };
       const client = MCPClient.fromDict(config);
-      
+
       await client.createSession("simple");
-      
+
       // Manually corrupt the session to cause an error
       const session = client.getSession("simple");
       if (session) {
         // Mock disconnect to throw an error
-        vi.spyOn(session, "disconnect").mockRejectedValueOnce(new Error("Disconnect error"));
+        vi.spyOn(session, "disconnect").mockRejectedValueOnce(
+          new Error("Disconnect error")
+        );
       }
-      
+
       // Should not throw, but handle errors gracefully
       await expect(client.closeAllSessions()).resolves.not.toThrow();
-      
+
       // Clean up
       await client.closeAllSessions();
     }, 30000);
@@ -355,8 +410,8 @@ describe("MCPClient Core Functionality", () => {
         return "done";
       `);
       expect(result.result).toBe("done");
-      expect(result.logs.some(log => log.includes("Hello"))).toBe(true);
-      expect(result.logs.some(log => log.includes("World"))).toBe(true);
+      expect(result.logs.some((log) => log.includes("Hello"))).toBe(true);
+      expect(result.logs.some((log) => log.includes("World"))).toBe(true);
     });
 
     it("handles async code", async () => {
@@ -377,14 +432,17 @@ describe("MCPClient Core Functionality", () => {
 
     it("respects timeout parameter", async () => {
       const client = new MCPClient({}, { codeMode: true });
-      const result = await client.executeCode(`
+      const result = await client.executeCode(
+        `
         // Use a busy loop to ensure timeout triggers
         const start = Date.now();
         while (Date.now() - start < 2000) {
           // Busy wait
         }
         return "done";
-      `, 100); // 100ms timeout - very short
+      `,
+        100
+      ); // 100ms timeout - very short
       // VM timeout should catch busy loops
       expect(result.error).toBeTruthy();
       expect(result.error).toContain("timed out");
@@ -414,7 +472,10 @@ describe("MCPClient Core Functionality", () => {
     });
 
     it("searches tools with query filter", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -424,20 +485,23 @@ describe("MCPClient Core Functionality", () => {
         },
       };
       const client = MCPClient.fromDict(config, { codeMode: true });
-      
+
       // Create session to get tools
       await client.createSession("simple");
-      
+
       const result = await client.searchTools("add");
       expect(result.meta.total_tools).toBeGreaterThan(0);
-      expect(result.results.some(tool => tool.name === "add")).toBe(true);
-      
+      expect(result.results.some((tool) => tool.name === "add")).toBe(true);
+
       // Clean up
       await client.closeAllSessions();
     }, 30000);
 
     it("searches tools with different detail levels", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -447,27 +511,27 @@ describe("MCPClient Core Functionality", () => {
         },
       };
       const client = MCPClient.fromDict(config, { codeMode: true });
-      
+
       await client.createSession("simple");
-      
+
       // Test names detail level
       const namesResult = await client.searchTools("", "names");
       expect(namesResult.results.length).toBeGreaterThan(0);
       expect(namesResult.results[0]).toHaveProperty("name");
       expect(namesResult.results[0]).toHaveProperty("server");
       expect(namesResult.results[0]).not.toHaveProperty("description");
-      
+
       // Test descriptions detail level
       const descResult = await client.searchTools("", "descriptions");
       expect(descResult.results.length).toBeGreaterThan(0);
       expect(descResult.results[0]).toHaveProperty("description");
       expect(descResult.results[0]).not.toHaveProperty("input_schema");
-      
+
       // Test full detail level
       const fullResult = await client.searchTools("", "full");
       expect(fullResult.results.length).toBeGreaterThan(0);
       expect(fullResult.results[0]).toHaveProperty("input_schema");
-      
+
       // Clean up
       await client.closeAllSessions();
     }, 30000);
@@ -496,13 +560,13 @@ describe("MCPClient Core Functionality", () => {
   describe("close()", () => {
     it("cleans up code executor and closes all sessions", async () => {
       const client = new MCPClient({}, { codeMode: true });
-      
+
       // Create a session if possible
       const sessions = client.getAllActiveSessions();
       expect(sessions["code_mode"]).toBeDefined();
-      
+
       await client.close();
-      
+
       // After close, sessions should be empty
       const sessionsAfterClose = client.getAllActiveSessions();
       expect(Object.keys(sessionsAfterClose)).toHaveLength(0);

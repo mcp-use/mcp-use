@@ -43,7 +43,10 @@ describe("BaseCodeExecutor", () => {
 
   describe("ensureServersConnected()", () => {
     it("connects to missing servers", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -70,7 +73,10 @@ describe("BaseCodeExecutor", () => {
     }, 30000);
 
     it("does not reconnect if servers already connected", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -118,11 +124,16 @@ describe("BaseCodeExecutor", () => {
 
       const namespaces = (codeModeExecutor as any).getToolNamespaces();
       // Should not include code_mode
-      expect(namespaces.every((n: any) => n.serverName !== "code_mode")).toBe(true);
+      expect(namespaces.every((n: any) => n.serverName !== "code_mode")).toBe(
+        true
+      );
     });
 
     it("returns tool namespaces from active sessions", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -168,7 +179,10 @@ describe("BaseCodeExecutor", () => {
     });
 
     it("search function filters by query", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -184,7 +198,7 @@ describe("BaseCodeExecutor", () => {
       await (testExecutor as any).ensureServersConnected();
 
       const searchFn = testExecutor.createSearchToolsFunction();
-      
+
       // Search for "add" tool
       const result = await searchFn("add");
       expect(result.results.some((t: any) => t.name === "add")).toBe(true);
@@ -198,7 +212,10 @@ describe("BaseCodeExecutor", () => {
     }, 30000);
 
     it("search function respects detail level 'names'", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -227,7 +244,10 @@ describe("BaseCodeExecutor", () => {
     }, 30000);
 
     it("search function respects detail level 'descriptions'", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -255,7 +275,10 @@ describe("BaseCodeExecutor", () => {
     }, 30000);
 
     it("search function respects detail level 'full'", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -282,7 +305,10 @@ describe("BaseCodeExecutor", () => {
     }, 30000);
 
     it("search function filters by server name", async () => {
-      const serverPath = path.resolve(__dirname, "../../servers/simple_server.ts");
+      const serverPath = path.resolve(
+        __dirname,
+        "../../servers/simple_server.ts"
+      );
       const config = {
         mcpServers: {
           simple: {
@@ -301,7 +327,9 @@ describe("BaseCodeExecutor", () => {
       const result = await searchFn("simple");
 
       // Should find tools from "simple" server
-      expect(result.results.every((t: any) => t.server === "simple")).toBe(true);
+      expect(result.results.every((t: any) => t.server === "simple")).toBe(
+        true
+      );
 
       // Clean up
       await testClient.closeAllSessions();

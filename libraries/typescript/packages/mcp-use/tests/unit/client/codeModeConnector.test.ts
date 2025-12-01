@@ -33,7 +33,9 @@ describe("CodeModeConnector", () => {
       const tools = connector.tools;
       const executeCodeTool = tools.find((t) => t.name === "execute_code");
       expect(executeCodeTool).toBeDefined();
-      expect(executeCodeTool?.description).toContain("Execute JavaScript/TypeScript code");
+      expect(executeCodeTool?.description).toContain(
+        "Execute JavaScript/TypeScript code"
+      );
       expect(executeCodeTool?.inputSchema).toBeDefined();
     });
 
@@ -41,7 +43,9 @@ describe("CodeModeConnector", () => {
       const tools = connector.tools;
       const searchToolsTool = tools.find((t) => t.name === "search_tools");
       expect(searchToolsTool).toBeDefined();
-      expect(searchToolsTool?.description).toContain("Search and discover available MCP tools");
+      expect(searchToolsTool?.description).toContain(
+        "Search and discover available MCP tools"
+      );
       expect(searchToolsTool?.inputSchema).toBeDefined();
     });
 
@@ -49,7 +53,7 @@ describe("CodeModeConnector", () => {
       const tools = connector.tools;
       const executeCodeTool = tools.find((t) => t.name === "execute_code");
       const schema = executeCodeTool?.inputSchema;
-      
+
       expect(schema?.type).toBe("object");
       expect(schema?.properties?.code).toBeDefined();
       expect(schema?.properties?.code?.type).toBe("string");
@@ -62,12 +66,16 @@ describe("CodeModeConnector", () => {
       const tools = connector.tools;
       const searchToolsTool = tools.find((t) => t.name === "search_tools");
       const schema = searchToolsTool?.inputSchema;
-      
+
       expect(schema?.type).toBe("object");
       expect(schema?.properties?.query).toBeDefined();
       expect(schema?.properties?.query?.type).toBe("string");
       expect(schema?.properties?.detail_level).toBeDefined();
-      expect(schema?.properties?.detail_level?.enum).toEqual(["names", "descriptions", "full"]);
+      expect(schema?.properties?.detail_level?.enum).toEqual([
+        "names",
+        "descriptions",
+        "full",
+      ]);
     });
   });
 
@@ -110,7 +118,7 @@ describe("CodeModeConnector", () => {
       expect(result.content).toBeDefined();
       expect(result.content.length).toBeGreaterThan(0);
       expect(result.content[0].type).toBe("text");
-      
+
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.result).toBe(42);
       expect(parsed.error).toBeNull();
@@ -136,7 +144,7 @@ describe("CodeModeConnector", () => {
       expect(result.content).toBeDefined();
       expect(result.content.length).toBeGreaterThan(0);
       expect(result.content[0].type).toBe("text");
-      
+
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed).toHaveProperty("results");
       expect(parsed).toHaveProperty("meta");
@@ -156,9 +164,9 @@ describe("CodeModeConnector", () => {
     });
 
     it("throws error for unknown tool", async () => {
-      await expect(
-        connector.callTool("unknown_tool", {})
-      ).rejects.toThrow("Unknown tool: unknown_tool");
+      await expect(connector.callTool("unknown_tool", {})).rejects.toThrow(
+        "Unknown tool: unknown_tool"
+      );
     });
 
     it("handles execute_code errors gracefully", async () => {
