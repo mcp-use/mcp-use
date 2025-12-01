@@ -69,14 +69,14 @@ export function createExternalUrlResource(
   encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
-): UIResourceContent {
+): UIResourceContent | Promise<UIResourceContent> {
   return createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: "externalUrl", iframeUrl },
     encoding,
     adapters: adapters,
     metadata: metadata,
-  });
+  }) as UIResourceContent | Promise<UIResourceContent>;
 }
 
 /**
@@ -95,14 +95,14 @@ export function createRawHtmlResource(
   encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
-): UIResourceContent {
+): UIResourceContent | Promise<UIResourceContent> {
   return createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: "rawHtml", htmlString },
     encoding,
     adapters: adapters,
     metadata: metadata,
-  });
+  }) as UIResourceContent | Promise<UIResourceContent>;
 }
 
 /**
@@ -123,14 +123,14 @@ export function createRemoteDomResource(
   encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
-): UIResourceContent {
+): UIResourceContent | Promise<UIResourceContent> {
   return createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: "remoteDom", script, framework },
     encoding,
     adapters: adapters,
     metadata: metadata,
-  });
+  }) as UIResourceContent | Promise<UIResourceContent>;
 }
 
 /**
@@ -208,11 +208,11 @@ export function createAppsSdkResource(
  * @param config - URL configuration for building widget URLs
  * @returns UIResourceContent object
  */
-export function createUIResourceFromDefinition(
+export async function createUIResourceFromDefinition(
   definition: UIResourceDefinition,
   params: Record<string, any>,
   config: UrlConfig
-): UIResourceContent {
+): Promise<UIResourceContent> {
   // Generate URI with build ID if available (for cache busting)
   const buildIdPart = config.buildId ? `-${config.buildId}` : "";
   const uri =
@@ -224,34 +224,40 @@ export function createUIResourceFromDefinition(
   switch (definition.type) {
     case "externalUrl": {
       const widgetUrl = buildWidgetUrl(definition.widget, params, config);
-      return createExternalUrlResource(
-        uri,
-        widgetUrl,
-        encoding,
-        definition.adapters,
-        definition.appsSdkMetadata
+      return await Promise.resolve(
+        createExternalUrlResource(
+          uri,
+          widgetUrl,
+          encoding,
+          definition.adapters,
+          definition.appsSdkMetadata
+        )
       );
     }
 
     case "rawHtml": {
-      return createRawHtmlResource(
-        uri,
-        definition.htmlContent,
-        encoding,
-        definition.adapters,
-        definition.appsSdkMetadata
+      return await Promise.resolve(
+        createRawHtmlResource(
+          uri,
+          definition.htmlContent,
+          encoding,
+          definition.adapters,
+          definition.appsSdkMetadata
+        )
       );
     }
 
     case "remoteDom": {
       const framework = definition.framework || "react";
-      return createRemoteDomResource(
-        uri,
-        definition.script,
-        framework,
-        encoding,
-        definition.adapters,
-        definition.appsSdkMetadata
+      return await Promise.resolve(
+        createRemoteDomResource(
+          uri,
+          definition.script,
+          framework,
+          encoding,
+          definition.adapters,
+          definition.appsSdkMetadata
+        )
       );
     }
 

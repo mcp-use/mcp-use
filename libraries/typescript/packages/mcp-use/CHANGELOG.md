@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.8.0-canary.0
+
+### Minor Changes
+
+- de6ca09: Add sampling support in inspector and fixed long running sampling requests (were timing out after 60s)
+
+### Patch Changes
+
+- Updated dependencies [de6ca09]
+  - @mcp-use/inspector@0.10.0-canary.0
+  - @mcp-use/cli@2.4.6-canary.0
+
 ## 1.7.2
 
 ### Patch Changes

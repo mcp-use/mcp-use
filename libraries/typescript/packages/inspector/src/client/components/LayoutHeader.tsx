@@ -21,6 +21,7 @@ import {
   Command,
   Copy,
   FolderOpen,
+  Hash,
   MessageCircle,
   MessageSquare,
   Wrench,
@@ -47,8 +48,24 @@ const tabs = [
   { id: "prompts", label: "Prompts", icon: MessageSquare },
   { id: "resources", label: "Resources", icon: FolderOpen },
   { id: "chat", label: "Chat", icon: MessageCircle },
+  { id: "sampling", label: "Sampling", icon: Hash },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
+
+function getTabCount(tabId: string, server: MCPConnection): number {
+  if (tabId === "tools") {
+    return server.tools.length;
+  } else if (tabId === "prompts") {
+    return server.prompts.length;
+  } else if (tabId === "resources") {
+    return server.resources.length;
+  } else if (tabId === "sampling") {
+    return server.pendingSamplingRequests.length;
+  } else if (tabId === "notifications") {
+    return server.unreadNotificationCount;
+  }
+  return 0;
+}
 
 export function LayoutHeader({
   connections,
@@ -132,17 +149,7 @@ export function LayoutHeader({
             >
               <TabsList className="w-full justify-center">
                 {tabs.map((tab) => {
-                  // Get count for the current tab
-                  let count = 0;
-                  if (tab.id === "tools") {
-                    count = selectedServer.tools.length;
-                  } else if (tab.id === "prompts") {
-                    count = selectedServer.prompts.length;
-                  } else if (tab.id === "resources") {
-                    count = selectedServer.resources.length;
-                  } else if (tab.id === "notifications") {
-                    count = selectedServer.unreadNotificationCount;
-                  }
+                  const count = getTabCount(tab.id, selectedServer);
 
                   return (
                     <TabsTrigger
@@ -193,17 +200,7 @@ export function LayoutHeader({
             >
               <TabsList className="overflow-x-auto">
                 {tabs.map((tab) => {
-                  // Get count for the current tab
-                  let count = 0;
-                  if (tab.id === "tools") {
-                    count = selectedServer.tools.length;
-                  } else if (tab.id === "prompts") {
-                    count = selectedServer.prompts.length;
-                  } else if (tab.id === "resources") {
-                    count = selectedServer.resources.length;
-                  } else if (tab.id === "notifications") {
-                    count = selectedServer.unreadNotificationCount;
-                  }
+                  const count = getTabCount(tab.id, selectedServer);
 
                   return (
                     <TabsTrigger

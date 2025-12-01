@@ -70,22 +70,38 @@ cd ../typescript
 pnpm install
 ```
 
-### 3. Set Up Pre-commit Hooks (Python)
+### 3. Set Up Pre-commit Hooks (Unified)
 
-Pre-commit hooks ensure code quality before committing. The hooks will:
+Pre-commit hooks ensure code quality before committing. The repository uses a unified pre-commit configuration that automatically runs the appropriate checks based on file types:
 
+**Python files** (`.py`):
 - Format code using Ruff
 - Run linting checks
 - Check for trailing whitespace and fix it
 - Ensure files end with a newline
-- Validate YAML files
-- Check for large files
 - Remove debug statements
 
+**TypeScript/JavaScript files** (`.ts`, `.tsx`, `.js`, `.jsx`):
+- Format code using Prettier
+- Run ESLint with auto-fix
+- Verify changeset exists for code changes
+
+To install the hooks:
+
 ```bash
-cd libraries/python
-pip install pre-commit
+# From the repository root
+pip install pre-commit  # If not already installed
 pre-commit install
+```
+
+The hooks will automatically detect which files you're committing and run only the relevant checks. You can also run the hooks manually:
+
+```bash
+# Run on all files
+pre-commit run --all-files
+
+# Run on staged files only
+pre-commit run
 ```
 
 ### 4. Verify Setup
@@ -372,7 +388,7 @@ Types:
 Before pushing, ensure:
 
 - Your code passes all tests
-- Pre-commit hooks pass (for Python)
+- Pre-commit hooks pass (automatically run for both Python and TypeScript)
 - No linting errors remain
 
 ```bash
