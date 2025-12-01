@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { BrowserMCPClient } from "../../../src/client/browser.js";
 import { BrowserOAuthClientProvider } from "../../../src/auth/browser-provider.js";
+import { HttpConnector } from "../../../src/connectors/http.js";
+import { WebSocketConnector } from "../../../src/connectors/websocket.js";
 
 // Mock browser APIs for integration tests
 const mockLocalStorage: Record<string, string> = {};
@@ -288,7 +290,7 @@ describe("BrowserMCPClient Integration Tests", () => {
       });
       expect(connector).toBeDefined();
       // Should default to HTTP
-      expect(connector.constructor.name).toBe("HttpConnector");
+      expect(connector).toBeInstanceOf(HttpConnector);
     });
 
     it("should use WebSocket for ws:// URLs", () => {
@@ -296,7 +298,7 @@ describe("BrowserMCPClient Integration Tests", () => {
       const connector = (client as any).createConnectorFromConfig({
         url: "ws://example.com/mcp",
       });
-      expect(connector.constructor.name).toBe("WebSocketConnector");
+      expect(connector).toBeInstanceOf(WebSocketConnector);
     });
 
     it("should use WebSocket for wss:// URLs", () => {
@@ -304,7 +306,7 @@ describe("BrowserMCPClient Integration Tests", () => {
       const connector = (client as any).createConnectorFromConfig({
         url: "wss://example.com/mcp",
       });
-      expect(connector.constructor.name).toBe("WebSocketConnector");
+      expect(connector).toBeInstanceOf(WebSocketConnector);
     });
   });
 });
