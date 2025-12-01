@@ -620,19 +620,27 @@ This document provides a comprehensive assessment of test coverage for the TypeS
    - Config loading
    - Error handling
 
+5. **Cross-Platform Feature Parity** - No tests verifying consistency across platforms
+   - Node.js client vs Browser client vs React hook
+   - Shared API behavior verification
+   - Platform-specific feature exclusion tests
+   - Agent compatibility across platforms
+   - Connector compatibility across platforms
+
 ### Medium Priority (Important Features)
-5. **Task Managers** - No tests for connection managers
-6. **React Components** - No tests for React hooks and components
-7. **Inspector UI** - No tests for the inspector package
-8. **CLI** - No tests for CLI commands
-9. **Utilities** - No tests for utility functions
-10. **E2E Tests** - No end-to-end tests for UI workflows
+6. **Task Managers** - No tests for connection managers
+7. **React Components** - No tests for React hooks and components (partially covered in cross-platform testing)
+8. **Browser Client** - No tests for browser-specific client implementation
+9. **Inspector UI** - No tests for the inspector package
+10. **CLI** - No tests for CLI commands
+11. **Utilities** - No tests for utility functions
+12. **E2E Tests** - No end-to-end tests for UI workflows
 
 ### Low Priority (Nice to Have)
-11. **Create MCP Use App** - E2E tests for scaffolding
-12. **Performance Tests** - Load and performance testing
-13. **Visual Regression** - UI visual testing
-14. **Coverage Reporting** - Automated coverage reporting
+13. **Create MCP Use App** - E2E tests for scaffolding
+14. **Performance Tests** - Load and performance testing
+15. **Visual Regression** - UI visual testing
+16. **Coverage Reporting** - Automated coverage reporting
 
 ---
 
@@ -661,10 +669,278 @@ This document provides a comprehensive assessment of test coverage for the TypeS
 | Integration Tests | 8 | Medium |
 | E2E Tests | 0 | None |
 | Runtime Tests | 1 | Low |
+| Cross-Platform Tests | 0 | None |
+
+### By Platform
+| Platform | Test Files | Coverage Level | Notes |
+|----------|-----------|----------------|-------|
+| Node.js Client | 2 | Low | Code mode partially tested |
+| Browser Client | 0 | None | No tests |
+| React Hook | 0 | None | No tests |
+| Cross-Platform Parity | 0 | None | No feature parity tests |
 
 ---
 
-## 11. Conclusion
+## 11. Cross-Platform Feature Parity Testing
+
+### 11.1 Overview
+
+The mcp-use library supports three client environments:
+- **Node.js Client** (`MCPClient` in `src/client.ts`)
+- **Browser Client** (`BrowserMCPClient` in `src/client/browser.ts`)
+- **React Hook** (`useMcp` in `src/react/useMcp.ts`)
+
+Each environment has different capabilities and limitations. **No tests currently verify feature parity** or document expected differences between platforms.
+
+### 11.2 Platform-Specific Features
+
+#### Node.js Client (`MCPClient`)
+**Unique Features:**
+- ✅ Code mode support (`codeMode` option)
+  - `executeCode()` method
+  - `searchTools()` method
+  - VM code executor
+  - E2B code executor
+- ✅ File system operations
+  - `fromConfigFile()` - Load config from file system
+  - `saveConfig()` - Save config to file system
+- ✅ STDIO connector support
+- ✅ Full connector support (HTTP, WebSocket, STDIO)
+
+**Current Test Coverage:**
+- ✅ Code mode basic functionality (limited)
+- ✅ VM code executor (unit tests)
+- ❌ `fromConfigFile()` - No tests
+- ❌ `saveConfig()` - No tests
+- ❌ STDIO connector - No tests
+- ❌ E2B code executor - No tests
+
+#### Browser Client (`BrowserMCPClient`)
+**Unique Features:**
+- ✅ Browser OAuth support (`BrowserOAuthClientProvider`)
+- ✅ HTTP connector support
+- ✅ WebSocket connector support
+- ❌ **No code mode** (intentionally excluded)
+- ❌ **No file system operations** (no `fromConfigFile`, `saveConfig`)
+- ❌ **No STDIO connector** (not available in browser)
+
+**Current Test Coverage:**
+- ❌ **No tests** for browser client
+- ❌ Browser OAuth - No tests
+- ❌ HTTP connector in browser - No tests
+- ❌ WebSocket connector in browser - No tests
+- ❌ Feature exclusion verification - No tests
+
+#### React Hook (`useMcp`)
+**Unique Features:**
+- ✅ React state management (hooks, useState, useEffect)
+- ✅ Connection state machine (`discovering`, `pending_auth`, `authenticating`, `connecting`, `loading`, `ready`, `failed`)
+- ✅ Auto-reconnect logic
+- ✅ Auto-retry logic
+- ✅ OAuth popup/redirect handling
+- ✅ localStorage-based token storage
+- ✅ Transport fallback (HTTP → SSE)
+- ✅ Notification handling via callbacks
+- ✅ Logging state management
+- ❌ **No code mode** (uses BrowserMCPClient internally)
+- ❌ **No file system operations**
+
+**Current Test Coverage:**
+- ❌ **No tests** for React hook
+- ❌ State machine transitions - No tests
+- ❌ Auto-reconnect - No tests
+- ❌ Auto-retry - No tests
+- ❌ OAuth flow - No tests
+- ❌ Token storage - No tests
+- ❌ Transport fallback - No tests
+- ❌ Notification handling - No tests
+
+### 11.3 Shared Features (Should Work Across All Platforms)
+
+**Base Client Features (`BaseMCPClient`):**
+- ✅ `addServer()` - Add server configuration
+- ✅ `removeServer()` - Remove server configuration
+- ✅ `getServerNames()` - List server names
+- ✅ `getServerConfig()` - Get server configuration
+- ✅ `getConfig()` - Get full config
+- ✅ `createSession()` - Create MCP session
+- ✅ `createAllSessions()` - Create all sessions
+- ✅ `getSession()` - Get session by name
+- ✅ `getAllActiveSessions()` - Get all active sessions
+- ✅ `closeSession()` - Close session
+- ✅ `closeAllSessions()` - Close all sessions
+
+**Agent Features:**
+- ✅ `MCPAgent` class - Should work with both Node.js and Browser clients
+- ✅ `run()` - Execute agent
+- ✅ `stream()` - Stream agent responses
+- ✅ `streamEvents()` - Stream LangChain events
+- ✅ Tool execution
+- ✅ Resource reading
+- ✅ Prompt execution
+
+**Current Test Coverage:**
+- ✅ Agent tests use Node.js client (indirect coverage)
+- ❌ **No cross-platform tests** verifying same behavior
+- ❌ **No browser client tests** for shared features
+- ❌ **No React hook tests** for shared features
+
+### 11.4 Feature Parity Test Gaps
+
+#### Critical Gaps
+
+1. **No Cross-Platform API Tests**
+   - ❌ Same API calls should produce same results (where applicable)
+   - ❌ Shared methods (`addServer`, `createSession`, etc.) should behave identically
+   - ❌ Error handling should be consistent
+   - ❌ Session lifecycle should be consistent
+
+2. **No Platform-Specific Feature Tests**
+   - ❌ Node.js-only features should fail gracefully in browser
+   - ❌ Browser-only features should not exist in Node.js client
+   - ❌ React hook should properly wrap browser client features
+
+3. **No Feature Exclusion Tests**
+   - ❌ Code mode should not be available in browser client
+   - ❌ File system operations should not be available in browser client
+   - ❌ STDIO connector should not be available in browser client
+   - ❌ Browser OAuth should not be available in Node.js client
+
+4. **No Compatibility Matrix Tests**
+   - ❌ Connector compatibility per platform
+   - ❌ Agent compatibility with different clients
+   - ❌ Transport compatibility per platform
+
+#### Recommended Cross-Platform Tests
+
+**1. Shared API Parity Tests**
+```typescript
+describe('Cross-Platform API Parity', () => {
+  describe('Node.js Client', () => {
+    it('should support all BaseMCPClient methods')
+    it('should create sessions correctly')
+    it('should handle multiple servers')
+  })
+  
+  describe('Browser Client', () => {
+    it('should support all BaseMCPClient methods')
+    it('should create sessions correctly')
+    it('should handle multiple servers')
+  })
+  
+  describe('React Hook', () => {
+    it('should expose same functionality as BrowserMCPClient')
+    it('should maintain state correctly')
+  })
+})
+```
+
+**2. Platform-Specific Feature Tests**
+```typescript
+describe('Platform-Specific Features', () => {
+  describe('Node.js Client', () => {
+    it('should support code mode')
+    it('should support fromConfigFile()')
+    it('should support saveConfig()')
+    it('should support STDIO connector')
+  })
+  
+  describe('Browser Client', () => {
+    it('should NOT support code mode')
+    it('should NOT support fromConfigFile()')
+    it('should NOT support saveConfig()')
+    it('should NOT support STDIO connector')
+    it('should support browser OAuth')
+  })
+  
+  describe('React Hook', () => {
+    it('should NOT expose code mode')
+    it('should provide connection state management')
+    it('should handle OAuth flow')
+    it('should support auto-reconnect')
+  })
+})
+```
+
+**3. Agent Compatibility Tests**
+```typescript
+describe('Agent Cross-Platform Compatibility', () => {
+  it('should work with Node.js client')
+  it('should work with Browser client')
+  it('should produce same results with same inputs')
+  it('should handle errors consistently')
+})
+```
+
+**4. Connector Compatibility Tests**
+```typescript
+describe('Connector Platform Compatibility', () => {
+  describe('HTTP Connector', () => {
+    it('should work in Node.js')
+    it('should work in Browser')
+    it('should behave identically')
+  })
+  
+  describe('WebSocket Connector', () => {
+    it('should work in Node.js')
+    it('should work in Browser')
+    it('should behave identically')
+  })
+  
+  describe('STDIO Connector', () => {
+    it('should work in Node.js')
+    it('should NOT be available in Browser')
+  })
+})
+```
+
+**5. Error Handling Parity Tests**
+```typescript
+describe('Error Handling Parity', () => {
+  it('should produce same error types across platforms')
+  it('should handle network errors consistently')
+  it('should handle authentication errors consistently')
+  it('should handle server errors consistently')
+})
+```
+
+### 11.5 Testing Infrastructure Gaps
+
+**Missing Test Infrastructure:**
+- ❌ Browser test environment setup (e.g., jsdom, happy-dom, or real browser)
+- ❌ React Testing Library setup for hook testing
+- ❌ Cross-platform test runner configuration
+- ❌ Platform detection utilities for conditional tests
+- ❌ Mock browser APIs (localStorage, window, etc.)
+- ❌ Mock Node.js APIs (fs, path, etc.)
+
+**Recommended Test Infrastructure:**
+- ✅ Vitest with jsdom/happy-dom for browser tests
+- ✅ @testing-library/react for React hook tests
+- ✅ Playwright or Puppeteer for E2E browser tests
+- ✅ Test utilities for platform detection
+- ✅ Mock factories for platform-specific APIs
+
+### 11.6 Priority Recommendations for Cross-Platform Testing
+
+**High Priority:**
+1. **Verify feature exclusion** - Ensure Node.js-only features fail gracefully in browser
+2. **Test shared APIs** - Verify BaseMCPClient methods work identically
+3. **Test agent compatibility** - Verify MCPAgent works with both clients
+4. **Test connector compatibility** - Verify HTTP/WebSocket work in both environments
+
+**Medium Priority:**
+5. **React hook tests** - Test state management and lifecycle
+6. **Browser OAuth tests** - Test OAuth flow in browser environment
+7. **Error handling parity** - Verify consistent error behavior
+
+**Low Priority:**
+8. **Performance parity** - Compare performance across platforms
+9. **Bundle size verification** - Ensure browser bundle doesn't include Node.js code
+
+---
+
+## 12. Conclusion
 
 The TypeScript codebase has **partial test coverage** with significant gaps in critical areas:
 
@@ -681,15 +957,20 @@ The TypeScript codebase has **partial test coverage** with significant gaps in c
    - Client session management (limited testing)
    - Inspector UI (no tests)
    - CLI (no tests)
+   - **Cross-platform feature parity (no tests)** - No verification that Node.js, Browser, and React clients behave consistently
 
 3. **Recommended Next Steps:**
    - Prioritize OAuth testing (all providers and utilities)
    - Add comprehensive server tests (tools, resources, prompts, widgets)
    - Add connector tests (all connector types)
    - Add client session management tests
+   - **Add cross-platform feature parity tests** (Node.js vs Browser vs React)
+   - Add browser client tests
+   - Add React hook tests
    - Add inspector UI tests (unit and E2E)
    - Add CLI tests
    - Set up coverage reporting and thresholds
    - Add E2E test framework for UI testing
+   - Set up browser test environment (jsdom/happy-dom)
 
 This assessment provides a roadmap for improving test coverage and ensuring the reliability of the mcp-use TypeScript codebase.
