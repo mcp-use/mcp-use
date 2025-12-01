@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.7.2-canary.0
+
+### Patch Changes
+
+- c1d7378: chore: update deps
+- Updated dependencies [c1d7378]
+  - @mcp-use/inspector@0.9.2-canary.0
+  - @mcp-use/cli@2.4.5-canary.0
+
 ## 1.7.1
 
 ### Patch Changes
