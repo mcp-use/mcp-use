@@ -14,6 +14,7 @@ import {
 } from "./sampling";
 import { useInspector } from "@/client/context/InspectorContext";
 import { formatRelativeTime } from "@/client/utils/time";
+import { useConfig } from "./chat/useConfig";
 
 interface SamplingTabProps {
   pendingRequests: PendingSamplingRequest[];
@@ -21,6 +22,7 @@ interface SamplingTabProps {
   onReject: (requestId: string, error?: string) => void;
   serverId: string;
   isConnected: boolean;
+  mcpServerUrl: string;
 }
 
 export function SamplingTab({
@@ -29,8 +31,10 @@ export function SamplingTab({
   onReject,
   serverId: _serverId,
   isConnected,
+  mcpServerUrl,
 }: SamplingTabProps) {
   const { selectedSamplingRequestId, setSelectedSamplingRequestId } = useInspector();
+  const { llmConfig } = useConfig({ mcpServerUrl });
   const [selectedRequest, setSelectedRequest] =
     useState<PendingSamplingRequest | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -381,6 +385,7 @@ export function SamplingTab({
             onCopy={handleCopy}
             onDownload={handleDownload}
             onFullscreen={handleFullscreen}
+            llmConfig={llmConfig}
           />
         </div>
       </ResizablePanel>

@@ -83,6 +83,7 @@ export function LayoutContent({
           onReject={selectedServer.rejectSampling}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
+          mcpServerUrl={selectedServer.url}
         />
       </div>
       <div style={{ display: activeTab === "notifications" ? "block" : "none" }} className="h-full">

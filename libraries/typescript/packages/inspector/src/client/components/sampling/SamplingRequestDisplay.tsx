@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
@@ -13,14 +13,16 @@ import { Textarea } from "@/client/components/ui/textarea";
 import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
 import type { PendingSamplingRequest } from "@/client/types/sampling";
+import type { LLMConfig } from "../chat/types";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import { toast } from "sonner";
-import { Check, Copy, Download, Maximize2, X } from "lucide-react";
+import { Check, Copy, Download, Maximize2, X, Loader2, Sparkles } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import { useSamplingLLM } from "./useSamplingLLM";
 
 interface SamplingRequestDisplayProps {
   request: PendingSamplingRequest | null;
@@ -33,6 +35,7 @@ interface SamplingRequestDisplayProps {
   onCopy: () => void;
   onDownload: () => void;
   onFullscreen: () => void;
+  llmConfig: LLMConfig | null;
 }
 
 export function SamplingRequestDisplay({
@@ -46,7 +49,9 @@ export function SamplingRequestDisplay({
   onCopy,
   onDownload,
   onFullscreen,
+  llmConfig,
 }: SamplingRequestDisplayProps) {
+  const [responseMode, setResponseMode] = useState<"manual" | "llm">("manual");
   const [model, setModel] = useState("stub-model");
   const [stopReason, setStopReason] = useState("endTurn");
   const [role, setRole] = useState<"assistant" | "user">("assistant");
@@ -54,6 +59,62 @@ export function SamplingRequestDisplay({
   const [textContent, setTextContent] = useState("positive"); // Default sentiment response
   const [imageData, setImageData] = useState("");
   const [imageMimeType, setImageMimeType] = useState("image/png");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  const { generateResponse, isAvailable } = useSamplingLLM({ llmConfig });
+
+  // Reset form when request changes
+  useEffect(() => {
+    if (request) {
+      setModel("stub-model");
+      setStopReason("endTurn");
+      setRole("assistant");
+      setContentType("text");
+      setTextContent("positive");
+      setImageData("");
+      setImageMimeType("image/png");
+      setGenerationError(null);
+    }
+  }, [request?.id]);
+
+  const handleGenerateWithLLM = async () => {
+    if (!request || !isAvailable) return;
+
+    setIsGenerating(true);
+    setGenerationError(null);
+
+    try {
+      const result = await generateResponse({ request: request.request });
+      
+      // Populate form fields with LLM response
+      setModel(result.model || llmConfig?.model || "stub-model");
+      setStopReason(result.stopReason || "endTurn");
+      setRole(result.role || "assistant");
+      
+      const content = Array.isArray(result.content)
+        ? result.content[0]
+        : result.content;
+      
+      if (content.type === "text") {
+        setContentType("text");
+        setTextContent(content.text || "");
+      } else if (content.type === "image") {
+        setContentType("image");
+        setImageData(content.data || "");
+        setImageMimeType(content.mimeType || "image/png");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to generate response";
+      setGenerationError(errorMessage);
+      toast.error("LLM Generation Failed", {
+        description: errorMessage,
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const messageResult = useMemo(() => {
     const result: any = {
@@ -227,9 +288,67 @@ export function SamplingRequestDisplay({
 
         {/* Response Form Section */}
         <div className="space-y-4">
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            Response
-          </h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Response
+            </h4>
+            <div className="flex items-center gap-2">
+              <Label htmlFor={`responseMode-${request.id}`} className="text-xs text-gray-500 dark:text-gray-400">
+                Mode:
+              </Label>
+              <Select
+                value={responseMode}
+                onValueChange={(v) => setResponseMode(v as "manual" | "llm")}
+              >
+                <SelectTrigger id={`responseMode-${request.id}`} className="w-32 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="llm">LLM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {responseMode === "llm" && (
+            <div className="space-y-2 p-3 bg-muted rounded-lg">
+              {isAvailable ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleGenerateWithLLM}
+                    disabled={isGenerating}
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Generate with LLM
+                      </>
+                    )}
+                  </Button>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Using {llmConfig?.provider} ({llmConfig?.model})
+                  </span>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  LLM not configured. Please configure LLM in the Chat tab.
+                </div>
+              )}
+              {generationError && (
+                <div className="text-xs text-red-600 dark:text-red-400">
+                  {generationError}
+                </div>
+              )}
+            </div>
+          )}
           
           <div className="space-y-2">
             <Label htmlFor={`model-${request.id}`}>Model</Label>
@@ -238,6 +357,7 @@ export function SamplingRequestDisplay({
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="stub-model"
+              disabled={responseMode === "llm" && isGenerating}
             />
           </div>
 
@@ -248,12 +368,17 @@ export function SamplingRequestDisplay({
               value={stopReason}
               onChange={(e) => setStopReason(e.target.value)}
               placeholder="endTurn"
+              disabled={responseMode === "llm" && isGenerating}
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor={`role-${request.id}`}>Role</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as "assistant" | "user")}>
+            <Select
+              value={role}
+              onValueChange={(v) => setRole(v as "assistant" | "user")}
+              disabled={responseMode === "llm" && isGenerating}
+            >
               <SelectTrigger id={`role-${request.id}`}>
                 <SelectValue />
               </SelectTrigger>
@@ -266,7 +391,11 @@ export function SamplingRequestDisplay({
 
           <div className="space-y-2">
             <Label htmlFor={`contentType-${request.id}`}>Content Type</Label>
-            <Select value={contentType} onValueChange={(v) => setContentType(v as "text" | "image")}>
+            <Select
+              value={contentType}
+              onValueChange={(v) => setContentType(v as "text" | "image")}
+              disabled={responseMode === "llm" && isGenerating}
+            >
               <SelectTrigger id={`contentType-${request.id}`}>
                 <SelectValue />
               </SelectTrigger>
@@ -286,6 +415,7 @@ export function SamplingRequestDisplay({
                 onChange={(e) => setTextContent(e.target.value)}
                 placeholder="Enter response text..."
                 rows={6}
+                disabled={responseMode === "llm" && isGenerating}
               />
             </div>
           )}
@@ -300,6 +430,7 @@ export function SamplingRequestDisplay({
                   onChange={(e) => setImageData(e.target.value)}
                   placeholder="Base64 encoded image data..."
                   rows={4}
+                  disabled={responseMode === "llm" && isGenerating}
                 />
               </div>
               <div className="space-y-2">
@@ -309,6 +440,7 @@ export function SamplingRequestDisplay({
                   value={imageMimeType}
                   onChange={(e) => setImageMimeType(e.target.value)}
                   placeholder="image/png"
+                  disabled={responseMode === "llm" && isGenerating}
                 />
               </div>
             </>
@@ -318,10 +450,19 @@ export function SamplingRequestDisplay({
 
       {/* Actions Footer */}
       <div className="flex gap-2 p-4 border-t dark:border-zinc-700">
-        <Button onClick={handleApprove} className="flex-1">
+        <Button
+          onClick={handleApprove}
+          className="flex-1"
+          disabled={responseMode === "llm" && isGenerating}
+        >
           Approve
         </Button>
-        <Button onClick={handleReject} variant="outline" className="flex-1">
+        <Button
+          onClick={handleReject}
+          variant="outline"
+          className="flex-1"
+          disabled={responseMode === "llm" && isGenerating}
+        >
           Reject
         </Button>
       </div>
