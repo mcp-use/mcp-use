@@ -1,0 +1,130 @@
+---
+title: "Runner"
+description: "Server runner for different transport types API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/runner.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/runner.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/runner.py</a>
+</Callout>
+
+Server runner for different transport types.
+
+## ServerRunner
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ServerRunner</div>
+
+Handles running the server with different transport types.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.runner import ServerRunner
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="server" type="MCPServer" required="True" >   Server name or configuration </ParamField>
+
+**Signature**
+```python wrap
+def __init__(server: MCPServer):
+```
+
+</Card>
+<Card type="info">
+### `method` run
+
+Run the MCP server.
+
+
+
+**Parameters**
+><ParamField body="transport" type="Literal" default='streamable-http' >   Transport protocol to use ("stdio", "streamable-http" or "sse") </ParamField>
+><ParamField body="host" type="str" default='127.0.0.1' >   Host to bind to </ParamField>
+><ParamField body="port" type="int" default="8000" >   Port to bind to </ParamField>
+><ParamField body="reload" type="bool" default="False" >   Whether to enable auto-reload </ParamField>
+><ParamField body="debug" type="bool" default="False" >   Whether to enable debug mode </ParamField>
+
+**Signature**
+```python wrap
+def run(
+transport: Literal = "streamable-http",
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    reload: bool = False,
+    debug: bool = False
+):
+```
+
+</Card>
+
+<Card type="info">
+### `method` run_sse_async
+
+Run the server using SSE transport.
+
+
+**Parameters**
+><ParamField body="host" type="str" default='127.0.0.1' >   String value </ParamField>
+><ParamField body="port" type="int" default="8000" >   Integer value </ParamField>
+><ParamField body="reload" type="bool" default="False" >   Boolean flag </ParamField>
+
+**Signature**
+```python wrap
+def run_sse_async(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
+```
+
+</Card>
+
+<Card type="info">
+### `method` run_streamable_http_async
+
+Run the server using StreamableHTTP transport.
+
+
+**Parameters**
+><ParamField body="host" type="str" default='127.0.0.1' >   String value </ParamField>
+><ParamField body="port" type="int" default="8000" >   Integer value </ParamField>
+><ParamField body="reload" type="bool" default="False" >   Boolean flag </ParamField>
+
+**Signature**
+```python wrap
+def run_streamable_http_async(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
+```
+
+</Card>
+
+<Card type="info">
+### `method` serve_starlette_app
+
+
+**Parameters**
+><ParamField body="starlette_app" type="starlette.applications.Starlette" required="True" >   Parameter value </ParamField>
+><ParamField body="host" type="str" default='127.0.0.1' >   String value </ParamField>
+><ParamField body="port" type="int" default="8000" >   Integer value </ParamField>
+><ParamField body="transport" type="Literal | None" default="None" >   Parameter value </ParamField>
+><ParamField body="reload" type="bool" default="False" >   Boolean flag </ParamField>
+
+**Signature**
+```python wrap
+def serve_starlette_app(
+starlette_app: starlette.applications.Starlette,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    transport: Literal | None = None,
+    reload: bool = False
+):
+```
+
+</Card>
+
+</div>

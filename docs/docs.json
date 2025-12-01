@@ -356,6 +356,39 @@
                 "pages": [
                   "python/api-reference/mcp_use_errors_error_formatting"
                 ]
+              },
+              {
+                "group": "Server",
+                "icon": "server",
+                "pages": [
+                  "python/api-reference/mcp_use_server_context",
+                  {
+                    "group": "Logging",
+                    "icon": "logs",
+                    "pages": [
+                      "python/api-reference/mcp_use_server_logging_config",
+                      "python/api-reference/mcp_use_server_logging_formatters",
+                      "python/api-reference/mcp_use_server_logging_middleware",
+                      "python/api-reference/mcp_use_server_logging_startup",
+                      "python/api-reference/mcp_use_server_logging_state"
+                    ]
+                  },
+                  "python/api-reference/mcp_use_server_router",
+                  "python/api-reference/mcp_use_server_runner",
+                  "python/api-reference/mcp_use_server_server",
+                  "python/api-reference/mcp_use_server_types",
+                  {
+                    "group": "Utils",
+                    "icon": "tool",
+                    "pages": [
+                      "python/api-reference/mcp_use_server_utils_inspector",
+                      "python/api-reference/mcp_use_server_utils_openmcp",
+                      "python/api-reference/mcp_use_server_utils_routes",
+                      "python/api-reference/mcp_use_server_utils_signals",
+                      "python/api-reference/mcp_use_server_utils_utils"
+                    ]
+                  }
+                ]
               }
             ]
           },

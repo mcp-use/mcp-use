@@ -1,0 +1,60 @@
+---
+title: "Routes"
+description: "Route handlers for the MCP server API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/routes.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/routes.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/routes.py</a>
+</Callout>
+
+Route handlers for the MCP server.
+
+
+## docs_ui
+<Card type="info">
+### `function` docs_ui
+
+Serve the docs UI.
+
+```python
+from mcp_use.server.utils.routes import docs_ui
+```
+
+**Parameters**
+><ParamField body="request" type="starlette.requests.Request" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="starlette.responses.HTMLResponse" />
+
+**Signature**
+```python wrap
+def docs_ui(request: starlette.requests.Request):
+```
+
+</Card>
+
+
+## openmcp_json
+<Card type="info">
+### `function` openmcp_json
+
+Serve the OpenMCP JSON configuration.
+
+```python
+from mcp_use.server.utils.routes import openmcp_json
+```
+
+**Parameters**
+><ParamField body="request" type="starlette.requests.Request" required="True" >   Parameter value </ParamField>
+><ParamField body="server" required="True" >   Server name or configuration </ParamField>
+
+**Signature**
+```python wrap
+def openmcp_json(request: starlette.requests.Request, server):
+```
+
+</Card>

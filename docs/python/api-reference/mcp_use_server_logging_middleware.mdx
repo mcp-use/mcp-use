@@ -1,0 +1,62 @@
+---
+title: "Middleware"
+description: "MCP logging middleware API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/middleware.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/middleware.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/middleware.py</a>
+</Callout>
+
+MCP logging middleware.
+
+## MCPLoggingMiddleware
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPLoggingMiddleware</div>
+
+Middleware that extracts MCP method information from JSON-RPC requests.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.logging.middleware import MCPLoggingMiddleware
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="app" required="True" >   Parameter value </ParamField>
+><ParamField body="debug_level" type="int" default="0" >   Enable debug/verbose mode </ParamField>
+><ParamField body="mcp_path" type="str" default='/mcp' >   File path </ParamField>
+><ParamField body="pretty_print_jsonrpc" type="bool" default="False" >   Boolean flag </ParamField>
+
+**Signature**
+```python wrap
+def __init__(app, debug_level: int = 0, mcp_path: str = "/mcp", pretty_print_jsonrpc: bool = False):
+```
+
+</Card>
+<Card type="info">
+### `method` get_method_info
+
+Get method info for current thread.
+
+
+**Returns**
+><ResponseField name="returns" type="dict | None" />
+
+**Signature**
+```python wrap
+def get_method_info():
+```
+
+</Card>
+
+</div>
