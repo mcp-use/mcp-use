@@ -105,9 +105,7 @@ describe("Node.js-Specific Features", () => {
 
       expect(fs.existsSync(testConfigPath)).toBe(true);
 
-      const savedConfig = JSON.parse(
-        fs.readFileSync(testConfigPath, "utf-8")
-      );
+      const savedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"));
       expect(savedConfig).toEqual(config);
     });
 
@@ -142,9 +140,7 @@ describe("Node.js-Specific Features", () => {
       client.addServer("server2", { url: "http://localhost:3001" });
       client.saveConfig(testConfigPath);
 
-      const savedConfig = JSON.parse(
-        fs.readFileSync(testConfigPath, "utf-8")
-      );
+      const savedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"));
       expect(savedConfig.mcpServers.server1).toBeDefined();
       expect(savedConfig.mcpServers.server2).toBeDefined();
     });
@@ -160,9 +156,7 @@ describe("Node.js-Specific Features", () => {
       client.removeServer("server1");
       client.saveConfig(testConfigPath);
 
-      const savedConfig = JSON.parse(
-        fs.readFileSync(testConfigPath, "utf-8")
-      );
+      const savedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"));
       expect(savedConfig.mcpServers.server1).toBeUndefined();
       expect(savedConfig.mcpServers.server2).toBeDefined();
     });

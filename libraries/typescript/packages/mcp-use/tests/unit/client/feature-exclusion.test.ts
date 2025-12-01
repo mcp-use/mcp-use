@@ -60,7 +60,8 @@ describe("Feature Exclusion Tests", () => {
     it("should NOT have BrowserOAuthClientProvider (browser-specific)", async () => {
       // BrowserOAuthClientProvider is imported separately and not part of MCPClient
       // This is verified by the fact that it's not exported from client.ts
-      const { BrowserOAuthClientProvider } = await import("../../../src/auth/browser-provider.js");
+      const { BrowserOAuthClientProvider } =
+        await import("../../../src/auth/browser-provider.js");
       expect(BrowserOAuthClientProvider).toBeDefined();
 
       // But MCPClient doesn't have direct OAuth support like browser client
@@ -77,7 +78,7 @@ describe("Feature Exclusion Tests", () => {
       // This is verified by TypeScript types in UseMcpOptions
       // Since types are compile-time only, we verify the hook exists and uses BrowserMCPClient
       const { useMcp } = await import("../../../src/react/useMcp.js");
-      
+
       // TypeScript would prevent codeMode from being passed
       // We verify that the hook exists and uses BrowserMCPClient (which doesn't support codeMode)
       expect(useMcp).toBeDefined();
@@ -88,7 +89,7 @@ describe("Feature Exclusion Tests", () => {
       // This is verified by the UseMcpResult type
       // Since types are compile-time only, we verify the hook exists
       const { useMcp } = await import("../../../src/react/useMcp.js");
-      
+
       // The result type should not include saveConfig or fromConfigFile
       // Type-level check - TypeScript enforces this at compile time
       expect(useMcp).toBeDefined();
@@ -112,7 +113,8 @@ describe("Feature Exclusion Tests", () => {
       // Browser features
       const browserFeatures = {
         codeMode: (browserClient as any).codeMode !== undefined,
-        fromConfigFile: typeof (BrowserMCPClient as any).fromConfigFile === "function",
+        fromConfigFile:
+          typeof (BrowserMCPClient as any).fromConfigFile === "function",
         saveConfig: typeof (browserClient as any).saveConfig === "function",
         executeCode: typeof (browserClient as any).executeCode === "function",
         httpConnector: true, // Supported

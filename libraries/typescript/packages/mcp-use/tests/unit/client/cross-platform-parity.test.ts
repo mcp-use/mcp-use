@@ -29,7 +29,9 @@ describe("Cross-Platform API Parity", () => {
       expect(browserClient.getServerNames()).toEqual(["test-server"]);
 
       expect(nodeClient.getServerConfig("test-server")).toEqual(serverConfig);
-      expect(browserClient.getServerConfig("test-server")).toEqual(serverConfig);
+      expect(browserClient.getServerConfig("test-server")).toEqual(
+        serverConfig
+      );
     });
 
     it("should have identical removeServer behavior", () => {
@@ -172,13 +174,13 @@ describe("Cross-Platform API Parity", () => {
       const nodeClient = new MCPClient();
       const browserClient = new BrowserMCPClient();
 
-      await expect(
-        nodeClient.createSession("nonexistent")
-      ).rejects.toThrow("Server 'nonexistent' not found in config");
+      await expect(nodeClient.createSession("nonexistent")).rejects.toThrow(
+        "Server 'nonexistent' not found in config"
+      );
 
-      await expect(
-        browserClient.createSession("nonexistent")
-      ).rejects.toThrow("Server 'nonexistent' not found in config");
+      await expect(browserClient.createSession("nonexistent")).rejects.toThrow(
+        "Server 'nonexistent' not found in config"
+      );
     });
 
     it("should handle empty config identically", () => {

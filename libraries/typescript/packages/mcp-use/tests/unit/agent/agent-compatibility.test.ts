@@ -14,10 +14,11 @@ import { BrowserMCPClient } from "../../../src/client/browser.js";
 import { MCPAgent } from "../../../src/agents/mcp_agent.js";
 
 // Mock LLM for testing (MCPAgent requires llm or agentId)
-const createMockLLM = () => ({
-  invoke: async () => ({ content: "test" }),
-  bindTools: () => ({}),
-} as any);
+const createMockLLM = () =>
+  ({
+    invoke: async () => ({ content: "test" }),
+    bindTools: () => ({}),
+  }) as any;
 
 describe("MCPAgent Compatibility", () => {
   describe("Agent with Node.js Client", () => {
