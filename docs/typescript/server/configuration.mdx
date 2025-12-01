@@ -14,6 +14,34 @@ This guide covers advanced configuration options, deployment strategies, and bes
 
 The server accepts configuration during initialization:
 
+### Icons and Website URL (SEP-973)
+
+You can add icons and a website URL to your server configuration. These are displayed in the MCP Inspector and help users identify your server:
+
+```typescript
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  description: 'My MCP server',
+  // Server icon - displayed in Inspector's server capabilities modal
+  icons: [
+    {
+      src: 'https://example.com/logo.png',  // URL or data URI
+      mimeType: 'image/png',                // Optional MIME type
+      sizes: '512x512'                       // Icon size(s)
+    }
+  ],
+  // Website URL - displayed as clickable link in Inspector
+  websiteUrl: 'https://example.com'
+})
+```
+
+**Icon Formats:**
+- **URL-based icons**: Use HTTPS URLs pointing to icon images
+- **Data URI icons**: Base64-encoded images (e.g., `data:image/png;base64,...`)
+- **Multiple sizes**: Specify multiple sizes like `"16x16 32x32 48x48"` for responsive displays
+
+**Security Note**: When using URL-based icons, ensure URLs are from trusted domains. The Inspector validates icon sources and provides fallback icons if loading fails.
+
 ```typescript
 import { createMCPServer } from 'mcp-use/server'
 
@@ -26,7 +54,16 @@ const server = createMCPServer('my-server', {
     ? ['https://myapp.com']      // Production: explicit origins
     : undefined,                 // Development: allows all origins
   sessionIdleTimeoutMs: 300000,  // Session idle timeout (default: 5 minutes)
-  autoCreateSessionOnInvalidId: true  // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
+  autoCreateSessionOnInvalidId: true,  // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
+  // Icons and website URL (SEP-973) - displayed in MCP Inspector
+  icons: [
+    {
+      src: 'https://example.com/logo.png',
+      mimeType: 'image/png',
+      sizes: '512x512'
+    }
+  ],
+  websiteUrl: 'https://example.com'  // Optional website URL
 })
 ```
 
