@@ -582,9 +582,15 @@ export function ToolsTab({
     setResults((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  // Filter results to only show executions of the currently selected tool
+  const filteredResults = useMemo(() => {
+    if (!selectedTool) return [];
+    return results.filter((r) => r.toolName === selectedTool.name);
+  }, [results, selectedTool]);
+
   const handleFullscreen = useCallback(
     (index: number) => {
-      const result = results[index];
+      const result = filteredResults[index];
       if (result) {
         const newWindow = window.open("", "_blank", "width=800,height=600");
         if (newWindow) {
@@ -827,7 +833,7 @@ export function ToolsTab({
                 className="absolute inset-0 bg-background z-20"
               >
                 <ToolResultDisplay
-                  results={results}
+                  results={filteredResults}
                   copiedResult={copiedResult}
                   previewMode={previewMode}
                   serverId={serverId}
@@ -1002,7 +1008,7 @@ export function ToolsTab({
           <ResizablePanel ref={bottomPanelRef} defaultSize={60}>
             <div className="flex flex-col h-full">
               <ToolResultDisplay
-                results={results}
+                results={filteredResults}
                 copiedResult={copiedResult}
                 previewMode={previewMode}
                 serverId={serverId}

@@ -154,6 +154,13 @@ export class McpServer<HasOAuth extends boolean = false> {
       transport: any; // StreamableHTTPServerTransport
       lastAccessedAt: number;
       context?: Context; // Store Hono context for this session
+      progressToken?: number; // Progress token for current tool call
+      sendNotification?: (notification: {
+        method: string;
+        params: Record<string, any>;
+      }) => Promise<void>; // Function to send notifications
+      expressRes?: any; // Store response object for sending notifications
+      honoContext?: Context; // Store Hono context for direct response access
     }
   >();
   private idleCleanupInterval?: NodeJS.Timeout;
@@ -621,7 +628,53 @@ export class McpServer<HasOAuth extends boolean = false> {
         }
 
         // Extract progress token from request metadata
-        const progressToken = extra?._meta?.progressToken;
+        // First try from extra (if SDK provides it), then from session
+        let progressToken = extra?._meta?.progressToken;
+        let sendNotification = extra?.sendNotification;
+
+        // If not provided by SDK, try to get from session
+        if (!progressToken || !sendNotification) {
+          // Find the session that matches the current request context
+          let session:
+            | {
+                transport: any;
+                lastAccessedAt: number;
+                context?: Context;
+                progressToken?: number;
+                sendNotification?: (notification: {
+                  method: string;
+                  params: Record<string, any>;
+                }) => Promise<void>;
+                expressRes?: any;
+                honoContext?: Context;
+              }
+            | undefined;
+
+          if (requestContext) {
+            // Try to find session by matching context
+            for (const [, s] of this.sessions.entries()) {
+              if (s.context === requestContext) {
+                session = s;
+                break;
+              }
+            }
+          } else {
+            // Fallback: use first available session (for compatibility)
+            const firstSession = this.sessions.values().next().value;
+            if (firstSession) {
+              session = firstSession;
+            }
+          }
+
+          if (session) {
+            if (!progressToken && session.progressToken) {
+              progressToken = session.progressToken;
+            }
+            if (!sendNotification && session.sendNotification) {
+              sendNotification = session.sendNotification;
+            }
+          }
+        }
 
         // Create enhanced context that combines ToolContext methods with Hono request context
         // This provides a unified interface with sample(), reportProgress(), auth, req, etc.
@@ -658,7 +711,7 @@ export class McpServer<HasOAuth extends boolean = false> {
           let progressInterval: ReturnType<typeof setInterval> | null = null;
 
           // Set up progress notifications if we have a progress token
-          if (progressToken && extra?.sendNotification) {
+          if (progressToken && sendNotification) {
             progressInterval = setInterval(async () => {
               if (completed) return;
 
@@ -680,15 +733,17 @@ export class McpServer<HasOAuth extends boolean = false> {
 
               // Send progress notification to client
               try {
-                await extra.sendNotification({
-                  method: "notifications/progress",
-                  params: {
-                    progressToken,
-                    progress: progressData.progress,
-                    total: progressData.total,
-                    message: progressData.message,
-                  },
-                });
+                if (sendNotification) {
+                  await sendNotification({
+                    method: "notifications/progress",
+                    params: {
+                      progressToken,
+                      progress: progressData.progress,
+                      total: progressData.total,
+                      message: progressData.message,
+                    },
+                  });
+                }
               } catch {
                 // Ignore errors - request might have completed
               }
@@ -697,7 +752,14 @@ export class McpServer<HasOAuth extends boolean = false> {
 
           try {
             // Create the sampling promise
-            const samplePromise = this.createMessage(sampleParams);
+            // Pass a very long timeout to override SDK's default 60-second timeout
+            // We handle our own timeout logic below if the user specified one
+            // Use 2147483647 (max 32-bit signed int) = ~24.8 days, as setTimeout uses 32-bit
+            const sdkTimeout =
+              timeout && timeout !== Infinity ? timeout : 2147483647; // ~24.8 days - effectively infinite for sampling
+            const samplePromise = this.createMessage(sampleParams, {
+              timeout: sdkTimeout,
+            });
 
             // If timeout is specified, race against it
             if (timeout && timeout !== Infinity) {
@@ -726,17 +788,19 @@ export class McpServer<HasOAuth extends boolean = false> {
          * Only works if the client requested progress updates for this tool call.
          */
         enhancedContext.reportProgress =
-          progressToken && extra?.sendNotification
+          progressToken && sendNotification
             ? async (progress: number, total?: number, message?: string) => {
-                await extra.sendNotification({
-                  method: "notifications/progress",
-                  params: {
-                    progressToken,
-                    progress,
-                    total,
-                    message,
-                  },
-                });
+                if (sendNotification) {
+                  await sendNotification({
+                    method: "notifications/progress",
+                    params: {
+                      progressToken,
+                      progress,
+                      total,
+                      message,
+                    },
+                  });
+                }
               }
             : undefined;
 
@@ -853,7 +917,6 @@ export class McpServer<HasOAuth extends boolean = false> {
     params: CreateMessageRequest["params"],
     options?: RequestOptions
   ): Promise<CreateMessageResult> {
-    console.log("createMessage", params, options);
     // The official SDK's McpServer has a `server` property which is the Server instance
     // The Server instance has the createMessage method
     return await this.server.server.createMessage(params, options);
@@ -2182,7 +2245,7 @@ if (container && Component) {
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => generateUUID(),
-        enableJsonResponse: true,
+        enableJsonResponse: false, // Allow SSE streaming for progress notifications
         allowedOrigins: allowedOrigins,
         enableDnsRebindingProtection: enableDnsRebindingProtection,
         onsessioninitialized: (id) => {
@@ -2217,7 +2280,7 @@ if (container && Component) {
       // This ensures the client's subsequent requests with this session ID will work
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => oldSessionId, // Reuse old session ID!
-        enableJsonResponse: true,
+        enableJsonResponse: false, // Allow SSE streaming for progress notifications
         allowedOrigins: allowedOrigins,
         enableDnsRebindingProtection: enableDnsRebindingProtection,
         // We'll manually store the session, so don't rely on onsessioninitialized
@@ -2369,6 +2432,13 @@ if (container && Component) {
       const headers: Record<string, string> = {};
       let ended = false;
       let headersSent = false;
+      let isSSEStream = false;
+      let streamWriter: any = null; // WritableStreamDefaultWriter<Uint8Array>
+      let streamingResponse: Response | null = null;
+      let sseStreamReady: ((response: Response) => void) | null = null;
+      const sseStreamPromise = new Promise<Response>((resolve) => {
+        sseStreamReady = resolve;
+      });
 
       const expressReq: any = {
         ...req,
@@ -2396,19 +2466,52 @@ if (container && Component) {
         },
         setHeader: (name: string, value: string | string[]) => {
           if (!headersSent) {
-            headers[name] = Array.isArray(value) ? value.join(", ") : value;
+            headers[name.toLowerCase()] = Array.isArray(value)
+              ? value.join(", ")
+              : value;
+            // Detect SSE when Content-Type is set to text/event-stream
+            if (
+              name.toLowerCase() === "content-type" &&
+              (Array.isArray(value) ? value.join(", ") : value).includes(
+                "text/event-stream"
+              )
+            ) {
+              isSSEStream = true;
+              // Create TransformStream for SSE
+              const { readable, writable } = new (
+                globalThis as any
+              ).TransformStream();
+              streamWriter = writable.getWriter();
+              streamingResponse = new Response(readable, {
+                status: statusCode,
+                headers: headers,
+              });
+              // Resolve the promise so the POST handler can return the stream immediately
+              if (sseStreamReady) {
+                sseStreamReady(streamingResponse);
+              }
+            }
           }
         },
-        getHeader: (name: string) => headers[name],
+        getHeader: (name: string) => headers[name.toLowerCase()],
         write: (chunk: any, encoding?: any, callback?: any) => {
-          if (!ended) {
+          if (!ended || isSSEStream) {
             const data =
               typeof chunk === "string"
                 ? new TextEncoder().encode(chunk)
                 : chunk instanceof Uint8Array
                   ? chunk
                   : Buffer.from(chunk);
-            responseBody.push(data);
+
+            // For SSE streams, write directly to the stream
+            if (isSSEStream && streamWriter) {
+              streamWriter.write(data).catch(() => {
+                // Ignore write errors (client may have disconnected)
+              });
+            } else {
+              // Buffer for non-SSE responses
+              responseBody.push(data);
+            }
           }
           if (typeof encoding === "function") {
             encoding();
@@ -2425,9 +2528,23 @@ if (container && Component) {
                 : chunk instanceof Uint8Array
                   ? chunk
                   : Buffer.from(chunk);
-            responseBody.push(data);
+
+            // For SSE streams, write to stream but DON'T close it yet
+            // The SDK will manage when to close the stream
+            if (isSSEStream && streamWriter) {
+              streamWriter.write(data).catch(() => {
+                // Ignore write errors (client may have disconnected)
+              });
+              // Don't close the stream here - let the SDK manage it
+            } else {
+              responseBody.push(data);
+            }
           }
-          ended = true;
+          // For SSE streams, don't mark as ended - the stream stays open
+          // The SDK will close it when all responses are sent
+          if (!isSSEStream) {
+            ended = true;
+          }
           if (typeof encoding === "function") {
             encoding();
           } else if (callback) {
@@ -2446,14 +2563,45 @@ if (container && Component) {
           expressRes.statusCode = code;
           headersSent = true;
           if (_headers) {
-            Object.assign(headers, _headers);
+            // Handle both object and array of header tuples
+            // Normalize all keys to lowercase for consistent access
+            if (Array.isArray(_headers)) {
+              // Array format: [['Content-Type', 'text/event-stream'], ...]
+              for (const [name, value] of _headers) {
+                headers[name.toLowerCase()] = value;
+              }
+            } else {
+              // Object format: { 'Content-Type': 'text/event-stream', ... }
+              // Normalize keys to lowercase
+              for (const [key, value] of Object.entries(_headers)) {
+                headers[key.toLowerCase()] = value as string;
+              }
+            }
+
+            // Check if SSE headers are being set
+            const contentType = headers["content-type"];
+            if (contentType && contentType.includes("text/event-stream")) {
+              isSSEStream = true;
+              // Create TransformStream for SSE
+              const { readable, writable } = new (
+                globalThis as any
+              ).TransformStream();
+              streamWriter = writable.getWriter();
+              streamingResponse = new Response(readable, {
+                status: statusCode,
+                headers: headers,
+              });
+              // Resolve the promise so the POST handler can return the stream immediately
+              if (sseStreamReady) {
+                sseStreamReady(streamingResponse);
+              }
+            }
           }
           return expressRes;
         },
         flushHeaders: () => {
           headersSent = true;
-          // For SSE streaming, this is a no-op in our adapter
-          // The headers will be sent when the response is returned
+          // For SSE streaming, headers are already set in streamingResponse
         },
         send: (body: any) => {
           if (!ended) {
@@ -2467,6 +2615,11 @@ if (container && Component) {
         expressReq,
         expressRes,
         getResponse: () => {
+          // For SSE streams, return the streaming response immediately
+          if (isSSEStream && streamingResponse) {
+            return streamingResponse;
+          }
+          // For buffered responses, return after end is called
           if (ended) {
             if (responseBody.length > 0) {
               const body = isDeno
@@ -2485,6 +2638,8 @@ if (container && Component) {
           }
           return null;
         },
+        isSSEStream: () => isSSEStream,
+        waitForSSEStream: () => sseStreamPromise,
       };
     };
 
@@ -2492,8 +2647,13 @@ if (container && Component) {
     const mountEndpoint = (endpoint: string) => {
       // POST endpoint for messages
       this.app.post(endpoint, async (c: Context) => {
-        const { expressReq, expressRes, getResponse } =
-          createExpressLikeObjects(c);
+        const {
+          expressReq,
+          expressRes,
+          getResponse,
+          isSSEStream,
+          waitForSSEStream,
+        } = createExpressLikeObjects(c);
 
         // Get request body
         let body: any = {};
@@ -2557,6 +2717,27 @@ if (container && Component) {
           const session = this.sessions.get(sessionId)!;
           session.lastAccessedAt = Date.now();
           session.context = c; // Store the Hono context
+          session.honoContext = c; // Store for direct response access
+          session.expressRes = expressRes; // Store response object for notifications
+
+          // Extract progressToken from tool call requests
+          if (
+            body?.method === "tools/call" &&
+            body?.params?._meta?.progressToken
+          ) {
+            session.progressToken = body.params._meta.progressToken;
+            console.log(
+              `Received progressToken ${session.progressToken} for tool call: ${body.params?.name}`
+            );
+          } else {
+            // Clear progressToken if not a tool call or no token provided
+            session.progressToken = undefined;
+            if (body?.method === "tools/call") {
+              console.log(
+                `No progressToken in tool call request: ${body.params?.name}`
+              );
+            }
+          }
         }
 
         // Handle close event
@@ -2570,16 +2751,86 @@ if (container && Component) {
 
         // Wrap the request handling in AsyncLocalStorage context
         // This makes the Hono context available to tool callbacks via getRequestContext()
+        // For SSE streams, we need to return the stream immediately after headers are set
+        // The SDK's handleRequest will call writeHead synchronously for SSE
+        let streamingResponse: Response | null = null;
+        let shouldReturnStream = false;
+
         await runWithContext(c, async () => {
-          // Wait for handleRequest to complete and for response to be written
-          await this.waitForRequestComplete(
-            transport,
+          // Start handleRequest - it will call writeHead which may create SSE stream
+          const handleRequestPromise = transport.handleRequest(
             expressReq,
             expressRes,
             expressReq.body
           );
+
+          // Race between SSE stream creation and request completion
+          // If SSE stream is created, return it immediately
+          // Otherwise, wait for request to complete
+          try {
+            // Wait for either SSE stream to be ready or a short timeout
+            // The SDK calls writeHead/setHeader synchronously when processing the request
+            const sseStream = await Promise.race([
+              waitForSSEStream(),
+              new Promise<Response | null>((resolve) => {
+                // Give handleRequest a chance to call writeHead/setHeader
+                // The SDK processes the request and sets headers synchronously
+                setTimeout(() => resolve(null), 50);
+              }),
+            ]);
+
+            if (sseStream) {
+              streamingResponse = sseStream;
+              shouldReturnStream = true;
+              // Let handleRequest continue in background - it will write SSE events
+              handleRequestPromise.catch((err: any) => {
+                // Ignore SSE stream errors (client may have disconnected)
+              });
+              return;
+            } else {
+              // Check again if SSE was detected but promise didn't resolve
+              if (isSSEStream()) {
+                const response = getResponse();
+                if (response) {
+                  streamingResponse = response;
+                  shouldReturnStream = true;
+                  handleRequestPromise.catch(() => {
+                    // Ignore errors (client may have disconnected)
+                  });
+                  return;
+                }
+              }
+            }
+          } catch {
+            // Ignore timeout errors
+          }
+
+          // Not SSE or SSE stream not created - wait for request completion
+          await new Promise<void>((resolve) => {
+            const originalEnd = expressRes.end;
+            let ended = false;
+            expressRes.end = (...args: any[]) => {
+              if (!ended) {
+                originalEnd.apply(expressRes, args);
+                ended = true;
+                resolve();
+              }
+            };
+            // If handleRequest already completed, resolve immediately
+            handleRequestPromise.finally(() => {
+              if (!ended) {
+                expressRes.end();
+              }
+            });
+          });
         });
 
+        // If we have a streaming response (SSE), return it immediately
+        if (shouldReturnStream && streamingResponse) {
+          return streamingResponse;
+        }
+
+        // Check for buffered response (non-SSE)
         const response = getResponse();
         if (response) {
           return response;

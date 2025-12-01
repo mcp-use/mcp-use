@@ -6,6 +6,7 @@ export type TabType =
   | "prompts"
   | "resources"
   | "chat"
+  | "sampling"
   | "notifications";
 
 interface InspectorState {
@@ -14,6 +15,7 @@ interface InspectorState {
   selectedToolName: string | null;
   selectedPromptName: string | null;
   selectedResourceUri: string | null;
+  selectedSamplingRequestId: string | null;
   tunnelUrl: string | null;
 }
 
@@ -23,6 +25,7 @@ interface InspectorContextType extends InspectorState {
   setSelectedToolName: (toolName: string | null) => void;
   setSelectedPromptName: (promptName: string | null) => void;
   setSelectedResourceUri: (resourceUri: string | null) => void;
+  setSelectedSamplingRequestId: (requestId: string | null) => void;
   setTunnelUrl: (tunnelUrl: string | null) => void;
   navigateToItem: (
     serverId: string,
@@ -43,6 +46,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     selectedToolName: null,
     selectedPromptName: null,
     selectedResourceUri: null,
+    selectedSamplingRequestId: null,
     tunnelUrl: null,
   });
 
@@ -66,6 +70,13 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, selectedResourceUri: resourceUri }));
   }, []);
 
+  const setSelectedSamplingRequestId = useCallback(
+    (requestId: string | null) => {
+      setState((prev) => ({ ...prev, selectedSamplingRequestId: requestId }));
+    },
+    []
+  );
+
   const setTunnelUrl = useCallback((tunnelUrl: string | null) => {
     setState((prev) => ({ ...prev, tunnelUrl }));
   }, []);
@@ -85,6 +96,9 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
         selectedPromptName: tab === "prompts" ? itemIdentifier || null : null,
         selectedResourceUri:
           tab === "resources" ? itemIdentifier || null : null,
+        selectedSamplingRequestId:
+          tab === "sampling" ? itemIdentifier || null : null,
+        tunnelUrl: null,
       };
 
       console.warn("[InspectorContext] Setting new state:", newState);
@@ -101,6 +115,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
       selectedToolName: null,
       selectedPromptName: null,
       selectedResourceUri: null,
+      selectedSamplingRequestId: null,
     }));
   }, []);
 
@@ -111,6 +126,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setSelectedToolName,
     setSelectedPromptName,
     setSelectedResourceUri,
+    setSelectedSamplingRequestId,
     setTunnelUrl,
     navigateToItem,
     clearSelection,
