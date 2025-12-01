@@ -69,6 +69,7 @@ export {
 export type {
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
+  Icon,
   InputDefinition,
   McpContext,
   PromptCallback,

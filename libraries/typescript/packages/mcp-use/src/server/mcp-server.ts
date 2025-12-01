@@ -179,7 +179,10 @@ export class McpServer<HasOAuth extends boolean = false> {
     this.server = new OfficialMcpServer({
       name: config.name,
       version: config.version,
-    });
+      // Icons and websiteUrl support for SEP-973 - SDK types will be updated to support these
+      icons: config.icons,
+      websiteUrl: config.websiteUrl,
+    } as any);
     this.app = new Hono();
 
     // Enable CORS by default
@@ -418,8 +421,10 @@ export class McpServer<HasOAuth extends boolean = false> {
         title: resourceDefinition.title,
         description: resourceDefinition.description,
         mimeType: resourceDefinition.mimeType,
+        // Icons support for SEP-973 - SDK types will be updated to support this
+        icons: resourceDefinition.icons,
         _meta: resourceDefinition._meta,
-      },
+      } as any,
       async () => {
         return await resourceDefinition.readCallback();
       }
@@ -491,11 +496,15 @@ export class McpServer<HasOAuth extends boolean = false> {
     if (resourceTemplateDefinition.annotations) {
       metadata.annotations = resourceTemplateDefinition.annotations;
     }
+    if (resourceTemplateDefinition.icons) {
+      // Icons support for SEP-973 - SDK types will be updated to support this
+      metadata.icons = resourceTemplateDefinition.icons;
+    }
 
     this.server.registerResource(
       resourceTemplateDefinition.name,
       template,
-      metadata,
+      metadata as any,
       async (uri: URL) => {
         // Parse URI parameters from the template
         const params = this.parseTemplateUri(
@@ -603,6 +612,8 @@ export class McpServer<HasOAuth extends boolean = false> {
         description: toolDefinition.description ?? "",
         inputSchema,
         annotations: toolDefinition.annotations,
+        // @ts-expect-error - SDK types haven't been updated for SEP-973 yet
+        icons: toolDefinition.icons,
         _meta: toolDefinition._meta,
       },
       async (params: any, extra?: any) => {
@@ -805,6 +816,8 @@ export class McpServer<HasOAuth extends boolean = false> {
         title: promptDefinition.title,
         description: promptDefinition.description ?? "",
         argsSchema: argsSchema as any, // Type assertion for Zod v4 compatibility
+        // @ts-expect-error - SDK types haven't been updated for SEP-973 yet
+        icons: promptDefinition.icons,
       },
       async (params: any): Promise<GetPromptResult> => {
         return await promptDefinition.cb(params);

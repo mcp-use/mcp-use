@@ -1,5 +1,5 @@
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
-import type { ResourceAnnotations } from "./common.js";
+import type { Icon, ResourceAnnotations } from "./common.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
 
 // UIResourceContent type from MCP-UI
@@ -105,6 +105,15 @@ export interface ResourceTemplateDefinition {
   title?: string;
   description?: string;
   annotations?: ResourceAnnotations;
+  /**
+   * An optional list of icons for a resource template.
+   * This can be used by clients to display the resource template's icon in a user interface.
+   * Each icon should have a `src` property that points to the icon file or data representation, and may also include a `mimeType` and `sizes` property.
+   * The `mimeType` property should be a valid MIME type for the icon file, such as "image/png" or "image/svg+xml".
+   * The `sizes` property should be a string that specifies one or more sizes at which the icon file can be used, such as "48x48" or "any" for scalable formats like SVG.
+   * The `sizes` property is optional, and if not provided, the client should assume that the icon can be used at any size.
+   */
+  icons?: Icon[];
   readCallback: ReadResourceTemplateCallback;
   _meta?: Record<string, unknown>;
 }
@@ -122,6 +131,15 @@ export interface ResourceDefinition {
   mimeType: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
+  /**
+   * An optional list of icons for a resource.
+   * This can be used by clients to display the resource's icon in a user interface.
+   * Each icon should have a `src` property that points to the icon file or data representation, and may also include a `mimeType` and `sizes` property.
+   * The `mimeType` property should be a valid MIME type for the icon file, such as "image/png" or "image/svg+xml".
+   * The `sizes` property should be a string that specifies one or more sizes at which the icon file can be used, such as "48x48" or "any" for scalable formats like SVG.
+   * The `sizes` property is optional, and if not provided, the client should assume that the icon can be used at any size.
+   */
+  icons?: Icon[];
   /** Async callback function that returns the resource content */
   readCallback: ReadResourceCallback;
   _meta?: Record<string, unknown>;
