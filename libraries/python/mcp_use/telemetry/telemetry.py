@@ -192,10 +192,10 @@ class Telemetry:
         return self._curr_user_id
 
     @requires_telemetry
-    def capture(self, event: BaseTelemetryEvent) -> None:
+    def capture(self, event: BaseTelemetryEvent, provider: str = "posthog+scarf") -> None:
         """Capture a telemetry event"""
         # Send to PostHog
-        if self._posthog_client:
+        if "posthog" in provider and self._posthog_client:
             try:
                 # Add package version to all events
                 properties = event.properties.copy()
@@ -206,7 +206,7 @@ class Telemetry:
                 logger.debug(f"Failed to track PostHog event {event.name}: {e}")
 
         # Send to Scarf
-        if self._scarf_client:
+        if "scarf" in provider and self._scarf_client:
             try:
                 # Add package version and user_id to all events
                 properties = {}
@@ -340,7 +340,7 @@ class Telemetry:
             error_type=error_type,
             additional_properties=additional_properties,
         )
-        self.capture(event)
+        self.capture(event, provider="posthog")
 
     @requires_telemetry
     def flush(self) -> None:

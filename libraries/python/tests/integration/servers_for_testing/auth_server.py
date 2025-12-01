@@ -1,10 +1,14 @@
 import argparse
+from typing import get_args
 
-from fastmcp import Context, FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse
 
-mcp = FastMCP(name="AuthServer")
+from mcp_use import MCPServer
+from mcp_use.server import Context
+from mcp_use.server.types import TransportType
+
+mcp = MCPServer(name="AuthServer")
 
 # We set all the fields to ensure that models
 # correctly bind data
@@ -126,7 +130,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--transport",
         type=str,
-        choices=["streamable-http", "sse"],
+        choices=get_args(TransportType),
         default="streamable-http",
         help="MCP transport type to use (default: streamable-http)",
     )

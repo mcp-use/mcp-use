@@ -32,10 +32,10 @@ ruff check --fix
 ruff format
 
 # Run type checking
-mypy mcp_use/
+ty check
 
 # Run pre-commit hooks
-pre-commit run --all-files
+prek run --all-files
 ```
 
 ### Testing

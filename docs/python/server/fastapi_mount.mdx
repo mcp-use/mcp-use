@@ -1,0 +1,66 @@
+
+# FastAPI Mounting Guide
+
+You can mount an `MCPServer` (or `FastMCP`) instance within an existing FastAPI application. This allows you to serve your MCP tools alongside your existing API endpoints.
+
+## Basic Integration
+
+When mounting `MCPServer`, we need to ensure its internal task group (used for managing SSE streams) is properly initialized. We do this using FastAPI's lifespan events.
+
+```python
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from mcp_use.server import MCPServer
+import uvicorn
+import anyio
+
+# 1. Create your MCP Server
+mcp = MCPServer("my-agent-server")
+
+@mcp.tool()
+def add(a: int, b: int) -> int:
+    return a + b
+
+# 2. Define lifespan to manage MCP server startup/shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize the SSE task group
+    async with anyio.create_task_group() as tg:
+        # Inject the task group into the session manager
+        mcp.session_manager._task_group = tg
+        yield
+
+# 3. Create your existing FastAPI app with lifespan
+app = FastAPI(title="My Existing App", lifespan=lifespan)
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello from the main app"}
+
+# 4. Mount the MCP Server
+mount_path = "/agent"
+app.mount(mount_path, mcp.app)
+
+if __name__ == "__main__":
+    print(f"Serving MCP at http://localhost:8000{mount_path}/mcp")
+    uvicorn.run(app, port=8000)
+```
+
+## Important Considerations
+
+1.  **Lifespan Management:** The critical part is wrapping the application lifespan with an `anyio.create_task_group()` and assigning it to `mcp.session_manager._task_group`. This works around `FastMCP`'s assumption that it controls the main loop.
+2.  **Transport:** Mounting implies using the **Streamable HTTP** transport pattern.
+3.  **Paths:** The `MCPServer` has internal routes like `/mcp` (for SSE/POST) and `/docs`. When mounted at `/agent`, these become `/agent/mcp` and `/agent/docs`.
+
+## Example with Shared State
+
+If you want your MCP tools to access the main application's state (like a database connection), you can pass that context into the tool or use a closure.
+
+```python
+fake_db = {"items": []}
+
+@mcp.tool()
+def add_item(name: str):
+    fake_db["items"].append(name)
+    return f"Added {name}"
+```

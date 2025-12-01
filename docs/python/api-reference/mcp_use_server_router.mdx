@@ -1,0 +1,365 @@
+---
+title: "Router"
+description: "MCP Router for organizing tools, resources, and prompts into modules API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/router.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/router.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/router.py</a>
+</Callout>
+
+MCP Router for organizing tools, resources, and prompts into modules.
+
+## MCPRouter
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPRouter</div>
+
+Router for organizing MCP tools, resources, and prompts into reusable modules.
+
+    Similar to FastAPI's APIRouter, this allows you to define tools and resources
+    in separate files and then include them in your main server.
+
+    Example:
+        ```python
+        # routes/math.py
+        from mcp_use.server import MCPRouter
+
+        router = MCPRouter()
+
+        @router.tool()
+        def add(a: int, b: int) -> int:
+            return a + b
+
+        # main.py
+        from mcp_use.server import MCPServer
+        from routes.math import router as math_router
+
+        server = MCPServer(name="my-server")
+        server.include_router(math_router, prefix="math")
+        ```
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.router import MCPRouter
+```
+
+<Card type="info">
+### `method` __init__
+
+Create a new MCP router.
+
+
+**Parameters**
+><ParamField body="prefix" type="str" default='' >   Optional prefix to add to all tool/resource names when included. </ParamField>
+><ParamField body="tags" type="list[str] | None" default="None" >   Optional tags for documentation/organization purposes. </ParamField>
+
+**Signature**
+```python wrap
+def __init__(prefix: str = "", tags: list[str] | None = None):
+```
+
+</Card>
+<Card type="info">
+### `method` include_router
+
+Include another router's tools, resources, and prompts into this router.
+
+        This allows for nested router organization.
+
+
+
+**Parameters**
+><ParamField body="router" type="MCPRouter" required="True" >   The router to include </ParamField>
+><ParamField body="prefix" type="str" default='' >   Additional prefix to add to included items </ParamField>
+
+**Signature**
+```python wrap
+def include_router(router: MCPRouter, prefix: str = ""):
+```
+
+</Card>
+
+<Card type="info">
+### `method` prompt
+
+Decorator to register a prompt with this router.
+
+        Example:
+            ```python
+            @router.prompt()
+            def greeting_prompt(name: str) -> str:
+                return f"Hello, \{name\}! How can I help you today?"
+            ```
+
+
+**Parameters**
+><ParamField body="name" type="str | None" default="None" >   Prompt name (defaults to function name) </ParamField>
+><ParamField body="description" type="str | None" default="None" >   Prompt description </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Callable" />
+
+**Signature**
+```python wrap
+def prompt(name: str | None = None, description: str | None = None):
+```
+
+</Card>
+
+<Card type="info">
+### `property` prompts
+
+Get all pending prompts in this router.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp_use.server.router.PendingPrompt]" />
+
+**Signature**
+```python wrap
+def prompts():
+```
+
+</Card>
+
+<Card type="info">
+### `method` resource
+
+Decorator to register a resource with this router.
+
+        Example:
+            ```python
+            @router.resource(uri="config://app")
+            def get_config() -> str:
+                return '\{"setting": "value"\}'
+            ```
+
+
+**Parameters**
+><ParamField body="uri" type="str" required="True" >   Resource URI (required, e.g., "config://app" or "file://data.json") </ParamField>
+><ParamField body="name" type="str | None" default="None" >   Human-readable name </ParamField>
+><ParamField body="description" type="str | None" default="None" >   Resource description </ParamField>
+><ParamField body="mime_type" type="str | None" default="None" >   MIME type of the resource content </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Callable" />
+
+**Signature**
+```python wrap
+def resource(
+uri: str,
+    name: str | None = None,
+    description: str | None = None,
+    mime_type: str | None = None
+):
+```
+
+</Card>
+
+<Card type="info">
+### `property` resources
+
+Get all pending resources in this router.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp_use.server.router.PendingResource]" />
+
+**Signature**
+```python wrap
+def resources():
+```
+
+</Card>
+
+<Card type="info">
+### `method` tool
+
+Decorator to register a tool with this router.
+
+        Example:
+            ```python
+            @router.tool()
+            def my_tool(arg: str) -> str:
+                '''Tool description here.'''
+                return f"Result: \{arg\}"
+            ```
+
+
+**Parameters**
+><ParamField body="name" type="str | None" default="None" >   Override the tool name (defaults to function name) </ParamField>
+><ParamField body="title" type="str | None" default="None" >   Human-readable title for the tool </ParamField>
+><ParamField body="description" type="str | None" default="None" >   Tool description (defaults to function docstring) </ParamField>
+><ParamField body="annotations" type="mcp.types.ToolAnnotations | None" default="None" >   MCP tool annotations </ParamField>
+><ParamField body="structured_output" type="bool | None" default="None" >   Whether the tool returns structured output </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Callable" />
+
+**Signature**
+```python wrap
+def tool(
+name: str | None = None,
+    title: str | None = None,
+    description: str | None = None,
+    annotations: mcp.types.ToolAnnotations | None = None,
+    structured_output: bool | None = None
+):
+```
+
+</Card>
+
+<Card type="info">
+### `property` tools
+
+Get all pending tools in this router.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp_use.server.router.PendingTool]" />
+
+**Signature**
+```python wrap
+def tools():
+```
+
+</Card>
+
+</div>
+
+## PendingPrompt
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> PendingPrompt</div>
+
+A prompt waiting to be registered with a server.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.router import PendingPrompt
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="fn" type="Callable" required="True" >   Parameter value </ParamField>
+<ParamField body="name" type="str | None" required="True" >   Name identifier </ParamField>
+<ParamField body="description" type="str | None" required="True" >   String value </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="fn" type="Callable" required="True" >   Parameter value </ParamField>
+><ParamField body="name" type="str | None" default="None" >   Name identifier </ParamField>
+><ParamField body="description" type="str | None" default="None" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(fn: Callable, name: str | None = None, description: str | None = None):
+```
+
+</Card>
+</div>
+
+## PendingResource
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> PendingResource</div>
+
+A resource waiting to be registered with a server.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.router import PendingResource
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="fn" type="Callable" required="True" >   Parameter value </ParamField>
+<ParamField body="uri" type="str" required="True" >   String value </ParamField>
+<ParamField body="name" type="str | None" required="True" >   Name identifier </ParamField>
+<ParamField body="description" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="mime_type" type="str | None" required="True" >   String value </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="fn" type="Callable" required="True" >   Parameter value </ParamField>
+><ParamField body="uri" type="str" required="True" >   String value </ParamField>
+><ParamField body="name" type="str | None" default="None" >   Name identifier </ParamField>
+><ParamField body="description" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="mime_type" type="str | None" default="None" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(fn: Callable, uri: str, name: str | None = None, description: str | None = None, mime_type: str | None = None):
+```
+
+</Card>
+</div>
+
+## PendingTool
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> PendingTool</div>
+
+A tool waiting to be registered with a server.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.router import PendingTool
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="fn" type="Callable" required="True" >   Parameter value </ParamField>
+<ParamField body="name" type="str | None" required="True" >   Name identifier </ParamField>
+<ParamField body="title" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="description" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="annotations" type="mcp.types.ToolAnnotations | None" required="True" >   Parameter value </ParamField>
+<ParamField body="structured_output" type="bool | None" required="True" >   Boolean flag </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="fn" type="Callable" required="True" >   Parameter value </ParamField>
+><ParamField body="name" type="str | None" default="None" >   Name identifier </ParamField>
+><ParamField body="title" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="description" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="annotations" type="mcp.types.ToolAnnotations | None" default="None" >   Parameter value </ParamField>
+><ParamField body="structured_output" type="bool | None" default="None" >   Boolean flag </ParamField>
+
+**Signature**
+```python wrap
+def __init__(fn: Callable, name: str | None = None, title: str | None = None, description: str | None = None, annotations: mcp.types.ToolAnnotations | None = None, structured_output: bool | None = None):
+```
+
+</Card>
+</div>
