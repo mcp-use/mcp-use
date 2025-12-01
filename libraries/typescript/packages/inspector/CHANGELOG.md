@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 0.10.0
+
+### Minor Changes
+
+- 00b19c5: Add sampling support in inspector and fixed long running sampling requests (were timing out after 60s)
+
+### Patch Changes
+
+- Updated dependencies [00b19c5]
+  - mcp-use@1.8.0
+
 ## 0.10.0-canary.0
 
 ### Minor Changes
