@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.9.2",
     "mcp-use": "1.7.2"
   },
-  "changesets": []
+  "changesets": [
+    "violet-years-bathe"
+  ]
 }
