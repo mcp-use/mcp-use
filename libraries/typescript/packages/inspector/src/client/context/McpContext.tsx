@@ -38,6 +38,12 @@ export interface MCPConnection {
   serverInfo?: {
     name: string;
     version?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+      sizes?: string;
+    }>;
+    websiteUrl?: string;
   };
   capabilities?: {
     tools?: {

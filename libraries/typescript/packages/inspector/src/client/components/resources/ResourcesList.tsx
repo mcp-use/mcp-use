@@ -7,7 +7,7 @@ import {
   FileText,
   Globe,
 } from "lucide-react";
-import { ListItem } from "@/client/components/shared";
+import { ListItem, IconRenderer } from "@/client/components/shared";
 
 interface ResourcesListProps {
   resources: Resource[];
@@ -61,7 +61,18 @@ export function ResourcesList({
   return (
     <div className="overflow-y-auto flex-1 overscroll-contain">
       {resources.map((resource, index) => {
-        const icon = getResourceIcon(resource.mimeType, resource.uri);
+        // Use icon from resource.icons if available, otherwise use mimeType-based icon
+        const resourceIcons = (resource as any).icons;
+        const icon = resourceIcons ? (
+          <IconRenderer
+            icons={resourceIcons}
+            size={20}
+            fallback={getResourceIcon(resource.mimeType, resource.uri)}
+            className="h-5 w-5"
+          />
+        ) : (
+          getResourceIcon(resource.mimeType, resource.uri)
+        );
         const description = [
           resource.description,
           resource.mimeType && (
@@ -80,16 +91,11 @@ export function ResourcesList({
             icon={icon}
             title={resource.name}
             description={
-              description.length > 0 ? (
-                <span className="flex flex-col gap-1">
-                  {resource.description && <span>{resource.description}</span>}
-                  {resource.mimeType && (
-                    <span className="text-xs text-gray-500 dark:text-gray-500 font-mono">
-                      {resource.mimeType}
-                    </span>
-                  )}
-                </span>
-              ) : undefined
+              description.length > 0
+                ? resource.description || resource.mimeType
+                  ? `${resource.description || ""}${resource.description && resource.mimeType ? " " : ""}${resource.mimeType || ""}`
+                  : undefined
+                : undefined
             }
             onClick={() => onResourceSelect(resource)}
           />

@@ -1,6 +1,6 @@
 import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import { MessageSquare } from "lucide-react";
-import { ListItem } from "@/client/components/shared";
+import { ListItem, IconRenderer } from "@/client/components/shared";
 import { Badge } from "@/client/components/ui/badge";
 
 interface PromptsListProps {
@@ -27,29 +27,44 @@ export function PromptsList({
 
   return (
     <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
-      {prompts.map((prompt, index) => (
-        <ListItem
-          key={prompt.name}
-          id={`prompt-${prompt.name}`}
-          isSelected={selectedPrompt?.name === prompt.name}
-          isFocused={focusedIndex === index}
-          icon={<MessageSquare className="h-4 w-4" />}
-          title={prompt.name}
-          description={prompt.description}
-          metadata={
-            prompt.arguments &&
-            prompt.arguments.length > 0 && (
-              <Badge
-                variant="outline"
-                className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
-              >
-                {prompt.arguments.length} args
-              </Badge>
-            )
-          }
-          onClick={() => onPromptSelect(prompt)}
-        />
-      ))}
+      {prompts.map((prompt, index) => {
+        // Use icon from prompt.icons if available, otherwise fallback to MessageSquare
+        const promptIcons = (prompt as any).icons;
+        const icon = promptIcons ? (
+          <IconRenderer
+            icons={promptIcons}
+            size={16}
+            fallback={<MessageSquare className="h-4 w-4" />}
+            className="h-4 w-4"
+          />
+        ) : (
+          <MessageSquare className="h-4 w-4" />
+        );
+
+        return (
+          <ListItem
+            key={prompt.name}
+            id={`prompt-${prompt.name}`}
+            isSelected={selectedPrompt?.name === prompt.name}
+            isFocused={focusedIndex === index}
+            icon={icon}
+            title={prompt.name}
+            description={prompt.description}
+            metadata={
+              prompt.arguments &&
+              prompt.arguments.length > 0 && (
+                <Badge
+                  variant="outline"
+                  className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
+                >
+                  {prompt.arguments.length} args
+                </Badge>
+              )
+            }
+            onClick={() => onPromptSelect(prompt)}
+          />
+        );
+      })}
     </div>
   );
 }
