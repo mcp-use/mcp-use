@@ -3,9 +3,17 @@ set -e
 
 echo "🦕 Running Deno tests with workspace version..."
 
+# Patch package.json for Deno compatibility
+echo "🔧 Patching package.json for Deno compatibility..."
+sed -i.bak 's|"@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194"|"@modelcontextprotocol/sdk": "^1.23.0"|g' package.json
+
 # Pack the built package
 echo "📦 Packing package..."
 pnpm pack
+
+# Restore original package.json
+echo "🔄 Restoring original package.json..."
+mv package.json.bak package.json
 
 # Create temp test directory
 echo "📁 Setting up test directory..."
