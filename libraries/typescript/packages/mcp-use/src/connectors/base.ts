@@ -252,7 +252,9 @@ export abstract class BaseConnector {
         return await this.opts.samplingCallback!(request.params);
       }
     );
-    logger.debug("setupSamplingHandler: Sampling handler registered successfully");
+    logger.debug(
+      "setupSamplingHandler: Sampling handler registered successfully"
+    );
   }
 
   /** Establish the connection and create the SDK client. */

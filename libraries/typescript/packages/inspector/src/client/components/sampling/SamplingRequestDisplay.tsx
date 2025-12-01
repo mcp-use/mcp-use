@@ -16,7 +16,15 @@ import type { PendingSamplingRequest } from "@/client/types/sampling";
 import type { LLMConfig } from "../chat/types";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import { toast } from "sonner";
-import { Check, Copy, Download, Maximize2, X, Loader2, Sparkles } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  Maximize2,
+  X,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -86,16 +94,16 @@ export function SamplingRequestDisplay({
 
     try {
       const result = await generateResponse({ request: request.request });
-      
+
       // Populate form fields with LLM response
       setModel(result.model || llmConfig?.model || "stub-model");
       setStopReason(result.stopReason || "endTurn");
       setRole(result.role || "assistant");
-      
+
       const content = Array.isArray(result.content)
         ? result.content[0]
         : result.content;
-      
+
       if (content.type === "text") {
         setContentType("text");
         setTextContent(content.text || "");
@@ -134,11 +142,19 @@ export function SamplingRequestDisplay({
     }
 
     return result;
-  }, [model, stopReason, role, contentType, textContent, imageData, imageMimeType]);
+  }, [
+    model,
+    stopReason,
+    role,
+    contentType,
+    textContent,
+    imageData,
+    imageMimeType,
+  ]);
 
   const handleApprove = () => {
     if (!request) return;
-    
+
     const validationResult = CreateMessageResultSchema.safeParse(messageResult);
     if (!validationResult.success) {
       toast.error("Invalid response", {
@@ -149,7 +165,7 @@ export function SamplingRequestDisplay({
 
     onApprove(request.id, validationResult.data);
     onClose();
-    
+
     // Show success toast with navigation back to tools tab
     // Use the same button styling as the approve/deny toast
     import("react").then((React) => {
@@ -161,7 +177,11 @@ export function SamplingRequestDisplay({
             "div",
             null,
             React.createElement("strong", null, "Sampling Response Sent"),
-            React.createElement("p", { className: "text-sm text-muted-foreground mt-1" }, "The tool will continue executing.")
+            React.createElement(
+              "p",
+              { className: "text-sm text-muted-foreground mt-1" },
+              "The tool will continue executing."
+            )
           ),
           React.createElement(
             "div",
@@ -169,12 +189,16 @@ export function SamplingRequestDisplay({
             React.createElement(
               "button",
               {
-                className: "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
+                className:
+                  "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
                 onClick: () => {
                   // Dispatch event to navigate to tools tab
-                  const event = new globalThis.CustomEvent("navigate-to-tool-result", {
-                    detail: { toolName: request.toolName },
-                  });
+                  const event = new globalThis.CustomEvent(
+                    "navigate-to-tool-result",
+                    {
+                      detail: { toolName: request.toolName },
+                    }
+                  );
                   window.dispatchEvent(event);
                   // Dismiss the toast immediately
                   toast.dismiss(toastId);
@@ -293,14 +317,20 @@ export function SamplingRequestDisplay({
               Response
             </h4>
             <div className="flex items-center gap-2">
-              <Label htmlFor={`responseMode-${request.id}`} className="text-xs text-gray-500 dark:text-gray-400">
+              <Label
+                htmlFor={`responseMode-${request.id}`}
+                className="text-xs text-gray-500 dark:text-gray-400"
+              >
                 Mode:
               </Label>
               <Select
                 value={responseMode}
                 onValueChange={(v) => setResponseMode(v as "manual" | "llm")}
               >
-                <SelectTrigger id={`responseMode-${request.id}`} className="w-32 h-8 text-xs">
+                <SelectTrigger
+                  id={`responseMode-${request.id}`}
+                  className="w-32 h-8 text-xs"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -349,7 +379,7 @@ export function SamplingRequestDisplay({
               )}
             </div>
           )}
-          
+
           <div className="space-y-2">
             <Label htmlFor={`model-${request.id}`}>Model</Label>
             <Input
@@ -423,7 +453,9 @@ export function SamplingRequestDisplay({
           {contentType === "image" && (
             <>
               <div className="space-y-2">
-                <Label htmlFor={`imageData-${request.id}`}>Base64 Image Data</Label>
+                <Label htmlFor={`imageData-${request.id}`}>
+                  Base64 Image Data
+                </Label>
                 <Textarea
                   id={`imageData-${request.id}`}
                   value={imageData}
@@ -469,4 +501,3 @@ export function SamplingRequestDisplay({
     </div>
   );
 }
-

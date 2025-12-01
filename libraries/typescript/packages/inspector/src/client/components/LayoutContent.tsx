@@ -40,7 +40,10 @@ export function LayoutContent({
   // Render all tabs but hide inactive ones to preserve state
   return (
     <>
-      <div style={{ display: activeTab === "tools" ? "block" : "none" }} className="h-full">
+      <div
+        style={{ display: activeTab === "tools" ? "block" : "none" }}
+        className="h-full"
+      >
         <ToolsTab
           ref={toolsSearchRef}
           tools={selectedServer.tools}
@@ -50,7 +53,10 @@ export function LayoutContent({
           isConnected={selectedServer.state === "ready"}
         />
       </div>
-      <div style={{ display: activeTab === "prompts" ? "block" : "none" }} className="h-full">
+      <div
+        style={{ display: activeTab === "prompts" ? "block" : "none" }}
+        className="h-full"
+      >
         <PromptsTab
           ref={promptsSearchRef}
           prompts={selectedServer.prompts}
@@ -59,7 +65,10 @@ export function LayoutContent({
           isConnected={selectedServer.state === "ready"}
         />
       </div>
-      <div style={{ display: activeTab === "resources" ? "block" : "none" }} className="h-full">
+      <div
+        style={{ display: activeTab === "resources" ? "block" : "none" }}
+        className="h-full"
+      >
         <ResourcesTab
           ref={resourcesSearchRef}
           resources={selectedServer.resources}
@@ -68,7 +77,10 @@ export function LayoutContent({
           isConnected={selectedServer.state === "ready"}
         />
       </div>
-      <div style={{ display: activeTab === "chat" ? "block" : "none" }} className="h-full">
+      <div
+        style={{ display: activeTab === "chat" ? "block" : "none" }}
+        className="h-full"
+      >
         <ChatTab
           key={selectedServer.id}
           connection={selectedServer}
@@ -76,7 +88,10 @@ export function LayoutContent({
           readResource={selectedServer.readResource}
         />
       </div>
-      <div style={{ display: activeTab === "sampling" ? "block" : "none" }} className="h-full">
+      <div
+        style={{ display: activeTab === "sampling" ? "block" : "none" }}
+        className="h-full"
+      >
         <SamplingTab
           pendingRequests={selectedServer.pendingSamplingRequests}
           onApprove={selectedServer.approveSampling}
@@ -86,7 +101,10 @@ export function LayoutContent({
           mcpServerUrl={selectedServer.url}
         />
       </div>
-      <div style={{ display: activeTab === "notifications" ? "block" : "none" }} className="h-full">
+      <div
+        style={{ display: activeTab === "notifications" ? "block" : "none" }}
+        className="h-full"
+      >
         <NotificationsTab
           notifications={selectedServer.notifications}
           unreadCount={selectedServer.unreadNotificationCount}
@@ -97,14 +115,12 @@ export function LayoutContent({
           isConnected={selectedServer.state === "ready"}
         />
       </div>
-      {activeTab !== "tools" && 
-       activeTab !== "prompts" && 
-       activeTab !== "resources" && 
-       activeTab !== "chat" && 
-       activeTab !== "sampling" && 
-       activeTab !== "notifications" && (
-        <>{children}</>
-      )}
+      {activeTab !== "tools" &&
+        activeTab !== "prompts" &&
+        activeTab !== "resources" &&
+        activeTab !== "chat" &&
+        activeTab !== "sampling" &&
+        activeTab !== "notifications" && <>{children}</>}
     </>
   );
 }

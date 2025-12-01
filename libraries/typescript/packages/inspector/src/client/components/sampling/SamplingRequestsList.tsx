@@ -34,7 +34,7 @@ export function SamplingRequestsList({
       {requests.map((request, index) => {
         const messageCount = request.request.params?.messages?.length || 0;
         const maxTokens = request.request.params?.maxTokens;
-        
+
         return (
           <ListItem
             key={request.id}
@@ -51,12 +51,15 @@ export function SamplingRequestsList({
               const timeStr = formatRelativeTime(request.timestamp);
               const details = [];
               if (messageCount > 0) {
-                details.push(`${messageCount} message${messageCount > 1 ? 's' : ''}`);
+                details.push(
+                  `${messageCount} message${messageCount > 1 ? "s" : ""}`
+                );
               }
               if (maxTokens) {
                 details.push(`max ${maxTokens} tokens`);
               }
-              const detailsStr = details.length > 0 ? ` | ${details.join(', ')}` : '';
+              const detailsStr =
+                details.length > 0 ? ` | ${details.join(", ")}` : "";
               return timeStr + detailsStr;
             })()}
             onClick={() => onRequestSelect(request)}
@@ -66,4 +69,3 @@ export function SamplingRequestsList({
     </div>
   );
 }
-

@@ -33,11 +33,11 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
       const params = request.params || {};
       const maxTokens = params.maxTokens;
       const temperature = params.temperature;
-      const modelPreferences = params.modelPreferences;
+      const _modelPreferences = params.modelPreferences;
 
       // Convert MCP messages to LangChain format
       const messages = params.messages || [];
-      
+
       // Debug logging
       console.log("[useSamplingLLM] Request structure:", {
         hasParams: !!params,
@@ -45,7 +45,7 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
         messages: messages,
         params: params,
       });
-      
+
       if (messages.length === 0) {
         throw new Error("No messages found in sampling request");
       }
@@ -53,7 +53,9 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
       const langchainMessages: any[] = [];
 
       // Import message classes once
-      const { HumanMessage, AIMessage } = await import("@langchain/core/messages");
+      const { HumanMessage, AIMessage } = await import(
+        "@langchain/core/messages"
+      );
 
       for (const msg of messages) {
         if (!msg || !msg.role) {
@@ -77,7 +79,10 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
             langchainMessages.push(new AIMessage(content.text));
           }
         } else {
-          console.warn("Skipping message with unsupported content type:", content);
+          console.warn(
+            "Skipping message with unsupported content type:",
+            content
+          );
         }
       }
 
@@ -159,4 +164,3 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
     isAvailable: llmConfig !== null,
   };
 }
-

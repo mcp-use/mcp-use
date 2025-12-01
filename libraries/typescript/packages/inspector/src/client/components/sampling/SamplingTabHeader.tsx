@@ -93,4 +93,3 @@ export function SamplingTabHeader({
     </div>
   );
 }
-

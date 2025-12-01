@@ -70,9 +70,12 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, selectedResourceUri: resourceUri }));
   }, []);
 
-  const setSelectedSamplingRequestId = useCallback((requestId: string | null) => {
-    setState((prev) => ({ ...prev, selectedSamplingRequestId: requestId }));
-  }, []);
+  const setSelectedSamplingRequestId = useCallback(
+    (requestId: string | null) => {
+      setState((prev) => ({ ...prev, selectedSamplingRequestId: requestId }));
+    },
+    []
+  );
 
   const setTunnelUrl = useCallback((tunnelUrl: string | null) => {
     setState((prev) => ({ ...prev, tunnelUrl }));

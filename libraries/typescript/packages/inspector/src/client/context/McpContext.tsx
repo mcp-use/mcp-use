@@ -355,9 +355,12 @@ function McpConnectionWrapper({
                 requestId={requestId}
                 serverName={name}
                 onViewDetails={() => {
-                  const event = new globalThis.CustomEvent("navigate-to-sampling", {
-                    detail: { requestId },
-                  });
+                  const event = new globalThis.CustomEvent(
+                    "navigate-to-sampling",
+                    {
+                      detail: { requestId },
+                    }
+                  );
                   window.dispatchEvent(event);
                   toast.dismiss(toastId);
                 }}
@@ -377,7 +380,9 @@ function McpConnectionWrapper({
                   setPendingSamplingRequests((prev) => {
                     const request = prev.find((r) => r.id === requestId);
                     if (request) {
-                      request.reject(new Error("User denied sampling request from toast"));
+                      request.reject(
+                        new Error("User denied sampling request from toast")
+                      );
                       toast.error("Sampling request denied");
                       return prev.filter((r) => r.id !== requestId);
                     }
@@ -495,7 +500,8 @@ function McpConnectionWrapper({
           prev.capabilities !== connection.capabilities ||
           prev.notifications.length !== connection.notifications.length ||
           prev.unreadNotificationCount !== connection.unreadNotificationCount ||
-          prev.pendingSamplingRequests.length !== connection.pendingSamplingRequests.length ||
+          prev.pendingSamplingRequests.length !==
+            connection.pendingSamplingRequests.length ||
           !prev.client
         ) {
           prevConnectionRef.current = connection;
@@ -555,7 +561,8 @@ function McpConnectionWrapper({
         prev.capabilities !== connection.capabilities ||
         prev.notifications.length !== connection.notifications.length ||
         prev.unreadNotificationCount !== connection.unreadNotificationCount ||
-        prev.pendingSamplingRequests.length !== connection.pendingSamplingRequests.length ||
+        prev.pendingSamplingRequests.length !==
+          connection.pendingSamplingRequests.length ||
         !prev.client
       ) {
         prevConnectionRef.current = connection;

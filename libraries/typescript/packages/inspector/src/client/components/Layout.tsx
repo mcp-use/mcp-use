@@ -53,20 +53,24 @@ export function Layout({ children }: LayoutProps) {
 
   // Listen for custom navigation events from toast (for sampling requests)
   useEffect(() => {
-    const handleNavigateToSampling = (event: Event) => {
-      const customEvent = event as CustomEvent<{ requestId: string }>;
+    const handleNavigateToSampling = (event: globalThis.Event) => {
+      const customEvent = event as globalThis.CustomEvent<{
+        requestId: string;
+      }>;
       const requestId = customEvent.detail.requestId;
-      
+
       // Switch to sampling tab and auto-select the request
       if (selectedServerId) {
         navigateToItem(selectedServerId, "sampling", requestId);
       }
     };
 
-    const handleNavigateToToolResult = (event: Event) => {
-      const customEvent = event as CustomEvent<{ toolName: string | null }>;
+    const handleNavigateToToolResult = (event: globalThis.Event) => {
+      const customEvent = event as globalThis.CustomEvent<{
+        toolName: string | null;
+      }>;
       const toolName = customEvent.detail.toolName;
-      
+
       // Switch to tools tab and auto-select the tool
       if (selectedServerId && toolName) {
         navigateToItem(selectedServerId, "tools", toolName);
@@ -77,11 +81,20 @@ export function Layout({ children }: LayoutProps) {
     };
 
     window.addEventListener("navigate-to-sampling", handleNavigateToSampling);
-    window.addEventListener("navigate-to-tool-result", handleNavigateToToolResult);
-    
+    window.addEventListener(
+      "navigate-to-tool-result",
+      handleNavigateToToolResult
+    );
+
     return () => {
-      window.removeEventListener("navigate-to-sampling", handleNavigateToSampling);
-      window.removeEventListener("navigate-to-tool-result", handleNavigateToToolResult);
+      window.removeEventListener(
+        "navigate-to-sampling",
+        handleNavigateToSampling
+      );
+      window.removeEventListener(
+        "navigate-to-tool-result",
+        handleNavigateToToolResult
+      );
     };
   }, [selectedServerId, setActiveTab, navigateToItem]);
 

@@ -636,19 +636,21 @@ export class McpServer<HasOAuth extends boolean = false> {
         // If not provided by SDK, try to get from session
         if (!progressToken || !sendNotification) {
           // Find the session that matches the current request context
-          let session: {
-            transport: any;
-            lastAccessedAt: number;
-            context?: Context;
-            progressToken?: number;
-            sendNotification?: (notification: {
-              method: string;
-              params: Record<string, any>;
-            }) => Promise<void>;
-            expressRes?: any;
-            honoContext?: Context;
-          } | undefined;
-          
+          let session:
+            | {
+                transport: any;
+                lastAccessedAt: number;
+                context?: Context;
+                progressToken?: number;
+                sendNotification?: (notification: {
+                  method: string;
+                  params: Record<string, any>;
+                }) => Promise<void>;
+                expressRes?: any;
+                honoContext?: Context;
+              }
+            | undefined;
+
           if (requestContext) {
             // Try to find session by matching context
             for (const [, s] of this.sessions.entries()) {
@@ -754,9 +756,8 @@ export class McpServer<HasOAuth extends boolean = false> {
             // Pass a very long timeout to override SDK's default 60-second timeout
             // We handle our own timeout logic below if the user specified one
             // Use 2147483647 (max 32-bit signed int) = ~24.8 days, as setTimeout uses 32-bit
-            const sdkTimeout = timeout && timeout !== Infinity 
-              ? timeout 
-              : 2147483647; // ~24.8 days - effectively infinite for sampling
+            const sdkTimeout =
+              timeout && timeout !== Infinity ? timeout : 2147483647; // ~24.8 days - effectively infinite for sampling
             const samplePromise = this.createMessage(sampleParams, {
               timeout: sdkTimeout,
             });
@@ -2462,13 +2463,21 @@ if (container && Component) {
         },
         setHeader: (name: string, value: string | string[]) => {
           if (!headersSent) {
-            headers[name.toLowerCase()] = Array.isArray(value) ? value.join(", ") : value;
+            headers[name.toLowerCase()] = Array.isArray(value)
+              ? value.join(", ")
+              : value;
             // Detect SSE when Content-Type is set to text/event-stream
-            if (name.toLowerCase() === "content-type" && 
-                (Array.isArray(value) ? value.join(", ") : value).includes("text/event-stream")) {
+            if (
+              name.toLowerCase() === "content-type" &&
+              (Array.isArray(value) ? value.join(", ") : value).includes(
+                "text/event-stream"
+              )
+            ) {
               isSSEStream = true;
               // Create TransformStream for SSE
-              const { readable, writable } = new (globalThis as any).TransformStream();
+              const { readable, writable } = new (
+                globalThis as any
+              ).TransformStream();
               streamWriter = writable.getWriter();
               streamingResponse = new Response(readable, {
                 status: statusCode,
@@ -2490,7 +2499,7 @@ if (container && Component) {
                 : chunk instanceof Uint8Array
                   ? chunk
                   : Buffer.from(chunk);
-            
+
             // For SSE streams, write directly to the stream
             if (isSSEStream && streamWriter) {
               streamWriter.write(data).catch(() => {
@@ -2516,7 +2525,7 @@ if (container && Component) {
                 : chunk instanceof Uint8Array
                   ? chunk
                   : Buffer.from(chunk);
-            
+
             // For SSE streams, write to stream but DON'T close it yet
             // The SDK will manage when to close the stream
             if (isSSEStream && streamWriter) {
@@ -2565,13 +2574,15 @@ if (container && Component) {
                 headers[key.toLowerCase()] = value as string;
               }
             }
-            
+
             // Check if SSE headers are being set
             const contentType = headers["content-type"];
             if (contentType && contentType.includes("text/event-stream")) {
               isSSEStream = true;
               // Create TransformStream for SSE
-              const { readable, writable } = new (globalThis as any).TransformStream();
+              const { readable, writable } = new (
+                globalThis as any
+              ).TransformStream();
               streamWriter = writable.getWriter();
               streamingResponse = new Response(readable, {
                 status: statusCode,
@@ -2633,8 +2644,13 @@ if (container && Component) {
     const mountEndpoint = (endpoint: string) => {
       // POST endpoint for messages
       this.app.post(endpoint, async (c: Context) => {
-        const { expressReq, expressRes, getResponse, isSSEStream, waitForSSEStream } =
-          createExpressLikeObjects(c);
+        const {
+          expressReq,
+          expressRes,
+          getResponse,
+          isSSEStream,
+          waitForSSEStream,
+        } = createExpressLikeObjects(c);
 
         // Get request body
         let body: any = {};
@@ -2702,7 +2718,10 @@ if (container && Component) {
           session.expressRes = expressRes; // Store response object for notifications
 
           // Extract progressToken from tool call requests
-          if (body?.method === "tools/call" && body?.params?._meta?.progressToken) {
+          if (
+            body?.method === "tools/call" &&
+            body?.params?._meta?.progressToken
+          ) {
             session.progressToken = body.params._meta.progressToken;
             console.log(
               `Received progressToken ${session.progressToken} for tool call: ${body.params?.name}`
@@ -2733,7 +2752,7 @@ if (container && Component) {
         // The SDK's handleRequest will call writeHead synchronously for SSE
         let streamingResponse: Response | null = null;
         let shouldReturnStream = false;
-        
+
         await runWithContext(c, async () => {
           // Start handleRequest - it will call writeHead which may create SSE stream
           const handleRequestPromise = transport.handleRequest(
@@ -2741,7 +2760,7 @@ if (container && Component) {
             expressRes,
             expressReq.body
           );
-          
+
           // Race between SSE stream creation and request completion
           // If SSE stream is created, return it immediately
           // Otherwise, wait for request to complete
@@ -2756,7 +2775,7 @@ if (container && Component) {
                 setTimeout(() => resolve(null), 50);
               }),
             ]);
-            
+
             if (sseStream) {
               streamingResponse = sseStream;
               shouldReturnStream = true;
@@ -2782,7 +2801,7 @@ if (container && Component) {
           } catch {
             // Ignore timeout errors
           }
-          
+
           // Not SSE or SSE stream not created - wait for request completion
           await new Promise<void>((resolve) => {
             const originalEnd = expressRes.end;

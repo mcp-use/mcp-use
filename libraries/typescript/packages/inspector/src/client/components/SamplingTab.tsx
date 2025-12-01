@@ -33,7 +33,8 @@ export function SamplingTab({
   isConnected,
   mcpServerUrl,
 }: SamplingTabProps) {
-  const { selectedSamplingRequestId, setSelectedSamplingRequestId } = useInspector();
+  const { selectedSamplingRequestId, setSelectedSamplingRequestId } =
+    useInspector();
   const { llmConfig } = useConfig({ mcpServerUrl });
   const [selectedRequest, setSelectedRequest] =
     useState<PendingSamplingRequest | null>(null);
@@ -55,11 +56,17 @@ export function SamplingTab({
       pendingRequestsCount: pendingRequests.length,
       currentSelectedId: selectedRequest?.id,
     });
-    
+
     if (selectedSamplingRequestId && pendingRequests.length > 0) {
-      const request = pendingRequests.find((r) => r.id === selectedSamplingRequestId);
-      
-      console.log("[SamplingTab] Found request for auto-selection:", !!request, request?.id);
+      const request = pendingRequests.find(
+        (r) => r.id === selectedSamplingRequestId
+      );
+
+      console.log(
+        "[SamplingTab] Found request for auto-selection:",
+        !!request,
+        request?.id
+      );
 
       if (request) {
         console.log("[SamplingTab] Auto-selecting request:", request.id);
@@ -69,7 +76,9 @@ export function SamplingTab({
         setSelectedRequest(request);
         // Scroll after a short delay
         setTimeout(() => {
-          const requestElement = document.getElementById(`sampling-request-${request.id}`);
+          const requestElement = document.getElementById(
+            `sampling-request-${request.id}`
+          );
           console.log("[SamplingTab] Scrolling to element:", !!requestElement);
           if (requestElement) {
             requestElement.scrollIntoView({
@@ -88,19 +97,23 @@ export function SamplingTab({
 
   // Listen for custom navigation events from toast
   useEffect(() => {
-    const handleNavigate = (event: Event) => {
-      const customEvent = event as CustomEvent<{ requestId: string }>;
+    const handleNavigate = (event: globalThis.Event) => {
+      const customEvent = event as globalThis.CustomEvent<{
+        requestId: string;
+      }>;
       const requestId = customEvent.detail.requestId;
-      
+
       console.log("[SamplingTab] Custom navigate event received:", requestId);
-      
+
       // Find and select the request immediately
       const request = pendingRequests.find((r) => r.id === requestId);
       if (request) {
         console.log("[SamplingTab] Selecting request from event:", requestId);
         setSelectedRequest(request);
         setTimeout(() => {
-          const requestElement = document.getElementById(`sampling-request-${requestId}`);
+          const requestElement = document.getElementById(
+            `sampling-request-${requestId}`
+          );
           if (requestElement) {
             requestElement.scrollIntoView({
               behavior: "smooth",
@@ -112,7 +125,8 @@ export function SamplingTab({
     };
 
     window.addEventListener("navigate-to-sampling", handleNavigate);
-    return () => window.removeEventListener("navigate-to-sampling", handleNavigate);
+    return () =>
+      window.removeEventListener("navigate-to-sampling", handleNavigate);
   }, [pendingRequests]);
 
   // Auto-scroll to top when new requests arrive (only if user hasn't scrolled)

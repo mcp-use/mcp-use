@@ -26,4 +26,3 @@ export const DEFAULT_SAMPLING_RESPONSE: CreateMessageResult = {
     text: "positive", // Generic positive response for sentiment/analysis tasks
   },
 };
-
