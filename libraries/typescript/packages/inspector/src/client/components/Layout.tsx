@@ -51,6 +51,40 @@ export function Layout({ children }: LayoutProps) {
     setTunnelUrl(tunnelUrl);
   }, [location.search, setTunnelUrl]);
 
+  // Listen for custom navigation events from toast (for sampling requests)
+  useEffect(() => {
+    const handleNavigateToSampling = (event: Event) => {
+      const customEvent = event as CustomEvent<{ requestId: string }>;
+      const requestId = customEvent.detail.requestId;
+      
+      // Switch to sampling tab and auto-select the request
+      if (selectedServerId) {
+        navigateToItem(selectedServerId, "sampling", requestId);
+      }
+    };
+
+    const handleNavigateToToolResult = (event: Event) => {
+      const customEvent = event as CustomEvent<{ toolName: string | null }>;
+      const toolName = customEvent.detail.toolName;
+      
+      // Switch to tools tab and auto-select the tool
+      if (selectedServerId && toolName) {
+        navigateToItem(selectedServerId, "tools", toolName);
+      } else if (selectedServerId) {
+        // If no toolName, just switch to tools tab
+        setActiveTab("tools");
+      }
+    };
+
+    window.addEventListener("navigate-to-sampling", handleNavigateToSampling);
+    window.addEventListener("navigate-to-tool-result", handleNavigateToToolResult);
+    
+    return () => {
+      window.removeEventListener("navigate-to-sampling", handleNavigateToSampling);
+      window.removeEventListener("navigate-to-tool-result", handleNavigateToToolResult);
+    };
+  }, [selectedServerId, setActiveTab, navigateToItem]);
+
   // Refs for search inputs in tabs
   const toolsSearchRef = useRef<{
     focusSearch: () => void;

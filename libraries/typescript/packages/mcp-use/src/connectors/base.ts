@@ -234,9 +234,16 @@ export abstract class BaseConnector {
    * This is called after the client connects to register the handler for sampling requests.
    */
   protected setupSamplingHandler(): void {
-    if (!this.client) return;
-    if (!this.opts.samplingCallback) return;
+    if (!this.client) {
+      logger.debug("setupSamplingHandler: No client available");
+      return;
+    }
+    if (!this.opts.samplingCallback) {
+      logger.debug("setupSamplingHandler: No sampling callback provided");
+      return;
+    }
 
+    logger.debug("setupSamplingHandler: Setting up sampling request handler");
     // Handle sampling/createMessage requests from the server
     this.client.setRequestHandler(
       CreateMessageRequestSchema,
@@ -245,6 +252,7 @@ export abstract class BaseConnector {
         return await this.opts.samplingCallback!(request.params);
       }
     );
+    logger.debug("setupSamplingHandler: Sampling handler registered successfully");
   }
 
   /** Establish the connection and create the SDK client. */
