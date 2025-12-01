@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^5.1.0",
+    "express": "^5.2.0",
     "mcp-use": "workspace:*",
     "node-mocks-http": "^1.17.2",
     "react": "^19.2.0",
