@@ -4,6 +4,23 @@ description: "New updates and improvements"
 icon:  "history"
 ---
 
+<Update label="v1.5.0 - 2025‑12‑01">
+  ## Complete MCP Server SDK
+  - **Major**: Complete MCP Server SDK with MCPServer class, routing, and production features
+  - **New**: MCPRouter for modular server organization (similar to FastAPI's APIRouter)
+  - **New**: Enhanced Context with sampling, elicitation, and notification support
+  - **New**: Advanced logging system with customizable formats and JSON-RPC debugging
+  - **New**: Built-in Inspector integration for real-time debugging and testing
+  - **New**: Multiple transport protocols (stdio, streamable-http, SSE)
+  - **New**: Development tools (docs UI, OpenMCP config, inspector)
+  - **New**: FastMCP compatibility layer for seamless migration
+  - **Enhancement**: Middleware can now modify context parameters ([#522](https://github.com/mcp-use/mcp-use/pull/522))
+  - **Enhancement**: Tool enable/disable support with dynamic notifications
+  - **Enhancement**: Refactored test suite using MCPServer instead of external servers
+  - **Enhancement**: Type checking with ty and pre-commit hooks with prek
+  - **Enhancement**: Moved Ruff configuration to pyproject.toml for better organization
+</Update>
+
 <Update label="v1.4.1 - 2025‑11‑20">
   ## Code Mode & Pretty Display
   - **New**: Code Mode integration for direct code execution through MCP servers with isolated environments
