@@ -1,0 +1,13 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.4.3",
+    "create-mcp-use-app": "0.7.1",
+    "@mcp-use/inspector": "0.9.0",
+    "mcp-use": "1.7.0"
+  },
+  "changesets": [
+    "fuzzy-kings-begin"
+  ]
+}

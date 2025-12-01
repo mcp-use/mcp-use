@@ -12,7 +12,7 @@
 
 /* globals Deno */
 
-import { createMCPServer } from "npm:mcp-use/server";
+import { createMCPServer } from "mcp-use/server";
 import {
   assertEquals,
   assertExists,
