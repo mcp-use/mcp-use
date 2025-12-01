@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.7.2
+
+### Patch Changes
+
+- a4341d5: chore: update deps
+
 ## 0.7.2-canary.0
 
 ### Patch Changes
