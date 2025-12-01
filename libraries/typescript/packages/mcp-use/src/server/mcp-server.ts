@@ -1035,7 +1035,10 @@ export class McpServer<HasOAuth extends boolean = false> {
             ? this.applyDefaultProps(definition.props)
             : {};
 
-        const uiResource = this.createWidgetUIResource(definition, params);
+        const uiResource = await this.createWidgetUIResource(
+          definition,
+          params
+        );
 
         // Ensure the resource content URI matches the registered URI (with build ID)
         uiResource.resource.uri = resourceUri;
@@ -1066,7 +1069,7 @@ export class McpServer<HasOAuth extends boolean = false> {
         annotations: definition.annotations,
         readCallback: async (uri, params) => {
           // Use empty params for Apps SDK since structuredContent is passed separately
-          const uiResource = this.createWidgetUIResource(definition, {});
+          const uiResource = await this.createWidgetUIResource(definition, {});
 
           // Ensure the resource content URI matches the template URI (with build ID)
           uiResource.resource.uri = uri.toString();
@@ -1109,7 +1112,10 @@ export class McpServer<HasOAuth extends boolean = false> {
       _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
       cb: async (params: any) => {
         // Create the UIResource with user-provided params
-        const uiResource = this.createWidgetUIResource(definition, params);
+        const uiResource = await this.createWidgetUIResource(
+          definition,
+          params
+        );
 
         // For Apps SDK, return _meta at top level with only text in content
         if (definition.type === "appsSdk") {
@@ -1169,10 +1175,10 @@ export class McpServer<HasOAuth extends boolean = false> {
    * @param params - Parameters to pass to the widget via URL
    * @returns UIResource object compatible with MCP-UI
    */
-  private createWidgetUIResource(
+  private async createWidgetUIResource(
     definition: UIResourceDefinition,
     params: Record<string, any>
-  ): UIResourceContent {
+  ): Promise<UIResourceContent> {
     // If baseUrl is set, parse it to extract protocol, host, and port
     let configBaseUrl = `http://${this.serverHost}`;
     let configPort: number | string = this.serverPort || 3001;
@@ -1194,7 +1200,7 @@ export class McpServer<HasOAuth extends boolean = false> {
       buildId: this.buildId,
     };
 
-    const uiResource = createUIResourceFromDefinition(
+    const uiResource = await createUIResourceFromDefinition(
       definition,
       params,
       urlConfig
