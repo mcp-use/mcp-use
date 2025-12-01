@@ -8,6 +8,7 @@ import {
   Globe,
 } from "lucide-react";
 import { ListItem, IconRenderer } from "@/client/components/shared";
+import { getResourceIcons } from "@/client/utils/entity-types";
 
 interface ResourcesListProps {
   resources: Resource[];
@@ -62,7 +63,7 @@ export function ResourcesList({
     <div className="overflow-y-auto flex-1 overscroll-contain">
       {resources.map((resource, index) => {
         // Use icon from resource.icons if available, otherwise use mimeType-based icon
-        const resourceIcons = (resource as any).icons;
+        const resourceIcons = getResourceIcons(resource);
         const icon = resourceIcons ? (
           <IconRenderer
             icons={resourceIcons}

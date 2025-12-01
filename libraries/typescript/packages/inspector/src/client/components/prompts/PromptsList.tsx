@@ -2,6 +2,7 @@ import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import { MessageSquare } from "lucide-react";
 import { ListItem, IconRenderer } from "@/client/components/shared";
 import { Badge } from "@/client/components/ui/badge";
+import { getPromptIcons } from "@/client/utils/entity-types";
 
 interface PromptsListProps {
   prompts: Prompt[];
@@ -29,7 +30,7 @@ export function PromptsList({
     <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
       {prompts.map((prompt, index) => {
         // Use icon from prompt.icons if available, otherwise fallback to MessageSquare
-        const promptIcons = (prompt as any).icons;
+        const promptIcons = getPromptIcons(prompt);
         const icon = promptIcons ? (
           <IconRenderer
             icons={promptIcons}

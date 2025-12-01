@@ -38,11 +38,13 @@ export interface MCPConnection {
   serverInfo?: {
     name: string;
     version?: string;
+    /** Icons for this server implementation (SEP-973) */
     icons?: Array<{
       src: string;
       mimeType?: string;
       sizes?: string;
     }>;
+    /** Website URL for this server implementation (SEP-973) */
     websiteUrl?: string;
   };
   capabilities?: {

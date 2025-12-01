@@ -2,6 +2,7 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Wrench } from "lucide-react";
 import { ListItem, IconRenderer } from "@/client/components/shared";
 import { Badge } from "@/client/components/ui/badge";
+import { getToolIcons } from "@/client/utils/entity-types";
 
 interface ToolsListProps {
   tools: Tool[];
@@ -29,7 +30,7 @@ export function ToolsList({
     <div className="overflow-y-auto flex-1 overscroll-contain">
       {tools.map((tool, index) => {
         // Use icon from tool.icons if available, otherwise fallback to Wrench
-        const toolIcons = (tool as any).icons;
+        const toolIcons = getToolIcons(tool);
         const icon = toolIcons ? (
           <IconRenderer
             icons={toolIcons}

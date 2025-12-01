@@ -2,7 +2,11 @@ import { useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 
-interface Icon {
+/**
+ * Icon type matching SEP-973 specification
+ * @see https://github.com/modelcontextprotocol/specification/blob/main/SEPs/sep-973-icons-and-website-url.md
+ */
+export interface Icon {
   src: string;
   mimeType?: string;
   sizes?: string;
