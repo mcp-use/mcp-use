@@ -1,9 +1,0 @@
-{
-  "tasks": {
-    "test:deno": "bash test-deno.sh"
-  },
-  "compilerOptions": {
-    "lib": ["deno.window", "deno.unstable"]
-  }
-}
-

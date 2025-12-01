@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194",
+    "mcp-use/server": "npm:mcp-use/server"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window", "deno.unstable"]
+  }
+}
+
