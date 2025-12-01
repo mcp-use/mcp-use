@@ -25,6 +25,18 @@ cd .deno-test-temp
 PACKAGE_FILE=$(ls ../mcp-use-*.tgz | head -1)
 echo "📦 Using package: $PACKAGE_FILE"
 
+# Verify the tarball has the patched package.json
+echo "🔍 Verifying tarball contents..."
+tar -xzf "$PACKAGE_FILE" package/package.json
+if grep -q "pkg.pr.new" package/package.json; then
+  echo "❌ ERROR: Tarball still contains pkg.pr.new URL!"
+  cat package/package.json | grep "@modelcontextprotocol/sdk"
+  rm -rf package
+  exit 1
+fi
+echo "✅ Tarball verified - using proper npm dependency"
+rm -rf package
+
 # Create package.json to install the local tarball
 cat > package.json << EOF
 {
