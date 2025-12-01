@@ -2022,7 +2022,10 @@ if (container && Component) {
           let prevHtmlWithoutComments;
           do {
             prevHtmlWithoutComments = htmlWithoutComments;
-            htmlWithoutComments = htmlWithoutComments.replace(/<!--[\s\S]*?-->/g, "");
+            htmlWithoutComments = htmlWithoutComments.replace(
+              /<!--[\s\S]*?-->/g,
+              ""
+            );
           } while (prevHtmlWithoutComments !== htmlWithoutComments);
 
           // Try to replace existing base tag (only if not in comments)

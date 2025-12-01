@@ -53,9 +53,8 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
       const langchainMessages: any[] = [];
 
       // Import message classes once
-      const { HumanMessage, AIMessage } = await import(
-        "@langchain/core/messages"
-      );
+      const { HumanMessage, AIMessage } =
+        await import("@langchain/core/messages");
 
       for (const msg of messages) {
         if (!msg || !msg.role) {
@@ -122,9 +121,8 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
           const { ChatAnthropic } = await import("@langchain/anthropic");
           llm = new ChatAnthropic(llmOptions);
         } else if (llmConfig.provider === "google") {
-          const { ChatGoogleGenerativeAI } = await import(
-            "@langchain/google-genai"
-          );
+          const { ChatGoogleGenerativeAI } =
+            await import("@langchain/google-genai");
           llm = new ChatGoogleGenerativeAI(llmOptions);
         } else {
           throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
