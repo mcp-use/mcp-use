@@ -345,11 +345,29 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
 
+    // If resetTimeoutOnProgress is enabled but no onprogress callback is provided,
+    // add a no-op callback to trigger the SDK to add progressToken to the request.
+    // The SDK only adds progressToken when onprogress is present, which is required
+    // for the server to send progress notifications that reset the timeout.
+    const enhancedOptions = options ? { ...options } : undefined;
+    if (
+      enhancedOptions?.resetTimeoutOnProgress &&
+      !enhancedOptions.onprogress
+    ) {
+      // Add no-op progress callback to trigger progressToken addition
+      enhancedOptions.onprogress = () => {
+        // No-op: progress notifications are handled by the SDK's timeout reset logic
+      };
+      logger.debug(
+        `[BaseConnector] Added onprogress callback for tool '${name}' to enable progressToken`
+      );
+    }
+
     logger.debug(`Calling tool '${name}' with args`, args);
     const res = await this.client.callTool(
       { name, arguments: args },
       undefined,
-      options
+      enhancedOptions
     );
     logger.debug(`Tool '${name}' returned`, res);
     return res as CallToolResult;
