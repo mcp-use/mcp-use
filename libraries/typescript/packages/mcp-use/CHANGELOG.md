@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.9.0-canary.2
+
+### Minor Changes
+
+- b56c907: feat: added support for elicitation in inspector
+
+### Patch Changes
+
+- Updated dependencies [b56c907]
+  - @mcp-use/inspector@0.11.0-canary.2
+  - @mcp-use/cli@2.4.8-canary.2
+
 ## 1.9.0-canary.1
 
 ### Minor Changes
