@@ -2497,7 +2497,7 @@ if (container && Component) {
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => generateUUID(),
-        enableJsonResponse: false, // Allow SSE streaming for progress notifications
+        enableJsonResponse: true, // Allow SSE streaming for progress notifications
         allowedOrigins: allowedOrigins,
         enableDnsRebindingProtection: enableDnsRebindingProtection,
         onsessioninitialized: (id) => {
