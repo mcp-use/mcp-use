@@ -29,7 +29,7 @@
     "create-mcp-use-app": "./dist/index.js"
   },
   "scripts": {
-    "build": "npm run clean && tsup src/index.ts --format esm && tsc --emitDeclarationOnly --declaration && npm run copy-templates",
+    "build": "npm run clean && tsup src/index.tsx --format esm && tsc --emitDeclarationOnly --declaration && npm run copy-templates",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "copy-templates": "node scripts/copy-templates.js",
     "dev": "tsc --build --watch",
@@ -49,13 +49,16 @@
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
     "fs-extra": "^11.3.2",
-    "inquirer": "^13.0.1",
-    "ora": "^9.0.0"
+    "ink": "^6.5.1",
+    "ink-select-input": "^6.2.0",
+    "ink-text-input": "^6.0.0",
+    "ora": "^9.0.0",
+    "react": "^19.2.0"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
-    "@types/inquirer": "^9.0.9",
     "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
     "typescript": "^5.9.3",
     "vitest": "^4.0.14"
   },

@@ -2,7 +2,9 @@
 
 import chalk from "chalk";
 import { Command } from "commander";
-import inquirer from "inquirer";
+import { render } from "ink";
+import SelectInput from "ink-select-input";
+import TextInput from "ink-text-input";
 import { execSync, spawn } from "node:child_process";
 import {
   copyFileSync,
@@ -16,6 +18,8 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ora from "ora";
+import React, { useState } from "react";
+import { Box, Text } from "ink";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -297,12 +301,62 @@ function processTemplateFile(
   return processedContent;
 }
 
+// Function to get available templates
+function getAvailableTemplates(): string[] {
+  const templatesDir = join(__dirname, "templates");
+  if (!existsSync(templatesDir)) {
+    return [];
+  }
+  return readdirSync(templatesDir, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name)
+    .sort();
+}
+
+// Function to list templates
+function listTemplates(): void {
+  console.log("");
+  renderLogo();
+  console.log("");
+  console.log(chalk.bold("Available Templates:"));
+  console.log("");
+
+  const templatesDir = join(__dirname, "templates");
+  const availableTemplates = getAvailableTemplates();
+
+  if (availableTemplates.length === 0) {
+    console.log(chalk.red("❌ No templates found!"));
+    return;
+  }
+
+  for (const template of availableTemplates) {
+    const packageJsonPath = join(templatesDir, template, "package.json");
+    let description = "MCP server template";
+    
+    if (existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+        description = packageJson.description || description;
+      } catch (error) {
+        // Use default description
+      }
+    }
+    
+    console.log(chalk.cyan(`  ${template.padEnd(15)}`), chalk.gray(description));
+  }
+  
+  console.log("");
+  console.log(chalk.gray("💡 Use with: npx create-mcp-use-app my-project --template <template>"));
+  console.log("");
+}
+
 program
   .name("create-mcp-use-app")
   .description("Create a new MCP server project")
   .version(packageJson.version)
   .argument("[project-name]", "Name of the MCP server project")
-  .option("-t, --template <template>", "Template to use", "starter")
+  .option("-t, --template <template>", "Template to use (starter, mcp-ui, apps-sdk)", "starter")
+  .option("--list-templates", "List all available templates")
   .option("--install", "Install dependencies after creating project")
   .option("--no-git", "Skip initializing a git repository")
   .option("--dev", "Use workspace dependencies for development")
@@ -315,6 +369,7 @@ program
       projectName: string | undefined,
       options: {
         template: string;
+        listTemplates?: boolean;
         install?: boolean;
         git: boolean;
         dev: boolean;
@@ -325,6 +380,12 @@ program
       }
     ) => {
       try {
+        // Handle --list-templates flag first
+        if (options.listTemplates) {
+          listTemplates();
+          process.exit(0);
+        }
+
         let selectedTemplate = options.template;
 
         // If no project name provided, prompt for it
@@ -768,69 +829,135 @@ function updatePackageJson(projectPath: string, projectName: string) {
   writeFileSync(packageJsonPath, JSON.stringify(packageJsonContent, null, 2));
 }
 
-async function promptForProjectName(): Promise<string> {
-  const { projectName } = await inquirer.prompt([
-    {
-      type: "input",
-      name: "projectName",
-      message: "What is your project name?",
-      validate: (input: string) => {
-        const trimmed = input.trim();
-        if (!trimmed) {
-          return "Project name is required";
-        }
-        if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
-          return "Project name can only contain letters, numbers, hyphens, and underscores";
-        }
-        if (existsSync(join(process.cwd(), trimmed))) {
-          return `Directory "${trimmed}" already exists! Please choose a different name.`;
-        }
-        return true;
-      },
-    },
-  ]);
-  return projectName;
+// Ink component for project name input
+function ProjectNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = (val: string) => {
+    const trimmed = val.trim();
+    
+    if (!trimmed) {
+      setError("Project name is required");
+      return;
+    }
+    if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
+      setError("Project name can only contain letters, numbers, hyphens, and underscores");
+      return;
+    }
+    if (existsSync(join(process.cwd(), trimmed))) {
+      setError(`Directory "${trimmed}" already exists! Please choose a different name.`);
+      return;
+    }
+    
+    onSubmit(trimmed);
+  };
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text bold>What is your project name?</Text>
+      </Box>
+      <Box>
+        <Text color="cyan">❯ </Text>
+        <TextInput
+          value={value}
+          onChange={setValue}
+          onSubmit={handleSubmit}
+        />
+      </Box>
+      {error && (
+        <Box marginTop={1}>
+          <Text color="red">✖ {error}</Text>
+        </Box>
+      )}
+    </Box>
+  );
 }
 
-async function promptForTemplate(): Promise<string> {
-  // Get available templates
+async function promptForProjectName(): Promise<string> {
+  return new Promise((resolve) => {
+    const { unmount } = render(
+      <ProjectNameInput
+        onSubmit={(name) => {
+          unmount();
+          resolve(name);
+        }}
+      />
+    );
+  });
+}
+
+// Ink component for template selection
+function TemplateSelector({ onSelect }: { onSelect: (template: string) => void }) {
   const templatesDir = join(__dirname, "templates");
+  
+  if (!existsSync(templatesDir)) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red">❌ Templates directory not found at: {templatesDir}</Text>
+        <Text color="yellow">   __dirname: {__dirname}</Text>
+      </Box>
+    );
+  }
+  
   const availableTemplates = readdirSync(templatesDir, { withFileTypes: true })
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
     .sort();
 
+  if (availableTemplates.length === 0) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red">❌ No templates found in: {templatesDir}</Text>
+      </Box>
+    );
+  }
+
   // Read template descriptions dynamically from package.json files
-  const templateDescriptions: Record<string, string> = {};
-  for (const template of availableTemplates) {
+  const items = availableTemplates.map((template) => {
     const packageJsonPath = join(templatesDir, template, "package.json");
+    let description = "MCP server template";
+    
     if (existsSync(packageJsonPath)) {
       try {
         const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
-        templateDescriptions[template] =
-          packageJson.description || "MCP server template";
+        description = packageJson.description || description;
       } catch (error) {
-        templateDescriptions[template] = "MCP server template";
+        // Use default description
       }
-    } else {
-      templateDescriptions[template] = "MCP server template";
     }
-  }
+    
+    return {
+      label: `${template} - ${description}`,
+      value: template,
+    };
+  });
 
-  const { template } = await inquirer.prompt([
-    {
-      type: "list",
-      name: "template",
-      message: "Select a template:",
-      default: "starter",
-      choices: availableTemplates.map((template) => ({
-        name: `${template} - ${templateDescriptions[template] || "MCP server template"}`,
-        value: template,
-      })),
-    },
-  ]);
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text bold>Select a template:</Text>
+      </Box>
+      <SelectInput
+        items={items}
+        onSelect={(item) => onSelect(item.value)}
+      />
+    </Box>
+  );
+}
 
-  return template;
+async function promptForTemplate(): Promise<string> {
+  return new Promise((resolve) => {
+    const { unmount } = render(
+      <TemplateSelector
+        onSelect={(template) => {
+          unmount();
+          resolve(template);
+        }}
+      />
+    );
+  });
 }
 
 program.parse();
