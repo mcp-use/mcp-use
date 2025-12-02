@@ -1,6 +1,16 @@
 name: MCP Conformance Tests
 
 on:
+  workflow_dispatch:
+    inputs:
+      python_only:
+        description: 'Run only Python conformance tests'
+        type: boolean
+        default: false
+      typescript_only:
+        description: 'Run only TypeScript conformance tests'
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -31,6 +41,7 @@ jobs:
     name: Python Server Conformance
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.typescript_only }}
 
     steps:
       - name: Checkout repository
@@ -87,6 +98,7 @@ jobs:
     name: TypeScript Server Conformance
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.python_only }}
 
     steps:
       - name: Checkout repository
@@ -142,7 +154,7 @@ jobs:
     name: Conformance Summary
     runs-on: ubuntu-latest
     needs: [conformance-python, conformance-typescript]
-    if: always()
+    if: always() && !cancelled()
 
     steps:
       - name: Download Python results
