@@ -3,6 +3,9 @@ import path from "node:path";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { BaseMCPClient } from "./client/base.js";
 import type { ExecutionResult } from "./client/codeExecutor.js";
@@ -53,6 +56,18 @@ export interface MCPClientOptions {
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  /**
+   * Optional callback function to handle elicitation requests from servers.
+   * When provided, the client will declare elicitation capability and handle
+   * `elicitation/create` requests by calling this callback.
+   *
+   * Elicitation allows servers to request additional information from users:
+   * - Form mode: Collect structured data with JSON schema validation
+   * - URL mode: Direct users to external URLs for sensitive interactions
+   */
+  elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 }
 
 // Export executor classes and utilities for external use

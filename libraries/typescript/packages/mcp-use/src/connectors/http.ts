@@ -202,6 +202,10 @@ export class HttpConnector extends BaseConnector {
           roots: { listChanged: true }, // Always advertise roots capability
           // Add sampling capability if callback is provided
           ...(this.opts.samplingCallback ? { sampling: {} } : {}),
+          // Add elicitation capability if callback is provided
+          ...(this.opts.elicitationCallback
+            ? { elicitation: { form: {}, url: {} } }
+            : {}),
         },
       };
       logger.debug(
@@ -279,6 +283,7 @@ export class HttpConnector extends BaseConnector {
       this.transportType = "streamable-http";
       this.setupNotificationHandler();
       this.setupSamplingHandler();
+      this.setupElicitationHandler();
       // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
@@ -318,6 +323,10 @@ export class HttpConnector extends BaseConnector {
           roots: { listChanged: true }, // Always advertise roots capability
           // Add sampling capability if callback is provided
           ...(this.opts.samplingCallback ? { sampling: {} } : {}),
+          // Add elicitation capability if callback is provided
+          ...(this.opts.elicitationCallback
+            ? { elicitation: { form: {}, url: {} } }
+            : {}),
         },
       };
       logger.debug(
@@ -337,6 +346,7 @@ export class HttpConnector extends BaseConnector {
       this.transportType = "sse";
       this.setupNotificationHandler();
       this.setupSamplingHandler();
+      this.setupElicitationHandler();
       // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
       logger.debug(
         `Successfully connected to MCP implementation via HTTP/SSE: ${baseUrl}`

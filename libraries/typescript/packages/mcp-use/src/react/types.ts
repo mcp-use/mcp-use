@@ -1,6 +1,9 @@
 import type {
   CreateMessageRequest,
   CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
   Notification,
   Prompt,
   Resource,
@@ -78,6 +81,18 @@ export type UseMcpOptions = {
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  /**
+   * Optional callback function to handle elicitation requests from servers.
+   * When provided, the client will declare elicitation capability and handle
+   * `elicitation/create` requests by calling this callback.
+   *
+   * Elicitation allows servers to request additional information from users:
+   * - Form mode: Collect structured data with JSON schema validation
+   * - URL mode: Direct users to external URLs for sensitive interactions
+   */
+  onElicitation?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 };
 
 export type UseMcpResult = {

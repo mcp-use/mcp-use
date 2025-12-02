@@ -91,6 +91,10 @@ export class StdioConnector extends BaseConnector {
           roots: { listChanged: true }, // Always advertise roots capability
           // Add sampling capability if callback is provided
           ...(this.opts.samplingCallback ? { sampling: {} } : {}),
+          // Add elicitation capability if callback is provided
+          ...(this.opts.elicitationCallback
+            ? { elicitation: { form: {}, url: {} } }
+            : {}),
         },
       };
       this.client = new Client(this.clientInfo, clientOptions);
@@ -100,6 +104,7 @@ export class StdioConnector extends BaseConnector {
       this.setupNotificationHandler();
       this.setupRootsHandler();
       this.setupSamplingHandler();
+      this.setupElicitationHandler();
       logger.debug(
         `Successfully connected to MCP implementation: ${this.command}`
       );
