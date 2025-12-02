@@ -1,0 +1,194 @@
+name: MCP Conformance Tests
+
+on:
+  push:
+    branches:
+      - main
+      - canary
+    paths:
+      - 'libraries/python/mcp_use/server/**'
+      - 'libraries/python/pyproject.toml'
+      - 'libraries/typescript/packages/mcp-use/src/server/**'
+      - 'libraries/typescript/packages/mcp-use/package.json'
+      - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
+      - 'libraries/typescript/packages/mcp-use/examples/server/conformance/**'
+      - '.github/workflows/conformance.yml'
+  pull_request:
+    branches:
+      - main
+      - canary
+    paths:
+      - 'libraries/python/mcp_use/server/**'
+      - 'libraries/python/pyproject.toml'
+      - 'libraries/typescript/packages/mcp-use/src/server/**'
+      - 'libraries/typescript/packages/mcp-use/package.json'
+      - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
+      - 'libraries/typescript/packages/mcp-use/examples/server/conformance/**'
+      - '.github/workflows/conformance.yml'
+
+jobs:
+  conformance-python:
+    name: Python Server Conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install Python dependencies
+        working-directory: libraries/python
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip install -e ".[dev]"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Start Python conformance server
+        working-directory: libraries/python
+        run: |
+          source .venv/bin/activate
+          python tests/integration/servers_for_testing/conformance_server.py --transport streamable-http --port 8000 &
+          sleep 5
+
+      - name: Run conformance tests against Python server
+        run: |
+          npx @modelcontextprotocol/conformance server --url http://127.0.0.1:8000/mcp 2>&1 | tee python-conformance-results.txt
+          # Extract pass/fail summary
+          echo "## Python Server Conformance Results" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          grep -E "(SUMMARY|✓|✗|Total:)" python-conformance-results.txt >> $GITHUB_STEP_SUMMARY || true
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Python conformance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-conformance-results
+          path: |
+            python-conformance-results.txt
+            results/
+
+  conformance-typescript:
+    name: TypeScript Server Conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        working-directory: libraries/typescript
+        run: pnpm install
+
+      - name: Build mcp-use package
+        working-directory: libraries/typescript/packages/mcp-use
+        run: pnpm build
+
+      - name: Install conformance server dependencies
+        working-directory: libraries/typescript/packages/mcp-use/examples/server/conformance
+        run: pnpm install
+
+      - name: Start TypeScript conformance server
+        working-directory: libraries/typescript/packages/mcp-use/examples/server/conformance
+        run: |
+          npx tsx src/server.ts &
+          sleep 5
+
+      - name: Run conformance tests against TypeScript server
+        run: |
+          npx @modelcontextprotocol/conformance server --url http://localhost:3000/mcp 2>&1 | tee typescript-conformance-results.txt
+          # Extract pass/fail summary
+          echo "## TypeScript Server Conformance Results" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          grep -E "(SUMMARY|✓|✗|Total:)" typescript-conformance-results.txt >> $GITHUB_STEP_SUMMARY || true
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload TypeScript conformance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: typescript-conformance-results
+          path: |
+            typescript-conformance-results.txt
+            results/
+
+  conformance-summary:
+    name: Conformance Summary
+    runs-on: ubuntu-latest
+    needs: [conformance-python, conformance-typescript]
+    if: always()
+
+    steps:
+      - name: Download Python results
+        uses: actions/download-artifact@v4
+        with:
+          name: python-conformance-results
+          path: python-results
+        continue-on-error: true
+
+      - name: Download TypeScript results
+        uses: actions/download-artifact@v4
+        with:
+          name: typescript-conformance-results
+          path: typescript-results
+        continue-on-error: true
+
+      - name: Generate summary
+        run: |
+          echo "# MCP Conformance Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Python Server" >> $GITHUB_STEP_SUMMARY
+          if [ -f python-results/python-conformance-results.txt ]; then
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            grep -E "(✓|✗|Total:)" python-results/python-conformance-results.txt >> $GITHUB_STEP_SUMMARY || echo "No results found" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No results available" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## TypeScript Server" >> $GITHUB_STEP_SUMMARY
+          if [ -f typescript-results/typescript-conformance-results.txt ]; then
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            grep -E "(✓|✗|Total:)" typescript-results/typescript-conformance-results.txt >> $GITHUB_STEP_SUMMARY || echo "No results found" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No results available" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Known Missing Features" >> $GITHUB_STEP_SUMMARY
+          echo "The following conformance tests are expected to fail due to missing SDK features:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`tools-call-audio\` - Audio content type not implemented" >> $GITHUB_STEP_SUMMARY
+          echo "- \`resources-subscribe/unsubscribe\` - Resource subscriptions not implemented" >> $GITHUB_STEP_SUMMARY
+          echo "- \`completion-complete\` - Autocomplete not implemented" >> $GITHUB_STEP_SUMMARY
+          echo "- \`tools-call-elicitation\` (TS only) - Elicitation not in TypeScript SDK" >> $GITHUB_STEP_SUMMARY
+          echo "- \`elicitation-sep1034-defaults\` (TS only) - Elicitation not in TypeScript SDK" >> $GITHUB_STEP_SUMMARY
+
