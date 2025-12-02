@@ -130,6 +130,12 @@ coverage
 **/conformance/*-conformance-results.txt
 python-conformance-results.txt
 typescript-conformance-results.txt
+typescript-conformance-results-final.txt
+results/
+
+# Implementation notes and development files
+ELICITATION_IMPLEMENTATION.md
+ext-apps/
 
 # Turbo
 .turbo
