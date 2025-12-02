@@ -269,8 +269,8 @@ jobs:
               ...Object.keys(tsResults.tests || {})
             ])].sort();
             
-            // Build the table header
-            const testHeaders = allTests.map(t => t.replace(/-/g, ' ')).join(' | ');
+            // Build the table header (keep dashes for single-line names)
+            const testHeaders = allTests.join(' | ');
             const headerSeparator = allTests.map(() => ':---:').join(' | ');
             
             // Build Python row
@@ -292,10 +292,10 @@ jobs:
               '',
               `**Commit:** \`${sha}\``,
               '',
-              `| Server | Overall | Pass | Fail | ${testHeaders} |`,
-              `|--------|:-------:|:----:|:----:|${headerSeparator}|`,
-              `| Python | ${pyResults.rate}% | ${pyResults.passed} | ${pyResults.failed} | ${pyTestCells} |`,
-              `| TypeScript | ${tsResults.rate}% | ${tsResults.passed} | ${tsResults.failed} | ${tsTestCells} |`,
+              `| Server | Overall | ${testHeaders} |`,
+              `|--------|:-------:|${headerSeparator}|`,
+              `| Python | ${pyResults.rate}% | ${pyTestCells} |`,
+              `| TypeScript | ${tsResults.rate}% | ${tsTestCells} |`,
               '',
               `[View full run details](${runUrl})`
             ].join('\n');
