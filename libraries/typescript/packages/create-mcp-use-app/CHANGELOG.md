@@ -1,5 +1,12 @@
 # create-mcp-use-app
 
+## 0.7.4
+
+### Patch Changes
+
+- 4fc04a9: Updated dependencies.
+- 4fc04a9: fix: fix transport bug
+
 ## 0.7.4-canary.1
 
 ### Patch Changes
