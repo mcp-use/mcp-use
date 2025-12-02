@@ -223,6 +223,66 @@ server.tool({
   },
 });
 
+// tools-call-elicitation-sep1034-defaults
+server.tool({
+  name: "test_elicitation_sep1034_defaults",
+  description:
+    "A tool that uses elicitation with default values for all primitive types (SEP-1034)",
+  inputs: [],
+  cb: async (params, ctx) => {
+    try {
+      const result = await ctx.elicit(
+        "Please provide your information",
+        z.object({
+          name: z.string().default("John Doe"),
+          age: z.number().int().default(30),
+          score: z.number().default(95.5),
+          status: z.enum(["active", "inactive", "pending"]).default("active"),
+          verified: z.boolean().default(true),
+        })
+      );
+
+      if (result.action === "accept") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Elicitation completed: action=accept, content=${JSON.stringify(result.data)}`,
+            },
+          ],
+        };
+      } else if (result.action === "decline") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Elicitation completed: action=decline",
+            },
+          ],
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Elicitation completed: action=cancel",
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Elicitation error: ${error.message || String(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  },
+});
+
 // tools-call-error
 server.tool({
   name: "test_error_handling",
@@ -428,7 +488,8 @@ console.log(`🔧 MCP endpoint at http://localhost:${PORT}/mcp`);
 console.log(`
 Features implemented:
   Tools: test_simple_text, test_image, test_embedded_resource, test_mixed_content,
-         test_tool_with_progress, test_sampling, test_elicitation, test_error_handling
+         test_tool_with_progress, test_sampling, test_elicitation,
+         test_elicitation_sep1034_defaults, test_error_handling
   Resources: test://static-text, test://static-binary, test://template/{id}/data
   Prompts: test_simple_prompt, test_prompt_with_arguments,
            test_prompt_with_embedded_resource, test_prompt_with_image
