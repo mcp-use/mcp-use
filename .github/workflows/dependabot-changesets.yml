@@ -109,21 +109,42 @@ jobs:
               return;
             }
 
-            // Get package names from changed package.json files
+            // Get affected package names by finding which packages contain the changed files
             async function getPackageNames(files) {
-              const names = [];
+              const packageDirs = new Set();
+              const packagesPath = `${TYPESCRIPT_DIR}/packages/`;
+              
+              // For each changed file, find which package directory it belongs to
               for (const file of files) {
+                if (file.startsWith(packagesPath)) {
+                  // Extract the package directory name (e.g., "mcp-use", "inspector", etc.)
+                  const relativePath = file.substring(packagesPath.length);
+                  const packageDir = relativePath.split('/')[0];
+                  packageDirs.add(`${packagesPath}${packageDir}`);
+                }
+              }
+              
+              console.log(`Found ${packageDirs.size} affected package directories:`, [...packageDirs]);
+              
+              // Read each package's package.json to get the package name
+              const names = [];
+              for (const packageDir of packageDirs) {
                 try {
-                  const content = await fs.readFile(file, "utf8");
+                  const packageJsonPath = `${packageDir}/package.json`;
+                  const content = await fs.readFile(packageJsonPath, "utf8");
                   const data = JSON.parse(content);
                   // Only include non-private packages
                   if (!data.private && data.name) {
                     names.push(data.name);
+                    console.log(`✓ Affected package: ${data.name}`);
+                  } else {
+                    console.log(`  Skipped (private): ${packageDir}`);
                   }
                 } catch (e) {
-                  console.log(`Warning: Could not read ${file}: ${e.message}`);
+                  console.log(`Warning: Could not read package.json for ${packageDir}: ${e.message}`);
                 }
               }
+              
               return [...new Set(names)]; // Remove duplicates
             }
 
