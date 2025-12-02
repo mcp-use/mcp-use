@@ -99,6 +99,9 @@ export class MCPClient extends BaseMCPClient {
   private _samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  private _elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 
   constructor(
     config?: string | Record<string, any>,
@@ -136,6 +139,7 @@ export class MCPClient extends BaseMCPClient {
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;
     this._samplingCallback = options?.samplingCallback;
+    this._elicitationCallback = options?.elicitationCallback;
 
     if (this.codeMode) {
       this._setupCodeModeConnector();
@@ -176,6 +180,7 @@ export class MCPClient extends BaseMCPClient {
   ): BaseConnector {
     return createConnectorFromConfig(serverConfig, {
       samplingCallback: this._samplingCallback,
+      elicitationCallback: this._elicitationCallback,
     });
   }
 

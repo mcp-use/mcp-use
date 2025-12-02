@@ -70,7 +70,7 @@ const result = await ctx.elicit(message, zodSchema);
 Use Zod schemas to define the structure and validation rules for user input. Benefits:
 
 - **Type Safety**: Return type is automatically inferred from your schema
-- **Server-Side Validation**: Data is validated against the Zod schema before being returned
+- **Server-Side Validation**: Data is validated against the Zod schema before being returned (mcp-use feature)
 - **Validation**: Built-in Zod validators (`.min()`, `.max()`, `.email()`, etc.)
 - **Descriptions**: Use `.describe()` for field labels
 - **Defaults**: Use `.default()` for default values
@@ -79,7 +79,7 @@ Use Zod schemas to define the structure and validation rules for user input. Ben
 ## Server-Side Validation
 
 <Note>
-**Automatic Validation**: When using the simplified API with Zod schemas (`ctx.elicit(message, zodSchema)`), the server automatically validates the returned data against your schema. Invalid data is rejected with clear error messages before reaching your tool logic.
+**Automatic Validation with mcp-use**: When using the mcp-use server library's simplified API with Zod schemas (`ctx.elicit(message, zodSchema)`), the server automatically validates the returned data against your schema. This is a convenience feature provided by mcp-use. Invalid data is rejected with clear error messages before reaching your tool logic.
 </Note>
 
 The validation flow:

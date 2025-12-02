@@ -12,6 +12,7 @@ import type {
   ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { ElicitationValidationError } from "../errors.js";
 
 /**
  * Options for the sample() function in tool context.
@@ -929,7 +930,7 @@ export class McpServer<HasOAuth extends boolean = false> {
             if (typeof schemaOrUrlOrOptions === "string") {
               // URL mode: ctx.elicit(message, url, options?)
               options = maybeOptions;
-              const elicitationId = `elicit-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+              const elicitationId = `elicit-${generateUUID()}`;
 
               sdkParams = {
                 mode: "url",
@@ -969,7 +970,7 @@ export class McpServer<HasOAuth extends boolean = false> {
             const params = messageOrParams;
 
             if (params.mode === "url") {
-              const elicitationId = `elicit-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+              const elicitationId = `elicit-${generateUUID()}`;
 
               sdkParams = {
                 mode: "url",
@@ -978,6 +979,10 @@ export class McpServer<HasOAuth extends boolean = false> {
                 elicitationId,
               } as ElicitRequestURLParams;
             } else {
+              // Note: When using verbose form mode API, no Zod schema is provided,
+              // so server-side validation is not performed. The requestedSchema is
+              // passed as-is without type safety. Consider using the simplified API
+              // (ctx.elicit(message, zodSchema)) for automatic server-side validation.
               sdkParams = {
                 mode: "form",
                 message: params.message,
@@ -1011,8 +1016,9 @@ export class McpServer<HasOAuth extends boolean = false> {
               };
             } catch (error: any) {
               // Zod validation failed - data doesn't match the schema
-              throw new Error(
-                `Elicitation data validation failed: ${error.message}`
+              throw new ElicitationValidationError(
+                `Elicitation data validation failed: ${error.message}`,
+                error
               );
             }
           }

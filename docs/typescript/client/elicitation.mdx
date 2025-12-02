@@ -19,7 +19,7 @@ Elicitation supports two modes:
 <Note>
 **Server API**: Servers use a simplified API like `ctx.elicit(message, zodSchema)` or `ctx.elicit(message, url)`. The mode is automatically detected and the request is sent to the client with the appropriate JSON schema or URL.
 
-**Server-Side Validation**: When servers use Zod schemas, returned data is automatically validated server-side. Invalid data is rejected before it reaches the tool logic, ensuring type safety and data integrity.
+**Server-Side Validation with mcp-use**: When using the mcp-use server library with Zod schemas (simplified API), returned data is automatically validated server-side before reaching your tool logic. This is a convenience feature provided by mcp-use, ensuring type safety and data integrity.
 </Note>
 
 ## Configuration
