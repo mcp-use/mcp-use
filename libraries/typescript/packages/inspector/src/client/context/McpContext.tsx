@@ -10,13 +10,22 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CreateMessageResult,
+  ElicitResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { PendingSamplingRequest } from "@/client/types/sampling";
+import type { PendingElicitationRequest } from "@/client/types/elicitation";
 import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
+import { ElicitationRequestToast } from "@/client/components/elicitation/ElicitationRequestToast";
 
 // Empty function constants for sampling operations
 const EMPTY_APPROVE_SAMPLING = () => {};
 const EMPTY_REJECT_SAMPLING = () => {};
+
+// Empty function constants for elicitation operations
+const EMPTY_APPROVE_ELICITATION = () => {};
+const EMPTY_REJECT_ELICITATION = () => {};
 
 export interface MCPNotification {
   id: string;
@@ -69,6 +78,9 @@ export interface MCPConnection {
   pendingSamplingRequests: PendingSamplingRequest[];
   approveSampling: (requestId: string, result: CreateMessageResult) => void;
   rejectSampling: (requestId: string, error?: string) => void;
+  pendingElicitationRequests: PendingElicitationRequest[];
+  approveElicitation: (requestId: string, result: ElicitResult) => void;
+  rejectElicitation: (requestId: string, error?: string) => void;
   callTool: (
     toolName: string,
     args: any,
@@ -189,6 +201,17 @@ function McpConnectionWrapper({
   >([]);
   const requestIdCounter = useRef(0);
 
+  // Elicitation state management
+  const [pendingElicitationRequests, setPendingElicitationRequests] = useState<
+    Array<
+      PendingElicitationRequest & {
+        resolve: (result: ElicitResult) => void;
+        reject: (error: Error) => void;
+      }
+    >
+  >([]);
+  const elicitationIdCounter = useRef(0);
+
   // Memoize the mapped pendingSamplingRequests to avoid duplication
   const mappedPendingSamplingRequests = useMemo(
     () =>
@@ -199,6 +222,18 @@ function McpConnectionWrapper({
         serverName: r.serverName,
       })),
     [pendingSamplingRequests]
+  );
+
+  // Memoize the mapped pendingElicitationRequests to avoid duplication
+  const mappedPendingElicitationRequests = useMemo(
+    () =>
+      pendingElicitationRequests.map((r) => ({
+        id: r.id,
+        request: r.request,
+        timestamp: r.timestamp,
+        serverName: r.serverName,
+      })),
+    [pendingElicitationRequests]
   );
 
   // Import transport wrapper for RPC logging - load it immediately
@@ -331,6 +366,32 @@ function McpConnectionWrapper({
     });
   }, []);
 
+  // Elicitation handlers
+  const approveElicitation = useCallback(
+    (requestId: string, result: ElicitResult) => {
+      setPendingElicitationRequests((prev) => {
+        const request = prev.find((r) => r.id === requestId);
+        if (request) {
+          request.resolve(result);
+          return prev.filter((r) => r.id !== requestId);
+        }
+        return prev;
+      });
+    },
+    []
+  );
+
+  const rejectElicitation = useCallback((requestId: string, error?: string) => {
+    setPendingElicitationRequests((prev) => {
+      const request = prev.find((r) => r.id === requestId);
+      if (request) {
+        request.reject(new Error(error || "User rejected elicitation request"));
+        return prev.filter((r) => r.id !== requestId);
+      }
+      return prev;
+    });
+  }, []);
+
   // Sampling callback for useMcp
   const samplingCallback = useCallback(
     async (params: any) => {
@@ -402,6 +463,78 @@ function McpConnectionWrapper({
     [name]
   );
 
+  // Elicitation callback for useMcp
+  const elicitationCallback = useCallback(
+    async (params: any) => {
+      return new Promise<ElicitResult>((resolve, reject) => {
+        const requestId = `elicitation-${elicitationIdCounter.current++}`;
+        const newRequest = {
+          id: requestId,
+          request: params,
+          timestamp: Date.now(),
+          serverName: name,
+          resolve,
+          reject,
+        };
+
+        setPendingElicitationRequests((prev) => [...prev, newRequest]);
+
+        // Show toast notification with view details/open URL/fill form/cancel actions
+        if (typeof window !== "undefined") {
+          import("sonner").then(({ toast }) => {
+            const toastId = toast(
+              <ElicitationRequestToast
+                requestId={requestId}
+                serverName={name}
+                mode={params.mode || "form"}
+                message={params.message}
+                url={params.mode === "url" ? params.url : undefined}
+                onViewDetails={() => {
+                  const event = new globalThis.CustomEvent(
+                    "navigate-to-elicitation",
+                    {
+                      detail: { requestId },
+                    }
+                  );
+                  window.dispatchEvent(event);
+                  toast.dismiss(toastId);
+                }}
+                onOpenUrl={
+                  params.mode === "url"
+                    ? () => {
+                        window.open(params.url, "_blank");
+                        toast.dismiss(toastId);
+                      }
+                    : undefined
+                }
+                onCancel={() => {
+                  setPendingElicitationRequests((prev) => {
+                    const request = prev.find((r) => r.id === requestId);
+                    if (request) {
+                      request.reject(
+                        new Error(
+                          "User cancelled elicitation request from toast"
+                        )
+                      );
+                      toast.error("Elicitation request cancelled");
+                      return prev.filter((r) => r.id !== requestId);
+                    }
+                    return prev;
+                  });
+                  toast.dismiss(toastId);
+                }}
+              />,
+              {
+                duration: 5000,
+              }
+            );
+          });
+        }
+      });
+    },
+    [name]
+  );
+
   // Only enable useMcp connection after transport wrapper is ready
   // This ensures RPC logging is active from the start
   const mcpHook = useMcp({
@@ -424,6 +557,7 @@ function McpConnectionWrapper({
       });
     },
     samplingCallback,
+    onElicitation: elicitationCallback,
   });
 
   const onUpdateRef = useRef(onUpdate);
@@ -474,6 +608,9 @@ function McpConnectionWrapper({
           pendingSamplingRequests: mappedPendingSamplingRequests,
           approveSampling,
           rejectSampling,
+          pendingElicitationRequests: mappedPendingElicitationRequests,
+          approveElicitation,
+          rejectElicitation,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
@@ -502,6 +639,8 @@ function McpConnectionWrapper({
           prev.unreadNotificationCount !== connection.unreadNotificationCount ||
           prev.pendingSamplingRequests.length !==
             connection.pendingSamplingRequests.length ||
+          prev.pendingElicitationRequests.length !==
+            connection.pendingElicitationRequests.length ||
           !prev.client
         ) {
           prevConnectionRef.current = connection;
@@ -535,6 +674,9 @@ function McpConnectionWrapper({
         pendingSamplingRequests: mappedPendingSamplingRequests,
         approveSampling,
         rejectSampling,
+        pendingElicitationRequests: mappedPendingElicitationRequests,
+        approveElicitation,
+        rejectElicitation,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
@@ -563,6 +705,8 @@ function McpConnectionWrapper({
         prev.unreadNotificationCount !== connection.unreadNotificationCount ||
         prev.pendingSamplingRequests.length !==
           connection.pendingSamplingRequests.length ||
+        prev.pendingElicitationRequests.length !==
+          connection.pendingElicitationRequests.length ||
         !prev.client
       ) {
         prevConnectionRef.current = connection;
@@ -600,6 +744,9 @@ function McpConnectionWrapper({
     pendingSamplingRequests,
     approveSampling,
     rejectSampling,
+    mappedPendingElicitationRequests,
+    approveElicitation,
+    rejectElicitation,
   ]);
 
   return null;
@@ -657,6 +804,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
               pendingSamplingRequests: [],
               approveSampling: EMPTY_APPROVE_SAMPLING,
               rejectSampling: EMPTY_REJECT_SAMPLING,
+              pendingElicitationRequests: [],
+              approveElicitation: EMPTY_APPROVE_ELICITATION,
+              rejectElicitation: EMPTY_REJECT_ELICITATION,
               callTool: async () => {},
               readResource: async () => {},
               listPrompts: async () => {},
@@ -759,6 +909,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
                 pendingSamplingRequests: [],
                 approveSampling: EMPTY_APPROVE_SAMPLING,
                 rejectSampling: EMPTY_REJECT_SAMPLING,
+                pendingElicitationRequests: [],
+                approveElicitation: EMPTY_APPROVE_ELICITATION,
+                rejectElicitation: EMPTY_REJECT_ELICITATION,
                 callTool: async () => {},
                 readResource: async () => {},
                 listPrompts: async () => {},
@@ -821,6 +974,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
             pendingSamplingRequests: [],
             approveSampling: EMPTY_APPROVE_SAMPLING,
             rejectSampling: EMPTY_REJECT_SAMPLING,
+            pendingElicitationRequests: [],
+            approveElicitation: EMPTY_APPROVE_ELICITATION,
+            rejectElicitation: EMPTY_REJECT_ELICITATION,
             callTool: async () => {},
             readResource: async () => {},
             listPrompts: async () => {},
@@ -870,6 +1026,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
           pendingSamplingRequests: [],
           approveSampling: EMPTY_APPROVE_SAMPLING,
           rejectSampling: EMPTY_REJECT_SAMPLING,
+          pendingElicitationRequests: [],
+          approveElicitation: EMPTY_APPROVE_ELICITATION,
+          rejectElicitation: EMPTY_REJECT_ELICITATION,
           callTool: async () => {},
           readResource: async () => {},
           listPrompts: async () => {},
@@ -992,7 +1151,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
           current.unreadNotificationCount ===
             updatedConnection.unreadNotificationCount &&
           current.pendingSamplingRequests.length ===
-            updatedConnection.pendingSamplingRequests.length
+            updatedConnection.pendingSamplingRequests.length &&
+          current.pendingElicitationRequests.length ===
+            updatedConnection.pendingElicitationRequests.length
         ) {
           return prev;
         }

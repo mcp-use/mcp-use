@@ -51,7 +51,7 @@ export function Layout({ children }: LayoutProps) {
     setTunnelUrl(tunnelUrl);
   }, [location.search, setTunnelUrl]);
 
-  // Listen for custom navigation events from toast (for sampling requests)
+  // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {
     const handleNavigateToSampling = (event: globalThis.Event) => {
       const customEvent = event as globalThis.CustomEvent<{
@@ -62,6 +62,18 @@ export function Layout({ children }: LayoutProps) {
       // Switch to sampling tab and auto-select the request
       if (selectedServerId) {
         navigateToItem(selectedServerId, "sampling", requestId);
+      }
+    };
+
+    const handleNavigateToElicitation = (event: globalThis.Event) => {
+      const customEvent = event as globalThis.CustomEvent<{
+        requestId: string;
+      }>;
+      const requestId = customEvent.detail.requestId;
+
+      // Switch to elicitation tab and auto-select the request
+      if (selectedServerId) {
+        navigateToItem(selectedServerId, "elicitation", requestId);
       }
     };
 
@@ -82,6 +94,10 @@ export function Layout({ children }: LayoutProps) {
 
     window.addEventListener("navigate-to-sampling", handleNavigateToSampling);
     window.addEventListener(
+      "navigate-to-elicitation",
+      handleNavigateToElicitation
+    );
+    window.addEventListener(
       "navigate-to-tool-result",
       handleNavigateToToolResult
     );
@@ -90,6 +106,10 @@ export function Layout({ children }: LayoutProps) {
       window.removeEventListener(
         "navigate-to-sampling",
         handleNavigateToSampling
+      );
+      window.removeEventListener(
+        "navigate-to-elicitation",
+        handleNavigateToElicitation
       );
       window.removeEventListener(
         "navigate-to-tool-result",

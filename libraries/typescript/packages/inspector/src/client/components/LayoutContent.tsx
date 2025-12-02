@@ -6,6 +6,7 @@ import { PromptsTab } from "./PromptsTab";
 import { ResourcesTab } from "./ResourcesTab";
 import { ToolsTab } from "./ToolsTab";
 import { SamplingTab } from "./SamplingTab";
+import { ElicitationTab } from "./ElicitationTab";
 
 interface LayoutContentProps {
   selectedServer: MCPConnection | undefined;
@@ -102,6 +103,18 @@ export function LayoutContent({
         />
       </div>
       <div
+        style={{ display: activeTab === "elicitation" ? "block" : "none" }}
+        className="h-full"
+      >
+        <ElicitationTab
+          pendingRequests={selectedServer.pendingElicitationRequests}
+          onApprove={selectedServer.approveElicitation}
+          onReject={selectedServer.rejectElicitation}
+          serverId={selectedServer.id}
+          isConnected={selectedServer.state === "ready"}
+        />
+      </div>
+      <div
         style={{ display: activeTab === "notifications" ? "block" : "none" }}
         className="h-full"
       >
@@ -120,6 +133,7 @@ export function LayoutContent({
         activeTab !== "resources" &&
         activeTab !== "chat" &&
         activeTab !== "sampling" &&
+        activeTab !== "elicitation" &&
         activeTab !== "notifications" && <>{children}</>}
     </>
   );

@@ -6,11 +6,15 @@ import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.j
 import {
   ListRootsRequestSchema,
   CreateMessageRequestSchema,
+  ElicitRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type {
   CallToolResult,
   CreateMessageRequest,
   CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
   Notification,
   Root,
   Tool,
@@ -57,6 +61,18 @@ export interface ConnectorInitOptions {
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  /**
+   * Optional callback function to handle elicitation requests from servers.
+   * When provided, the client will declare elicitation capability and handle
+   * `elicitation/create` requests by calling this callback.
+   *
+   * Elicitation allows servers to request additional information from users:
+   * - Form mode: Collect structured data with JSON schema validation
+   * - URL mode: Direct users to external URLs for sensitive interactions
+   */
+  elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 }
 
 /**
@@ -254,6 +270,36 @@ export abstract class BaseConnector {
     );
     logger.debug(
       "setupSamplingHandler: Sampling handler registered successfully"
+    );
+  }
+
+  /**
+   * Internal: set up elicitation/create request handler.
+   * This is called after the client connects to register the handler for elicitation requests.
+   */
+  protected setupElicitationHandler(): void {
+    if (!this.client) {
+      logger.debug("setupElicitationHandler: No client available");
+      return;
+    }
+    if (!this.opts.elicitationCallback) {
+      logger.debug("setupElicitationHandler: No elicitation callback provided");
+      return;
+    }
+
+    logger.debug(
+      "setupElicitationHandler: Setting up elicitation request handler"
+    );
+    // Handle elicitation/create requests from the server
+    this.client.setRequestHandler(
+      ElicitRequestSchema,
+      async (request, _extra) => {
+        logger.debug("Server requested elicitation, forwarding to callback");
+        return await this.opts.elicitationCallback!(request.params);
+      }
+    );
+    logger.debug(
+      "setupElicitationHandler: Elicitation handler registered successfully"
     );
   }
 

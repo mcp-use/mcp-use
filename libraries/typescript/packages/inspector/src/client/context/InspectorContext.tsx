@@ -7,6 +7,7 @@ export type TabType =
   | "resources"
   | "chat"
   | "sampling"
+  | "elicitation"
   | "notifications";
 
 interface InspectorState {
@@ -16,6 +17,7 @@ interface InspectorState {
   selectedPromptName: string | null;
   selectedResourceUri: string | null;
   selectedSamplingRequestId: string | null;
+  selectedElicitationRequestId: string | null;
   tunnelUrl: string | null;
 }
 
@@ -26,6 +28,7 @@ interface InspectorContextType extends InspectorState {
   setSelectedPromptName: (promptName: string | null) => void;
   setSelectedResourceUri: (resourceUri: string | null) => void;
   setSelectedSamplingRequestId: (requestId: string | null) => void;
+  setSelectedElicitationRequestId: (requestId: string | null) => void;
   setTunnelUrl: (tunnelUrl: string | null) => void;
   navigateToItem: (
     serverId: string,
@@ -47,6 +50,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     selectedPromptName: null,
     selectedResourceUri: null,
     selectedSamplingRequestId: null,
+    selectedElicitationRequestId: null,
     tunnelUrl: null,
   });
 
@@ -77,6 +81,16 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const setSelectedElicitationRequestId = useCallback(
+    (requestId: string | null) => {
+      setState((prev) => ({
+        ...prev,
+        selectedElicitationRequestId: requestId,
+      }));
+    },
+    []
+  );
+
   const setTunnelUrl = useCallback((tunnelUrl: string | null) => {
     setState((prev) => ({ ...prev, tunnelUrl }));
   }, []);
@@ -98,6 +112,8 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
           tab === "resources" ? itemIdentifier || null : null,
         selectedSamplingRequestId:
           tab === "sampling" ? itemIdentifier || null : null,
+        selectedElicitationRequestId:
+          tab === "elicitation" ? itemIdentifier || null : null,
         tunnelUrl: null,
       };
 
@@ -116,6 +132,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
       selectedPromptName: null,
       selectedResourceUri: null,
       selectedSamplingRequestId: null,
+      selectedElicitationRequestId: null,
     }));
   }, []);
 
@@ -127,6 +144,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setSelectedPromptName,
     setSelectedResourceUri,
     setSelectedSamplingRequestId,
+    setSelectedElicitationRequestId,
     setTunnelUrl,
     navigateToItem,
     clearSelection,

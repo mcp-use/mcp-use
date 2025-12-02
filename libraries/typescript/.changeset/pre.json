@@ -1,0 +1,16 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.4.7",
+    "create-mcp-use-app": "0.7.3",
+    "@mcp-use/inspector": "0.10.1",
+    "mcp-use": "1.8.1"
+  },
+  "changesets": [
+    "dependabot-bf81452",
+    "green-mangos-sip",
+    "icy-wolves-happen",
+    "lemon-taxes-brush"
+  ]
+}

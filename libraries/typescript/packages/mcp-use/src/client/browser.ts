@@ -37,6 +37,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       wrapTransport,
       clientOptions,
       samplingCallback,
+      elicitationCallback,
     } = serverConfig;
 
     if (!url) {
@@ -51,6 +52,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       wrapTransport, // ← Pass transport wrapper if provided
       clientOptions, // ← Pass client options (capabilities, etc.) to connector
       samplingCallback, // ← Pass sampling callback to connector
+      elicitationCallback, // ← Pass elicitation callback to connector
     };
 
     // Debug: Log if clientOptions are being passed

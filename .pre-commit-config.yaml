@@ -19,6 +19,7 @@ repos:
       - id: end-of-file-fixer
         files: ^libraries/python/
       - id: check-yaml
+        exclude: (pnpm-lock\.yaml|package-lock\.json)$
       - id: check-added-large-files
       - id: debug-statements
         files: ^libraries/python/.*\.py$

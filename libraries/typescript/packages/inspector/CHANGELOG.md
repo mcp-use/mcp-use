@@ -1,5 +1,38 @@
 # @mcp-use/inspector
 
+## 0.11.0-canary.3
+
+### Patch Changes
+
+- b0d1ffe: fix: fix transport bug
+- Updated dependencies [b0d1ffe]
+  - mcp-use@1.9.0-canary.3
+
+## 0.11.0-canary.2
+
+### Minor Changes
+
+- b56c907: feat: added support for elicitation in inspector
+
+### Patch Changes
+
+- Updated dependencies [b56c907]
+  - mcp-use@1.9.0-canary.2
+
+## 0.10.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [b4e960a]
+  - mcp-use@1.9.0-canary.1
+
+## 0.10.2-canary.0
+
+### Patch Changes
+
+- d726bfa: Updated dependencies.
+  - mcp-use@1.8.2-canary.0
+
 ## 0.10.1
 
 ### Patch Changes
