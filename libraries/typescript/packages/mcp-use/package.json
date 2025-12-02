@@ -118,6 +118,7 @@
     "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/notifications/src/server.ts & sleep 3 && tsx examples/client/notification-client.ts",
     "example:server:sampling": "tsx examples/server/sampling/src/server.ts",
     "example:client:sampling": "tsx examples/client/sampling-client.ts",
+    "example:server:elicitation": "tsx examples/server/elicitation/src/server.ts",
     "example:sampling": "lsof -ti:3001 | xargs kill -9 2>/dev/null; tsx examples/server/sampling/src/server.ts & sleep 3 && tsx examples/client/sampling-client.ts",
     "example:server:oauth:supabase": "tsx examples/server/oauth/supabase/src/server.ts",
     "example:client:oauth:auth0": "tsx examples/server/oauth/auth0/src/server.ts",

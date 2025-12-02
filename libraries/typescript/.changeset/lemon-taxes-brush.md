@@ -41,7 +41,7 @@ Added comprehensive elicitation support following MCP specification, enabling se
 
 ### Examples
 
-- Created `examples/server/elicitation-test/` with 4 working tools
+- Created `examples/server/elicitation/` with 4 working tools
 - Included basic functionality test client
 - Included comprehensive validation test client (7 scenarios)  
 - Added timeout configuration examples
