@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.7.4-canary.1
+
+### Patch Changes
+
+- b0d1ffe: fix: fix transport bug
+
 ## 0.7.4-canary.0
 
 ### Patch Changes

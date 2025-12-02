@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.9.0-canary.3
+
+### Patch Changes
+
+- b0d1ffe: fix: fix transport bug
+- Updated dependencies [b0d1ffe]
+  - @mcp-use/inspector@0.11.0-canary.3
+  - @mcp-use/cli@2.4.8-canary.3
+
 ## 1.9.0-canary.2
 
 ### Minor Changes
