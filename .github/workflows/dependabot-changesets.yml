@@ -119,9 +119,14 @@ jobs:
               }
             }
 
-            // Get changed package.json files from the diff
-            const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "HEAD~1"]);
+            // Get changed package.json files from the diff against base branch
+            // Fetch the base branch to ensure we have the latest
+            await exec.exec("git", ["fetch", "origin", "main"]);
+            const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "origin/main...HEAD"]);
             const diffFiles = diffOutput.split("\n").filter(Boolean);
+            
+            console.log(`Found ${diffFiles.length} changed files in PR`);
+            console.log("Changed files:", diffFiles.slice(0, 10).join(", ") + (diffFiles.length > 10 ? "..." : ""));
             
             const changedPackageJsons = diffFiles
               .filter(file => file.startsWith(TYPESCRIPT_DIR))
