@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.7.3-canary.0
+
+### Patch Changes
+
+- 33a1a69: Updated dependencies.
+
 ## 0.7.2
 
 ### Patch Changes
