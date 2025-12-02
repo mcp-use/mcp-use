@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.7.4-canary.0
+
+### Patch Changes
+
+- d726bfa: Updated dependencies.
+
 ## 0.7.3
 
 ### Patch Changes

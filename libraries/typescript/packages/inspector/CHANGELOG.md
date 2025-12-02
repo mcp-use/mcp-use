@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.10.2-canary.0
+
+### Patch Changes
+
+- d726bfa: Updated dependencies.
+  - mcp-use@1.8.2-canary.0
+
 ## 0.10.1
 
 ### Patch Changes
