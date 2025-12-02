@@ -444,13 +444,14 @@ jobs:
             }).join(' | ');
             
             const body = [
-              '<picture>',
+              '<h2>',
+              '<picture style="display: inline-block; vertical-align: middle; margin-right: 8px;">',
               '  <source media="(prefers-color-scheme: dark)" srcset="https://registry.npmmirror.com/@lobehub/icons-static-png/1.74.0/files/dark/mcp.png">',
               '  <source media="(prefers-color-scheme: light)" srcset="https://registry.npmmirror.com/@lobehub/icons-static-png/1.74.0/files/light/mcp.png">',
-              '  <img alt="MCP" src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.74.0/files/light/mcp.png" height="24" width="24">',
+              '  <img alt="MCP" src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.74.0/files/light/mcp.png" height="32" width="32" style="display: inline-block; vertical-align: middle;">',
               '</picture>',
-              '',
-              '## MCP Conformance Test Results',
+              '<span style="vertical-align: middle;">MCP Conformance Test Results</span>',
+              '</h2>',
               '',
               `**Commit:** \`${sha}\``,
               '',
