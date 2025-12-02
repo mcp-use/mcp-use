@@ -63,20 +63,20 @@ export function buildWidgetUrl(
  * @param metadata - Additional metadata for the resource
  * @returns UIResourceContent object
  */
-export function createExternalUrlResource(
+export async function createExternalUrlResource(
   uri: string,
   iframeUrl: string,
   encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
-): UIResourceContent | Promise<UIResourceContent> {
-  return createUIResource({
+): Promise<UIResourceContent> {
+  return await createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: "externalUrl", iframeUrl },
     encoding,
     adapters: adapters,
     metadata: metadata,
-  }) as UIResourceContent | Promise<UIResourceContent>;
+  });
 }
 
 /**
@@ -89,20 +89,20 @@ export function createExternalUrlResource(
  * @param metadata - Additional metadata for the resource
  * @returns UIResourceContent object
  */
-export function createRawHtmlResource(
+export async function createRawHtmlResource(
   uri: string,
   htmlString: string,
   encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
-): UIResourceContent | Promise<UIResourceContent> {
-  return createUIResource({
+): Promise<UIResourceContent> {
+  return await createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: "rawHtml", htmlString },
     encoding,
     adapters: adapters,
     metadata: metadata,
-  }) as UIResourceContent | Promise<UIResourceContent>;
+  });
 }
 
 /**
@@ -116,21 +116,21 @@ export function createRawHtmlResource(
  * @param metadata - Additional metadata for the resource
  * @returns UIResourceContent object
  */
-export function createRemoteDomResource(
+export async function createRemoteDomResource(
   uri: string,
   script: string,
   framework: "react" | "webcomponents" = "react",
   encoding: UIEncoding = "text",
   adapters?: AdaptersConfig,
   metadata?: AppsSdkMetadata
-): UIResourceContent | Promise<UIResourceContent> {
-  return createUIResource({
+): Promise<UIResourceContent> {
+  return await createUIResource({
     uri: uri as `ui://${string}`,
     content: { type: "remoteDom", script, framework },
     encoding,
     adapters: adapters,
     metadata: metadata,
-  }) as UIResourceContent | Promise<UIResourceContent>;
+  });
 }
 
 /**
@@ -224,40 +224,34 @@ export async function createUIResourceFromDefinition(
   switch (definition.type) {
     case "externalUrl": {
       const widgetUrl = buildWidgetUrl(definition.widget, params, config);
-      return await Promise.resolve(
-        createExternalUrlResource(
-          uri,
-          widgetUrl,
-          encoding,
-          definition.adapters,
-          definition.appsSdkMetadata
-        )
+      return await createExternalUrlResource(
+        uri,
+        widgetUrl,
+        encoding,
+        definition.adapters,
+        definition.appsSdkMetadata
       );
     }
 
     case "rawHtml": {
-      return await Promise.resolve(
-        createRawHtmlResource(
-          uri,
-          definition.htmlContent,
-          encoding,
-          definition.adapters,
-          definition.appsSdkMetadata
-        )
+      return await createRawHtmlResource(
+        uri,
+        definition.htmlContent,
+        encoding,
+        definition.adapters,
+        definition.appsSdkMetadata
       );
     }
 
     case "remoteDom": {
       const framework = definition.framework || "react";
-      return await Promise.resolve(
-        createRemoteDomResource(
-          uri,
-          definition.script,
-          framework,
-          encoding,
-          definition.adapters,
-          definition.appsSdkMetadata
-        )
+      return await createRemoteDomResource(
+        uri,
+        definition.script,
+        framework,
+        encoding,
+        definition.adapters,
+        definition.appsSdkMetadata
       );
     }
 
