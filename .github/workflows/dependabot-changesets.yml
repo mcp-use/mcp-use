@@ -95,36 +95,34 @@ jobs:
               return;
             }
 
-            // Check if changeset already exists in this PR
-            const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "HEAD~1"]);
-            const diffFiles = diffOutput.split("\n").filter(Boolean);
-
-            const existingChangesets = diffFiles.filter(f => 
-              f.startsWith(`${CHANGESET_DIR}/`) && 
-              f.endsWith(".md") && 
-              !f.endsWith("README.md")
-            );
+            // Check if changeset already exists in the directory
+            let existingChangesets = [];
+            try {
+              const changesetFiles = await fs.readdir(CHANGESET_DIR);
+              existingChangesets = changesetFiles
+                .filter(f => f.endsWith(".md") && f !== "README.md")
+                .map(f => `${CHANGESET_DIR}/${f}`);
+            } catch (e) {
+              console.log("Warning: Could not read changeset directory:", e.message);
+            }
 
             if (existingChangesets.length > 0) {
               if (FORCE) {
                 console.log(`🔄 Force mode: Removing ${existingChangesets.length} existing changeset(s)`);
                 for (const changeset of existingChangesets) {
-                  try {
-                    // Check if file exists before trying to remove it
-                    await fs.access(changeset);
-                    await exec.exec("git", ["rm", changeset]);
-                    console.log(`  Removed: ${changeset}`);
-                  } catch (e) {
-                    console.log(`  Already removed or doesn't exist: ${changeset}`);
-                  }
+                  await exec.exec("git", ["rm", changeset]);
+                  console.log(`  Removed: ${changeset}`);
                 }
               } else {
-                console.log("Changeset already exists, skipping (use force option to regenerate)");
+                console.log(`Changeset already exists (${existingChangesets.join(', ')}), skipping (use force option to regenerate)`);
                 return;
               }
             }
 
-            // Get changed package.json files in the typescript library
+            // Get changed package.json files from the diff
+            const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "HEAD~1"]);
+            const diffFiles = diffOutput.split("\n").filter(Boolean);
+            
             const changedPackageJsons = diffFiles
               .filter(file => file.startsWith(TYPESCRIPT_DIR))
               .filter(file => file.endsWith("package.json"))
