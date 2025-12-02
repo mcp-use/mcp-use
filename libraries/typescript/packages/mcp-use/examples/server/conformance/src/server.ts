@@ -7,6 +7,7 @@
  */
 
 import { createMCPServer } from "mcp-use/server";
+import { z } from "zod";
 
 // Create server instance
 const server = createMCPServer("ConformanceTestServer", {
@@ -166,6 +167,114 @@ server.tool({
           {
             type: "text",
             text: `Sampling error: ${error.message || String(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  },
+});
+
+// tools-call-elicitation
+server.tool({
+  name: "test_elicitation",
+  description: "A tool that uses elicitation to get user input",
+  inputs: [],
+  cb: async (params, ctx) => {
+    try {
+      // Use the simplified elicitation API with Zod schema
+      const result = await ctx.elicit(
+        "Please provide your information",
+        z.object({
+          name: z.string().default("Anonymous"),
+          age: z.number().default(0),
+        })
+      );
+
+      // Handle the three possible actions
+      if (result.action === "accept") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Received: ${result.data.name}, age ${result.data.age}`,
+            },
+          ],
+        };
+      } else if (result.action === "decline") {
+        return {
+          content: [{ type: "text", text: "User declined" }],
+        };
+      }
+      return {
+        content: [{ type: "text", text: "Operation cancelled" }],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Elicitation error: ${error.message || String(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  },
+});
+
+// tools-call-elicitation-sep1034-defaults
+server.tool({
+  name: "test_elicitation_sep1034_defaults",
+  description:
+    "A tool that uses elicitation with default values for all primitive types (SEP-1034)",
+  inputs: [],
+  cb: async (params, ctx) => {
+    try {
+      const result = await ctx.elicit(
+        "Please provide your information",
+        z.object({
+          name: z.string().default("John Doe"),
+          age: z.number().int().default(30),
+          score: z.number().default(95.5),
+          status: z.enum(["active", "inactive", "pending"]).default("active"),
+          verified: z.boolean().default(true),
+        })
+      );
+
+      if (result.action === "accept") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Elicitation completed: action=accept, content=${JSON.stringify(result.data)}`,
+            },
+          ],
+        };
+      } else if (result.action === "decline") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Elicitation completed: action=decline",
+            },
+          ],
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Elicitation completed: action=cancel",
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Elicitation error: ${error.message || String(error)}`,
           },
         ],
         isError: true,
@@ -379,13 +488,13 @@ console.log(`🔧 MCP endpoint at http://localhost:${PORT}/mcp`);
 console.log(`
 Features implemented:
   Tools: test_simple_text, test_image, test_embedded_resource, test_mixed_content,
-         test_tool_with_progress, test_sampling, test_error_handling
+         test_tool_with_progress, test_sampling, test_elicitation,
+         test_elicitation_sep1034_defaults, test_error_handling
   Resources: test://static-text, test://static-binary, test://template/{id}/data
   Prompts: test_simple_prompt, test_prompt_with_arguments,
            test_prompt_with_embedded_resource, test_prompt_with_image
 
 Missing features (not supported in TypeScript SDK):
-  - test_elicitation (elicitation not implemented)
   - tools-call-audio (audio content type not implemented)
   - tools-call-with-logging (logging from tools not implemented)
   - resources-subscribe/unsubscribe (subscriptions not implemented)

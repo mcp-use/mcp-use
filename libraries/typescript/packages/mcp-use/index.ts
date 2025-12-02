@@ -114,6 +114,13 @@ export type {
   ToolSearchResult,
 } from "./src/client/codeExecutor.js";
 
+// Export custom error types
+export {
+  ElicitationDeclinedError,
+  ElicitationTimeoutError,
+  ElicitationValidationError,
+} from "./src/errors.js";
+
 // Export sampling types for LLM sampling capabilities
 export type {
   CreateMessageRequest,
