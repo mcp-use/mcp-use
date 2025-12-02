@@ -12,6 +12,11 @@ on:
         description: 'PR number to test (e.g., 602)'
         required: true
         type: string
+      force:
+        description: 'Force regenerate changeset even if one exists'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   generate-changeset:
@@ -80,6 +85,7 @@ jobs:
 
             const TYPESCRIPT_DIR = "libraries/typescript";
             const CHANGESET_DIR = `${TYPESCRIPT_DIR}/.changeset`;
+            const FORCE = '${{ github.event.inputs.force }}' === 'true';
 
             // Check if we're on a dependabot branch
             const { stdout } = await exec.getExecOutput("git", ["branch", "--show-current"]);
@@ -93,9 +99,23 @@ jobs:
             const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "HEAD~1"]);
             const diffFiles = diffOutput.split("\n").filter(Boolean);
 
-            if (diffFiles.some(f => f.startsWith(`${CHANGESET_DIR}/`) && f.endsWith(".md") && !f.endsWith("README.md"))) {
-              console.log("Changeset already exists, skipping");
-              return;
+            const existingChangesets = diffFiles.filter(f => 
+              f.startsWith(`${CHANGESET_DIR}/`) && 
+              f.endsWith(".md") && 
+              !f.endsWith("README.md")
+            );
+
+            if (existingChangesets.length > 0) {
+              if (FORCE) {
+                console.log(`🔄 Force mode: Removing ${existingChangesets.length} existing changeset(s)`);
+                for (const changeset of existingChangesets) {
+                  await exec.exec("git", ["rm", changeset]);
+                  console.log(`  Removed: ${changeset}`);
+                }
+              } else {
+                console.log("Changeset already exists, skipping (use force option to regenerate)");
+                return;
+              }
             }
 
             // Get changed package.json files in the typescript library
