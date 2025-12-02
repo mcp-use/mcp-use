@@ -57,7 +57,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ steps.pr-info.outputs.head_ref || github.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -120,8 +120,6 @@ jobs:
             }
 
             // Get changed package.json files from the diff against base branch
-            // Fetch the base branch to ensure we have the latest
-            await exec.exec("git", ["fetch", "origin", "main"]);
             const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "origin/main...HEAD"]);
             const diffFiles = diffOutput.split("\n").filter(Boolean);
             
