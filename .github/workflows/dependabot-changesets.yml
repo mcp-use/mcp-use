@@ -82,8 +82,8 @@ jobs:
             const CHANGESET_DIR = `${TYPESCRIPT_DIR}/.changeset`;
 
             // Check if we're on a dependabot branch
-            const { stdout: branch } = await exec.getExecOutput("git", ["branch", "--show-current"]);
-            const branchName = branch.stdout.trim();
+            const { stdout } = await exec.getExecOutput("git", ["branch", "--show-current"]);
+            const branchName = stdout.trim();
             if (!branchName.startsWith("dependabot/")) {
               console.log(`Not a dependabot branch (${branchName}), skipping`);
               return;
