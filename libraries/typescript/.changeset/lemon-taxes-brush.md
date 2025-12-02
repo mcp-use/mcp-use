@@ -1,5 +1,5 @@
 ---
-"mcp-use": minor
+"mcp-use": patch
 ---
 
 ## Elicitation Support
