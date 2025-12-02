@@ -663,6 +663,25 @@ importers:
         specifier: '>=5.4.21'
         version: 7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
 
+  packages/mcp-use/examples/server/conformance:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../..
+    devDependencies:
+      '@mcp-use/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/mcp-use/examples/server/elicitation-test:
     dependencies:
       mcp-use:
