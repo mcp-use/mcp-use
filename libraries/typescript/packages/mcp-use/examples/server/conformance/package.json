@@ -18,7 +18,8 @@
     "start": "mcp-use start"
   },
   "dependencies": {
-    "mcp-use": "workspace:*"
+    "mcp-use": "workspace:*",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@mcp-use/cli": "workspace:*",

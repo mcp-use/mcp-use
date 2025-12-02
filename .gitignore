@@ -125,6 +125,12 @@ node_modules
 # Testing
 coverage
 
+# Conformance test results
+**/conformance/results/
+**/conformance/*-conformance-results.txt
+python-conformance-results.txt
+typescript-conformance-results.txt
+
 # Turbo
 .turbo
 

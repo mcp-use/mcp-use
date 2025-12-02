@@ -668,6 +668,9 @@ importers:
       mcp-use:
         specifier: workspace:*
         version: link:../../..
+      zod:
+        specifier: ^4.1.13
+        version: 4.1.13
     devDependencies:
       '@mcp-use/cli':
         specifier: workspace:*
