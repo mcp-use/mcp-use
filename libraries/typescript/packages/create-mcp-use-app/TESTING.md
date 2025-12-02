@@ -52,17 +52,17 @@ This creates `create-mcp-use-app-X.X.X.tgz`
 
 **Using npm/npx:**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui
 ```
 
 **Using yarn:**
 ```bash
-yarn dlx -p ./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui --no-install
+yarn dlx -p ./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui
 ```
 
 **Using pnpm:**
 ```bash
-pnpm --package=./create-mcp-use-app-0.4.3.tgz dlx create-mcp-use-app my-test-app --template ui --no-install
+pnpm --package=./create-mcp-use-app-0.4.3.tgz dlx create-mcp-use-app my-test-app --template ui
 ```
 
 ### 3. Test Package Manager Flags
@@ -71,19 +71,19 @@ Test that the correct package manager commands are shown in the output:
 
 **Test --yarn flag:**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-yarn --template ui --yarn --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-yarn --template ui --yarn
 # Should show: "yarn dev" and "yarn" commands
 ```
 
 **Test --npm flag:**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-npm --template ui --npm --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-npm --template ui --npm
 # Should show: "npm run dev" and "npm install" commands
 ```
 
 **Test --pnpm flag:**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-pnpm --template ui --pnpm --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-pnpm --template ui --pnpm
 # Should show: "pnpm dev" and "pnpm install" commands
 ```
 
@@ -93,7 +93,7 @@ Test that the correct package versions are set in generated `package.json`:
 
 **Test --dev flag (workspace versions):**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-dev --template ui --dev --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-dev --template ui --dev
 cd test-dev
 cat package.json | grep "mcp-use"
 # Should show: "mcp-use": "workspace:*"
@@ -101,7 +101,7 @@ cat package.json | grep "mcp-use"
 
 **Test --canary flag:**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-canary --template ui --canary --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-canary --template ui --canary
 cd test-canary
 cat package.json | grep "mcp-use"
 # Should show: "mcp-use": "canary"
@@ -109,7 +109,7 @@ cat package.json | grep "mcp-use"
 
 **Test default (latest versions):**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-latest --template ui --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-latest --template ui
 cd test-latest
 cat package.json | grep "mcp-use"
 # Should show: "mcp-use": "latest" or a specific version like "^1.2.3"
@@ -119,13 +119,13 @@ cat package.json | grep "mcp-use"
 
 ```bash
 # UI template (with React resources from tools)
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-ui --template ui --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-ui --template ui
 
 # UI Resource template (with standalone resources)
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-uiresource --template uiresource --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-uiresource --template uiresource
 
 # Apps SDK template (advanced features)
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-apps-sdk --template apps_sdk --no-install
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-apps-sdk --template apps_sdk
 ```
 
 ### 5. Test Full Installation

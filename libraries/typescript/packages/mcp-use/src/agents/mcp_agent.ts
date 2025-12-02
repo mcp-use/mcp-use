@@ -16,7 +16,7 @@ import {
   type ReactAgent,
 } from "langchain";
 import type { ZodSchema } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { toJSONSchema } from "zod";
 import { LangChainAdapter } from "../adapters/langchain_adapter.js";
 import type { MCPClient } from "../client.js";
 import type { BaseConnector } from "../connectors/base.js";
@@ -1735,7 +1735,7 @@ export class MCPAgent {
     let schemaDescription = "";
 
     logger.debug(
-      `🔄 Structured output requested, schema: ${JSON.stringify(zodToJsonSchema(outputSchema), null, 2)}`
+      `🔄 Structured output requested, schema: ${JSON.stringify(toJSONSchema(outputSchema), null, 2)}`
     );
     // Check if withStructuredOutput method exists
     if (
@@ -1750,7 +1750,7 @@ export class MCPAgent {
     } else {
       throw new Error("LLM is required for structured output");
     }
-    const jsonSchema = zodToJsonSchema(outputSchema) as any;
+    const jsonSchema = toJSONSchema(outputSchema) as any;
     const { $schema, additionalProperties, ...cleanSchema } = jsonSchema;
     schemaDescription = JSON.stringify(cleanSchema, null, 2);
     logger.info(`🔄 Schema description: ${schemaDescription}`);
@@ -1953,7 +1953,7 @@ export class MCPAgent {
     outputSchema: ZodSchema<T>
   ): string {
     try {
-      const jsonSchema = zodToJsonSchema(outputSchema) as any;
+      const jsonSchema = toJSONSchema(outputSchema) as any;
       const { $schema, additionalProperties, ...cleanSchema } = jsonSchema;
       const schemaDescription = JSON.stringify(cleanSchema, null, 2);
 

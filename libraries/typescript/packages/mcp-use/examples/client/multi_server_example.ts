@@ -5,14 +5,13 @@
  * 1. Configure multiple MCP servers
  * 2. Create and manage sessions for each server
  * 3. Use tools from different servers in a single agent
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: ANTHROPIC_API_KEY
  */
 
 import { ChatAnthropic } from "@langchain/anthropic";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 async function runMultiServerExample() {
   // Create a configuration with multiple servers

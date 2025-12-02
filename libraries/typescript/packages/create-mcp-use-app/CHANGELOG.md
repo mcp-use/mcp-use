@@ -1,5 +1,38 @@
 # create-mcp-use-app
 
+## 0.7.2
+
+### Patch Changes
+
+- a4341d5: chore: update deps
+
+## 0.7.2-canary.0
+
+### Patch Changes
+
+- c1d7378: chore: update deps
+
+## 0.7.1
+
+### Patch Changes
+
+- 2730902: fix: parse port to number
+- 2730902: Optimized dependencies
+- 2730902: Moved ai sdk dep to optional since it's only used in test and example
+
+## 0.7.1-canary.1
+
+### Patch Changes
+
+- caf8c7c: fix: parse port to number
+- caf8c7c: Moved ai sdk dep to optional since it's only used in test and example
+
+## 0.7.1-canary.0
+
+### Patch Changes
+
+- 1ca9801: Optimized dependencies
+
 ## 0.7.0
 
 ### Minor Changes

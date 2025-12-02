@@ -1,0 +1,580 @@
+---
+title: "Version 1.5.0"
+description: "Complete MCP Server SDK with routing, logging, and developer tools"
+icon: "sparkles"
+og:image: "https://cdn.mcp-use.com/release1.5.0.png"
+---
+
+<Card img="https://cdn.mcp-use.com/release1.5.0.png" title="Release 1.5.0" href="https://github.com/mcp-use/mcp-use/releases/tag/python-v1.5.0">
+  We've introduced a **complete MCP Server SDK**, enabling you to build production-ready MCP servers with routing, advanced logging, inspector integration, and multiple transport protocols.
+</Card>
+
+## Major Changes
+
+### Complete MCP Server SDK
+
+Build powerful MCP servers with a comprehensive SDK that rivals FastMCP while providing unique capabilities for production deployments.
+
+**Key Components:**
+
+#### MCPServer - Production-Ready Server Class
+Built on top of FastMCP with significant enhancements for production use:
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="my-awesome-server",
+    version="1.0.0",
+    instructions="A production-ready MCP server",
+    debug=True,  # Enable development tools
+    pretty_print_jsonrpc=True,  # Beautiful JSON-RPC logs
+)
+
+@server.tool()
+def calculate(expression: str) -> float:
+    """Evaluate a mathematical expression."""
+    return eval(expression)
+
+# Run with multiple transport options
+server.run(
+    transport="streamable-http",  # or "stdio", "sse"
+    host="0.0.0.0",
+    port=8000,
+    reload=True  # Auto-reload on code changes
+)
+```
+
+**Features:**
+- Multiple transport protocols: stdio, streamable-http, SSE
+- Integrated development tools and inspector
+- Advanced logging with customizable formats
+- Production-ready with signal handling
+- FastMCP compatibility layer
+
+#### MCPRouter - Modular Server Organization
+Organize your MCP server into reusable modules, similar to FastAPI's APIRouter:
+
+```python
+from mcp_use.server import MCPServer, MCPRouter
+
+# routes/math.py
+math_router = MCPRouter()
+
+@math_router.tool()
+def add(a: float, b: float) -> float:
+    """Add two numbers."""
+    return a + b
+
+@math_router.tool()
+def multiply(a: float, b: float) -> float:
+    """Multiply two numbers."""
+    return a * b
+
+# routes/weather.py
+weather_router = MCPRouter()
+
+@weather_router.resource(uri="weather://current/{city}")
+def get_weather(city: str) -> str:
+    """Get current weather for a city."""
+    return f"Weather data for {city}"
+
+# main.py
+server = MCPServer(name="multi-module-server")
+server.include_router(math_router, prefix="math")  # Tools: math_add, math_multiply
+server.include_router(weather_router, prefix="weather")
+server.include_router(admin_router, enabled=False)  # Conditionally disable routers
+```
+
+**Features:**
+- Clean separation of concerns
+- Reusable modules across projects
+- Optional prefixing for namespacing
+- Conditional router enabling/disabling
+- Support for tools, resources, and prompts
+
+#### Enhanced Context with Advanced Capabilities
+Extended context object with powerful server-side features:
+
+```python
+from mcp_use.server import MCPServer, Context
+
+server = MCPServer(name="context-demo")
+
+@server.tool()
+async def smart_search(query: str, ctx: Context) -> str:
+    """Intelligent search with LLM refinement."""
+    # Sampling: Request LLM assistance from the client
+    result = await ctx.sample(
+        messages=f"Refine this search query: {query}",
+        max_tokens=100,
+        temperature=0.7,
+        model_preferences={"hints": [{"name": "claude-3-5-sonnet"}]}
+    )
+    refined_query = result.content.text
+    
+    # Elicitation: Get structured input from user
+    from dataclasses import dataclass
+    
+    @dataclass
+    class SearchFilters:
+        date_range: str
+        categories: list[str]
+        max_results: int = 10
+    
+    filters = await ctx.elicit(
+        message="Please specify search filters",
+        schema=SearchFilters  # Supports both Pydantic and dataclasses
+    )
+    
+    # Perform search with refined query and filters...
+    return f"Results for '{refined_query}' with filters: {filters.data}"
+
+@server.tool()
+async def add_new_tool(name: str, ctx: Context) -> str:
+    """Dynamically register a new tool."""
+    # Notify clients about tool list changes
+    await ctx.send_tool_list_changed()
+    return f"Added tool: {name}"
+
+@server.tool()
+async def get_request_info(ctx: Context) -> dict:
+    """Access HTTP request details."""
+    request = ctx.get_http_request()
+    if request:
+        return {
+            "method": request.method,
+            "url": str(request.url),
+            "headers": dict(request.headers)
+        }
+    return {"transport": "stdio"}
+```
+
+**Context Features:**
+- `sample()`: Client-side LLM sampling with model preferences
+- `elicit()`: Structured user input with Pydantic or dataclass schemas
+- `send_tool_list_changed()`: Dynamic tool registration notifications
+- `send_resource_list_changed()`: Resource update notifications
+- `send_prompt_list_changed()`: Prompt update notifications
+- `get_http_request()`: Access underlying HTTP request (streamable-http only)
+
+#### Advanced Logging System
+Production-grade logging with beautiful formatting and debugging tools:
+
+**Features:**
+- Customizable log formats with color-coded output
+- JSON-RPC request/response logging
+- Session ID tracking across requests
+- Request/response size monitoring
+- Configurable debug levels (0=production, 1=debug, 2=verbose)
+- Middleware-based architecture for extensibility
+
+**Debug Levels:**
+```bash
+# Production: Clean logs only
+DEBUG=0 python server.py
+
+# Debug: Clean logs + dev routes (/docs, /inspector, /openmcp.json)
+DEBUG=1 python server.py
+
+# Verbose: Everything + JSON-RPC logging with pretty printing
+DEBUG=2 python server.py
+```
+
+#### Built-in Development Tools
+
+**Inspector Integration:**
+- Auto-populated inspector at `/inspector`
+- Real-time tool testing
+- Request/response inspection
+- Session management
+
+**Documentation UI:**
+- Auto-generated docs at `/docs`
+- Interactive API explorer
+- Tool/resource/prompt documentation
+
+**OpenMCP Configuration:**
+- Standard OpenMCP config at `/openmcp.json`
+- Easy integration with MCP clients
+- Auto-discovery support
+
+#### Multiple Transport Protocols
+
+```python
+# Stdio - Traditional MCP transport
+server.run(transport="stdio")
+
+# Streamable HTTP - Recommended for production
+server.run(
+    transport="streamable-http",
+    host="0.0.0.0",
+    port=8000
+)
+
+# SSE - Server-Sent Events (deprecated, use streamable-http)
+server.run(
+    transport="sse",
+    host="127.0.0.1",
+    port=8000
+)
+```
+
+**Transport Comparison:**
+- `stdio`: Best for local CLI tools and desktop apps
+- `streamable-http`: Recommended for web services and cloud deployments
+- `sse`: Legacy support (deprecated in favor of streamable-http)
+
+#### FastMCP Migration Path
+
+Seamless migration from FastMCP with compatibility exports:
+
+```python
+# Old FastMCP code
+from fastmcp import FastMCP
+
+server = FastMCP(name="my-server")
+
+# New mcp-use code - drop-in replacement
+from mcp_use.server import FastMCP  # Compatibility alias
+
+server = FastMCP(name="my-server")  # Works identically
+
+# Or use enhanced MCPServer for new features
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="my-server")  # Recommended
+```
+
+See [FastMCP compatibility guide](/python/server/compatibility) for migration details.
+
+## Enhancements
+
+### Middleware Parameter Mutation
+
+Middleware can now modify request parameters, with changes properly propagated:
+
+```python
+from mcp_use.client import MCPClient, Middleware, MiddlewareContext
+
+class ParameterEnrichmentMiddleware(Middleware):
+    async def process_request(self, context: MiddlewareContext):
+        # Middleware can now modify context.params
+        if context.request_type == "call_tool":
+            # Add/modify parameters
+            context.params["enriched"] = True
+            context.params["timestamp"] = time.time()
+        
+        # Changes are automatically propagated to the tool call
+        return await context.next()
+
+client = MCPClient(
+    config={"mcpServers": {...}},
+    middleware=[ParameterEnrichmentMiddleware()]
+)
+```
+
+**Changes:**
+- Middleware parameter modifications are now preserved
+- `context.params` can be mutated and changes propagate
+- Improved middleware documentation with examples
+
+See [PR #522](https://github.com/mcp-use/mcp-use/pull/522) for details.
+
+### Enhanced Sampling & Elicitation
+
+Server-side support for advanced MCP protocols:
+
+**Sampling:**
+```python
+@server.tool()
+async def intelligent_tool(query: str, ctx: Context) -> str:
+    # Request LLM assistance from the client
+    response = await ctx.sample(
+        messages=[
+            "You are a helpful assistant",
+            {"role": "user", "content": query}
+        ],
+        max_tokens=500,
+        temperature=0.8,
+        model_preferences={"hints": [{"name": "claude-3-5-sonnet"}]}
+    )
+    return response.content.text
+```
+
+**Elicitation:**
+```python
+@server.tool()
+async def structured_input(ctx: Context) -> dict:
+    # Get structured user input
+    result = await ctx.elicit(
+        message="Please provide task details",
+        schema=TaskSchema
+    )
+    
+    if result.action == "accept":
+        return result.data.model_dump()
+    else:
+        return {"cancelled": True}
+```
+
+### Tool Enable/Disable Support
+
+Dynamic tool management during runtime:
+
+```python
+@server.tool()
+async def toggle_feature(feature: str, enabled: bool, ctx: Context) -> str:
+    # Enable or disable tools dynamically
+    if enabled:
+        # Register new tool
+        pass
+    else:
+        # Unregister tool
+        pass
+    
+    # Notify clients
+    await ctx.send_tool_list_changed()
+    return f"Feature {feature} {'enabled' if enabled else 'disabled'}"
+```
+
+## Code Quality
+
+### Type Checking with Ty
+
+Introduced **ty** as the official type checker for better type safety:
+
+```bash
+# Run type checking
+ty check
+
+# Pre-commit integration
+git commit  # Automatically runs ty on staged files
+```
+
+**Benefits:**
+- Strict type checking for improved code quality
+- Pre-commit integration with prek
+- Configured to ignore certain patterns for flexibility
+
+### Pre-commit Hooks with Prek
+
+Standardized pre-commit workflow with **prek**:
+
+```bash
+# Install pre-commit hooks
+prek install
+
+# Run on all files
+prek run --all-files
+```
+
+**Hooks:**
+- Type checking with ty
+- Code formatting with ruff
+- Import sorting
+- Trailing whitespace removal
+
+### Refactored Test Suite
+
+Complete test reorganization for better maintainability:
+
+**Structure:**
+```
+tests/
+├── client/           # Client-side tests
+│   ├── primitives/   # MCP primitives (tools, resources, prompts)
+│   ├── transports/   # Transport protocols
+│   └── others/       # Other client features
+└── server/           # Server-side integration tests (future)
+```
+
+**Improvements:**
+- Tests now use MCPServer instead of external servers
+- Removed dependency on FastMCP test servers
+- Better test isolation
+- Clearer test organization
+
+### Ruff Configuration
+
+Moved Ruff configuration from separate file to pyproject.toml:
+
+```toml
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+```
+
+**Benefits:**
+- Single configuration file
+- Consistent with Python ecosystem standards
+- Easier project setup
+
+## Documentation
+
+### New Server Documentation
+
+Comprehensive documentation for the new server SDK:
+
+- [Server Overview](/python/server/index) - Introduction and architecture
+- [Router Guide](/python/server/router) - Modular server organization
+- [Logging System](/python/server/logging) - Production logging setup
+- [Running Servers](/python/server/running) - Deployment guide
+- [Inspector Integration](/python/server/inspector) - Debugging tools
+- [FastMCP Migration](/python/server/compatibility) - Migration guide
+- [Sampling](/python/server/sampling) - Client LLM requests
+- [Elicitation](/python/server/elicitation) - Structured user input
+- [Notifications](/python/server/notifications) - Dynamic updates
+
+### Updated Examples
+
+New example servers showcasing features:
+
+- `context_example.py` - Context features demo
+- `fastmcp_example.py` - FastMCP compatibility
+- `fastmcp2_example.py` - Advanced FastMCP patterns
+- `fmcp_use_server_example.py` - Full-featured server
+
+### API Reference
+
+Auto-generated API documentation for all new modules:
+
+- `mcp_use.server.server` - MCPServer class
+- `mcp_use.server.router` - MCPRouter class
+- `mcp_use.server.context` - Enhanced Context
+- `mcp_use.server.logging` - Logging components
+- `mcp_use.server.runner` - Server runner
+- `mcp_use.server.types` - Type definitions
+- `mcp_use.server.utils` - Utility functions
+
+## Breaking Changes
+
+None - all changes are backward compatible. Existing client code continues to work without modifications.
+
+## Migration Guide
+
+### Starting a New Server
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="my-server",
+    version="1.0.0",
+    debug=True  # Enable dev tools during development
+)
+
+@server.tool()
+def my_tool(arg: str) -> str:
+    return f"Result: {arg}"
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", port=8000)
+```
+
+### Migrating from FastMCP
+
+Replace imports and enjoy enhanced features:
+
+```python
+# Before
+from fastmcp import FastMCP
+server = FastMCP(name="my-server")
+
+# After - Option 1: Compatibility mode
+from mcp_use.server import FastMCP
+server = FastMCP(name="my-server")
+
+# After - Option 2: Full features (recommended)
+from mcp_use.server import MCPServer
+server = MCPServer(name="my-server", debug=True)
+```
+
+### Organizing with Routers
+
+Split large servers into modules:
+
+```python
+# routes/database.py
+from mcp_use.server import MCPRouter
+
+db_router = MCPRouter()
+
+@db_router.tool()
+def query(sql: str) -> list:
+    return []
+
+# main.py
+from mcp_use.server import MCPServer
+from routes.database import db_router
+
+server = MCPServer(name="my-server")
+server.include_router(db_router, prefix="db")
+```
+
+### Enabling Advanced Features
+
+```python
+from mcp_use.server import MCPServer, Context
+
+server = MCPServer(name="advanced-server")
+
+@server.tool()
+async def advanced_tool(query: str, ctx: Context) -> str:
+    # Use sampling
+    result = await ctx.sample(messages=query)
+    
+    # Send notifications
+    await ctx.send_tool_list_changed()
+    
+    # Access HTTP request
+    request = ctx.get_http_request()
+    
+    return result.content.text
+```
+
+## Dependencies
+
+### Updated Requirements
+
+```toml
+mcp>=1.10.0  # Updated for latest MCP features
+pydantic>=2.11.0  # Enhanced schema support
+```
+
+### New Development Tools
+
+```toml
+[project.optional-dependencies]
+dev = [
+    "prek>=0.2.0",  # Pre-commit framework
+    "ty>=0.0.1a7",  # Type checker
+]
+```
+
+## Contributors
+
+Thank you to all contributors who made this release possible:
+
+- Pietro Zullo (@pietrozullo)
+- Vladimir Krasnoselskikh (@v-krasnoselskikh-im)
+- Vincenzo Reina (@renvins)
+- Enrico Toniato (@tonxxd)
+
+## Statistics
+
+- **Total Commits:** 30+ (Python-specific)
+- **Files Changed:** 106
+- **Lines Added:** 5,818+
+- **Lines Removed:** 4,402+
+- **New Modules:** 15+
+- **New Examples:** 4
+- **New Documentation Pages:** 10+
+
+---
+
+For full changelog and commit history, see the [commit log](https://github.com/mcp-use/mcp-use/compare/e76f5e76...be9942a4).
+

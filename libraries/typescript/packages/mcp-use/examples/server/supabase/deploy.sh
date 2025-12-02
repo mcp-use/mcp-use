@@ -29,6 +29,51 @@ print_warning() {
     echo -e "${YELLOW}⚠${NC} $1"
 }
 
+# Check if Docker is running
+check_docker_running() {
+    if docker info > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check if project has widgets
+has_widgets() {
+    local resources_dir="resources"
+    
+    # Check if resources directory exists
+    if [ ! -d "$resources_dir" ]; then
+        return 1
+    fi
+    
+    # Check for widget files: *.tsx, *.ts files directly in resources/, or widget.tsx in subdirectories
+    # Exclude macOS resource fork files and hidden files
+    for item in "$resources_dir"/*; do
+        # Skip if no matches found (glob expansion)
+        [ -e "$item" ] || continue
+        
+        local basename=$(basename "$item")
+        
+        # Skip hidden/system files
+        if [[ "$basename" =~ ^\._ ]] || [[ "$basename" == ".DS_Store" ]]; then
+            continue
+        fi
+        
+        # Check if it's a file with .tsx or .ts extension
+        if [ -f "$item" ] && [[ "$basename" =~ \.(tsx|ts)$ ]]; then
+            return 0
+        fi
+        
+        # Check if it's a directory with widget.tsx inside
+        if [ -d "$item" ] && [ -f "$item/widget.tsx" ]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
 # Help function
 show_help() {
     echo -e "${BLUE}Supabase MCP-USE Deployment Script${NC}"
@@ -140,6 +185,16 @@ if ! supabase projects list &> /dev/null; then
     exit 1
 fi
 print_success "Authenticated with Supabase"
+
+# Check Docker if project has widgets
+if has_widgets; then
+    print_info "Widgets detected, checking Docker..."
+    if ! check_docker_running; then
+        print_error "Docker is required for widgets data. Please start Docker and try again."
+        exit 1
+    fi
+    print_success "Docker is running"
+fi
 
 # Check if project is linked
 print_info "Checking if project is linked..."

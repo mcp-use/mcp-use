@@ -1,8 +1,10 @@
 import argparse
+from typing import get_args
 
-from fastmcp import FastMCP
+from mcp_use import MCPServer
+from mcp_use.server.types import TransportType
 
-mcp = FastMCP()
+mcp = MCPServer(name="SimpleServer", instructions="Simple arithmetic utilities for integration tests.")
 
 
 @mcp.tool()
@@ -16,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--transport",
         type=str,
-        choices=["stdio", "streamable-http", "sse"],
+        choices=get_args(TransportType),
         default="stdio",
         help="MCP transport type to use (default: stdio)",
     )

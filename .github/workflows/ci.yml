@@ -1,4 +1,6 @@
 name: CI
+permissions:
+  contents: read
 
 # ============================================================================
 # CI Workflow Overview
@@ -18,7 +20,9 @@ name: CI
 #    ├─ python-lint: Ruff linting and formatting checks
 #    ├─ python-unit-tests: Matrix [Python 3.11, 3.12]
 #    ├─ python-transport-tests: Matrix [stdio, sse, streamable_http]
+#    │  └─ python-transport-tests-report: Posts PR comment with test results table
 #    ├─ python-primitive-tests: Matrix [7 MCP primitives]
+#    │  └─ python-primitive-tests-report: Posts PR comment with test results table
 #    ├─ python-integration-tests: Other integration tests
 #    └─ python-agent-tests: Matrix [4 agent test suites] (requires API keys)
 #
@@ -145,6 +149,30 @@ jobs:
         run: |
           ruff format --check .
 
+  # (skipped) python-ty-check job is disabled, pre commits will make use compliant, then we can add this back.
+  # Pietro: this is me, I will check when is a good time to re enable. keep the comment.
+  # python-ty-check:
+  #   needs: python-lint
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: libraries/python
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+  #     - name: Set up Python 3.11
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3.11"
+  #     - name: Install dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install ty
+  #     - name: Type check with ty
+  #       run: |
+  #         ty check .
+
   python-unit-tests:
     needs: python-lint
     name: "python-unit"
@@ -203,9 +231,134 @@ jobs:
         run: |
           uv pip install --system .[dev,anthropic,openai,search,e2b]
       - name: Run integration tests for ${{ matrix.transport }} transport
+        id: test
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pytest -vv tests/integration/transports/test_${{ matrix.transport }}.py
+        run: |
+          pytest -vv tests/integration/client/transports/test_${{ matrix.transport }}.py \
+            --junit-xml=test-results-${{ matrix.transport }}.xml || true
+          # Check if tests passed
+          if grep -q 'failures="0"' test-results-${{ matrix.transport }}.xml && \
+             grep -q 'errors="0"' test-results-${{ matrix.transport }}.xml; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transport-test-results-${{ matrix.transport }}
+          path: libraries/python/test-results-${{ matrix.transport }}.xml
+          retention-days: 7
+      - name: Fail if tests failed
+        if: steps.test.outputs.status == 'failed'
+        run: exit 1
+
+  python-transport-tests-report:
+    needs: python-transport-tests
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: transport-test-results-*
+          path: test-results
+          merge-multiple: false
+      - name: Generate PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const transports = ['stdio', 'sse', 'streamable_http'];
+            let tableRows = [];
+            let allPassed = true;
+            
+            for (const transport of transports) {
+              const xmlPath = path.join('test-results', `transport-test-results-${transport}`, `test-results-${transport}.xml`);
+              let status = '⏭️ Skipped';
+              let tests = '-';
+              let passed = '-';
+              let failed = '-';
+              let errors = '-';
+              let time = '-';
+              
+              if (fs.existsSync(xmlPath)) {
+                const content = fs.readFileSync(xmlPath, 'utf8');
+                
+                // Parse basic stats from JUnit XML
+                const testsMatch = content.match(/tests="(\d+)"/);
+                const failuresMatch = content.match(/failures="(\d+)"/);
+                const errorsMatch = content.match(/errors="(\d+)"/);
+                const timeMatch = content.match(/time="([\d.]+)"/);
+                
+                if (testsMatch) {
+                  const totalTests = parseInt(testsMatch[1]);
+                  const failureCount = failuresMatch ? parseInt(failuresMatch[1]) : 0;
+                  const errorCount = errorsMatch ? parseInt(errorsMatch[1]) : 0;
+                  const passedCount = totalTests - failureCount - errorCount;
+                  
+                  tests = totalTests.toString();
+                  passed = passedCount.toString();
+                  failed = failureCount.toString();
+                  errors = errorCount.toString();
+                  time = timeMatch ? `${parseFloat(timeMatch[1]).toFixed(2)}s` : '-';
+                  
+                  if (failureCount === 0 && errorCount === 0) {
+                    status = '✅ Passed';
+                  } else {
+                    status = '❌ Failed';
+                    allPassed = false;
+                  }
+                }
+              }
+              
+              tableRows.push(`| ${transport} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
+            }
+            
+            const overallStatus = allPassed ? '✅ All transport tests passed!' : '❌ Some transport tests failed';
+            
+            const comment = `## Python Transport Tests Results
+            
+            ${overallStatus}
+            
+            | Transport | Status | Tests | Passed | Failed | Errors | Time |
+            |-----------|--------|-------|--------|--------|--------|------|
+            ${tableRows.join('\n')}
+            `;
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(c => 
+              c.user.type === 'Bot' && 
+              c.body.includes('## Python Transport Tests Results')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment,
+              });
+            }
 
   python-primitive-tests:
     needs: python-lint
@@ -242,9 +395,134 @@ jobs:
         run: |
           uv pip install --system .[dev,anthropic,openai,search,e2b]
       - name: Run integration tests for ${{ matrix.primitive }} primitive
+        id: test
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pytest -vv tests/integration/primitives/test_${{ matrix.primitive }}.py
+        run: |
+          pytest -vv tests/integration/client/primitives/test_${{ matrix.primitive }}.py \
+            --junit-xml=test-results-${{ matrix.primitive }}.xml || true
+          # Check if tests passed
+          if grep -q 'failures="0"' test-results-${{ matrix.primitive }}.xml && \
+             grep -q 'errors="0"' test-results-${{ matrix.primitive }}.xml; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: primitive-test-results-${{ matrix.primitive }}
+          path: libraries/python/test-results-${{ matrix.primitive }}.xml
+          retention-days: 7
+      - name: Fail if tests failed
+        if: steps.test.outputs.status == 'failed'
+        run: exit 1
+
+  python-primitive-tests-report:
+    needs: python-primitive-tests
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: primitive-test-results-*
+          path: test-results
+          merge-multiple: false
+      - name: Generate PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const primitives = ['sampling', 'tools', 'resources', 'prompts', 'elicitation', 'notifications', 'auth'];
+            let tableRows = [];
+            let allPassed = true;
+            
+            for (const primitive of primitives) {
+              const xmlPath = path.join('test-results', `primitive-test-results-${primitive}`, `test-results-${primitive}.xml`);
+              let status = '⏭️ Skipped';
+              let tests = '-';
+              let passed = '-';
+              let failed = '-';
+              let errors = '-';
+              let time = '-';
+              
+              if (fs.existsSync(xmlPath)) {
+                const content = fs.readFileSync(xmlPath, 'utf8');
+                
+                // Parse basic stats from JUnit XML
+                const testsMatch = content.match(/tests="(\d+)"/);
+                const failuresMatch = content.match(/failures="(\d+)"/);
+                const errorsMatch = content.match(/errors="(\d+)"/);
+                const timeMatch = content.match(/time="([\d.]+)"/);
+                
+                if (testsMatch) {
+                  const totalTests = parseInt(testsMatch[1]);
+                  const failureCount = failuresMatch ? parseInt(failuresMatch[1]) : 0;
+                  const errorCount = errorsMatch ? parseInt(errorsMatch[1]) : 0;
+                  const passedCount = totalTests - failureCount - errorCount;
+                  
+                  tests = totalTests.toString();
+                  passed = passedCount.toString();
+                  failed = failureCount.toString();
+                  errors = errorCount.toString();
+                  time = timeMatch ? `${parseFloat(timeMatch[1]).toFixed(2)}s` : '-';
+                  
+                  if (failureCount === 0 && errorCount === 0) {
+                    status = '✅ Passed';
+                  } else {
+                    status = '❌ Failed';
+                    allPassed = false;
+                  }
+                }
+              }
+              
+              tableRows.push(`| ${primitive} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
+            }
+            
+            const overallStatus = allPassed ? '✅ All primitive tests passed!' : '❌ Some primitive tests failed';
+            
+            const comment = `## Python Primitive Tests Results
+            
+            ${overallStatus}
+            
+            | Primitive | Status | Tests | Passed | Failed | Errors | Time |
+            |-----------|--------|-------|--------|--------|--------|------|
+            ${tableRows.join('\n')}
+            `;
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(c => 
+              c.user.type === 'Bot' && 
+              c.body.includes('## Python Primitive Tests Results')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment,
+              });
+            }
 
   python-integration-tests:
     needs: python-lint
@@ -270,7 +548,7 @@ jobs:
       - name: Run other integration tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pytest -vv tests/integration/others/
+        run: pytest -vv tests/integration/client/others/
 
   python-agent-tests:
     needs: python-lint
@@ -467,6 +745,41 @@ jobs:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter @mcp-use/cli --if-present test
 
+  typescript-deno-test:
+    if: false # tmp disable
+    needs: [detect-changes, typescript-build]
+    # if: needs.detect-changes.outputs.typescript == 'true'
+    name: "typescript/deno"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Build mcp-use Package
+        run: pnpm --filter mcp-use build
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Run Deno Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        working-directory: libraries/typescript/packages/mcp-use
+        run: bash test-deno.sh
+
   typescript-changeset-check:
     needs: detect-changes
     if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && needs.detect-changes.outputs.typescript == 'true') }}
@@ -636,7 +949,7 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
-          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }} --no-install
+          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }}
           echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Install dependencies with npm
         working-directory: test-app-npm-${{ matrix.template }}
@@ -694,7 +1007,7 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
-          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }} --no-install
+          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }}
           echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Install dependencies with yarn
         working-directory: test-app-yarn-${{ matrix.template }}

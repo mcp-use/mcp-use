@@ -111,7 +111,6 @@
               },
               {
                 "group": "MCP Server",
-                "hidden": true,
                 "icon": "server",
                 "tag": "Beta",
                 "pages": [
@@ -125,19 +124,18 @@
                     ]
                   },
                   {
-                    "group": "Core Features",
+                    "group": "Features",
                     "icon": "list-plus",
                     "pages": [
                       "python/server/tools",
                       "python/server/resources",
-                      "python/server/prompts"
+                      "python/server/prompts",
+                      "python/server/sampling",
+                      "python/server/elicitation",
+                      "python/server/notifications"
                     ]
                   },
-                  {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
-                    "pages": []
-                  },
+                  "python/server/router",
                   "python/server/inspector",
                   "python/server/logging",
                   "python/server/openmcp"
@@ -358,6 +356,39 @@
                 "pages": [
                   "python/api-reference/mcp_use_errors_error_formatting"
                 ]
+              },
+              {
+                "group": "Server",
+                "icon": "server",
+                "pages": [
+                  "python/api-reference/mcp_use_server_context",
+                  {
+                    "group": "Logging",
+                    "icon": "logs",
+                    "pages": [
+                      "python/api-reference/mcp_use_server_logging_config",
+                      "python/api-reference/mcp_use_server_logging_formatters",
+                      "python/api-reference/mcp_use_server_logging_middleware",
+                      "python/api-reference/mcp_use_server_logging_startup",
+                      "python/api-reference/mcp_use_server_logging_state"
+                    ]
+                  },
+                  "python/api-reference/mcp_use_server_router",
+                  "python/api-reference/mcp_use_server_runner",
+                  "python/api-reference/mcp_use_server_server",
+                  "python/api-reference/mcp_use_server_types",
+                  {
+                    "group": "Utils",
+                    "icon": "tool",
+                    "pages": [
+                      "python/api-reference/mcp_use_server_utils_inspector",
+                      "python/api-reference/mcp_use_server_utils_openmcp",
+                      "python/api-reference/mcp_use_server_utils_routes",
+                      "python/api-reference/mcp_use_server_utils_signals",
+                      "python/api-reference/mcp_use_server_utils_utils"
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -374,6 +405,7 @@
               {
                 "group": "Versions",
                 "pages": [
+                  "python/changelog/1_5_0",
                   "python/changelog/1_4_1",
                   "python/changelog/1_4_0",
                   "python/changelog/1_3_13",
@@ -448,7 +480,15 @@
                       "typescript/server/tools",
                       "typescript/server/resources",
                       "typescript/server/prompts",
+                      "typescript/server/notifications",
                       "typescript/server/api-reference"
+                    ]
+                  },
+                  {
+                    "group": "Advanced Features",
+                    "icon": "sparkle",
+                    "pages": [
+                      "typescript/server/authentication"
                     ]
                   },
                   {

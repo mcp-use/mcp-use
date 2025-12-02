@@ -117,8 +117,8 @@ npx create-mcp-use-app my-project --npm
 npx create-mcp-use-app my-project --yarn
 npx create-mcp-use-app my-project --pnpm
 
-# Skip dependency installation
-npx create-mcp-use-app my-project --no-install
+# Install deps automatically
+npx create-mcp-use-app my-project --install
 ```
 
 ---

@@ -188,7 +188,7 @@ npm install ai @langchain/anthropic
 
 ```ts
 import { ChatAnthropic } from '@langchain/anthropic'
-import { LangChainAdapter } from 'ai'
+import { createTextStreamResponse } from 'ai'
 import {
   createReadableStreamFromGenerator,
   MCPAgent,
@@ -215,7 +215,7 @@ async function createApiHandler() {
     const aiSDKStream = streamEventsToAISDK(streamEvents)
     const readableStream = createReadableStreamFromGenerator(aiSDKStream)
 
-    return LangChainAdapter.toDataStreamResponse(readableStream)
+    return createTextStreamResponse({ textStream: readableStream })
   }
 }
 ```
@@ -245,7 +245,7 @@ async function createEnhancedApiHandler() {
     const enhancedStream = streamEventsToAISDKWithTools(streamEvents)
     const readableStream = createReadableStreamFromGenerator(enhancedStream)
 
-    return LangChainAdapter.toDataStreamResponse(readableStream)
+    return createTextStreamResponse({ textStream: readableStream })
   }
 }
 ```
@@ -255,7 +255,7 @@ async function createEnhancedApiHandler() {
 ```ts
 // pages/api/chat.ts or app/api/chat/route.ts
 import { ChatAnthropic } from '@langchain/anthropic'
-import { LangChainAdapter } from 'ai'
+import { createTextStreamResponse } from 'ai'
 import {
   createReadableStreamFromGenerator,
   MCPAgent,
@@ -284,7 +284,7 @@ export async function POST(req: Request) {
     const aiSDKStream = streamEventsToAISDK(streamEvents)
     const readableStream = createReadableStreamFromGenerator(aiSDKStream)
 
-    return LangChainAdapter.toDataStreamResponse(readableStream)
+    return createTextStreamResponse({ textStream: readableStream })
   } finally {
     await client.closeAllSessions()
   }

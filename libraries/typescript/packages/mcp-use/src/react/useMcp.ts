@@ -6,7 +6,7 @@ import type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { sanitizeUrl } from "strict-url-sanitise";
+import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { BrowserMCPClient } from "../client/browser.js";
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
 import { assert } from "../utils/assert.js";
@@ -14,7 +14,6 @@ import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
-const AUTH_TIMEOUT = 5 * 60 * 1000;
 
 // Define Transport types literal for clarity
 type TransportType = "http" | "sse";
@@ -68,7 +67,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
     transportType = "auto",
-    preventAutoAuth = false,
+    preventAutoAuth = false, // Default to false for backward compatibility (auto-trigger OAuth)
+    useRedirectFlow = false, // Default to false for backward compatibility (use popup)
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
@@ -243,6 +243,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         clientUri,
         callbackUrl,
         preventAutoAuth,
+        useRedirectFlow,
         onPopupWindow,
       });
       addLog("debug", "BrowserOAuthClientProvider initialized in connect.");
@@ -364,12 +365,62 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const errorMessage = err?.message || String(err);
 
         // Handle 401 errors
-        // Note: OAuth is handled automatically by the SDK's authProvider if configured
         if (
           err.code === 401 ||
           errorMessage.includes("401") ||
           errorMessage.includes("Unauthorized")
         ) {
+          // Check if OAuth provider is configured
+          if (authProviderRef.current) {
+            // OAuth is configured - enter pending_auth state
+            addLog(
+              "info",
+              "Authentication required. OAuth provider available."
+            );
+
+            // Generate auth URL manually since SDK didn't trigger it
+            // This happens because 401 occurs before OAuth flow starts
+            try {
+              const { auth } =
+                await import("@modelcontextprotocol/sdk/client/auth.js");
+              const baseUrl = new URL(url).origin;
+
+              // Trigger auth to generate the URL, but it will be blocked by preventAutoAuth
+              // This ensures the URL gets prepared and stored
+              auth(authProviderRef.current, { serverUrl: baseUrl }).catch(
+                () => {
+                  // Expected to fail/stop - we just want the URL prepared
+                }
+              );
+
+              // Give it a moment to prepare the URL
+              setTimeout(() => {
+                if (isMountedRef.current) {
+                  const manualUrl =
+                    authProviderRef.current?.getLastAttemptedAuthUrl();
+                  if (manualUrl) {
+                    setAuthUrl(manualUrl);
+                    addLog(
+                      "info",
+                      "Manual authentication URL available:",
+                      manualUrl
+                    );
+                  } else {
+                    addLog("warn", "Could not generate authentication URL");
+                  }
+                }
+              }, 100);
+            } catch (authGenError) {
+              addLog("warn", "Error generating auth URL:", authGenError);
+            }
+
+            if (isMountedRef.current) {
+              setState("pending_auth");
+            }
+            connectingRef.current = false;
+            return "auth_redirect";
+          }
+
           // Check if custom headers were provided (invalid credentials)
           if (customHeaders && Object.keys(customHeaders).length > 0) {
             failConnection(
@@ -379,7 +430,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             return "failed";
           }
 
-          // No custom headers - suggest adding them
+          // No OAuth and no custom headers - suggest adding them
           failConnection(
             "Authentication required: Server returned 401 Unauthorized. " +
               "Add an Authorization header in the Custom Headers section " +
@@ -445,6 +496,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     customHeaders,
     transportType,
     preventAutoAuth,
+    useRedirectFlow,
     onPopupWindow,
     enabled,
     timeout,
@@ -552,16 +604,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       retry();
     } else if (currentState === "pending_auth") {
       addLog("info", "Proceeding with authentication from pending state...");
-      setState("authenticating");
-      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
-      authTimeoutRef.current = setTimeout(() => {
-        if (isMountedRef.current) {
-          const currentStateValue = stateRef.current;
-          if (currentStateValue === "authenticating") {
-            failConnection("Authentication timed out. Please try again.");
-          }
-        }
-      }, AUTH_TIMEOUT) as any;
 
       try {
         assert(
@@ -569,18 +611,68 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           "Auth Provider not available for manual auth"
         );
         assert(url, "Server URL is required for authentication");
-        // OAuth handled via popup - just trigger reconnect after auth completes
-        // The auth callback will handle reconnection
-        addLog(
-          "info",
-          "Redirecting for manual authentication. Waiting for callback..."
-        );
+
+        // Clear ALL stale OAuth state from previous attempts
+        addLog("info", "Clearing all OAuth state and initiating fresh flow...");
+
+        // Clear all OAuth-related keys for this server
+        const hashPrefix = `${storageKeyPrefix}:${authProviderRef.current.serverUrlHash}`;
+        Object.keys(localStorage).forEach((key) => {
+          // Remove all keys for this server's hash
+          if (key.startsWith(hashPrefix)) {
+            addLog("debug", `Removing stale OAuth key: ${key}`);
+            localStorage.removeItem(key);
+          }
+          // Also remove any orphaned state parameters
+          if (key.startsWith(`${storageKeyPrefix}:state_`)) {
+            addLog("debug", `Removing orphaned state: ${key}`);
+            localStorage.removeItem(key);
+          }
+        });
+
+        // Update state to authenticating before redirect
+        setState("authenticating");
+
+        // Recreate the auth provider WITHOUT preventAutoAuth
+        const freshAuthProvider = new BrowserOAuthClientProvider(url, {
+          storageKeyPrefix,
+          clientName,
+          clientUri,
+          callbackUrl,
+          preventAutoAuth: false, // ← Allow OAuth to proceed
+          useRedirectFlow,
+          onPopupWindow,
+        });
+
+        // Replace the auth provider
+        authProviderRef.current = freshAuthProvider;
+
+        addLog("info", "Triggering fresh OAuth authorization...");
+
+        // Generate a fresh authorization URL and redirect immediately
+        // We need to manually trigger what the SDK would do
+        const { auth } =
+          await import("@modelcontextprotocol/sdk/client/auth.js");
+
+        // This will trigger the OAuth flow with the new provider
+        // The provider will redirect/popup automatically since preventAutoAuth is false
+        const baseUrl = new URL(url).origin;
+        auth(freshAuthProvider, {
+          serverUrl: baseUrl,
+        }).catch((err) => {
+          // This is expected to "fail" with redirect - the auth flow continues in the popup/redirect
+          addLog(
+            "info",
+            "OAuth flow initiated:",
+            err?.message || "Redirecting..."
+          );
+        });
       } catch (authError) {
         if (!isMountedRef.current) return;
-        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
-        failConnection(
-          `Manual authentication failed: ${authError instanceof Error ? authError.message : String(authError)}`,
-          authError instanceof Error ? authError : undefined
+        setState("pending_auth"); // Go back to pending state on error
+        addLog(
+          "error",
+          `Manual authentication failed: ${authError instanceof Error ? authError.message : String(authError)}`
         );
       }
     } else if (currentState === "authenticating") {
@@ -599,7 +691,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         `Client not in a state requiring manual authentication trigger (state: ${currentState}). If needed, try disconnecting and reconnecting.`
       );
     }
-  }, [addLog, retry, authUrl, url, failConnection, connect]);
+  }, [
+    addLog,
+    retry,
+    authUrl,
+    url,
+    useRedirectFlow,
+    onPopupWindow,
+    storageKeyPrefix,
+    clientName,
+    clientUri,
+    callbackUrl,
+  ]);
 
   /**
    * Clear OAuth tokens from localStorage and disconnect
@@ -877,6 +980,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         clientUri,
         callbackUrl,
         preventAutoAuth,
+        useRedirectFlow,
         onPopupWindow,
       });
       addLog(
@@ -899,6 +1003,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     clientUri,
     clientConfig.name,
     clientConfig.version,
+    useRedirectFlow,
   ]);
 
   /**

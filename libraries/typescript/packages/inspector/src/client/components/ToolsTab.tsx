@@ -582,9 +582,15 @@ export function ToolsTab({
     setResults((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  // Filter results to only show executions of the currently selected tool
+  const filteredResults = useMemo(() => {
+    if (!selectedTool) return [];
+    return results.filter((r) => r.toolName === selectedTool.name);
+  }, [results, selectedTool]);
+
   const handleFullscreen = useCallback(
     (index: number) => {
-      const result = results[index];
+      const result = filteredResults[index];
       if (result) {
         const newWindow = window.open("", "_blank", "width=800,height=600");
         if (newWindow) {
@@ -827,7 +833,7 @@ export function ToolsTab({
                 className="absolute inset-0 bg-background z-20"
               >
                 <ToolResultDisplay
-                  results={results}
+                  results={filteredResults}
                   copiedResult={copiedResult}
                   previewMode={previewMode}
                   serverId={serverId}
@@ -867,39 +873,41 @@ export function ToolsTab({
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
-            <ToolsTabHeader
-              activeTab={activeTab}
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              filteredToolsCount={filteredTools.length}
-              savedRequestsCount={savedRequests.length}
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              onTabSwitch={() =>
-                setActiveTab(activeTab === "tools" ? "saved" : "tools")
-              }
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+            <div className="flex flex-col h-full overflow-hidden">
+              <ToolsTabHeader
+                activeTab={activeTab}
+                isSearchExpanded={isSearchExpanded}
+                searchQuery={searchQuery}
+                filteredToolsCount={filteredTools.length}
+                savedRequestsCount={savedRequests.length}
+                onSearchExpand={() => setIsSearchExpanded(true)}
+                onSearchChange={setSearchQuery}
+                onSearchBlur={handleSearchBlur}
+                onTabSwitch={() =>
+                  setActiveTab(activeTab === "tools" ? "saved" : "tools")
+                }
+                searchInputRef={
+                  searchInputRef as React.RefObject<HTMLInputElement>
+                }
+              />
 
-            {activeTab === "tools" ? (
-              <ToolsList
-                tools={filteredTools}
-                selectedTool={selectedTool}
-                onToolSelect={handleToolSelect}
-                focusedIndex={focusedIndex}
-              />
-            ) : (
-              <SavedRequestsList
-                savedRequests={savedRequests}
-                selectedRequest={selectedSavedRequest}
-                onLoadRequest={loadSavedRequest}
-                onDeleteRequest={deleteSavedRequest}
-                focusedIndex={focusedIndex}
-              />
-            )}
+              {activeTab === "tools" ? (
+                <ToolsList
+                  tools={filteredTools}
+                  selectedTool={selectedTool}
+                  onToolSelect={handleToolSelect}
+                  focusedIndex={focusedIndex}
+                />
+              ) : (
+                <SavedRequestsList
+                  savedRequests={savedRequests}
+                  selectedRequest={selectedSavedRequest}
+                  onLoadRequest={loadSavedRequest}
+                  onDeleteRequest={deleteSavedRequest}
+                  focusedIndex={focusedIndex}
+                />
+              )}
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
@@ -909,7 +917,7 @@ export function ToolsTab({
             defaultSize={0}
             collapsible
             minSize={5}
-            collapsedSize={6}
+            collapsedSize={5}
             onCollapse={() => {
               setRpcPanelCollapsed(true);
             }}
@@ -1000,7 +1008,7 @@ export function ToolsTab({
           <ResizablePanel ref={bottomPanelRef} defaultSize={60}>
             <div className="flex flex-col h-full">
               <ToolResultDisplay
-                results={results}
+                results={filteredResults}
                 copiedResult={copiedResult}
                 previewMode={previewMode}
                 serverId={serverId}

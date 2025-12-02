@@ -3,15 +3,16 @@
  *
  * This module provides automatic instrumentation and callback handler
  * for Langfuse observability platform.
+ *
+ * Note: This module expects environment variables to be loaded before import.
+ * Users should load their environment variables using their preferred method
+ * (e.g., dotenv, direct process.env assignment, or system environment).
  */
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="./types.d.ts" />
 
 import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
-import { config } from "dotenv";
 import { logger } from "../logging.js";
-
-config();
 
 // Check if Langfuse is disabled via environment variable
 const langfuseDisabled =

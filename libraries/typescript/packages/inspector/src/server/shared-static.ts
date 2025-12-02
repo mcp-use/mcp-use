@@ -57,6 +57,42 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
   });
 
   // Serve the main HTML file for /inspector and all other routes (SPA routing)
+  // Need to match both /inspector and /inspector/* for React Router to work
+  app.get("/inspector", (c) => {
+    const indexPath = join(distPath, "index.html");
+    if (existsSync(indexPath)) {
+      const content = readFileSync(indexPath, "utf-8");
+      return c.html(content);
+    }
+    return c.html(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>MCP Inspector</title>
+        </head>
+        <body>
+          <h1>MCP Inspector</h1>
+          <p>Client files not found. Please run 'yarn build' to build the UI.</p>
+        </body>
+      </html>
+    `);
+  });
+
+  // Catch-all for any /inspector/* routes (for React Router SPA routing)
+  // Handle both GET and POST since some OAuth flows use POST
+  const handleInspectorRoute = (c: any) => {
+    const indexPath = join(distPath, "index.html");
+    if (existsSync(indexPath)) {
+      const content = readFileSync(indexPath, "utf-8");
+      return c.html(content);
+    }
+    return c.notFound();
+  };
+
+  app.get("/inspector/*", handleInspectorRoute);
+  app.post("/inspector/*", handleInspectorRoute);
+
+  // Final catch-all for root and other routes
   app.get("*", (c) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {

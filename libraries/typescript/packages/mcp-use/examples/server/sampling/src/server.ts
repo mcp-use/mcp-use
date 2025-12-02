@@ -31,19 +31,7 @@ server.tool({
       description: "The text to analyze for sentiment",
     },
   ],
-  cb: async (params, ctx?: ToolContext) => {
-    if (!ctx) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "Error: This tool requires a client with sampling support. Please provide a samplingCallback when initializing the client.",
-          },
-        ],
-        isError: true,
-      };
-    }
-
+  cb: async (params, ctx) => {
     try {
       // Request LLM analysis through sampling
       // Progress notifications are sent automatically every 5 seconds
@@ -131,19 +119,7 @@ server.tool({
       description: "Maximum length of the summary in words (default: 50)",
     },
   ],
-  cb: async (params, ctx?: ToolContext) => {
-    if (!ctx) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "Error: This tool requires a client with sampling support.",
-          },
-        ],
-        isError: true,
-      };
-    }
-
+  cb: async (params, ctx) => {
     try {
       const maxLength = params.maxLength || 50;
       const prompt = `Summarize the following text in ${maxLength} words or less:
@@ -214,57 +190,9 @@ server.tool({
       description: "The target language (e.g., 'Spanish', 'French', 'German')",
     },
   ],
-  cb: async (params, ctx?: ToolContext) => {
-    // Prefer ctx.sample() for automatic progress handling
-    if (ctx) {
-      try {
-        const result = await ctx.sample({
-          messages: [
-            {
-              role: "user",
-              content: {
-                type: "text",
-                text: `Translate the following text to ${params.targetLanguage}:\n\n${params.text}`,
-              },
-            },
-          ],
-          systemPrompt:
-            "You are a professional translator. Provide only the translation, no additional commentary.",
-          modelPreferences: {
-            intelligencePriority: 0.9,
-            speedPriority: 0.4,
-          },
-          maxTokens: 500,
-        });
-
-        const content = Array.isArray(result.content)
-          ? result.content[0]
-          : result.content;
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Translation: ${content.text || "Unable to translate"}`,
-            },
-          ],
-        };
-      } catch (error: any) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error during translation: ${error.message || String(error)}. Make sure the client supports sampling.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    // Fallback to server.createMessage() if no context (no progress notifications)
+  cb: async (params, ctx) => {
     try {
-      const result = await server.createMessage({
+      const result = await ctx.sample({
         messages: [
           {
             role: "user",

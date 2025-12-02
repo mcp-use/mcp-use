@@ -231,6 +231,24 @@ export function useAutoConnect({
       return;
     }
 
+    // Handle authentication states - clear loading overlay so user can authenticate
+    // But DON'T navigate yet - wait for them to complete auth
+    if (
+      connection?.state === "pending_auth" ||
+      connection?.state === "authenticating"
+    ) {
+      console.warn(
+        "[useAutoConnect] Connection requires authentication, clearing loading overlay"
+      );
+
+      // Just clear the loading overlay - user will see auth UI on the dashboard
+      // We'll navigate to the server after auth completes and state becomes "ready"
+      setTimeout(() => {
+        setIsAutoConnecting(false);
+      }, 100);
+      return;
+    }
+
     // Only check hasTriedBothModes for failure retry logic
     if (hasTriedBothModes) {
       return;

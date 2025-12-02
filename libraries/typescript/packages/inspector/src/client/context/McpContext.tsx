@@ -1,6 +1,6 @@
 import { MCPServerRemovedEvent, Telemetry } from "@/client/telemetry";
 import { useMcp } from "mcp-use/react";
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import {
   createContext,
   use,
@@ -10,6 +10,13 @@ import {
   useRef,
   useState,
 } from "react";
+import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
+import type { PendingSamplingRequest } from "@/client/types/sampling";
+import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
+
+// Empty function constants for sampling operations
+const EMPTY_APPROVE_SAMPLING = () => {};
+const EMPTY_REJECT_SAMPLING = () => {};
 
 export interface MCPNotification {
   id: string;
@@ -59,6 +66,9 @@ export interface MCPConnection {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
+  pendingSamplingRequests: PendingSamplingRequest[];
+  approveSampling: (requestId: string, result: CreateMessageResult) => void;
+  rejectSampling: (requestId: string, error?: string) => void;
   callTool: (
     toolName: string,
     args: any,
@@ -75,6 +85,7 @@ export interface MCPConnection {
   authenticate: () => void;
   retry: () => void;
   clearStorage: () => void;
+  disconnect: () => void;
   client: any;
 }
 
@@ -166,6 +177,29 @@ function McpConnectionWrapper({
   if (proxyConfig?.customHeaders) {
     customHeaders = { ...customHeaders, ...proxyConfig.customHeaders };
   }
+
+  // Sampling state management
+  const [pendingSamplingRequests, setPendingSamplingRequests] = useState<
+    Array<
+      PendingSamplingRequest & {
+        resolve: (result: CreateMessageResult) => void;
+        reject: (error: Error) => void;
+      }
+    >
+  >([]);
+  const requestIdCounter = useRef(0);
+
+  // Memoize the mapped pendingSamplingRequests to avoid duplication
+  const mappedPendingSamplingRequests = useMemo(
+    () =>
+      pendingSamplingRequests.map((r) => ({
+        id: r.id,
+        request: r.request,
+        timestamp: r.timestamp,
+        serverName: r.serverName,
+      })),
+    [pendingSamplingRequests]
+  );
 
   // Import transport wrapper for RPC logging - load it immediately
   // We need to load this BEFORE useMcp is called, so we use a ref to track readiness
@@ -271,6 +305,103 @@ function McpConnectionWrapper({
     []
   );
 
+  // Sampling handlers
+  const approveSampling = useCallback(
+    (requestId: string, result: CreateMessageResult) => {
+      setPendingSamplingRequests((prev) => {
+        const request = prev.find((r) => r.id === requestId);
+        if (request) {
+          request.resolve(result);
+          return prev.filter((r) => r.id !== requestId);
+        }
+        return prev;
+      });
+    },
+    []
+  );
+
+  const rejectSampling = useCallback((requestId: string, error?: string) => {
+    setPendingSamplingRequests((prev) => {
+      const request = prev.find((r) => r.id === requestId);
+      if (request) {
+        request.reject(new Error(error || "User rejected sampling request"));
+        return prev.filter((r) => r.id !== requestId);
+      }
+      return prev;
+    });
+  }, []);
+
+  // Sampling callback for useMcp
+  const samplingCallback = useCallback(
+    async (params: any) => {
+      return new Promise<CreateMessageResult>((resolve, reject) => {
+        const requestId = `sampling-${requestIdCounter.current++}`;
+        const newRequest = {
+          id: requestId,
+          request: { params },
+          timestamp: Date.now(),
+          serverName: name,
+          resolve,
+          reject,
+        };
+
+        setPendingSamplingRequests((prev) => [...prev, newRequest]);
+
+        // Show toast notification with approve/deny/view details actions
+        if (typeof window !== "undefined") {
+          import("sonner").then(({ toast }) => {
+            const toastId = toast(
+              <SamplingRequestToast
+                requestId={requestId}
+                serverName={name}
+                onViewDetails={() => {
+                  const event = new globalThis.CustomEvent(
+                    "navigate-to-sampling",
+                    {
+                      detail: { requestId },
+                    }
+                  );
+                  window.dispatchEvent(event);
+                  toast.dismiss(toastId);
+                }}
+                onApprove={(defaultResponse) => {
+                  setPendingSamplingRequests((prev) => {
+                    const request = prev.find((r) => r.id === requestId);
+                    if (request) {
+                      request.resolve(defaultResponse);
+                      toast.success("Sampling request approved");
+                      return prev.filter((r) => r.id !== requestId);
+                    }
+                    return prev;
+                  });
+                  toast.dismiss(toastId);
+                }}
+                onDeny={() => {
+                  setPendingSamplingRequests((prev) => {
+                    const request = prev.find((r) => r.id === requestId);
+                    if (request) {
+                      request.reject(
+                        new Error("User denied sampling request from toast")
+                      );
+                      toast.error("Sampling request denied");
+                      return prev.filter((r) => r.id !== requestId);
+                    }
+                    return prev;
+                  });
+                  toast.dismiss(toastId);
+                }}
+              />,
+              {
+                duration: 5000,
+              }
+            );
+          });
+        }
+      });
+    },
+    [name]
+  );
+
   // Only enable useMcp connection after transport wrapper is ready
   // This ensures RPC logging is active from the start
   const mcpHook = useMcp({
@@ -279,6 +410,8 @@ function McpConnectionWrapper({
     customHeaders:
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
     transportType: transportType || "http", // Default to 'http' for Streamable HTTP
+    preventAutoAuth: true, // Show auth button instead of auto-triggering OAuth
+    useRedirectFlow: true, // Use redirect instead of popup for better UX
     enabled: wrapTransportReady, // Only connect when wrapper is ready
     wrapTransport: wrapTransportFn,
     onNotification: (notification) => {
@@ -290,6 +423,7 @@ function McpConnectionWrapper({
         read: false,
       });
     },
+    samplingCallback,
   });
 
   const onUpdateRef = useRef(onUpdate);
@@ -337,6 +471,9 @@ function McpConnectionWrapper({
           markNotificationRead,
           markAllNotificationsRead,
           clearNotifications,
+          pendingSamplingRequests: mappedPendingSamplingRequests,
+          approveSampling,
+          rejectSampling,
           callTool: mcpHook.callTool,
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
@@ -344,6 +481,7 @@ function McpConnectionWrapper({
           authenticate: mcpHook.authenticate,
           retry: mcpHook.retry,
           clearStorage: mcpHook.clearStorage,
+          disconnect: mcpHook.disconnect,
           client: mcpHook.client,
         };
 
@@ -362,6 +500,8 @@ function McpConnectionWrapper({
           prev.capabilities !== connection.capabilities ||
           prev.notifications.length !== connection.notifications.length ||
           prev.unreadNotificationCount !== connection.unreadNotificationCount ||
+          prev.pendingSamplingRequests.length !==
+            connection.pendingSamplingRequests.length ||
           !prev.client
         ) {
           prevConnectionRef.current = connection;
@@ -392,6 +532,9 @@ function McpConnectionWrapper({
         markNotificationRead,
         markAllNotificationsRead,
         clearNotifications,
+        pendingSamplingRequests: mappedPendingSamplingRequests,
+        approveSampling,
+        rejectSampling,
         callTool: mcpHook.callTool,
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
@@ -399,6 +542,7 @@ function McpConnectionWrapper({
         authenticate: mcpHook.authenticate,
         retry: mcpHook.retry,
         clearStorage: mcpHook.clearStorage,
+        disconnect: mcpHook.disconnect,
         client: mcpHook.client,
       };
 
@@ -417,6 +561,8 @@ function McpConnectionWrapper({
         prev.capabilities !== connection.capabilities ||
         prev.notifications.length !== connection.notifications.length ||
         prev.unreadNotificationCount !== connection.unreadNotificationCount ||
+        prev.pendingSamplingRequests.length !==
+          connection.pendingSamplingRequests.length ||
         !prev.client
       ) {
         prevConnectionRef.current = connection;
@@ -451,6 +597,9 @@ function McpConnectionWrapper({
     mcpHook.authenticate,
     mcpHook.retry,
     mcpHook.clearStorage,
+    pendingSamplingRequests,
+    approveSampling,
+    rejectSampling,
   ]);
 
   return null;
@@ -505,6 +654,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
               markNotificationRead: () => {},
               markAllNotificationsRead: () => {},
               clearNotifications: () => {},
+              pendingSamplingRequests: [],
+              approveSampling: EMPTY_APPROVE_SAMPLING,
+              rejectSampling: EMPTY_REJECT_SAMPLING,
               callTool: async () => {},
               readResource: async () => {},
               listPrompts: async () => {},
@@ -512,6 +664,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
               authenticate: () => {},
               retry: () => {},
               clearStorage: () => {},
+              disconnect: () => {},
               client: null,
             }))
           );
@@ -603,6 +756,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
                 markNotificationRead: () => {},
                 markAllNotificationsRead: () => {},
                 clearNotifications: () => {},
+                pendingSamplingRequests: [],
+                approveSampling: EMPTY_APPROVE_SAMPLING,
+                rejectSampling: EMPTY_REJECT_SAMPLING,
                 callTool: async () => {},
                 readResource: async () => {},
                 listPrompts: async () => {},
@@ -610,6 +766,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
                 authenticate: () => {},
                 retry: () => {},
                 clearStorage: () => {},
+                disconnect: () => {},
                 client: null,
               },
             ]);
@@ -661,6 +818,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
             markNotificationRead: () => {},
             markAllNotificationsRead: () => {},
             clearNotifications: () => {},
+            pendingSamplingRequests: [],
+            approveSampling: EMPTY_APPROVE_SAMPLING,
+            rejectSampling: EMPTY_REJECT_SAMPLING,
             callTool: async () => {},
             readResource: async () => {},
             listPrompts: async () => {},
@@ -668,6 +828,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
             authenticate: () => {},
             retry: () => {},
             clearStorage: () => {},
+            disconnect: () => {},
             client: null,
           },
         ]);
@@ -706,6 +867,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
           markNotificationRead: () => {},
           markAllNotificationsRead: () => {},
           clearNotifications: () => {},
+          pendingSamplingRequests: [],
+          approveSampling: EMPTY_APPROVE_SAMPLING,
+          rejectSampling: EMPTY_REJECT_SAMPLING,
           callTool: async () => {},
           readResource: async () => {},
           listPrompts: async () => {},
@@ -713,6 +877,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
           authenticate: () => {},
           retry: () => {},
           clearStorage: () => {},
+          disconnect: () => {},
           client: null,
         },
       ]);
@@ -720,30 +885,53 @@ export function McpProvider({ children }: { children: ReactNode }) {
     [connectionConfigs, connections]
   );
 
-  const removeConnection = useCallback((id: string) => {
-    setConnectionConfigs((prev) => prev.filter((c) => c.id !== id));
-    setConnections((prev) => prev.filter((c) => c.id !== id));
+  const removeConnection = useCallback(
+    (id: string) => {
+      // Find the connection and properly clean it up
+      const connection = connections.find((c) => c.id === id);
+      if (connection) {
+        console.log(`[McpContext] Cleaning up connection: ${id}`);
 
-    // Also remove from localStorage immediately
-    const currentConfigs = localStorage.getItem("mcp-inspector-connections");
-    if (currentConfigs) {
-      try {
-        const parsed = JSON.parse(currentConfigs);
-        const filtered = parsed.filter((c: any) => (c.id || c.url) !== id);
-        localStorage.setItem(
-          "mcp-inspector-connections",
-          JSON.stringify(filtered)
-        );
-      } catch (e) {
-        console.error("Failed to update localStorage on remove:", e);
+        // First disconnect from the server (closes MCP session)
+        if (connection.disconnect) {
+          console.log(`[McpContext] Disconnecting from server: ${id}`);
+          connection.disconnect();
+        }
+
+        // Then clear OAuth storage (tokens, client info, etc.)
+        if (connection.clearStorage) {
+          console.log(
+            `[McpContext] Clearing OAuth storage for connection: ${id}`
+          );
+          connection.clearStorage();
+        }
       }
-    }
 
-    // Track removal
-    Telemetry.getInstance().capture(
-      new MCPServerRemovedEvent({ serverId: id })
-    );
-  }, []);
+      setConnectionConfigs((prev) => prev.filter((c) => c.id !== id));
+      setConnections((prev) => prev.filter((c) => c.id !== id));
+
+      // Also remove from localStorage immediately
+      const currentConfigs = localStorage.getItem("mcp-inspector-connections");
+      if (currentConfigs) {
+        try {
+          const parsed = JSON.parse(currentConfigs);
+          const filtered = parsed.filter((c: any) => (c.id || c.url) !== id);
+          localStorage.setItem(
+            "mcp-inspector-connections",
+            JSON.stringify(filtered)
+          );
+        } catch (e) {
+          console.error("Failed to update localStorage on remove:", e);
+        }
+      }
+
+      // Track removal
+      Telemetry.getInstance().capture(
+        new MCPServerRemovedEvent({ serverId: id })
+      );
+    },
+    [connections]
+  );
 
   const updateConnectionConfig = useCallback(
     (
@@ -802,7 +990,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
           current.client === updatedConnection.client &&
           current.notifications === updatedConnection.notifications &&
           current.unreadNotificationCount ===
-            updatedConnection.unreadNotificationCount
+            updatedConnection.unreadNotificationCount &&
+          current.pendingSamplingRequests.length ===
+            updatedConnection.pendingSamplingRequests.length
         ) {
           return prev;
         }

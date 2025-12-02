@@ -5,15 +5,14 @@
  * conversation history capabilities for better contextual interactions.
  *
  * Special thanks to https://github.com/microsoft/playwright-mcp for the server.
+ *
+ * Note: Make sure to load your environment variables before running this example.
+ * Required: OPENAI_API_KEY
  */
 
 import readline from "node:readline";
 import { ChatOpenAI } from "@langchain/openai";
-import { config } from "dotenv";
 import { MCPAgent, MCPClient } from "../../index.js";
-
-// Load environment variables from .env file
-config();
 
 async function runMemoryChat() {
   // Config file path - change this to your config file

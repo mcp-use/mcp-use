@@ -4,6 +4,8 @@ export default defineConfig({
   entry: [
     "index.ts",
     "src/agents/index.ts",
+    "src/auth/index.ts",
+    "src/bin.ts",
     "src/browser.ts",
     "src/react/index.ts",
     "src/server/index.ts",
@@ -30,9 +32,13 @@ export default defineConfig({
     "@langchain/openai",
     "langchain",
     "@langfuse/langchain",
-    // Keep chalk and supports-color external (uses Node.js built-ins, incompatible with neutral platform)
+    // Keep optional display dependencies external (uses Node.js built-ins, incompatible with neutral platform)
     "chalk",
+    "cli-highlight",
+    "winston",
     "supports-color",
+    // Keep react-router-dom external (optional, for widgets)
+    "react-router-dom",
   ],
   esbuildOptions(options) {
     // Preserve node: prefix for Deno compatibility

@@ -7,6 +7,7 @@ import type {
   CreateMessageResult,
   GetPromptResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 
 /**
  * Options for the sample() function in tool context.
@@ -97,13 +98,8 @@ export interface ToolContext {
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { Hono, type Context, type Hono as HonoType, type Next } from "hono";
 import { cors } from "hono/cors";
-import { z } from "zod";
+import { runWithContext, getRequestContext } from "./context-storage.js";
 
-// UUID generation helper (works in Node.js, Deno, and browsers)
-// Uses the Web Crypto API which is available globally
-function generateUUID(): string {
-  return (globalThis.crypto as any).randomUUID();
-}
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -120,118 +116,26 @@ import type {
   ResourceTemplateDefinition,
   ServerConfig,
   ToolDefinition,
+  ToolCallback,
   UIResourceContent,
   UIResourceDefinition,
   WidgetProps,
+  InferToolInput,
+  InferToolOutput,
 } from "./types/index.js";
 import type { WidgetMetadata } from "./types/widget.js";
+import {
+  isDeno,
+  getEnv,
+  pathHelpers,
+  fsHelpers,
+  generateUUID,
+  getCwd,
+} from "./utils/runtime.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
 
-// Runtime detection
-const isDeno = typeof (globalThis as any).Deno !== "undefined";
-
-// Helper to get environment variable
-function getEnv(key: string): string | undefined {
-  if (isDeno) {
-    return (globalThis as any).Deno.env.get(key);
-  }
-  return process.env[key];
-}
-
-// Helper to get current working directory
-function getCwd(): string {
-  if (isDeno) {
-    return (globalThis as any).Deno.cwd();
-  }
-  return process.cwd();
-}
-
-// Runtime-aware file system helpers
-const fsHelpers = {
-  async readFileSync(path: string, encoding: string = "utf8"): Promise<string> {
-    if (isDeno) {
-      return await (globalThis as any).Deno.readTextFile(path);
-    }
-    const { readFileSync } = await import("node:fs");
-    const result = readFileSync(path, encoding as any);
-    return typeof result === "string"
-      ? result
-      : result.toString(encoding as any);
-  },
-
-  async readFile(path: string): Promise<ArrayBuffer> {
-    if (isDeno) {
-      const data = await (globalThis as any).Deno.readFile(path);
-      return data.buffer;
-    }
-    const { readFileSync } = await import("node:fs");
-    const buffer = readFileSync(path);
-    return buffer.buffer.slice(
-      buffer.byteOffset,
-      buffer.byteOffset + buffer.byteLength
-    );
-  },
-
-  async existsSync(path: string): Promise<boolean> {
-    if (isDeno) {
-      try {
-        await (globalThis as any).Deno.stat(path);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    const { existsSync } = await import("node:fs");
-    return existsSync(path);
-  },
-
-  async readdirSync(path: string): Promise<string[]> {
-    if (isDeno) {
-      const entries = [];
-      for await (const entry of (globalThis as any).Deno.readDir(path)) {
-        entries.push(entry.name);
-      }
-      return entries;
-    }
-    const { readdirSync } = await import("node:fs");
-    return readdirSync(path);
-  },
-};
-
-// Runtime-aware path helpers
-const pathHelpers = {
-  join(...paths: string[]): string {
-    if (isDeno) {
-      // Use simple path joining for Deno (web-standard approach)
-      return paths.join("/").replace(/\/+/g, "/");
-    }
-    // For Node, we need to use the sync version or cache the import
-    // We'll use a simple implementation that works for both
-    return paths.join("/").replace(/\/+/g, "/");
-  },
-
-  relative(from: string, to: string): string {
-    // Simple relative path calculation
-    const fromParts = from.split("/").filter((p) => p);
-    const toParts = to.split("/").filter((p) => p);
-
-    let i = 0;
-    while (
-      i < fromParts.length &&
-      i < toParts.length &&
-      fromParts[i] === toParts[i]
-    ) {
-      i++;
-    }
-
-    const upCount = fromParts.length - i;
-    const relativeParts = [...Array(upCount).fill(".."), ...toParts.slice(i)];
-    return relativeParts.join("/");
-  },
-};
-
-export class McpServer {
+export class McpServer<HasOAuth extends boolean = false> {
   private server: OfficialMcpServer;
   private config: ServerConfig;
   private app: HonoType;
@@ -249,9 +153,21 @@ export class McpServer {
     {
       transport: any; // StreamableHTTPServerTransport
       lastAccessedAt: number;
+      context?: Context; // Store Hono context for this session
+      progressToken?: number; // Progress token for current tool call
+      sendNotification?: (notification: {
+        method: string;
+        params: Record<string, any>;
+      }) => Promise<void>; // Function to send notifications
+      expressRes?: any; // Store response object for sending notifications
+      honoContext?: Context; // Store Hono context for direct response access
     }
   >();
   private idleCleanupInterval?: NodeJS.Timeout;
+  private oauthProvider?: any; // OAuthProvider from oauth/index.js
+  private oauthMiddleware?: any; // Bearer auth middleware
+  private oauthConfig?: any; // Store OAuth config for lazy initialization
+  private oauthSetupComplete = false;
 
   /**
    * Creates a new MCP server instance with Hono integration
@@ -295,6 +211,11 @@ export class McpServer {
 
     // Request logging middleware
     this.app.use("*", requestLogger);
+
+    // Store OAuth config for lazy initialization (will be setup in listen/getHandler)
+    if (config.oauth) {
+      this.oauthConfig = config.oauth;
+    }
 
     // Proxy all Hono methods to the underlying app with special handling for 'use'
     return new Proxy(this, {
@@ -364,7 +285,7 @@ export class McpServer {
         const value = (target.app as any)[prop];
         return typeof value === "function" ? value.bind(target.app) : value;
       },
-    }) as McpServer;
+    }) as McpServer<HasOAuth>;
   }
 
   /**
@@ -405,6 +326,55 @@ export class McpServer {
 
     console.log("[CSP] Parsed CSP URLs:", urls);
     return urls;
+  }
+
+  /**
+   * Setup OAuth authentication
+   *
+   * Initializes OAuth provider, creates bearer auth middleware,
+   * sets up OAuth routes, and applies auth to /mcp endpoints.
+   *
+   * @private
+   */
+  private async setupOAuth(oauthProvider: any): Promise<void> {
+    if (this.oauthSetupComplete) {
+      return; // Already setup
+    }
+
+    // Dynamically import OAuth utilities
+    const { setupOAuthRoutes, createBearerAuthMiddleware } =
+      await import("./oauth/index.js");
+
+    // Store the provider (already created by factory function)
+    this.oauthProvider = oauthProvider;
+    console.log(`[OAuth] OAuth provider initialized`);
+
+    // Setup OAuth routes (will be mounted immediately)
+    const baseUrl = this.getServerBaseUrl();
+
+    // Create bearer auth middleware with baseUrl for WWW-Authenticate header
+    this.oauthMiddleware = createBearerAuthMiddleware(
+      this.oauthProvider,
+      baseUrl
+    );
+    setupOAuthRoutes(this.app, this.oauthProvider, baseUrl);
+    const mode = this.oauthProvider.getMode?.() || "proxy";
+    if (mode === "direct") {
+      console.log(
+        "[OAuth] Direct mode: Clients will authenticate with provider directly"
+      );
+      console.log("[OAuth] Metadata endpoints: /.well-known/*");
+    } else {
+      console.log(
+        "[OAuth] Proxy mode: Routes at /authorize, /token, /.well-known/*"
+      );
+    }
+
+    // Apply bearer auth to all /mcp routes
+    this.app.use("/mcp/*", this.oauthMiddleware);
+    console.log("[OAuth] Bearer authentication enabled on /mcp routes");
+
+    this.oauthSetupComplete = true;
   }
 
   /**
@@ -556,35 +526,81 @@ export class McpServer {
    *
    * @param toolDefinition - Configuration object containing tool metadata and handler function
    * @param toolDefinition.name - Unique identifier for the tool
-   * @param toolDefinition.description - Human-readable description of what the tool does
-   * @param toolDefinition.inputs - Array of input parameter definitions with types and validation
+   * @param toolDefinition.description - Optional human-readable description of what the tool does
+   * @param toolDefinition.inputs - Array of input parameter definitions (legacy, use schema instead)
+   * @param toolDefinition.schema - Zod object schema for input validation (preferred)
+   * @param toolDefinition.outputSchema - Zod object schema for structured output validation
    * @param toolDefinition.cb - Async callback function that executes the tool logic with provided parameters
    * @param toolDefinition._meta - Optional metadata for the tool (e.g. Apps SDK metadata)
+   * @param callback - Optional separate callback function (alternative to cb property)
    * @returns The server instance for method chaining
    *
    * @example
    * ```typescript
+   * // Using Zod schema (preferred)
    * server.tool({
    *   name: 'calculate',
    *   description: 'Performs mathematical calculations',
-   *   inputs: [
-   *     { name: 'expression', type: 'string', required: true },
-   *     { name: 'precision', type: 'number', required: false }
-   *   ],
+   *   schema: z.object({
+   *     expression: z.string(),
+   *     precision: z.number().optional()
+   *   }),
    *   cb: async ({ expression, precision = 2 }) => {
    *     const result = eval(expression)
-   *     return { result: Number(result.toFixed(precision)) }
-   *   },
-   *   _meta: {
-   *     'openai/outputTemplate': 'ui://widgets/calculator',
-   *     'openai/toolInvocation/invoking': 'Calculating...',
-   *     'openai/toolInvocation/invoked': 'Calculation complete'
+   *     return text(`Result: ${result.toFixed(precision)}`)
    *   }
    * })
+   *
+   * // Using legacy inputs array
+   * server.tool({
+   *   name: 'greet',
+   *   inputs: [{ name: 'name', type: 'string', required: true }],
+   *   cb: async ({ name }) => text(`Hello, ${name}!`)
+   * })
+   *
+   * // With separate callback for better typing
+   * server.tool({
+   *   name: 'add',
+   *   schema: z.object({ a: z.number(), b: z.number() })
+   * }, async ({ a, b }) => text(`${a + b}`))
    * ```
    */
-  tool(toolDefinition: ToolDefinition): this {
-    const inputSchema = this.createParamsSchema(toolDefinition.inputs || []);
+  // Overload for separate callback with automatic type inference
+  tool<T extends ToolDefinition<any, any, HasOAuth>>(
+    toolDefinition: T,
+    callback: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
+  ): this;
+
+  // Overload for inline callback
+  tool<T extends ToolDefinition<any, any, HasOAuth>>(toolDefinition: T): this;
+
+  // Implementation
+  tool<T extends ToolDefinition<any, any, HasOAuth>>(
+    toolDefinition: T,
+    callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
+  ): this {
+    // Determine which callback to use
+    const actualCallback = callback || toolDefinition.cb;
+
+    if (!actualCallback) {
+      throw new Error(
+        `Tool '${toolDefinition.name}' must have either a cb property or a callback parameter`
+      );
+    }
+
+    // Determine input schema - prefer schema over inputs
+    let inputSchema: Record<string, z.ZodSchema>;
+
+    if (toolDefinition.schema) {
+      // Use Zod schema if provided
+      inputSchema = this.convertZodSchemaToParams(toolDefinition.schema);
+    } else if (toolDefinition.inputs && toolDefinition.inputs.length > 0) {
+      // Fall back to inputs array for backward compatibility
+      inputSchema = this.createParamsSchema(toolDefinition.inputs);
+    } else {
+      // No schema defined - empty schema
+      inputSchema = {};
+    }
 
     this.server.registerTool(
       toolDefinition.name,
@@ -596,63 +612,129 @@ export class McpServer {
         _meta: toolDefinition._meta,
       },
       async (params: any, extra?: any) => {
+        // Get the HTTP request context from AsyncLocalStorage
+        // If not available (SDK broke async chain), try to find it from active sessions
+        let requestContext = getRequestContext();
+
+        if (!requestContext) {
+          // Fallback: Find context from any active session
+          // In practice, there's usually only one active request at a time per session
+          for (const [, session] of this.sessions.entries()) {
+            if (session.context) {
+              requestContext = session.context;
+              break;
+            }
+          }
+        }
+
         // Extract progress token from request metadata
-        const progressToken = extra?._meta?.progressToken;
+        // First try from extra (if SDK provides it), then from session
+        let progressToken = extra?._meta?.progressToken;
+        let sendNotification = extra?.sendNotification;
 
-        // Create context object with sample method that automatically sends progress
-        const context: ToolContext = {
-          /**
-           * Request sampling from the client's LLM with automatic progress notifications.
-           *
-           * Progress notifications are sent every 5 seconds (configurable) while waiting
-           * for the sampling response. This prevents client-side timeouts when
-           * resetTimeoutOnProgress is enabled.
-           *
-           * @param params - Sampling parameters (messages, model preferences, etc.)
-           * @param options - Optional configuration
-           * @param options.timeout - Timeout in milliseconds (default: no timeout / Infinity)
-           * @param options.progressIntervalMs - Interval between progress notifications (default: 5000ms)
-           * @param options.onProgress - Optional callback called each time progress is reported
-           * @returns The sampling result from the client's LLM
-           */
-          sample: async (
-            sampleParams: CreateMessageRequest["params"],
-            options?: SampleOptions
-          ): Promise<CreateMessageResult> => {
-            const {
-              timeout,
-              progressIntervalMs = 5000,
-              onProgress,
-            } = options ?? {};
+        // If not provided by SDK, try to get from session
+        if (!progressToken || !sendNotification) {
+          // Find the session that matches the current request context
+          let session:
+            | {
+                transport: any;
+                lastAccessedAt: number;
+                context?: Context;
+                progressToken?: number;
+                sendNotification?: (notification: {
+                  method: string;
+                  params: Record<string, any>;
+                }) => Promise<void>;
+                expressRes?: any;
+                honoContext?: Context;
+              }
+            | undefined;
 
-            let progressCount = 0;
-            let completed = false;
-            let progressInterval: ReturnType<typeof setInterval> | null = null;
+          if (requestContext) {
+            // Try to find session by matching context
+            for (const [, s] of this.sessions.entries()) {
+              if (s.context === requestContext) {
+                session = s;
+                break;
+              }
+            }
+          } else {
+            // Fallback: use first available session (for compatibility)
+            const firstSession = this.sessions.values().next().value;
+            if (firstSession) {
+              session = firstSession;
+            }
+          }
 
-            // Set up progress notifications if we have a progress token
-            if (progressToken && extra?.sendNotification) {
-              progressInterval = setInterval(async () => {
-                if (completed) return;
+          if (session) {
+            if (!progressToken && session.progressToken) {
+              progressToken = session.progressToken;
+            }
+            if (!sendNotification && session.sendNotification) {
+              sendNotification = session.sendNotification;
+            }
+          }
+        }
 
-                progressCount++;
-                const progressData = {
-                  progress: progressCount,
-                  total: undefined as number | undefined,
-                  message: `Waiting for LLM response... (${progressCount * Math.round(progressIntervalMs / 1000)}s elapsed)`,
-                };
+        // Create enhanced context that combines ToolContext methods with Hono request context
+        // This provides a unified interface with sample(), reportProgress(), auth, req, etc.
+        const enhancedContext = requestContext
+          ? Object.create(requestContext)
+          : {};
 
-                // Call user's progress callback if provided
-                if (onProgress) {
-                  try {
-                    onProgress(progressData);
-                  } catch {
-                    // Ignore errors in progress callback
-                  }
-                }
+        /**
+         * Request sampling from the client's LLM with automatic progress notifications.
+         *
+         * Progress notifications are sent every 5 seconds (configurable) while waiting
+         * for the sampling response. This prevents client-side timeouts when
+         * resetTimeoutOnProgress is enabled.
+         *
+         * @param params - Sampling parameters (messages, model preferences, etc.)
+         * @param options - Optional configuration
+         * @param options.timeout - Timeout in milliseconds (default: no timeout / Infinity)
+         * @param options.progressIntervalMs - Interval between progress notifications (default: 5000ms)
+         * @param options.onProgress - Optional callback called each time progress is reported
+         * @returns The sampling result from the client's LLM
+         */
+        enhancedContext.sample = async (
+          sampleParams: CreateMessageRequest["params"],
+          options?: SampleOptions
+        ): Promise<CreateMessageResult> => {
+          const {
+            timeout,
+            progressIntervalMs = 5000,
+            onProgress,
+          } = options ?? {};
 
-                // Send progress notification to client
+          let progressCount = 0;
+          let completed = false;
+          let progressInterval: ReturnType<typeof setInterval> | null = null;
+
+          // Set up progress notifications if we have a progress token
+          if (progressToken && sendNotification) {
+            progressInterval = setInterval(async () => {
+              if (completed) return;
+
+              progressCount++;
+              const progressData = {
+                progress: progressCount,
+                total: undefined as number | undefined,
+                message: `Waiting for LLM response... (${progressCount * Math.round(progressIntervalMs / 1000)}s elapsed)`,
+              };
+
+              // Call user's progress callback if provided
+              if (onProgress) {
                 try {
-                  await extra.sendNotification({
+                  onProgress(progressData);
+                } catch {
+                  // Ignore errors in progress callback
+                }
+              }
+
+              // Send progress notification to client
+              try {
+                if (sendNotification) {
+                  await sendNotification({
                     method: "notifications/progress",
                     params: {
                       progressToken,
@@ -661,48 +743,55 @@ export class McpServer {
                       message: progressData.message,
                     },
                   });
-                } catch {
-                  // Ignore errors - request might have completed
                 }
-              }, progressIntervalMs);
+              } catch {
+                // Ignore errors - request might have completed
+              }
+            }, progressIntervalMs);
+          }
+
+          try {
+            // Create the sampling promise
+            // Pass a very long timeout to override SDK's default 60-second timeout
+            // We handle our own timeout logic below if the user specified one
+            // Use 2147483647 (max 32-bit signed int) = ~24.8 days, as setTimeout uses 32-bit
+            const sdkTimeout =
+              timeout && timeout !== Infinity ? timeout : 2147483647; // ~24.8 days - effectively infinite for sampling
+            const samplePromise = this.createMessage(sampleParams, {
+              timeout: sdkTimeout,
+            });
+
+            // If timeout is specified, race against it
+            if (timeout && timeout !== Infinity) {
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(
+                  () =>
+                    reject(new Error(`Sampling timed out after ${timeout}ms`)),
+                  timeout
+                );
+              });
+              return await Promise.race([samplePromise, timeoutPromise]);
             }
 
-            try {
-              // Create the sampling promise
-              const samplePromise = this.createMessage(sampleParams);
-
-              // If timeout is specified, race against it
-              if (timeout && timeout !== Infinity) {
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                  setTimeout(
-                    () =>
-                      reject(
-                        new Error(`Sampling timed out after ${timeout}ms`)
-                      ),
-                    timeout
-                  );
-                });
-                return await Promise.race([samplePromise, timeoutPromise]);
-              }
-
-              // No timeout - wait indefinitely
-              return await samplePromise;
-            } finally {
-              completed = true;
-              if (progressInterval) {
-                clearInterval(progressInterval);
-              }
+            // No timeout - wait indefinitely
+            return await samplePromise;
+          } finally {
+            completed = true;
+            if (progressInterval) {
+              clearInterval(progressInterval);
             }
-          },
+          }
+        };
 
-          /**
-           * Send a progress notification to the client.
-           * Only works if the client requested progress updates for this tool call.
-           */
-          reportProgress:
-            progressToken && extra?.sendNotification
-              ? async (progress: number, total?: number, message?: string) => {
-                  await extra.sendNotification({
+        /**
+         * Send a progress notification to the client.
+         * Only works if the client requested progress updates for this tool call.
+         */
+        enhancedContext.reportProgress =
+          progressToken && sendNotification
+            ? async (progress: number, total?: number, message?: string) => {
+                if (sendNotification) {
+                  await sendNotification({
                     method: "notifications/progress",
                     params: {
                       progressToken,
@@ -712,15 +801,25 @@ export class McpServer {
                     },
                   });
                 }
-              : undefined,
+              }
+            : undefined;
+
+        // Wrap callback execution with context to ensure AsyncLocalStorage works
+        const executeCallback = async () => {
+          if (actualCallback.length >= 2) {
+            // Pass the enhanced context that includes sample, reportProgress, auth, req, etc.
+            return await (actualCallback as any)(params, enhancedContext);
+          }
+          // Single parameter callback - just input
+          return await (actualCallback as any)(params);
         };
 
-        // Pass context as second parameter if callback accepts it
-        // Check if callback signature accepts 2 parameters
-        if (toolDefinition.cb.length >= 2) {
-          return await (toolDefinition.cb as any)(params, context);
+        // If we have a request context, wrap execution with it
+        if (requestContext) {
+          return await runWithContext(requestContext, executeCallback);
         }
-        return await toolDefinition.cb(params);
+
+        return await executeCallback();
       }
     );
     this.registeredTools.push(toolDefinition.name);
@@ -768,7 +867,7 @@ export class McpServer {
       {
         title: promptDefinition.title,
         description: promptDefinition.description ?? "",
-        argsSchema,
+        argsSchema: argsSchema as any, // Type assertion for Zod v4 compatibility
       },
       async (params: any): Promise<GetPromptResult> => {
         return await promptDefinition.cb(params);
@@ -818,7 +917,6 @@ export class McpServer {
     params: CreateMessageRequest["params"],
     options?: RequestOptions
   ): Promise<CreateMessageResult> {
-    console.log("createMessage", params, options);
     // The official SDK's McpServer has a `server` property which is the Server instance
     // The Server instance has the createMessage method
     return await this.server.server.createMessage(params, options);
@@ -937,7 +1035,10 @@ export class McpServer {
             ? this.applyDefaultProps(definition.props)
             : {};
 
-        const uiResource = this.createWidgetUIResource(definition, params);
+        const uiResource = await this.createWidgetUIResource(
+          definition,
+          params
+        );
 
         // Ensure the resource content URI matches the registered URI (with build ID)
         uiResource.resource.uri = resourceUri;
@@ -968,7 +1069,7 @@ export class McpServer {
         annotations: definition.annotations,
         readCallback: async (uri, params) => {
           // Use empty params for Apps SDK since structuredContent is passed separately
-          const uiResource = this.createWidgetUIResource(definition, {});
+          const uiResource = await this.createWidgetUIResource(definition, {});
 
           // Ensure the resource content URI matches the template URI (with build ID)
           uiResource.resource.uri = uri.toString();
@@ -1009,9 +1110,12 @@ export class McpServer {
       description: definition.description,
       inputs: this.convertPropsToInputs(definition.props),
       _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
-      cb: async (params) => {
+      cb: async (params: any) => {
         // Create the UIResource with user-provided params
-        const uiResource = this.createWidgetUIResource(definition, params);
+        const uiResource = await this.createWidgetUIResource(
+          definition,
+          params
+        );
 
         // For Apps SDK, return _meta at top level with only text in content
         if (definition.type === "appsSdk") {
@@ -1033,7 +1137,7 @@ export class McpServer {
             _meta: uniqueToolMetadata,
             content: [
               {
-                type: "text",
+                type: "text" as const,
                 text: `Displaying ${displayName}`,
               },
             ],
@@ -1046,7 +1150,7 @@ export class McpServer {
         return {
           content: [
             {
-              type: "text",
+              type: "text" as const,
               text: `Displaying ${displayName}`,
               description: `Show MCP-UI widget for ${displayName}`,
             },
@@ -1071,10 +1175,10 @@ export class McpServer {
    * @param params - Parameters to pass to the widget via URL
    * @returns UIResource object compatible with MCP-UI
    */
-  private createWidgetUIResource(
+  private async createWidgetUIResource(
     definition: UIResourceDefinition,
     params: Record<string, any>
-  ): UIResourceContent {
+  ): Promise<UIResourceContent> {
     // If baseUrl is set, parse it to extract protocol, host, and port
     let configBaseUrl = `http://${this.serverHost}`;
     let configPort: number | string = this.serverPort || 3001;
@@ -1096,7 +1200,7 @@ export class McpServer {
       buildId: this.buildId,
     };
 
-    const uiResource = createUIResourceFromDefinition(
+    const uiResource = await createUIResourceFromDefinition(
       definition,
       params,
       urlConfig
@@ -1142,40 +1246,6 @@ export class McpServer {
 
     // Construct URI: ui://widget/name-buildId-suffix.extension
     return `ui://widget/${parts.join("-")}${extension}`;
-  }
-
-  /**
-   * Build a complete URL for a widget including query parameters
-   *
-   * Constructs the full URL to access a widget's iframe, encoding any provided
-   * parameters as query string parameters. Complex objects are JSON-stringified
-   * for transmission.
-   *
-   * @private
-   * @param widget - Widget name/identifier
-   * @param params - Parameters to encode in the URL
-   * @returns Complete URL with encoded parameters
-   */
-  private buildWidgetUrl(widget: string, params: Record<string, any>): string {
-    const baseUrl = `http://${this.serverHost}:${this.serverPort}/mcp-use/widgets/${widget}`;
-
-    if (Object.keys(params).length === 0) {
-      return baseUrl;
-    }
-
-    const queryParams = new URLSearchParams();
-
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null) {
-        if (typeof value === "object") {
-          queryParams.append(key, JSON.stringify(value));
-        } else {
-          queryParams.append(key, String(value));
-        }
-      }
-    }
-
-    return `${baseUrl}?${queryParams.toString()}`;
   }
 
   /**
@@ -1370,34 +1440,46 @@ export class McpServer {
     await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
     // Import dev dependencies - these are optional and only needed for dev mode
-    // Using dynamic string-based imports to prevent static analysis by bundlers
+    // Using dynamic imports with createRequire to resolve from user's project directory
     let createServer: any;
     let react: any;
     let tailwindcss: any;
 
     try {
-      // Use Function constructor to create truly dynamic imports that can't be statically analyzed
-      // eslint-disable-next-line no-new-func
-      const viteModule = await new Function('return import("vite")')();
+      // Use createRequire to resolve modules from the user's project directory (getCwd())
+      // instead of from the mcp-use package location
+      const { createRequire } = await import("node:module");
+      const { pathToFileURL } = await import("node:url");
+
+      // Create a require function that resolves from the user's project directory
+      const userProjectRequire = createRequire(
+        pathToFileURL(pathHelpers.join(getCwd(), "package.json")).href
+      );
+
+      // Resolve the actual module paths from the user's project
+      const vitePath = userProjectRequire.resolve("vite");
+      const reactPluginPath = userProjectRequire.resolve(
+        "@vitejs/plugin-react"
+      );
+      const tailwindPath = userProjectRequire.resolve("@tailwindcss/vite");
+
+      // Now import using the resolved paths
+      const viteModule = await import(vitePath);
       createServer = viteModule.createServer;
-      // eslint-disable-next-line no-new-func
-      const reactModule = await new Function(
-        'return import("@vitejs/plugin-react")'
-      )();
+      const reactModule = await import(reactPluginPath);
       react = reactModule.default;
-      // eslint-disable-next-line no-new-func
-      const tailwindModule = await new Function(
-        'return import("@tailwindcss/vite")'
-      )();
+      const tailwindModule = await import(tailwindPath);
       tailwindcss = tailwindModule.default;
     } catch (error) {
-      console.error(
-        "[WIDGETS] Dev dependencies not available. Install vite, @vitejs/plugin-react, and @tailwindcss/vite for widget development."
+      throw new Error(
+        "❌ Widget dependencies not installed!\n\n" +
+          "To use MCP widgets with resources folder, you need to install the required dependencies:\n\n" +
+          "  npm install vite @vitejs/plugin-react @tailwindcss/vite\n" +
+          "  # or\n" +
+          "  pnpm add vite @vitejs/plugin-react @tailwindcss/vite\n\n" +
+          "These dependencies are automatically included in projects created with 'create-mcp-use-app'.\n" +
+          "For production, pre-build your widgets using 'mcp-use build'."
       );
-      console.error(
-        "[WIDGETS] For production, use 'mcp-use build' to pre-build widgets."
-      );
-      return;
     }
 
     const widgets = entries.map((entry) => {
@@ -1942,7 +2024,15 @@ if (container && Component) {
         const mcpUrl = this.getServerBaseUrl();
         if (mcpUrl && html) {
           // Remove HTML comments temporarily to avoid matching base tags inside comments
-          const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
+          let htmlWithoutComments = html;
+          let prevHtmlWithoutComments;
+          do {
+            prevHtmlWithoutComments = htmlWithoutComments;
+            htmlWithoutComments = htmlWithoutComments.replace(
+              /<!--[\s\S]*?-->/g,
+              ""
+            );
+          } while (prevHtmlWithoutComments !== htmlWithoutComments);
 
           // Try to replace existing base tag (only if not in comments)
           const baseTagRegex = /<base\s+[^>]*\/?>/i;
@@ -2117,9 +2207,8 @@ if (container && Component) {
   private async mountMcp(): Promise<void> {
     if (this.mcpMounted) return;
 
-    const { StreamableHTTPServerTransport } = await import(
-      "@modelcontextprotocol/sdk/server/streamableHttp.js"
-    );
+    const { StreamableHTTPServerTransport } =
+      await import("@modelcontextprotocol/sdk/server/streamableHttp.js");
 
     const idleTimeoutMs = this.config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
@@ -2165,7 +2254,7 @@ if (container && Component) {
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => generateUUID(),
-        enableJsonResponse: true,
+        enableJsonResponse: false, // Allow SSE streaming for progress notifications
         allowedOrigins: allowedOrigins,
         enableDnsRebindingProtection: enableDnsRebindingProtection,
         onsessioninitialized: (id) => {
@@ -2200,7 +2289,7 @@ if (container && Component) {
       // This ensures the client's subsequent requests with this session ID will work
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => oldSessionId, // Reuse old session ID!
-        enableJsonResponse: true,
+        enableJsonResponse: false, // Allow SSE streaming for progress notifications
         allowedOrigins: allowedOrigins,
         enableDnsRebindingProtection: enableDnsRebindingProtection,
         // We'll manually store the session, so don't rely on onsessioninitialized
@@ -2352,6 +2441,13 @@ if (container && Component) {
       const headers: Record<string, string> = {};
       let ended = false;
       let headersSent = false;
+      let isSSEStream = false;
+      let streamWriter: any = null; // WritableStreamDefaultWriter<Uint8Array>
+      let streamingResponse: Response | null = null;
+      let sseStreamReady: ((response: Response) => void) | null = null;
+      const sseStreamPromise = new Promise<Response>((resolve) => {
+        sseStreamReady = resolve;
+      });
 
       const expressReq: any = {
         ...req,
@@ -2379,19 +2475,52 @@ if (container && Component) {
         },
         setHeader: (name: string, value: string | string[]) => {
           if (!headersSent) {
-            headers[name] = Array.isArray(value) ? value.join(", ") : value;
+            headers[name.toLowerCase()] = Array.isArray(value)
+              ? value.join(", ")
+              : value;
+            // Detect SSE when Content-Type is set to text/event-stream
+            if (
+              name.toLowerCase() === "content-type" &&
+              (Array.isArray(value) ? value.join(", ") : value).includes(
+                "text/event-stream"
+              )
+            ) {
+              isSSEStream = true;
+              // Create TransformStream for SSE
+              const { readable, writable } = new (
+                globalThis as any
+              ).TransformStream();
+              streamWriter = writable.getWriter();
+              streamingResponse = new Response(readable, {
+                status: statusCode,
+                headers: headers,
+              });
+              // Resolve the promise so the POST handler can return the stream immediately
+              if (sseStreamReady) {
+                sseStreamReady(streamingResponse);
+              }
+            }
           }
         },
-        getHeader: (name: string) => headers[name],
+        getHeader: (name: string) => headers[name.toLowerCase()],
         write: (chunk: any, encoding?: any, callback?: any) => {
-          if (!ended) {
+          if (!ended || isSSEStream) {
             const data =
               typeof chunk === "string"
                 ? new TextEncoder().encode(chunk)
                 : chunk instanceof Uint8Array
                   ? chunk
                   : Buffer.from(chunk);
-            responseBody.push(data);
+
+            // For SSE streams, write directly to the stream
+            if (isSSEStream && streamWriter) {
+              streamWriter.write(data).catch(() => {
+                // Ignore write errors (client may have disconnected)
+              });
+            } else {
+              // Buffer for non-SSE responses
+              responseBody.push(data);
+            }
           }
           if (typeof encoding === "function") {
             encoding();
@@ -2408,9 +2537,23 @@ if (container && Component) {
                 : chunk instanceof Uint8Array
                   ? chunk
                   : Buffer.from(chunk);
-            responseBody.push(data);
+
+            // For SSE streams, write to stream but DON'T close it yet
+            // The SDK will manage when to close the stream
+            if (isSSEStream && streamWriter) {
+              streamWriter.write(data).catch(() => {
+                // Ignore write errors (client may have disconnected)
+              });
+              // Don't close the stream here - let the SDK manage it
+            } else {
+              responseBody.push(data);
+            }
           }
-          ended = true;
+          // For SSE streams, don't mark as ended - the stream stays open
+          // The SDK will close it when all responses are sent
+          if (!isSSEStream) {
+            ended = true;
+          }
           if (typeof encoding === "function") {
             encoding();
           } else if (callback) {
@@ -2429,14 +2572,45 @@ if (container && Component) {
           expressRes.statusCode = code;
           headersSent = true;
           if (_headers) {
-            Object.assign(headers, _headers);
+            // Handle both object and array of header tuples
+            // Normalize all keys to lowercase for consistent access
+            if (Array.isArray(_headers)) {
+              // Array format: [['Content-Type', 'text/event-stream'], ...]
+              for (const [name, value] of _headers) {
+                headers[name.toLowerCase()] = value;
+              }
+            } else {
+              // Object format: { 'Content-Type': 'text/event-stream', ... }
+              // Normalize keys to lowercase
+              for (const [key, value] of Object.entries(_headers)) {
+                headers[key.toLowerCase()] = value as string;
+              }
+            }
+
+            // Check if SSE headers are being set
+            const contentType = headers["content-type"];
+            if (contentType && contentType.includes("text/event-stream")) {
+              isSSEStream = true;
+              // Create TransformStream for SSE
+              const { readable, writable } = new (
+                globalThis as any
+              ).TransformStream();
+              streamWriter = writable.getWriter();
+              streamingResponse = new Response(readable, {
+                status: statusCode,
+                headers: headers,
+              });
+              // Resolve the promise so the POST handler can return the stream immediately
+              if (sseStreamReady) {
+                sseStreamReady(streamingResponse);
+              }
+            }
           }
           return expressRes;
         },
         flushHeaders: () => {
           headersSent = true;
-          // For SSE streaming, this is a no-op in our adapter
-          // The headers will be sent when the response is returned
+          // For SSE streaming, headers are already set in streamingResponse
         },
         send: (body: any) => {
           if (!ended) {
@@ -2450,6 +2624,11 @@ if (container && Component) {
         expressReq,
         expressRes,
         getResponse: () => {
+          // For SSE streams, return the streaming response immediately
+          if (isSSEStream && streamingResponse) {
+            return streamingResponse;
+          }
+          // For buffered responses, return after end is called
           if (ended) {
             if (responseBody.length > 0) {
               const body = isDeno
@@ -2468,6 +2647,8 @@ if (container && Component) {
           }
           return null;
         },
+        isSSEStream: () => isSSEStream,
+        waitForSSEStream: () => sseStreamPromise,
       };
     };
 
@@ -2475,8 +2656,13 @@ if (container && Component) {
     const mountEndpoint = (endpoint: string) => {
       // POST endpoint for messages
       this.app.post(endpoint, async (c: Context) => {
-        const { expressReq, expressRes, getResponse } =
-          createExpressLikeObjects(c);
+        const {
+          expressReq,
+          expressRes,
+          getResponse,
+          isSSEStream,
+          waitForSSEStream,
+        } = createExpressLikeObjects(c);
 
         // Get request body
         let body: any = {};
@@ -2535,8 +2721,32 @@ if (container && Component) {
 
         // Note: lastAccessedAt is already updated in getOrCreateTransport when session is found
         // This redundant update is kept for safety but should not be necessary
+        // Also store the request context for this session
         if (sessionId && this.sessions.has(sessionId)) {
-          this.sessions.get(sessionId)!.lastAccessedAt = Date.now();
+          const session = this.sessions.get(sessionId)!;
+          session.lastAccessedAt = Date.now();
+          session.context = c; // Store the Hono context
+          session.honoContext = c; // Store for direct response access
+          session.expressRes = expressRes; // Store response object for notifications
+
+          // Extract progressToken from tool call requests
+          if (
+            body?.method === "tools/call" &&
+            body?.params?._meta?.progressToken
+          ) {
+            session.progressToken = body.params._meta.progressToken;
+            console.log(
+              `Received progressToken ${session.progressToken} for tool call: ${body.params?.name}`
+            );
+          } else {
+            // Clear progressToken if not a tool call or no token provided
+            session.progressToken = undefined;
+            if (body?.method === "tools/call") {
+              console.log(
+                `No progressToken in tool call request: ${body.params?.name}`
+              );
+            }
+          }
         }
 
         // Handle close event
@@ -2548,14 +2758,88 @@ if (container && Component) {
           });
         }
 
-        // Wait for handleRequest to complete and for response to be written
-        await this.waitForRequestComplete(
-          transport,
-          expressReq,
-          expressRes,
-          expressReq.body
-        );
+        // Wrap the request handling in AsyncLocalStorage context
+        // This makes the Hono context available to tool callbacks via getRequestContext()
+        // For SSE streams, we need to return the stream immediately after headers are set
+        // The SDK's handleRequest will call writeHead synchronously for SSE
+        let streamingResponse: Response | null = null;
+        let shouldReturnStream = false;
 
+        await runWithContext(c, async () => {
+          // Start handleRequest - it will call writeHead which may create SSE stream
+          const handleRequestPromise = transport.handleRequest(
+            expressReq,
+            expressRes,
+            expressReq.body
+          );
+
+          // Race between SSE stream creation and request completion
+          // If SSE stream is created, return it immediately
+          // Otherwise, wait for request to complete
+          try {
+            // Wait for either SSE stream to be ready or a short timeout
+            // The SDK calls writeHead/setHeader synchronously when processing the request
+            const sseStream = await Promise.race([
+              waitForSSEStream(),
+              new Promise<Response | null>((resolve) => {
+                // Give handleRequest a chance to call writeHead/setHeader
+                // The SDK processes the request and sets headers synchronously
+                setTimeout(() => resolve(null), 50);
+              }),
+            ]);
+
+            if (sseStream) {
+              streamingResponse = sseStream;
+              shouldReturnStream = true;
+              // Let handleRequest continue in background - it will write SSE events
+              handleRequestPromise.catch((err: any) => {
+                // Ignore SSE stream errors (client may have disconnected)
+              });
+              return;
+            } else {
+              // Check again if SSE was detected but promise didn't resolve
+              if (isSSEStream()) {
+                const response = getResponse();
+                if (response) {
+                  streamingResponse = response;
+                  shouldReturnStream = true;
+                  handleRequestPromise.catch(() => {
+                    // Ignore errors (client may have disconnected)
+                  });
+                  return;
+                }
+              }
+            }
+          } catch {
+            // Ignore timeout errors
+          }
+
+          // Not SSE or SSE stream not created - wait for request completion
+          await new Promise<void>((resolve) => {
+            const originalEnd = expressRes.end;
+            let ended = false;
+            expressRes.end = (...args: any[]) => {
+              if (!ended) {
+                originalEnd.apply(expressRes, args);
+                ended = true;
+                resolve();
+              }
+            };
+            // If handleRequest already completed, resolve immediately
+            handleRequestPromise.finally(() => {
+              if (!ended) {
+                expressRes.end();
+              }
+            });
+          });
+        });
+
+        // If we have a streaming response (SSE), return it immediately
+        if (shouldReturnStream && streamingResponse) {
+          return streamingResponse;
+        }
+
+        // Check for buffered response (non-SSE)
         const response = getResponse();
         if (response) {
           return response;
@@ -2871,6 +3155,11 @@ if (container && Component) {
       this.serverHost = hostEnv;
     }
 
+    // Setup OAuth before mounting widgets/MCP (if configured)
+    if (this.oauthConfig && !this.oauthSetupComplete) {
+      await this.setupOAuth(this.oauthConfig);
+    }
+
     await this.mountWidgets({
       baseRoute: "/mcp-use/widgets",
       resourcesDir: "resources",
@@ -3005,6 +3294,11 @@ if (container && Component) {
   async getHandler(options?: {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
+    // Setup OAuth before mounting widgets/MCP (if configured)
+    if (this.oauthConfig && !this.oauthSetupComplete) {
+      await this.setupOAuth(this.oauthConfig);
+    }
+
     console.log("[MCP] Mounting widgets");
     await this.mountWidgets({
       baseRoute: "/mcp-use/widgets",
@@ -3552,30 +3846,29 @@ if (container && Component) {
   }
 
   /**
-   * Create input schema for resource templates
+   * Convert a Zod object schema to the internal Record<string, z.ZodSchema> format
    *
-   * Parses a URI template string to extract parameter names and generates a Zod
-   * validation schema for those parameters. Used internally for validating resource
-   * template parameters before processing requests.
-   *
-   * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
-   * @returns Object mapping parameter names to Zod string schemas
-   *
-   * @example
-   * ```typescript
-   * const schema = this.createInputSchema("/users/{id}/posts/{postId}")
-   * // Returns: { id: z.string(), postId: z.string() }
-   * ```
+   * @param zodSchema - Zod object schema to convert
+   * @returns Object mapping parameter names to Zod validation schemas
    */
-  private createInputSchema(uriTemplate: string): Record<string, z.ZodSchema> {
-    const params = this.extractTemplateParams(uriTemplate);
-    const schema: Record<string, z.ZodSchema> = {};
+  private convertZodSchemaToParams(
+    zodSchema: z.ZodObject<any>
+  ): Record<string, z.ZodSchema> {
+    // Validate that it's a ZodObject
+    if (!(zodSchema instanceof z.ZodObject)) {
+      throw new Error("schema must be a Zod object schema (z.object({...}))");
+    }
 
-    params.forEach((param) => {
-      schema[param] = z.string();
-    });
+    // Extract the shape from the Zod object schema
+    const shape = zodSchema.shape;
+    const params: Record<string, z.ZodSchema> = {};
 
-    return schema;
+    // Convert each property in the shape
+    for (const [key, value] of Object.entries(shape)) {
+      params[key] = value as z.ZodSchema;
+    }
+
+    return params;
   }
 
   /**
@@ -3645,83 +3938,6 @@ if (container && Component) {
   }
 
   /**
-   * Create arguments schema for prompts
-   *
-   * Converts prompt argument definitions into Zod validation schemas for runtime validation.
-   * Supports common data types (string, number, boolean, object, array) and optional
-   * parameters. Used internally when registering prompt templates with the MCP server.
-   *
-   * @param inputs - Array of argument definitions with name, type, and optional flag
-   * @returns Object mapping argument names to Zod validation schemas
-   *
-   * @example
-   * ```typescript
-   * const schema = this.createPromptArgsSchema([
-   *   { name: 'topic', type: 'string', required: true },
-   *   { name: 'style', type: 'string', required: false }
-   * ])
-   * // Returns: { topic: z.string(), style: z.string().optional() }
-   * ```
-   */
-  private createPromptArgsSchema(
-    inputs: Array<{ name: string; type: string; required?: boolean }>
-  ): Record<string, z.ZodSchema> {
-    const schema: Record<string, z.ZodSchema> = {};
-
-    inputs.forEach((input) => {
-      let zodType: z.ZodSchema;
-      switch (input.type) {
-        case "string":
-          zodType = z.string();
-          break;
-        case "number":
-          zodType = z.number();
-          break;
-        case "boolean":
-          zodType = z.boolean();
-          break;
-        case "object":
-          zodType = z.object({});
-          break;
-        case "array":
-          zodType = z.array(z.any());
-          break;
-        default:
-          zodType = z.any();
-      }
-
-      if (!input.required) {
-        zodType = zodType.optional();
-      }
-
-      schema[input.name] = zodType;
-    });
-
-    return schema;
-  }
-
-  /**
-   * Extract parameter names from URI template
-   *
-   * Parses a URI template string to extract parameter names enclosed in curly braces.
-   * Used internally to identify dynamic parameters in resource templates and generate
-   * appropriate validation schemas.
-   *
-   * @param uriTemplate - URI template string with parameter placeholders (e.g., "/users/{id}/posts/{postId}")
-   * @returns Array of parameter names found in the template
-   *
-   * @example
-   * ```typescript
-   * const params = this.extractTemplateParams("/users/{id}/posts/{postId}")
-   * // Returns: ["id", "postId"]
-   * ```
-   */
-  private extractTemplateParams(uriTemplate: string): string[] {
-    const matches = uriTemplate.match(/\{([^}]+)\}/g);
-    return matches ? matches.map((match) => match.slice(1, -1)) : [];
-  }
-
-  /**
    * Parse parameter values from a URI based on a template
    *
    * Extracts parameter values from an actual URI by matching it against a URI template.
@@ -3767,7 +3983,10 @@ if (container && Component) {
   }
 }
 
-export type McpServerInstance = Omit<McpServer, keyof HonoType> &
+export type McpServerInstance<HasOAuth extends boolean = false> = Omit<
+  McpServer<HasOAuth>,
+  keyof HonoType
+> &
   HonoType & {
     getHandler: (options?: {
       provider?: "supabase" | "cloudflare" | "deno-deploy";
@@ -3820,10 +4039,27 @@ export type McpServerInstance = Omit<McpServer, keyof HonoType> &
  * })
  * ```
  */
+
+// Overload: when OAuth is configured
+
+export function createMCPServer(
+  name: string,
+  config: Partial<ServerConfig> & { oauth: NonNullable<ServerConfig["oauth"]> }
+): McpServerInstance<true>;
+
+// Overload: when OAuth is not configured
+// eslint-disable-next-line no-redeclare
+export function createMCPServer(
+  name: string,
+  config?: Partial<ServerConfig>
+): McpServerInstance<false>;
+
+// Implementation
+// eslint-disable-next-line no-redeclare
 export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> = {}
-): McpServerInstance {
+): McpServerInstance<boolean> {
   const instance = new McpServer({
     name,
     version: config.version || "1.0.0",
@@ -3832,6 +4068,9 @@ export function createMCPServer(
     baseUrl: config.baseUrl,
     allowedOrigins: config.allowedOrigins,
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
-  });
-  return instance as unknown as McpServerInstance;
+    autoCreateSessionOnInvalidId: config.autoCreateSessionOnInvalidId,
+    oauth: config.oauth,
+  }) as any;
+
+  return instance as unknown as McpServerInstance<boolean>;
 }

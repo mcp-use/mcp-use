@@ -234,9 +234,16 @@ export abstract class BaseConnector {
    * This is called after the client connects to register the handler for sampling requests.
    */
   protected setupSamplingHandler(): void {
-    if (!this.client) return;
-    if (!this.opts.samplingCallback) return;
+    if (!this.client) {
+      logger.debug("setupSamplingHandler: No client available");
+      return;
+    }
+    if (!this.opts.samplingCallback) {
+      logger.debug("setupSamplingHandler: No sampling callback provided");
+      return;
+    }
 
+    logger.debug("setupSamplingHandler: Setting up sampling request handler");
     // Handle sampling/createMessage requests from the server
     this.client.setRequestHandler(
       CreateMessageRequestSchema,
@@ -244,6 +251,9 @@ export abstract class BaseConnector {
         logger.debug("Server requested sampling, forwarding to callback");
         return await this.opts.samplingCallback!(request.params);
       }
+    );
+    logger.debug(
+      "setupSamplingHandler: Sampling handler registered successfully"
     );
   }
 
@@ -337,11 +347,29 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
 
+    // If resetTimeoutOnProgress is enabled but no onprogress callback is provided,
+    // add a no-op callback to trigger the SDK to add progressToken to the request.
+    // The SDK only adds progressToken when onprogress is present, which is required
+    // for the server to send progress notifications that reset the timeout.
+    const enhancedOptions = options ? { ...options } : undefined;
+    if (
+      enhancedOptions?.resetTimeoutOnProgress &&
+      !enhancedOptions.onprogress
+    ) {
+      // Add no-op progress callback to trigger progressToken addition
+      enhancedOptions.onprogress = () => {
+        // No-op: progress notifications are handled by the SDK's timeout reset logic
+      };
+      logger.debug(
+        `[BaseConnector] Added onprogress callback for tool '${name}' to enable progressToken`
+      );
+    }
+
     logger.debug(`Calling tool '${name}' with args`, args);
     const res = await this.client.callTool(
       { name, arguments: args },
       undefined,
-      options
+      enhancedOptions
     );
     logger.debug(`Tool '${name}' returned`, res);
     return res as CallToolResult;

@@ -1,5 +1,228 @@
 # mcp-use
 
+## 1.8.0-canary.0
+
+### Minor Changes
+
+- de6ca09: Add sampling support in inspector and fixed long running sampling requests (were timing out after 60s)
+
+### Patch Changes
+
+- Updated dependencies [de6ca09]
+  - @mcp-use/inspector@0.10.0-canary.0
+  - @mcp-use/cli@2.4.6-canary.0
+
+## 1.7.2
+
+### Patch Changes
+
+- a4341d5: chore: update deps
+- Updated dependencies [a4341d5]
+  - @mcp-use/inspector@0.9.2
+  - @mcp-use/cli@2.4.5
+
+## 1.7.2-canary.0
+
+### Patch Changes
+
+- c1d7378: chore: update deps
+- Updated dependencies [c1d7378]
+  - @mcp-use/inspector@0.9.2-canary.0
+  - @mcp-use/cli@2.4.5-canary.0
+
+## 1.7.1
+
+### Patch Changes
+
+- f6f2b61: ### Bug Fixes
+  - **Fixed bin entry issue (#536)**: Resolved pnpm installation warning where bin entry referenced non-existent `./node_modules/@mcp-use/cli/dist/index.js` path. Created proper bin forwarding script at `./dist/src/bin.js` that allows users to run `mcp-use` CLI commands (dev, build, etc.) after installing the package.
+
+  ### Improvements
+  - Standardized import statement formatting across multiple files for improved code consistency and readability
+
+- f6f2b61: fix lint & format
+- Updated dependencies [f6f2b61]
+- Updated dependencies [f6f2b61]
+  - @mcp-use/inspector@0.9.1
+  - @mcp-use/cli@2.4.4
+
+## 1.7.1-canary.1
+
+### Patch Changes
+
+- c9cb2db: fix lint & format
+- Updated dependencies [c9cb2db]
+  - @mcp-use/inspector@0.9.1-canary.1
+  - @mcp-use/cli@2.4.4-canary.1
+
+## 1.7.1-canary.0
+
+### Patch Changes
+
+- bab4ad0: ### Bug Fixes
+  - **Fixed bin entry issue (#536)**: Resolved pnpm installation warning where bin entry referenced non-existent `./node_modules/@mcp-use/cli/dist/index.js` path. Created proper bin forwarding script at `./dist/src/bin.js` that allows users to run `mcp-use` CLI commands (dev, build, etc.) after installing the package.
+
+  ### Improvements
+  - Standardized import statement formatting across multiple files for improved code consistency and readability
+
+- Updated dependencies [bab4ad0]
+  - @mcp-use/inspector@0.9.1-canary.0
+  - @mcp-use/cli@2.4.4-canary.0
+
+## 1.7.0
+
+### Minor Changes
+
+- 2730902: ## New Features
+  - **OAuth Authentication System**: Complete OAuth 2.0 support with built-in providers (Auth0, WorkOS, Supabase, Keycloak) and custom provider configuration
+  - **OAuth Middleware & Routes**: Server-side OAuth flow handling with automatic token management and session persistence
+  - **OAuth Callback Component**: Inspector now includes OAuth callback handling for authentication flows
+  - **Context Storage**: New async local storage system for request-scoped context in servers
+  - **Response Helpers**: Utility functions for standardized HTTP responses and error handling
+  - **Runtime Detection**: Auto-detection utilities for Node.js, Bun, and Deno environments
+  - **Server Authentication Examples**: Added OAuth examples for Auth0, WorkOS, and Supabase
+
+  ## Improvements
+  - **Enhanced useMcp Hook**: Improved connection management with better state handling and OAuth support
+  - **Enhanced Inspector Dashboard**: Added OAuth configuration UI and connection status indicators
+  - **Enhanced Browser Provider**: Better authentication flow handling with OAuth integration
+  - **Improved Auto-Connect**: Enhanced connection recovery and auto-reconnect logic
+  - **Enhanced Authentication Docs**: Comprehensive server-side authentication guide with OAuth setup instructions
+  - **Renamed Notification Example**: Cleaner naming convention (notification-example → notifications)
+  - **Enhanced Tool Types**: Improved type definitions for server-side tool handlers with context support
+  - **Enhanced HTTP Connectors**: Added OAuth token handling in HTTP transport layer
+
+  ## Documentation
+  - Added server authentication guide
+  - Enhanced client authentication documentation with OAuth flows
+  - Added notification examples and usage patterns
+  - Updated useMcp hook documentation with OAuth configuration
+
+### Patch Changes
+
+- 2730902: Fix react-router-dom
+- 2730902: Fix: switched to https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194 instead of @modelcontextprotocol/sdk to fix zod errors on deno runtime
+- 2730902: Optimized dependencies
+- 2730902: Moved ai sdk dep to optional since it's only used in test and example
+- 2730902: chore: update ai sdk from v4 to v5 and fixed integration tests
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+- Updated dependencies [2730902]
+  - @mcp-use/inspector@0.9.0
+  - @mcp-use/cli@2.4.3
+
+## 1.7.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [0daae72]
+  - @mcp-use/cli@2.4.3-canary.8
+  - @mcp-use/inspector@0.9.0-canary.8
+
+## 1.7.0-canary.7
+
+### Patch Changes
+
+- caf8c7c: Fix: switched to https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194 instead of @modelcontextprotocol/sdk to fix zod errors on deno runtime
+- caf8c7c: Moved ai sdk dep to optional since it's only used in test and example
+- caf8c7c: chore: update ai sdk from v4 to v5 and fixed integration tests
+- Updated dependencies [caf8c7c]
+  - @mcp-use/inspector@0.9.0-canary.7
+  - @mcp-use/cli@2.4.3-canary.7
+
+## 1.7.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [38da68d]
+- Updated dependencies [38da68d]
+  - @mcp-use/inspector@0.9.0-canary.6
+  - @mcp-use/cli@2.4.3-canary.6
+
+## 1.7.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [4b917e0]
+  - @mcp-use/inspector@0.9.0-canary.5
+  - @mcp-use/cli@2.4.3-canary.5
+
+## 1.7.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f44e60f]
+  - @mcp-use/inspector@0.9.0-canary.4
+  - @mcp-use/cli@2.4.3-canary.4
+
+## 1.7.0-canary.3
+
+### Patch Changes
+
+- 0c8cb1a: Fix react-router-dom
+  - @mcp-use/cli@2.4.3-canary.3
+  - @mcp-use/inspector@0.9.0-canary.3
+
+## 1.7.0-canary.2
+
+### Patch Changes
+
+- 1ca9801: Optimized dependencies
+- Updated dependencies [1ca9801]
+  - @mcp-use/inspector@0.9.0-canary.2
+  - @mcp-use/cli@2.4.3-canary.2
+
+## 1.7.0-canary.1
+
+### Minor Changes
+
+- 6bb0f3d: ## New Features
+  - **OAuth Authentication System**: Complete OAuth 2.0 support with built-in providers (Auth0, WorkOS, Supabase, Keycloak) and custom provider configuration
+  - **OAuth Middleware & Routes**: Server-side OAuth flow handling with automatic token management and session persistence
+  - **OAuth Callback Component**: Inspector now includes OAuth callback handling for authentication flows
+  - **Context Storage**: New async local storage system for request-scoped context in servers
+  - **Response Helpers**: Utility functions for standardized HTTP responses and error handling
+  - **Runtime Detection**: Auto-detection utilities for Node.js, Bun, and Deno environments
+  - **Server Authentication Examples**: Added OAuth examples for Auth0, WorkOS, and Supabase
+
+  ## Improvements
+  - **Enhanced useMcp Hook**: Improved connection management with better state handling and OAuth support
+  - **Enhanced Inspector Dashboard**: Added OAuth configuration UI and connection status indicators
+  - **Enhanced Browser Provider**: Better authentication flow handling with OAuth integration
+  - **Improved Auto-Connect**: Enhanced connection recovery and auto-reconnect logic
+  - **Enhanced Authentication Docs**: Comprehensive server-side authentication guide with OAuth setup instructions
+  - **Renamed Notification Example**: Cleaner naming convention (notification-example → notifications)
+  - **Enhanced Tool Types**: Improved type definitions for server-side tool handlers with context support
+  - **Enhanced HTTP Connectors**: Added OAuth token handling in HTTP transport layer
+
+  ## Documentation
+  - Added server authentication guide
+  - Enhanced client authentication documentation with OAuth flows
+  - Added notification examples and usage patterns
+  - Updated useMcp hook documentation with OAuth configuration
+
+### Patch Changes
+
+- Updated dependencies [6bb0f3d]
+  - @mcp-use/inspector@0.9.0-canary.1
+  - @mcp-use/cli@2.4.3-canary.1
+
+## 1.6.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [041da75]
+- Updated dependencies [041da75]
+  - @mcp-use/inspector@0.8.3-canary.0
+  - @mcp-use/cli@2.4.3-canary.0
+
 ## 1.6.2
 
 ### Patch Changes

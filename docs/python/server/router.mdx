@@ -1,0 +1,338 @@
+---
+title: "Router"
+description: "Organize tools, resources, and prompts into modular routers"
+icon: "route"
+---
+
+Routers let you organize your MCP server into modular, reusable components. Similar to [FastAPI's APIRouter](https://fastapi.tiangolo.com/reference/apirouter/), you can define tools, resources, and prompts in separate files and include them in your server with optional prefixes.
+
+## Basic Usage
+
+Create a router and define your tools:
+
+```python
+# routes/math.py
+from mcp_use.server import MCPRouter
+
+router = MCPRouter()
+
+@router.tool()
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+@router.tool()
+def subtract(a: int, b: int) -> int:
+    """Subtract two numbers."""
+    return a - b
+```
+
+Include it in your server:
+
+```python
+# main.py
+from mcp_use.server import MCPServer
+from routes.math import router as math_router
+
+server = MCPServer(name="my-server")
+server.include_router(math_router, prefix="math")
+
+server.run(transport="streamable-http")
+```
+
+With the `prefix="math"`, your tools become `math_add` and `math_subtract`.
+
+## Router Options
+
+The `MCPRouter` constructor accepts optional metadata:
+
+```python
+router = MCPRouter(
+    name="Math Operations",
+    prefix="math",              # Default prefix for nested routers
+    tags=["calculations"],      # For organization
+    description="Basic math operations",
+    version="1.0.0",
+)
+```
+
+## Defining Resources
+
+Use `@router.resource()` to define resources:
+
+```python
+router = MCPRouter()
+
+@router.resource(uri="weather://forecast")
+def get_forecast() -> str:
+    """Get weather forecast data."""
+    return '{"temperature": 72, "conditions": "sunny"}'
+
+@router.resource(uri="config://settings", mime_type="application/json")
+def get_settings() -> str:
+    """Get application settings."""
+    return '{"theme": "dark", "language": "en"}'
+```
+
+## Defining Prompts
+
+Use `@router.prompt()` to define prompts:
+
+```python
+router = MCPRouter()
+
+@router.prompt()
+def coding_assistant() -> str:
+    """A prompt for coding assistance."""
+    return "You are a helpful coding assistant."
+
+@router.prompt(name="reviewer", description="Code review prompt")
+def code_reviewer() -> str:
+    """Review code for best practices."""
+    return "Review the following code for bugs and improvements."
+```
+
+## Multiple Routers
+
+Organize different domains into separate routers:
+
+```python
+# routes/math.py
+from mcp_use.server import MCPRouter
+
+router = MCPRouter()
+
+@router.tool()
+def add(a: int, b: int) -> int:
+    return a + b
+
+@router.tool()
+def multiply(a: int, b: int) -> int:
+    return a * b
+```
+
+```python
+# routes/weather.py
+from mcp_use.server import MCPRouter
+
+router = MCPRouter()
+
+@router.tool()
+def get_weather(city: str) -> str:
+    return f"Weather in {city}: Sunny, 72°F"
+
+@router.resource(uri="weather://forecast")
+def forecast() -> str:
+    return '{"forecast": "clear skies"}'
+```
+
+```python
+# main.py
+from mcp_use.server import MCPServer
+from routes.math import router as math_router
+from routes.weather import router as weather_router
+
+server = MCPServer(
+    name="multi-domain-server",
+    version="1.0.0",
+)
+
+server.include_router(math_router, prefix="math")
+server.include_router(weather_router, prefix="weather")
+
+server.run(transport="streamable-http")
+```
+
+This creates:
+- Tools: `math_add`, `math_multiply`, `weather_get_weather`
+- Resources: `weather_weather://forecast`
+
+## Nested Routers
+
+Routers can include other routers:
+
+```python
+# routes/arithmetic.py
+from mcp_use.server import MCPRouter
+
+arithmetic_router = MCPRouter()
+
+@arithmetic_router.tool()
+def add(a: int, b: int) -> int:
+    return a + b
+```
+
+```python
+# routes/math.py
+from mcp_use.server import MCPRouter
+from routes.arithmetic import arithmetic_router
+
+router = MCPRouter()
+
+# Include nested router
+router.include_router(arithmetic_router, prefix="arithmetic")
+
+@router.tool()
+def factorial(n: int) -> int:
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
+```
+
+```python
+# main.py
+from mcp_use.server import MCPServer
+from routes.math import router as math_router
+
+server = MCPServer(name="nested-example")
+server.include_router(math_router, prefix="math")
+
+server.run(transport="streamable-http")
+```
+
+This creates tools: `math_arithmetic_add`, `math_factorial`
+
+## Without Prefix
+
+You can include routers without a prefix:
+
+```python
+server.include_router(math_router)  # No prefix
+# Tools keep their original names: add, subtract
+```
+
+## Enabling/Disabling Routers
+
+Use the `enabled` flag to conditionally include routers:
+
+```python
+import os
+
+server.include_router(math_router, prefix="math")
+server.include_router(debug_router, prefix="debug", enabled=os.getenv("DEBUG") == "1")
+server.include_router(experimental_router, enabled=False)  # Disabled
+```
+
+This is useful for:
+- Feature flags
+- Environment-specific routes (dev vs production)
+- Temporarily disabling functionality
+
+## Complete Example
+
+Here's a full example with multiple routers:
+
+```python
+# routes/database.py
+from mcp_use.server import MCPRouter
+
+router = MCPRouter()
+
+@router.tool()
+async def query(sql: str) -> str:
+    """Execute a SQL query."""
+    return f"Executed: {sql}"
+
+@router.resource(uri="db://schema")
+def get_schema() -> str:
+    """Get database schema."""
+    return '{"tables": ["users", "orders"]}'
+
+@router.prompt()
+def sql_assistant() -> str:
+    """SQL query assistant prompt."""
+    return "You are a SQL expert. Help write efficient queries."
+```
+
+```python
+# routes/files.py
+from mcp_use.server import MCPRouter
+
+router = MCPRouter()
+
+@router.tool()
+def read_file(path: str) -> str:
+    """Read file contents."""
+    with open(path) as f:
+        return f.read()
+
+@router.tool()
+def write_file(path: str, content: str) -> str:
+    """Write content to file."""
+    with open(path, 'w') as f:
+        f.write(content)
+    return f"Written to {path}"
+```
+
+```python
+# main.py
+from mcp_use.server import MCPServer
+from routes.database import router as db_router
+from routes.files import router as files_router
+
+server = MCPServer(
+    name="full-stack-server",
+    version="1.0.0",
+    instructions="A server with database and file operations",
+)
+
+server.include_router(db_router, prefix="db")
+server.include_router(files_router, prefix="fs")
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", debug=True)
+```
+
+Output:
+```
+mcp-use Version: 1.4.1
+
+full-stack-server
+A server with database and file operations
+Tools: 3 | Resources: 1 | Prompts: 1
+
+- Local:        http://127.0.0.1:8000
+- MCP:          http://127.0.0.1:8000/mcp
+```
+
+## API Reference
+
+### MCPRouter
+
+```python
+MCPRouter(
+    name: str | None = None,
+    prefix: str | None = None,
+    tags: list[str] | None = None,
+    description: str | None = None,
+    version: str | None = None,
+)
+```
+
+### Decorators
+
+| Decorator | Description |
+|-----------|-------------|
+| `@router.tool()` | Register a function as an MCP tool |
+| `@router.resource()` | Register a function as an MCP resource |
+| `@router.prompt()` | Register a function as an MCP prompt |
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `router.include_router(router, prefix)` | Include another router |
+
+### MCPServer Methods
+
+| Method | Description |
+|--------|-------------|
+| `server.include_router(router, prefix, enabled)` | Include a router in the server |
+
+### include_router Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `router` | `MCPRouter` | required | The router to include |
+| `prefix` | `str` | `""` | Prefix for tool/prompt names |
+| `enabled` | `bool` | `True` | Whether to register this router |
