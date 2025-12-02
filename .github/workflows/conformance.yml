@@ -155,6 +155,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [conformance-python, conformance-typescript]
     if: always() && !cancelled()
+    permissions:
+      pull-requests: write
 
     steps:
       - name: Download Python results
@@ -170,6 +172,57 @@ jobs:
           name: typescript-conformance-results
           path: typescript-results
         continue-on-error: true
+
+      - name: Parse results and create comment
+        id: parse-results
+        run: |
+          # Parse Python results
+          PY_PASSED=0
+          PY_FAILED=0
+          PY_DETAILS=""
+          if [ -f python-results/python-conformance-results.txt ]; then
+            PY_PASSED=$(grep -c "✓" python-results/python-conformance-results.txt || echo "0")
+            PY_FAILED=$(grep -c "✗" python-results/python-conformance-results.txt || echo "0")
+            PY_DETAILS=$(grep -E "(✓|✗)" python-results/python-conformance-results.txt | head -50 || echo "No details")
+          fi
+          
+          # Parse TypeScript results
+          TS_PASSED=0
+          TS_FAILED=0
+          TS_DETAILS=""
+          if [ -f typescript-results/typescript-conformance-results.txt ]; then
+            TS_PASSED=$(grep -c "✓" typescript-results/typescript-conformance-results.txt || echo "0")
+            TS_FAILED=$(grep -c "✗" typescript-results/typescript-conformance-results.txt || echo "0")
+            TS_DETAILS=$(grep -E "(✓|✗)" typescript-results/typescript-conformance-results.txt | head -50 || echo "No details")
+          fi
+          
+          # Calculate totals and pass rates
+          PY_TOTAL=$((PY_PASSED + PY_FAILED))
+          TS_TOTAL=$((TS_PASSED + TS_FAILED))
+          
+          if [ $PY_TOTAL -gt 0 ]; then
+            PY_RATE=$(echo "scale=1; $PY_PASSED * 100 / $PY_TOTAL" | bc)
+          else
+            PY_RATE="N/A"
+          fi
+          
+          if [ $TS_TOTAL -gt 0 ]; then
+            TS_RATE=$(echo "scale=1; $TS_PASSED * 100 / $TS_TOTAL" | bc)
+          else
+            TS_RATE="N/A"
+          fi
+          
+          # Save to environment
+          echo "py_passed=$PY_PASSED" >> $GITHUB_OUTPUT
+          echo "py_failed=$PY_FAILED" >> $GITHUB_OUTPUT
+          echo "py_rate=$PY_RATE" >> $GITHUB_OUTPUT
+          echo "ts_passed=$TS_PASSED" >> $GITHUB_OUTPUT
+          echo "ts_failed=$TS_FAILED" >> $GITHUB_OUTPUT
+          echo "ts_rate=$TS_RATE" >> $GITHUB_OUTPUT
+          
+          # Save details to files for multiline handling
+          echo "$PY_DETAILS" > py_details.txt
+          echo "$TS_DETAILS" > ts_details.txt
 
       - name: Generate summary
         run: |
@@ -203,4 +256,78 @@ jobs:
           echo "- \`completion-complete\` - Autocomplete not implemented" >> $GITHUB_STEP_SUMMARY
           echo "- \`tools-call-elicitation\` (TS only) - Elicitation not in TypeScript SDK" >> $GITHUB_STEP_SUMMARY
           echo "- \`elicitation-sep1034-defaults\` (TS only) - Elicitation not in TypeScript SDK" >> $GITHUB_STEP_SUMMARY
+
+      - name: Post comment to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pyPassed = '${{ steps.parse-results.outputs.py_passed }}';
+            const pyFailed = '${{ steps.parse-results.outputs.py_failed }}';
+            const pyRate = '${{ steps.parse-results.outputs.py_rate }}';
+            const tsPassed = '${{ steps.parse-results.outputs.ts_passed }}';
+            const tsFailed = '${{ steps.parse-results.outputs.ts_failed }}';
+            const tsRate = '${{ steps.parse-results.outputs.ts_rate }}';
+            const sha = context.sha.substring(0, 7);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            
+            const fs = require('fs');
+            let pyDetails = 'No results available';
+            let tsDetails = 'No results available';
+            
+            try {
+              pyDetails = fs.readFileSync('py_details.txt', 'utf8').trim() || 'No results available';
+            } catch (e) {}
+            
+            try {
+              tsDetails = fs.readFileSync('ts_details.txt', 'utf8').trim() || 'No results available';
+            } catch (e) {}
+            
+            const body = `## 🔬 MCP Conformance Test Results
+            
+            **Commit:** \`${sha}\`
+            
+            | Server | Passed | Failed | Pass Rate |
+            |--------|--------|--------|-----------|
+            | Python | ${pyPassed} | ${pyFailed} | ${pyRate}% |
+            | TypeScript | ${tsPassed} | ${tsFailed} | ${tsRate}% |
+            
+            <details>
+            <summary>Python Server Details</summary>
+            
+            \`\`\`
+            ${pyDetails}
+            \`\`\`
+            
+            </details>
+            
+            <details>
+            <summary>TypeScript Server Details</summary>
+            
+            \`\`\`
+            ${tsDetails}
+            \`\`\`
+            
+            </details>
+            
+            <details>
+            <summary>Known Missing Features</summary>
+            
+            - \`tools-call-audio\` - Audio content type not implemented
+            - \`resources-subscribe/unsubscribe\` - Resource subscriptions not implemented  
+            - \`completion-complete\` - Autocomplete not implemented
+            - \`tools-call-elicitation\` (TS only) - Elicitation not in TypeScript SDK
+            - \`elicitation-sep1034-defaults\` (TS only) - Elicitation not in TypeScript SDK
+            
+            </details>
+            
+            [View full run details](${runUrl})
+            `;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
 
