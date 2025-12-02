@@ -4,10 +4,58 @@
 
 import type { OAuthProvider } from "../oauth/providers/types.js";
 
+/**
+ * A url pointing to an icon URL or a base64-encoded data URI
+ *
+ * Clients that support rendering icons MUST support at least the following MIME types:
+ * - image/png - PNG images (safe, universal compatibility)
+ * - image/jpeg (and image/jpg) - JPEG images (safe, universal compatibility)
+ *
+ * Clients that support rendering icons SHOULD also support:
+ * - image/svg+xml - SVG images (scalable but requires security precautions)
+ * - image/webp - WebP images (modern, efficient format)
+ */
+export interface Icon {
+  /**
+   * A standard URI pointing to an icon resource or a base64-encoded data URI.
+   *
+   * Consumers MUST take steps to ensure URLs serving icons are from the
+   * same domain as the client/server or a trusted domain.
+   *
+   * Consumers MUST take appropriate precautions when consuming SVGs as they can contain
+   * executable JavaScript
+   *
+   * @format uri
+   */
+  src: string;
+  /** Optional override if the server's MIME type is missing or generic. */
+  mimeType?: string;
+  /** e.g. "48x48", "any" (for SVG), or "48x48 96x96" */
+  sizes?: string;
+}
+
 export interface ServerConfig {
   name: string;
   version: string;
   description?: string;
+  /**
+   * An optional list of icons for this implementation.
+   * This can be used by clients to display the implementation in a user interface.
+   * Each icon should have a `src` property that points to the icon file or data representation, and may also include a `mimeType` and `sizes` property.
+   * The `mimeType` property should be a valid MIME type for the icon file, such as "image/png" or "image/svg+xml".
+   * The `sizes` property should be a string that specifies one or more sizes at which the icon file can be used, such as "48x48" or "any" for scalable formats like SVG.
+   * The `sizes` property is optional, and if not provided, the client should assume that the icon can be used at any size.
+   */
+  icons?: Icon[];
+  /**
+   * An optional URL of the website for this implementation.
+   *
+   * Consumers MUST take steps to ensure URLs are from the
+   * same domain as the client/server or a trusted domain.
+   *
+   * @format uri
+   */
+  websiteUrl?: string;
   host?: string; // Hostname for widget URLs and server endpoints (defaults to 'localhost')
   baseUrl?: string; // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
   /**

@@ -1,7 +1,8 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Wrench } from "lucide-react";
-import { ListItem } from "@/client/components/shared";
+import { ListItem, IconRenderer } from "@/client/components/shared";
 import { Badge } from "@/client/components/ui/badge";
+import { getToolIcons } from "@/client/utils/entity-types";
 
 interface ToolsListProps {
   tools: Tool[];
@@ -27,28 +28,43 @@ export function ToolsList({
 
   return (
     <div className="overflow-y-auto flex-1 overscroll-contain">
-      {tools.map((tool, index) => (
-        <ListItem
-          key={tool.name}
-          id={`tool-${tool.name}`}
-          isSelected={selectedTool?.name === tool.name}
-          isFocused={focusedIndex === index}
-          icon={<Wrench className="h-4 w-4" />}
-          title={tool.name}
-          description={tool.description}
-          metadata={
-            tool.inputSchema?.properties && (
-              <Badge
-                variant="outline"
-                className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
-              >
-                {Object.keys(tool.inputSchema.properties).length} params
-              </Badge>
-            )
-          }
-          onClick={() => onToolSelect(tool)}
-        />
-      ))}
+      {tools.map((tool, index) => {
+        // Use icon from tool.icons if available, otherwise fallback to Wrench
+        const toolIcons = getToolIcons(tool);
+        const icon = toolIcons ? (
+          <IconRenderer
+            icons={toolIcons}
+            size={16}
+            fallback={<Wrench className="h-4 w-4" />}
+            className="h-4 w-4"
+          />
+        ) : (
+          <Wrench className="h-4 w-4" />
+        );
+
+        return (
+          <ListItem
+            key={tool.name}
+            id={`tool-${tool.name}`}
+            isSelected={selectedTool?.name === tool.name}
+            isFocused={focusedIndex === index}
+            icon={icon}
+            title={tool.name}
+            description={tool.description}
+            metadata={
+              tool.inputSchema?.properties && (
+                <Badge
+                  variant="outline"
+                  className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
+                >
+                  {Object.keys(tool.inputSchema.properties).length} params
+                </Badge>
+              )
+            }
+            onClick={() => onToolSelect(tool)}
+          />
+        );
+      })}
     </div>
   );
 }

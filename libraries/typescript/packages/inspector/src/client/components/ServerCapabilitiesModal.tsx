@@ -1,6 +1,7 @@
 import {
   CheckCircle2,
   Database,
+  ExternalLink,
   Info,
   MessageSquare,
   Settings,
@@ -16,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/client/components/ui/dialog";
-import { JSONDisplay } from "./shared/JSONDisplay";
+import { JSONDisplay, IconRenderer } from "./shared";
 
 interface ServerCapabilitiesModalProps {
   open: boolean;
@@ -112,15 +113,38 @@ export function ServerCapabilitiesModal({
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Info className="w-5 h-5" />
+            {connection.serverInfo?.icons ? (
+              <IconRenderer
+                icons={connection.serverInfo.icons}
+                size={20}
+                fallback={<Info className="w-5 h-5" />}
+                className="w-5 h-5"
+              />
+            ) : (
+              <Info className="w-5 h-5" />
+            )}
             Server Capabilities
           </DialogTitle>
-          <DialogDescription>
-            {connection.serverInfo?.name || connection.name}
-            {connection.serverInfo?.version && (
-              <span className="text-muted-foreground ml-2">
-                v{connection.serverInfo.version}
-              </span>
+          <DialogDescription className="flex items-center gap-2">
+            <span>
+              {connection.serverInfo?.name || connection.name}
+              {connection.serverInfo?.version && (
+                <span className="text-muted-foreground ml-2">
+                  v{connection.serverInfo.version}
+                </span>
+              )}
+            </span>
+            {connection.serverInfo?.websiteUrl && (
+              <a
+                href={connection.serverInfo.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span className="text-xs">Website</span>
+              </a>
             )}
           </DialogDescription>
         </DialogHeader>

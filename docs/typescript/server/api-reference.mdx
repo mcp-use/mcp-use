@@ -47,6 +47,20 @@ const server = createMCPServer('my-server', {
   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
 })
 
+// With icons and website URL (SEP-973)
+const server = createMCPServer('my-server', {
+  version: '1.0.0',
+  description: 'My MCP server',
+  icons: [
+    {
+      src: 'https://example.com/logo.png',
+      mimeType: 'image/png',
+      sizes: '512x512'
+    }
+  ],
+  websiteUrl: 'https://example.com'
+})
+
 // Production with explicit allowed origins
 const server = createMCPServer('my-server', {
   version: '1.0.0',
@@ -73,6 +87,14 @@ interface ServerConfig {
   allowedOrigins?: string[] // Allowed origins for DNS rebinding protection
   sessionIdleTimeoutMs?: number // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
   autoCreateSessionOnInvalidId?: boolean // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
+  icons?: Icon[]     // Optional list of icons for this server (SEP-973)
+  websiteUrl?: string // Optional website URL for this server (SEP-973)
+}
+
+interface Icon {
+  src: string         // URI pointing to icon resource or base64 data URI
+  mimeType?: string   // Optional MIME type override
+  sizes?: string      // Icon sizes (e.g., "48x48", "any", "16x16 32x32 48x48")
 }
 ```
 
@@ -157,6 +179,13 @@ tool(definition: ToolDefinition): this
 server.tool({
   name: 'calculate',
   description: 'Perform calculations',
+  icons: [
+    {
+      src: 'https://example.com/calculator-icon.png',
+      mimeType: 'image/png',
+      sizes: '48x48'
+    }
+  ],
   inputs: [
     { name: 'expression', type: 'string', required: true }
   ],
@@ -193,6 +222,13 @@ server.resource({
   title: 'Configuration',
   mimeType: 'application/json',
   description: 'Server configuration',
+  icons: [
+    {
+      src: 'https://example.com/config-icon.png',
+      mimeType: 'image/png',
+      sizes: '32x32'
+    }
+  ],
   annotations: {
     audience: ['user', 'assistant'],
     priority: 0.8
@@ -261,6 +297,13 @@ prompt(definition: PromptDefinition): this
 server.prompt({
   name: 'code_review',
   description: 'Generate code review prompt',
+  icons: [
+    {
+      src: 'https://example.com/code-review-icon.png',
+      mimeType: 'image/png',
+      sizes: '48x48'
+    }
+  ],
   args: [
     { name: 'language', type: 'string', required: true },
     { name: 'focus', type: 'string', required: false }
@@ -344,6 +387,7 @@ interface ToolDefinition {
   title?: string                  // Display title
   description?: string            // Tool description
   inputs?: InputDefinition[]      // Input parameters
+  icons?: Icon[]                  // Optional list of icons for this tool (SEP-973)
   cb: ToolCallback               // Handler function
   annotations?: ToolAnnotations   // Optional annotations
   _meta?: Record<string, unknown> // Metadata (e.g., Apps SDK)
@@ -363,6 +407,7 @@ interface ResourceDefinition {
   title?: string                     // Display title
   description?: string               // Resource description
   mimeType: string                   // MIME type
+  icons?: Icon[]                     // Optional list of icons for this resource (SEP-973)
   annotations?: ResourceAnnotations  // Optional annotations
   readCallback: ReadResourceCallback // Content provider
 }
@@ -386,6 +431,7 @@ interface ResourceTemplateDefinition {
   name: string                              // Template identifier
   title?: string                           // Display title
   description?: string                     // Template description
+  icons?: Icon[]                           // Optional list of icons for this resource template (SEP-973)
   annotations?: ResourceAnnotations        // Optional annotations
   resourceTemplate: ResourceTemplateConfig // Template configuration
   readCallback: ReadResourceTemplateCallback // Dynamic content provider
@@ -414,6 +460,7 @@ interface PromptDefinition {
   title?: string             // Display title
   description?: string       // Prompt description
   args?: InputDefinition[]   // Arguments
+  icons?: Icon[]            // Optional list of icons for this prompt (SEP-973)
   cb: PromptCallback        // Prompt generator
 }
 

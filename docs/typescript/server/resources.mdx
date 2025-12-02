@@ -15,6 +15,7 @@ Resources are:
 - **Readable**: Content can be retrieved via URI
 - **Typed**: Each resource has a MIME type
 - **Annotated**: Metadata helps clients understand resource purpose
+- **Customizable**: Can include icons for better visual identification (SEP-973)
 
 ## Resource Types
 
@@ -29,6 +30,13 @@ server.resource({
   title: 'Application Configuration',
   description: 'Current application settings',
   mimeType: 'application/json',
+  icons: [
+    {
+      src: 'https://example.com/config-icon.png',
+      mimeType: 'image/png',
+      sizes: '32x32'
+    }
+  ],
   readCallback: async () => ({
     contents: [{
       uri: 'config://application',
@@ -50,6 +58,13 @@ Resources with parameterized URIs for dynamic content:
 ```typescript
 server.resourceTemplate({
   name: 'user_data',
+  icons: [
+    {
+      src: 'https://example.com/user-icon.png',
+      mimeType: 'image/png',
+      sizes: '32x32'
+    }
+  ],
   resourceTemplate: {
     uriTemplate: 'user://{userId}/data',
     name: 'User Data',

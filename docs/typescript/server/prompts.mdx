@@ -15,6 +15,7 @@ Prompts in MCP are:
 - **Parameterized**: Accept arguments to customize content
 - **Discoverable**: Clients can list available prompts
 - **Typed**: Arguments have defined types and validation
+- **Customizable**: Can include icons for better visual identification (SEP-973)
 
 ## Basic Prompt Structure
 
@@ -24,6 +25,7 @@ Every prompt has three main components:
 server.prompt({
   name: 'prompt_name',              // Unique identifier
   description: 'What it generates',  // Clear description
+  icons: [...],                     // Optional icons (SEP-973)
   args: [...],                       // Argument definitions
   cb: async (args) => {...}          // Generator function
 })
@@ -78,6 +80,36 @@ Prompts support five argument types:
   required: false
 }
 ```
+
+### Adding Icons to Prompts
+
+You can add custom icons to prompts for better visual identification in the MCP Inspector:
+
+```typescript
+server.prompt({
+  name: 'code_review',
+  description: 'Generate code review prompt',
+  icons: [
+    {
+      src: 'https://example.com/code-icon.png',
+      mimeType: 'image/png',
+      sizes: '48x48'
+    }
+  ],
+  args: [
+    { name: 'language', type: 'string', required: true }
+  ],
+  cb: async ({ language }) => {
+    // Prompt generation
+  }
+})
+```
+
+**Icon Options:**
+- **URL icons**: Use HTTPS URLs for external icons
+- **Data URI icons**: Embed icons as base64 data URIs
+- **Multiple sizes**: Specify `"16x16 32x32 48x48"` for responsive displays
+- **Fallback**: Inspector provides default icons if custom icons fail to load
 
 ### Optional Arguments and Defaults
 

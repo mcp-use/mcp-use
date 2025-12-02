@@ -7,6 +7,7 @@ export {
   ServerConfig,
   InputDefinition,
   ResourceAnnotations,
+  Icon,
 } from "./common.js";
 
 // Context types

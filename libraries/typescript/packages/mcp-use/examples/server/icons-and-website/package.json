@@ -1,0 +1,20 @@
+{
+  "name": "icons-example-server",
+  "version": "1.0.0",
+  "description": "Example MCP server demonstrating icons and website URL features (SEP-973)",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

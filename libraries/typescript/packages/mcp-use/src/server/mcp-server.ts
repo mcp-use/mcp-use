@@ -7,6 +7,12 @@ import type {
   CreateMessageResult,
   GetPromptResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  ExtendedServerCapabilities,
+  ExtendedToolMetadata,
+  ExtendedResourceMetadata,
+  ExtendedPromptMetadata,
+} from "./types/sdk-extensions.js";
 import { z } from "zod";
 
 /**
@@ -183,10 +189,16 @@ export class McpServer<HasOAuth extends boolean = false> {
     this.config = config;
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
-    this.server = new OfficialMcpServer({
+    // TODO: Remove type assertion once SDK is updated with SEP-973 support
+    // Track SDK version that includes SEP-973: TBD
+    const serverConfig: ExtendedServerCapabilities = {
       name: config.name,
       version: config.version,
-    });
+      icons: config.icons,
+      websiteUrl: config.websiteUrl,
+    };
+    // Type assertion needed until SDK types include SEP-973 fields
+    this.server = new OfficialMcpServer(serverConfig as unknown as ConstructorParameters<typeof OfficialMcpServer>[0]);
     this.app = new Hono();
 
     // Enable CORS by default
@@ -417,15 +429,19 @@ export class McpServer<HasOAuth extends boolean = false> {
    * ```
    */
   resource(resourceDefinition: ResourceDefinition): this {
+    // TODO: Remove type assertion once SDK is updated with SEP-973 support
+    const resourceMetadata: ExtendedResourceMetadata = {
+      title: resourceDefinition.title,
+      description: resourceDefinition.description,
+      mimeType: resourceDefinition.mimeType,
+      icons: resourceDefinition.icons,
+      _meta: resourceDefinition._meta,
+    };
+    // Type assertion needed until SDK types include SEP-973 fields
     this.server.registerResource(
       resourceDefinition.name,
       resourceDefinition.uri,
-      {
-        title: resourceDefinition.title,
-        description: resourceDefinition.description,
-        mimeType: resourceDefinition.mimeType,
-        _meta: resourceDefinition._meta,
-      },
+      resourceMetadata as unknown as Parameters<typeof this.server.registerResource>[2],
       async () => {
         return await resourceDefinition.readCallback();
       }
@@ -497,11 +513,17 @@ export class McpServer<HasOAuth extends boolean = false> {
     if (resourceTemplateDefinition.annotations) {
       metadata.annotations = resourceTemplateDefinition.annotations;
     }
+    if (resourceTemplateDefinition.icons) {
+      // TODO: Remove type assertion once SDK is updated with SEP-973 support
+      (metadata as ExtendedResourceMetadata).icons = resourceTemplateDefinition.icons;
+    }
 
+    // TODO: Remove type assertion once SDK is updated with SEP-973 support
+    // Type assertion needed until SDK types include SEP-973 fields
     this.server.registerResource(
       resourceTemplateDefinition.name,
       template,
-      metadata,
+      metadata as unknown as Parameters<typeof this.server.registerResource>[2],
       async (uri: URL) => {
         // Parse URI parameters from the template
         const params = this.parseTemplateUri(
@@ -602,15 +624,19 @@ export class McpServer<HasOAuth extends boolean = false> {
       inputSchema = {};
     }
 
+    // TODO: Remove type assertion once SDK is updated with SEP-973 support
+    const toolMetadata: ExtendedToolMetadata = {
+      title: toolDefinition.title,
+      description: toolDefinition.description ?? "",
+      inputSchema,
+      annotations: toolDefinition.annotations,
+      icons: toolDefinition.icons,
+      _meta: toolDefinition._meta,
+    };
+    // Type assertion needed until SDK types include SEP-973 fields
     this.server.registerTool(
       toolDefinition.name,
-      {
-        title: toolDefinition.title,
-        description: toolDefinition.description ?? "",
-        inputSchema,
-        annotations: toolDefinition.annotations,
-        _meta: toolDefinition._meta,
-      },
+      toolMetadata as unknown as Parameters<typeof this.server.registerTool>[1],
       async (params: any, extra?: any) => {
         // Get the HTTP request context from AsyncLocalStorage
         // If not available (SDK broke async chain), try to find it from active sessions
@@ -862,13 +888,17 @@ export class McpServer<HasOAuth extends boolean = false> {
    */
   prompt(promptDefinition: PromptDefinition): this {
     const argsSchema = this.createParamsSchema(promptDefinition.args || []);
+    // TODO: Remove type assertion once SDK is updated with SEP-973 support
+    const promptMetadata: ExtendedPromptMetadata = {
+      title: promptDefinition.title,
+      description: promptDefinition.description ?? "",
+      argsSchema: argsSchema as any, // Type assertion for Zod v4 compatibility
+      icons: promptDefinition.icons,
+    };
+    // Type assertion needed until SDK types include SEP-973 fields
     this.server.registerPrompt(
       promptDefinition.name,
-      {
-        title: promptDefinition.title,
-        description: promptDefinition.description ?? "",
-        argsSchema: argsSchema as any, // Type assertion for Zod v4 compatibility
-      },
+      promptMetadata as unknown as Parameters<typeof this.server.registerPrompt>[1],
       async (params: any): Promise<GetPromptResult> => {
         return await promptDefinition.cb(params);
       }
