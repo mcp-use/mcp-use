@@ -18,6 +18,7 @@ import { cn } from "@/client/lib/utils";
 import {
   Bell,
   Check,
+  CheckSquare,
   Command,
   Copy,
   FolderOpen,
@@ -49,6 +50,7 @@ const tabs = [
   { id: "resources", label: "Resources", icon: FolderOpen },
   { id: "chat", label: "Chat", icon: MessageCircle },
   { id: "sampling", label: "Sampling", icon: Hash },
+  { id: "elicitation", label: "Elicitation", icon: CheckSquare },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
@@ -60,7 +62,9 @@ function getTabCount(tabId: string, server: MCPConnection): number {
   } else if (tabId === "resources") {
     return server.resources.length;
   } else if (tabId === "sampling") {
-    return server.pendingSamplingRequests.length;
+    return server.pendingSamplingRequests?.length || 0;
+  } else if (tabId === "elicitation") {
+    return server.pendingElicitationRequests?.length || 0;
   } else if (tabId === "notifications") {
     return server.unreadNotificationCount;
   }
