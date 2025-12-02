@@ -109,8 +109,14 @@ jobs:
               if (FORCE) {
                 console.log(`🔄 Force mode: Removing ${existingChangesets.length} existing changeset(s)`);
                 for (const changeset of existingChangesets) {
-                  await exec.exec("git", ["rm", changeset]);
-                  console.log(`  Removed: ${changeset}`);
+                  try {
+                    // Check if file exists before trying to remove it
+                    await fs.access(changeset);
+                    await exec.exec("git", ["rm", changeset]);
+                    console.log(`  Removed: ${changeset}`);
+                  } catch (e) {
+                    console.log(`  Already removed or doesn't exist: ${changeset}`);
+                  }
                 }
               } else {
                 console.log("Changeset already exists, skipping (use force option to regenerate)");
