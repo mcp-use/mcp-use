@@ -96,12 +96,14 @@ jobs:
             echo "message=no tests" >> $GITHUB_OUTPUT
             echo "color=lightgrey" >> $GITHUB_OUTPUT
           else
-            RATE=$(echo "scale=1; $PASSED * 100 / $TOTAL" | bc)
-            echo "message=${PASSED}/${TOTAL} (${RATE}%)" >> $GITHUB_OUTPUT
+            RATE=$(echo "scale=0; $PASSED * 100 / $TOTAL" | bc)
+            {
+              echo "message=$PASSED/$TOTAL ($RATE%)"
+            } >> $GITHUB_OUTPUT
             
             if [ $PASSED -eq $TOTAL ]; then
               echo "color=brightgreen" >> $GITHUB_OUTPUT
-            elif [ $(echo "$RATE >= 80" | bc) -eq 1 ]; then
+            elif [ $(echo "$RATE >= 60" | bc) -eq 1 ]; then
               echo "color=yellow" >> $GITHUB_OUTPUT
             else
               echo "color=red" >> $GITHUB_OUTPUT
@@ -115,7 +117,7 @@ jobs:
           auth: ${{ secrets.GIST_SECRET }}
           gistID: ${{ secrets.CONFORMANCE_GIST_ID }}
           filename: python-conformance.json
-          label: Python Conformance
+          label: MCP Conformance (PY)
           message: ${{ steps.python-badge.outputs.message }}
           color: ${{ steps.python-badge.outputs.color }}
 
@@ -186,12 +188,14 @@ jobs:
             echo "message=no tests" >> $GITHUB_OUTPUT
             echo "color=lightgrey" >> $GITHUB_OUTPUT
           else
-            RATE=$(echo "scale=1; $PASSED * 100 / $TOTAL" | bc)
-            echo "message=${PASSED}/${TOTAL} (${RATE}%)" >> $GITHUB_OUTPUT
+            RATE=$(echo "scale=0; $PASSED * 100 / $TOTAL" | bc)
+            {
+              echo "message=$PASSED/$TOTAL ($RATE%)"
+            } >> $GITHUB_OUTPUT
             
             if [ $PASSED -eq $TOTAL ]; then
               echo "color=brightgreen" >> $GITHUB_OUTPUT
-            elif [ $(echo "$RATE >= 80" | bc) -eq 1 ]; then
+            elif [ $(echo "$RATE >= 60" | bc) -eq 1 ]; then
               echo "color=yellow" >> $GITHUB_OUTPUT
             else
               echo "color=red" >> $GITHUB_OUTPUT
@@ -203,9 +207,9 @@ jobs:
         uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483
         with:
           auth: ${{ secrets.GIST_SECRET }}
-          gistID: ${{ secrets.CONFORMANCE_GIST_ID }}
+          gistID: 6edf670f0446dc9f7a1f32d6bfda2b70
           filename: typescript-conformance.json
-          label: TypeScript Conformance
+          label: MCP Conformance (TS)
           message: ${{ steps.typescript-badge.outputs.message }}
           color: ${{ steps.typescript-badge.outputs.color }}
 
