@@ -184,8 +184,8 @@ export interface WidgetServerConfig {
  * ```typescript
  * const serverConfig = {
  *   serverHost: 'localhost',
- *   serverPort: 3001,
- *   serverBaseUrl: 'http://localhost:3001',
+ *   serverPort: 3000,
+ *   serverBaseUrl: 'http://localhost:3000',
  *   buildId: 'abc123'
  * };
  *
@@ -261,7 +261,7 @@ export function getContentType(filename: string): string {
  * @example
  * ```typescript
  * const html = '<html><head></head><body>...</body></html>';
- * const processed = processWidgetHtml(html, 'kanban-board', 'http://localhost:3001');
+ * const processed = processWidgetHtml(html, 'kanban-board', 'http://localhost:3000');
  * ```
  */
 export function processWidgetHtml(
@@ -339,7 +339,7 @@ export function processWidgetHtml(
  *   'kanban-board',
  *   { title: 'Kanban Board', description: 'Task board' },
  *   '<html>...</html>',
- *   { serverBaseUrl: 'http://localhost:3001', cspUrls: [] },
+ *   { serverBaseUrl: 'http://localhost:3000', cspUrls: [] },
  *   true
  * );
  * ```
@@ -424,7 +424,7 @@ export async function createWidgetUIResource(
 ): Promise<UIResourceContent> {
   // If baseUrl is set, parse it to extract protocol, host, and port
   let configBaseUrl = `http://${serverConfig.serverHost}`;
-  let configPort: number | string = serverConfig.serverPort || 3001;
+  let configPort: number | string = serverConfig.serverPort || 3000;
 
   if (serverConfig.serverBaseUrl) {
     try {

@@ -117,7 +117,7 @@ export function uiResourceRegistration(
   // Create server config for widget UI resource creation
   const serverConfig: WidgetServerConfig = {
     serverHost: this.serverHost,
-    serverPort: this.serverPort || 3001,
+    serverPort: this.serverPort || 3000,
     serverBaseUrl: this.serverBaseUrl,
     buildId: this.buildId,
   };

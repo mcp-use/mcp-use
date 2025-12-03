@@ -501,7 +501,7 @@ export class McpServer {
    * The server will be accessible at the specified port with MCP endpoints at /mcp and /sse
    * and inspector UI at /inspector (if the inspector package is installed).
    *
-   * @param port - Port number to listen on (defaults to 3001 if not specified)
+   * @param port - Port number to listen on (defaults to 3000 if not specified)
    * @returns Promise that resolves when the server is successfully listening
    *
    * @example
