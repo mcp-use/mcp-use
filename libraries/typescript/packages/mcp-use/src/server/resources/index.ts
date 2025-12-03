@@ -13,6 +13,9 @@ import type {
 import type { ResourceTemplateDefinition } from "../types/index.js";
 import { convertToolResultToResourceResult } from "./conversion.js";
 
+// Export subscription management
+export { ResourceSubscriptionManager } from "./subscriptions.js";
+
 export interface ResourceServerContext {
   server: {
     registerResource(

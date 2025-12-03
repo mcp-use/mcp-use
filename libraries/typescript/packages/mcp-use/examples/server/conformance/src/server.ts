@@ -290,6 +290,37 @@ server.resourceTemplate(
   })
 );
 
+// resources-subscribe / resources-unsubscribe
+// Add a dynamic resource that can be subscribed to and updated
+let subscribableResourceValue = "Initial value";
+
+server.resource(
+  {
+    name: "subscribable_resource",
+    uri: "test://subscribable",
+    title: "Subscribable Resource",
+    description: "A resource that supports subscriptions and can be updated",
+  },
+  async () => text(subscribableResourceValue)
+);
+
+// Tool to trigger resource update for subscription testing
+server.tool(
+  {
+    name: "update_subscribable_resource",
+    description: "Update the subscribable resource and notify subscribers",
+    schema: z.object({
+      newValue: z.string().optional(),
+    }),
+  },
+  async ({ newValue = "Updated value" }) => {
+    subscribableResourceValue = newValue;
+    // Notify all subscribers of the update
+    await server.notifyResourceUpdated("test://subscribable");
+    return text(`Resource updated to: ${newValue}`);
+  }
+);
+
 // =============================================================================
 // PROMPTS (exact names expected by conformance tests)
 // All args are optional for conformance tests

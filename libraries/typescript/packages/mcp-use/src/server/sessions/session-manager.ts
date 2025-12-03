@@ -41,10 +41,15 @@ export interface SessionData {
  * Monitors sessions and removes them if they've been inactive for too long.
  * Note: This only cleans up our session metadata. The transport manages
  * its own session state.
+ *
+ * @param sessions - Map of active sessions
+ * @param idleTimeoutMs - Idle timeout in milliseconds
+ * @param mcpServerInstance - Optional MCP server instance for cleanup callbacks
  */
 export function startIdleCleanup(
   sessions: Map<string, SessionData>,
-  idleTimeoutMs: number
+  idleTimeoutMs: number,
+  mcpServerInstance?: any
 ): NodeJS.Timeout | undefined {
   if (idleTimeoutMs <= 0) {
     return undefined;
@@ -66,6 +71,8 @@ export function startIdleCleanup(
       );
       for (const sessionId of expiredSessions) {
         sessions.delete(sessionId);
+        // Clean up resource subscriptions for this session if mcpServerInstance provided
+        mcpServerInstance?.cleanupSessionSubscriptions?.(sessionId);
       }
     }
   }, 60000); // Check every minute

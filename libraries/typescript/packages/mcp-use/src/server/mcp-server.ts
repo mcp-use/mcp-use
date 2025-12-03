@@ -20,6 +20,7 @@ import {
 import {
   registerResource,
   registerResourceTemplate,
+  ResourceSubscriptionManager,
 } from "./resources/index.js";
 import { registerPrompt } from "./prompts/index.js";
 
@@ -115,6 +116,24 @@ export class McpServer {
   };
 
   /**
+   * Resource subscription manager for tracking and notifying resource updates
+   */
+  private subscriptionManager = new ResourceSubscriptionManager();
+
+  /**
+   * Clean up resource subscriptions for a closed session
+   *
+   * This method is called automatically when a session is closed to remove
+   * all resource subscriptions associated with that session.
+   *
+   * @param sessionId - The session ID to clean up
+   * @internal
+   */
+  public cleanupSessionSubscriptions(sessionId: string): void {
+    this.subscriptionManager.cleanupSession(sessionId);
+  }
+
+  /**
    * Creates a new MCP server instance with Hono integration
    *
    * Initializes the server with the provided configuration, sets up CORS headers,
@@ -138,6 +157,10 @@ export class McpServer {
       {
         capabilities: {
           logging: {},
+          resources: {
+            subscribe: true,
+            listChanged: true,
+          },
         },
       }
     );
@@ -498,6 +521,9 @@ export class McpServer {
       }
     );
 
+    // Register resource subscription handlers
+    this.subscriptionManager.registerHandlers(newServer, this.sessions);
+
     return newServer;
   }
 
@@ -534,6 +560,25 @@ export class McpServer {
   public getActiveSessions = getActiveSessions;
   public sendNotification = sendNotification;
   public sendNotificationToSession = sendNotificationToSession;
+
+  /**
+   * Notify subscribed clients that a resource has been updated
+   *
+   * This method sends a `notifications/resources/updated` notification to all
+   * sessions that have subscribed to the specified resource URI.
+   *
+   * @param uri - The URI of the resource that changed
+   * @returns Promise that resolves when all notifications have been sent
+   *
+   * @example
+   * ```typescript
+   * // After updating a resource, notify subscribers
+   * await server.notifyResourceUpdated("file:///path/to/resource.txt");
+   * ```
+   */
+  public async notifyResourceUpdated(uri: string): Promise<void> {
+    return this.subscriptionManager.notifyResourceUpdated(uri, this.sessions);
+  }
 
   public uiResource = uiResourceRegistration as any;
 

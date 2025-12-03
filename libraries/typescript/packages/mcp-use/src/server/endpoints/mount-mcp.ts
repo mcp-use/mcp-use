@@ -35,7 +35,11 @@ export async function mountMcp(
   // Start idle cleanup interval if configured
   let idleCleanupInterval: NodeJS.Timeout | undefined;
   if (idleTimeoutMs > 0) {
-    idleCleanupInterval = startIdleCleanup(sessions, idleTimeoutMs);
+    idleCleanupInterval = startIdleCleanup(
+      sessions,
+      idleTimeoutMs,
+      mcpServerInstance
+    );
   }
 
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
@@ -79,6 +83,8 @@ export async function mountMcp(
         console.log(`[MCP] Session closed: ${sid}`);
         transports.delete(sid);
         sessions.delete(sid);
+        // Clean up resource subscriptions for this session
+        mcpServerInstance.cleanupSessionSubscriptions?.(sid);
       },
     });
 
