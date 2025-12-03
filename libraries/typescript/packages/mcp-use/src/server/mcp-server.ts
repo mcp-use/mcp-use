@@ -543,9 +543,9 @@ export class McpServer {
   }
 
   async listen(port?: number): Promise<void> {
-    // Priority: parameter > PORT env var > default (3001)
+    // Priority: parameter > PORT env var > default (3000)
     const portEnv = getEnv("PORT");
-    this.serverPort = port || (portEnv ? parseInt(portEnv, 10) : 3001);
+    this.serverPort = port || (portEnv ? parseInt(portEnv, 10) : 3000);
 
     // Update host from HOST env var if set
     const hostEnv = getEnv("HOST");
