@@ -8,7 +8,7 @@ from mcp_use.client.connectors.stdio import StdioConnector as _StdioConnector
 warnings.warn(
     "mcp_use.connectors.stdio is deprecated. "
     "Use mcp_use.client.connectors.stdio. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

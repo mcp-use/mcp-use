@@ -8,7 +8,7 @@ from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter as _LangC
 warnings.warn(
     "mcp_use.adapters.langchain_adapter is deprecated. "
     "Use mcp_use.agents.adapters.langchain_adapter. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

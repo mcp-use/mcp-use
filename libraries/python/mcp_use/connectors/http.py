@@ -8,7 +8,7 @@ from mcp_use.client.connectors.http import HttpConnector as _HttpConnector
 warnings.warn(
     "mcp_use.connectors.http is deprecated. "
     "Use mcp_use.client.connectors.http. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )
