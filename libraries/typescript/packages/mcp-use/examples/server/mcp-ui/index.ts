@@ -8,8 +8,6 @@ const server = createMCPServer("uiresource-mcp-server", {
   baseUrl: process.env.MCP_URL, // Full base URL (e.g., https://myserver.com)
 });
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-
 /**
  * ════════════════════════════════════════════════════════════════════
  * Type 1: External URL (Iframe Widget from `resources/`)
@@ -112,7 +110,6 @@ server.uiResource({
 
         <p style="margin-top: 20px; font-size: 0.9em;">
           Server: <strong>uiresource-mcp-server v1.0.0</strong><br>
-          Port: <strong>${PORT}</strong>
         </p>
       </div>
     </body>
@@ -266,7 +263,7 @@ server.tool({
         type: "externalUrl",
         tool: "kanban-board",
         resource: "ui://widget/kanban-board",
-        url: `http://localhost:${PORT}/mcp-use/widgets/kanban-board`,
+        url: `/mcp-use/widgets/kanban-board`,
       },
       {
         name: "welcome-card",
@@ -306,102 +303,56 @@ server.tool({
   },
 });
 
-server.resource({
-  name: "server-config",
-  uri: "config://server",
-  title: "Server Configuration",
-  description: "Current server configuration and status",
-  mimeType: "application/json",
-  readCallback: async () => ({
-    contents: [
-      {
-        uri: "config://server",
-        mimeType: "application/json",
-        text: JSON.stringify(
-          {
-            port: PORT,
-            version: "1.0.0",
-            widgets: {
-              total: 3,
-              types: {
-                externalUrl: ["kanban-board"],
-                rawHtml: ["welcome-card"],
-                remoteDom: ["quick-poll"],
-              },
-              baseUrl: `http://localhost:${PORT}/mcp-use/widgets/`,
-            },
-            endpoints: {
-              mcp: `http://localhost:${PORT}/mcp`,
-              inspector: `http://localhost:${PORT}/inspector`,
-              widgets: `http://localhost:${PORT}/mcp-use/widgets/`,
-            },
-          },
-          null,
-          2
-        ),
-      },
-    ],
-  }),
-});
-
 // Start the server
-server.listen(PORT);
-
-// Display helpful startup message
-console.log(`
-╔═══════════════════════════════════════════════════════════════╗
-║            🎨 UIResource MCP Server (All Types)                ║
-╚═══════════════════════════════════════════════════════════════╝
-
-Server is running on port ${PORT}
-
-📍 Endpoints:
-   MCP Protocol:  http://localhost:${PORT}/mcp
-   Inspector UI:  http://localhost:${PORT}/inspector
-   Widgets Base:  http://localhost:${PORT}/mcp-use/widgets/
-
-🎯 Available UIResources (3 types demonstrated):
-
-   1️⃣  External URL Widget (Iframe)
-   • kanban-board
-     Tool:      kanban-board
-     Resource:  ui://widget/kanban-board
-     Browser:   http://localhost:${PORT}/mcp-use/widgets/kanban-board
-
-   2️⃣  Raw HTML Widget (Direct Rendering)
-   • welcome-card
-     Tool:      welcome-card
-     Resource:  ui://widget/welcome-card
-
-   3️⃣  Remote DOM Widget (React Components)
-   • quick-poll
-     Tool:      quick-poll
-     Resource:  ui://widget/quick-poll
-
-📝 Usage Examples:
-
-   // External URL - Call with dynamic parameters
-   await client.callTool('kanban-board', {
-     initialTasks: [{id: 1, title: 'Task 1'}],
-     theme: 'dark'
-   })
-
-   // Raw HTML - Access as resource
-   await client.readResource('ui://widget/welcome-card')
-
-   // Remote DOM - Interactive component
-   await client.callTool('quick-poll', {
-     question: 'Favorite color?',
-     options: ['Red', 'Blue', 'Green']
-   })
-
-💡 Tip: Open the Inspector UI to test all widget types interactively!
-`);
-
-// Handle graceful shutdown
-process.on("SIGINT", () => {
-  console.log("\n\nShutting down server...");
-  process.exit(0);
+server.listen().then(() => {
+  // Display helpful startup message
+  console.log(`
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║            🎨 UIResource MCP Server (All Types)                ║
+  ╚═══════════════════════════════════════════════════════════════╝
+  
+  Server is running on port ${server.serverPort}
+  
+  📍 Endpoints:
+     MCP Protocol:  http://localhost:${server.serverPort}/mcp
+     Inspector UI:  http://localhost:${server.serverPort}/inspector
+     Widgets Base:  http://localhost:${server.serverPort}/mcp-use/widgets/
+  
+  🎯 Available UIResources (3 types demonstrated):
+  
+     1️⃣  External URL Widget (Iframe)
+     • kanban-board
+       Tool:      kanban-board
+       Resource:  ui://widget/kanban-board
+       Browser:   http://localhost:${server.serverPort}/mcp-use/widgets/kanban-board
+  
+     2️⃣  Raw HTML Widget (Direct Rendering)
+     • welcome-card
+       Tool:      welcome-card
+       Resource:  ui://widget/welcome-card
+  
+     3️⃣  Remote DOM Widget (React Components)
+     • quick-poll
+       Tool:      quick-poll
+       Resource:  ui://widget/quick-poll
+  
+  📝 Usage Examples:
+  
+     // External URL - Call with dynamic parameters
+     await client.callTool('kanban-board', {
+       initialTasks: [{id: 1, title: 'Task 1'}],
+       theme: 'dark'
+     })
+  
+     // Raw HTML - Access as resource
+     await client.readResource('ui://widget/welcome-card')
+  
+     // Remote DOM - Interactive component
+     await client.callTool('quick-poll', {
+       question: 'Favorite color?',
+       options: ['Red', 'Blue', 'Green']
+     })
+  
+  💡 Tip: Open the Inspector UI to test all widget types interactively!
+  `);
 });
-
-export default server;

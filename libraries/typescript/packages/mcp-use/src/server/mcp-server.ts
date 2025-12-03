@@ -82,13 +82,13 @@ export class McpServer {
   public app: HonoType;
   private mcpMounted = false;
   private inspectorMounted = false;
-  protected serverPort?: number;
-  protected serverHost: string;
-  protected serverBaseUrl?: string;
+  public serverPort?: number;
+  public serverHost: string;
+  public serverBaseUrl?: string;
   public registeredTools: string[] = [];
   public registeredPrompts: string[] = [];
   public registeredResources: string[] = [];
-  protected buildId?: string;
+  public buildId?: string;
   public sessions = new Map<string, SessionData>();
   private idleCleanupInterval?: NodeJS.Timeout;
   private oauthConfig?: any; // Store OAuth config for lazy initialization

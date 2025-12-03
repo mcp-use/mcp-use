@@ -2,19 +2,40 @@ import type {
   GetPromptResult,
   CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { InputDefinition } from "./common.js";
+import type { InputDefinition, OptionalizeUndefinedFields } from "./common.js";
 import type { z } from "zod";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 
-// Callback types - now support both CallToolResult (from helpers) and GetPromptResult (old API)
-export type PromptCallback = (
-  params: any
-) => Promise<CallToolResult | GetPromptResult | TypedCallToolResult<any>>;
+/**
+ * Extract input type from a prompt definition's schema
+ */
+export type InferPromptInput<T> = T extends { schema: infer S }
+  ? S extends z.ZodTypeAny
+    ? OptionalizeUndefinedFields<z.infer<S>>
+    : Record<string, any>
+  : Record<string, any>;
+
+/**
+ * Helper interface that uses method signature syntax to enable bivariant parameter checking.
+ * @internal
+ */
+interface PromptCallbackBivariant<TInput> {
+  bivarianceHack(
+    params: TInput
+  ): Promise<CallToolResult | GetPromptResult | TypedCallToolResult<any>>;
+}
+
+/**
+ * Callback type for prompt execution - supports both CallToolResult (from helpers) and GetPromptResult (old API).
+ * Uses bivariant parameter checking for flexible destructuring patterns.
+ */
+export type PromptCallback<TInput = Record<string, any>> =
+  PromptCallbackBivariant<TInput>["bivarianceHack"];
 
 /**
  * Prompt definition with cb callback (old API)
  */
-export interface PromptDefinition {
+export interface PromptDefinition<TInput = Record<string, any>> {
   /** Unique identifier for the prompt */
   name: string;
   /** Human-readable title for the prompt */
@@ -26,7 +47,7 @@ export interface PromptDefinition {
   /** Zod schema for input validation (preferred) */
   schema?: z.ZodObject<any>;
   /** Async callback function that generates the prompt */
-  cb: PromptCallback;
+  cb: PromptCallback<TInput>;
 }
 
 /**

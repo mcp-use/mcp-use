@@ -12,8 +12,6 @@ const server = createMCPServer("elicitation-example-server", {
     "An MCP server example demonstrating elicitation capabilities (form and URL modes)",
 });
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-
 /**
  * Example tool that uses form mode elicitation to collect user information.
  * This demonstrates the simplified API with Zod schema and automatic type inference.
@@ -176,17 +174,4 @@ server.tool(
   }
 );
 
-// Start the server
-await server.listen(PORT);
-console.log(`🚀 Elicitation Example Server running on port ${PORT}`);
-console.log(`📊 Inspector available at http://localhost:${PORT}/inspector`);
-console.log(`🔧 MCP endpoint at http://localhost:${PORT}/mcp`);
-console.log(`
-💡 This server requires a client with elicitation support to use the tools.
-
-📝 Elicitation Modes:
-   - Form mode: Collects structured data with JSON schema validation
-   - URL mode: Directs users to external URLs for sensitive interactions
-   
-⚠️  Important: Use URL mode for sensitive data like credentials and API keys!
-`);
+await server.listen();

@@ -21,9 +21,12 @@ export type EnhancedToolContext<HasOAuth extends boolean = false> =
   ToolContext & McpContext<HasOAuth>;
 
 /**
- * Callback function for tool execution.
+ * Callback function interface for tool execution.
  *
- * Accepts input parameters and an enhanced context object that provides:
+ * Uses method signature syntax to enable bivariant parameter checking,
+ * which allows more flexible destructuring patterns for optional fields.
+ *
+ * Accepts input parameters and an optional enhanced context object that provides:
  * - LLM sampling via `ctx.sample()`
  * - Progress reporting via `ctx.reportProgress()`
  * - Authentication info via `ctx.auth` (when OAuth is configured)
@@ -55,16 +58,69 @@ export type EnhancedToolContext<HasOAuth extends boolean = false> =
  * }
  * ```
  */
+/**
+ * Helper interface that uses method signature syntax to enable bivariant parameter checking.
+ * This allows more flexible callback assignments where users can destructure optional fields
+ * without explicitly marking them as optional in their function signature.
+ *
+ * @internal
+ */
+interface ToolCallbackBivariant<
+  TInput,
+  TOutput extends Record<string, unknown>,
+  HasOAuth extends boolean,
+> {
+  // Method signature enables bivariant checking for TInput parameter
+  bivarianceHack(
+    params: TInput,
+    ctx: EnhancedToolContext<HasOAuth>
+  ): Promise<TypedCallToolResult<TOutput>>;
+}
+
+/**
+ * Callback function type for tool execution.
+ *
+ * Uses bivariant parameter checking via method signature extraction,
+ * which allows more flexible destructuring patterns for optional fields.
+ *
+ * Accepts input parameters and an enhanced context object that provides:
+ * - LLM sampling via `ctx.sample()`
+ * - Progress reporting via `ctx.reportProgress()`
+ * - Elicitation via `ctx.elicit()`
+ * - Authentication info via `ctx.auth` (when OAuth is configured)
+ * - HTTP request via `ctx.req`
+ * - All Hono Context properties and methods
+ *
+ * @template TInput - Input parameters type
+ * @template TOutput - Output type (constrains the structuredContent property when outputSchema is defined)
+ * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
+ *
+ * @example
+ * ```typescript
+ * // Simple tool without context
+ * async ({ name }) => ({
+ *   content: [{ type: 'text', text: `Hello, ${name}!` }]
+ * })
+ *
+ * // Tool with sampling and context
+ * async ({ text }, ctx) => {
+ *   const result = await ctx.sample({
+ *     messages: [{ role: 'user', content: { type: 'text', text } }]
+ *   });
+ *   return { content: result.content };
+ * }
+ *
+ * // Tool with authentication
+ * async ({ userId }, ctx) => {
+ *   return { content: [{ type: 'text', text: `User: ${ctx.auth.user.email}` }] };
+ * }
+ * ```
+ */
 export type ToolCallback<
   TInput = Record<string, any>,
   TOutput extends Record<string, unknown> = Record<string, unknown>,
   HasOAuth extends boolean = false,
-> =
-  | ((params: TInput) => Promise<TypedCallToolResult<TOutput>>)
-  | ((
-      params: TInput,
-      ctx: EnhancedToolContext<HasOAuth>
-    ) => Promise<TypedCallToolResult<TOutput>>);
+> = ToolCallbackBivariant<TInput, TOutput, HasOAuth>["bivarianceHack"];
 
 /**
  * Generic callback with full context support for better type inference.
@@ -80,7 +136,11 @@ export type ToolCallbackWithContext<
 ) => Promise<TypedCallToolResult<TOutput>>;
 
 /**
- * Extract input type from a tool definition's schema
+ * Extract input type from a tool definition's schema.
+ * Uses z.infer which preserves Zod's optional/default handling.
+ *
+ * For .optional() fields, the type will be T | undefined
+ * For .default() fields, the type will be T (since Zod guarantees a value)
  */
 export type InferToolInput<T> = T extends { schema: infer S }
   ? S extends z.ZodTypeAny

@@ -3,6 +3,37 @@
  */
 
 import type { OAuthProvider } from "../oauth/providers/types.js";
+import type { z } from "zod";
+
+/**
+ * Converts Zod optional fields to TypeScript optional properties.
+ * Transforms { field: T | undefined } to { field?: T }
+ *
+ * This utility enables natural destructuring patterns in callbacks:
+ * - async ({message}) => ... (without type annotation)
+ * - async ({message = "default"}) => ... (with default value)
+ *
+ * Without this, Zod's z.string().optional() produces { message: string | undefined }
+ * which requires the property to be present (though it can be undefined).
+ * This type makes it truly optional: { message?: string }
+ *
+ * Used across all callback types: tools, prompts, and resources.
+ */
+export type OptionalizeUndefinedFields<T> = {
+  [K in keyof T as undefined extends T[K] ? K : never]?: Exclude<
+    T[K],
+    undefined
+  >;
+} & {
+  [K in keyof T as undefined extends T[K] ? never : K]: T[K];
+};
+
+/**
+ * Infer input type from a Zod schema with proper optional field handling
+ */
+export type InferZodInput<S> = S extends z.ZodTypeAny
+  ? OptionalizeUndefinedFields<z.infer<S>>
+  : Record<string, any>;
 
 export interface ServerConfig {
   name: string;

@@ -47,6 +47,42 @@ server.tool(
     text(`Echo: ${message}`)
 );
 
+// tools-call-simple-text (message is optional)
+server.tool(
+  {
+    name: "test_simple_text",
+    description: "A simple tool that returns text content",
+    schema: z.object({
+      message: z.string().optional(),
+    }),
+  },
+  async ({ message }) => text(`Echo: ${message || "Hello, World!"}`)
+);
+
+// tools-call-simple-text (message is optional)
+server.tool(
+  {
+    name: "test_simple_text",
+    description: "A simple tool that returns text content",
+    schema: z.object({
+      message: z.string().default("Hello, World!"),
+    }),
+  },
+  async ({ message }) => text(`Echo: ${message || "Hello, World!"}`)
+);
+
+// tools-call-simple-text (message is optional)
+server.tool(
+  {
+    name: "test_simple_text",
+    description: "A simple tool that returns text content",
+    schema: z.object({
+      message: z.string().default("Hello, World!"),
+    }),
+  },
+  async ({ message }, ctx) => text(`Echo: ${message || "Hello, World!"}`)
+);
+
 // tools-call-image
 server.tool(
   {

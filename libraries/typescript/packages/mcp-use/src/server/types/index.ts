@@ -7,6 +7,8 @@ export {
   ServerConfig,
   InputDefinition,
   ResourceAnnotations,
+  OptionalizeUndefinedFields,
+  InferZodInput,
 } from "./common.js";
 
 // Context types
@@ -51,6 +53,7 @@ export {
 // Tool types
 export {
   ToolCallback,
+  ToolCallbackWithContext,
   ToolDefinition,
   InferToolInput,
   InferToolOutput,
@@ -62,4 +65,5 @@ export {
   PromptCallback,
   PromptDefinition,
   PromptDefinitionWithoutCallback,
+  InferPromptInput,
 } from "./prompt.js";
