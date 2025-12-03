@@ -85,6 +85,40 @@ jobs:
           grep -E "(SUMMARY|✓|✗|Total:)" python-conformance-results.txt >> $GITHUB_STEP_SUMMARY || true
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
+      - name: Calculate Python badge values
+        id: python-badge
+        run: |
+          PASSED=$(grep -c "✓" python-conformance-results.txt || echo "0")
+          FAILED=$(grep -c "✗" python-conformance-results.txt || echo "0")
+          TOTAL=$((PASSED + FAILED))
+          
+          if [ $TOTAL -eq 0 ]; then
+            echo "message=no tests" >> $GITHUB_OUTPUT
+            echo "color=lightgrey" >> $GITHUB_OUTPUT
+          else
+            RATE=$(echo "scale=1; $PASSED * 100 / $TOTAL" | bc)
+            echo "message=${PASSED}/${TOTAL} (${RATE}%)" >> $GITHUB_OUTPUT
+            
+            if [ $PASSED -eq $TOTAL ]; then
+              echo "color=brightgreen" >> $GITHUB_OUTPUT
+            elif [ $(echo "$RATE >= 80" | bc) -eq 1 ]; then
+              echo "color=yellow" >> $GITHUB_OUTPUT
+            else
+              echo "color=red" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Create Python conformance badge
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
+        uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ secrets.CONFORMANCE_GIST_ID }}
+          filename: python-conformance.json
+          label: Python Conformance
+          message: ${{ steps.python-badge.outputs.message }}
+          color: ${{ steps.python-badge.outputs.color }}
+
       - name: Upload Python conformance results
         uses: actions/upload-artifact@v4
         if: always()
@@ -140,6 +174,40 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           grep -E "(SUMMARY|✓|✗|Total:)" typescript-conformance-results.txt >> $GITHUB_STEP_SUMMARY || true
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Calculate TypeScript badge values
+        id: typescript-badge
+        run: |
+          PASSED=$(grep -c "✓" typescript-conformance-results.txt || echo "0")
+          FAILED=$(grep -c "✗" typescript-conformance-results.txt || echo "0")
+          TOTAL=$((PASSED + FAILED))
+          
+          if [ $TOTAL -eq 0 ]; then
+            echo "message=no tests" >> $GITHUB_OUTPUT
+            echo "color=lightgrey" >> $GITHUB_OUTPUT
+          else
+            RATE=$(echo "scale=1; $PASSED * 100 / $TOTAL" | bc)
+            echo "message=${PASSED}/${TOTAL} (${RATE}%)" >> $GITHUB_OUTPUT
+            
+            if [ $PASSED -eq $TOTAL ]; then
+              echo "color=brightgreen" >> $GITHUB_OUTPUT
+            elif [ $(echo "$RATE >= 80" | bc) -eq 1 ]; then
+              echo "color=yellow" >> $GITHUB_OUTPUT
+            else
+              echo "color=red" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Create TypeScript conformance badge
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
+        uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ secrets.CONFORMANCE_GIST_ID }}
+          filename: typescript-conformance.json
+          label: TypeScript Conformance
+          message: ${{ steps.typescript-badge.outputs.message }}
+          color: ${{ steps.typescript-badge.outputs.color }}
 
       - name: Upload TypeScript conformance results
         uses: actions/upload-artifact@v4
