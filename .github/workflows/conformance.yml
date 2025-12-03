@@ -110,7 +110,7 @@ jobs:
 
       - name: Create Python conformance badge
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
-        uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483
+        uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_SECRET }}
           gistID: ${{ secrets.CONFORMANCE_GIST_ID }}
