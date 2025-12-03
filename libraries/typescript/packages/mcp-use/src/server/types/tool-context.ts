@@ -274,4 +274,33 @@ export interface ToolContext {
     total?: number,
     message?: string
   ) => Promise<void>;
+
+  /**
+   * Send a log notification to the client.
+   * Always available - will send notifications if the client supports them.
+   *
+   * @param level - Log level (debug, info, notice, warning, error, critical, alert, emergency)
+   * @param message - Log message content
+   * @param logger - Optional logger name (defaults to 'tool')
+   *
+   * @example
+   * ```typescript
+   * await ctx.log('info', 'Processing started');
+   * await ctx.log('debug', 'Debug details', 'my-tool');
+   * await ctx.log('error', 'Something went wrong');
+   * ```
+   */
+  log: (
+    level:
+      | "debug"
+      | "info"
+      | "notice"
+      | "warning"
+      | "error"
+      | "critical"
+      | "alert"
+      | "emergency",
+    message: string,
+    logger?: string
+  ) => Promise<void>;
 }

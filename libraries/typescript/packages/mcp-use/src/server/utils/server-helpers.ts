@@ -191,7 +191,7 @@ export function parseTemplateUri(
 
   // Replace {param} with named capture groups
   const paramNames: string[] = [];
-  regexPattern = regexPattern.replace(/\\\{([^}]+)\\\}/g, (_, paramName) => {
+  regexPattern = regexPattern.replace(/\{([^}]+)\}/g, (_, paramName) => {
     paramNames.push(paramName);
     return "([^/]+)";
   });

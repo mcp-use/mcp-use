@@ -6,6 +6,8 @@
  * Run with: pnpm dev or tsx src/server.ts
  */
 
+import { setTimeout as sleep } from "timers/promises";
+
 import {
   createMCPServer,
   text,
@@ -13,9 +15,9 @@ import {
   resource,
   error,
   object,
-  markdown,
   binary,
   mix,
+  audio,
 } from "mcp-use/server";
 import { z } from "zod";
 
@@ -29,6 +31,11 @@ const server = createMCPServer("ConformanceTestServer", {
 // 1x1 red PNG pixel as base64
 const RED_PIXEL_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+
+// Minimal valid WAV file: 44-byte header + 1 sample (0x80 = silence for 8-bit PCM)
+// Format: 8kHz, mono, 8-bit PCM
+const SILENT_WAV_BASE64 =
+  "UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAABAAgAZGF0YQIAAACA";
 
 // =============================================================================
 // TOOLS (exact names expected by conformance tests)
@@ -50,10 +57,19 @@ server.tool(
 // tools-call-image
 server.tool(
   {
-    name: "test_image",
+    name: "test_image_content",
     description: "A tool that returns image content",
   },
   async () => image(RED_PIXEL_PNG, "image/png")
+);
+
+// tools-call-audio
+server.tool(
+  {
+    name: "test_audio_content",
+    description: "A tool that returns audio content",
+  },
+  async () => audio(SILENT_WAV_BASE64, "audio/wav")
 );
 
 // tools-call-embedded-resource
@@ -63,21 +79,44 @@ server.tool(
     description: "A tool that returns an embedded resource",
   },
   async () =>
-    resource(
-      "test://embedded",
-      "text/plain",
-      "This is embedded resource content"
-    )
+    resource("test://embedded", text("This is embedded resource content"))
 );
 
 // tools-call-mixed-content
 server.tool(
   {
-    name: "test_mixed_content",
-    description: "A tool that returns mixed content (text + image)",
+    name: "test_multiple_content_types",
+    description: "A tool that returns mixed content (text + image + resource)",
   },
   async () =>
-    mix(text("Here is some text content"), image(RED_PIXEL_PNG, "image/png"))
+    mix(
+      text("Multiple content types test:"),
+      image(RED_PIXEL_PNG, "image/png"),
+      resource(
+        "test://mixed-content-resource",
+        object({ test: "data", value: 123 })
+      )
+    )
+);
+
+// tools-call-with-logging
+server.tool(
+  {
+    name: "test_tool_with_logging",
+    description: "A tool that sends log messages during execution",
+  },
+  async (params, ctx) => {
+    // Send 3 log notifications as required by conformance test
+    await ctx.log("info", "Tool execution started");
+    await sleep(50);
+
+    await ctx.log("info", "Tool processing data");
+    await sleep(50);
+
+    await ctx.log("info", "Tool execution completed");
+
+    return text("Tool execution completed with logging");
+  }
 );
 
 // tools-call-with-progress (steps is optional with default)
@@ -94,7 +133,7 @@ server.tool(
       if (ctx.reportProgress) {
         await ctx.reportProgress(i + 1, steps, `Step ${i + 1} of ${steps}`);
       }
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await sleep(10);
     }
 
     return text(`Completed ${steps} steps`);
@@ -236,11 +275,50 @@ server.resourceTemplate(
       mimeType: "application/json",
     },
   },
-  async (uri, { id }) =>
-    object({
-      id,
-      data: `Data for ${id}`,
-    })
+  async (uri, variables) => ({
+    contents: [
+      {
+        uri: uri.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          id: variables.id,
+          templateTest: true,
+          data: `Data for ID: ${variables.id}`,
+        }),
+      },
+    ],
+  })
+);
+
+// resources-subscribe / resources-unsubscribe
+// Add a dynamic resource that can be subscribed to and updated
+let subscribableResourceValue = "Initial value";
+
+server.resource(
+  {
+    name: "subscribable_resource",
+    uri: "test://subscribable",
+    title: "Subscribable Resource",
+    description: "A resource that supports subscriptions and can be updated",
+  },
+  async () => text(subscribableResourceValue)
+);
+
+// Tool to trigger resource update for subscription testing
+server.tool(
+  {
+    name: "update_subscribable_resource",
+    description: "Update the subscribable resource and notify subscribers",
+    schema: z.object({
+      newValue: z.string().optional(),
+    }),
+  },
+  async ({ newValue = "Updated value" }) => {
+    subscribableResourceValue = newValue;
+    // Notify all subscribers of the update
+    await server.notifyResourceUpdated("test://subscribable");
+    return text(`Resource updated to: ${newValue}`);
+  }
 );
 
 // =============================================================================
@@ -263,12 +341,12 @@ server.prompt(
     name: "test_prompt_with_arguments",
     description: "A prompt that accepts arguments",
     schema: z.object({
-      topic: z.string().optional(),
-      style: z.string().optional(),
+      arg1: z.string().optional(),
+      arg2: z.string().optional(),
     }),
   },
-  async ({ topic = "general", style = "formal" }) =>
-    text(`Please write about ${topic} in a ${style} style.`)
+  async ({ arg1 = "default1", arg2 = "default2" }) =>
+    text(`Prompt with arguments: arg1='${arg1}', arg2='${arg2}'`)
 );
 
 // prompts-get-embedded-resource (resourceUri optional)
@@ -283,7 +361,7 @@ server.prompt(
   async ({ resourceUri = "config://embedded" }) =>
     mix(
       text("Here is the configuration:"),
-      resource(resourceUri, "application/json", '{"setting": "value"}')
+      resource(resourceUri, object({ setting: "value" }))
     )
 );
 
@@ -293,7 +371,7 @@ server.prompt(
     name: "test_prompt_with_image",
     description: "A prompt that includes an image",
   },
-  async () =>
+  async (params) =>
     mix(text("Here is a test image:"), image(RED_PIXEL_PNG, "image/png"))
 );
 

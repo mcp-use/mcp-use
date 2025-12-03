@@ -6,7 +6,9 @@ import type {
   CreateMessageRequest,
   CreateMessageResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
+import { z } from "zod";
 
 import { uiResourceRegistration, mountWidgets } from "./widgets/index.js";
 import { mountInspectorUI } from "./inspector/index.js";
@@ -18,6 +20,7 @@ import {
 import {
   registerResource,
   registerResourceTemplate,
+  ResourceSubscriptionManager,
 } from "./resources/index.js";
 import { registerPrompt } from "./prompts/index.js";
 
@@ -49,6 +52,7 @@ import {
 import {
   findSessionContext,
   createEnhancedContext,
+  isValidLogLevel,
 } from "./tools/tool-execution-helpers.js";
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
@@ -112,6 +116,24 @@ export class McpServer {
   };
 
   /**
+   * Resource subscription manager for tracking and notifying resource updates
+   */
+  private subscriptionManager = new ResourceSubscriptionManager();
+
+  /**
+   * Clean up resource subscriptions for a closed session
+   *
+   * This method is called automatically when a session is closed to remove
+   * all resource subscriptions associated with that session.
+   *
+   * @param sessionId - The session ID to clean up
+   * @internal
+   */
+  public cleanupSessionSubscriptions(sessionId: string): void {
+    this.subscriptionManager.cleanupSession(sessionId);
+  }
+
+  /**
    * Creates a new MCP server instance with Hono integration
    *
    * Initializes the server with the provided configuration, sets up CORS headers,
@@ -126,11 +148,22 @@ export class McpServer {
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
 
-    // Create native SDK server instance
-    this.nativeServer = new OfficialMcpServer({
-      name: config.name,
-      version: config.version,
-    });
+    // Create native SDK server instance with capabilities
+    this.nativeServer = new OfficialMcpServer(
+      {
+        name: config.name,
+        version: config.version,
+      },
+      {
+        capabilities: {
+          logging: {},
+          resources: {
+            subscribe: true,
+            listChanged: true,
+          },
+        },
+      }
+    );
 
     // Create and configure Hono app with default middleware
     this.app = createHonoApp(requestLogger);
@@ -209,10 +242,17 @@ export class McpServer {
    * This is called for each initialize request to create an isolated server.
    */
   public getServerForSession(): OfficialMcpServer {
-    const newServer = new OfficialMcpServer({
-      name: this.config.name,
-      version: this.config.version,
-    });
+    const newServer = new OfficialMcpServer(
+      {
+        name: this.config.name,
+        version: this.config.version,
+      },
+      {
+        capabilities: {
+          logging: {},
+        },
+      }
+    );
 
     // Replay all registrations on the new server
     // Tools - with context wrapping for ctx.sample(), ctx.elicit()
@@ -233,7 +273,7 @@ export class McpServer {
         const extraProgressToken = extra?._meta?.progressToken;
         const extraSendNotification = extra?.sendNotification;
 
-        const { requestContext, progressToken, sendNotification } =
+        const { requestContext, session, progressToken, sendNotification } =
           findSessionContext(
             this.sessions,
             initialRequestContext,
@@ -269,7 +309,8 @@ export class McpServer {
           createMessageWithLogging,
           newServer.server.elicitInput.bind(newServer.server),
           progressToken,
-          sendNotification
+          sendNotification,
+          session?.logLevel
         );
 
         const executeCallback = async () => {
@@ -307,8 +348,11 @@ export class McpServer {
       let argsSchema: any;
       if (config.schema) {
         argsSchema = this.convertZodSchemaToParams(config.schema);
+      } else if (config.args && config.args.length > 0) {
+        argsSchema = this.createParamsSchema(config.args);
       } else {
-        argsSchema = this.createParamsSchema(config.args || []);
+        // No schema validation when neither schema nor args are provided
+        argsSchema = undefined;
       }
 
       // Wrap handler to support both CallToolResult and GetPromptResult
@@ -419,6 +463,67 @@ export class McpServer {
       );
     }
 
+    // Register logging/setLevel handler per MCP specification
+    newServer.server.setRequestHandler(
+      z.object({ method: z.literal("logging/setLevel") }).passthrough(),
+      async (request: any) => {
+        const level = request.params?.level;
+
+        // Validate log level parameter
+        if (!level) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            "Missing 'level' parameter"
+          );
+        }
+
+        if (!isValidLogLevel(level)) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            `Invalid log level '${level}'. Must be one of: debug, info, notice, warning, error, critical, alert, emergency`
+          );
+        }
+
+        // Get current request context to find the session
+        const requestContext = getRequestContext();
+        if (requestContext) {
+          // Extract session ID from header
+          const sessionId = requestContext.req.header("mcp-session-id");
+
+          if (sessionId && this.sessions.has(sessionId)) {
+            // Store log level in session data
+            const session = this.sessions.get(sessionId)!;
+            session.logLevel = level;
+            console.log(
+              `[MCP] Set log level to '${level}' for session ${sessionId}`
+            );
+            return {};
+          }
+        }
+
+        // If we can't find the session, try to find it in the sessions map
+        // This handles cases where the request context isn't available
+        for (const [sessionId, session] of this.sessions.entries()) {
+          if (session.server === newServer) {
+            session.logLevel = level;
+            console.log(
+              `[MCP] Set log level to '${level}' for session ${sessionId}`
+            );
+            return {};
+          }
+        }
+
+        // If no session found, return error
+        console.warn(
+          "[MCP] Could not find session for logging/setLevel request"
+        );
+        throw new McpError(ErrorCode.InternalError, "Could not find session");
+      }
+    );
+
+    // Register resource subscription handlers
+    this.subscriptionManager.registerHandlers(newServer, this.sessions);
+
     return newServer;
   }
 
@@ -455,6 +560,25 @@ export class McpServer {
   public getActiveSessions = getActiveSessions;
   public sendNotification = sendNotification;
   public sendNotificationToSession = sendNotificationToSession;
+
+  /**
+   * Notify subscribed clients that a resource has been updated
+   *
+   * This method sends a `notifications/resources/updated` notification to all
+   * sessions that have subscribed to the specified resource URI.
+   *
+   * @param uri - The URI of the resource that changed
+   * @returns Promise that resolves when all notifications have been sent
+   *
+   * @example
+   * ```typescript
+   * // After updating a resource, notify subscribers
+   * await server.notifyResourceUpdated("file:///path/to/resource.txt");
+   * ```
+   */
+  public async notifyResourceUpdated(uri: string): Promise<void> {
+    return this.subscriptionManager.notifyResourceUpdated(uri, this.sessions);
+  }
 
   public uiResource = uiResourceRegistration as any;
 

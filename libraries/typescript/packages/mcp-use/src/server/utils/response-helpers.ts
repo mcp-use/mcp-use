@@ -1,4 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { fsHelpers, isDeno } from "./runtime.js";
 
 /**
  * Typed CallToolResult that constrains the structuredContent property
@@ -89,26 +90,214 @@ export function image(
 }
 
 /**
+ * Helper function to infer audio MIME type from file extension
+ *
+ * @param filename - The filename or path
+ * @returns Audio MIME type string
+ */
+function getAudioMimeType(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase();
+
+  switch (ext) {
+    case "wav":
+      return "audio/wav";
+    case "mp3":
+      return "audio/mpeg";
+    case "ogg":
+      return "audio/ogg";
+    case "m4a":
+      return "audio/mp4";
+    case "webm":
+      return "audio/webm";
+    case "flac":
+      return "audio/flac";
+    case "aac":
+      return "audio/aac";
+    default:
+      return "audio/wav";
+  }
+}
+
+/**
+ * Convert ArrayBuffer to base64 string in a cross-runtime compatible way
+ *
+ * @param buffer - The ArrayBuffer to convert
+ * @returns Base64 encoded string
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  if (isDeno) {
+    // Deno: use btoa with Uint8Array
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  } else {
+    // Node.js: use Buffer
+    return Buffer.from(buffer).toString("base64");
+  }
+}
+
+/**
+ * Create an audio content response for MCP tools and resources
+ *
+ * Accepts either base64 data or a file path. File paths will be automatically
+ * detected and read asynchronously, returning a Promise<CallToolResult>.
+ *
+ * @param dataOrPath - Audio data as base64 string, or path to audio file
+ * @param mimeType - MIME type (e.g., 'audio/wav'). If not provided, defaults to 'audio/wav'
+ *                   for base64 data, or inferred from file extension for file paths
+ * @returns CallToolResult for base64 data, or Promise<CallToolResult> for file paths
+ *
+ * @example
+ * ```typescript
+ * // With base64 data (synchronous)
+ * server.tool({
+ *   name: 'generate-audio',
+ *   cb: async () => audio(base64AudioData, 'audio/wav')
+ * })
+ *
+ * // With file path (asynchronous)
+ * server.resource(
+ *   { name: 'notification', uri: 'audio://notification' },
+ *   async () => await audio('./sounds/notification.wav')
+ * )
+ * ```
+ */
+export function audio(
+  dataOrPath: string,
+  mimeType?: string
+): CallToolResult | Promise<CallToolResult> {
+  // Check if it's a file path (contains path separators or file extension)
+  const isFilePath =
+    dataOrPath.includes("/") ||
+    dataOrPath.includes("\\") ||
+    dataOrPath.includes(".");
+
+  // If it looks like a file path and doesn't look like pure base64, treat it as a path
+  if (isFilePath && dataOrPath.length < 1000) {
+    // Async file reading path
+    return (async () => {
+      const buffer = await fsHelpers.readFile(dataOrPath);
+      const base64Data = arrayBufferToBase64(buffer);
+      const inferredMimeType = mimeType || getAudioMimeType(dataOrPath);
+
+      return {
+        content: [
+          {
+            type: "audio",
+            data: base64Data,
+            mimeType: inferredMimeType,
+          },
+        ],
+        _meta: {
+          mimeType: inferredMimeType,
+          isAudio: true,
+        },
+      };
+    })();
+  }
+
+  // Sync base64 data path
+  const finalMimeType = mimeType || "audio/wav";
+  return {
+    content: [
+      {
+        type: "audio",
+        data: dataOrPath,
+        mimeType: finalMimeType,
+      },
+    ],
+    _meta: {
+      mimeType: finalMimeType,
+      isAudio: true,
+    },
+  };
+}
+
+/**
  * Create a resource content response for MCP tools
  *
+ * Supports two usage patterns:
+ * 1. Three arguments: resource(uri, mimeType, text)
+ * 2. Two arguments: resource(uri, content) where content is a CallToolResult from helpers
+ *
  * @param uri - The resource URI
- * @param mimeType - Optional MIME type
- * @param text - Optional text content for the resource
+ * @param mimeTypeOrContent - MIME type (3-arg pattern) or CallToolResult (2-arg pattern)
+ * @param text - Optional text content (only for 3-arg pattern)
  * @returns CallToolResult with resource content
  *
  * @example
  * ```typescript
+ * // 3-arg pattern: Explicit mimeType and text
  * server.tool({
  *   name: 'get-config',
- *   cb: async () => resource('file:///config.json', 'application/json')
+ *   cb: async () => resource('test://embedded', 'text/plain', 'This is text content')
+ * })
+ *
+ * // 2-arg pattern: Using text helper
+ * server.tool({
+ *   name: 'get-greeting',
+ *   cb: async () => resource('test://embedded', text('Hello'))
+ * })
+ *
+ * // 2-arg pattern: Using object helper
+ * server.tool({
+ *   name: 'get-data',
+ *   cb: async () => resource('test://data', object({ test: 'data', value: 123 }))
  * })
  * ```
  */
 export function resource(
   uri: string,
-  mimeType?: string,
+  mimeTypeOrContent: string | CallToolResult | TypedCallToolResult<any>,
   text?: string
 ): CallToolResult {
+  // Handle 2-arg pattern: resource(uri, CallToolResult)
+  if (
+    typeof mimeTypeOrContent === "object" &&
+    mimeTypeOrContent !== null &&
+    "content" in mimeTypeOrContent
+  ) {
+    const contentResult = mimeTypeOrContent as CallToolResult;
+
+    // Extract text and mimeType from the CallToolResult
+    let extractedText: string | undefined;
+    let extractedMimeType: string | undefined;
+
+    // Get mimeType from _meta if available
+    if (contentResult._meta && typeof contentResult._meta === "object") {
+      const meta = contentResult._meta as Record<string, any>;
+      if (meta.mimeType && typeof meta.mimeType === "string") {
+        extractedMimeType = meta.mimeType;
+      }
+    }
+
+    // Get text from first content item
+    if (contentResult.content && contentResult.content.length > 0) {
+      const firstContent = contentResult.content[0];
+      if (firstContent.type === "text" && "text" in firstContent) {
+        extractedText = (firstContent as any).text;
+      }
+    }
+
+    const resourceContent: any = {
+      type: "resource",
+      resource: {
+        uri,
+        ...(extractedMimeType && { mimeType: extractedMimeType }),
+        ...(extractedText && { text: extractedText }),
+      },
+    };
+
+    return {
+      content: [resourceContent],
+    };
+  }
+
+  // Handle 3-arg pattern: resource(uri, mimeType, text)
+  const mimeType = mimeTypeOrContent as string | undefined;
   const resourceContent: any = {
     type: "resource",
     resource: {
