@@ -27,7 +27,9 @@ export {
   ReadResourceTemplateCallback,
   ResourceTemplateConfig,
   ResourceTemplateDefinition,
+  ResourceTemplateDefinitionWithoutCallback,
   ResourceDefinition,
+  ResourceDefinitionWithoutCallback,
   // UIResource specific types
   UIResourceContent,
   WidgetProps,
@@ -56,4 +58,8 @@ export {
 } from "./tool.js";
 
 // Prompt types
-export { PromptCallback, PromptDefinition } from "./prompt.js";
+export {
+  PromptCallback,
+  PromptDefinition,
+  PromptDefinitionWithoutCallback,
+} from "./prompt.js";

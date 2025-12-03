@@ -1,6 +1,10 @@
-import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  ReadResourceResult,
+  CallToolResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { ResourceAnnotations } from "./common.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
+import type { TypedCallToolResult } from "../utils/response-helpers.js";
 
 // UIResourceContent type from MCP-UI
 export type UIResourceContent = {
@@ -78,12 +82,14 @@ export interface AppsSdkToolMetadata extends Record<string, unknown> {
   "openai/resultCanProduceWidget"?: boolean;
 }
 
-// Callback types
-export type ReadResourceCallback = () => Promise<ReadResourceResult>;
+// Callback types - now support both CallToolResult (from helpers) and ReadResourceResult (old API)
+export type ReadResourceCallback = () => Promise<
+  CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+>;
 export type ReadResourceTemplateCallback = (
   uri: URL,
   params: Record<string, any>
-) => Promise<ReadResourceResult>;
+) => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
 
 /**
  * Configuration for a resource template
@@ -99,6 +105,9 @@ export interface ResourceTemplateConfig {
   description?: string;
 }
 
+/**
+ * Resource template definition with readCallback (old API)
+ */
 export interface ResourceTemplateDefinition {
   name: string;
   resourceTemplate: ResourceTemplateConfig;
@@ -109,6 +118,21 @@ export interface ResourceTemplateDefinition {
   _meta?: Record<string, unknown>;
 }
 
+/**
+ * Resource template definition without readCallback (new API with separate callback parameter)
+ */
+export interface ResourceTemplateDefinitionWithoutCallback {
+  name: string;
+  resourceTemplate: ResourceTemplateConfig;
+  title?: string;
+  description?: string;
+  annotations?: ResourceAnnotations;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Resource definition with readCallback (old API)
+ */
 export interface ResourceDefinition {
   /** Unique identifier for the resource */
   name: string;
@@ -118,12 +142,32 @@ export interface ResourceDefinition {
   title?: string;
   /** Optional description of the resource */
   description?: string;
-  /** MIME type of the resource content (required) */
+  /** MIME type of the resource content (required for old API) */
   mimeType: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   /** Async callback function that returns the resource content */
   readCallback: ReadResourceCallback;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Resource definition without readCallback (new API with separate callback parameter)
+ * MIME type is optional when using response helpers - it's inferred from the helper
+ */
+export interface ResourceDefinitionWithoutCallback {
+  /** Unique identifier for the resource */
+  name: string;
+  /** URI pattern for accessing the resource (e.g., 'config://app-settings') */
+  uri: string;
+  /** Optional title for the resource */
+  title?: string;
+  /** Optional description of the resource */
+  description?: string;
+  /** MIME type (optional - inferred from response helpers like text(), object(), etc.) */
+  mimeType?: string;
+  /** Optional annotations for the resource */
+  annotations?: ResourceAnnotations;
   _meta?: Record<string, unknown>;
 }
 

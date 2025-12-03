@@ -23,7 +23,10 @@ import {
  * @param app - The Hono app instance
  * @returns Proxied instance with both target and Hono methods
  */
-export function createHonoProxy<T extends object>(target: T, app: HonoType): T {
+export function createHonoProxy<T extends object>(
+  target: T,
+  app: HonoType
+): T & HonoType {
   return new Proxy(target, {
     get(target, prop) {
       // Special handling for 'use' method to auto-detect and adapt Express middleware
@@ -91,5 +94,5 @@ export function createHonoProxy<T extends object>(target: T, app: HonoType): T {
       const value = (app as any)[prop];
       return typeof value === "function" ? value.bind(app) : value;
     },
-  }) as T;
+  }) as T & HonoType;
 }

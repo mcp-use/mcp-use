@@ -256,14 +256,45 @@ export function createSampleMethod(
         params: Record<string, any>;
       }) => Promise<void>)
     | undefined
-): (
-  sampleParams: CreateMessageRequest["params"],
-  options?: SampleOptions
-) => Promise<CreateMessageResult> {
-  return async (
+): {
+  (prompt: string, options?: SampleOptions): Promise<CreateMessageResult>;
+  (
     sampleParams: CreateMessageRequest["params"],
     options?: SampleOptions
+  ): Promise<CreateMessageResult>;
+} {
+  return async (
+    promptOrParams: string | CreateMessageRequest["params"],
+    options?: SampleOptions
   ): Promise<CreateMessageResult> => {
+    // Convert string prompt to proper message format
+    let sampleParams: CreateMessageRequest["params"];
+    if (typeof promptOrParams === "string") {
+      sampleParams = {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: promptOrParams,
+            },
+          },
+        ],
+        maxTokens: options?.maxTokens || 1000,
+        ...(options?.modelPreferences && {
+          modelPreferences: options.modelPreferences,
+        }),
+        ...(options?.systemPrompt && { systemPrompt: options.systemPrompt }),
+        ...(options?.temperature !== undefined && {
+          temperature: options.temperature,
+        }),
+        ...(options?.stopSequences && { stopSequences: options.stopSequences }),
+        ...(options?.metadata && { metadata: options.metadata }),
+      };
+    } else {
+      sampleParams = promptOrParams;
+    }
+
     const { timeout, progressIntervalMs = 5000, onProgress } = options ?? {};
 
     let progressCount = 0;

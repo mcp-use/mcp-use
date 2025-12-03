@@ -157,38 +157,50 @@ export class McpServer {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
 
-    this.tool = function (toolDefinition: any, callback?: any) {
+    this.tool = (<
+      T extends import("./types/index.js").ToolDefinition<any, any, boolean>,
+    >(
+      toolDefinition: T,
+      callback?: import("./types/index.js").ToolCallback<
+        import("./types/index.js").InferToolInput<T>,
+        import("./types/index.js").InferToolOutput<T>,
+        boolean
+      >
+    ) => {
       const actualCallback = callback || toolDefinition.cb;
       self.registrationRecipes.tools.set(toolDefinition.name, {
         config: toolDefinition,
         handler: actualCallback,
       });
-      return originalTool.call(self, toolDefinition, callback);
-    } as any;
+      return originalTool.call(self, toolDefinition, callback as any);
+    }) as typeof originalTool;
 
-    this.prompt = function (promptDefinition: any) {
+    this.prompt = function (promptDefinition: any, callback?: any) {
+      const actualCallback = callback || promptDefinition.cb;
       self.registrationRecipes.prompts.set(promptDefinition.name, {
         config: promptDefinition,
-        handler: promptDefinition.cb,
+        handler: actualCallback,
       });
-      return originalPrompt.call(self, promptDefinition);
+      return originalPrompt.call(self, promptDefinition, callback);
     } as any;
 
-    this.resource = function (resourceDefinition: any) {
+    this.resource = function (resourceDefinition: any, callback?: any) {
+      const actualCallback = callback || resourceDefinition.readCallback;
       const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
       self.registrationRecipes.resources.set(resourceKey, {
         config: resourceDefinition,
-        handler: resourceDefinition.readCallback,
+        handler: actualCallback,
       });
-      return originalResource.call(self, resourceDefinition);
+      return originalResource.call(self, resourceDefinition, callback);
     } as any;
 
-    this.resourceTemplate = function (templateDefinition: any) {
+    this.resourceTemplate = function (templateDefinition: any, callback?: any) {
+      const actualCallback = callback || templateDefinition.readCallback;
       self.registrationRecipes.resourceTemplates.set(templateDefinition.name, {
         config: templateDefinition,
-        handler: templateDefinition.readCallback,
+        handler: actualCallback,
       });
-      return originalResourceTemplate.call(self, templateDefinition);
+      return originalResourceTemplate.call(self, templateDefinition, callback);
     } as any;
   }
 
@@ -290,7 +302,30 @@ export class McpServer {
     // Prompts
     for (const [name, recipe] of this.registrationRecipes.prompts) {
       const { config, handler } = recipe;
-      const argsSchema = this.createParamsSchema(config.args || []);
+
+      // Determine input schema - prefer schema over args
+      let argsSchema: any;
+      if (config.schema) {
+        argsSchema = this.convertZodSchemaToParams(config.schema);
+      } else {
+        argsSchema = this.createParamsSchema(config.args || []);
+      }
+
+      // Wrap handler to support both CallToolResult and GetPromptResult
+      const wrappedHandler = async (params: any) => {
+        const result = await handler(params);
+
+        // If it's already a GetPromptResult, return as-is
+        if ("messages" in result && Array.isArray(result.messages)) {
+          return result;
+        }
+
+        // Convert CallToolResult to GetPromptResult
+        const { convertToolResultToPromptResult } =
+          await import("./prompts/conversion.js");
+        return convertToolResultToPromptResult(result);
+      };
+
       newServer.registerPrompt(
         name,
         {
@@ -298,22 +333,36 @@ export class McpServer {
           description: config.description ?? "",
           argsSchema: argsSchema as any,
         },
-        handler
+        wrappedHandler
       );
     }
 
     // Resources
     for (const [_key, recipe] of this.registrationRecipes.resources) {
       const { config, handler } = recipe;
+      // Wrap handler to support both CallToolResult and ReadResourceResult
+      const wrappedHandler = async () => {
+        const result = await handler();
+        // If it's already a ReadResourceResult, return as-is
+        if ("contents" in result && Array.isArray(result.contents)) {
+          return result;
+        }
+        // Convert CallToolResult to ReadResourceResult
+        // Import convertToolResultToResourceResult dynamically to avoid circular dependencies
+        const { convertToolResultToResourceResult } =
+          await import("./resources/conversion.js");
+        return convertToolResultToResourceResult(config.uri, result);
+      };
+
       newServer.registerResource(
         config.name,
         config.uri,
         {
           title: config.title,
           description: config.description,
-          mimeType: config.mimeType,
+          mimeType: config.mimeType || "text/plain",
         },
-        handler
+        wrappedHandler
       );
     }
 
@@ -355,7 +404,17 @@ export class McpServer {
             config.resourceTemplate.uriTemplate,
             uri.toString()
           );
-          return await handler(uri, params);
+          const result = await handler(uri, params);
+
+          // If it's already a ReadResourceResult, return as-is
+          if ("contents" in result && Array.isArray(result.contents)) {
+            return result;
+          }
+
+          // Convert CallToolResult to ReadResourceResult
+          const { convertToolResultToResourceResult } =
+            await import("./resources/conversion.js");
+          return convertToolResultToResourceResult(uri.toString(), result);
         }
       );
     }
@@ -376,7 +435,7 @@ export class McpServer {
   }
 
   // Tool registration helper
-  public tool = toolRegistration;
+  public tool: typeof toolRegistration = toolRegistration;
 
   // Schema conversion helpers (used by tool registration)
   public convertZodSchemaToParams = convertZodSchemaToParams;
@@ -640,7 +699,7 @@ export class McpServer {
   }
 }
 
-export type McpServerInstance = McpServer;
+export type McpServerInstance = McpServer & HonoType;
 
 /**
  * Create a new MCP server instance

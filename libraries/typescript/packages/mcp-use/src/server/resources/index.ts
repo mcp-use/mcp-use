@@ -1,7 +1,17 @@
-import type { ResourceDefinition } from "../types/index.js";
+import type {
+  ResourceDefinition,
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
+  ResourceDefinitionWithoutCallback,
+  ResourceTemplateDefinitionWithoutCallback,
+} from "../types/index.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  ReadResourceResult,
+  CallToolResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { ResourceTemplateDefinition } from "../types/index.js";
+import { convertToolResultToResourceResult } from "./conversion.js";
 
 export interface ResourceServerContext {
   server: {
@@ -27,33 +37,43 @@ export interface ResourceServerContext {
  * Resources are static content like files, data, or pre-computed results that
  * can be retrieved by clients without requiring parameters.
  *
- * @param resourceDefinition - Configuration object containing resource metadata and handler function
+ * Supports two patterns:
+ * 1. Old API: Single object with readCallback property
+ * 2. New API: Definition object + separate callback (like tools)
+ *
+ * @param resourceDefinition - Configuration object containing resource metadata
  * @param resourceDefinition.name - Unique identifier for the resource
  * @param resourceDefinition.uri - URI pattern for accessing the resource
  * @param resourceDefinition.title - Optional human-readable title for the resource
  * @param resourceDefinition.description - Optional description of the resource
- * @param resourceDefinition.mimeType - MIME type of the resource content
+ * @param resourceDefinition.mimeType - MIME type (optional when using callback with response helpers)
  * @param resourceDefinition.annotations - Optional annotations (audience, priority, lastModified)
- * @param resourceDefinition.readCallback - Async callback function that returns the resource content
+ * @param callback - Optional separate callback function (new API pattern)
  * @returns The server instance for method chaining
  *
  * @example
  * ```typescript
+ * // New API: Using response helpers (recommended)
+ * server.resource(
+ *   { name: 'greeting', uri: 'app://greeting', title: 'Greeting' },
+ *   async () => text('Hello World!')
+ * )
+ *
+ * server.resource(
+ *   { name: 'config', uri: 'config://settings' },
+ *   async () => object({ theme: 'dark', version: '1.0' })
+ * )
+ *
+ * // Old API: Still supported for backward compatibility
  * server.resource({
  *   name: 'config',
  *   uri: 'config://app-settings',
- *   title: 'Application Settings',
  *   mimeType: 'application/json',
- *   description: 'Current application configuration',
- *   annotations: {
- *     audience: ['user'],
- *     priority: 0.8
- *   },
  *   readCallback: async () => ({
  *     contents: [{
  *       uri: 'config://app-settings',
  *       mimeType: 'application/json',
- *       text: JSON.stringify({ theme: 'dark', language: 'en' })
+ *       text: JSON.stringify({ theme: 'dark' })
  *     }]
  *   })
  * })
@@ -61,21 +81,55 @@ export interface ResourceServerContext {
  */
 export function registerResource(
   this: ResourceServerContext,
-  resourceDefinition: ResourceDefinition
+  resourceDefinition: ResourceDefinition | ResourceDefinitionWithoutCallback,
+  callback?: ReadResourceCallback
 ): ResourceServerContext {
+  // Determine which callback to use
+  const actualCallback =
+    callback || (resourceDefinition as ResourceDefinition).readCallback;
+
+  if (!actualCallback) {
+    throw new Error(
+      `Resource '${resourceDefinition.name}' must have either a readCallback property or a callback parameter`
+    );
+  }
+
+  // Determine MIME type - use from definition if provided, otherwise will be inferred from callback result
+  const explicitMimeType = (resourceDefinition as ResourceDefinition).mimeType;
+
+  // Wrap the callback to support both CallToolResult and ReadResourceResult
+  const wrappedCallback = async (): Promise<ReadResourceResult> => {
+    const result = await actualCallback();
+
+    // If it's already a ReadResourceResult, return as-is
+    if ("contents" in result && Array.isArray(result.contents)) {
+      return result as ReadResourceResult;
+    }
+
+    // Convert CallToolResult to ReadResourceResult
+    return convertToolResultToResourceResult(
+      resourceDefinition.uri,
+      result as CallToolResult
+    );
+  };
+
+  // For registration, we need a MIME type
+  // If explicit MIME type provided, use it; otherwise use a placeholder
+  // The actual MIME type will be determined by the callback result
+  const registrationMimeType = explicitMimeType || "text/plain";
+
   this.server.registerResource(
     resourceDefinition.name,
     resourceDefinition.uri,
     {
       title: resourceDefinition.title,
       description: resourceDefinition.description,
-      mimeType: resourceDefinition.mimeType,
+      mimeType: registrationMimeType,
       _meta: resourceDefinition._meta,
     },
-    async () => {
-      return await resourceDefinition.readCallback();
-    }
+    wrappedCallback
   );
+
   this.registeredResources.push(resourceDefinition.name);
   return this;
 }
@@ -100,26 +154,36 @@ export interface ResourceTemplateServerContext {
  * patterns with placeholders that can be filled in at request time, allowing dynamic
  * resource generation based on parameters.
  *
+ * Supports two patterns:
+ * 1. Old API: Single object with readCallback property
+ * 2. New API: Definition object + separate callback (like tools)
+ *
  * @param resourceTemplateDefinition - Configuration object for the resource template
  * @param resourceTemplateDefinition.name - Unique identifier for the template
  * @param resourceTemplateDefinition.resourceTemplate - ResourceTemplate object with uriTemplate and metadata
- * @param resourceTemplateDefinition.readCallback - Async callback function that generates resource content from URI and params
+ * @param callback - Optional separate callback function (new API pattern)
  * @returns The server instance for method chaining
  *
  * @example
  * ```typescript
+ * // New API: Using response helpers (recommended)
+ * server.resourceTemplate(
+ *   { name: 'user', resourceTemplate: { uriTemplate: 'user://{id}' } },
+ *   async (uri, { id }) => object(await getUserData(id))
+ * )
+ *
+ * // Old API: Still supported for backward compatibility
  * server.resourceTemplate({
  *   name: 'user-profile',
  *   resourceTemplate: {
  *     uriTemplate: 'user://{userId}/profile',
- *     name: 'User Profile',
  *     mimeType: 'application/json'
  *   },
  *   readCallback: async (uri, params) => ({
  *     contents: [{
  *       uri: uri.toString(),
  *       mimeType: 'application/json',
- *       text: JSON.stringify({ userId: params.userId, name: 'John Doe' })
+ *       text: JSON.stringify({ userId: params.userId })
  *     }]
  *   })
  * })
@@ -127,8 +191,22 @@ export interface ResourceTemplateServerContext {
  */
 export function registerResourceTemplate(
   this: ResourceTemplateServerContext,
-  resourceTemplateDefinition: ResourceTemplateDefinition
+  resourceTemplateDefinition:
+    | ResourceTemplateDefinition
+    | ResourceTemplateDefinitionWithoutCallback,
+  callback?: ReadResourceTemplateCallback
 ): ResourceTemplateServerContext {
+  // Determine which callback to use
+  const actualCallback =
+    callback ||
+    (resourceTemplateDefinition as ResourceTemplateDefinition).readCallback;
+
+  if (!actualCallback) {
+    throw new Error(
+      `Resource template '${resourceTemplateDefinition.name}' must have either a readCallback property or a callback parameter`
+    );
+  }
+
   // Create ResourceTemplate instance from SDK
   const template = new ResourceTemplate(
     resourceTemplateDefinition.resourceTemplate.uriTemplate,
@@ -168,7 +246,19 @@ export function registerResourceTemplate(
         resourceTemplateDefinition.resourceTemplate.uriTemplate,
         uri.toString()
       );
-      return await resourceTemplateDefinition.readCallback(uri, params);
+
+      const result = await actualCallback(uri, params);
+
+      // If it's already a ReadResourceResult, return as-is
+      if ("contents" in result && Array.isArray(result.contents)) {
+        return result as ReadResourceResult;
+      }
+
+      // Convert CallToolResult to ReadResourceResult
+      return convertToolResultToResourceResult(
+        uri.toString(),
+        result as CallToolResult
+      );
     }
   );
   this.registeredResources.push(resourceTemplateDefinition.name);

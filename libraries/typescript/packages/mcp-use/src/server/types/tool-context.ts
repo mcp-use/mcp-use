@@ -40,6 +40,45 @@ export interface SampleOptions {
     total?: number;
     message: string;
   }) => void;
+
+  /**
+   * Maximum number of tokens to generate.
+   * Default: 1000 (when using string prompt shorthand).
+   * Only used when calling sample() with a string prompt.
+   */
+  maxTokens?: number;
+
+  /**
+   * Model preferences for sampling.
+   * Allows specifying which models to use via hints.
+   */
+  modelPreferences?: {
+    hints?: Array<{ name?: string }>;
+    costPriority?: number;
+    speedPriority?: number;
+    intelligencePriority?: number;
+  };
+
+  /**
+   * System prompt to prepend to the conversation.
+   */
+  systemPrompt?: string;
+
+  /**
+   * Temperature for sampling (0.0 to 1.0).
+   * Controls randomness in the response.
+   */
+  temperature?: number;
+
+  /**
+   * Stop sequences to end generation.
+   */
+  stopSequences?: string[];
+
+  /**
+   * Additional metadata to pass with the request.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -98,6 +137,10 @@ export interface ToolContext {
   /**
    * Request sampling from the client's LLM with automatic progress notifications.
    *
+   * Supports two calling patterns:
+   * 1. **Simplified string API**: Pass a prompt string with optional options
+   * 2. **Full control API**: Pass complete CreateMessageRequest params
+   *
    * Progress notifications are sent every 5 seconds (configurable) while waiting
    * for the sampling response. This prevents client-side timeouts when the client
    * has `resetTimeoutOnProgress: true` enabled.
@@ -105,20 +148,34 @@ export interface ToolContext {
    * By default, there is no timeout - the function waits indefinitely for the
    * LLM response. Set `options.timeout` to limit the wait time.
    *
-   * @param params - Sampling parameters (messages, model preferences, etc.)
-   * @param options - Optional configuration for timeout and progress
+   * @param promptOrParams - Either a string prompt or complete sampling parameters
+   * @param options - Optional configuration for timeout, progress, maxTokens, etc.
    * @returns The sampling result from the client's LLM
    *
    * @example
    * ```typescript
-   * // Basic usage - waits indefinitely with automatic progress notifications
+   * // Simplified API - just pass a string prompt
+   * const result = await ctx.sample("What is the capital of France?");
+   *
+   * // With options (maxTokens, temperature, etc.)
+   * const result = await ctx.sample(
+   *   "Analyze this code...",
+   *   { maxTokens: 2000, temperature: 0.7 }
+   * );
+   *
+   * // Full control API - complete params object
    * const result = await ctx.sample({
-   *   messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+   *   messages: [
+   *     { role: 'system', content: { type: 'text', text: 'You are helpful' } },
+   *     { role: 'user', content: { type: 'text', text: 'Hello' } }
+   *   ],
+   *   maxTokens: 1500,
+   *   modelPreferences: { hints: [{ name: 'claude-3-5-sonnet' }] }
    * });
    *
    * // With timeout and custom progress handling
    * const result = await ctx.sample(
-   *   { messages: [...] },
+   *   "Complex task...",
    *   {
    *     timeout: 120000, // 2 minute timeout
    *     progressIntervalMs: 3000, // Report progress every 3 seconds
@@ -127,10 +184,16 @@ export interface ToolContext {
    * );
    * ```
    */
-  sample: (
-    params: CreateMessageRequest["params"],
-    options?: SampleOptions
-  ) => Promise<CreateMessageResult>;
+  sample: {
+    // Overload 1: Simplified string API (recommended for simple cases)
+    (prompt: string, options?: SampleOptions): Promise<CreateMessageResult>;
+
+    // Overload 2: Full control API (for complex cases)
+    (
+      params: CreateMessageRequest["params"],
+      options?: SampleOptions
+    ): Promise<CreateMessageResult>;
+  };
 
   /**
    * Request user input via the client through elicitation.

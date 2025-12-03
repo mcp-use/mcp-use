@@ -18,7 +18,7 @@ export {
   hasRequestContext,
 } from "./context-storage.js";
 
-// Response helper utilities for tool results
+// Response helper utilities for tools and resources
 export {
   text,
   image,
@@ -27,6 +27,14 @@ export {
   object,
   array,
   widget,
+  mix,
+  // MIME-specific helpers for resources
+  html,
+  markdown,
+  xml,
+  css,
+  javascript,
+  binary,
   type WidgetResponseConfig,
   type TypedCallToolResult,
 } from "./utils/response-helpers.js";

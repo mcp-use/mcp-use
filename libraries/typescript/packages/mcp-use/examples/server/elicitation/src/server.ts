@@ -1,4 +1,8 @@
-import { createMCPServer } from "../../../../dist/src/server/index.js";
+import {
+  createMCPServer,
+  text,
+  error,
+} from "../../../../dist/src/server/index.js";
 import { z } from "zod";
 
 // Create an MCP server with elicitation support
@@ -14,12 +18,13 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
  * Example tool that uses form mode elicitation to collect user information.
  * This demonstrates the simplified API with Zod schema and automatic type inference.
  */
-server.tool({
-  name: "collect-user-info",
-  description:
-    "Collect user information via form mode elicitation. Requires a client with elicitation support.",
-  inputs: [],
-  cb: async (params, ctx) => {
+server.tool(
+  {
+    name: "collect-user-info",
+    description:
+      "Collect user information via form mode elicitation. Requires a client with elicitation support.",
+  },
+  async (params, ctx) => {
     try {
       // Simplified API: ctx.elicit(message, zodSchema)
       // Mode is automatically inferred from the Zod schema parameter
@@ -39,57 +44,31 @@ server.tool({
 
       // result.data is automatically typed as { name: string, age: number, email?: string }
       if (result.action === "accept") {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `✅ Information received:\n- Name: ${result.data.name}\n- Age: ${result.data.age}\n- Email: ${result.data.email || "Not provided"}`,
-            },
-          ],
-        };
+        return text(
+          `✅ Information received:\n- Name: ${result.data.name}\n- Age: ${result.data.age}\n- Email: ${result.data.email || "Not provided"}`
+        );
       } else if (result.action === "decline") {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "❌ User declined to provide information",
-            },
-          ],
-        };
+        return text("❌ User declined to provide information");
       } else {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "⚠️ Operation was cancelled",
-            },
-          ],
-        };
+        return text("⚠️ Operation was cancelled");
       }
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error during elicitation: ${error.message || String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+    } catch (err: any) {
+      return error(`Error during elicitation: ${err.message || String(err)}`);
     }
-  },
-});
+  }
+);
 
 /**
  * Example tool for conformance testing - matches expected test names
  * Uses simplified API with Zod schema
  */
-server.tool({
-  name: "test_elicitation",
-  description:
-    "A tool that uses elicitation to get user input (conformance test)",
-  inputs: [],
-  cb: async (params, ctx) => {
+server.tool(
+  {
+    name: "test_elicitation",
+    description:
+      "A tool that uses elicitation to get user input (conformance test)",
+  },
+  async (params, ctx) => {
     try {
       // Simplified API with Zod schema
       const result = await ctx.elicit(
@@ -102,35 +81,16 @@ server.tool({
 
       // result.data is typed as { name: string, age: number }
       if (result.action === "accept") {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Received: ${result.data.name}, age ${result.data.age}`,
-            },
-          ],
-        };
+        return text(`Received: ${result.data.name}, age ${result.data.age}`);
       } else if (result.action === "decline") {
-        return {
-          content: [{ type: "text", text: "User declined" }],
-        };
+        return text("User declined");
       }
-      return {
-        content: [{ type: "text", text: "Operation cancelled" }],
-      };
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Elicitation error: ${error.message || String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+      return text("Operation cancelled");
+    } catch (err: any) {
+      return error(`Elicitation error: ${err.message || String(err)}`);
     }
-  },
-});
+  }
+);
 
 /**
  * Example tool that demonstrates URL mode elicitation.
@@ -139,19 +99,16 @@ server.tool({
  * Note: In a real implementation, the URL would direct users to an actual
  * OAuth authorization page or secure credential collection form.
  */
-server.tool({
-  name: "authorize-service",
-  description:
-    "Authorize access to a service using URL mode elicitation (for demonstration purposes)",
-  inputs: [
-    {
-      name: "serviceName",
-      type: "string",
-      required: true,
-      description: "Name of the service to authorize",
-    },
-  ],
-  cb: async (params, ctx) => {
+server.tool(
+  {
+    name: "authorize-service",
+    description:
+      "Authorize access to a service using URL mode elicitation (for demonstration purposes)",
+    schema: z.object({
+      serviceName: z.string().describe("Name of the service to authorize"),
+    }),
+  },
+  async (params, ctx) => {
     try {
       // In a real implementation, this URL would be dynamically generated
       // and point to your OAuth authorization endpoint
@@ -165,55 +122,27 @@ server.tool({
       );
 
       if (result.action === "accept") {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `✅ Authorization completed for ${params.serviceName}`,
-            },
-          ],
-        };
+        return text(`✅ Authorization completed for ${params.serviceName}`);
       } else if (result.action === "decline") {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `❌ Authorization declined for ${params.serviceName}`,
-            },
-          ],
-        };
+        return text(`❌ Authorization declined for ${params.serviceName}`);
       } else {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `⚠️ Authorization cancelled for ${params.serviceName}`,
-            },
-          ],
-        };
+        return text(`⚠️ Authorization cancelled for ${params.serviceName}`);
       }
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error during authorization: ${error.message || String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+    } catch (err: any) {
+      return error(`Error during authorization: ${err.message || String(err)}`);
     }
-  },
-});
+  }
+);
 
 /**
  * Validation test tool - demonstrates required field validation
  */
-server.tool({
-  name: "test-required-validation",
-  description: "Test required field validation without defaults",
-  inputs: [],
-  cb: async (params, ctx) => {
+server.tool(
+  {
+    name: "test-required-validation",
+    description: "Test required field validation without defaults",
+  },
+  async (params, ctx) => {
     try {
       // Schema with truly required fields (no defaults)
       const result = await ctx.elicit(
@@ -234,43 +163,18 @@ server.tool({
       if (result.action === "accept") {
         // Validate passwords match (additional validation)
         if (result.data.password !== result.data.confirmPassword) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: "❌ Passwords do not match",
-              },
-            ],
-            isError: true,
-          };
+          return error("❌ Passwords do not match");
         }
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: `✅ Account created for ${result.data.username}`,
-            },
-          ],
-        };
+        return text(`✅ Account created for ${result.data.username}`);
       }
 
-      return {
-        content: [{ type: "text", text: "Account creation cancelled" }],
-      };
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Validation error: ${error.message || String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+      return text("Account creation cancelled");
+    } catch (err: any) {
+      return error(`Validation error: ${err.message || String(err)}`);
     }
-  },
-});
+  }
+);
 
 // Start the server
 await server.listen(PORT);
