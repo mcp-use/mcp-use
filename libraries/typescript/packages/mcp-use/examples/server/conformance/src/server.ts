@@ -30,6 +30,11 @@ const server = createMCPServer("ConformanceTestServer", {
 const RED_PIXEL_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
 
+// Minimal valid WAV file: 44-byte header + 1 sample (0x80 = silence for 8-bit PCM)
+// Format: 8kHz, mono, 8-bit PCM
+const SILENT_WAV_BASE64 =
+  "UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAABAAgAZGF0YQIAAACA";
+
 // =============================================================================
 // TOOLS (exact names expected by conformance tests)
 // =============================================================================
@@ -50,10 +55,27 @@ server.tool(
 // tools-call-image
 server.tool(
   {
-    name: "test_image",
+    name: "test_image_content",
     description: "A tool that returns image content",
   },
   async () => image(RED_PIXEL_PNG, "image/png")
+);
+
+// tools-call-audio
+server.tool(
+  {
+    name: "test_audio_content",
+    description: "A tool that returns audio content",
+  },
+  async () => ({
+    content: [
+      {
+        type: "audio",
+        data: SILENT_WAV_BASE64,
+        mimeType: "audio/wav",
+      },
+    ],
+  })
 );
 
 // tools-call-embedded-resource
@@ -73,11 +95,41 @@ server.tool(
 // tools-call-mixed-content
 server.tool(
   {
-    name: "test_mixed_content",
-    description: "A tool that returns mixed content (text + image)",
+    name: "test_multiple_content_types",
+    description: "A tool that returns mixed content (text + image + resource)",
   },
   async () =>
-    mix(text("Here is some text content"), image(RED_PIXEL_PNG, "image/png"))
+    mix(
+      text("Multiple content types test:"),
+      image(RED_PIXEL_PNG, "image/png"),
+      resource(
+        "test://mixed-content-resource",
+        "application/json",
+        '{"test":"data","value":123}'
+      )
+    )
+);
+
+// tools-call-with-logging
+// Note: This tool simulates logging but the actual log notifications
+// may not be sent if the SDK doesn't expose logging in tool context.
+// The SDK may handle logging automatically at the protocol level.
+server.tool(
+  {
+    name: "test_tool_with_logging",
+    description: "A tool that sends log messages during execution",
+  },
+  async () => {
+    // TODO: Add proper logging notifications when SDK exposes logging API
+    // For now, we'll use console.log which may be captured by the SDK
+    console.log("Tool execution started");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    console.log("Tool processing data");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    console.log("Tool execution completed");
+
+    return text("Tool execution completed with logging");
+  }
 );
 
 // tools-call-with-progress (steps is optional with default)
@@ -236,11 +288,19 @@ server.resourceTemplate(
       mimeType: "application/json",
     },
   },
-  async (uri, { id }) =>
-    object({
-      id,
-      data: `Data for ${id}`,
-    })
+  async (uri, variables) => ({
+    contents: [
+      {
+        uri: uri.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          id: variables.id,
+          templateTest: true,
+          data: `Data for ID: ${variables.id}`,
+        }),
+      },
+    ],
+  })
 );
 
 // =============================================================================
@@ -263,12 +323,12 @@ server.prompt(
     name: "test_prompt_with_arguments",
     description: "A prompt that accepts arguments",
     schema: z.object({
-      topic: z.string().optional(),
-      style: z.string().optional(),
+      arg1: z.string().optional(),
+      arg2: z.string().optional(),
     }),
   },
-  async ({ topic = "general", style = "formal" }) =>
-    text(`Please write about ${topic} in a ${style} style.`)
+  async ({ arg1 = "default1", arg2 = "default2" }) =>
+    text(`Prompt with arguments: arg1='${arg1}', arg2='${arg2}'`)
 );
 
 // prompts-get-embedded-resource (resourceUri optional)
@@ -293,7 +353,7 @@ server.prompt(
     name: "test_prompt_with_image",
     description: "A prompt that includes an image",
   },
-  async () =>
+  async (params) =>
     mix(text("Here is a test image:"), image(RED_PIXEL_PNG, "image/png"))
 );
 
