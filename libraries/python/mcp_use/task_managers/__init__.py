@@ -22,7 +22,7 @@ from mcp_use.client.task_managers import (
 warnings.warn(
     "mcp_use.task_managers is deprecated. "
     "Use mcp_use.client.task_managers. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

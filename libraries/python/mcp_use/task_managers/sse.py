@@ -8,7 +8,7 @@ from mcp_use.client.task_managers.sse import SseConnectionManager as _SseConnect
 warnings.warn(
     "mcp_use.task_managers.sse is deprecated. "
     "Use mcp_use.client.task_managers.sse. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

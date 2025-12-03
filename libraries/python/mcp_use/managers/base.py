@@ -8,7 +8,7 @@ from mcp_use.agents.managers.base import BaseServerManager as _BaseServerManager
 warnings.warn(
     "mcp_use.managers.base is deprecated. "
     "Use mcp_use.agents.managers.base. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

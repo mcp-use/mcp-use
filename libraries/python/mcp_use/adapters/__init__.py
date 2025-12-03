@@ -7,7 +7,7 @@ from mcp_use.agents.adapters import BaseAdapter as _BaseAdapter
 from mcp_use.agents.adapters import LangChainAdapter as _LangChainAdapter
 
 warnings.warn(
-    "mcp_use.adapters is deprecated. Use mcp_use.agents.adapters. This import will be removed in version 1.4.0",
+    "mcp_use.adapters is deprecated. Use mcp_use.agents.adapters. This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )
