@@ -128,6 +128,10 @@ class BaseConnector(ABC):
 
         # First stop the connection manager, this closes the ClientSession inside
         # the same task where it was opened, avoiding cancel-scope mismatches.
+        # We only need client sessions' manual exit for connectors that never
+        # had a _connection_manager. Without this variable we would always have
+        # the client session exit called causing in RuntimeError raised.
+        manager_existed = self._connection_manager is not None
         if self._connection_manager:
             try:
                 logger.debug("Stopping connection manager")
@@ -145,7 +149,7 @@ class BaseConnector(ABC):
         # failed connections where no manager was started.
         if self.client_session:
             try:
-                if not self._connection_manager:
+                if not manager_existed:
                     logger.debug("Closing client session (no connection manager)")
                     await self.client_session.__aexit__(None, None, None)
             except Exception as e:
