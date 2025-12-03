@@ -90,8 +90,11 @@ export function registerPrompt(
     argsSchema = this.convertZodSchemaToParams(
       (promptDefinition as any).schema
     );
+  } else if (promptDefinition.args && promptDefinition.args.length > 0) {
+    argsSchema = this.createParamsSchema(promptDefinition.args);
   } else {
-    argsSchema = this.createParamsSchema(promptDefinition.args || []);
+    // No schema validation when neither schema nor args are provided
+    argsSchema = undefined;
   }
 
   // Wrap the callback to support both CallToolResult and GetPromptResult

@@ -307,8 +307,11 @@ export class McpServer {
       let argsSchema: any;
       if (config.schema) {
         argsSchema = this.convertZodSchemaToParams(config.schema);
+      } else if (config.args && config.args.length > 0) {
+        argsSchema = this.createParamsSchema(config.args);
       } else {
-        argsSchema = this.createParamsSchema(config.args || []);
+        // No schema validation when neither schema nor args are provided
+        argsSchema = undefined;
       }
 
       // Wrap handler to support both CallToolResult and GetPromptResult
