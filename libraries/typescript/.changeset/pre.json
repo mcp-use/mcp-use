@@ -8,6 +8,7 @@
     "mcp-use": "1.8.1"
   },
   "changesets": [
+    "calm-cups-play",
     "dependabot-bf81452",
     "green-mangos-sip",
     "icy-wolves-happen",

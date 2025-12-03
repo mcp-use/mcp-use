@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.7.5-canary.0
+
+### Patch Changes
+
+- 4d1aa19: fix: refactor to use https://github.com/modelcontextprotocol/typescript-sdk/pull/1209
+
 ## 0.7.4
 
 ### Patch Changes

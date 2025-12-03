@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.4.9-canary.0
+
+### Patch Changes
+
+- 4d1aa19: fix: refactor to use https://github.com/modelcontextprotocol/typescript-sdk/pull/1209
+- Updated dependencies [4d1aa19]
+  - @mcp-use/inspector@0.11.1-canary.0
+  - mcp-use@1.9.1-canary.0
+
 ## 2.4.8
 
 ### Patch Changes
