@@ -12,6 +12,15 @@ export {
 // Context types
 export { McpContext } from "./context.js";
 
+// Tool context types
+export {
+  ToolContext,
+  SampleOptions,
+  ElicitOptions,
+  ElicitFormParams,
+  ElicitUrlParams,
+} from "./tool-context.js";
+
 // Resource types including UIResource
 export {
   ReadResourceCallback,

@@ -1,19 +1,6 @@
 import type { Context, Next } from "hono";
 
-// Runtime detection
-const isDeno = typeof (globalThis as any).Deno !== "undefined";
-
-/**
- * Helper to get environment variable (works in both Node.js and Deno)
- */
-function getEnv(key: string): string | undefined {
-  if (isDeno) {
-    return (globalThis as any).Deno.env.get(key);
-  }
-  return typeof process !== "undefined" && process.env
-    ? process.env[key]
-    : undefined;
-}
+import { getEnv } from "./utils/runtime.js";
 
 /**
  * Check if DEBUG mode is enabled via environment variable

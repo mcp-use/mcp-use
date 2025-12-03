@@ -1,6 +1,6 @@
 import type { InputDefinition } from "./common.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import type { ToolContext } from "../mcp-server.js";
+import type { ToolContext } from "./tool-context.js";
 import type { McpContext } from "./context.js";
 import type { z } from "zod";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
