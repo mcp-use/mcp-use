@@ -99,7 +99,7 @@ export class McpServer {
 
   /**
    * Storage for registration "recipes" that can be replayed on new server instances
-   * This enables multi-session support where each session gets its own server instance
+   * Following the official SDK pattern where each session gets its own server instance
    */
   private registrationRecipes = {
     tools: new Map<string, { config: any; handler: any }>(),
@@ -142,108 +142,67 @@ export class McpServer {
   }
 
   /**
-   * Wrap registration methods to capture recipes that can be replayed on new server instances.
-   * This enables multi-session support where each session gets its own isolated server.
+   * Wrap registration methods to capture recipes following official SDK pattern.
+   * Each session will get a fresh server instance with all registrations replayed.
    */
   private wrapRegistrationMethods(): void {
-    // Store original methods
     const originalTool = toolRegistration;
     const originalPrompt = registerPrompt;
     const originalResource = registerResource;
     const originalResourceTemplate = registerResourceTemplate;
 
-    // Capture 'this' reference (eslint-disable-line to suppress aliasing warning)
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
 
-    // Wrap tool registration
     this.tool = function (toolDefinition: any, callback?: any) {
-      // Store recipe
       const actualCallback = callback || toolDefinition.cb;
       self.registrationRecipes.tools.set(toolDefinition.name, {
         config: toolDefinition,
         handler: actualCallback,
       });
-
-      // Call original with proper 'this' binding
       return originalTool.call(self, toolDefinition, callback);
     } as any;
 
-    // Wrap prompt registration
     this.prompt = function (promptDefinition: any) {
-      // Store recipe
       self.registrationRecipes.prompts.set(promptDefinition.name, {
         config: promptDefinition,
         handler: promptDefinition.cb,
       });
-
-      // Call original with proper 'this' binding
       return originalPrompt.call(self, promptDefinition);
     } as any;
 
-    // Wrap resource registration
     this.resource = function (resourceDefinition: any) {
-      // Store recipe
       const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
       self.registrationRecipes.resources.set(resourceKey, {
         config: resourceDefinition,
         handler: resourceDefinition.cb,
       });
-
-      // Call original with proper 'this' binding
       return originalResource.call(self, resourceDefinition);
     } as any;
 
-    // Wrap resource template registration
     this.resourceTemplate = function (templateDefinition: any) {
-      // Store recipe
       self.registrationRecipes.resourceTemplates.set(templateDefinition.name, {
         config: templateDefinition,
         handler: templateDefinition.cb,
       });
-
-      // Call original with proper 'this' binding
       return originalResourceTemplate.call(self, templateDefinition);
     } as any;
   }
 
   /**
-   * Gets the server base URL with fallback to host:port if not configured
-   * @returns The complete base URL for the server
+   * Create a new server instance for a session following official SDK pattern.
+   * This is called for each initialize request to create an isolated server.
    */
-  private getServerBaseUrl(): string {
-    return getServerBaseUrlHelper(
-      this.serverBaseUrl,
-      this.serverHost,
-      this.serverPort
-    );
-  }
-
-  /**
-   * Create a new native MCP server instance for a session with all registrations replayed.
-   * This enables multi-session support where each session gets its own isolated server instance.
-   *
-   * @returns A new OfficialMcpServer instance with all tools, prompts, and resources registered
-   */
-  private createNativeServerForSession(): OfficialMcpServer {
+  public getServerForSession(): OfficialMcpServer {
     const newServer = new OfficialMcpServer({
       name: this.config.name,
       version: this.config.version,
     });
 
-    // Create session-specific createMessage function bound to this server instance
-    const createMessageForSession = async (
-      params: CreateMessageRequest["params"],
-      options?: any
-    ): Promise<CreateMessageResult> => {
-      return await newServer.server.createMessage(params, options);
-    };
-
-    // Replay all tool registrations with context wrapping
+    // Replay all registrations on the new server
+    // Tools - with context wrapping for ctx.sample(), ctx.elicit()
     for (const [name, recipe] of this.registrationRecipes.tools) {
       const { config, handler: actualCallback } = recipe;
-
-      // Prepare input schema
       let inputSchema: Record<string, any>;
       if (config.schema) {
         inputSchema = this.convertZodSchemaToParams(config.schema);
@@ -253,16 +212,12 @@ export class McpServer {
         inputSchema = {};
       }
 
-      // Wrap handler with context enhancement logic (same as toolRegistration)
+      // Wrap handler to provide enhanced context
       const wrappedHandler = async (params: any, extra?: any) => {
-        // Get the HTTP request context from AsyncLocalStorage
         const initialRequestContext = getRequestContext();
-
-        // Extract progress token from request metadata
         const extraProgressToken = extra?._meta?.progressToken;
         const extraSendNotification = extra?.sendNotification;
 
-        // Find session context and extract metadata
         const { requestContext, progressToken, sendNotification } =
           findSessionContext(
             this.sessions,
@@ -271,17 +226,37 @@ export class McpServer {
             extraSendNotification
           );
 
-        // Create enhanced context with sample, elicit, and reportProgress methods
-        // Use session-specific createMessage bound to this server instance
+        // Use the session server's native createMessage and elicitInput
+        // These are already properly connected to the transport
+        const createMessageWithLogging = async (params: any, options?: any) => {
+          console.log("[createMessage] About to call server.createMessage");
+          console.log("[createMessage] Has server:", !!newServer);
+          try {
+            const result = await newServer.server.createMessage(
+              params,
+              options
+            );
+            console.log("[createMessage] Got result successfully");
+            return result;
+          } catch (err: any) {
+            console.error(
+              "[createMessage] Error:",
+              err.message,
+              "Code:",
+              err.code
+            );
+            throw err;
+          }
+        };
+
         const enhancedContext = createEnhancedContext(
           requestContext,
-          createMessageForSession,
+          createMessageWithLogging,
           newServer.server.elicitInput.bind(newServer.server),
           progressToken,
           sendNotification
         );
 
-        // Execute callback
         const executeCallback = async () => {
           if (actualCallback.length >= 2) {
             return await (actualCallback as any)(params, enhancedContext);
@@ -309,11 +284,10 @@ export class McpServer {
       );
     }
 
-    // Replay all prompt registrations
+    // Prompts
     for (const [name, recipe] of this.registrationRecipes.prompts) {
       const { config, handler } = recipe;
       const argsSchema = this.createParamsSchema(config.args || []);
-
       newServer.registerPrompt(
         name,
         {
@@ -325,10 +299,9 @@ export class McpServer {
       );
     }
 
-    // Replay all resource registrations
+    // Resources
     for (const [_key, recipe] of this.registrationRecipes.resources) {
       const { config, handler } = recipe;
-
       newServer.registerResource(
         config.name,
         config.uri,
@@ -341,10 +314,9 @@ export class McpServer {
       );
     }
 
-    // Replay all resource template registrations
+    // Resource Templates
     for (const [_name, recipe] of this.registrationRecipes.resourceTemplates) {
       const { config, handler } = recipe;
-
       newServer.registerResource(
         config.name,
         config.uriTemplate,
@@ -358,6 +330,18 @@ export class McpServer {
     }
 
     return newServer;
+  }
+
+  /**
+   * Gets the server base URL with fallback to host:port if not configured
+   * @returns The complete base URL for the server
+   */
+  private getServerBaseUrl(): string {
+    return getServerBaseUrlHelper(
+      this.serverBaseUrl,
+      this.serverHost,
+      this.serverPort
+    );
   }
 
   // Tool registration helper
@@ -387,9 +371,9 @@ export class McpServer {
   /**
    * Mount MCP server endpoints at /mcp and /sse
    *
-   * Sets up the HTTP transport layer for the MCP server with multi-session support.
-   * Each session gets its own isolated server instance with all tools/prompts/resources.
-   * Supports both stateful (reuse session) and stateless (new session per request) modes.
+   * Sets up the HTTP transport layer for the MCP server, creating endpoints for
+   * Server-Sent Events (SSE) streaming, POST message handling, and DELETE session cleanup.
+   * The transport manages multiple sessions through a single server instance.
    *
    * This method is called automatically when the server starts listening and ensures
    * that MCP clients can communicate with the server over HTTP.
@@ -408,7 +392,7 @@ export class McpServer {
 
     const result = await mountMcpHelper(
       this.app,
-      () => this.createNativeServerForSession(),
+      this, // Pass the McpServer instance so mountMcp can call getServerForSession()
       this.sessions,
       this.config,
       isProductionModeHelper()

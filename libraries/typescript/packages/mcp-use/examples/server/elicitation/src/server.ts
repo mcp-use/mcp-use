@@ -8,7 +8,7 @@ const server = createMCPServer("elicitation-example-server", {
     "An MCP server example demonstrating elicitation capabilities (form and URL modes)",
 });
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3002;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 /**
  * Example tool that uses form mode elicitation to collect user information.

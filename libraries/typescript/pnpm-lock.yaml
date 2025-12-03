@@ -555,8 +555,8 @@ importers:
         specifier: workspace:*
         version: link:../inspector
       '@modelcontextprotocol/sdk':
-        specifier: https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194
-        version: https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194(@cfworker/json-schema@4.1.1)(zod@4.1.13)
+        specifier: https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1209
+        version: https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1209(@cfworker/json-schema@4.1.1)(zod@4.1.13)
       express:
         specifier: ^5.2.0
         version: 5.2.1
@@ -1639,6 +1639,17 @@ packages:
 
   '@modelcontextprotocol/sdk@https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194':
     resolution: {tarball: https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194}
+    version: 1.23.0
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@cfworker/json-schema': ^4.1.1
+      zod: ^4.1.13
+    peerDependenciesMeta:
+      '@cfworker/json-schema':
+        optional: true
+
+  '@modelcontextprotocol/sdk@https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1209':
+    resolution: {tarball: https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1209}
     version: 1.23.0
     engines: {node: '>=18'}
     peerDependencies:
@@ -8172,6 +8183,27 @@ snapshots:
       jose: 6.1.2
       pkce-challenge: 5.0.0
       raw-body: 3.0.1
+      zod: 4.1.13
+      zod-to-json-schema: 3.25.0(zod@4.1.13)
+    optionalDependencies:
+      '@cfworker/json-schema': 4.1.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@modelcontextprotocol/sdk@https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1209(@cfworker/json-schema@4.1.1)(zod@4.1.13)':
+    dependencies:
+      ajv: 8.17.1
+      ajv-formats: 3.0.1(ajv@8.17.1)
+      content-type: 1.0.5
+      cors: 2.8.5
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.0.6
+      express: 5.2.1
+      express-rate-limit: 7.5.1(express@5.2.1)
+      jose: 6.1.2
+      pkce-challenge: 5.0.0
+      raw-body: 3.0.2
       zod: 4.1.13
       zod-to-json-schema: 3.25.0(zod@4.1.13)
     optionalDependencies:

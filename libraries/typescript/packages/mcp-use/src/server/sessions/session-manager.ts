@@ -9,13 +9,13 @@ import type { Context } from "hono";
 
 /**
  * Session data stored for each active MCP session
- * Each session has its own transport and server instance for isolation
+ * Following official SDK pattern - each session has its own transport and server
  */
 export interface SessionData {
   /** Reference to this session's transport instance */
   transport: any;
   /** Reference to this session's server instance */
-  server: any;
+  server?: any;
   /** Timestamp of last activity for idle timeout tracking */
   lastAccessedAt: number;
   /** Hono context for this session's current request */
