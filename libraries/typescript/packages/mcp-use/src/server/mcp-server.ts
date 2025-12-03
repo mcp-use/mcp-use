@@ -43,6 +43,11 @@ import {
   sendNotification,
   sendNotificationToSession,
 } from "./notifications/index.js";
+import {
+  findSessionContext,
+  createEnhancedContext,
+} from "./tools/tool-execution-helpers.js";
+import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
 import type { ServerConfig } from "./types/index.js";
 import {
@@ -226,9 +231,17 @@ export class McpServer {
       version: this.config.version,
     });
 
-    // Replay all tool registrations
+    // Create session-specific createMessage function bound to this server instance
+    const createMessageForSession = async (
+      params: CreateMessageRequest["params"],
+      options?: any
+    ): Promise<CreateMessageResult> => {
+      return await newServer.server.createMessage(params, options);
+    };
+
+    // Replay all tool registrations with context wrapping
     for (const [name, recipe] of this.registrationRecipes.tools) {
-      const { config, handler } = recipe;
+      const { config, handler: actualCallback } = recipe;
 
       // Prepare input schema
       let inputSchema: Record<string, any>;
@@ -240,6 +253,49 @@ export class McpServer {
         inputSchema = {};
       }
 
+      // Wrap handler with context enhancement logic (same as toolRegistration)
+      const wrappedHandler = async (params: any, extra?: any) => {
+        // Get the HTTP request context from AsyncLocalStorage
+        const initialRequestContext = getRequestContext();
+
+        // Extract progress token from request metadata
+        const extraProgressToken = extra?._meta?.progressToken;
+        const extraSendNotification = extra?.sendNotification;
+
+        // Find session context and extract metadata
+        const { requestContext, progressToken, sendNotification } =
+          findSessionContext(
+            this.sessions,
+            initialRequestContext,
+            extraProgressToken,
+            extraSendNotification
+          );
+
+        // Create enhanced context with sample, elicit, and reportProgress methods
+        // Use session-specific createMessage bound to this server instance
+        const enhancedContext = createEnhancedContext(
+          requestContext,
+          createMessageForSession,
+          newServer.server.elicitInput.bind(newServer.server),
+          progressToken,
+          sendNotification
+        );
+
+        // Execute callback
+        const executeCallback = async () => {
+          if (actualCallback.length >= 2) {
+            return await (actualCallback as any)(params, enhancedContext);
+          }
+          return await (actualCallback as any)(params);
+        };
+
+        if (requestContext) {
+          return await runWithContext(requestContext, executeCallback);
+        }
+
+        return await executeCallback();
+      };
+
       newServer.registerTool(
         name,
         {
@@ -249,7 +305,7 @@ export class McpServer {
           annotations: config.annotations,
           _meta: config._meta,
         },
-        handler
+        wrappedHandler
       );
     }
 
