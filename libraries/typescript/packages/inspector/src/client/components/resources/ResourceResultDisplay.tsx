@@ -38,6 +38,26 @@ interface ResourceResultDisplayProps {
   isCopied?: boolean;
 }
 
+// Helper function to extract error message from result with isError: true
+function extractErrorMessage(result: any): string | null {
+  if (!result?.isError) {
+    return null;
+  }
+
+  if (result.content && Array.isArray(result.content)) {
+    const textContents = result.content
+      .filter((item: any) => item.type === "text")
+      .map((item: any) => item.text)
+      .filter(Boolean);
+
+    if (textContents.length > 0) {
+      return textContents.join("\n");
+    }
+  }
+
+  return "An error occurred";
+}
+
 export function ResourceResultDisplay({
   result,
   isLoading,
@@ -119,13 +139,16 @@ export function ResourceResultDisplay({
     );
   }
 
-  if (result.error) {
+  // Check for error in result.error or result.result.isError
+  const errorMessage = result.error || extractErrorMessage(result.result);
+
+  if (errorMessage) {
     return (
       <div className="p-4">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
           <p className="text-red-800 dark:text-red-300 font-medium">Error:</p>
           <p className="text-red-700 dark:text-red-400 text-sm">
-            {result.error}
+            {errorMessage}
           </p>
         </div>
       </div>

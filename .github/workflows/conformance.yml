@@ -129,7 +129,7 @@ jobs:
       - name: Start TypeScript conformance server
         working-directory: libraries/typescript/packages/mcp-use/examples/server/conformance
         run: |
-          npx tsx src/server.ts &
+          PORT=3000 npx tsx src/server.ts &
           sleep 5
 
       - name: Run conformance tests against TypeScript server

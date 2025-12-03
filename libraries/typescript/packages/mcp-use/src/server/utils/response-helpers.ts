@@ -12,18 +12,25 @@ export interface TypedCallToolResult<
 }
 
 /**
- * Create a text content response for MCP tools
+ * Create a text content response for MCP tools and resources
  *
  * @param content - The text content to return
  * @returns CallToolResult with text content
  *
  * @example
  * ```typescript
+ * // For tools
  * server.tool({
  *   name: 'greet',
  *   schema: z.object({ name: z.string() }),
  *   cb: async ({ name }) => text(`Hello, ${name}!`)
  * })
+ *
+ * // For resources
+ * server.resource(
+ *   { name: 'greeting', uri: 'app://greeting' },
+ *   async () => text('Hello World!')
+ * )
  * ```
  */
 export function text(content: string): CallToolResult {
@@ -34,11 +41,14 @@ export function text(content: string): CallToolResult {
         text: content,
       },
     ],
+    _meta: {
+      mimeType: "text/plain",
+    },
   };
 }
 
 /**
- * Create an image content response for MCP tools
+ * Create an image content response for MCP tools and resources
  *
  * @param data - The image data (data URL or base64)
  * @param mimeType - MIME type (e.g., 'image/png', defaults to 'image/png')
@@ -46,10 +56,17 @@ export function text(content: string): CallToolResult {
  *
  * @example
  * ```typescript
+ * // For tools
  * server.tool({
  *   name: 'generate-image',
  *   cb: async () => image('data:image/png;base64,...', 'image/png')
  * })
+ *
+ * // For resources
+ * server.resource(
+ *   { name: 'logo', uri: 'asset://logo' },
+ *   async () => image(base64Data, 'image/png')
+ * )
  * ```
  */
 export function image(
@@ -64,6 +81,10 @@ export function image(
         mimeType,
       },
     ],
+    _meta: {
+      mimeType,
+      isImage: true,
+    },
   };
 }
 
@@ -134,13 +155,14 @@ export function error(message: string): CallToolResult {
 }
 
 /**
- * Create a JSON object response for MCP tools
+ * Create a JSON object response for MCP tools and resources
  *
  * @param data - The object to return as JSON
  * @returns TypedCallToolResult with JSON text content and typed structuredContent
  *
  * @example
  * ```typescript
+ * // For tools
  * server.tool({
  *   name: 'get-user-info',
  *   cb: async (_args, _ctx, { auth }) => object({
@@ -148,6 +170,12 @@ export function error(message: string): CallToolResult {
  *     email: auth.user.email
  *   })
  * })
+ *
+ * // For resources
+ * server.resource(
+ *   { name: 'config', uri: 'config://settings' },
+ *   async () => object({ theme: 'dark', version: '1.0' })
+ * )
  * ```
  */
 export function object<T extends Record<string, any>>(
@@ -163,6 +191,9 @@ export function object<T extends Record<string, any>>(
           },
         ],
         structuredContent: data,
+        _meta: {
+          mimeType: "application/json",
+        },
       };
 }
 
@@ -177,6 +208,176 @@ export function array<T extends any[]>(
       },
     ],
     structuredContent: { data: data },
+  };
+}
+
+/**
+ * Create an HTML content response for MCP tools and resources
+ *
+ * @param content - The HTML content to return
+ * @returns CallToolResult with HTML text content and MIME type metadata
+ *
+ * @example
+ * ```typescript
+ * server.resource(
+ *   { name: 'page', uri: 'ui://dashboard' },
+ *   async () => html('<h1>Dashboard</h1><p>Welcome</p>')
+ * )
+ * ```
+ */
+export function html(content: string): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: content,
+      },
+    ],
+    _meta: {
+      mimeType: "text/html",
+    },
+  };
+}
+
+/**
+ * Create a Markdown content response for MCP tools and resources
+ *
+ * @param content - The Markdown content to return
+ * @returns CallToolResult with Markdown text content and MIME type metadata
+ *
+ * @example
+ * ```typescript
+ * server.resource(
+ *   { name: 'readme', uri: 'doc://readme' },
+ *   async () => markdown('# Welcome\n\nGetting started...')
+ * )
+ * ```
+ */
+export function markdown(content: string): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: content,
+      },
+    ],
+    _meta: {
+      mimeType: "text/markdown",
+    },
+  };
+}
+
+/**
+ * Create an XML content response for MCP tools and resources
+ *
+ * @param content - The XML content to return
+ * @returns CallToolResult with XML text content and MIME type metadata
+ *
+ * @example
+ * ```typescript
+ * server.resource(
+ *   { name: 'sitemap', uri: 'data://sitemap' },
+ *   async () => xml('<?xml version="1.0"?><root>...</root>')
+ * )
+ * ```
+ */
+export function xml(content: string): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: content,
+      },
+    ],
+    _meta: {
+      mimeType: "text/xml",
+    },
+  };
+}
+
+/**
+ * Create a CSS content response for MCP tools and resources
+ *
+ * @param content - The CSS content to return
+ * @returns CallToolResult with CSS text content and MIME type metadata
+ *
+ * @example
+ * ```typescript
+ * server.resource(
+ *   { name: 'styles', uri: 'asset://theme.css' },
+ *   async () => css('body { margin: 0; }')
+ * )
+ * ```
+ */
+export function css(content: string): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: content,
+      },
+    ],
+    _meta: {
+      mimeType: "text/css",
+    },
+  };
+}
+
+/**
+ * Create a JavaScript content response for MCP tools and resources
+ *
+ * @param content - The JavaScript content to return
+ * @returns CallToolResult with JavaScript text content and MIME type metadata
+ *
+ * @example
+ * ```typescript
+ * server.resource(
+ *   { name: 'script', uri: 'asset://main.js' },
+ *   async () => javascript('console.log("Hello");')
+ * )
+ * ```
+ */
+export function javascript(content: string): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: content,
+      },
+    ],
+    _meta: {
+      mimeType: "text/javascript",
+    },
+  };
+}
+
+/**
+ * Create a binary content response for MCP tools and resources
+ *
+ * @param base64Data - The base64-encoded binary data
+ * @param mimeType - The MIME type of the binary content
+ * @returns CallToolResult with binary content and MIME type metadata
+ *
+ * @example
+ * ```typescript
+ * server.resource(
+ *   { name: 'document', uri: 'file://document.pdf' },
+ *   async () => binary(base64PdfData, 'application/pdf')
+ * )
+ * ```
+ */
+export function binary(base64Data: string, mimeType: string): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: base64Data,
+      },
+    ],
+    _meta: {
+      mimeType,
+      isBinary: true,
+    },
   };
 }
 

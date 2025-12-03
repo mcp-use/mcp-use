@@ -7,10 +7,21 @@ export {
   ServerConfig,
   InputDefinition,
   ResourceAnnotations,
+  OptionalizeUndefinedFields,
+  InferZodInput,
 } from "./common.js";
 
 // Context types
 export { McpContext } from "./context.js";
+
+// Tool context types
+export {
+  ToolContext,
+  SampleOptions,
+  ElicitOptions,
+  ElicitFormParams,
+  ElicitUrlParams,
+} from "./tool-context.js";
 
 // Resource types including UIResource
 export {
@@ -18,7 +29,10 @@ export {
   ReadResourceTemplateCallback,
   ResourceTemplateConfig,
   ResourceTemplateDefinition,
+  ResourceTemplateDefinitionWithoutCallback,
   ResourceDefinition,
+  ResourceDefinitionWithoutCallback,
+  EnhancedResourceContext,
   // UIResource specific types
   UIResourceContent,
   WidgetProps,
@@ -40,6 +54,7 @@ export {
 // Tool types
 export {
   ToolCallback,
+  ToolCallbackWithContext,
   ToolDefinition,
   InferToolInput,
   InferToolOutput,
@@ -47,4 +62,10 @@ export {
 } from "./tool.js";
 
 // Prompt types
-export { PromptCallback, PromptDefinition } from "./prompt.js";
+export {
+  PromptCallback,
+  PromptDefinition,
+  PromptDefinitionWithoutCallback,
+  InferPromptInput,
+  EnhancedPromptContext,
+} from "./prompt.js";
