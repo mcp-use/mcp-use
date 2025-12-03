@@ -19,8 +19,24 @@ function isDebugMode(): boolean {
  * Format an object for logging (pretty-print JSON)
  */
 function formatForLogging(obj: any): string {
+  function truncate(val: any): any {
+    if (typeof val === "string" && val.length > 100) {
+      return val.slice(0, 100) + "...";
+    } else if (Array.isArray(val)) {
+      return val.map(truncate);
+    } else if (val && typeof val === "object") {
+      const result: Record<string, any> = {};
+      for (const key in val) {
+        if (Object.prototype.hasOwnProperty.call(val, key)) {
+          result[key] = truncate(val[key]);
+        }
+      }
+      return result;
+    }
+    return val;
+  }
   try {
-    return JSON.stringify(obj, null, 2);
+    return JSON.stringify(truncate(obj), null, 2);
   } catch {
     return String(obj);
   }

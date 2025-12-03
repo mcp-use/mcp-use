@@ -1,4 +1,8 @@
 import { McpServer as OfficialMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
 
 import { uiResourceRegistration, mountWidgets } from "./widgets/index.js";
@@ -50,11 +54,22 @@ import {
   createHonoApp,
   createHonoProxy,
   isProductionMode as isProductionModeHelper,
+  parseTemplateUri as parseTemplateUriHelper,
 } from "./utils/index.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
 
 export class McpServer {
-  protected server: OfficialMcpServer;
+  /**
+   * Native MCP server instance from @modelcontextprotocol/sdk
+   * Exposed publicly for advanced use cases
+   */
+  public readonly nativeServer: OfficialMcpServer;
+
+  /** @deprecated Use nativeServer instead - kept for backward compatibility */
+  public get server(): OfficialMcpServer {
+    return this.nativeServer;
+  }
+
   private config: ServerConfig;
   public app: HonoType;
   private mcpMounted = false;
@@ -62,11 +77,11 @@ export class McpServer {
   protected serverPort?: number;
   protected serverHost: string;
   protected serverBaseUrl?: string;
-  protected registeredTools: string[] = [];
-  private registeredPrompts: string[] = [];
-  private registeredResources: string[] = [];
+  public registeredTools: string[] = [];
+  public registeredPrompts: string[] = [];
+  public registeredResources: string[] = [];
   protected buildId?: string;
-  private sessions = new Map<string, SessionData>();
+  public sessions = new Map<string, SessionData>();
   private idleCleanupInterval?: NodeJS.Timeout;
   private oauthConfig?: any; // Store OAuth config for lazy initialization
   private oauthSetupState = {
@@ -76,6 +91,17 @@ export class McpServer {
   };
   private oauthProvider?: any;
   private oauthMiddleware?: any;
+
+  /**
+   * Storage for registration "recipes" that can be replayed on new server instances
+   * This enables multi-session support where each session gets its own server instance
+   */
+  private registrationRecipes = {
+    tools: new Map<string, { config: any; handler: any }>(),
+    prompts: new Map<string, { config: any; handler: any }>(),
+    resources: new Map<string, { config: any; handler: any }>(),
+    resourceTemplates: new Map<string, { config: any; handler: any }>(),
+  };
 
   /**
    * Creates a new MCP server instance with Hono integration
@@ -91,7 +117,9 @@ export class McpServer {
     this.config = config;
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
-    this.server = new OfficialMcpServer({
+
+    // Create native SDK server instance
+    this.nativeServer = new OfficialMcpServer({
       name: config.name,
       version: config.version,
     });
@@ -99,13 +127,79 @@ export class McpServer {
     // Create and configure Hono app with default middleware
     this.app = createHonoApp(requestLogger);
 
-    // Store OAuth config for lazy initialization (will be setup in listen/getHandler)
-    if (config.oauth) {
-      this.oauthConfig = config.oauth;
-    }
+    this.oauthConfig = config.oauth;
+
+    // Wrap registration methods to capture recipes for multi-session support
+    this.wrapRegistrationMethods();
 
     // Return proxied instance that allows direct access to Hono methods
     return createHonoProxy(this, this.app);
+  }
+
+  /**
+   * Wrap registration methods to capture recipes that can be replayed on new server instances.
+   * This enables multi-session support where each session gets its own isolated server.
+   */
+  private wrapRegistrationMethods(): void {
+    // Store original methods
+    const originalTool = toolRegistration;
+    const originalPrompt = registerPrompt;
+    const originalResource = registerResource;
+    const originalResourceTemplate = registerResourceTemplate;
+
+    // Capture 'this' reference (eslint-disable-line to suppress aliasing warning)
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+
+    // Wrap tool registration
+    this.tool = function (toolDefinition: any, callback?: any) {
+      // Store recipe
+      const actualCallback = callback || toolDefinition.cb;
+      self.registrationRecipes.tools.set(toolDefinition.name, {
+        config: toolDefinition,
+        handler: actualCallback,
+      });
+
+      // Call original with proper 'this' binding
+      return originalTool.call(self, toolDefinition, callback);
+    } as any;
+
+    // Wrap prompt registration
+    this.prompt = function (promptDefinition: any) {
+      // Store recipe
+      self.registrationRecipes.prompts.set(promptDefinition.name, {
+        config: promptDefinition,
+        handler: promptDefinition.cb,
+      });
+
+      // Call original with proper 'this' binding
+      return originalPrompt.call(self, promptDefinition);
+    } as any;
+
+    // Wrap resource registration
+    this.resource = function (resourceDefinition: any) {
+      // Store recipe
+      const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
+      self.registrationRecipes.resources.set(resourceKey, {
+        config: resourceDefinition,
+        handler: resourceDefinition.cb,
+      });
+
+      // Call original with proper 'this' binding
+      return originalResource.call(self, resourceDefinition);
+    } as any;
+
+    // Wrap resource template registration
+    this.resourceTemplate = function (templateDefinition: any) {
+      // Store recipe
+      self.registrationRecipes.resourceTemplates.set(templateDefinition.name, {
+        config: templateDefinition,
+        handler: templateDefinition.cb,
+      });
+
+      // Call original with proper 'this' binding
+      return originalResourceTemplate.call(self, templateDefinition);
+    } as any;
   }
 
   /**
@@ -120,12 +214,105 @@ export class McpServer {
     );
   }
 
+  /**
+   * Create a new native MCP server instance for a session with all registrations replayed.
+   * This enables multi-session support where each session gets its own isolated server instance.
+   *
+   * @returns A new OfficialMcpServer instance with all tools, prompts, and resources registered
+   */
+  private createNativeServerForSession(): OfficialMcpServer {
+    const newServer = new OfficialMcpServer({
+      name: this.config.name,
+      version: this.config.version,
+    });
+
+    // Replay all tool registrations
+    for (const [name, recipe] of this.registrationRecipes.tools) {
+      const { config, handler } = recipe;
+
+      // Prepare input schema
+      let inputSchema: Record<string, any>;
+      if (config.schema) {
+        inputSchema = this.convertZodSchemaToParams(config.schema);
+      } else if (config.inputs && config.inputs.length > 0) {
+        inputSchema = this.createParamsSchema(config.inputs);
+      } else {
+        inputSchema = {};
+      }
+
+      newServer.registerTool(
+        name,
+        {
+          title: config.title,
+          description: config.description ?? "",
+          inputSchema,
+          annotations: config.annotations,
+          _meta: config._meta,
+        },
+        handler
+      );
+    }
+
+    // Replay all prompt registrations
+    for (const [name, recipe] of this.registrationRecipes.prompts) {
+      const { config, handler } = recipe;
+      const argsSchema = this.createParamsSchema(config.args || []);
+
+      newServer.registerPrompt(
+        name,
+        {
+          title: config.title,
+          description: config.description ?? "",
+          argsSchema: argsSchema as any,
+        },
+        handler
+      );
+    }
+
+    // Replay all resource registrations
+    for (const [_key, recipe] of this.registrationRecipes.resources) {
+      const { config, handler } = recipe;
+
+      newServer.registerResource(
+        config.name,
+        config.uri,
+        {
+          title: config.title,
+          description: config.description,
+          mimeType: config.mimeType,
+        },
+        handler
+      );
+    }
+
+    // Replay all resource template registrations
+    for (const [_name, recipe] of this.registrationRecipes.resourceTemplates) {
+      const { config, handler } = recipe;
+
+      newServer.registerResource(
+        config.name,
+        config.uriTemplate,
+        {
+          title: config.title,
+          description: config.description,
+          mimeType: config.mimeType,
+        },
+        handler
+      );
+    }
+
+    return newServer;
+  }
+
   // Tool registration helper
   public tool = toolRegistration;
 
   // Schema conversion helpers (used by tool registration)
   public convertZodSchemaToParams = convertZodSchemaToParams;
   public createParamsSchema = createParamsSchema;
+
+  // Template URI parsing helper (used by resource templates)
+  public parseTemplateUri = parseTemplateUriHelper;
 
   // Resource registration helpers
   public resource = registerResource;
@@ -144,9 +331,9 @@ export class McpServer {
   /**
    * Mount MCP server endpoints at /mcp and /sse
    *
-   * Sets up the HTTP transport layer for the MCP server, creating endpoints for
-   * Server-Sent Events (SSE) streaming, POST message handling, and DELETE session cleanup.
-   * Transports are reused per session ID to maintain state across requests.
+   * Sets up the HTTP transport layer for the MCP server with multi-session support.
+   * Each session gets its own isolated server instance with all tools/prompts/resources.
+   * Supports both stateful (reuse session) and stateless (new session per request) modes.
    *
    * This method is called automatically when the server starts listening and ensures
    * that MCP clients can communicate with the server over HTTP.
@@ -165,16 +352,13 @@ export class McpServer {
 
     const result = await mountMcpHelper(
       this.app,
-      this.server,
+      () => this.createNativeServerForSession(),
       this.sessions,
       this.config,
       isProductionModeHelper()
     );
 
     this.mcpMounted = result.mcpMounted;
-    if (result.idleCleanupInterval) {
-      this.idleCleanupInterval = result.idleCleanupInterval;
-    }
   }
 
   /**
@@ -215,6 +399,17 @@ export class McpServer {
 
   public getServerPort() {
     return this.serverPort || 3000;
+  }
+
+  /**
+   * Create a message for sampling (calling the LLM)
+   * Delegates to the native SDK server
+   */
+  public async createMessage(
+    params: CreateMessageRequest["params"],
+    options?: any
+  ): Promise<CreateMessageResult> {
+    return await this.nativeServer.server.createMessage(params, options);
   }
 
   async listen(port?: number): Promise<void> {

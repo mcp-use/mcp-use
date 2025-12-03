@@ -2,15 +2,7 @@
  * Session Management Exports
  */
 
-export {
-  type SessionData,
-  type TransportConfig,
-  getTransportConfig,
-  createNewTransport,
-  createAndAutoInitializeTransport,
-  getOrCreateTransport,
-  startIdleCleanup,
-} from "./session-manager.js";
+export { type SessionData, startIdleCleanup } from "./session-manager.js";
 
 export {
   sendNotificationToAll,

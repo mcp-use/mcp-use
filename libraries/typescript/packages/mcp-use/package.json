@@ -162,6 +162,7 @@
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194",
+    "express": "^5.2.0",
     "hono": "^4.10.7",
     "jose": "^6.1.2",
     "langchain": "^1.1.1",
