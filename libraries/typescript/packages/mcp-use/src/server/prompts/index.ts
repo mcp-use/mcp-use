@@ -95,8 +95,41 @@ export function registerPrompt(
   }
 
   // Wrap the callback to support both CallToolResult and GetPromptResult
-  const wrappedCallback = async (params: any): Promise<GetPromptResult> => {
-    const result = await actualCallback(params);
+  const wrappedCallback = async (
+    params: any,
+    extra?: any
+  ): Promise<GetPromptResult> => {
+    // Get the HTTP request context from AsyncLocalStorage
+    const { getRequestContext, runWithContext } =
+      await import("../context-storage.js");
+    const { findSessionContext } =
+      await import("../tools/tool-execution-helpers.js");
+
+    const initialRequestContext = getRequestContext();
+
+    // Find session context
+    const sessions = (this as any).sessions || new Map();
+    const { requestContext } = findSessionContext(
+      sessions,
+      initialRequestContext,
+      undefined,
+      undefined
+    );
+
+    // Create enhanced context (without tool-specific features like sample/elicit/reportProgress)
+    const enhancedContext = requestContext || {};
+
+    // Execute callback with context
+    const executeCallback = async () => {
+      if (actualCallback.length >= 2) {
+        return await (actualCallback as any)(params, enhancedContext);
+      }
+      return await (actualCallback as any)(params);
+    };
+
+    const result = requestContext
+      ? await runWithContext(requestContext, executeCallback)
+      : await executeCallback();
 
     // If it's already a GetPromptResult, return as-is
     if ("messages" in result && Array.isArray(result.messages)) {

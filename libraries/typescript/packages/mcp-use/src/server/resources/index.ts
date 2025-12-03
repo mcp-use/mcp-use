@@ -99,7 +99,37 @@ export function registerResource(
 
   // Wrap the callback to support both CallToolResult and ReadResourceResult
   const wrappedCallback = async (): Promise<ReadResourceResult> => {
-    const result = await actualCallback();
+    // Get the HTTP request context from AsyncLocalStorage
+    const { getRequestContext, runWithContext } =
+      await import("../context-storage.js");
+    const { findSessionContext } =
+      await import("../tools/tool-execution-helpers.js");
+
+    const initialRequestContext = getRequestContext();
+
+    // Find session context
+    const sessions = (this as any).sessions || new Map();
+    const { requestContext } = findSessionContext(
+      sessions,
+      initialRequestContext,
+      undefined,
+      undefined
+    );
+
+    // Create enhanced context (without tool-specific features)
+    const enhancedContext = requestContext || {};
+
+    // Execute callback with context
+    const executeCallback = async () => {
+      if (actualCallback.length >= 1) {
+        return await (actualCallback as any)(enhancedContext);
+      }
+      return await (actualCallback as any)();
+    };
+
+    const result = requestContext
+      ? await runWithContext(requestContext, executeCallback)
+      : await executeCallback();
 
     // If it's already a ReadResourceResult, return as-is
     if ("contents" in result && Array.isArray(result.contents)) {
@@ -247,7 +277,37 @@ export function registerResourceTemplate(
         uri.toString()
       );
 
-      const result = await actualCallback(uri, params);
+      // Get the HTTP request context from AsyncLocalStorage
+      const { getRequestContext, runWithContext } =
+        await import("../context-storage.js");
+      const { findSessionContext } =
+        await import("../tools/tool-execution-helpers.js");
+
+      const initialRequestContext = getRequestContext();
+
+      // Find session context
+      const sessions = (this as any).sessions || new Map();
+      const { requestContext } = findSessionContext(
+        sessions,
+        initialRequestContext,
+        undefined,
+        undefined
+      );
+
+      // Create enhanced context (without tool-specific features)
+      const enhancedContext = requestContext || {};
+
+      // Execute callback with context
+      const executeCallback = async () => {
+        if (actualCallback.length >= 3) {
+          return await (actualCallback as any)(uri, params, enhancedContext);
+        }
+        return await (actualCallback as any)(uri, params);
+      };
+
+      const result = requestContext
+        ? await runWithContext(requestContext, executeCallback)
+        : await executeCallback();
 
       // If it's already a ReadResourceResult, return as-is
       if ("contents" in result && Array.isArray(result.contents)) {

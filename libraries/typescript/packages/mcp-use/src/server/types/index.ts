@@ -32,6 +32,7 @@ export {
   ResourceTemplateDefinitionWithoutCallback,
   ResourceDefinition,
   ResourceDefinitionWithoutCallback,
+  EnhancedResourceContext,
   // UIResource specific types
   UIResourceContent,
   WidgetProps,
@@ -66,4 +67,5 @@ export {
   PromptDefinition,
   PromptDefinitionWithoutCallback,
   InferPromptInput,
+  EnhancedPromptContext,
 } from "./prompt.js";

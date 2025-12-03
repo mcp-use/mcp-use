@@ -47,42 +47,6 @@ server.tool(
     text(`Echo: ${message}`)
 );
 
-// tools-call-simple-text (message is optional)
-server.tool(
-  {
-    name: "test_simple_text",
-    description: "A simple tool that returns text content",
-    schema: z.object({
-      message: z.string().optional(),
-    }),
-  },
-  async ({ message }) => text(`Echo: ${message || "Hello, World!"}`)
-);
-
-// tools-call-simple-text (message is optional)
-server.tool(
-  {
-    name: "test_simple_text",
-    description: "A simple tool that returns text content",
-    schema: z.object({
-      message: z.string().default("Hello, World!"),
-    }),
-  },
-  async ({ message }) => text(`Echo: ${message || "Hello, World!"}`)
-);
-
-// tools-call-simple-text (message is optional)
-server.tool(
-  {
-    name: "test_simple_text",
-    description: "A simple tool that returns text content",
-    schema: z.object({
-      message: z.string().default("Hello, World!"),
-    }),
-  },
-  async ({ message }, ctx) => text(`Echo: ${message || "Hello, World!"}`)
-);
-
 // tools-call-image
 server.tool(
   {
@@ -149,7 +113,7 @@ server.tool(
   async ({ prompt = "Hello" }, ctx) => {
     try {
       const result = await ctx.sample(prompt);
-      return text((result.content as any[])?.at(0)?.text || "No response");
+      return text((result.content as { text?: string })?.text || "No response");
     } catch (err: any) {
       return error(`Sampling error: ${err.message || String(err)}`);
     }

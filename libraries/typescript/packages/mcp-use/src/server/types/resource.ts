@@ -5,6 +5,7 @@ import type {
 import type { ResourceAnnotations } from "./common.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
+import type { McpContext } from "./context.js";
 
 // UIResourceContent type from MCP-UI
 export type UIResourceContent = {
@@ -82,14 +83,58 @@ export interface AppsSdkToolMetadata extends Record<string, unknown> {
   "openai/resultCanProduceWidget"?: boolean;
 }
 
-// Callback types - now support both CallToolResult (from helpers) and ReadResourceResult (old API)
-export type ReadResourceCallback = () => Promise<
-  CallToolResult | ReadResourceResult | TypedCallToolResult<any>
->;
-export type ReadResourceTemplateCallback = (
-  uri: URL,
-  params: Record<string, any>
-) => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
+/**
+ * Enhanced Resource Context that provides access to request context.
+ *
+ * This unified context provides:
+ * - `auth` - Authentication info (when OAuth is configured)
+ * - `req` - Hono request object
+ * - All other Hono Context properties and methods
+ *
+ * @template HasOAuth - Whether OAuth is configured (affects auth availability)
+ */
+export type EnhancedResourceContext<HasOAuth extends boolean = false> =
+  McpContext<HasOAuth>;
+
+/**
+ * Helper interface for bivariant parameter checking on resource callbacks.
+ * @internal
+ */
+interface ReadResourceCallbackBivariant<HasOAuth extends boolean> {
+  bivarianceHack(
+    ctx: EnhancedResourceContext<HasOAuth>
+  ): Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
+}
+
+/**
+ * Helper interface for bivariant parameter checking on resource template callbacks.
+ * @internal
+ */
+interface ReadResourceTemplateCallbackBivariant<HasOAuth extends boolean> {
+  bivarianceHack(
+    uri: URL,
+    params: Record<string, any>,
+    ctx: EnhancedResourceContext<HasOAuth>
+  ): Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
+}
+
+/**
+ * Callback type for reading a static resource.
+ * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
+ *
+ * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
+ */
+export type ReadResourceCallback<HasOAuth extends boolean = false> =
+  ReadResourceCallbackBivariant<HasOAuth>["bivarianceHack"];
+
+/**
+ * Callback type for reading a resource template with parameters.
+ * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
+ *
+ * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
+ */
+export type ReadResourceTemplateCallback<HasOAuth extends boolean = false> =
+  ReadResourceTemplateCallbackBivariant<HasOAuth>["bivarianceHack"];
 
 /**
  * Configuration for a resource template
@@ -108,13 +153,13 @@ export interface ResourceTemplateConfig {
 /**
  * Resource template definition with readCallback (old API)
  */
-export interface ResourceTemplateDefinition {
+export interface ResourceTemplateDefinition<HasOAuth extends boolean = false> {
   name: string;
   resourceTemplate: ResourceTemplateConfig;
   title?: string;
   description?: string;
   annotations?: ResourceAnnotations;
-  readCallback: ReadResourceTemplateCallback;
+  readCallback: ReadResourceTemplateCallback<HasOAuth>;
   _meta?: Record<string, unknown>;
 }
 
@@ -133,7 +178,7 @@ export interface ResourceTemplateDefinitionWithoutCallback {
 /**
  * Resource definition with readCallback (old API)
  */
-export interface ResourceDefinition {
+export interface ResourceDefinition<HasOAuth extends boolean = false> {
   /** Unique identifier for the resource */
   name: string;
   /** URI pattern for accessing the resource (e.g., 'config://app-settings') */
@@ -147,7 +192,7 @@ export interface ResourceDefinition {
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   /** Async callback function that returns the resource content */
-  readCallback: ReadResourceCallback;
+  readCallback: ReadResourceCallback<HasOAuth>;
   _meta?: Record<string, unknown>;
 }
 
