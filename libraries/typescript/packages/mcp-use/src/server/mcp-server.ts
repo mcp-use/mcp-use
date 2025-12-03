@@ -1,4 +1,7 @@
-import { McpServer as OfficialMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  McpServer as OfficialMcpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
@@ -175,7 +178,7 @@ export class McpServer {
       const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
       self.registrationRecipes.resources.set(resourceKey, {
         config: resourceDefinition,
-        handler: resourceDefinition.cb,
+        handler: resourceDefinition.readCallback,
       });
       return originalResource.call(self, resourceDefinition);
     } as any;
@@ -183,7 +186,7 @@ export class McpServer {
     this.resourceTemplate = function (templateDefinition: any) {
       self.registrationRecipes.resourceTemplates.set(templateDefinition.name, {
         config: templateDefinition,
-        handler: templateDefinition.cb,
+        handler: templateDefinition.readCallback,
       });
       return originalResourceTemplate.call(self, templateDefinition);
     } as any;
@@ -317,15 +320,43 @@ export class McpServer {
     // Resource Templates
     for (const [_name, recipe] of this.registrationRecipes.resourceTemplates) {
       const { config, handler } = recipe;
+      // Create ResourceTemplate instance from SDK
+      const template = new ResourceTemplate(
+        config.resourceTemplate.uriTemplate,
+        {
+          list: undefined,
+          complete: undefined,
+        }
+      );
+
+      // Create metadata object
+      const metadata: any = {};
+      if (config.title) {
+        metadata.title = config.title;
+      }
+      if (config.description || config.resourceTemplate.description) {
+        metadata.description =
+          config.description || config.resourceTemplate.description;
+      }
+      if (config.resourceTemplate.mimeType) {
+        metadata.mimeType = config.resourceTemplate.mimeType;
+      }
+      if (config.annotations) {
+        metadata.annotations = config.annotations;
+      }
+
       newServer.registerResource(
         config.name,
-        config.uriTemplate,
-        {
-          title: config.title,
-          description: config.description,
-          mimeType: config.mimeType,
-        },
-        handler
+        template,
+        metadata,
+        async (uri: URL) => {
+          // Parse URI parameters from the template
+          const params = this.parseTemplateUri(
+            config.resourceTemplate.uriTemplate,
+            uri.toString()
+          );
+          return await handler(uri, params);
+        }
       );
     }
 
