@@ -23,22 +23,10 @@ import type {
   ElicitFormParams,
   ElicitUrlParams,
 } from "../types/index.js";
+import type { SessionData } from "../sessions/session-manager.js";
 
-/**
- * Session data for tool context
- */
-export interface SessionData {
-  transport: any;
-  lastAccessedAt: number;
-  context?: Context;
-  progressToken?: number;
-  sendNotification?: (notification: {
-    method: string;
-    params: Record<string, any>;
-  }) => Promise<void>;
-  expressRes?: any;
-  honoContext?: Context;
-}
+// Re-export SessionData for backwards compatibility
+export type { SessionData };
 
 /**
  * Result of session context lookup
@@ -431,7 +419,99 @@ export function createReportProgressMethod(
 }
 
 /**
- * Create enhanced context with sample, elicit, and reportProgress methods
+ * RFC 5424 log levels with numeric values for comparison
+ */
+const LOG_LEVELS = {
+  debug: 0,
+  info: 1,
+  notice: 2,
+  warning: 3,
+  error: 4,
+  critical: 5,
+  alert: 6,
+  emergency: 7,
+} as const;
+
+type LogLevel = keyof typeof LOG_LEVELS;
+
+/**
+ * Valid log levels according to RFC 5424
+ */
+export const VALID_LOG_LEVELS: readonly LogLevel[] = [
+  "debug",
+  "info",
+  "notice",
+  "warning",
+  "error",
+  "critical",
+  "alert",
+  "emergency",
+] as const;
+
+/**
+ * Check if a log level is valid
+ */
+export function isValidLogLevel(level: string): level is LogLevel {
+  return VALID_LOG_LEVELS.includes(level as LogLevel);
+}
+
+/**
+ * Check if a message level meets the minimum log level threshold
+ */
+export function shouldLogMessage(
+  messageLevel: string,
+  minLevel: string | undefined
+): boolean {
+  // If no minimum level is set, log everything
+  if (!minLevel) {
+    return true;
+  }
+
+  // If either level is invalid, default to logging
+  if (!isValidLogLevel(messageLevel) || !isValidLogLevel(minLevel)) {
+    return true;
+  }
+
+  return LOG_LEVELS[messageLevel] >= LOG_LEVELS[minLevel];
+}
+
+/**
+ * Create log method for sending log notifications to the client
+ */
+function createLogMethod(
+  sendNotification:
+    | ((notification: {
+        method: string;
+        params: Record<string, any>;
+      }) => Promise<void>)
+    | undefined,
+  minLogLevel?: string
+):
+  | ((level: string, message: string, logger?: string) => Promise<void>)
+  | undefined {
+  if (!sendNotification) {
+    return undefined;
+  }
+
+  return async (level: string, message: string, logger?: string) => {
+    // Filter messages based on minimum log level
+    if (!shouldLogMessage(level, minLogLevel)) {
+      return; // Don't send messages below the minimum level
+    }
+
+    await sendNotification({
+      method: "notifications/message",
+      params: {
+        level,
+        data: message,
+        logger: logger || "tool",
+      },
+    });
+  };
+}
+
+/**
+ * Create enhanced context with sample, elicit, reportProgress, and log methods
  */
 export function createEnhancedContext(
   baseContext: Context | undefined,
@@ -446,7 +526,8 @@ export function createEnhancedContext(
         method: string;
         params: Record<string, any>;
       }) => Promise<void>)
-    | undefined
+    | undefined,
+  minLogLevel?: string
 ): any {
   const enhancedContext = baseContext ? Object.create(baseContext) : {};
 
@@ -462,6 +543,8 @@ export function createEnhancedContext(
     progressToken,
     sendNotification
   );
+
+  enhancedContext.log = createLogMethod(sendNotification, minLogLevel);
 
   return enhancedContext;
 }

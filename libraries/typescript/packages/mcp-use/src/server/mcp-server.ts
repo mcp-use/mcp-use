@@ -6,7 +6,9 @@ import type {
   CreateMessageRequest,
   CreateMessageResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
+import { z } from "zod";
 
 import { uiResourceRegistration, mountWidgets } from "./widgets/index.js";
 import { mountInspectorUI } from "./inspector/index.js";
@@ -49,6 +51,7 @@ import {
 import {
   findSessionContext,
   createEnhancedContext,
+  isValidLogLevel,
 } from "./tools/tool-execution-helpers.js";
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
@@ -126,11 +129,18 @@ export class McpServer {
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
 
-    // Create native SDK server instance
-    this.nativeServer = new OfficialMcpServer({
-      name: config.name,
-      version: config.version,
-    });
+    // Create native SDK server instance with capabilities
+    this.nativeServer = new OfficialMcpServer(
+      {
+        name: config.name,
+        version: config.version,
+      },
+      {
+        capabilities: {
+          logging: {},
+        },
+      }
+    );
 
     // Create and configure Hono app with default middleware
     this.app = createHonoApp(requestLogger);
@@ -209,10 +219,17 @@ export class McpServer {
    * This is called for each initialize request to create an isolated server.
    */
   public getServerForSession(): OfficialMcpServer {
-    const newServer = new OfficialMcpServer({
-      name: this.config.name,
-      version: this.config.version,
-    });
+    const newServer = new OfficialMcpServer(
+      {
+        name: this.config.name,
+        version: this.config.version,
+      },
+      {
+        capabilities: {
+          logging: {},
+        },
+      }
+    );
 
     // Replay all registrations on the new server
     // Tools - with context wrapping for ctx.sample(), ctx.elicit()
@@ -233,7 +250,7 @@ export class McpServer {
         const extraProgressToken = extra?._meta?.progressToken;
         const extraSendNotification = extra?.sendNotification;
 
-        const { requestContext, progressToken, sendNotification } =
+        const { requestContext, session, progressToken, sendNotification } =
           findSessionContext(
             this.sessions,
             initialRequestContext,
@@ -269,7 +286,8 @@ export class McpServer {
           createMessageWithLogging,
           newServer.server.elicitInput.bind(newServer.server),
           progressToken,
-          sendNotification
+          sendNotification,
+          session?.logLevel
         );
 
         const executeCallback = async () => {
@@ -421,6 +439,64 @@ export class McpServer {
         }
       );
     }
+
+    // Register logging/setLevel handler per MCP specification
+    newServer.server.setRequestHandler(
+      z.object({ method: z.literal("logging/setLevel") }).passthrough(),
+      async (request: any) => {
+        const level = request.params?.level;
+
+        // Validate log level parameter
+        if (!level) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            "Missing 'level' parameter"
+          );
+        }
+
+        if (!isValidLogLevel(level)) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            `Invalid log level '${level}'. Must be one of: debug, info, notice, warning, error, critical, alert, emergency`
+          );
+        }
+
+        // Get current request context to find the session
+        const requestContext = getRequestContext();
+        if (requestContext) {
+          // Extract session ID from header
+          const sessionId = requestContext.req.header("mcp-session-id");
+
+          if (sessionId && this.sessions.has(sessionId)) {
+            // Store log level in session data
+            const session = this.sessions.get(sessionId)!;
+            session.logLevel = level;
+            console.log(
+              `[MCP] Set log level to '${level}' for session ${sessionId}`
+            );
+            return {};
+          }
+        }
+
+        // If we can't find the session, try to find it in the sessions map
+        // This handles cases where the request context isn't available
+        for (const [sessionId, session] of this.sessions.entries()) {
+          if (session.server === newServer) {
+            session.logLevel = level;
+            console.log(
+              `[MCP] Set log level to '${level}' for session ${sessionId}`
+            );
+            return {};
+          }
+        }
+
+        // If no session found, return error
+        console.warn(
+          "[MCP] Could not find session for logging/setLevel request"
+        );
+        throw new McpError(ErrorCode.InternalError, "Could not find session");
+      }
+    );
 
     return newServer;
   }

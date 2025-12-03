@@ -31,6 +31,8 @@ export interface SessionData {
   expressRes?: any;
   /** Hono context for direct response access */
   honoContext?: Context;
+  /** Minimum log level for filtering log messages (RFC 5424 levels) */
+  logLevel?: string;
 }
 
 /**

@@ -28,6 +28,7 @@ export {
   array,
   widget,
   mix,
+  audio,
   // MIME-specific helpers for resources
   html,
   markdown,

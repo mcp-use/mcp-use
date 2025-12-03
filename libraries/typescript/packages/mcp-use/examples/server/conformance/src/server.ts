@@ -6,6 +6,8 @@
  * Run with: pnpm dev or tsx src/server.ts
  */
 
+import { setTimeout as sleep } from "timers/promises";
+
 import {
   createMCPServer,
   text,
@@ -13,9 +15,9 @@ import {
   resource,
   error,
   object,
-  markdown,
   binary,
   mix,
+  audio,
 } from "mcp-use/server";
 import { z } from "zod";
 
@@ -67,15 +69,7 @@ server.tool(
     name: "test_audio_content",
     description: "A tool that returns audio content",
   },
-  async () => ({
-    content: [
-      {
-        type: "audio",
-        data: SILENT_WAV_BASE64,
-        mimeType: "audio/wav",
-      },
-    ],
-  })
+  async () => audio(SILENT_WAV_BASE64, "audio/wav")
 );
 
 // tools-call-embedded-resource
@@ -85,11 +79,7 @@ server.tool(
     description: "A tool that returns an embedded resource",
   },
   async () =>
-    resource(
-      "test://embedded",
-      "text/plain",
-      "This is embedded resource content"
-    )
+    resource("test://embedded", text("This is embedded resource content"))
 );
 
 // tools-call-mixed-content
@@ -104,29 +94,26 @@ server.tool(
       image(RED_PIXEL_PNG, "image/png"),
       resource(
         "test://mixed-content-resource",
-        "application/json",
-        '{"test":"data","value":123}'
+        object({ test: "data", value: 123 })
       )
     )
 );
 
 // tools-call-with-logging
-// Note: This tool simulates logging but the actual log notifications
-// may not be sent if the SDK doesn't expose logging in tool context.
-// The SDK may handle logging automatically at the protocol level.
 server.tool(
   {
     name: "test_tool_with_logging",
     description: "A tool that sends log messages during execution",
   },
-  async () => {
-    // TODO: Add proper logging notifications when SDK exposes logging API
-    // For now, we'll use console.log which may be captured by the SDK
-    console.log("Tool execution started");
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    console.log("Tool processing data");
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    console.log("Tool execution completed");
+  async (params, ctx) => {
+    // Send 3 log notifications as required by conformance test
+    await ctx.log("info", "Tool execution started");
+    await sleep(50);
+
+    await ctx.log("info", "Tool processing data");
+    await sleep(50);
+
+    await ctx.log("info", "Tool execution completed");
 
     return text("Tool execution completed with logging");
   }
@@ -146,7 +133,7 @@ server.tool(
       if (ctx.reportProgress) {
         await ctx.reportProgress(i + 1, steps, `Step ${i + 1} of ${steps}`);
       }
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await sleep(10);
     }
 
     return text(`Completed ${steps} steps`);
@@ -343,7 +330,7 @@ server.prompt(
   async ({ resourceUri = "config://embedded" }) =>
     mix(
       text("Here is the configuration:"),
-      resource(resourceUri, "application/json", '{"setting": "value"}')
+      resource(resourceUri, object({ setting: "value" }))
     )
 );
 
