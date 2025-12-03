@@ -161,7 +161,7 @@
     "@mcp-ui/server": "^5.15.0",
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
-    "@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194",
+    "@modelcontextprotocol/sdk": "1.24.1",
     "hono": "^4.10.7",
     "jose": "^6.1.2",
     "langchain": "^1.1.1",
