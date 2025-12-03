@@ -12,6 +12,9 @@ on:
         type: boolean
         default: false
   push:
+    branches:
+      - main
+      - canary
     paths:
       - 'libraries/python/mcp_use/server/**'
       - 'libraries/python/pyproject.toml'
@@ -21,6 +24,9 @@ on:
       - 'libraries/typescript/packages/mcp-use/examples/server/conformance/**'
       - '.github/workflows/conformance.yml'
   pull_request:
+    branches:
+      - main
+      - canary
     paths:
       - 'libraries/python/mcp_use/server/**'
       - 'libraries/python/pyproject.toml'
