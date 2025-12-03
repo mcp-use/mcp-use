@@ -19,7 +19,7 @@ from mcp_use.client.middleware.metrics import (
 warnings.warn(
     "mcp_use.middleware.metrics is deprecated. "
     "Use mcp_use.client.middleware.metrics. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )
