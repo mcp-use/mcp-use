@@ -319,22 +319,17 @@ export function createSampleMethod(
     }
 
     try {
-      console.log("[SAMPLING DEBUG] Calling createMessage...");
       const sdkTimeout = timeout && timeout !== Infinity ? timeout : 2147483647;
       const samplePromise = createMessage(sampleParams, {
         timeout: sdkTimeout,
       });
 
-      console.log("[SAMPLING DEBUG] Waiting for response...");
-      const result = await withTimeout(
+      return await withTimeout(
         samplePromise,
         timeout,
         `Sampling timed out after ${timeout}ms`
       );
-      console.log("[SAMPLING DEBUG] Got result:", result);
-      return result;
     } catch (error) {
-      console.error("[SAMPLING DEBUG] Error during sampling:", error);
       throw error;
     } finally {
       completed = true;

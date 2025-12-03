@@ -257,210 +257,229 @@ export class McpServer {
     // Replay all registrations on the new server
     // Tools - with context wrapping for ctx.sample(), ctx.elicit()
     for (const [name, recipe] of this.registrationRecipes.tools) {
-      const { config, handler: actualCallback } = recipe;
-      let inputSchema: Record<string, any>;
-      if (config.schema) {
-        inputSchema = this.convertZodSchemaToParams(config.schema);
-      } else if (config.inputs && config.inputs.length > 0) {
-        inputSchema = this.createParamsSchema(config.inputs);
-      } else {
-        inputSchema = {};
-      }
-
-      // Wrap handler to provide enhanced context
-      const wrappedHandler = async (params: any, extra?: any) => {
-        const initialRequestContext = getRequestContext();
-        const extraProgressToken = extra?._meta?.progressToken;
-        const extraSendNotification = extra?.sendNotification;
-
-        const { requestContext, session, progressToken, sendNotification } =
-          findSessionContext(
-            this.sessions,
-            initialRequestContext,
-            extraProgressToken,
-            extraSendNotification
-          );
-
-        // Use the session server's native createMessage and elicitInput
-        // These are already properly connected to the transport
-        const createMessageWithLogging = async (params: any, options?: any) => {
-          console.log("[createMessage] About to call server.createMessage");
-          console.log("[createMessage] Has server:", !!newServer);
-          try {
-            const result = await newServer.server.createMessage(
-              params,
-              options
-            );
-            console.log("[createMessage] Got result successfully");
-            return result;
-          } catch (err: any) {
-            console.error(
-              "[createMessage] Error:",
-              err.message,
-              "Code:",
-              err.code
-            );
-            throw err;
-          }
-        };
-
-        const enhancedContext = createEnhancedContext(
-          requestContext,
-          createMessageWithLogging,
-          newServer.server.elicitInput.bind(newServer.server),
-          progressToken,
-          sendNotification,
-          session?.logLevel
-        );
-
-        const executeCallback = async () => {
-          if (actualCallback.length >= 2) {
-            return await (actualCallback as any)(params, enhancedContext);
-          }
-          return await (actualCallback as any)(params);
-        };
-
-        if (requestContext) {
-          return await runWithContext(requestContext, executeCallback);
+      try {
+        const { config, handler: actualCallback } = recipe;
+        let inputSchema: Record<string, any>;
+        if (config.schema) {
+          inputSchema = this.convertZodSchemaToParams(config.schema);
+        } else if (config.inputs && config.inputs.length > 0) {
+          inputSchema = this.createParamsSchema(config.inputs);
+        } else {
+          inputSchema = {};
         }
 
-        return await executeCallback();
-      };
+        // Wrap handler to provide enhanced context
+        const wrappedHandler = async (params: any, extra?: any) => {
+          const initialRequestContext = getRequestContext();
+          const extraProgressToken = extra?._meta?.progressToken;
+          const extraSendNotification = extra?.sendNotification;
 
-      newServer.registerTool(
-        name,
-        {
-          title: config.title,
-          description: config.description ?? "",
-          inputSchema,
-          annotations: config.annotations,
-          _meta: config._meta,
-        },
-        wrappedHandler
-      );
+          const { requestContext, session, progressToken, sendNotification } =
+            findSessionContext(
+              this.sessions,
+              initialRequestContext,
+              extraProgressToken,
+              extraSendNotification
+            );
+
+          // Use the session server's native createMessage and elicitInput
+          // These are already properly connected to the transport
+          const createMessageWithLogging = async (
+            params: any,
+            options?: any
+          ) => {
+            try {
+              return await newServer.server.createMessage(params, options);
+            } catch (err: any) {
+              // Re-throw the error - let the calling code handle logging if needed
+              throw err;
+            }
+          };
+
+          const enhancedContext = createEnhancedContext(
+            requestContext,
+            createMessageWithLogging,
+            newServer.server.elicitInput.bind(newServer.server),
+            progressToken,
+            sendNotification,
+            session?.logLevel
+          );
+
+          const executeCallback = async () => {
+            if (actualCallback.length >= 2) {
+              return await (actualCallback as any)(params, enhancedContext);
+            }
+            return await (actualCallback as any)(params);
+          };
+
+          if (requestContext) {
+            return await runWithContext(requestContext, executeCallback);
+          }
+
+          return await executeCallback();
+        };
+
+        newServer.registerTool(
+          name,
+          {
+            title: config.title,
+            description: config.description ?? "",
+            inputSchema,
+            annotations: config.annotations,
+            _meta: config._meta,
+          },
+          wrappedHandler
+        );
+      } catch (error) {
+        console.error(`[MCP] Failed to register tool '${name}':`, error);
+        // Continue with other registrations even if one fails
+      }
     }
 
     // Prompts
     for (const [name, recipe] of this.registrationRecipes.prompts) {
-      const { config, handler } = recipe;
+      try {
+        const { config, handler } = recipe;
 
-      // Determine input schema - prefer schema over args
-      let argsSchema: any;
-      if (config.schema) {
-        argsSchema = this.convertZodSchemaToParams(config.schema);
-      } else if (config.args && config.args.length > 0) {
-        argsSchema = this.createParamsSchema(config.args);
-      } else {
-        // No schema validation when neither schema nor args are provided
-        argsSchema = undefined;
-      }
-
-      // Wrap handler to support both CallToolResult and GetPromptResult
-      const wrappedHandler = async (params: any) => {
-        const result = await handler(params);
-
-        // If it's already a GetPromptResult, return as-is
-        if ("messages" in result && Array.isArray(result.messages)) {
-          return result;
+        // Determine input schema - prefer schema over args
+        let argsSchema: any;
+        if (config.schema) {
+          argsSchema = this.convertZodSchemaToParams(config.schema);
+        } else if (config.args && config.args.length > 0) {
+          argsSchema = this.createParamsSchema(config.args);
+        } else {
+          // No schema validation when neither schema nor args are provided
+          argsSchema = undefined;
         }
 
-        // Convert CallToolResult to GetPromptResult
-        const { convertToolResultToPromptResult } =
-          await import("./prompts/conversion.js");
-        return convertToolResultToPromptResult(result);
-      };
+        // Wrap handler to support both CallToolResult and GetPromptResult
+        const wrappedHandler = async (params: any) => {
+          const result = await handler(params);
 
-      newServer.registerPrompt(
-        name,
-        {
-          title: config.title,
-          description: config.description ?? "",
-          argsSchema: argsSchema as any,
-        },
-        wrappedHandler
-      );
+          // If it's already a GetPromptResult, return as-is
+          if ("messages" in result && Array.isArray(result.messages)) {
+            return result;
+          }
+
+          // Convert CallToolResult to GetPromptResult
+          const { convertToolResultToPromptResult } =
+            await import("./prompts/conversion.js");
+          return convertToolResultToPromptResult(result);
+        };
+
+        newServer.registerPrompt(
+          name,
+          {
+            title: config.title,
+            description: config.description ?? "",
+            argsSchema: argsSchema as any,
+          },
+          wrappedHandler
+        );
+      } catch (error) {
+        console.error(`[MCP] Failed to register prompt '${name}':`, error);
+        // Continue with other registrations even if one fails
+      }
     }
 
     // Resources
     for (const [_key, recipe] of this.registrationRecipes.resources) {
-      const { config, handler } = recipe;
-      // Wrap handler to support both CallToolResult and ReadResourceResult
-      const wrappedHandler = async () => {
-        const result = await handler();
-        // If it's already a ReadResourceResult, return as-is
-        if ("contents" in result && Array.isArray(result.contents)) {
-          return result;
-        }
-        // Convert CallToolResult to ReadResourceResult
-        // Import convertToolResultToResourceResult dynamically to avoid circular dependencies
-        const { convertToolResultToResourceResult } =
-          await import("./resources/conversion.js");
-        return convertToolResultToResourceResult(config.uri, result);
-      };
-
-      newServer.registerResource(
-        config.name,
-        config.uri,
-        {
-          title: config.title,
-          description: config.description,
-          mimeType: config.mimeType || "text/plain",
-        },
-        wrappedHandler
-      );
-    }
-
-    // Resource Templates
-    for (const [_name, recipe] of this.registrationRecipes.resourceTemplates) {
-      const { config, handler } = recipe;
-      // Create ResourceTemplate instance from SDK
-      const template = new ResourceTemplate(
-        config.resourceTemplate.uriTemplate,
-        {
-          list: undefined,
-          complete: undefined,
-        }
-      );
-
-      // Create metadata object
-      const metadata: any = {};
-      if (config.title) {
-        metadata.title = config.title;
-      }
-      if (config.description || config.resourceTemplate.description) {
-        metadata.description =
-          config.description || config.resourceTemplate.description;
-      }
-      if (config.resourceTemplate.mimeType) {
-        metadata.mimeType = config.resourceTemplate.mimeType;
-      }
-      if (config.annotations) {
-        metadata.annotations = config.annotations;
-      }
-
-      newServer.registerResource(
-        config.name,
-        template,
-        metadata,
-        async (uri: URL) => {
-          // Parse URI parameters from the template
-          const params = this.parseTemplateUri(
-            config.resourceTemplate.uriTemplate,
-            uri.toString()
-          );
-          const result = await handler(uri, params);
-
+      const resourceKey = recipe.config?.name || _key;
+      try {
+        const { config, handler } = recipe;
+        // Wrap handler to support both CallToolResult and ReadResourceResult
+        const wrappedHandler = async () => {
+          const result = await handler();
           // If it's already a ReadResourceResult, return as-is
           if ("contents" in result && Array.isArray(result.contents)) {
             return result;
           }
-
           // Convert CallToolResult to ReadResourceResult
+          // Import convertToolResultToResourceResult dynamically to avoid circular dependencies
           const { convertToolResultToResourceResult } =
             await import("./resources/conversion.js");
-          return convertToolResultToResourceResult(uri.toString(), result);
+          return convertToolResultToResourceResult(config.uri, result);
+        };
+
+        newServer.registerResource(
+          config.name,
+          config.uri,
+          {
+            title: config.title,
+            description: config.description,
+            mimeType: config.mimeType || "text/plain",
+          },
+          wrappedHandler
+        );
+      } catch (error) {
+        console.error(
+          `[MCP] Failed to register resource '${resourceKey}':`,
+          error
+        );
+        // Continue with other registrations even if one fails
+      }
+    }
+
+    // Resource Templates
+    for (const [_name, recipe] of this.registrationRecipes.resourceTemplates) {
+      const templateName = recipe.config?.name || _name;
+      try {
+        const { config, handler } = recipe;
+        // Create ResourceTemplate instance from SDK
+        const template = new ResourceTemplate(
+          config.resourceTemplate.uriTemplate,
+          {
+            list: undefined,
+            complete: undefined,
+          }
+        );
+
+        // Create metadata object
+        const metadata: any = {};
+        if (config.title) {
+          metadata.title = config.title;
         }
-      );
+        if (config.description || config.resourceTemplate.description) {
+          metadata.description =
+            config.description || config.resourceTemplate.description;
+        }
+        if (config.resourceTemplate.mimeType) {
+          metadata.mimeType = config.resourceTemplate.mimeType;
+        }
+        if (config.annotations) {
+          metadata.annotations = config.annotations;
+        }
+
+        newServer.registerResource(
+          config.name,
+          template,
+          metadata,
+          async (uri: URL) => {
+            // Parse URI parameters from the template
+            const params = this.parseTemplateUri(
+              config.resourceTemplate.uriTemplate,
+              uri.toString()
+            );
+            const result = await handler(uri, params);
+
+            // If it's already a ReadResourceResult, return as-is
+            if ("contents" in result && Array.isArray(result.contents)) {
+              return result;
+            }
+
+            // Convert CallToolResult to ReadResourceResult
+            const { convertToolResultToResourceResult } =
+              await import("./resources/conversion.js");
+            return convertToolResultToResourceResult(uri.toString(), result);
+          }
+        );
+      } catch (error) {
+        console.error(
+          `[MCP] Failed to register resource template '${templateName}':`,
+          error
+        );
+        // Continue with other registrations even if one fails
+      }
     }
 
     // Register logging/setLevel handler per MCP specification
@@ -751,17 +770,12 @@ export class McpServer {
       );
     }
 
-    console.log("[MCP] Mounting widgets");
     await mountWidgets(this, {
       baseRoute: "/mcp-use/widgets",
       resourcesDir: "resources",
     });
-    console.log("[MCP] Mounted widgets");
     await this.mountMcp();
-    console.log("[MCP] Mounted MCP");
-    console.log("[MCP] Mounting inspector");
     await this.mountInspector();
-    console.log("[MCP] Mounted inspector");
 
     // Wrap the fetch handler to ensure it always returns a Promise<Response>
     const fetchHandler = this.app.fetch.bind(this.app);

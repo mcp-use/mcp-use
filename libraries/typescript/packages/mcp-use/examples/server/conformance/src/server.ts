@@ -57,7 +57,7 @@ server.tool(
 // tools-call-image
 server.tool(
   {
-    name: "test_image_content",
+    name: "test_image",
     description: "A tool that returns image content",
   },
   async () => image(RED_PIXEL_PNG, "image/png")
@@ -66,7 +66,7 @@ server.tool(
 // tools-call-audio
 server.tool(
   {
-    name: "test_audio_content",
+    name: "test_audio",
     description: "A tool that returns audio content",
   },
   async () => audio(SILENT_WAV_BASE64, "audio/wav")
@@ -85,7 +85,7 @@ server.tool(
 // tools-call-mixed-content
 server.tool(
   {
-    name: "test_multiple_content_types",
+    name: "test_mixed_content",
     description: "A tool that returns mixed content (text + image + resource)",
   },
   async () =>
