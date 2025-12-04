@@ -1,0 +1,268 @@
+name: 'MCP Conformance Test'
+description: 'Run MCP conformance tests against Python and/or TypeScript servers with PR comments and baseline comparison'
+author: 'MCP Use'
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  # Python Server Configuration
+  python-server-path:
+    description: 'Path to Python server file (e.g., "server/conformance_server.py")'
+    required: false
+  python-server-url:
+    description: 'URL of running Python server (e.g., "http://localhost:8000/mcp")'
+    required: false
+  python-server-port:
+    description: 'Port for Python server when starting from path'
+    required: false
+    default: '8000'
+  python-working-directory:
+    description: 'Working directory for Python server'
+    required: false
+    default: '.'
+  python-install-command:
+    description: 'Command to install Python dependencies (e.g., "pip install -e .")'
+    required: false
+  
+  # TypeScript Server Configuration
+  typescript-server-path:
+    description: 'Path to TypeScript server file (e.g., "server/conformance_server.ts")'
+    required: false
+  typescript-server-url:
+    description: 'URL of running TypeScript server (e.g., "http://localhost:3000/mcp")'
+    required: false
+  typescript-server-port:
+    description: 'Port for TypeScript server when starting from path'
+    required: false
+    default: '3000'
+  typescript-working-directory:
+    description: 'Working directory for TypeScript server'
+    required: false
+    default: '.'
+  typescript-install-command:
+    description: 'Command to install TypeScript dependencies (e.g., "pnpm install")'
+    required: false
+  
+  # PR Comment Configuration
+  comment-on-pr:
+    description: 'Whether to comment on pull requests with test results'
+    required: false
+    default: 'true'
+  comment-mode:
+    description: 'Comment mode: "update" to overwrite existing comment, "append" to add new comment per run'
+    required: false
+    default: 'update'
+  
+  # Baseline Comparison
+  baseline-branches:
+    description: 'Comma-separated list of branches to compare against (e.g., "main,develop")'
+    required: false
+    default: 'main'
+  
+  # Badge Configuration
+  enable-badge:
+    description: 'Generate badge data for shields.io or GitHub badges'
+    required: false
+    default: 'true'
+  
+  # GitHub Configuration
+  github-token:
+    description: 'GitHub token for API access (required for PR comments and baseline fetching)'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  python-results:
+    description: 'JSON object with Python test results'
+    value: ${{ steps.output-results.outputs.python-results }}
+  typescript-results:
+    description: 'JSON object with TypeScript test results'
+    value: ${{ steps.output-results.outputs.typescript-results }}
+  python-pass-rate:
+    description: 'Python pass rate percentage'
+    value: ${{ steps.output-results.outputs.python-pass-rate }}
+  typescript-pass-rate:
+    description: 'TypeScript pass rate percentage'
+    value: ${{ steps.output-results.outputs.typescript-pass-rate }}
+  badge-data:
+    description: 'JSON data for shields.io badge generation'
+    value: ${{ steps.output-results.outputs.badge-data }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.python-server-path }}" ] && \
+           [ -z "${{ inputs.python-server-url }}" ] && \
+           [ -z "${{ inputs.typescript-server-path }}" ] && \
+           [ -z "${{ inputs.typescript-server-url }}" ]; then
+          echo "❌ Error: At least one server must be specified (python or typescript, path or URL)"
+          exit 1
+        fi
+        echo "✅ Input validation passed"
+    
+    - name: Set up Node.js for conformance CLI
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    
+    - name: Install conformance test CLI
+      shell: bash
+      run: npm install -g @modelcontextprotocol/conformance
+    
+    - name: Run conformance tests
+      shell: bash
+      env:
+        PYTHON_SERVER_PATH: ${{ inputs.python-server-path }}
+        PYTHON_SERVER_URL: ${{ inputs.python-server-url }}
+        PYTHON_SERVER_PORT: ${{ inputs.python-server-port }}
+        PYTHON_WORKING_DIR: ${{ inputs.python-working-directory }}
+        PYTHON_INSTALL_CMD: ${{ inputs.python-install-command }}
+        TS_SERVER_PATH: ${{ inputs.typescript-server-path }}
+        TS_SERVER_URL: ${{ inputs.typescript-server-url }}
+        TS_SERVER_PORT: ${{ inputs.typescript-server-port }}
+        TS_WORKING_DIR: ${{ inputs.typescript-working-directory }}
+        TS_INSTALL_CMD: ${{ inputs.typescript-install-command }}
+      run: |
+        ACTION_DIR="${{ github.action_path }}"
+        bash "${ACTION_DIR}/scripts/run-tests.sh"
+    
+    - name: Parse test results
+      shell: bash
+      run: |
+        ACTION_DIR="${{ github.action_path }}"
+        node "${ACTION_DIR}/scripts/parse-results.js"
+    
+    - name: Fetch baseline results
+      if: github.event_name == 'pull_request' && inputs.baseline-branches != ''
+      uses: actions/github-script@v7
+      env:
+        BASELINE_BRANCHES: ${{ inputs.baseline-branches }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const branches = process.env.BASELINE_BRANCHES.split(',').map(b => b.trim());
+          
+          async function fetchBaselineForBranch(branch) {
+            try {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: context.workflow,
+                branch: branch,
+                status: 'completed',
+                conclusion: 'success',
+                per_page: 1
+              });
+              
+              if (runs.data.workflow_runs.length === 0) {
+                console.log(`No successful runs found for ${branch}`);
+                return false;
+              }
+              
+              const runId = runs.data.workflow_runs[0].id;
+              const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId
+              });
+              
+              const resultsArtifact = artifacts.data.artifacts.find(a => a.name === 'conformance-results');
+              if (!resultsArtifact) {
+                console.log(`No conformance results artifact found for ${branch}`);
+                return false;
+              }
+              
+              const baseDir = `baseline-${branch}`;
+              if (!fs.existsSync(baseDir)) {
+                fs.mkdirSync(baseDir, { recursive: true });
+              }
+              
+              const download = await github.rest.actions.downloadArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: resultsArtifact.id,
+                archive_format: 'zip'
+              });
+              
+              fs.writeFileSync(`${baseDir}/results.zip`, Buffer.from(download.data));
+              console.log(`Downloaded baseline for ${branch}`);
+              return true;
+            } catch (error) {
+              console.log(`Error fetching baseline for ${branch}:`, error.message);
+              return false;
+            }
+          }
+          
+          for (const branch of branches) {
+            await fetchBaselineForBranch(branch);
+          }
+    
+    - name: Extract baseline artifacts
+      if: github.event_name == 'pull_request' && inputs.baseline-branches != ''
+      shell: bash
+      run: |
+        for dir in baseline-*; do
+          if [ -d "$dir" ] && [ -f "$dir/results.zip" ]; then
+            unzip -q "$dir/results.zip" -d "$dir/"
+            echo "Extracted baseline: $dir"
+          fi
+        done
+    
+    - name: Generate badge data
+      if: inputs.enable-badge == 'true'
+      shell: bash
+      run: |
+        ACTION_DIR="${{ github.action_path }}"
+        node "${ACTION_DIR}/scripts/generate-badge.js"
+    
+    - name: Comment on PR
+      if: github.event_name == 'pull_request' && inputs.comment-on-pr == 'true'
+      uses: actions/github-script@v7
+      env:
+        COMMENT_MODE: ${{ inputs.comment-mode }}
+        BASELINE_BRANCHES: ${{ inputs.baseline-branches }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const scriptPath = path.join('${{ github.action_path }}', 'scripts', 'comment-pr.js');
+          const commentScript = require(scriptPath);
+          await commentScript({ github, context, core: require('@actions/core') });
+    
+    - name: Set outputs
+      id: output-results
+      shell: bash
+      run: |
+        if [ -f "conformance-results/python-results.json" ]; then
+          PYTHON_RESULTS=$(cat conformance-results/python-results.json)
+          PYTHON_RATE=$(echo "$PYTHON_RESULTS" | jq -r '.rate')
+          echo "python-results=$PYTHON_RESULTS" >> $GITHUB_OUTPUT
+          echo "python-pass-rate=$PYTHON_RATE" >> $GITHUB_OUTPUT
+        fi
+        
+        if [ -f "conformance-results/typescript-results.json" ]; then
+          TS_RESULTS=$(cat conformance-results/typescript-results.json)
+          TS_RATE=$(echo "$TS_RESULTS" | jq -r '.rate')
+          echo "typescript-results=$TS_RESULTS" >> $GITHUB_OUTPUT
+          echo "typescript-pass-rate=$TS_RATE" >> $GITHUB_OUTPUT
+        fi
+        
+        if [ -f "conformance-results/badge-data.json" ]; then
+          BADGE_DATA=$(cat conformance-results/badge-data.json)
+          echo "badge-data=$BADGE_DATA" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Upload conformance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: conformance-results
+        path: conformance-results/
+
