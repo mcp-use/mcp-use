@@ -428,117 +428,32 @@ jobs:
             echo "⚠️ No results available" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Post comment to PR
+      - name: Save PR metadata
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        run: |
+          mkdir -p pr-metadata
+          echo "${{ github.event.pull_request.number }}" > pr-metadata/pr_number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > pr-metadata/head_sha.txt
+          echo "${{ github.event.pull_request.base.ref }}" > pr-metadata/base_ref.txt
+          echo "${{ github.run_id }}" > pr-metadata/run_id.txt
+
+      - name: Upload PR metadata
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const fs = require('fs');
-            const sha = context.sha.substring(0, 7);
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            
-            // Helper to safely load JSON
-            function loadResults(path) {
-              try {
-                const content = fs.readFileSync(path, 'utf8');
-                return JSON.parse(content);
-              } catch (e) {
-                return { passed: 0, failed: 0, rate: "0", tests: {} };
-              }
-            }
-            
-            // Load all results
-            const pyResults = loadResults('py_results.json');
-            const tsResults = loadResults('ts_results.json');
-            const mainPyResults = loadResults('main_py_results.json');
-            const mainTsResults = loadResults('main_ts_results.json');
-            const canaryPyResults = loadResults('canary_py_results.json');
-            const canaryTsResults = loadResults('canary_ts_results.json');
-            
-            // Calculate comparison indicators
-            function getComparisonIcon(current, baseline) {
-              if (!baseline || baseline.passed === 0) return '🆕';
-              const diff = current.passed - baseline.passed;
-              if (diff > 0) return `🟢 +${diff}`;
-              if (diff < 0) return `🔴 ${diff}`;
-              return '⚪ +0';
-            }
-            
-            const pyVsMain = getComparisonIcon(pyResults, mainPyResults);
-            const pyVsCanary = getComparisonIcon(pyResults, canaryPyResults);
-            const tsVsMain = getComparisonIcon(tsResults, mainTsResults);
-            const tsVsCanary = getComparisonIcon(tsResults, canaryTsResults);
-            
-            // Get all unique test names from both servers
-            const allTests = [...new Set([
-              ...Object.keys(pyResults.tests || {}),
-              ...Object.keys(tsResults.tests || {})
-            ])].sort();
-            
-            // Build the table header (use non-breaking hyphens to prevent line breaks)
-            const testHeaders = allTests.map(t => t.replace(/-/g, '&#8209;')).join(' | ');
-            const headerSeparator = allTests.map(() => ':---:').join(' | ');
-            
-            // Build Python row with change indicators
-            const pyTestCells = allTests.map(test => {
-              const current = pyResults.tests[test];
-              const baseline = mainPyResults.tests[test];
-              
-              let icon = '➖';
-              if (current === true) icon = '✅';
-              else if (current === false) icon = '❌';
-              
-              // Add change indicator if changed from baseline
-              if (baseline !== undefined && baseline !== current) {
-                if (current === true && baseline === false) return `${icon} +1`;
-                if (current === false && baseline === true) return `${icon} -1`;
-              }
-              
-              return icon;
-            }).join(' | ');
-            
-            // Build TypeScript row with change indicators
-            const tsTestCells = allTests.map(test => {
-              const current = tsResults.tests[test];
-              const baseline = mainTsResults.tests[test];
-              
-              let icon = '➖';
-              if (current === true) icon = '✅';
-              else if (current === false) icon = '❌';
-              
-              // Add change indicator if changed from baseline
-              if (baseline !== undefined && baseline !== current) {
-                if (current === true && baseline === false) return `${icon} +1`;
-                if (current === false && baseline === true) return `${icon} -1`;
-              }
-              
-              return icon;
-            }).join(' | ');
-            
-            const body = [
-              '<h2>',
-              '<picture style="display: inline-block; vertical-align: middle; margin-right: 8px;">',
-              '  <source media="(prefers-color-scheme: dark)" srcset="https://registry.npmmirror.com/@lobehub/icons-static-png/1.74.0/files/dark/mcp.png">',
-              '  <source media="(prefers-color-scheme: light)" srcset="https://registry.npmmirror.com/@lobehub/icons-static-png/1.74.0/files/light/mcp.png">',
-              '  <img alt="MCP" src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.74.0/files/light/mcp.png" height="32" width="32" style="display: inline-block; vertical-align: middle;">',
-              '</picture>',
-              '<span style="vertical-align: middle;">MCP Conformance Test Results</span>',
-              '</h2>',
-              '',
-              `**Commit:** \`${sha}\``,
-              '',
-              `| Server | Overall | vs Main | vs Canary | ${testHeaders} |`,
-              `|--------|:-------:|:-------:|:---------:|${headerSeparator}|`,
-              `| Python | ${pyResults.rate}% | ${pyVsMain} | ${pyVsCanary} | ${pyTestCells} |`,
-              `| TypeScript | ${tsResults.rate}% | ${tsVsMain} | ${tsVsCanary} | ${tsTestCells} |`,
-              '',
-              `[View full run details](${runUrl})`
-            ].join('\n');
-            
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
+          name: pr-metadata
+          path: pr-metadata/
+
+      - name: Upload parsed results for comment workflow
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: parsed-results
+          path: |
+            py_results.json
+            ts_results.json
+            main_py_results.json
+            main_ts_results.json
+            canary_py_results.json
+            canary_ts_results.json
 
