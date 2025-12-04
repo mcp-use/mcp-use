@@ -70,12 +70,16 @@ jobs:
 
       - name: Post comment to PR
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr-metadata.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.pr-metadata.outputs.head_sha }}
+          RUN_ID: ${{ steps.pr-metadata.outputs.run_id }}
         with:
           script: |
             const fs = require('fs');
-            const prNumber = '${{ steps.pr-metadata.outputs.pr_number }}';
-            const headSha = '${{ steps.pr-metadata.outputs.head_sha }}';
-            const runId = '${{ steps.pr-metadata.outputs.run_id }}';
+            const prNumber = process.env.PR_NUMBER;
+            const headSha = process.env.HEAD_SHA;
+            const runId = process.env.RUN_ID;
             const sha = headSha.substring(0, 7);
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
             
