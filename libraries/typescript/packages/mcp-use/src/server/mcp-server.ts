@@ -677,6 +677,14 @@ export class McpServer {
       this.serverHost = hostEnv;
     }
 
+    // Update baseUrl using the helper that checks MCP_URL env var
+    // This ensures widgets/assets use the correct public URL instead of 0.0.0.0
+    this.serverBaseUrl = getServerBaseUrlHelper(
+      this.serverBaseUrl,
+      this.serverHost,
+      this.serverPort
+    );
+
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthConfig && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
