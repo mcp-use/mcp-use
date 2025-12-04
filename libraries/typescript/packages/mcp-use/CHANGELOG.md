@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.9.1-canary.1
+
+### Patch Changes
+
+- 94f4852: fix: getServerBase url was not called anymore, fixed
+  - @mcp-use/cli@2.4.9-canary.1
+  - @mcp-use/inspector@0.11.1-canary.1
+
 ## 1.9.1-canary.0
 
 ### Patch Changes
