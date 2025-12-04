@@ -109,7 +109,6 @@ There are several ways to create an MCPClient:
 
 Create configuration programmatically:
 
-<CodeGroup>
 ```typescript TypeScript
 import { MCPClient } from 'mcp-use'
 
@@ -125,23 +124,6 @@ const config = {
 
 const client = new MCPClient(config)
 ```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-const config = {
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: { DISPLAY: ':1' }
-        }
-    }
-}
-
-const client = new MCPClient(config)
-```
-</CodeGroup>
 
 ### From Configuration File
 

@@ -648,6 +648,12 @@
       }
     ]
   },
+  "redirects": [
+  {
+    "source": "/typescript/getting-started",
+    "destination": "/typescript/getting-started/quickstart"
+  }
+],
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"

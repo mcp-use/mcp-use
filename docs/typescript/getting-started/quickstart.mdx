@@ -3,49 +3,170 @@ title: "Quickstart"
 description: "Get started with mcp-use in minutes"
 icon: "rocket"
 ---
-## Overview
-mcp-use is an MCP server framework and an SDK to build MCP Clients & AI Agents connected to MCP servers.
+**mcp-use** is a unified MCP framework to build **MCP servers**, **MCP clients** and **MCP Agents**.
+
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+graph LR
+    Agent[MCP Agent] -->|uses| Client[MCP Client]
+    Client -->|connects to| Server[MCP Server]
+    Server -->|provides tools| Client
+```
+
 
 | Section | Description |
 |---------|-------------|
-| [MCP Server](#mcp-server) | Set up MCP servers standalone or in an existing Express server |
-| [MCP Agent](#mcp-agent-installation) | Install and initialize and AI Agent with MCP Client |
+| [Agent](#mcp-agent) | An AI Agent with tool calling capabilities through MCP connections |
+| [Client](#mcp-client) | A full featured MCP Client implementation for TypeScript |
+| [Server](#mcp-server) | The MCP Server framework implementation for TypeScript, with Apps SDK and MCP-UI support |
 
-## MCP Server
-**mcp-use** is the complete MCP server framework for TypeScript. 
-It combines the official Model Context Protocol SDK with Express.js and React to enable both MCP protocol communication and HTTP endpoints for UI widgets and custom routes.
-You can expose UI components to chat clients like ChatGPT, Claude, and MCP-UI compatible ones.
 
-### Installation
-The fastest way to scaffold a new MCP server is to use the `create-mcp-use-app` command.
+## MCP Agent
+
+**mcp-use** has a complete MCP Agent implementation for TypeScript.
+**MCP Agents** are AI-powered agents that can use tools from MCP servers to accomplish complex tasks. They reason across multiple steps, selecting and executing tools as needed.
+Building such agents is easy with **mcp-use**, all you need is an LLM and the MCP Client.
 
 <CodeGroup>
+```bash yarn
+yarn add mcp-use
+```
 ```bash npm
-npx create-mcp-use-app@latest my-mcp-server
+npm install mcp-use
+```
+```bash pnpm
+pnpm add mcp-use
+```
+</CodeGroup>
+
+Here's a simple example to get you started for an agent with **browser tools** support.
+
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai' // use your preferred LLM provider
+import { MCPAgent, MCPClient } from 'mcp-use'
+// Create MCPClient from configuration object
+const client = new MCPClient({
+  mcpServers: {
+    playwright: {
+      command: 'npx',
+      args: ['@playwright/mcp@latest'],
+      env: {
+        DISPLAY: ':1'
+      }
+    }
+  }
+})
+
+// Create agent with the client
+const agent = new MCPAgent({
+  llm: new ChatOpenAI({ model: 'gpt-5.1' }), // use your preferred LLM provider
+  client,
+  maxSteps: 30
+})
+
+// Run the query
+const result = await agent.run(
+    'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
+)
+console.log(`\nResult: ${result}`)
+
+// Clean up
+await client.closeAllSessions()
+
+```
+
+<Tip>
+For multi-server setups, tool restrictions, and advanced configuration options, see the [Configuration Overview](/typescript/getting-started/configuration).
+</Tip>
+
+For a complete overview of the mcp-use MCP Agent, see the [MCP Agent](/typescript/agent) documentation.
+
+
+### Available MCP Servers
+
+mcp-use supports **any MCP server**. Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) list for available options.
+Or deploy your own following the instruction [below](#mcp-server).
+
+
+## MCP Client
+**mcp-use** has a complete MCP Client implementation for TypeScript.
+It improves the official Model Context Protocol Client SDK with browser and server environments support, react hooks and more.
+The mcp-use client has a conformance score of 100/100 based on the official MCP Conformance Tests.
+
+<CodeGroup>
+```bash yarn
+yarn add mcp-use
+```
+```bash npm
+npm install mcp-use
+```
+```bash pnpm
+pnpm add mcp-use
+```
+</CodeGroup>
+
+Then create a new MCP Client:
+
+<CodeGroup>
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
+
+const client = new MCPClient({
+    mcpServers: {
+        everything: {
+            command: 'npx',
+            args: ['-y', '@modelcontextprotocol/server-everything']
+        }
+    }
+})
+
+// Initialize all configured sessions
+await client.createAllSessions()
+
+// Get the session for a specific server
+const session = client.getSession('everything')
+
+// List available tools
+const tools = await session.listTools()
+console.log(`Available tools: ${tools.map(t => t.name).join(', ')}`)
+
+// Call a specific tool with arguments
+const result = await session.callTool(
+    'add',
+    { a: 1, b: 2 }
+)
+```
+
+```typescript React
+import { useMcp } from 'mcp-use/react'
+
+const { tools, callTool } = useMcp({
+    url: 'http://localhost:3000/mcp'
+})
+
+const result = await callTool('add', { a: 1, b: 2 })
+```
+
+</CodeGroup>
+
+To learn more about the MCP Client, see the [MCP Client](/typescript/client) documentation.
+
+## MCP Server
+**mcp-use** has a complete MCP server framework implementation for TypeScript. 
+It improves the official Model Context Protocol SDK with support for Edge Runtime, ChatGPT Apps SDK and MCP-UI. In addition, it supports all official MCP features and achieves a conformance score of 100/100 based on the official MCP Conformance Tests.
+
+```bash
+npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
 npm run dev
 ```
 
-```bash pnpm
-pnpm create mcp-use-app@latest my-mcp-server
-cd my-mcp-server
-pnpm dev
-```
-
-```bash yarn
-yarn create mcp-use-app@latest my-mcp-server
-cd my-mcp-server
-yarn dev
-```
-</CodeGroup>
 
 This command will create a new MCP server with:
 - A complete TypeScript MCP server project structure.
 - Example MCP Tools and Resources to get you started.
 - Example UI Widgets React components in `resources/` folder exposed as tools and resources in Apps SDK for ChatGPT and MCP-UI format.
-- Pre-configured build tools and dev server.
-- All necessary dependencies installed.
-- MCP Inspector to test your server.
+- Automatically launches an MCP Inspector in your browser to test your server.
 
 ### Project Structure
 
@@ -54,8 +175,8 @@ After creation, your project will have this structure:
 ```
 my-mcp-server/
 ├── resources/
-│   └── component.ts # MCP-UI / OpenAI Apps SDK example
-├── index.ts   # MCP server entry point
+│   └── component.tsx  # React widgets for Apps SDK and MCP-UI
+├── index.ts           # MCP server entry point, you can add tools and rest endpoints here
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -66,33 +187,38 @@ my-mcp-server/
 Commands:
 
 <CodeGroup>
-```bash npm
-npm run dev   # start the development server
-npm run build # build the server
-npm run start # start the production server
-```
-
-```bash pnpm
-pnpm dev   # start the development server
-pnpm build # build the server
-pnpm start # start the production server
-```
-
 ```bash yarn
 yarn dev   # start the development server
 yarn build # build the server
 yarn start # start the production server
+yarn deploy # deploy the server to mcp-use cloud
+```
+```bash npm
+npm run dev   # start the development server
+npm run build # build the server
+npm run start # start the production server
+npm run deploy # deploy the server to mcp-use cloud
+```
+```bash pnpm
+pnpm dev   # start the development server
+pnpm build # build the server
+pnpm start # start the production server
+pnpm deploy # deploy the server to mcp-use cloud
 ```
 </CodeGroup>
 
 When you run your MCP server, it will be available at:
 - **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
-- **MCP Inspector**: `http://localhost:3000/inspector` - It will automatically launch an [MCP Inspector](/inspector) for you to test you MCP server.
+- **MCP Inspector**: `http://localhost:3000/inspector` 
 
 
 ### Deploy Your MCP Server
 You can deploy your MCP server on any platform. Build your MCP server with `npm run build` and start the production server with `npm run start`.
 Or you can deploy it on [mcp-use Cloud](https://mcp-use.com).
+For detailed instructions, see the [Deploy Your Server](/typescript/server/deployment-mcp-use) guide.
+
+
+
 
 ### Next Steps
 
@@ -103,238 +229,21 @@ Or you can deploy it on [mcp-use Cloud](https://mcp-use.com).
 
 ---
 
-## MCP Agent
-
-
-### Installing LangChain Providers
-
-mcp-use works with various LLM providers through LangChain. You'll need to install the appropriate LangChain provider package for your chosen LLM:
-
-
-<Warning>
-**Tool Calling Required**: Only models with tool calling capabilities can be used with mcp-use. Make sure your chosen model supports function calling or tool use.
-</Warning>
-
-<Tip>
-For other providers, check the [LangChain chat models documentation](https://python.langchain.com/docs/integrations/chat/)
-</Tip>
-
-### Environment Setup
-
-<Note>
-Set up your environment variables in a `.env` file for secure API key management:
-</Note>
-
-```bash .env
-# LLM Provider Keys (set the ones you want to use)
-OPENAI_API_KEY=your_api_key_here
-ANTHROPIC_API_KEY=your_api_key_here
-GROQ_API_KEY=your_api_key_here
-GOOGLE_API_KEY=your_api_key_here
-```
-
-### Your First Agent
-
-Here's a simple example to get you started:
-
-<CodeGroup>
-```typescript TypeScript
-  import { ChatOpenAI } from '@langchain/openai'
-  import { config } from 'dotenv'
-  import { MCPAgent, MCPClient } from 'mcp-use'
-
-  async function main() {
-      // Load environment variables
-      config()
-
-      // Create configuration object
-      const configuration = {
-        mcpServers: {
-          playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: {
-              DISPLAY: ':1'
-            }
-          }
-        }
-      }
-
-      // Create MCPClient from configuration object
-      const client = new MCPClient(configuration)
-
-      // Create LLM
-      const llm = new ChatOpenAI({ model: 'gpt-4o' })
-
-      // Create agent with the client
-      const agent = new MCPAgent({
-        llm,
-        client,
-        maxSteps: 30
-      })
-
-      // Run the query
-      const result = await agent.run(
-          'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
-      )
-      console.log(`\nResult: ${result}`)
-
-      // Clean up
-      await client.closeAllSessions()
-  }
-
-  main().catch(console.error)
-  ```
-
-```typescript TypeScript
-  import { ChatOpenAI } from '@langchain/openai'
-  import { config } from 'dotenv'
-  import { MCPAgent, MCPClient } from 'mcp-use'
-
-  async function main() {
-      // Load environment variables
-      config()
-
-      // Create configuration object
-      const configuration = {
-        mcpServers: {
-          playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: {
-              DISPLAY: ':1'
-            }
-          }
-        }
-      }
-
-      // Create MCPClient from configuration object
-      const client = new MCPClient(configuration)
-
-      // Create LLM
-      const llm = new ChatOpenAI({ model: 'gpt-4o' })
-
-      // Create agent with the client
-      const agent = new MCPAgent({
-        llm,
-        client,
-        maxSteps: 30
-      })
-
-      // Run the query
-      const result = await agent.run(
-          'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
-      )
-      console.log(`\nResult: ${result}`)
-
-      // Clean up
-      await client.closeAllSessions()
-  }
-
-  main().catch(console.error)
-  ```
-</CodeGroup>
-
-### Configuration Options
-
-You can also load servers configuration from a config file:
-
-<CodeGroup>
-```typescript TypeScript
-  import { loadConfigFile } from 'mcp-use'
-
-  const config = await loadConfigFile("browser_mcp.json")
-  const client = new MCPClient(config)
-  ```
-
-```typescript TypeScript
-  import { loadConfigFile } from 'mcp-use'
-
-  const config = await loadConfigFile("browser_mcp.json")
-  const client = new MCPClient(config)
-  ```
-</CodeGroup>
-
-Example configuration file (`browser_mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"],
-      "env": {
-        "DISPLAY": ":1"
-      }
-    }
-  }
-}
-```
-
-<Tip>
-For multi-server setups, tool restrictions, and advanced configuration options, see the [Configuration Overview](/typescript/getting-started/configuration).
-</Tip>
-
-
-### Available MCP Servers
-
-mcp-use supports **any MCP server**. Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) list for available options.
-
-### Streaming Agent Output
-
-Stream agent responses as they're generated:
-
-<CodeGroup>
-```typescript TypeScript
-  // Stream intermediate steps
-  for await (const step of agent.stream("your query here")) {
-      console.log(`Tool: ${step.action.tool}`)
-      console.log(`Result: ${step.observation}`)
-  }
-
-  // Or stream token-level events
-  for await (const event of agent.streamEvents("your query here")) {
-      if (event.event === 'on_chat_model_stream') {
-          process.stdout.write(event.data?.chunk?.text || '')
-      }
-  }
-  ```
-
-```typescript TypeScript
-  // Stream intermediate steps
-  for await (const step of agent.stream("your query here")) {
-      console.log(`Tool: ${step.action.tool}`)
-      console.log(`Result: ${step.observation}`)
-  }
-
-  // Or stream token-level events
-  for await (const event of agent.streamEvents("your query here")) {
-      if (event.event === 'on_chat_model_stream') {
-          process.stdout.write(event.data?.chunk?.text || '')
-      }
-  }
-  ```
-</CodeGroup>
-
-<Tip>
-Uses LangChain's streaming API. See [streaming documentation](https://python.langchain.com/docs/how_to/streaming/) for more details.
-</Tip>
-
 
 ## Next Steps
 
 <CardGroup cols={3}>
-  <Card title="Configuration" icon="gear" href="/typescript/getting-started/configuration">
-    Complete configuration guide covering client setup and agent customization
+  <Card title="Configuration" icon="cog" href="/typescript/getting-started/configuration">
+    Configure your Agent and connected MCP servers
   </Card>
-  <Card title="LLM Integration" icon="brain" href="/typescript/agent/llm-integration">
-    Discover all supported LLM providers and optimization tips
+  <Card title="UI Widgets" icon="app-window-mac" href="/typescript/server/ui-widgets">
+    Create your own UI widgets for ChatGPT Apps SDK and MCP-UI.
   </Card>
-  <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
-    Explore real-world examples and use cases
+  <Card title="Deployment" icon="cloud" href="/typescript/server/deployment-mcp-use">
+    Deploy your MCP server to production with one command.
   </Card>
 </CardGroup>
 
 <Tip>
-**Need Help?** Join our community discussions on GitHub or check out the comprehensive examples in our repository!
+**Need Help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or [Github](https://github.com/mcp-use/mcp-use) communities.
 </Tip>
