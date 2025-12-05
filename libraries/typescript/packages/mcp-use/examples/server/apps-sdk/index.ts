@@ -123,6 +123,12 @@ server.tool(
     name: "get-current-weather",
     description: "Get current weather for a city",
     schema: z.object({ city: z.string() }),
+    // Widget config sets all registration-time metadata
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
   },
   async ({ city }) => {
     // Fetch weather data (mock for demo)
@@ -134,9 +140,8 @@ server.tool(
       windSpeed: 10,
     };
 
-    // Return widget with the fetched data
+    // Return widget with runtime data only
     return widget({
-      name: "weather-display",
       data: {
         city,
         temperature: weather.temperature,
@@ -145,8 +150,6 @@ server.tool(
         windSpeed: weather.windSpeed,
       },
       message: `Current weather in ${city}`,
-      invoking: "Fetching weather data...",
-      invoked: "Weather data loaded",
     });
   }
 );

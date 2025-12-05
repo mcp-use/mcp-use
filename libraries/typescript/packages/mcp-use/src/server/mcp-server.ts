@@ -139,6 +139,12 @@ class MCPServerClass {
   };
 
   /**
+   * Storage for widget definitions, used to inject metadata into tool responses
+   * when using the widget() helper with returnsWidget option
+   */
+  public widgetDefinitions = new Map<string, Record<string, unknown>>();
+
+  /**
    * Resource subscription manager for tracking and notifying resource updates
    */
   private subscriptionManager = new ResourceSubscriptionManager();
@@ -223,14 +229,81 @@ class MCPServerClass {
         boolean
       >
     ) => {
-      const actualCallback = callback || toolDefinition.cb;
+      // Auto-add widget metadata if widget config is set
+      // This matches the metadata structure used by auto-registered widget tools
+      const widgetConfig = toolDefinition.widget;
+      const widgetName = widgetConfig?.name;
+
+      if (widgetConfig && widgetName) {
+        const buildIdPart = self.buildId ? `-${self.buildId}` : "";
+        const outputTemplate = `ui://widget/${widgetName}${buildIdPart}.html`;
+
+        toolDefinition._meta = {
+          ...toolDefinition._meta,
+          "openai/outputTemplate": outputTemplate,
+          "openai/toolInvocation/invoking":
+            widgetConfig.invoking ?? `Loading ${widgetName}...`,
+          "openai/toolInvocation/invoked":
+            widgetConfig.invoked ?? `${widgetName} ready`,
+          "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
+          "openai/resultCanProduceWidget":
+            widgetConfig.resultCanProduceWidget ?? true,
+        };
+      }
+
+      let actualCallback = callback || toolDefinition.cb;
+
+      // If widget config is set, wrap the callback to inject widget metadata into response
+      if (widgetConfig && widgetName && actualCallback) {
+        const originalCallback = actualCallback;
+        actualCallback = (async (params: any, ctx: any) => {
+          const result = await originalCallback(params, ctx);
+
+          // Look up the widget definition and inject its metadata into the response
+          const widgetDef = self.widgetDefinitions.get(widgetName);
+
+          if (result && typeof result === "object") {
+            // Generate unique URI for this invocation
+            const randomId = Math.random().toString(36).substring(2, 15);
+            const buildIdPart = self.buildId ? `-${self.buildId}` : "";
+            const uniqueUri = `ui://widget/${widgetName}${buildIdPart}-${randomId}.html`;
+
+            // Build response metadata
+            const responseMeta: Record<string, unknown> = {
+              ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
+              "openai/outputTemplate": uniqueUri,
+              "openai/toolInvocation/invoking":
+                widgetConfig.invoking ?? `Loading ${widgetName}...`,
+              "openai/toolInvocation/invoked":
+                widgetConfig.invoked ?? `${widgetName} ready`,
+              "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
+              "openai/resultCanProduceWidget":
+                widgetConfig.resultCanProduceWidget ?? true,
+            };
+
+            // Set _meta on the result
+            (result as any)._meta = responseMeta;
+
+            // Update message if empty
+            if (
+              (result as any).content?.[0]?.type === "text" &&
+              !(result as any).content[0].text
+            ) {
+              (result as any).content[0].text = `Displaying ${widgetName}`;
+            }
+          }
+
+          return result;
+        }) as typeof actualCallback;
+      }
+
       if (actualCallback) {
         self.registrationRecipes.tools.set(toolDefinition.name, {
           config: toolDefinition as any,
           handler: actualCallback as any,
         });
       }
-      return originalTool.call(self, toolDefinition, callback as any);
+      return originalTool.call(self, toolDefinition, actualCallback as any);
     }) as typeof originalTool;
 
     this.prompt = (<HasOAuth extends boolean = false>(

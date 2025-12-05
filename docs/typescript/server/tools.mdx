@@ -169,12 +169,55 @@ server.tool({
 })
 ```
 
+## Returning Widgets from Tools
+
+Tools can return interactive UI widgets using the `widget()` helper and the `returnsWidget` option. This automatically configures the tool to render widgets in the Inspector and ChatGPT.
+
+<Warning>
+ You must set the `returnsWidget` option to `true` in the tool definition to return a widget.
+</Warning>
+
+```typescript
+import { widget } from 'mcp-use/server';
+import { z } from 'zod';
+
+server.tool({
+  name: 'get-weather',
+  description: 'Get current weather for a city',
+  schema: z.object({
+    city: z.string().describe('City name')
+  }),
+  // Widget config sets all registration-time metadata
+  widget: {
+    name: 'weather-display',  // Must match a widget in resources/
+    invoking: 'Fetching weather...',
+    invoked: 'Weather loaded'
+  }
+}, async ({ city }) => {
+  // Fetch weather data
+  const weatherData = await fetchWeather(city);
+  
+  // Return widget with runtime data only
+  return widget({
+    data: weatherData,
+    message: `Current weather in ${city}`
+  });
+});
+```
+
+**How it works:**
+- `widget: { name, invoking, invoked, ... }` - Configures all widget metadata at registration time
+- `widget()` helper - Returns runtime data (structured content and optional message)
+- The widget must exist in your `resources/` folder and be registered with the server
+
+See [UI Widgets](./ui-widgets) for complete widget creation and registration documentation.
+
 ## OpenAI Apps SDK Integration
 
 For ChatGPT and OpenAI compatible clients:
 
 <Tip>
-**Recommended Approach**: The recommended way to create OpenAI Apps SDK widgets is to use the [widget helper or automatic widget mounting](./ui-widgets#automatic-widget-registration), which automatically registers widgets from the `resources/` folder as tools. The manual approach below is shown for reference.
+**Recommended Approach**: The recommended way to create OpenAI Apps SDK widgets is to use the [widget helper with returnsWidget option](./ui-widgets#custom-tools-with-widgets) or [automatic widget mounting](./ui-widgets#automatic-widget-registration), which automatically registers widgets from the `resources/` folder as tools. The manual approach below is shown for reference.
 </Tip>
 
 ```typescript

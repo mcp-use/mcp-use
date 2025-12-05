@@ -111,7 +111,7 @@ describe("Widget Helper Integration Tests", () => {
       exposeAsTool: false,
     });
 
-    // Manual tool that uses widget() helper
+    // Manual tool that uses widget() helper with widget config
     server.tool(
       {
         name: "manual-comparison-tool",
@@ -122,32 +122,36 @@ describe("Widget Helper Integration Tests", () => {
             description: "A message",
           },
         },
+        widget: {
+          name: "comparison-widget",
+        },
       },
       async (params) => {
         return widget({
-          name: "comparison-widget",
           data: params,
           message: "Displaying comparison-widget",
         });
       }
     );
 
-    // Tool with custom metadata
+    // Tool with custom metadata in widget config
     server.tool(
       {
         name: "manual-custom-metadata-tool",
         description: "Manual tool with custom metadata",
         inputs: {},
-      },
-      async () => {
-        return widget({
+        widget: {
           name: "comparison-widget",
-          data: { foo: "bar" },
-          message: "Custom message",
           invoking: "Custom invoking...",
           invoked: "Custom invoked",
           widgetAccessible: false,
           resultCanProduceWidget: true,
+        },
+      },
+      async () => {
+        return widget({
+          data: { foo: "bar" },
+          message: "Custom message",
         });
       }
     );

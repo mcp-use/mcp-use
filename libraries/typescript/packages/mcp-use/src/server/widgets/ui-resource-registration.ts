@@ -35,6 +35,8 @@ export interface UIResourceServer {
   readonly serverHost: string;
   readonly serverPort?: number;
   readonly serverBaseUrl?: string;
+  /** Storage for widget definitions, used to inject metadata into tool responses */
+  widgetDefinitions: Map<string, Record<string, unknown>>;
   resource: (
     definition: ResourceDefinition | ResourceDefinitionWithoutCallback,
     callback?: any
@@ -91,6 +93,14 @@ export function uiResourceRegistration<T extends UIResourceServer>(
   definition: UIResourceDefinition
 ): T {
   const displayName = definition.title || definition.name;
+
+  // Store widget definition for use by tools with returnsWidget option
+  if (definition.type === "appsSdk" && definition._meta) {
+    server.widgetDefinitions.set(
+      definition.name,
+      definition._meta as Record<string, unknown>
+    );
+  }
 
   // Determine resource URI and mimeType based on type
   let resourceUri: string;
