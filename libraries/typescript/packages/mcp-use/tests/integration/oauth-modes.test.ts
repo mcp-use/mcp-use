@@ -754,8 +754,8 @@ describe("OAuth Modes Integration Tests", () => {
     it("should provide OAuth metadata endpoints (direct mode)", async () => {
       // In direct mode, the server tries to fetch metadata from the provider
       // Since we're using a mock provider, we'll mock the fetch
-      const originalFetch = global.fetch;
-      global.fetch = async (url: any) => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (url: any) => {
         if (url.toString().includes("oauth-authorization-server")) {
           return new Response(
             JSON.stringify({
@@ -790,7 +790,7 @@ describe("OAuth Modes Integration Tests", () => {
         );
         expect(metadata.token_endpoint).toBe("https://auth.example.com/token");
       } finally {
-        global.fetch = originalFetch;
+        globalThis.fetch = originalFetch;
       }
     });
 

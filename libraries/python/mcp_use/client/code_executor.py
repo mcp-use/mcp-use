@@ -232,19 +232,16 @@ class CodeExecutor:
             prefilter_config = self.code_mode_config.semantic_prefilter
             query = prefilter_config.query
             
-            # If no query provided, we'll filter based on a general context
-            # In practice, this could be extracted from agent context or user query
-            if not query:
-                query = "general purpose tools"
-            
             # Flatten all tools for filtering
             all_tools_flat: list[tuple[str, Any]] = []
             for server_name, tools in all_tools_by_server.items():
                 for tool in tools:
                     all_tools_flat.append((server_name, tool))
             
-            # Filter tools
-            if len(all_tools_flat) > prefilter_config.top_k_final:
+            # Only perform semantic filtering if a query is explicitly provided
+            # If no query, filter_tools will return all tools (but still filter enum parameters)
+            # This allows the agent to use context from the conversation later
+            if query and len(all_tools_flat) > prefilter_config.top_k_final:
                 logger.info(
                     f"Pre-filtering {len(all_tools_flat)} tools with semantic search "
                     f"(query: {query})"
@@ -335,6 +332,26 @@ class CodeExecutor:
                     f"Filtered tools from {len(all_tools_flat)} to "
                     f"{sum(len(tools) for tools in all_tools_by_server.values())}"
                 )
+            elif not query:
+                # No query provided - still filter enum parameters but don't do semantic filtering
+                # This allows the agent to use context from the conversation later
+                logger.debug(
+                    "No query provided for semantic pre-filtering. "
+                    "Filtering enum parameters only, keeping all tools available."
+                )
+                # Filter enum parameters for all tools without semantic filtering
+                tools_list = [tool for _, tool in all_tools_flat]
+                filtered_tools, _ = await self._semantic_prefilter.filter_tools(
+                    tools_list,
+                    query=None,  # No semantic filtering, just enum parameter filtering
+                    use_reranking=False,
+                )
+                # Rebuild all_tools_by_server with enum-filtered tools
+                all_tools_by_server = {}
+                for (server_name, _), filtered_tool in zip(all_tools_flat, filtered_tools, strict=False):
+                    if server_name not in all_tools_by_server:
+                        all_tools_by_server[server_name] = []
+                    all_tools_by_server[server_name].append(filtered_tool)
 
         # Create namespaces from (potentially filtered) tools
         for server_name, tools in all_tools_by_server.items():
