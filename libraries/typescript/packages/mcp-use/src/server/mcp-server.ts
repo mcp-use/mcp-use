@@ -801,6 +801,22 @@ export class McpServer<HasOAuth extends boolean = false> {
           ? Object.create(requestContext)
           : {};
 
+        // Explicitly copy auth and other properties for tool callbacks
+        // Object.create inheritance might not work for all property access patterns
+        if (requestContext) {
+          const auth =
+            requestContext.get("auth") || (requestContext as any).auth;
+          if (auth) {
+            (enhancedContext as any).auth = auth;
+          }
+          // Also copy other commonly used properties
+          const user =
+            requestContext.get("user") || (requestContext as any).user;
+          if (user) {
+            (enhancedContext as any).user = user;
+          }
+        }
+
         /**
          * Request sampling from the client's LLM with automatic progress notifications.
          *

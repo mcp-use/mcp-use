@@ -487,20 +487,34 @@ class CodeExecutor:
                 ):
                     prefilter_config = self.code_mode_config.semantic_prefilter
                     # Convert tool info back to tool objects for filtering
+                    # Optimize by building server->tools mapping once per server
                     tool_objects = []
                     tool_info_to_tool = {}
+                    server_tools_cache: dict[str, list[Any]] = {}
+                    
                     for tool_info in all_tools:
                         # Find the original tool object
                         server_name = tool_info["server"]
                         tool_name = tool_info["name"]
+                        
                         try:
-                            session = self.client.get_session(server_name)
-                            tools = await session.list_tools()
+                            # Cache tools per server to avoid repeated list_tools calls
+                            if server_name not in server_tools_cache:
+                                session = self.client.get_session(server_name)
+                                server_tools_cache[server_name] = await session.list_tools()
+                            
+                            tools = server_tools_cache[server_name]
+                            # Use dict lookup for faster tool finding (if tools support it)
+                            # Otherwise fall back to linear search
+                            tool_found = None
                             for tool in tools:
                                 if tool.name == tool_name:
-                                    tool_objects.append(tool)
-                                    tool_info_to_tool[id(tool)] = tool_info
+                                    tool_found = tool
                                     break
+                            
+                            if tool_found:
+                                tool_objects.append(tool_found)
+                                tool_info_to_tool[id(tool_found)] = tool_info
                         except Exception:
                             continue
                     

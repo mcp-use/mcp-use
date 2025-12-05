@@ -9,7 +9,9 @@ usage and improving accuracy by avoiding Context Rot.
 import json
 import math
 import os
+from collections import OrderedDict
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 import httpx
 
@@ -70,8 +72,11 @@ class SemanticPreFilter:
         self.top_k_final = top_k_final
         self.enum_reduction_threshold = enum_reduction_threshold
 
-        # Cache for embeddings
-        self._embedding_cache: dict[str, list[float]] = {}
+        # LRU cache for embeddings with max size to prevent unbounded growth
+        # Default max size: 1000 entries (configurable via env var)
+        max_cache_size = int(os.getenv("MCP_USE_EMBEDDING_CACHE_SIZE", "1000"))
+        self._embedding_cache: OrderedDict[str, list[float]] = OrderedDict()
+        self._max_cache_size = max_cache_size
         self._tool_embeddings: dict[str, list[float]] = {}
 
     async def _get_embedding(self, text: str, use_cache: bool = True) -> list[float]:
@@ -86,14 +91,27 @@ class SemanticPreFilter:
             Embedding vector
         """
         if use_cache and text in self._embedding_cache:
+            # Move to end (most recently used) for LRU
+            self._embedding_cache.move_to_end(text)
             return self._embedding_cache[text]
 
         try:
             # Check if it's OpenAI-compatible API
             if "openai" in self.embeddings_url.lower() or "api.openai.com" in self.embeddings_url:
+                # Use urllib.parse for robust URL manipulation
+                parsed_url = urlparse(self.embeddings_url)
+                if "/inference/" in parsed_url.path:
+                    # Replace /inference/ with /embeddings in the path
+                    new_path = parsed_url.path.replace("/inference/", "/embeddings")
+                    embeddings_url = urlunparse(
+                        parsed_url._replace(path=new_path)
+                    )
+                else:
+                    embeddings_url = self.embeddings_url
+                
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(
-                        self.embeddings_url.replace("/inference/", "/embeddings") if "/inference/" in self.embeddings_url else self.embeddings_url,
+                        embeddings_url,
                         headers={
                             "Authorization": f"Bearer {self.embeddings_api_key}",
                             "Content-Type": "application/json",
@@ -125,7 +143,7 @@ class SemanticPreFilter:
                         embedding = []
 
             if use_cache:
-                self._embedding_cache[text] = embedding
+                self._set_cache(text, embedding)
 
             return embedding
 
@@ -146,9 +164,20 @@ class SemanticPreFilter:
         try:
             # Check if it's OpenAI-compatible API
             if "openai" in self.embeddings_url.lower() or "api.openai.com" in self.embeddings_url:
+                # Use urllib.parse for robust URL manipulation
+                parsed_url = urlparse(self.embeddings_url)
+                if "/inference/" in parsed_url.path:
+                    # Replace /inference/ with /embeddings in the path
+                    new_path = parsed_url.path.replace("/inference/", "/embeddings")
+                    embeddings_url = urlunparse(
+                        parsed_url._replace(path=new_path)
+                    )
+                else:
+                    embeddings_url = self.embeddings_url
+                
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     response = await client.post(
-                        self.embeddings_url.replace("/inference/", "/embeddings") if "/inference/" in self.embeddings_url else self.embeddings_url,
+                        embeddings_url,
                         headers={
                             "Authorization": f"Bearer {self.embeddings_api_key}",
                             "Content-Type": "application/json",
@@ -471,4 +500,24 @@ class SemanticPreFilter:
             if key in schema and isinstance(schema[key], list):
                 for sub_schema in schema[key]:
                     self._filter_schema_enums(sub_schema)
+
+    def _set_cache(self, key: str, value: list[float]) -> None:
+        """
+        Set cache value with LRU eviction when max size is reached.
+
+        Args:
+            key: Cache key
+            value: Cache value (embedding vector)
+        """
+        # If key exists, move to end (most recently used)
+        if key in self._embedding_cache:
+            self._embedding_cache.move_to_end(key)
+        else:
+            # Add new entry
+            self._embedding_cache[key] = value
+            
+            # Evict oldest entry if cache exceeds max size
+            if len(self._embedding_cache) > self._max_cache_size:
+                # Remove oldest (first) entry
+                self._embedding_cache.popitem(last=False)
 
