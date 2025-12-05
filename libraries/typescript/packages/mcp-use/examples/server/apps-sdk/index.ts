@@ -1,4 +1,5 @@
-import { MCPServer, object } from "mcp-use/server";
+import { MCPServer, object, widget } from "mcp-use/server";
+import { z } from "zod";
 
 const server = new MCPServer({
   name: "test-app",
@@ -11,9 +12,14 @@ const server = new MCPServer({
  * All React components in the `resources/` folder are automatically registered as MCP tools and resources.
  * Just export widgetMetadata with description and Zod schema, and mcp-use handles the rest!
  *
- * It will automatically add to your MCP server:
- * - server.tool('get-brand-info')
- * - server.resource('ui://widget/get-brand-info')
+ * The product-search-result widget will automatically be registered as:
+ * - server.tool('product-search-result')
+ * - server.resource('ui://widget/product-search-result')
+ *
+ * The weather-display widget has exposeAsTool: false, so it's only registered as:
+ * - server.resource('ui://widget/weather-display')
+ *
+ * We then create custom tools that use the weather-display widget manually.
  *
  * See docs: https://docs.mcp-use.com/typescript/server/ui-widgets
  */
@@ -40,7 +46,7 @@ server.get("/api/fruits", (c) => {
   ]);
 });
 
-// Brand Info Tool - Returns brand information
+// Brand Info Tool - Returns structured data
 server.tool(
   {
     name: "get-brand-info",
@@ -76,6 +82,124 @@ server.tool(
         "MCP protocol compliance",
       ],
     })
+);
+
+/**
+ * CUSTOM TOOLS WITH MANUAL WIDGET USAGE
+ *
+ * The weather-display widget has exposeAsTool: false, so it's not automatically
+ * registered as a tool. Instead, we create custom tools that fetch data and
+ * then use the widget() helper to display it.
+ *
+ * This pattern is useful when you want:
+ * - Custom logic before showing the widget
+ * - Different tool parameters than widget props
+ * - One widget used by multiple tools
+ * - To combine data from multiple sources
+ */
+
+// Mock weather data for demo purposes
+const weatherData: Record<string, any> = {
+  tokyo: {
+    temperature: 22,
+    conditions: "partly cloudy",
+    humidity: 65,
+    windSpeed: 12,
+  },
+  london: { temperature: 15, conditions: "rainy", humidity: 80, windSpeed: 20 },
+  "new york": {
+    temperature: 18,
+    conditions: "sunny",
+    humidity: 55,
+    windSpeed: 8,
+  },
+  paris: { temperature: 17, conditions: "cloudy", humidity: 70, windSpeed: 15 },
+  sydney: { temperature: 25, conditions: "sunny", humidity: 60, windSpeed: 10 },
+};
+
+// Get current weather - uses the weather-display widget
+server.tool(
+  {
+    name: "get-current-weather",
+    description: "Get current weather for a city",
+    inputs: {
+      city: {
+        type: "string",
+        description: "The city name",
+      },
+    },
+  },
+  async ({ city }: { city: string }) => {
+    // Fetch weather data (mock for demo)
+    const cityLower = city.toLowerCase();
+    const weather = weatherData[cityLower] || {
+      temperature: 20,
+      conditions: "unknown",
+      humidity: 50,
+      windSpeed: 10,
+    };
+
+    // Return widget with the fetched data
+    return widget({
+      name: "weather-display",
+      data: {
+        city,
+        temperature: weather.temperature,
+        conditions: weather.conditions,
+        humidity: weather.humidity,
+        windSpeed: weather.windSpeed,
+      },
+      message: `Current weather in ${city}`,
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    });
+  }
+);
+
+// Get weather forecast - also uses the weather-display widget
+server.tool(
+  {
+    name: "get-weather-forecast",
+    description: "Get weather forecast for tomorrow in a city",
+    inputs: {
+      city: {
+        type: "string",
+        description: "The city name",
+      },
+    },
+  },
+  async ({ city }: { city: string }) => {
+    // Fetch forecast data (mock - add 3 degrees for tomorrow)
+    const cityLower = city.toLowerCase();
+    const today = weatherData[cityLower] || {
+      temperature: 20,
+      conditions: "unknown",
+      humidity: 50,
+      windSpeed: 10,
+    };
+
+    const tomorrow = {
+      temperature: today.temperature + 3,
+      conditions: "sunny",
+      humidity: today.humidity - 5,
+      windSpeed: today.windSpeed + 2,
+    };
+
+    // Return widget with the forecast data
+    return widget({
+      name: "weather-display",
+      data: {
+        city: `${city} (Tomorrow)`,
+        temperature: tomorrow.temperature,
+        conditions: tomorrow.conditions,
+        humidity: tomorrow.humidity,
+        windSpeed: tomorrow.windSpeed,
+      },
+      message: `Weather forecast for ${city}`,
+      invoking: "Fetching forecast...",
+      invoked: "Forecast loaded",
+    });
+  }
 );
 
 await server.listen();

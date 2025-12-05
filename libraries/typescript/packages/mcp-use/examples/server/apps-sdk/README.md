@@ -61,13 +61,18 @@ npm start
 
 ```
 apps-sdk/
-├── resources/                          # React widget components
-│   ├── display-weather.tsx              # Weather widget example
-│   ├── ecommerce-carousel.tsx           # Ecommerce product carousel
-│   ├── product-search-result.tsx        # Product search with filters
-│   ├── stores-locations-map.tsx         # Store locations map
-│   └── order-confirmation.tsx           # Order confirmation widget
-├── index.ts                             # Server entry point (includes brand info tool)
+├── resources/                           # React widget components
+│   ├── product-search-result/           # Auto-registered widget (folder-based)
+│   │   ├── widget.tsx                   # Widget entry point
+│   │   ├── components/                  # Reusable components
+│   │   ├── hooks/                       # Custom hooks
+│   │   └── types.ts                     # Type definitions
+│   ├── weather-display/                 # Manual-only widget (exposeAsTool: false)
+│   │   └── widget.tsx                   # Widget with custom tool usage
+│   └── styles.css                       # Global widget styles
+├── public/                              # Static assets
+│   └── fruits/                          # Example images
+├── index.ts                             # Server entry point with custom tools
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -89,6 +94,7 @@ const propSchema = z.object({
 export const widgetMetadata: WidgetMetadata = {
   description: 'My widget description',
   inputs: propSchema,
+  // exposeAsTool defaults to true - widget auto-registers as tool
 };
 
 const MyWidget: React.FC = () => {
@@ -100,8 +106,44 @@ export default MyWidget;
 ```
 
 This automatically creates:
-- **Tool**: `display-weather` - Accepts parameters via OpenAI
-- **Resource**: `ui://widget/display-weather` - Static access
+- **Tool**: `product-search-result` - Accepts parameters via OpenAI
+- **Resource**: `ui://widget/product-search-result` - Static access
+
+## Manual Tool Registration Pattern
+
+You can prevent auto-registration and create custom tools using the `widget()` helper:
+
+```typescript
+// In your widget file
+export const widgetMetadata: WidgetMetadata = {
+  description: 'Weather display widget',
+  inputs: propSchema,
+  exposeAsTool: false,  // Don't auto-register as tool
+};
+
+// In your server file
+import { widget } from 'mcp-use/server';
+
+server.tool({
+  name: 'get-current-weather',
+  inputs: z.object({ city: z.string() }),
+}, async ({ city }) => {
+  const weatherData = await fetchWeather(city);
+  return widget({
+    name: 'weather-display',
+    data: weatherData,
+    message: `Current weather in ${city}`
+  });
+});
+```
+
+This pattern is useful when you want:
+- Custom logic before showing the widget
+- Different tool parameters than widget props
+- One widget used by multiple tools
+- To combine data from multiple sources
+
+See `weather-display/widget.tsx` and `index.ts` for a complete example.
 
 ## Building Widgets with Apps SDK
 
