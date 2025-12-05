@@ -908,7 +908,7 @@ jobs:
           if [ "${{ runner.os }}" == "Windows" ]; then
             PACKAGE_PATH=$(powershell -Command "(Get-ChildItem ./packages/create-mcp-use-app-*.tgz).FullName")
           else
-            PACKAGE_PATH=$(realpath ./packages/create-mcp-use-app-*.tgz)
+            PACKAGE_PATH=$(realpath ./packages/create-mcp-use-app-*.tgz 2>/dev/null || realpath $(ls ./packages/create-mcp-use-app-*.tgz | head -n1))
           fi
 
           # Run create command based on PM
@@ -954,7 +954,7 @@ jobs:
       - name: Create app with npm
         shell: bash
         run: |
-          PACKAGE_PATH=$(realpath ./packages/create-mcp-use-app-*.tgz)
+          PACKAGE_PATH=$(realpath $(ls ./packages/create-mcp-use-app-*.tgz | head -n1))
           npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }} --dev
           echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Replace workspace deps with file references
@@ -1054,7 +1054,7 @@ jobs:
       - name: Create app with yarn
         shell: bash
         run: |
-          PACKAGE_PATH=$(realpath ./packages/create-mcp-use-app-*.tgz)
+          PACKAGE_PATH=$(realpath $(ls ./packages/create-mcp-use-app-*.tgz | head -n1))
           yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }} --dev
           echo "✅ Project created successfully with template ${{ matrix.template }}"
       - name: Replace workspace deps with file references
