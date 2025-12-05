@@ -372,6 +372,9 @@ export function createWidgetRegistration(
   const description =
     (metadata.description as string | undefined) || `Widget: ${widgetName}`;
   const title = (metadata.title as string | undefined) || widgetName;
+  // Extract exposeAsTool flag (defaults to true if not specified)
+  const exposeAsTool =
+    metadata.exposeAsTool !== undefined ? metadata.exposeAsTool : true;
 
   const mcp_connect_domain = serverConfig.serverBaseUrl
     ? new URL(serverConfig.serverBaseUrl || "").origin
@@ -392,6 +395,7 @@ export function createWidgetRegistration(
         props: props,
         html: html,
         dev: isDev,
+        exposeAsTool: exposeAsTool,
       },
       ...(metadata._meta || {}),
     },
