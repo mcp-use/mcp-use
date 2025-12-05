@@ -973,14 +973,14 @@ jobs:
           
           # Replace workspace:* with file: references in package.json
           # Use node for cross-platform JSON manipulation
-          node -e "
+          MCP_USE_TGZ="$MCP_USE_TGZ" CLI_TGZ="$CLI_TGZ" INSPECTOR_TGZ="$INSPECTOR_TGZ" node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             
             const replacements = {
-              'mcp-use': 'file:$MCP_USE_TGZ',
-              '@mcp-use/cli': 'file:$CLI_TGZ',
-              '@mcp-use/inspector': 'file:$INSPECTOR_TGZ'
+              'mcp-use': 'file:' + process.env.MCP_USE_TGZ,
+              '@mcp-use/cli': 'file:' + process.env.CLI_TGZ,
+              '@mcp-use/inspector': 'file:' + process.env.INSPECTOR_TGZ
             };
             
             for (const [name, newVersion] of Object.entries(replacements)) {
@@ -1073,14 +1073,14 @@ jobs:
           
           # Replace workspace:* with file: references in package.json
           # Use node for cross-platform JSON manipulation
-          node -e "
+          MCP_USE_TGZ="$MCP_USE_TGZ" CLI_TGZ="$CLI_TGZ" INSPECTOR_TGZ="$INSPECTOR_TGZ" node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             
             const replacements = {
-              'mcp-use': 'file:$MCP_USE_TGZ',
-              '@mcp-use/cli': 'file:$CLI_TGZ',
-              '@mcp-use/inspector': 'file:$INSPECTOR_TGZ'
+              'mcp-use': 'file:' + process.env.MCP_USE_TGZ,
+              '@mcp-use/cli': 'file:' + process.env.CLI_TGZ,
+              '@mcp-use/inspector': 'file:' + process.env.INSPECTOR_TGZ
             };
             
             for (const [name, newVersion] of Object.entries(replacements)) {
