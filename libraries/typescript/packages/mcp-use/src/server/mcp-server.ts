@@ -69,7 +69,7 @@ import {
   parseTemplateUri as parseTemplateUriHelper,
 } from "./utils/index.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
-import type { OAuthConfig, OAuthProvider } from "./oauth/providers/types.js";
+import type { OAuthProvider } from "./oauth/providers/types.js";
 import type {
   ToolDefinition,
   ToolCallback,
@@ -109,7 +109,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public buildId?: string;
   public sessions = new Map<string, SessionData>();
   private idleCleanupInterval?: NodeJS.Timeout;
-  private oauthConfig?: OAuthConfig; // Store OAuth config for lazy initialization
   private oauthSetupState = {
     complete: false,
     provider: undefined as OAuthProvider | undefined,
@@ -202,7 +201,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Create and configure Hono app with default middleware
     this.app = createHonoApp(requestLogger);
 
-    this.oauthConfig = config.oauth as OAuthConfig | undefined;
+    this.oauthProvider = config.oauth;
 
     // Wrap registration methods to capture recipes for multi-session support
     this.wrapRegistrationMethods();
@@ -892,11 +891,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // Setup OAuth before mounting widgets/MCP (if configured)
-    if (
-      this.oauthConfig &&
-      !this.oauthSetupState.complete &&
-      this.oauthProvider
-    ) {
+    if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
         this.app,
         this.oauthProvider,
@@ -960,11 +955,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
     // Setup OAuth before mounting widgets/MCP (if configured)
-    if (
-      this.oauthConfig &&
-      !this.oauthSetupState.complete &&
-      this.oauthProvider
-    ) {
+    if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
         this.app,
         this.oauthProvider,
