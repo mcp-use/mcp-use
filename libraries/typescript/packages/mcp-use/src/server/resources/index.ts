@@ -6,13 +6,15 @@ import type {
   ResourceTemplateDefinitionWithoutCallback,
   FlatResourceTemplateDefinition,
   FlatResourceTemplateDefinitionWithoutCallback,
+  ResourceTemplateDefinition,
+  EnhancedResourceContext,
 } from "../types/index.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   ReadResourceResult,
   CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { ResourceTemplateDefinition } from "../types/index.js";
+import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import { convertToolResultToResourceResult } from "./conversion.js";
 
 // Export subscription management
@@ -242,6 +244,37 @@ export interface ResourceTemplateServerContext {
  * }, async (uri, { userId }) => object(await getUserData(userId)))
  * ```
  */
+
+// Overloads for better type inference when callback has 2 parameters (uri, params)
+export function registerResourceTemplate<HasOAuth extends boolean = false>(
+  this: ResourceTemplateServerContext,
+  resourceTemplateDefinition:
+    | ResourceTemplateDefinition<HasOAuth>
+    | ResourceTemplateDefinitionWithoutCallback
+    | FlatResourceTemplateDefinition<HasOAuth>
+    | FlatResourceTemplateDefinitionWithoutCallback,
+  callback: (
+    uri: URL,
+    params: Record<string, any>
+  ) => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>
+): ResourceTemplateServerContext;
+// Overload for callback with 3 parameters (uri, params, ctx)
+// eslint-disable-next-line no-redeclare
+export function registerResourceTemplate<HasOAuth extends boolean = false>(
+  this: ResourceTemplateServerContext,
+  resourceTemplateDefinition:
+    | ResourceTemplateDefinition<HasOAuth>
+    | ResourceTemplateDefinitionWithoutCallback
+    | FlatResourceTemplateDefinition<HasOAuth>
+    | FlatResourceTemplateDefinitionWithoutCallback,
+  callback: (
+    uri: URL,
+    params: Record<string, any>,
+    ctx: EnhancedResourceContext<HasOAuth>
+  ) => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>
+): ResourceTemplateServerContext;
+// Implementation (supports all callback signatures)
+// eslint-disable-next-line no-redeclare
 export function registerResourceTemplate(
   this: ResourceTemplateServerContext,
   resourceTemplateDefinition:

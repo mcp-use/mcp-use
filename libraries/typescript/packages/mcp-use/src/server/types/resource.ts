@@ -107,27 +107,6 @@ interface ReadResourceCallbackBivariant<HasOAuth extends boolean> {
 }
 
 /**
- * Helper interface for bivariant parameter checking on resource template callbacks.
- *
- * Supports multiple callback signatures:
- * - `async () => ...` - No parameters
- * - `async (uri) => ...` - Just URI
- * - `async (uri, params) => ...` - URI and parameters
- * - `async (uri, params, ctx) => ...` - URI, parameters, and context
- *
- * The implementation checks callback.length to determine which signature to use.
- *
- * @internal
- */
-interface ReadResourceTemplateCallbackBivariant<HasOAuth extends boolean> {
-  bivarianceHack(
-    uri?: URL,
-    params?: Record<string, any>,
-    ctx?: EnhancedResourceContext<HasOAuth>
-  ): Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
-}
-
-/**
  * Callback type for reading a static resource.
  * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
  *
@@ -140,10 +119,38 @@ export type ReadResourceCallback<HasOAuth extends boolean = false> =
  * Callback type for reading a resource template with parameters.
  * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
  *
+ * Supports multiple callback signatures:
+ * - `async () => ...` - No parameters
+ * - `async (uri: URL) => ...` - Just URI (required)
+ * - `async (uri: URL, params: Record<string, any>) => ...` - URI and parameters (both required)
+ * - `async (uri: URL, params: Record<string, any>, ctx: EnhancedResourceContext) => ...` - All parameters (all required)
+ *
+ * The implementation checks callback.length to determine which signature to use.
+ *
  * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
  */
 export type ReadResourceTemplateCallback<HasOAuth extends boolean = false> =
-  ReadResourceTemplateCallbackBivariant<HasOAuth>["bivarianceHack"];
+  | (() => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL,
+      params: Record<string, any>
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL,
+      params: Record<string, any>,
+      ctx: EnhancedResourceContext<HasOAuth>
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >);
 
 /**
  * Configuration for a resource template
