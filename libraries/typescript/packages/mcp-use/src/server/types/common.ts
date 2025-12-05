@@ -169,7 +169,7 @@ export interface InputDefinition {
   type: "string" | "number" | "boolean" | "object" | "array";
   description?: string;
   required?: boolean;
-  default?: any;
+  default?: unknown;
 }
 
 /**

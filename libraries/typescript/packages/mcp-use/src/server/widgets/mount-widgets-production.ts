@@ -133,7 +133,7 @@ export async function mountWidgetsProduction(
     await registerWidgetFromTemplate(
       widgetName,
       indexPath,
-      metadata,
+      metadata as Record<string, unknown>,
       serverConfig,
       registerWidget,
       false // isDev

@@ -46,6 +46,7 @@ vi.mock("../src/adapters/langchain_adapter.js", () => {
 
 describe("mCPAgent streamEvents()", () => {
   let agent: MCPAgent;
+  // Using any for test mocks is acceptable for flexibility
   let mockClient: any;
   let mockLLM: any;
 

@@ -394,7 +394,7 @@ if (container && Component) {
           // The inputs is a Zod schema, we can use zodToJsonSchema or extract shape
           try {
             // Store the zod schema shape for inputs
-            metadata.inputs = metadata.inputs.shape || metadata.inputs;
+            metadata.inputs = (metadata.inputs as any).shape || metadata.inputs;
           } catch (error) {
             console.warn(
               `[WIDGET] Failed to extract props schema for ${widget.name}:`,
@@ -414,9 +414,12 @@ if (container && Component) {
     await registerWidgetFromTemplate(
       widget.name,
       pathHelpers.join(tempDir, widget.name, "index.html"),
-      metadata.description
+      (metadata.description
         ? metadata
-        : { ...metadata, description: widget.description },
+        : { ...metadata, description: widget.description }) as Record<
+        string,
+        unknown
+      >,
       serverConfig,
       registerWidget,
       true // isDev

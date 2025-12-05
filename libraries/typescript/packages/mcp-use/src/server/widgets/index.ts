@@ -6,6 +6,7 @@
  */
 
 import type { MCPServer } from "../mcp-server.js";
+import type { RegisterWidgetCallback } from "./widget-types.js";
 import { isDeno } from "../utils/runtime.js";
 import { isProductionMode, getCSPUrls } from "../utils/index.js";
 import { mountWidgetsDev } from "./mount-widgets-dev.js";
@@ -88,7 +89,7 @@ export async function mountWidgets(
     buildId: (server as any).buildId,
   };
 
-  const registerWidget = (widgetDef: any) => {
+  const registerWidget: RegisterWidgetCallback = (widgetDef) => {
     server.uiResource(widgetDef);
   };
 

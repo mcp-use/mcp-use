@@ -44,8 +44,8 @@ export type RegisterWidgetCallback = (widgetDefinition: {
   title: string;
   description: string;
   type: "appsSdk";
-  props: any;
-  _meta: Record<string, any>;
+  props: import("../types/resource.js").WidgetProps;
+  _meta: Record<string, unknown>;
   htmlTemplate: string;
-  appsSdkMetadata: Record<string, any>;
+  appsSdkMetadata: import("../types/resource.js").AppsSdkMetadata;
 }) => void;

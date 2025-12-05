@@ -36,7 +36,7 @@ export class ResourceSubscriptionManager {
     // Register resources/subscribe handler per MCP specification
     server.server.setRequestHandler(
       SubscribeRequestSchema,
-      async (request: any) => {
+      async (request: { params: { uri: string } }) => {
         const { uri } = request.params;
 
         // Get session ID from request context
@@ -66,7 +66,7 @@ export class ResourceSubscriptionManager {
     // Register resources/unsubscribe handler per MCP specification
     server.server.setRequestHandler(
       UnsubscribeRequestSchema,
-      async (request: any) => {
+      async (request: { params: { uri: string } }) => {
         const { uri } = request.params;
 
         // Get session ID from request context

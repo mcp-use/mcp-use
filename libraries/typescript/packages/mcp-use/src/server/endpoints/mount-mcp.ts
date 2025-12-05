@@ -19,7 +19,10 @@ import { generateUUID } from "../utils/runtime.js";
  */
 export async function mountMcp(
   app: HonoType,
-  mcpServerInstance: any, // The McpServer instance with getServerForSession() method
+  mcpServerInstance: {
+    getServerForSession: () => import("@modelcontextprotocol/sdk/server/mcp.js").McpServer;
+    cleanupSessionSubscriptions?: (sessionId: string) => void;
+  }, // The McpServer instance with getServerForSession() method
   sessions: Map<string, SessionData>,
   config: ServerConfig,
   isProductionMode: boolean

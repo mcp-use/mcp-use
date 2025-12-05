@@ -10,6 +10,8 @@ import type {
   CreateMessageRequest,
   CreateMessageResult,
   ElicitResult,
+  CallToolResult,
+  ElicitRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { runWithContext, getRequestContext } from "../context-storage.js";
 import type {
@@ -17,6 +19,7 @@ import type {
   ToolCallback,
   InferToolInput,
   InferToolOutput,
+  InputDefinition,
 } from "../types/index.js";
 import {
   type SessionData,
@@ -32,15 +35,27 @@ export interface ToolServerContext<_HasOAuth extends boolean = false> {
   server: {
     registerTool: (
       name: string,
-      config: any,
-      handler: (params: any, extra?: any) => Promise<any>
+      config: Record<string, unknown>,
+      handler: (
+        params: Record<string, unknown>,
+        extra?: {
+          _meta?: { progressToken?: number };
+          sendNotification?: (notification: {
+            method: string;
+            params: Record<string, unknown>;
+          }) => Promise<void>;
+        }
+      ) => Promise<CallToolResult>
     ) => void;
     server: {
       createMessage: (
-        params: any,
-        options?: any
+        params: CreateMessageRequest["params"],
+        options?: { timeout?: number }
       ) => Promise<CreateMessageResult>;
-      elicitInput: (params: any, options?: any) => Promise<ElicitResult>;
+      elicitInput: (
+        params: ElicitRequest["params"],
+        options?: { timeout?: number }
+      ) => Promise<ElicitResult>;
     };
   };
   /** Sessions map */
@@ -52,11 +67,11 @@ export interface ToolServerContext<_HasOAuth extends boolean = false> {
     schema: z.ZodObject<any>
   ): Record<string, z.ZodSchema>;
   /** Create params schema from inputs */
-  createParamsSchema(inputs: any[]): Record<string, z.ZodSchema>;
+  createParamsSchema(inputs: InputDefinition[]): Record<string, z.ZodSchema>;
   /** Create message for sampling */
   createMessage(
     params: CreateMessageRequest["params"],
-    options?: any
+    options?: { timeout?: number }
   ): Promise<CreateMessageResult>;
 }
 
@@ -150,7 +165,16 @@ export function toolRegistration<
       annotations: toolDefinition.annotations,
       _meta: toolDefinition._meta,
     },
-    async (params: any, extra?: any) => {
+    async (
+      params: Record<string, unknown>,
+      extra?: {
+        _meta?: { progressToken?: number };
+        sendNotification?: (notification: {
+          method: string;
+          params: Record<string, unknown>;
+        }) => Promise<void>;
+      }
+    ) => {
       // Get the HTTP request context from AsyncLocalStorage
       const initialRequestContext = getRequestContext();
 
