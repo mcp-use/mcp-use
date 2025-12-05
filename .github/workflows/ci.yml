@@ -962,9 +962,9 @@ jobs:
         shell: bash
         run: |
           # Get absolute paths to tarballs
-          MCP_USE_TGZ=$(realpath ../packages/mcp-use-*.tgz)
-          CLI_TGZ=$(realpath ../packages/mcp-use-cli-*.tgz)
-          INSPECTOR_TGZ=$(realpath ../packages/mcp-use-inspector-*.tgz)
+          MCP_USE_TGZ=$(realpath $(find ../packages -name 'mcp-use-*.tgz' -not -name '*cli*' -not -name '*inspector*' -type f | head -n1))
+          CLI_TGZ=$(realpath $(find ../packages -name 'mcp-use-cli-*.tgz' -type f | head -n1))
+          INSPECTOR_TGZ=$(realpath $(find ../packages -name 'mcp-use-inspector-*.tgz' -type f | head -n1))
           
           echo "Using tarballs:"
           echo "  mcp-use: $MCP_USE_TGZ"
@@ -1062,9 +1062,9 @@ jobs:
         shell: bash
         run: |
           # Get absolute paths to tarballs
-          MCP_USE_TGZ=$(realpath ../packages/mcp-use-*.tgz)
-          CLI_TGZ=$(realpath ../packages/mcp-use-cli-*.tgz)
-          INSPECTOR_TGZ=$(realpath ../packages/mcp-use-inspector-*.tgz)
+          MCP_USE_TGZ=$(realpath $(find ../packages -name 'mcp-use-*.tgz' -not -name '*cli*' -not -name '*inspector*' -type f | head -n1))
+          CLI_TGZ=$(realpath $(find ../packages -name 'mcp-use-cli-*.tgz' -type f | head -n1))
+          INSPECTOR_TGZ=$(realpath $(find ../packages -name 'mcp-use-inspector-*.tgz' -type f | head -n1))
           
           echo "Using tarballs:"
           echo "  mcp-use: $MCP_USE_TGZ"
