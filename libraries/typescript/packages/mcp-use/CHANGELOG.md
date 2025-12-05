@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.10.0-canary.4
+
+### Patch Changes
+
+- 4f8c871: chore: trigger canary
+  - @mcp-use/cli@2.5.0-canary.4
+  - @mcp-use/inspector@0.12.0-canary.4
+
 ## 1.10.0-canary.3
 
 ### Patch Changes
