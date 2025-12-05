@@ -26,24 +26,26 @@ Deno.test("MCP Server - Create and register tool", async () => {
   });
 
   // Register a simple tool
-  server.tool({
-    name: "echo",
-    description: "Echo back the input message",
-    inputs: [
-      {
-        name: "message",
-        type: "string",
-        description: "Message to echo",
-        required: true,
-      },
-    ],
-    cb: async (params: Record<string, any>) => {
+  server.tool(
+    {
+      name: "echo",
+      description: "Echo back the input message",
+      inputs: [
+        {
+          name: "message",
+          type: "string",
+          description: "Message to echo",
+          required: true,
+        },
+      ],
+    },
+    async (params: Record<string, any>) => {
       const message = params.message as string;
       return {
         content: [{ type: "text", text: `Echo: ${message}` }],
       };
-    },
-  });
+    }
+  );
 
   // Verify server exists and has expected methods
   assertExists(server);
@@ -84,22 +86,24 @@ Deno.test("MCP Server - Prompt registration", async () => {
   });
 
   // Register a prompt
-  server.prompt({
-    name: "test-prompt",
-    description: "A test prompt",
-    args: [
-      {
-        name: "topic",
-        type: "string",
-        description: "The topic",
-        required: true,
-      },
-    ],
-    cb: async (params: Record<string, any>) => {
+  server.prompt(
+    {
+      name: "test-prompt",
+      description: "A test prompt",
+      args: [
+        {
+          name: "topic",
+          type: "string",
+          description: "The topic",
+          required: true,
+        },
+      ],
+    },
+    async (params: Record<string, any>) => {
       const topic = params.topic as string;
       return `Tell me about ${topic}`;
-    },
-  });
+    }
+  );
 
   // Verify server exists
   assertExists(server);
@@ -114,17 +118,21 @@ Deno.test("MCP Server - Multiple registrations", async () => {
   });
 
   // Register multiple items
-  server.tool({
-    name: "tool1",
-    description: "First tool",
-    cb: async () => ({ content: [{ type: "text", text: "Tool 1" }] }),
-  });
+  server.tool(
+    {
+      name: "tool1",
+      description: "First tool",
+    },
+    async () => ({ content: [{ type: "text", text: "Tool 1" }] })
+  );
 
-  server.tool({
-    name: "tool2",
-    description: "Second tool",
-    cb: async () => ({ content: [{ type: "text", text: "Tool 2" }] }),
-  });
+  server.tool(
+    {
+      name: "tool2",
+      description: "Second tool",
+    },
+    async () => ({ content: [{ type: "text", text: "Tool 2" }] })
+  );
 
   server.resource({
     uri: "test://res1",

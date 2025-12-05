@@ -31,11 +31,13 @@ describe("Elicitation Integration Tests", () => {
     });
 
     // Add test tools
-    server.tool({
-      name: "form-mode-simple",
-      description: "Simple form mode elicitation",
-      inputs: [],
-      cb: async (_: any, ctx: any) => {
+    server.tool(
+      {
+        name: "form-mode-simple",
+        description: "Simple form mode elicitation",
+        inputs: [],
+      },
+      async (_: any, ctx: any) => {
         const result = await ctx.elicit(
           "Enter your name",
           z.object({
@@ -52,14 +54,16 @@ describe("Elicitation Integration Tests", () => {
         return {
           content: [{ type: "text", text: "No name provided" }],
         };
-      },
-    });
+      }
+    );
 
-    server.tool({
-      name: "form-mode-validation",
-      description: "Form mode with validation",
-      inputs: [],
-      cb: async (_: any, ctx: any) => {
+    server.tool(
+      {
+        name: "form-mode-validation",
+        description: "Form mode with validation",
+        inputs: [],
+      },
+      async (_: any, ctx: any) => {
         const result = await ctx.elicit(
           "Enter user details",
           z.object({
@@ -83,14 +87,16 @@ describe("Elicitation Integration Tests", () => {
         return {
           content: [{ type: "text", text: "Cancelled" }],
         };
-      },
-    });
+      }
+    );
 
-    server.tool({
-      name: "url-mode-test",
-      description: "URL mode elicitation",
-      inputs: [],
-      cb: async (_: any, ctx: any) => {
+    server.tool(
+      {
+        name: "url-mode-test",
+        description: "URL mode elicitation",
+        inputs: [],
+      },
+      async (_: any, ctx: any) => {
         const result = await ctx.elicit(
           "Please authorize",
           "https://example.com/oauth"
@@ -105,14 +111,16 @@ describe("Elicitation Integration Tests", () => {
         return {
           content: [{ type: "text", text: "Authorization failed" }],
         };
-      },
-    });
+      }
+    );
 
-    server.tool({
-      name: "with-timeout",
-      description: "Elicitation with timeout",
-      inputs: [],
-      cb: async (_: any, ctx: any) => {
+    server.tool(
+      {
+        name: "with-timeout",
+        description: "Elicitation with timeout",
+        inputs: [],
+      },
+      async (_: any, ctx: any) => {
         const result = await ctx.elicit(
           "Quick response",
           z.object({ answer: z.string() }),
@@ -128,8 +136,8 @@ describe("Elicitation Integration Tests", () => {
         return {
           content: [{ type: "text", text: "No answer" }],
         };
-      },
-    });
+      }
+    );
 
     // Start server
     await server.listen(TEST_PORT);

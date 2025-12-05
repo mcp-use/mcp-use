@@ -9,13 +9,15 @@ const server = new MCPServer({
 });
 
 // Register tools from the original index.ts
-server.tool({
-  name: "get-my-city",
-  description: "Get my city",
-  cb: async () => {
-    return { content: [{ type: "text", text: `My city is San Francisco` }] };
+server.tool(
+  {
+    name: "get-my-city",
+    description: "Get my city",
   },
-});
+  async () => {
+    return { content: [{ type: "text", text: `My city is San Francisco` }] };
+  }
+);
 
 // Start the server - automatically handles CORS for Deno/Supabase
 await server.listen();

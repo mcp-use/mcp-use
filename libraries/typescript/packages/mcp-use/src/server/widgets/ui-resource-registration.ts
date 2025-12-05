@@ -212,13 +212,15 @@ export function uiResourceRegistration(
     }
   }
 
-  this.tool({
-    name: definition.name,
-    title: definition.title,
-    description: definition.description,
-    inputs: convertPropsToInputs(definition.props),
-    _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
-    cb: async (params: any) => {
+  this.tool(
+    {
+      name: definition.name,
+      title: definition.title,
+      description: definition.description,
+      inputs: convertPropsToInputs(definition.props),
+      _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
+    },
+    async (params: any) => {
       // Create the UIResource with user-provided params
       const uiResource = await createWidgetUIResource(
         definition,
@@ -267,8 +269,8 @@ export function uiResourceRegistration(
           uiResource,
         ],
       };
-    },
-  });
+    }
+  );
 
   return this;
 }
