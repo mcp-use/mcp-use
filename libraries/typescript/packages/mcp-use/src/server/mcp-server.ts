@@ -70,7 +70,7 @@ import {
 } from "./utils/index.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
 
-export class McpServer {
+export class MCPServer {
   /**
    * Native MCP server instance from @modelcontextprotocol/sdk
    * Exposed publicly for advanced use cases
@@ -141,7 +141,7 @@ export class McpServer {
    * access to Hono methods while preserving MCP server functionality.
    *
    * @param config - Server configuration including name, version, and description
-   * @returns A proxied McpServer instance that supports both MCP and Hono methods
+   * @returns A proxied MCPServer instance that supports both MCP and Hono methods
    */
   constructor(config: ServerConfig) {
     this.config = config;
@@ -281,6 +281,17 @@ export class McpServer {
             extraSendNotification
           );
 
+        // Find the sessionId by looking up the session in the sessions map
+        let sessionId: string | undefined;
+        if (session) {
+          for (const [id, s] of this.sessions.entries()) {
+            if (s === session) {
+              sessionId = id;
+              break;
+            }
+          }
+        }
+
         // Use the session server's native createMessage and elicitInput
         // These are already properly connected to the transport
         const createMessageWithLogging = async (params: any, options?: any) => {
@@ -310,7 +321,10 @@ export class McpServer {
           newServer.server.elicitInput.bind(newServer.server),
           progressToken,
           sendNotification,
-          session?.logLevel
+          session?.logLevel,
+          session?.clientCapabilities,
+          sessionId,
+          this.sessions
         );
 
         const executeCallback = async () => {
@@ -413,26 +427,39 @@ export class McpServer {
     // Resource Templates
     for (const [_name, recipe] of this.registrationRecipes.resourceTemplates) {
       const { config, handler } = recipe;
+
+      // Detect structure type: flat (uriTemplate on config) vs nested (resourceTemplate.uriTemplate)
+      const isFlatStructure = "uriTemplate" in config;
+
+      // Extract uriTemplate and metadata based on structure
+      const uriTemplate = isFlatStructure
+        ? (config as any).uriTemplate
+        : config.resourceTemplate.uriTemplate;
+
+      const mimeType = isFlatStructure
+        ? (config as any).mimeType
+        : config.resourceTemplate.mimeType;
+
+      const templateDescription = isFlatStructure
+        ? undefined
+        : config.resourceTemplate.description;
+
       // Create ResourceTemplate instance from SDK
-      const template = new ResourceTemplate(
-        config.resourceTemplate.uriTemplate,
-        {
-          list: undefined,
-          complete: undefined,
-        }
-      );
+      const template = new ResourceTemplate(uriTemplate, {
+        list: undefined,
+        complete: undefined,
+      });
 
       // Create metadata object
       const metadata: any = {};
       if (config.title) {
         metadata.title = config.title;
       }
-      if (config.description || config.resourceTemplate.description) {
-        metadata.description =
-          config.description || config.resourceTemplate.description;
+      if (config.description || templateDescription) {
+        metadata.description = config.description || templateDescription;
       }
-      if (config.resourceTemplate.mimeType) {
-        metadata.mimeType = config.resourceTemplate.mimeType;
+      if (mimeType) {
+        metadata.mimeType = mimeType;
       }
       if (config.annotations) {
         metadata.annotations = config.annotations;
@@ -444,10 +471,7 @@ export class McpServer {
         metadata,
         async (uri: URL) => {
           // Parse URI parameters from the template
-          const params = this.parseTemplateUri(
-            config.resourceTemplate.uriTemplate,
-            uri.toString()
-          );
+          const params = this.parseTemplateUri(uriTemplate, uri.toString());
           const result = await handler(uri, params);
 
           // If it's already a ReadResourceResult, return as-is
@@ -606,7 +630,7 @@ export class McpServer {
 
     const result = await mountMcpHelper(
       this.app,
-      this, // Pass the McpServer instance so mountMcp can call getServerForSession()
+      this, // Pass the MCPServer instance so mountMcp can call getServerForSession()
       this.sessions,
       this.config,
       isProductionModeHelper()
@@ -731,7 +755,7 @@ export class McpServer {
    * @example
    * ```typescript
    * // For Supabase Edge Functions (handles path rewriting automatically)
-   * const server = createMCPServer('my-server');
+   * const server = new MCPServer({ name: 'my-server', version: '1.0.0' });
    * server.tool({ ... });
    * const handler = await server.getHandler({ provider: 'supabase' });
    * Deno.serve(handler);
@@ -740,7 +764,7 @@ export class McpServer {
    * @example
    * ```typescript
    * // For Cloudflare Workers
-   * const server = createMCPServer('my-server');
+   * const server = new MCPServer({ name: 'my-server', version: '1.0.0' });
    * server.tool({ ... });
    * const handler = await server.getHandler();
    * export default { fetch: handler };
@@ -831,7 +855,7 @@ export class McpServer {
   }
 }
 
-export type McpServerInstance = McpServer & HonoType;
+export type McpServerInstance = MCPServer & HonoType;
 
 /**
  * Create a new MCP server instance
@@ -851,14 +875,22 @@ export type McpServerInstance = McpServer & HonoType;
  *
  * @example
  * ```typescript
- * // Basic usage (development mode - allows all origins)
+ * // Recommended: Use class constructor (matches MCPClient/MCPAgent pattern)
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   description: 'My MCP server'
+ * })
+ *
+ * // Legacy: Factory function (still supported for backward compatibility)
  * const server = createMCPServer('my-server', {
  *   version: '1.0.0',
  *   description: 'My MCP server'
  * })
  *
  * // Production mode with explicit allowed origins
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
  *   version: '1.0.0',
  *   allowedOrigins: [
  *     'https://myapp.com',
@@ -867,13 +899,15 @@ export type McpServerInstance = McpServer & HonoType;
  * })
  *
  * // With custom host (e.g., for Docker or remote access)
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
  *   version: '1.0.0',
  *   host: '0.0.0.0' // or 'myserver.com'
  * })
  *
  * // With full base URL (e.g., behind a proxy or custom domain)
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
  *   version: '1.0.0',
  *   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
  * })
@@ -900,7 +934,7 @@ export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> = {}
 ): McpServerInstance {
-  const instance = new McpServer({
+  const instance = new MCPServer({
     name,
     version: config.version || "1.0.0",
     description: config.description,

@@ -33,6 +33,8 @@ export interface SessionData {
   honoContext?: Context;
   /** Minimum log level for filtering log messages (RFC 5424 levels) */
   logLevel?: string;
+  /** Client capabilities advertised during initialization */
+  clientCapabilities?: Record<string, any>;
 }
 
 /**

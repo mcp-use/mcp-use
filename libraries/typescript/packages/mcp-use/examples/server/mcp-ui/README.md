@@ -76,9 +76,10 @@ npm start
 ### Simple Widget Registration
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   description: 'Server with UIResource widgets',
 })

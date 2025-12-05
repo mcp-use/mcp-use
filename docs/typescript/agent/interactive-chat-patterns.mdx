@@ -1,16 +1,27 @@
 ---
 title: "Interactive Chat Patterns"
-description: "Create interactive chat interfaces with persistent conversation memory"
-icon: "message-circle"
+description: "Build conversational interfaces with memory"
+icon: "messages"
 ---
 
-## Building a chat loop
+Interactive chat patterns enable you to build conversational interfaces where agents maintain context across multiple turns, remember previous interactions, and provide coherent, contextual responses.
 
-With mcp-use you can build interactive interface where users can have conversations with
-your `MCPAgent`, maintaining context and memory across multiple queries.
+## Why Interactive Patterns?
 
-## Basic chat loop
-Here's a basic chat-loop with conversation memory enabled:
+Building chat interfaces with agents requires:
+
+- **Memory management**: Remember previous messages and context
+- **Turn-based interaction**: Handle user input and agent responses
+- **Context preservation**: Maintain conversation flow across multiple exchanges
+- **State management**: Track conversation state and history
+
+<Info>
+**Memory-Enabled Agents**: Enable `memoryEnabled: true` when creating your agent to automatically track conversation history across multiple turns.
+</Info>
+
+## Basic Chat Loop
+
+Create a simple interactive chat interface with persistent memory:
 
 <CodeGroup>
 ```typescript TypeScript

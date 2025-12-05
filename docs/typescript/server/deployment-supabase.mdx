@@ -1,6 +1,7 @@
 ---
-title: Deploying to Supabase
+title: Supabase
 description: Deploy your MCP server on Supabase Edge Functions
+icon: "); -webkit-mask-image: url('https://simpleicons.org/icons/supabase.svg'); mask-image: url('https://simpleicons.org/icons/supabase.svg');/*"
 ---
 
 This guide demonstrates how to deploy an MCP server on [Supabase Edge Functions](https://supabase.com/docs/guides/functions), which runs on Deno and provides a serverless environment for your MCP applications.
@@ -125,7 +126,7 @@ A full working example is available in the repository: [Supabase Example](https:
 ```typescript
 // supabase/functions/mcp-server/index.ts
 
-import { createMCPServer } from "https://esm.sh/mcp-use@latest/server";
+import { MCPServer } from "https://esm.sh/mcp-use@latest/server";
 
 const PROJECT_REF = Deno.env.get("SUPABASE_PROJECT_REF") || "your-project-ref";
 const BASE_URL =
@@ -133,7 +134,8 @@ const BASE_URL =
   `https://${PROJECT_REF}.supabase.co/functions/v1/mcp-server`;
 
 // Create the mcp-use MCP server instance
-const server = createMCPServer("test-app", {
+const server = new MCPServer({
+  name: "test-app",
   version: "1.0.0",
   description:
     "MCP server with automatic UI widget registration deployed on Supabase",

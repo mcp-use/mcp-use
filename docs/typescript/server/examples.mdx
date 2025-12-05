@@ -13,7 +13,7 @@ This page provides complete, production-ready examples of MCP servers built with
 A complete weather information server with tools, resources, and UI widgets.
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 import express from 'express'
 import axios from 'axios'
 
@@ -35,7 +35,8 @@ interface Forecast {
 }
 
 // Create server
-const server = createMCPServer('weather-service', {
+const server = new MCPServer({
+  name: 'weather-service',
   version: '2.0.0',
   description: 'Comprehensive weather information service'
 })
@@ -383,12 +384,13 @@ server.listen(PORT).then(() => {
 A server for database operations with schema inspection and query execution.
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 import { Pool } from 'pg' // PostgreSQL client
 import sqlFormatter from 'sql-formatter'
 
 // Create server
-const server = createMCPServer('database-manager', {
+const server = new MCPServer({
+  name: 'database-manager',
   version: '1.0.0',
   description: 'Database management and query execution'
 })
@@ -711,12 +713,13 @@ server.listen(3000)
 A server for browsing and managing files with content preview.
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 import fs from 'fs/promises'
 import path from 'path'
 import mime from 'mime-types'
 
-const server = createMCPServer('file-manager', {
+const server = new MCPServer({
+  name: 'file-manager',
   version: '1.0.0',
   description: 'File system browsing and management'
 })

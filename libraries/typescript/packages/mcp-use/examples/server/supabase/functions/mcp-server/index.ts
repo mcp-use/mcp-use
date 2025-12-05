@@ -1,7 +1,8 @@
 // MCP Server deployed on Supabase Edge Functions
-import { createMCPServer } from "https://esm.sh/mcp-use@1.2.5-canary.4/server";
+import { MCPServer } from "https://esm.sh/mcp-use@1.2.5-canary.4/server";
 
-const server = createMCPServer("test-app", {
+const server = new MCPServer({
+  name: "test-app",
   version: "1.0.0",
   description:
     "Test MCP server with automatic UI widget registration deployed on Supabase",

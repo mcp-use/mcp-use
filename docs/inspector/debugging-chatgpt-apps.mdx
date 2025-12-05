@@ -510,9 +510,10 @@ For the complete OpenAI Apps SDK API reference, see:
 Your ChatGPT App needs an MCP server that exposes tools and optionally widgets:
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-const server = createMCPServer('my-chatgpt-app', {
+const server = new MCPServer({
+  name: 'my-chatgpt-app',
   version: '1.0.0',
 })
 

@@ -1,4 +1,8 @@
-export { createMCPServer, type McpServerInstance } from "./mcp-server.js";
+export {
+  MCPServer,
+  createMCPServer,
+  type McpServerInstance,
+} from "./mcp-server.js";
 
 // Re-export tool context types
 export type {
@@ -99,4 +103,8 @@ export type {
   WidgetConfig,
   WidgetManifest,
   WidgetProps,
+  // MCP SDK type re-exports
+  ToolAnnotations,
+  GetPromptResult,
+  PromptResult,
 } from "./types/index.js";

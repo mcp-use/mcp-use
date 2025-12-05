@@ -1,16 +1,38 @@
 ---
 title: "Logging"
-description: "MCP provides a dedicated channel for servers to send log messages to the client, which is separate from the standard notification system. This allows for structured and level-specific logging without cluttering the main message stream."
-icon: "logs"
+description: "Handle server logs and debug output"
+icon: "file-text"
 ---
 
-`mcp-use` supports this feature through a `logging_callback` function that can be passed to the `MCPClient`.
+MCP provides a dedicated logging channel for servers to send structured log messages to clients. This enables proper debugging, monitoring, and observability without cluttering the main notification stream.
 
-## Client-Side: Handling Logs
+<Warning>
+**TypeScript Support Coming Soon**
 
-While you can catch `LoggingMessageNotification` events within the general `message_handler`, the recommended approach is to use the dedicated `logging_callback`. This keeps your code clean by separating logging concerns from other notification handling.
+Logging callbacks are currently under development for the TypeScript client. The Python version has full support. See the [Python Logging documentation](/python/client/logging) for reference.
+</Warning>
 
-The `logging_callback` receives the parameters of the log notification directly, which include the `level` and `message`.
+## Understanding Logging
+
+The MCP logging system provides:
+
+- **Structured messages**: Level-based logging (debug, info, warning, error)
+- **Separate channel**: Dedicated logging path independent of notifications
+- **Server diagnostics**: Debug server behavior without main protocol interference
+- **Client-side handling**: Process logs according to your application needs
+
+## Logging Levels
+
+MCP defines standard log levels:
+
+- **debug**: Detailed diagnostic information
+- **info**: General informational messages
+- **warning**: Warning messages for potential issues
+- **error**: Error messages for failures
+
+## Future API
+
+When implemented, the TypeScript client will support logging through a callback:
 
 <CodeGroup>
 ```typescript TypeScript

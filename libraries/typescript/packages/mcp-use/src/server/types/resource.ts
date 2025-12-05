@@ -107,18 +107,6 @@ interface ReadResourceCallbackBivariant<HasOAuth extends boolean> {
 }
 
 /**
- * Helper interface for bivariant parameter checking on resource template callbacks.
- * @internal
- */
-interface ReadResourceTemplateCallbackBivariant<HasOAuth extends boolean> {
-  bivarianceHack(
-    uri: URL,
-    params: Record<string, any>,
-    ctx: EnhancedResourceContext<HasOAuth>
-  ): Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
-}
-
-/**
  * Callback type for reading a static resource.
  * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
  *
@@ -131,10 +119,38 @@ export type ReadResourceCallback<HasOAuth extends boolean = false> =
  * Callback type for reading a resource template with parameters.
  * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
  *
+ * Supports multiple callback signatures:
+ * - `async () => ...` - No parameters
+ * - `async (uri: URL) => ...` - Just URI (required)
+ * - `async (uri: URL, params: Record<string, any>) => ...` - URI and parameters (both required)
+ * - `async (uri: URL, params: Record<string, any>, ctx: EnhancedResourceContext) => ...` - All parameters (all required)
+ *
+ * The implementation checks callback.length to determine which signature to use.
+ *
  * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
  */
 export type ReadResourceTemplateCallback<HasOAuth extends boolean = false> =
-  ReadResourceTemplateCallbackBivariant<HasOAuth>["bivarianceHack"];
+  | (() => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL,
+      params: Record<string, any>
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL,
+      params: Record<string, any>,
+      ctx: EnhancedResourceContext<HasOAuth>
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >);
 
 /**
  * Configuration for a resource template
@@ -171,6 +187,54 @@ export interface ResourceTemplateDefinitionWithoutCallback {
   resourceTemplate: ResourceTemplateConfig;
   title?: string;
   description?: string;
+  annotations?: ResourceAnnotations;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Flat resource template definition with readCallback (new API)
+ *
+ * Simplified structure where uriTemplate is directly on the definition object
+ * instead of nested in a resourceTemplate property.
+ */
+export interface FlatResourceTemplateDefinition<
+  HasOAuth extends boolean = false,
+> {
+  /** Unique identifier for the template */
+  name: string;
+  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  uriTemplate: string;
+  /** Optional title for the resource */
+  title?: string;
+  /** Optional description of the resource */
+  description?: string;
+  /** MIME type of the resource content */
+  mimeType?: string;
+  /** Optional annotations for the resource */
+  annotations?: ResourceAnnotations;
+  /** Async callback function that returns the resource content */
+  readCallback: ReadResourceTemplateCallback<HasOAuth>;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Flat resource template definition without readCallback (new API with separate callback parameter)
+ *
+ * Simplified structure where uriTemplate is directly on the definition object
+ * instead of nested in a resourceTemplate property.
+ */
+export interface FlatResourceTemplateDefinitionWithoutCallback {
+  /** Unique identifier for the template */
+  name: string;
+  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  uriTemplate: string;
+  /** Optional title for the resource */
+  title?: string;
+  /** Optional description of the resource */
+  description?: string;
+  /** MIME type of the resource content */
+  mimeType?: string;
+  /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   _meta?: Record<string, unknown>;
 }

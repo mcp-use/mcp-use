@@ -12,14 +12,15 @@
 
 /* globals Deno */
 
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 import {
   assertEquals,
   assertExists,
 } from "https://deno.land/std@0.220.0/assert/mod.ts";
 
 Deno.test("MCP Server - Create and register tool", async () => {
-  const server = createMCPServer("test-deno-server", {
+  const server = new MCPServer({
+    name: "test-deno-server",
     version: "1.0.0",
     description: "Test MCP server for Deno environment",
   });
@@ -53,7 +54,8 @@ Deno.test("MCP Server - Create and register tool", async () => {
 });
 
 Deno.test("MCP Server - Resource registration", async () => {
-  const server = createMCPServer("test-resource-server", {
+  const server = new MCPServer({
+    name: "test-resource-server",
     version: "1.0.0",
     description: "Test resource registration",
   });
@@ -75,7 +77,8 @@ Deno.test("MCP Server - Resource registration", async () => {
 });
 
 Deno.test("MCP Server - Prompt registration", async () => {
-  const server = createMCPServer("test-prompt-server", {
+  const server = new MCPServer({
+    name: "test-prompt-server",
     version: "1.0.0",
     description: "Test prompt registration",
   });
@@ -104,7 +107,8 @@ Deno.test("MCP Server - Prompt registration", async () => {
 });
 
 Deno.test("MCP Server - Multiple registrations", async () => {
-  const server = createMCPServer("test-multi-server", {
+  const server = new MCPServer({
+    name: "test-multi-server",
     version: "1.0.0",
     description: "Test multiple registrations",
   });
@@ -135,7 +139,8 @@ Deno.test("MCP Server - Multiple registrations", async () => {
 });
 
 Deno.test("MCP Server - API method existence", async () => {
-  const server = createMCPServer("test-api-server", {
+  const server = new MCPServer({
+    name: "test-api-server",
     version: "1.0.0",
     description: "Test API methods exist",
   });

@@ -1,22 +1,26 @@
 ---
 title: 'Server Manager'
-description: 'Intelligent management of multiple MCP servers and dynamic tool discovery'
-icon: 'server-cog'
+description: 'Dynamic multi-server orchestration for agents'
+icon: 'sitemap'
 ---
 
-# Server Manager: Dynamic Multi-Server Intelligence
+The Server Manager enables intelligent orchestration of multiple MCP servers, allowing agents to dynamically discover, connect to, and utilize tools from different servers without loading everything upfront.
 
-The Server Manager is the brain behind intelligent MCP server orchestration. It transforms your agent from a static tool user into a dynamic, adaptive assistant that can discover, connect to, and intelligently utilize tools from multiple MCP servers on-demand.
+## Why Use Server Manager?
 
-## What Makes It Special
+When working with multiple MCP servers, you face a challenge: each server can expose dozens of tools, and loading all tools from all servers into your agent's context can be overwhelming and inefficient.
 
-Instead of overwhelming your agent with hundreds of tools from all servers at once, the Server Manager:
+The Server Manager solves this by:
 
-- **Dynamically loads tools** only when needed, with full schemas
-- **Intelligently discovers** the right server for each task
-- **Automatically updates** available tools as connections change
-- **Provides semantic search** across all server tools
-- **Manages connection lifecycle** efficiently
+- **Dynamic loading**: Load tools only when needed, not everything upfront
+- **Intelligent routing**: Automatically select the right server for each task
+- **Context optimization**: Keep agent context focused and efficient
+- **Automatic discovery**: Find and connect to the right tools automatically
+- **Lifecycle management**: Handle connections and cleanup automatically
+
+<Tip>
+**Best for multi-server setups**: If you're connecting to 3+ servers or dealing with 20+ total tools, the Server Manager significantly improves agent performance and context efficiency.
+</Tip>
 
 ## Architecture Overview
 

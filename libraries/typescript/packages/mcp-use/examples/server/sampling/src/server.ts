@@ -1,7 +1,8 @@
-import { createMCPServer, text } from "../../../../dist/src/server/index.js";
+import { MCPServer, text } from "../../../../dist/src/server/index.js";
 import { z } from "zod";
 
-const server = createMCPServer("sampling-example-server", {
+const server = new MCPServer({
+  name: "sampling-example-server",
   version: "1.0.0",
   description: "An MCP server example demonstrating sampling capabilities",
 });
