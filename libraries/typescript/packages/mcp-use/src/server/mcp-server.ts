@@ -288,12 +288,7 @@ export class McpServer {
             params: any,
             options?: any
           ) => {
-            try {
-              return await newServer.server.createMessage(params, options);
-            } catch (err: any) {
-              // Re-throw the error - let the calling code handle logging if needed
-              throw err;
-            }
+            return await newServer.server.createMessage(params, options);
           };
 
           const enhancedContext = createEnhancedContext(

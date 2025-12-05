@@ -329,8 +329,6 @@ export function createSampleMethod(
         timeout,
         `Sampling timed out after ${timeout}ms`
       );
-    } catch (error) {
-      throw error;
     } finally {
       completed = true;
       if (progressInterval) {
