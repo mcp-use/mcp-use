@@ -835,17 +835,30 @@ jobs:
       - name: Install Dependencies
         working-directory: libraries/typescript
         run: pnpm install --no-frozen-lockfile
-      - name: Build create-mcp-use-app
-        working-directory: libraries/typescript/packages/create-mcp-use-app
+      - name: Build All Packages
+        working-directory: libraries/typescript
         run: pnpm build
-      - name: Pack Package
+      - name: Pack create-mcp-use-app
         working-directory: libraries/typescript/packages/create-mcp-use-app
         run: npm pack
-      - name: Upload Package Artifact
+      - name: Pack mcp-use
+        working-directory: libraries/typescript/packages/mcp-use
+        run: npm pack
+      - name: Pack @mcp-use/cli
+        working-directory: libraries/typescript/packages/cli
+        run: npm pack
+      - name: Pack @mcp-use/inspector
+        working-directory: libraries/typescript/packages/inspector
+        run: npm pack
+      - name: Upload All Package Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: create-mcp-use-app-package
-          path: libraries/typescript/packages/create-mcp-use-app/create-mcp-use-app-*.tgz
+          name: workspace-packages
+          path: |
+            libraries/typescript/packages/create-mcp-use-app/create-mcp-use-app-*.tgz
+            libraries/typescript/packages/mcp-use/mcp-use-*.tgz
+            libraries/typescript/packages/cli/mcp-use-cli-*.tgz
+            libraries/typescript/packages/inspector/mcp-use-inspector-*.tgz
           retention-days: 1
 
   create-mcp-use-app-tests:
@@ -886,16 +899,16 @@ jobs:
       - name: Download Package Artifact
         uses: actions/download-artifact@v4
         with:
-          name: create-mcp-use-app-package
-          path: ./package
+          name: workspace-packages
+          path: ./packages
       - name: Test CLI Creation
         shell: bash
         run: |
           # Get package path
           if [ "${{ runner.os }}" == "Windows" ]; then
-            PACKAGE_PATH=$(powershell -Command "(Get-ChildItem ./package/create-mcp-use-app-*.tgz).FullName")
+            PACKAGE_PATH=$(powershell -Command "(Get-ChildItem ./packages/create-mcp-use-app-*.tgz).FullName")
           else
-            PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
+            PACKAGE_PATH=$(realpath ./packages/create-mcp-use-app-*.tgz)
           fi
 
           # Run create command based on PM
@@ -933,17 +946,59 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Download Package Artifact
+      - name: Download Package Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: create-mcp-use-app-package
-          path: ./package
+          name: workspace-packages
+          path: ./packages
       - name: Create app with npm
         shell: bash
         run: |
-          PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
+          PACKAGE_PATH=$(realpath ./packages/create-mcp-use-app-*.tgz)
           npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }} --dev
           echo "✅ Project created successfully with template ${{ matrix.template }}"
+      - name: Replace workspace deps with file references
+        working-directory: test-app-npm-${{ matrix.template }}
+        shell: bash
+        run: |
+          # Get absolute paths to tarballs
+          MCP_USE_TGZ=$(realpath ../packages/mcp-use-*.tgz)
+          CLI_TGZ=$(realpath ../packages/mcp-use-cli-*.tgz)
+          INSPECTOR_TGZ=$(realpath ../packages/mcp-use-inspector-*.tgz)
+          
+          echo "Using tarballs:"
+          echo "  mcp-use: $MCP_USE_TGZ"
+          echo "  cli: $CLI_TGZ"
+          echo "  inspector: $INSPECTOR_TGZ"
+          
+          # Replace workspace:* with file: references in package.json
+          # Use node for cross-platform JSON manipulation
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            
+            const replacements = {
+              'mcp-use': 'file:$MCP_USE_TGZ',
+              '@mcp-use/cli': 'file:$CLI_TGZ',
+              '@mcp-use/inspector': 'file:$INSPECTOR_TGZ'
+            };
+            
+            for (const [name, newVersion] of Object.entries(replacements)) {
+              if (pkg.dependencies && pkg.dependencies[name] === 'workspace:*') {
+                pkg.dependencies[name] = newVersion;
+                console.log('Replaced ' + name + ' with ' + newVersion);
+              }
+              if (pkg.devDependencies && pkg.devDependencies[name] === 'workspace:*') {
+                pkg.devDependencies[name] = newVersion;
+                console.log('Replaced ' + name + ' (dev) with ' + newVersion);
+              }
+            }
+            
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          
+          echo "Updated package.json:"
+          cat package.json
       - name: Install dependencies with npm
         working-directory: test-app-npm-${{ matrix.template }}
         shell: bash
@@ -991,17 +1046,59 @@ jobs:
           node-version: 22
       - name: Setup Yarn
         run: corepack enable
-      - name: Download Package Artifact
+      - name: Download Package Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: create-mcp-use-app-package
-          path: ./package
+          name: workspace-packages
+          path: ./packages
       - name: Create app with yarn
         shell: bash
         run: |
-          PACKAGE_PATH=$(realpath ./package/create-mcp-use-app-*.tgz)
+          PACKAGE_PATH=$(realpath ./packages/create-mcp-use-app-*.tgz)
           yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }} --dev
           echo "✅ Project created successfully with template ${{ matrix.template }}"
+      - name: Replace workspace deps with file references
+        working-directory: test-app-yarn-${{ matrix.template }}
+        shell: bash
+        run: |
+          # Get absolute paths to tarballs
+          MCP_USE_TGZ=$(realpath ../packages/mcp-use-*.tgz)
+          CLI_TGZ=$(realpath ../packages/mcp-use-cli-*.tgz)
+          INSPECTOR_TGZ=$(realpath ../packages/mcp-use-inspector-*.tgz)
+          
+          echo "Using tarballs:"
+          echo "  mcp-use: $MCP_USE_TGZ"
+          echo "  cli: $CLI_TGZ"
+          echo "  inspector: $INSPECTOR_TGZ"
+          
+          # Replace workspace:* with file: references in package.json
+          # Use node for cross-platform JSON manipulation
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            
+            const replacements = {
+              'mcp-use': 'file:$MCP_USE_TGZ',
+              '@mcp-use/cli': 'file:$CLI_TGZ',
+              '@mcp-use/inspector': 'file:$INSPECTOR_TGZ'
+            };
+            
+            for (const [name, newVersion] of Object.entries(replacements)) {
+              if (pkg.dependencies && pkg.dependencies[name] === 'workspace:*') {
+                pkg.dependencies[name] = newVersion;
+                console.log('Replaced ' + name + ' with ' + newVersion);
+              }
+              if (pkg.devDependencies && pkg.devDependencies[name] === 'workspace:*') {
+                pkg.devDependencies[name] = newVersion;
+                console.log('Replaced ' + name + ' (dev) with ' + newVersion);
+              }
+            }
+            
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          
+          echo "Updated package.json:"
+          cat package.json
       - name: Install dependencies with yarn
         working-directory: test-app-yarn-${{ matrix.template }}
         shell: bash
