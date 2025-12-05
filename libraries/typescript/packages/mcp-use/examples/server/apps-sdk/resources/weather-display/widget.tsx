@@ -1,7 +1,7 @@
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
-import "../../styles.css";
+import "../styles.css";
 
 const propSchema = z.object({
   city: z.string().describe("The city name"),
@@ -29,7 +29,7 @@ const WeatherDisplay: React.FC = () => {
 
   return (
     <McpUseProvider debugger viewControls>
-      <div className="relative bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800 rounded-3xl p-8">
+      <div className="relative bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800 rounded-3xl p-8">
         <div className="flex items-start justify-between mb-6">
           <div>
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">

@@ -79,7 +79,7 @@ import type {
   ReadResourceTemplateCallback,
 } from "./types/resource.js";
 
-export class MCPServer {
+class MCPServerClass {
   /**
    * Native MCP server instance from @modelcontextprotocol/sdk
    * Exposed publicly for advanced use cases
@@ -947,7 +947,22 @@ export class MCPServer {
   }
 }
 
-export type McpServerInstance = MCPServer & HonoType;
+export type McpServerInstance = MCPServerClass & HonoType;
+
+// Type alias for use in type annotations (e.g., function parameters)
+export type MCPServer = MCPServerClass;
+
+// Interface to properly type the MCPServer constructor
+export interface MCPServerConstructor {
+  new (config: ServerConfig): McpServerInstance;
+  prototype: MCPServerClass;
+}
+
+// Export MCPServer constructor with proper return typing
+// This allows both: `function foo(server: MCPServer)` and `new MCPServer()`
+// TypeScript allows both a type and a const with the same name (declaration merging)
+// eslint-disable-next-line @typescript-eslint/no-redeclare, no-redeclare
+export const MCPServer: MCPServerConstructor = MCPServerClass as any;
 
 /**
  * Create a new MCP server instance
@@ -1026,7 +1041,7 @@ export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> = {}
 ): McpServerInstance {
-  const instance = new MCPServer({
+  const instance = new MCPServerClass({
     name,
     version: config.version || "1.0.0",
     description: config.description,
