@@ -217,24 +217,42 @@ export class MCPServer {
       return originalPrompt.call(self, promptDefinition, callback);
     } as any;
 
-    this.resource = function (resourceDefinition: any, callback?: any) {
-      const actualCallback = callback || resourceDefinition.readCallback;
+    this.resource = (<HasOAuth extends boolean = false>(
+      resourceDefinition:
+        | import("./types/index.js").ResourceDefinition<HasOAuth>
+        | import("./types/index.js").ResourceDefinitionWithoutCallback,
+      callback?: import("./types/index.js").ReadResourceCallback<HasOAuth>
+    ) => {
+      const actualCallback =
+        callback || (resourceDefinition as any).readCallback;
       const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
       self.registrationRecipes.resources.set(resourceKey, {
         config: resourceDefinition,
         handler: actualCallback,
       });
-      return originalResource.call(self, resourceDefinition, callback);
-    } as any;
+      return originalResource.call(self, resourceDefinition, callback as any);
+    }) as typeof originalResource;
 
-    this.resourceTemplate = function (templateDefinition: any, callback?: any) {
-      const actualCallback = callback || templateDefinition.readCallback;
+    this.resourceTemplate = (<HasOAuth extends boolean = false>(
+      templateDefinition:
+        | import("./types/index.js").ResourceTemplateDefinition<HasOAuth>
+        | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
+        | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth>
+        | import("./types/index.js").FlatResourceTemplateDefinitionWithoutCallback,
+      callback?: import("./types/index.js").ReadResourceTemplateCallback<HasOAuth>
+    ) => {
+      const actualCallback =
+        callback || (templateDefinition as any).readCallback;
       self.registrationRecipes.resourceTemplates.set(templateDefinition.name, {
         config: templateDefinition,
         handler: actualCallback,
       });
-      return originalResourceTemplate.call(self, templateDefinition, callback);
-    } as any;
+      return originalResourceTemplate.call(
+        self,
+        templateDefinition,
+        callback as any
+      );
+    }) as typeof originalResourceTemplate;
   }
 
   /**
@@ -604,7 +622,11 @@ export class MCPServer {
     return this.subscriptionManager.notifyResourceUpdated(uri, this.sessions);
   }
 
-  public uiResource = uiResourceRegistration as any;
+  public uiResource = (
+    definition: Parameters<typeof uiResourceRegistration>[1]
+  ) => {
+    return uiResourceRegistration(this, definition);
+  };
 
   /**
    * Mount MCP server endpoints at /mcp and /sse

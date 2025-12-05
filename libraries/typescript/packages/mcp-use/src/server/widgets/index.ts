@@ -52,7 +52,7 @@ export {
 
 export {
   uiResourceRegistration,
-  type UIResourceServerContext,
+  type UIResourceServer,
 } from "./ui-resource-registration.js";
 
 export {

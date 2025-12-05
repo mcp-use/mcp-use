@@ -5,7 +5,16 @@
  * in the MCP server. It creates a unified interface for MCP-UI compatible widgets.
  */
 
-import type { UIResourceDefinition } from "../types/index.js";
+import type {
+  UIResourceDefinition,
+  ResourceDefinition,
+  ResourceDefinitionWithoutCallback,
+  ResourceTemplateDefinition,
+  ResourceTemplateDefinitionWithoutCallback,
+  FlatResourceTemplateDefinition,
+  FlatResourceTemplateDefinitionWithoutCallback,
+  ToolDefinition,
+} from "../types/index.js";
 import {
   generateWidgetUri,
   convertPropsToInputs,
@@ -15,26 +24,30 @@ import {
 } from "./widget-helpers.js";
 
 /**
- * Interface representing the server context needed for UI resource registration
+ * Minimal server interface for UI resource registration
  *
- * Note: Properties can be private/protected in the implementing class since they're
- * accessed through the `this` context.
+ * This interface defines the minimal contract needed by uiResourceRegistration.
+ * It uses broad types to be compatible with the various wrapped method signatures
+ * in MCPServer while still providing type safety at the call sites.
  */
-export interface UIResourceServerContext {
-  /** Build ID for cache busting (can be private/protected) */
+export interface UIResourceServer {
   readonly buildId?: string;
-  /** Server host (can be private/protected) */
   readonly serverHost: string;
-  /** Server port (can be private/protected) */
   readonly serverPort?: number;
-  /** Server base URL (can be private/protected) */
   readonly serverBaseUrl?: string;
-  /** Method to register a resource */
-  resource(definition: any): void;
-  /** Method to register a resource template */
-  resourceTemplate(definition: any): void;
-  /** Method to register a tool */
-  tool(definition: any): void;
+  resource: (
+    definition: ResourceDefinition | ResourceDefinitionWithoutCallback,
+    callback?: any
+  ) => any;
+  resourceTemplate: (
+    definition:
+      | ResourceTemplateDefinition
+      | ResourceTemplateDefinitionWithoutCallback
+      | FlatResourceTemplateDefinition
+      | FlatResourceTemplateDefinitionWithoutCallback,
+    callback?: any
+  ) => any;
+  tool: (definition: ToolDefinition, callback?: any) => any;
 }
 
 /**
@@ -50,7 +63,7 @@ export interface UIResourceServerContext {
  * - remoteDom: Legacy MCP-UI Remote DOM scripting
  * - appsSdk: OpenAI Apps SDK compatible widgets (text/html+skybridge)
  *
- * @param this - Server context with registration methods
+ * @param server - MCPServer instance with registration methods
  * @param definition - Widget configuration object
  * @param definition.name - Unique identifier for the resource
  * @param definition.type - Type of UI resource (externalUrl, rawHtml, remoteDom, appsSdk)
@@ -63,14 +76,6 @@ export interface UIResourceServerContext {
  *
  * @example
  * ```typescript
- * // Usage in MCPServer class
- * class MCPServer {
- *   public uiResource = uiResourceRegistration;
- *
- *   // ... other methods
- * }
- *
- * // Then call it normally
  * server.uiResource({
  *   type: 'appsSdk',
  *   name: 'kanban-board',
@@ -81,10 +86,10 @@ export interface UIResourceServerContext {
  * })
  * ```
  */
-export function uiResourceRegistration(
-  this: UIResourceServerContext,
+export function uiResourceRegistration<T extends UIResourceServer>(
+  server: T,
   definition: UIResourceDefinition
-): UIResourceServerContext {
+): T {
   const displayName = definition.title || definition.name;
 
   // Determine resource URI and mimeType based on type
@@ -93,19 +98,19 @@ export function uiResourceRegistration(
 
   switch (definition.type) {
     case "externalUrl":
-      resourceUri = generateWidgetUri(definition.widget, this.buildId);
+      resourceUri = generateWidgetUri(definition.widget, server.buildId);
       mimeType = "text/uri-list";
       break;
     case "rawHtml":
-      resourceUri = generateWidgetUri(definition.name, this.buildId);
+      resourceUri = generateWidgetUri(definition.name, server.buildId);
       mimeType = "text/html";
       break;
     case "remoteDom":
-      resourceUri = generateWidgetUri(definition.name, this.buildId);
+      resourceUri = generateWidgetUri(definition.name, server.buildId);
       mimeType = "application/vnd.mcp-ui.remote-dom+javascript";
       break;
     case "appsSdk":
-      resourceUri = generateWidgetUri(definition.name, this.buildId, ".html");
+      resourceUri = generateWidgetUri(definition.name, server.buildId, ".html");
       mimeType = "text/html+skybridge";
       break;
     default:
@@ -116,14 +121,14 @@ export function uiResourceRegistration(
 
   // Create server config for widget UI resource creation
   const serverConfig: WidgetServerConfig = {
-    serverHost: this.serverHost,
-    serverPort: this.serverPort || 3000,
-    serverBaseUrl: this.serverBaseUrl,
-    buildId: this.buildId,
+    serverHost: server.serverHost,
+    serverPort: server.serverPort || 3000,
+    serverBaseUrl: server.serverBaseUrl,
+    buildId: server.buildId,
   };
 
   // Register the resource
-  this.resource({
+  server.resource({
     name: definition.name,
     uri: resourceUri,
     title: definition.title,
@@ -156,10 +161,10 @@ export function uiResourceRegistration(
   // For Apps SDK, also register a resource template to handle dynamic URIs with random IDs
   if (definition.type === "appsSdk") {
     // Build URI template with build ID if available
-    const buildIdPart = this.buildId ? `-${this.buildId}` : "";
+    const buildIdPart = server.buildId ? `-${server.buildId}` : "";
     const uriTemplate = `ui://widget/${definition.name}${buildIdPart}-{id}.html`;
 
-    this.resourceTemplate({
+    server.resourceTemplate({
       name: `${definition.name}-dynamic`,
       resourceTemplate: {
         uriTemplate,
@@ -212,7 +217,7 @@ export function uiResourceRegistration(
     }
   }
 
-  this.tool(
+  server.tool(
     {
       name: definition.name,
       title: definition.title,
@@ -234,7 +239,7 @@ export function uiResourceRegistration(
         const randomId = Math.random().toString(36).substring(2, 15);
         const uniqueUri = generateWidgetUri(
           definition.name,
-          this.buildId,
+          server.buildId,
           ".html",
           randomId
         );
@@ -272,5 +277,5 @@ export function uiResourceRegistration(
     }
   );
 
-  return this;
+  return server;
 }
