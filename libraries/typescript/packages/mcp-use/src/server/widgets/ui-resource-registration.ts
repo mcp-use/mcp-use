@@ -176,7 +176,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       title: definition.title,
       description: definition.description,
       annotations: definition.annotations,
-      readCallback: async (uri: any, params: any) => {
+      readCallback: async (uri: URL, params: Record<string, string>) => {
         // Use empty params for Apps SDK since structuredContent is passed separately
         const uiResource = await createWidgetUIResource(
           definition,
@@ -225,7 +225,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       inputs: convertPropsToInputs(definition.props),
       _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
     },
-    async (params: any) => {
+    async (params: Record<string, unknown>) => {
       // Create the UIResource with user-provided params
       const uiResource = await createWidgetUIResource(
         definition,

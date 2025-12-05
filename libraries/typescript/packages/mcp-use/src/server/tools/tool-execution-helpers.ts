@@ -13,6 +13,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
+  ElicitRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 import { ElicitationValidationError } from "../../errors.js";
@@ -235,13 +236,13 @@ export function parseElicitParams(
 export function createSampleMethod(
   createMessage: (
     params: CreateMessageRequest["params"],
-    options?: any
+    options?: { timeout?: number }
   ) => Promise<CreateMessageResult>,
   progressToken: number | undefined,
   sendNotification:
     | ((notification: {
         method: string;
-        params: Record<string, any>;
+        params: Record<string, unknown>;
       }) => Promise<void>)
     | undefined
 ): {
@@ -349,7 +350,10 @@ export function createSampleMethod(
  * Create the elicit() method for enhanced context
  */
 export function createElicitMethod(
-  elicitInput: (params: any, options?: any) => Promise<ElicitResult>
+  elicitInput: (
+    params: ElicitRequest["params"],
+    options?: { timeout?: number }
+  ) => Promise<ElicitResult>
 ): (
   messageOrParams: string | ElicitFormParams | ElicitUrlParams,
   schemaOrUrlOrOptions?: z.ZodObject<any> | string | ElicitOptions,
@@ -378,10 +382,11 @@ export function createElicitMethod(
           ...result,
           data: validatedData,
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as Error;
         throw new ElicitationValidationError(
-          `Elicitation data validation failed: ${error.message}`,
-          error
+          `Elicitation data validation failed: ${err.message}`,
+          err
         );
       }
     }
@@ -614,21 +619,35 @@ export function createEnhancedContext(
   baseContext: Context | undefined,
   createMessage: (
     params: CreateMessageRequest["params"],
-    options?: any
+    options?: { timeout?: number }
   ) => Promise<CreateMessageResult>,
-  elicitInput: (params: any, options?: any) => Promise<ElicitResult>,
+  elicitInput: (
+    params: ElicitRequest["params"],
+    options?: { timeout?: number }
+  ) => Promise<ElicitResult>,
   progressToken: number | undefined,
   sendNotification:
     | ((notification: {
         method: string;
-        params: Record<string, any>;
+        params: Record<string, unknown>;
       }) => Promise<void>)
     | undefined,
   minLogLevel?: string,
-  clientCapabilities?: Record<string, any>,
+  clientCapabilities?: Record<string, unknown>,
   sessionId?: string,
   sessions?: Map<string, SessionData>
-): any {
+): Context & {
+  sample: ReturnType<typeof createSampleMethod>;
+  elicit: ReturnType<typeof createElicitMethod>;
+  reportProgress: (params: {
+    progress: number;
+    total?: number;
+  }) => Promise<void>;
+  log: (level: string, data: unknown, logger?: string) => Promise<void>;
+  client: { capabilities?: Record<string, unknown> };
+  session: { id?: string };
+  sendNotification: typeof sendNotification;
+} {
   const enhancedContext = baseContext ? Object.create(baseContext) : {};
 
   enhancedContext.sample = createSampleMethod(

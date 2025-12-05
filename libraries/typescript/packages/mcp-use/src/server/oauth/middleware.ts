@@ -64,14 +64,15 @@ export function createBearerAuthMiddleware(
       const user = provider.getUserInfo(payload);
 
       // Create complete auth object
+      const scope = payload.scope as string | undefined;
       const authInfo = {
         user,
         payload,
         accessToken: token,
         // Extract scopes from scope claim (OAuth standard)
-        scopes: payload.scope ? payload.scope.split(" ") : [],
+        scopes: scope ? scope.split(" ") : [],
         // Extract permissions (Auth0 style, or custom)
-        permissions: payload.permissions || [],
+        permissions: (payload.permissions as string[]) || [],
       };
 
       // Attach to context in multiple ways for maximum compatibility:

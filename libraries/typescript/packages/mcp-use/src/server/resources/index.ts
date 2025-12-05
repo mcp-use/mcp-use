@@ -176,8 +176,8 @@ export interface ResourceTemplateServerContext {
     registerResource(
       name: string,
       template: ResourceTemplate,
-      metadata: any,
-      readCallback: (uri: URL) => Promise<any>
+      metadata: Record<string, unknown>,
+      readCallback: (uri: URL) => Promise<ReadResourceResult>
     ): void;
   };
   registeredResources: string[];
@@ -338,7 +338,7 @@ export function registerResourceTemplate(
   });
 
   // Create metadata object with optional fields
-  const metadata: any = {};
+  const metadata: Record<string, unknown> = {};
   if (resourceTemplateDefinition.title) {
     metadata.title = resourceTemplateDefinition.title;
   }

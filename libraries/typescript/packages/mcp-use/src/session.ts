@@ -103,7 +103,7 @@ export class MCPSession {
    *
    * @returns Server capabilities object
    */
-  get serverCapabilities(): any {
+  get serverCapabilities(): Record<string, unknown> {
     return this.connector.serverCapabilities;
   }
 

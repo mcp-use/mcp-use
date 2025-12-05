@@ -2,11 +2,12 @@ import { Check, Clock, Copy, Zap } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
 import { NotFound } from "../ui/not-found";
 import { JSONDisplay } from "../shared/JSONDisplay";
+import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
 
 export interface PromptResult {
   promptName: string;
   args: Record<string, unknown>;
-  result: any;
+  result: GetPromptResult | { error?: string; isError?: boolean };
   error?: string;
   timestamp: number;
   duration?: number;
@@ -15,27 +16,33 @@ export interface PromptResult {
 interface PromptResultDisplayProps {
   results: PromptResult[];
   copiedResult: number | null;
-  onCopy: (index: number, result: any) => void;
+  onCopy: (
+    index: number,
+    result: GetPromptResult | { error?: string; isError?: boolean }
+  ) => void;
 }
 
 // Helper function to extract error message from result with isError: true
-function extractErrorMessage(result: any): string | null {
-  if (!result?.isError) {
+function extractErrorMessage(
+  result: GetPromptResult | { error?: string; isError?: boolean }
+): string | null {
+  // Check if this is an error result object
+  if ("isError" in result && !result.isError) {
     return null;
   }
 
-  if (result.content && Array.isArray(result.content)) {
-    const textContents = result.content
-      .filter((item: any) => item.type === "text")
-      .map((item: any) => item.text)
-      .filter(Boolean);
-
-    if (textContents.length > 0) {
-      return textContents.join("\n");
-    }
+  // Handle error property directly
+  if ("error" in result && result.error) {
+    return result.error;
   }
 
-  return "An error occurred";
+  // GetPromptResult has messages, not content
+  // If isError is true but no explicit error, return generic message
+  if ("isError" in result && result.isError) {
+    return "An error occurred";
+  }
+
+  return null;
 }
 
 export function PromptResultDisplay({

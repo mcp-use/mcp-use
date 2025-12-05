@@ -69,6 +69,15 @@ import {
   parseTemplateUri as parseTemplateUriHelper,
 } from "./utils/index.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
+import type { OAuthConfig, OAuthProvider } from "./oauth/providers/types.js";
+import type { ToolDefinition, ToolCallback } from "./types/tool.js";
+import type { PromptDefinition, PromptCallback } from "./types/prompt.js";
+import type {
+  ResourceDefinition,
+  ResourceTemplateDefinition,
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
+} from "./types/resource.js";
 
 export class MCPServer {
   /**
@@ -95,24 +104,38 @@ export class MCPServer {
   public buildId?: string;
   public sessions = new Map<string, SessionData>();
   private idleCleanupInterval?: NodeJS.Timeout;
-  private oauthConfig?: any; // Store OAuth config for lazy initialization
+  private oauthConfig?: OAuthConfig; // Store OAuth config for lazy initialization
   private oauthSetupState = {
     complete: false,
-    provider: undefined,
-    middleware: undefined,
+    provider: undefined as OAuthProvider | undefined,
+    middleware: undefined as
+      | ((c: any, next: any) => Promise<Response | void>)
+      | undefined,
   };
-  private oauthProvider?: any;
-  private oauthMiddleware?: any;
+  private oauthProvider?: OAuthProvider;
+  private oauthMiddleware?: (c: any, next: any) => Promise<Response | void>;
 
   /**
    * Storage for registration "recipes" that can be replayed on new server instances
    * Following the official SDK pattern where each session gets its own server instance
    */
   private registrationRecipes = {
-    tools: new Map<string, { config: any; handler: any }>(),
-    prompts: new Map<string, { config: any; handler: any }>(),
-    resources: new Map<string, { config: any; handler: any }>(),
-    resourceTemplates: new Map<string, { config: any; handler: any }>(),
+    tools: new Map<string, { config: ToolDefinition; handler: ToolCallback }>(),
+    prompts: new Map<
+      string,
+      { config: PromptDefinition; handler: PromptCallback }
+    >(),
+    resources: new Map<
+      string,
+      { config: ResourceDefinition; handler: ReadResourceCallback }
+    >(),
+    resourceTemplates: new Map<
+      string,
+      {
+        config: ResourceTemplateDefinition;
+        handler: ReadResourceTemplateCallback;
+      }
+    >(),
   };
 
   /**
@@ -168,7 +191,7 @@ export class MCPServer {
     // Create and configure Hono app with default middleware
     this.app = createHonoApp(requestLogger);
 
-    this.oauthConfig = config.oauth;
+    this.oauthConfig = config.oauth as OAuthConfig | undefined;
 
     // Wrap registration methods to capture recipes for multi-session support
     this.wrapRegistrationMethods();
@@ -201,21 +224,34 @@ export class MCPServer {
       >
     ) => {
       const actualCallback = callback || toolDefinition.cb;
-      self.registrationRecipes.tools.set(toolDefinition.name, {
-        config: toolDefinition,
-        handler: actualCallback,
-      });
+      if (actualCallback) {
+        self.registrationRecipes.tools.set(toolDefinition.name, {
+          config: toolDefinition as any,
+          handler: actualCallback as any,
+        });
+      }
       return originalTool.call(self, toolDefinition, callback as any);
     }) as typeof originalTool;
 
-    this.prompt = function (promptDefinition: any, callback?: any) {
-      const actualCallback = callback || promptDefinition.cb;
-      self.registrationRecipes.prompts.set(promptDefinition.name, {
-        config: promptDefinition,
-        handler: actualCallback,
-      });
-      return originalPrompt.call(self, promptDefinition, callback);
-    } as any;
+    this.prompt = (<HasOAuth extends boolean = false>(
+      promptDefinition:
+        | import("./types/index.js").PromptDefinition<any, HasOAuth>
+        | import("./types/index.js").PromptDefinitionWithoutCallback,
+      callback?: import("./types/index.js").PromptCallback<any, HasOAuth>
+    ) => {
+      const actualCallback = callback || (promptDefinition as any).cb;
+      if (actualCallback) {
+        self.registrationRecipes.prompts.set(promptDefinition.name, {
+          config: promptDefinition as any,
+          handler: actualCallback as any,
+        });
+      }
+      return originalPrompt.call(
+        self as any,
+        promptDefinition,
+        callback as any
+      );
+    }) as typeof originalPrompt;
 
     this.resource = (<HasOAuth extends boolean = false>(
       resourceDefinition:
@@ -225,11 +261,13 @@ export class MCPServer {
     ) => {
       const actualCallback =
         callback || (resourceDefinition as any).readCallback;
-      const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
-      self.registrationRecipes.resources.set(resourceKey, {
-        config: resourceDefinition,
-        handler: actualCallback,
-      });
+      if (actualCallback) {
+        const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
+        self.registrationRecipes.resources.set(resourceKey, {
+          config: resourceDefinition as any,
+          handler: actualCallback as any,
+        });
+      }
       return originalResource.call(self, resourceDefinition, callback as any);
     }) as typeof originalResource;
 
@@ -243,10 +281,15 @@ export class MCPServer {
     ) => {
       const actualCallback =
         callback || (templateDefinition as any).readCallback;
-      self.registrationRecipes.resourceTemplates.set(templateDefinition.name, {
-        config: templateDefinition,
-        handler: actualCallback,
-      });
+      if (actualCallback) {
+        self.registrationRecipes.resourceTemplates.set(
+          templateDefinition.name,
+          {
+            config: templateDefinition as any,
+            handler: actualCallback as any,
+          }
+        );
+      }
       return originalResourceTemplate.call(
         self,
         templateDefinition,
@@ -286,7 +329,16 @@ export class MCPServer {
       }
 
       // Wrap handler to provide enhanced context
-      const wrappedHandler = async (params: any, extra?: any) => {
+      const wrappedHandler = async (
+        params: Record<string, unknown>,
+        extra?: {
+          _meta?: { progressToken?: number };
+          sendNotification?: (notification: {
+            method: string;
+            params: Record<string, unknown>;
+          }) => Promise<void>;
+        }
+      ) => {
         const initialRequestContext = getRequestContext();
         const extraProgressToken = extra?._meta?.progressToken;
         const extraSendNotification = extra?.sendNotification;
@@ -312,7 +364,10 @@ export class MCPServer {
 
         // Use the session server's native createMessage and elicitInput
         // These are already properly connected to the transport
-        const createMessageWithLogging = async (params: any, options?: any) => {
+        const createMessageWithLogging = async (
+          params: CreateMessageRequest["params"],
+          options?: { timeout?: number }
+        ): Promise<CreateMessageResult> => {
           console.log("[createMessage] About to call server.createMessage");
           console.log("[createMessage] Has server:", !!newServer);
           try {
@@ -322,12 +377,13 @@ export class MCPServer {
             );
             console.log("[createMessage] Got result successfully");
             return result;
-          } catch (err: any) {
+          } catch (err: unknown) {
+            const error = err as Error & { code?: string };
             console.error(
               "[createMessage] Error:",
-              err.message,
+              error.message,
               "Code:",
-              err.code
+              error.code
             );
             throw err;
           }
@@ -368,7 +424,7 @@ export class MCPServer {
           annotations: config.annotations,
           _meta: config._meta,
         },
-        wrappedHandler
+        wrappedHandler as any
       );
     }
 
@@ -377,7 +433,7 @@ export class MCPServer {
       const { config, handler } = recipe;
 
       // Determine input schema - prefer schema over args
-      let argsSchema: any;
+      let argsSchema: Record<string, z.ZodSchema> | undefined;
       if (config.schema) {
         argsSchema = this.convertZodSchemaToParams(config.schema);
       } else if (config.args && config.args.length > 0) {
@@ -388,18 +444,21 @@ export class MCPServer {
       }
 
       // Wrap handler to support both CallToolResult and GetPromptResult
-      const wrappedHandler = async (params: any) => {
-        const result = await handler(params);
+      const wrappedHandler = async (
+        params: Record<string, unknown>,
+        extra?: any
+      ) => {
+        const result = await (handler as any)(params, extra);
 
         // If it's already a GetPromptResult, return as-is
         if ("messages" in result && Array.isArray(result.messages)) {
-          return result;
+          return result as any;
         }
 
         // Convert CallToolResult to GetPromptResult
         const { convertToolResultToPromptResult } =
           await import("./prompts/conversion.js");
-        return convertToolResultToPromptResult(result);
+        return convertToolResultToPromptResult(result) as any;
       };
 
       newServer.registerPrompt(
@@ -409,7 +468,7 @@ export class MCPServer {
           description: config.description ?? "",
           argsSchema: argsSchema as any,
         },
-        wrappedHandler
+        wrappedHandler as any
       );
     }
 
@@ -417,17 +476,17 @@ export class MCPServer {
     for (const [_key, recipe] of this.registrationRecipes.resources) {
       const { config, handler } = recipe;
       // Wrap handler to support both CallToolResult and ReadResourceResult
-      const wrappedHandler = async () => {
-        const result = await handler();
+      const wrappedHandler = async (extra?: any) => {
+        const result = await (handler as any)(extra);
         // If it's already a ReadResourceResult, return as-is
         if ("contents" in result && Array.isArray(result.contents)) {
-          return result;
+          return result as any;
         }
         // Convert CallToolResult to ReadResourceResult
         // Import convertToolResultToResourceResult dynamically to avoid circular dependencies
         const { convertToolResultToResourceResult } =
           await import("./resources/conversion.js");
-        return convertToolResultToResourceResult(config.uri, result);
+        return convertToolResultToResourceResult(config.uri, result) as any;
       };
 
       newServer.registerResource(
@@ -437,8 +496,8 @@ export class MCPServer {
           title: config.title,
           description: config.description,
           mimeType: config.mimeType || "text/plain",
-        },
-        wrappedHandler
+        } as any,
+        wrappedHandler as any
       );
     }
 
@@ -469,7 +528,7 @@ export class MCPServer {
       });
 
       // Create metadata object
-      const metadata: any = {};
+      const metadata: Record<string, unknown> = {};
       if (config.title) {
         metadata.title = config.title;
       }
@@ -486,21 +545,24 @@ export class MCPServer {
       newServer.registerResource(
         config.name,
         template,
-        metadata,
-        async (uri: URL) => {
+        metadata as any,
+        async (uri: URL, extra?: any) => {
           // Parse URI parameters from the template
           const params = this.parseTemplateUri(uriTemplate, uri.toString());
-          const result = await handler(uri, params);
+          const result = await (handler as any)(uri, params, extra);
 
           // If it's already a ReadResourceResult, return as-is
           if ("contents" in result && Array.isArray(result.contents)) {
-            return result;
+            return result as any;
           }
 
           // Convert CallToolResult to ReadResourceResult
           const { convertToolResultToResourceResult } =
             await import("./resources/conversion.js");
-          return convertToolResultToResourceResult(uri.toString(), result);
+          return convertToolResultToResourceResult(
+            uri.toString(),
+            result
+          ) as any;
         }
       );
     }
@@ -508,7 +570,7 @@ export class MCPServer {
     // Register logging/setLevel handler per MCP specification
     newServer.server.setRequestHandler(
       z.object({ method: z.literal("logging/setLevel") }).passthrough(),
-      async (request: any) => {
+      (async (request: { params?: { level?: string } }, extra?: any) => {
         const level = request.params?.level;
 
         // Validate log level parameter
@@ -560,7 +622,7 @@ export class MCPServer {
           "[MCP] Could not find session for logging/setLevel request"
         );
         throw new McpError(ErrorCode.InternalError, "Could not find session");
-      }
+      }) as any
     );
 
     // Register resource subscription handlers
@@ -732,7 +794,11 @@ export class MCPServer {
     );
 
     // Setup OAuth before mounting widgets/MCP (if configured)
-    if (this.oauthConfig && !this.oauthSetupState.complete) {
+    if (
+      this.oauthConfig &&
+      !this.oauthSetupState.complete &&
+      this.oauthProvider
+    ) {
       await setupOAuthForServer(
         this.app,
         this.oauthProvider,
@@ -796,7 +862,11 @@ export class MCPServer {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
     // Setup OAuth before mounting widgets/MCP (if configured)
-    if (this.oauthConfig && !this.oauthSetupState.complete) {
+    if (
+      this.oauthConfig &&
+      !this.oauthSetupState.complete &&
+      this.oauthProvider
+    ) {
       await setupOAuthForServer(
         this.app,
         this.oauthProvider,

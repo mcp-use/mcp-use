@@ -4,16 +4,17 @@
  * Handles OAuth provider initialization and configuration for MCP servers.
  */
 
-import type { Hono as HonoType } from "hono";
+import type { Hono as HonoType, Context, Next } from "hono";
 import { setupOAuthRoutes } from "./routes.js";
 import { createBearerAuthMiddleware } from "./middleware.js";
+import type { OAuthProvider } from "./providers/types.js";
 
 /**
  * OAuth setup state
  */
 export interface OAuthSetupState {
-  provider?: any;
-  middleware?: any;
+  provider?: OAuthProvider;
+  middleware?: (c: Context, next: Next) => Promise<Response | void>;
   complete: boolean;
 }
 
@@ -31,7 +32,7 @@ export interface OAuthSetupState {
  */
 export async function setupOAuthForServer(
   app: HonoType,
-  oauthProvider: any,
+  oauthProvider: OAuthProvider,
   baseUrl: string,
   state: OAuthSetupState
 ): Promise<OAuthSetupState> {

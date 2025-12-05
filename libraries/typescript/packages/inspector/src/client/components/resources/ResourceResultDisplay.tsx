@@ -14,14 +14,15 @@ import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { Spinner } from "../ui/spinner";
 import { JSONDisplay } from "../shared/JSONDisplay";
+import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 
 export interface ResourceResult {
   uri: string;
-  result: any;
+  result: ReadResourceResult | { error?: string; isError?: boolean };
   error?: string;
   timestamp: number;
   // Resource metadata from definition (includes openai/outputTemplate in annotations)
-  resourceAnnotations?: Record<string, any>;
+  resourceAnnotations?: Record<string, unknown>;
 }
 
 interface ResourceResultDisplayProps {
@@ -29,25 +30,36 @@ interface ResourceResultDisplayProps {
   isLoading: boolean;
   previewMode: boolean;
   serverId?: string;
-  readResource?: (uri: string) => Promise<any>;
+  readResource?: (uri: string) => Promise<ReadResourceResult>;
   onTogglePreview: () => void;
   onCopy: () => void;
   onDownload: () => void;
   onFullscreen: () => void;
-  onUIAction?: (action: any) => void;
+  onUIAction?: (action: unknown) => void;
   isCopied?: boolean;
 }
 
 // Helper function to extract error message from result with isError: true
-function extractErrorMessage(result: any): string | null {
-  if (!result?.isError) {
+function extractErrorMessage(
+  result: ReadResourceResult | { error?: string; isError?: boolean }
+): string | null {
+  // Check if this is an error result object
+  if ("isError" in result && !result.isError) {
     return null;
   }
 
-  if (result.content && Array.isArray(result.content)) {
-    const textContents = result.content
-      .filter((item: any) => item.type === "text")
-      .map((item: any) => item.text)
+  // Handle error property directly
+  if ("error" in result && result.error) {
+    return result.error;
+  }
+
+  // ReadResourceResult has contents (plural), not content
+  if ("contents" in result && Array.isArray(result.contents)) {
+    const textContents = result.contents
+      .filter(
+        (item): item is Extract<typeof item, { text: string }> => "text" in item
+      )
+      .map((item) => item.text)
       .filter(Boolean);
 
     if (textContents.length > 0) {
@@ -55,7 +67,12 @@ function extractErrorMessage(result: any): string | null {
     }
   }
 
-  return "An error occurred";
+  // If isError is true but no explicit error, return generic message
+  if ("isError" in result && result.isError) {
+    return "An error occurred";
+  }
+
+  return null;
 }
 
 export function ResourceResultDisplay({

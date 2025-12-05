@@ -287,7 +287,7 @@ export interface WidgetProps {
   [key: string]: {
     type: "string" | "number" | "boolean" | "object" | "array";
     required?: boolean;
-    default?: any;
+    default?: unknown;
     description?: string;
   };
 }

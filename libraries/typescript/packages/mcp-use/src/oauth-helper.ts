@@ -114,7 +114,8 @@ export class OAuthHelper {
         serverUrl
       );
       return false;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error & { name?: string; message?: string };
       console.warn(
         "⚠️ [OAuthHelper] Could not check auth requirement for:",
         serverUrl,
@@ -123,9 +124,9 @@ export class OAuthHelper {
 
       // Handle specific error types
       if (
-        error.name === "TypeError" &&
-        (error.message?.includes("CORS") ||
-          error.message?.includes("Failed to fetch"))
+        err.name === "TypeError" &&
+        (err.message?.includes("CORS") ||
+          err.message?.includes("Failed to fetch"))
       ) {
         console.log(
           "🔍 [OAuthHelper] CORS blocked direct check, using heuristics for:",
@@ -134,7 +135,7 @@ export class OAuthHelper {
         return this.checkAuthByHeuristics(serverUrl);
       }
 
-      if (error.name === "AbortError") {
+      if (err.name === "AbortError") {
         console.log(
           "⏰ [OAuthHelper] Request timeout, assuming no auth required for:",
           serverUrl

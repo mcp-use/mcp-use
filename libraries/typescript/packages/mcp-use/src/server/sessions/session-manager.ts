@@ -6,6 +6,8 @@
  */
 
 import type { Context } from "hono";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 /**
  * Session data stored for each active MCP session
@@ -13,9 +15,9 @@ import type { Context } from "hono";
  */
 export interface SessionData {
   /** Reference to this session's transport instance */
-  transport: any;
+  transport: Transport;
   /** Reference to this session's server instance */
-  server?: any;
+  server?: McpServer;
   /** Timestamp of last activity for idle timeout tracking */
   lastAccessedAt: number;
   /** Hono context for this session's current request */
@@ -25,16 +27,16 @@ export interface SessionData {
   /** Function to send notifications to the client */
   sendNotification?: (notification: {
     method: string;
-    params: Record<string, any>;
+    params: Record<string, unknown>;
   }) => Promise<void>;
   /** Express-like response object for notifications */
-  expressRes?: any;
+  expressRes?: Response | Record<string, unknown>;
   /** Hono context for direct response access */
   honoContext?: Context;
   /** Minimum log level for filtering log messages (RFC 5424 levels) */
   logLevel?: string;
   /** Client capabilities advertised during initialization */
-  clientCapabilities?: Record<string, any>;
+  clientCapabilities?: Record<string, unknown>;
 }
 
 /**
@@ -51,7 +53,9 @@ export interface SessionData {
 export function startIdleCleanup(
   sessions: Map<string, SessionData>,
   idleTimeoutMs: number,
-  mcpServerInstance?: any
+  mcpServerInstance?: {
+    cleanupSessionSubscriptions?: (sessionId: string) => void;
+  }
 ): NodeJS.Timeout | undefined {
   if (idleTimeoutMs <= 0) {
     return undefined;

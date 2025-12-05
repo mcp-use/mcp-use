@@ -346,7 +346,14 @@ export function processWidgetHtml(
  */
 export function createWidgetRegistration(
   widgetName: string,
-  metadata: any,
+  metadata:
+    | Record<string, unknown>
+    | {
+        title?: string;
+        description?: string;
+        inputs?: unknown;
+        [key: string]: unknown;
+      },
   html: string,
   serverConfig: { serverBaseUrl: string; cspUrls: string[] },
   isDev: boolean = false
@@ -355,14 +362,16 @@ export function createWidgetRegistration(
   title: string;
   description: string;
   type: "appsSdk";
-  props: any;
-  _meta: Record<string, any>;
+  props: import("../types/resource.js").WidgetProps;
+  _meta: Record<string, unknown>;
   htmlTemplate: string;
   appsSdkMetadata: Record<string, any>;
 } {
-  const props = metadata.inputs || {};
-  const description = metadata.description || `Widget: ${widgetName}`;
-  const title = metadata.title || widgetName;
+  const props = (metadata.inputs ||
+    {}) as import("../types/resource.js").WidgetProps;
+  const description =
+    (metadata.description as string | undefined) || `Widget: ${widgetName}`;
+  const title = (metadata.title as string | undefined) || widgetName;
 
   const mcp_connect_domain = serverConfig.serverBaseUrl
     ? new URL(serverConfig.serverBaseUrl || "").origin
@@ -370,10 +379,10 @@ export function createWidgetRegistration(
 
   return {
     name: widgetName,
-    title: title,
-    description: description,
+    title: title as string,
+    description: description as string,
     type: "appsSdk",
-    props: props,
+    props: props as import("../types/resource.js").WidgetProps,
     _meta: {
       "mcp-use/widget": {
         name: widgetName,
@@ -393,13 +402,14 @@ export function createWidgetRegistration(
       "openai/toolInvocation/invoked": `${widgetName} ready`,
       "openai/widgetAccessible": true,
       "openai/resultCanProduceWidget": true,
-      ...(metadata.appsSdkMetadata || {}),
+      ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined) ||
+        {}),
       "openai/widgetCSP": {
         connect_domains: [
           // always also add the base url of the server
           ...(mcp_connect_domain ? [mcp_connect_domain] : []),
-          ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]?.connect_domains ||
-            []),
+          ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+            ?.connect_domains as string[]) || []),
         ],
         resource_domains: [
           "https://*.oaistatic.com",
@@ -409,8 +419,8 @@ export function createWidgetRegistration(
           ...(mcp_connect_domain ? [mcp_connect_domain] : []),
           // add additional CSP URLs from environment variable
           ...serverConfig.cspUrls,
-          ...(metadata.appsSdkMetadata?.["openai/widgetCSP"]
-            ?.resource_domains || []),
+          ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+            ?.resource_domains as string[]) || []),
         ],
       },
     },
@@ -476,10 +486,10 @@ export async function createWidgetUIResource(
  * ```
  */
 export function ensureWidgetMetadata(
-  metadata: any,
+  metadata: Record<string, unknown>,
   widgetName: string,
   widgetDescription?: string
-): any {
+): Record<string, unknown> {
   const result = { ...metadata };
 
   if (!result.description) {
@@ -548,9 +558,9 @@ export async function readWidgetHtml(
 export async function registerWidgetFromTemplate(
   widgetName: string,
   htmlPath: string,
-  metadata: any,
+  metadata: Record<string, unknown>,
   serverConfig: { serverBaseUrl: string; cspUrls: string[] },
-  registerWidget: (widgetDef: any) => void,
+  registerWidget: import("./widget-types.js").RegisterWidgetCallback,
   isDev: boolean = false
 ): Promise<void> {
   // Read and process HTML template

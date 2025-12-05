@@ -55,20 +55,24 @@ export class Auth0OAuthProvider implements OAuthProvider {
     }
   }
 
-  getUserInfo(payload: any): UserInfo {
+  getUserInfo(payload: Record<string, unknown>): UserInfo {
+    const scope = payload.scope as string | undefined;
     return {
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      username: payload.username,
-      nickname: payload.nickname,
-      picture: payload.picture,
+      userId: payload.sub as string,
+      email: payload.email as string | undefined,
+      name: payload.name as string | undefined,
+      username: payload.username as string | undefined,
+      nickname: payload.nickname as string | undefined,
+      picture: payload.picture as string | undefined,
       // Auth0 includes permissions directly in the token
-      permissions: payload.permissions || [],
+      permissions: (payload.permissions as string[]) || [],
       // Auth0 can include roles (if configured)
-      roles: payload.roles || payload["https://your-app.com/roles"] || [],
+      roles:
+        (payload.roles as string[]) ||
+        (payload["https://your-app.com/roles"] as string[]) ||
+        [],
       // Include scope as well
-      scopes: payload.scope ? payload.scope.split(" ") : [],
+      scopes: scope ? scope.split(" ") : [],
       // Additional Auth0-specific claims
       email_verified: payload.email_verified,
       updated_at: payload.updated_at,

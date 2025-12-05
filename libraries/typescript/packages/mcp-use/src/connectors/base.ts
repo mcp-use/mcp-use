@@ -82,7 +82,7 @@ export abstract class BaseConnector {
   protected client: Client | null = null;
   protected connectionManager: ConnectionManager<any> | null = null;
   protected toolsCache: Tool[] | null = null;
-  protected capabilitiesCache: any = null;
+  protected capabilitiesCache: Record<string, unknown> | null = null;
   protected serverInfoCache: { name: string; version?: string } | null = null;
   protected connected = false;
   protected readonly opts: ConnectorInitOptions;
@@ -346,7 +346,7 @@ export abstract class BaseConnector {
 
     // Cache server capabilities for callers who need them.
     const capabilities = this.client.getServerCapabilities();
-    this.capabilitiesCache = capabilities;
+    this.capabilitiesCache = (capabilities as Record<string, unknown>) || null;
 
     // Cache server info from the initialize response
     const serverInfo = this.client.getServerVersion();
@@ -374,8 +374,8 @@ export abstract class BaseConnector {
   }
 
   /** Expose cached server capabilities. */
-  get serverCapabilities(): any {
-    return this.capabilitiesCache;
+  get serverCapabilities(): Record<string, unknown> {
+    return this.capabilitiesCache || {};
   }
 
   /** Expose cached server info. */
@@ -466,9 +466,10 @@ export abstract class BaseConnector {
       } while (cursor);
 
       return { resources: allResources };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
-      if (err.code === -32601) {
+      if (error.code === -32601) {
         logger.debug("Server advertised resources but method not found");
         return { resources: [] };
       }
@@ -546,9 +547,10 @@ export abstract class BaseConnector {
     try {
       logger.debug("Listing prompts");
       return await this.client.listPrompts();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
-      if (err.code === -32601) {
+      if (error.code === -32601) {
         logger.debug("Server advertised prompts but method not found");
         return { prompts: [] };
       }

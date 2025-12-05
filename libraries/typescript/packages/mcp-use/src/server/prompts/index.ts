@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import type {
   GetPromptResult,
   CallToolResult,
@@ -16,14 +17,21 @@ export interface PromptServerContext {
       metadata: {
         title?: string;
         description: string;
-        argsSchema: any;
+        argsSchema: z.ZodObject<any> | Record<string, z.ZodSchema> | undefined;
       },
-      getPromptCallback: (params: any) => Promise<GetPromptResult>
+      getPromptCallback: (
+        params: Record<string, unknown>,
+        extra?: any
+      ) => Promise<GetPromptResult>
     ): void;
   };
   registeredPrompts: string[];
-  createParamsSchema: (args: any[]) => any;
-  convertZodSchemaToParams: (schema: any) => any;
+  createParamsSchema: (
+    args: import("../types/common.js").InputDefinition[]
+  ) => Record<string, z.ZodSchema>;
+  convertZodSchemaToParams: (
+    schema: z.ZodObject<any>
+  ) => Record<string, z.ZodSchema>;
 }
 
 /**
@@ -85,7 +93,7 @@ export function registerPrompt(
   }
 
   // Determine input schema - prefer schema over args
-  let argsSchema: any;
+  let argsSchema: Record<string, z.ZodSchema> | undefined;
   if ((promptDefinition as any).schema) {
     argsSchema = this.convertZodSchemaToParams(
       (promptDefinition as any).schema
@@ -99,8 +107,8 @@ export function registerPrompt(
 
   // Wrap the callback to support both CallToolResult and GetPromptResult
   const wrappedCallback = async (
-    params: any,
-    extra?: any
+    params: Record<string, unknown>,
+    extra?: Record<string, unknown>
   ): Promise<GetPromptResult> => {
     // Get the HTTP request context from AsyncLocalStorage
     const { getRequestContext, runWithContext } =
