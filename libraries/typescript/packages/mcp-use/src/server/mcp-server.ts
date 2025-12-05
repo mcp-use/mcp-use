@@ -755,7 +755,7 @@ export class MCPServer {
    * @example
    * ```typescript
    * // For Supabase Edge Functions (handles path rewriting automatically)
-   * const server = createMCPServer('my-server');
+   * const server = new MCPServer({ name: 'my-server', version: '1.0.0' });
    * server.tool({ ... });
    * const handler = await server.getHandler({ provider: 'supabase' });
    * Deno.serve(handler);
@@ -764,7 +764,7 @@ export class MCPServer {
    * @example
    * ```typescript
    * // For Cloudflare Workers
-   * const server = createMCPServer('my-server');
+   * const server = new MCPServer({ name: 'my-server', version: '1.0.0' });
    * server.tool({ ... });
    * const handler = await server.getHandler();
    * export default { fetch: handler };
@@ -875,14 +875,22 @@ export type McpServerInstance = MCPServer & HonoType;
  *
  * @example
  * ```typescript
- * // Basic usage (development mode - allows all origins)
+ * // Recommended: Use class constructor (matches MCPClient/MCPAgent pattern)
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   description: 'My MCP server'
+ * })
+ *
+ * // Legacy: Factory function (still supported for backward compatibility)
  * const server = createMCPServer('my-server', {
  *   version: '1.0.0',
  *   description: 'My MCP server'
  * })
  *
  * // Production mode with explicit allowed origins
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
  *   version: '1.0.0',
  *   allowedOrigins: [
  *     'https://myapp.com',
@@ -891,13 +899,15 @@ export type McpServerInstance = MCPServer & HonoType;
  * })
  *
  * // With custom host (e.g., for Docker or remote access)
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
  *   version: '1.0.0',
  *   host: '0.0.0.0' // or 'myserver.com'
  * })
  *
  * // With full base URL (e.g., behind a proxy or custom domain)
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
  *   version: '1.0.0',
  *   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
  * })
