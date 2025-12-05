@@ -311,10 +311,10 @@ server.tool(
     name: "update_subscribable_resource",
     description: "Update the subscribable resource and notify subscribers",
     schema: z.object({
-      newValue: z.string().optional(),
+      newValue: z.string().default("Updated value"),
     }),
   },
-  async ({ newValue = "Updated value" }) => {
+  async ({ newValue }) => {
     subscribableResourceValue = newValue;
     // Notify all subscribers of the update
     await server.notifyResourceUpdated("test://subscribable");
