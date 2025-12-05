@@ -70,7 +70,12 @@ import {
 } from "./utils/index.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
 import type { OAuthConfig, OAuthProvider } from "./oauth/providers/types.js";
-import type { ToolDefinition, ToolCallback } from "./types/tool.js";
+import type {
+  ToolDefinition,
+  ToolCallback,
+  InferToolInput,
+  InferToolOutput,
+} from "./types/tool.js";
 import type { PromptDefinition, PromptCallback } from "./types/prompt.js";
 import type {
   ResourceDefinition,
@@ -79,7 +84,7 @@ import type {
   ReadResourceTemplateCallback,
 } from "./types/resource.js";
 
-class MCPServerClass {
+class MCPServerClass<HasOAuth extends boolean = false> {
   /**
    * Native MCP server instance from @modelcontextprotocol/sdk
    * Exposed publicly for advanced use cases
@@ -220,13 +225,13 @@ class MCPServerClass {
     const self = this;
 
     this.tool = (<
-      T extends import("./types/index.js").ToolDefinition<any, any, boolean>,
+      T extends import("./types/index.js").ToolDefinition<any, any, HasOAuth>,
     >(
       toolDefinition: T,
       callback?: import("./types/index.js").ToolCallback<
         import("./types/index.js").InferToolInput<T>,
         import("./types/index.js").InferToolOutput<T>,
-        boolean
+        HasOAuth
       >
     ) => {
       // Auto-add widget metadata if widget config is set
@@ -304,9 +309,9 @@ class MCPServerClass {
         });
       }
       return originalTool.call(self, toolDefinition, actualCallback as any);
-    }) as typeof originalTool;
+    }) as any;
 
-    this.prompt = (<HasOAuth extends boolean = false>(
+    this.prompt = ((
       promptDefinition:
         | import("./types/index.js").PromptDefinition<any, HasOAuth>
         | import("./types/index.js").PromptDefinitionWithoutCallback,
@@ -324,9 +329,9 @@ class MCPServerClass {
         promptDefinition,
         callback as any
       );
-    }) as typeof originalPrompt;
+    }) as any;
 
-    this.resource = (<HasOAuth extends boolean = false>(
+    this.resource = ((
       resourceDefinition:
         | import("./types/index.js").ResourceDefinition<HasOAuth>
         | import("./types/index.js").ResourceDefinitionWithoutCallback,
@@ -342,9 +347,9 @@ class MCPServerClass {
         });
       }
       return originalResource.call(self, resourceDefinition, callback as any);
-    }) as typeof originalResource;
+    }) as any;
 
-    this.resourceTemplate = (<HasOAuth extends boolean = false>(
+    this.resourceTemplate = ((
       templateDefinition:
         | import("./types/index.js").ResourceTemplateDefinition<HasOAuth>
         | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
@@ -368,7 +373,7 @@ class MCPServerClass {
         templateDefinition,
         callback as any
       );
-    }) as typeof originalResourceTemplate;
+    }) as any;
   }
 
   /**
@@ -716,8 +721,11 @@ class MCPServerClass {
     );
   }
 
-  // Tool registration helper
-  public tool: typeof toolRegistration = toolRegistration;
+  // Tool registration helper - type is set in wrapRegistrationMethods
+  public tool!: <T extends ToolDefinition<any, any, HasOAuth>>(
+    toolDefinition: T,
+    callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
+  ) => this;
 
   // Schema conversion helpers (used by tool registration)
   public convertZodSchemaToParams = convertZodSchemaToParams;
@@ -726,12 +734,29 @@ class MCPServerClass {
   // Template URI parsing helper (used by resource templates)
   public parseTemplateUri = parseTemplateUriHelper;
 
-  // Resource registration helpers
-  public resource = registerResource;
-  public resourceTemplate = registerResourceTemplate;
+  // Resource registration helpers - types are set in wrapRegistrationMethods
+  public resource!: (
+    resourceDefinition:
+      | ResourceDefinition<HasOAuth>
+      | import("./types/index.js").ResourceDefinitionWithoutCallback,
+    callback?: ReadResourceCallback<HasOAuth>
+  ) => this;
+  public resourceTemplate!: (
+    templateDefinition:
+      | ResourceTemplateDefinition<HasOAuth>
+      | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
+      | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth>
+      | import("./types/index.js").FlatResourceTemplateDefinitionWithoutCallback,
+    callback?: ReadResourceTemplateCallback<HasOAuth>
+  ) => this;
 
-  // Prompt registration helper
-  public prompt = registerPrompt;
+  // Prompt registration helper - type is set in wrapRegistrationMethods
+  public prompt!: (
+    promptDefinition:
+      | PromptDefinition<any, HasOAuth>
+      | import("./types/index.js").PromptDefinitionWithoutCallback,
+    callback?: PromptCallback<any, HasOAuth>
+  ) => this;
 
   // Notification helpers
   public getActiveSessions = getActiveSessions;
@@ -760,7 +785,7 @@ class MCPServerClass {
   public uiResource = (
     definition: Parameters<typeof uiResourceRegistration>[1]
   ) => {
-    return uiResourceRegistration(this, definition);
+    return uiResourceRegistration(this as any, definition);
   };
 
   /**
@@ -880,7 +905,7 @@ class MCPServerClass {
       );
     }
 
-    await mountWidgets(this, {
+    await mountWidgets(this as any, {
       baseRoute: "/mcp-use/widgets",
       resourcesDir: "resources",
     });
@@ -949,7 +974,7 @@ class MCPServerClass {
     }
 
     console.log("[MCP] Mounting widgets");
-    await mountWidgets(this, {
+    await mountWidgets(this as any, {
       baseRoute: "/mcp-use/widgets",
       resourcesDir: "resources",
     });
@@ -1020,15 +1045,22 @@ class MCPServerClass {
   }
 }
 
-export type McpServerInstance = MCPServerClass & HonoType;
+export type McpServerInstance<HasOAuth extends boolean = false> =
+  MCPServerClass<HasOAuth> & HonoType;
 
 // Type alias for use in type annotations (e.g., function parameters)
-export type MCPServer = MCPServerClass;
+export type MCPServer<HasOAuth extends boolean = false> =
+  MCPServerClass<HasOAuth>;
 
-// Interface to properly type the MCPServer constructor
+// Interface to properly type the MCPServer constructor with OAuth overloads
 export interface MCPServerConstructor {
-  new (config: ServerConfig): McpServerInstance;
-  prototype: MCPServerClass;
+  // Overload: when OAuth is configured, return McpServerInstance<true>
+  new (
+    config: ServerConfig & { oauth: NonNullable<ServerConfig["oauth"]> }
+  ): McpServerInstance<true>;
+  // Overload: when OAuth is not configured, return McpServerInstance<false>
+  new (config: ServerConfig): McpServerInstance<false>;
+  prototype: MCPServerClass<boolean>;
 }
 
 // Export MCPServer constructor with proper return typing
@@ -1099,21 +1131,21 @@ export const MCPServer: MCPServerConstructor = MCPServerClass as any;
 export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> & { oauth: NonNullable<ServerConfig["oauth"]> }
-): McpServerInstance;
+): McpServerInstance<true>;
 
 // Overload: when OAuth is not configured
 // eslint-disable-next-line no-redeclare
 export function createMCPServer(
   name: string,
   config?: Partial<ServerConfig>
-): McpServerInstance;
+): McpServerInstance<false>;
 
 // Implementation
 // eslint-disable-next-line no-redeclare
 export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> = {}
-): McpServerInstance {
+): McpServerInstance<boolean> {
   const instance = new MCPServerClass({
     name,
     version: config.version || "1.0.0",
@@ -1126,5 +1158,5 @@ export function createMCPServer(
     oauth: config.oauth,
   }) as any;
 
-  return instance as unknown as McpServerInstance;
+  return instance as unknown as McpServerInstance<boolean>;
 }
