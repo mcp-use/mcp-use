@@ -34,7 +34,7 @@ export const SimpleSplitCard = ({
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100">
           <div className="grid grid-cols-2 h-full">
             <a href={leftHref} className="flex items-center justify-center bg-black/20 hover:bg-black/50" aria-label={leftLabel}>
-              <im noZoom src={leftLogo} alt={leftLabel} className="h-10 w-10 filter grayscale" />
+              <img noZoom src={leftLogo} alt={leftLabel} className="h-10 w-10 filter grayscale" />
             </a>
             <a href={rightHref} className="flex items-center justify-center bg-black/20 hover:bg-black/50" aria-label={rightLabel}>
               <img noZoom src={rightLogo} alt={rightLabel} className="h-10 w-10 filter grayscale" />
