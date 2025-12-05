@@ -6,9 +6,11 @@ through the standard input/output streams.
 """
 
 import sys
+from typing import Any
 
-from mcp import ClientSession, StdioServerParameters
+from mcp import ClientSession, ErrorData, McpError, StdioServerParameters
 from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.types import CONNECTION_CLOSED
 
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.client.middleware import CallbackClientSession, Middleware
@@ -94,13 +96,74 @@ class StdioConnector(BaseConnector):
             self._connected = True
             logger.debug(f"Successfully connected to MCP implementation: {self.command}")
 
-        except Exception as e:
-            logger.error(f"Failed to connect to MCP implementation: {e}")
+        except OSError as e:
+            # Process could not be started at all
+            logger.error(
+                f"Failed to start stdio MCP server {self.public_identifier}"
+                f"with command {self.command} and args {self.args}"
+            )
 
             # Clean up any resources if connection failed
             await self._cleanup_resources()
 
-            # Re-raise the original exception
+            # Re-raise runtime error
+            raise RuntimeError(
+                "Failed to start stdio MCP server "
+                f"'{self.public_identifier}'. "
+                f"Ensure '{self.command}' is installed and on PATH. "
+                f"Original error: {e}"
+            ) from e
+
+        except Exception as e:
+            logger.error(f"Failed to connect to stdio MCP server {self.public_identifier}: {e}")
+            await self._cleanup_resources()
+            raise
+
+    async def initialize(self) -> dict[str, Any]:
+        """
+        Initialize the MCP session for stdio servers with richer error messages.
+
+        In particular, wraps McpError(CONNECTION_CLOSED) to include the stdio
+        command/args and guidance to inspect stderr.
+        """
+        if not self.client_session:
+            raise RuntimeError("MCP client is not connected")
+
+        try:
+            # Delegate to BaseConnector.initialize (which handles capabilities + lists)
+            return await super().initialize()
+
+        except McpError as e:
+            err = getattr(e, "error", None)
+
+            # The common case when the server process starts, prints an error,
+            # and exits during initialize() (e.g. invalid CLI flag)
+            if err is not None and err.code == CONNECTION_CLOSED:
+                cmd = f"{self.command} {' '.join(self.args)}".strip()
+
+                message = (
+                    f"Failed to initialize stdio MCP server '{self.public_identifier}': "
+                    "the underlying process closed the connection during initialization.\n"
+                    f"Command: {cmd}\n"
+                    "This usually means the server failed to start correctly or crashed "
+                    "(for example, due to an invalid CLI flag or runtime error).\n"
+                    "Check the server's stderr output above for details."
+                )
+
+                raise McpError(
+                    ErrorData(
+                        code=err.code,
+                        message=message,
+                        data={
+                            "public_identifier": self.public_identifier,
+                            "command": self.command,
+                            "args": self.args,
+                            "phase": "initialize",
+                        },
+                    )
+                ) from e
+
+            # For other MCP errors, just re-raise
             raise
 
     @property
