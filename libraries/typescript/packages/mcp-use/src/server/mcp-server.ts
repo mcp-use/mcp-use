@@ -2,12 +2,17 @@ import {
   McpServer as OfficialMcpServer,
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
   GetPromptResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { ElicitationValidationError } from "../errors.js";
 
 /**
  * Options for the sample() function in tool context.
@@ -40,8 +45,56 @@ export interface SampleOptions {
 }
 
 /**
+ * Options for the elicit() function in tool context.
+ */
+export interface ElicitOptions {
+  /**
+   * Timeout in milliseconds for the elicitation request.
+   * Default: no timeout (Infinity) - waits indefinitely for user response.
+   * Set this if you want to limit how long to wait for user input.
+   *
+   * @example
+   * ```typescript
+   * // Wait indefinitely (default)
+   * await ctx.elicit(message, schema);
+   *
+   * // With 2 minute timeout
+   * await ctx.elicit(message, schema, { timeout: 120000 });
+   * ```
+   */
+  timeout?: number;
+}
+
+/**
+ * Parameters for form mode elicitation.
+ * Used to request structured data from users with optional JSON schema validation.
+ */
+export interface ElicitFormParams {
+  /** Human-readable message explaining why the information is needed */
+  message: string;
+  /** JSON Schema defining the structure of the expected response */
+  requestedSchema: Record<string, any>;
+  /** Mode specifier (optional for backwards compatibility, defaults to "form") */
+  mode?: "form";
+}
+
+/**
+ * Parameters for URL mode elicitation.
+ * Used to direct users to external URLs for sensitive interactions.
+ * MUST be used for interactions involving sensitive information like credentials.
+ */
+export interface ElicitUrlParams {
+  /** Human-readable message explaining why the interaction is needed */
+  message: string;
+  /** URL for the user to navigate to */
+  url: string;
+  /** Mode specifier (required for URL mode) */
+  mode: "url";
+}
+
+/**
  * Context object passed to tool callbacks.
- * Provides access to sampling and progress reporting capabilities.
+ * Provides access to sampling, elicitation, and progress reporting capabilities.
  */
 export interface ToolContext {
   /**
@@ -80,6 +133,72 @@ export interface ToolContext {
     params: CreateMessageRequest["params"],
     options?: SampleOptions
   ) => Promise<CreateMessageResult>;
+
+  /**
+   * Request user input via the client through elicitation.
+   *
+   * Supports two modes with automatic mode detection:
+   * - **Form mode**: Pass a Zod schema as second parameter - collects structured data
+   * - **URL mode**: Pass a URL string as second parameter - directs to external URL
+   * - **Verbose mode**: Pass an object with explicit mode for backwards compatibility
+   *
+   * By default, there is no timeout - waits indefinitely for user response.
+   * Set `options.timeout` to limit the wait time.
+   *
+   * @example
+   * ```typescript
+   * // Form mode (simplified) - automatically inferred from Zod schema
+   * const result = await ctx.elicit(
+   *   "Please provide your information",
+   *   z.object({
+   *     name: z.string().default("Anonymous"),
+   *     age: z.number().default(0)
+   *   })
+   * );
+   * // result.data is typed as { name: string, age: number }
+   *
+   * // With timeout
+   * const result = await ctx.elicit(
+   *   "Enter info",
+   *   z.object({ name: z.string() }),
+   *   { timeout: 60000 } // 1 minute timeout
+   * );
+   *
+   * // URL mode (simplified) - automatically inferred from URL string
+   * const authResult = await ctx.elicit(
+   *   "Please authorize access",
+   *   "https://example.com/oauth/authorize"
+   * );
+   *
+   * // Verbose API (backwards compatible)
+   * const verboseResult = await ctx.elicit({
+   *   message: "Please provide your information",
+   *   requestedSchema: { type: "object", properties: {...} },
+   *   mode: "form"
+   * });
+   * ```
+   */
+  elicit: {
+    // Overload 1: Form mode with Zod schema (simplified, type-safe)
+    <T extends z.ZodObject<any>>(
+      message: string,
+      schema: T,
+      options?: ElicitOptions
+    ): Promise<ElicitResult & { data: z.infer<T> }>;
+
+    // Overload 2: URL mode with string URL (simplified)
+    (
+      message: string,
+      url: string,
+      options?: ElicitOptions
+    ): Promise<ElicitResult>;
+
+    // Overload 3: Original verbose API (backwards compatibility)
+    (
+      params: ElicitFormParams | ElicitUrlParams,
+      options?: ElicitOptions
+    ): Promise<ElicitResult>;
+  };
 
   /**
    * Send a progress notification to the client.
@@ -781,6 +900,130 @@ export class McpServer<HasOAuth extends boolean = false> {
               clearInterval(progressInterval);
             }
           }
+        };
+
+        /**
+         * Request user input via elicitation.
+         *
+         * Supports three call signatures:
+         * 1. ctx.elicit(message, zodSchema, options?) - Form mode with type inference and validation
+         * 2. ctx.elicit(message, url, options?) - URL mode for sensitive data
+         * 3. ctx.elicit(params, options?) - Verbose API
+         *
+         * By default, there is no timeout - waits indefinitely for user response.
+         * Set options.timeout to limit the wait time.
+         */
+        enhancedContext.elicit = async (
+          messageOrParams: string | ElicitFormParams | ElicitUrlParams,
+          schemaOrUrlOrOptions?: z.ZodObject<any> | string | ElicitOptions,
+          maybeOptions?: ElicitOptions
+        ): Promise<ElicitResult> => {
+          let sdkParams: ElicitRequestFormParams | ElicitRequestURLParams;
+          let zodSchema: z.ZodObject<any> | null = null;
+          let options: ElicitOptions | undefined;
+
+          // Detect which signature was used
+          if (typeof messageOrParams === "string") {
+            // Simplified API: ctx.elicit(message, schemaOrUrl, options?)
+            const message = messageOrParams;
+
+            if (typeof schemaOrUrlOrOptions === "string") {
+              // URL mode: ctx.elicit(message, url, options?)
+              options = maybeOptions;
+              const elicitationId = `elicit-${generateUUID()}`;
+
+              sdkParams = {
+                mode: "url",
+                message,
+                url: schemaOrUrlOrOptions,
+                elicitationId,
+              } as ElicitRequestURLParams;
+            } else if (
+              schemaOrUrlOrOptions &&
+              typeof schemaOrUrlOrOptions === "object" &&
+              "_def" in schemaOrUrlOrOptions
+            ) {
+              // Form mode: ctx.elicit(message, zodSchema, options?)
+              options = maybeOptions;
+
+              // Store the Zod schema for validation after response
+              zodSchema = schemaOrUrlOrOptions as z.ZodObject<any>;
+
+              // Convert Zod schema to JSON Schema for the MCP request
+              const jsonSchema = toJsonSchemaCompat(
+                schemaOrUrlOrOptions as any
+              );
+
+              sdkParams = {
+                mode: "form",
+                message,
+                requestedSchema: jsonSchema,
+              } as ElicitRequestFormParams;
+            } else {
+              throw new Error(
+                "Invalid elicit signature: second parameter must be a Zod schema or URL string"
+              );
+            }
+          } else {
+            // Verbose API: ctx.elicit(params, options?)
+            options = schemaOrUrlOrOptions as ElicitOptions | undefined;
+            const params = messageOrParams;
+
+            if (params.mode === "url") {
+              const elicitationId = `elicit-${generateUUID()}`;
+
+              sdkParams = {
+                mode: "url",
+                message: params.message,
+                url: params.url,
+                elicitationId,
+              } as ElicitRequestURLParams;
+            } else {
+              // Note: When using verbose form mode API, no Zod schema is provided,
+              // so server-side validation is not performed. The requestedSchema is
+              // passed as-is without type safety. Consider using the simplified API
+              // (ctx.elicit(message, zodSchema)) for automatic server-side validation.
+              sdkParams = {
+                mode: "form",
+                message: params.message,
+                requestedSchema: params.requestedSchema,
+              } as ElicitRequestFormParams;
+            }
+          }
+
+          // Use the official SDK's Server.elicitInput method
+          // Default: no timeout (waits indefinitely like sampling)
+          // Override with options.timeout if specified
+          const { timeout } = options ?? {};
+
+          // Use 2147483647 (max 32-bit signed int) = ~24.8 days - effectively infinite
+          const sdkTimeout =
+            timeout && timeout !== Infinity ? timeout : 2147483647;
+
+          const result = await this.server.server.elicitInput(sdkParams, {
+            timeout: sdkTimeout,
+          });
+
+          // If we have a Zod schema and the user accepted, validate the data
+          if (zodSchema && result.action === "accept" && result.data) {
+            try {
+              // Validate and parse the data using Zod for type safety
+              // This ensures the data matches our TypeScript types
+              const validatedData = zodSchema.parse(result.data);
+              return {
+                ...result,
+                data: validatedData,
+              };
+            } catch (error: any) {
+              // Zod validation failed - data doesn't match the schema
+              throw new ElicitationValidationError(
+                `Elicitation data validation failed: ${error.message}`,
+                error
+              );
+            }
+          }
+
+          return result;
         };
 
         /**
@@ -2254,7 +2497,7 @@ if (container && Component) {
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => generateUUID(),
-        enableJsonResponse: false, // Allow SSE streaming for progress notifications
+        enableJsonResponse: true, // Allow SSE streaming for progress notifications
         allowedOrigins: allowedOrigins,
         enableDnsRebindingProtection: enableDnsRebindingProtection,
         onsessioninitialized: (id) => {

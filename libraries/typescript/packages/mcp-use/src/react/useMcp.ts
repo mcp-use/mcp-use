@@ -75,6 +75,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     wrapTransport,
     onNotification,
     samplingCallback,
+    onElicitation,
   } = options;
 
   const [state, setState] = useState<UseMcpResult["state"]>("discovering");
@@ -295,6 +296,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
           clientOptions: clientConfig, // ← Pass client config to connector
           samplingCallback: samplingCallback, // ← Pass sampling callback to connector
+          elicitationCallback: onElicitation, // ← Pass elicitation callback to connector
           wrapTransport: wrapTransport
             ? (transport: any) => {
                 console.log(

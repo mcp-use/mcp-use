@@ -488,7 +488,8 @@
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
-                      "typescript/server/authentication"
+                      "typescript/server/authentication",
+                      "typescript/server/elicitation"
                     ]
                   },
                   {

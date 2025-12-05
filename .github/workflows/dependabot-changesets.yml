@@ -1,0 +1,242 @@
+name: Dependabot Changesets
+
+on:
+  pull_request_target:
+    paths:
+      - ".github/workflows/dependabot-changesets.yml"
+      - "libraries/typescript/pnpm-lock.yaml"
+      - "libraries/typescript/**/package.json"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to test (e.g., 602)'
+        required: true
+        type: string
+      force:
+        description: 'Force regenerate changeset even if one exists'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  generate-changeset:
+    runs-on: ubuntu-latest
+    if: |
+      github.actor == 'dependabot[bot]' || 
+      github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Get PR info (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        id: pr-info
+        with:
+          script: |
+            const prNumber = parseInt(context.payload.inputs.pr_number);
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            
+            if (pr.user.login !== 'dependabot[bot]') {
+              core.setFailed(`PR #${prNumber} is not a Dependabot PR. User: ${pr.user.login}`);
+              return;
+            }
+            
+            core.setOutput('head_ref', pr.head.ref);
+            core.setOutput('head_sha', pr.head.sha);
+            core.info(`✅ Found Dependabot PR #${prNumber}: ${pr.head.ref}`);
+            return {
+              head_ref: pr.head.ref,
+              head_sha: pr.head.sha,
+            };
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr-info.outputs.head_ref || github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23
+
+      - name: Generate changeset
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { promises: fs } = require("fs");
+            const path = require("path");
+
+            const TYPESCRIPT_DIR = "libraries/typescript";
+            const CHANGESET_DIR = `${TYPESCRIPT_DIR}/.changeset`;
+            const FORCE = '${{ github.event.inputs.force }}' === 'true';
+
+            // Check if we're on a dependabot branch
+            const { stdout } = await exec.getExecOutput("git", ["branch", "--show-current"]);
+            const branchName = stdout.trim();
+            if (!branchName.startsWith("dependabot/")) {
+              console.log(`Not a dependabot branch (${branchName}), skipping`);
+              return;
+            }
+
+            // Check if changeset already exists in the directory
+            let existingChangesets = [];
+            try {
+              const changesetFiles = await fs.readdir(CHANGESET_DIR);
+              existingChangesets = changesetFiles
+                .filter(f => f.endsWith(".md") && f !== "README.md")
+                .map(f => `${CHANGESET_DIR}/${f}`);
+            } catch (e) {
+              console.log("Warning: Could not read changeset directory:", e.message);
+            }
+
+            if (existingChangesets.length > 0) {
+              if (FORCE) {
+                console.log(`🔄 Force mode: Removing ${existingChangesets.length} existing changeset(s)`);
+                for (const changeset of existingChangesets) {
+                  await exec.exec("git", ["rm", changeset]);
+                  console.log(`  Removed: ${changeset}`);
+                }
+              } else {
+                console.log(`Changeset already exists (${existingChangesets.join(', ')}), skipping (use force option to regenerate)`);
+                return;
+              }
+            }
+
+            // Get changed package.json files from the diff against base branch
+            const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "origin/main...HEAD"]);
+            const diffFiles = diffOutput.split("\n").filter(Boolean);
+            
+            console.log(`Found ${diffFiles.length} changed files in PR`);
+            console.log("Changed files:", diffFiles.slice(0, 10).join(", ") + (diffFiles.length > 10 ? "..." : ""));
+            
+            const changedPackageJsons = diffFiles
+              .filter(file => file.startsWith(TYPESCRIPT_DIR))
+              .filter(file => file.endsWith("package.json"))
+              .filter(file => file !== `${TYPESCRIPT_DIR}/package.json`); // Skip root package.json
+
+            if (changedPackageJsons.length === 0) {
+              console.log("No package.json changes in typescript packages, skipping");
+              return;
+            }
+
+            // Get affected package names by finding which packages contain the changed files
+            async function getPackageNames(files) {
+              const packageDirs = new Set();
+              const packagesPath = `${TYPESCRIPT_DIR}/packages/`;
+              
+              // For each changed file, find which package directory it belongs to
+              for (const file of files) {
+                if (file.startsWith(packagesPath)) {
+                  // Extract the package directory name (e.g., "mcp-use", "inspector", etc.)
+                  const relativePath = file.substring(packagesPath.length);
+                  const packageDir = relativePath.split('/')[0];
+                  packageDirs.add(`${packagesPath}${packageDir}`);
+                }
+              }
+              
+              console.log(`Found ${packageDirs.size} affected package directories:`, [...packageDirs]);
+              
+              // Read each package's package.json to get the package name
+              const names = [];
+              for (const packageDir of packageDirs) {
+                try {
+                  const packageJsonPath = `${packageDir}/package.json`;
+                  const content = await fs.readFile(packageJsonPath, "utf8");
+                  const data = JSON.parse(content);
+                  // Only include non-private packages
+                  if (!data.private && data.name) {
+                    names.push(data.name);
+                    console.log(`✓ Affected package: ${data.name}`);
+                  } else {
+                    console.log(`  Skipped (private): ${packageDir}`);
+                  }
+                } catch (e) {
+                  console.log(`Warning: Could not read package.json for ${packageDir}: ${e.message}`);
+                }
+              }
+              
+              return [...new Set(names)]; // Remove duplicates
+            }
+
+            // Extract dependency bumps from git diff
+            async function getBumps(files) {
+              const bumps = new Map();
+              for (const file of files) {
+                try {
+                  const { stdout: changes } = await exec.getExecOutput("git", ["show", file]);
+                  for (const line of changes.split("\n")) {
+                    // Only look at added lines (new versions)
+                    if (!line.startsWith("+") || line.startsWith("+++")) {
+                      continue;
+                    }
+                    // Match dependency entries like: "package-name": "^1.2.3"
+                    const match = line.match(/^\+\s*"([^"]+)":\s*"([^"]+)"/);
+                    if (match) {
+                      const [, pkg, version] = match;
+                      // Skip non-version entries
+                      if (!version.match(/[\d.]/)) continue;
+                      bumps.set(pkg, version);
+                    }
+                  }
+                } catch (e) {
+                  console.log(`Warning: Could not get diff for ${file}: ${e.message}`);
+                }
+              }
+              return bumps;
+            }
+
+            const packageNames = await getPackageNames(changedPackageJsons);
+
+            if (packageNames.length === 0) {
+              console.log("No public packages changed, skipping");
+              return;
+            }
+
+            const packageBumps = await getBumps(changedPackageJsons);
+
+            // Generate changeset content
+            let message = "";
+            for (const [pkg, version] of packageBumps) {
+              message += `Updated dependency \`${pkg}\` to \`${version}\`.\n`;
+            }
+
+            if (!message) {
+              message = "Updated dependencies.\n";
+            }
+
+            const pkgs = packageNames.map(pkg => `"${pkg}": patch`).join("\n");
+            const changesetContent = `---\n${pkgs}\n---\n\n${message.trim()}\n`;
+
+            // Create changeset file
+            const { stdout: shortHash } = await exec.getExecOutput("git", ["rev-parse", "--short", "HEAD"]);
+            const fileName = `${CHANGESET_DIR}/dependabot-${shortHash.trim()}.md`;
+
+            await fs.writeFile(fileName, changesetContent);
+            console.log(`Created changeset: ${fileName}`);
+            console.log("Content:");
+            console.log(changesetContent);
+
+            // Commit and push
+            await exec.exec("git", ["add", fileName]);
+            await exec.exec("git", ["commit", "-m", "chore: add changeset for dependabot updates"]);
+            await exec.exec("git", ["push"]);
+
+            console.log("✅ Changeset committed and pushed");
+

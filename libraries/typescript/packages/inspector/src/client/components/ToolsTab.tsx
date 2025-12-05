@@ -76,6 +76,8 @@ export function ToolsTab({
   const [results, setResults] = useState<ToolResult[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [copiedResult, setCopiedResult] = useState<number | null>(null);
+  const [abortController, setAbortController] =
+    useState<AbortController | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"tools" | "saved">("tools");
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([]);
@@ -379,6 +381,9 @@ export function ToolsTab({
   const executeTool = useCallback(async () => {
     if (!selectedTool || isExecuting) return;
 
+    // Create abort controller for this execution
+    const controller = new AbortController();
+    setAbortController(controller);
     setIsExecuting(true);
     const startTime = Date.now();
 
@@ -408,11 +413,12 @@ export function ToolsTab({
         );
       }
 
-      // Use a 10 minute timeout for tool calls, as tools may trigger sampling
+      // Use a 10 minute timeout for tool calls, as tools may trigger sampling/elicitation
       // which can take a long time (waiting for LLM responses or human input)
       const result = await callTool(selectedTool.name, parsedArgs, {
         timeout: 600000, // 10 minutes
         resetTimeoutOnProgress: true, // Reset timeout when progress is received
+        signal: controller.signal, // Pass abort signal
       });
       const duration = Date.now() - startTime;
 
@@ -1000,6 +1006,11 @@ export function ToolsTab({
               onArgChange={handleArgChange}
               onExecute={executeTool}
               onSave={openSaveDialog}
+              onCancel={() => {
+                if (abortController) {
+                  abortController.abort();
+                }
+              }}
             />
           </ResizablePanel>
 

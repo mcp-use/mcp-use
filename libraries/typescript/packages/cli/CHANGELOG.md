@@ -1,5 +1,74 @@
 # @mcp-use/cli
 
+## 2.4.8
+
+### Patch Changes
+
+- 4fc04a9: fix: fix transport bug
+- Updated dependencies [4fc04a9]
+- Updated dependencies [4fc04a9]
+- Updated dependencies [4fc04a9]
+- Updated dependencies [4fc04a9]
+  - @mcp-use/inspector@0.11.0
+  - mcp-use@1.9.0
+
+## 2.4.8-canary.3
+
+### Patch Changes
+
+- b0d1ffe: fix: fix transport bug
+- Updated dependencies [b0d1ffe]
+  - @mcp-use/inspector@0.11.0-canary.3
+  - mcp-use@1.9.0-canary.3
+
+## 2.4.8-canary.2
+
+### Patch Changes
+
+- Updated dependencies [b56c907]
+  - @mcp-use/inspector@0.11.0-canary.2
+  - mcp-use@1.9.0-canary.2
+
+## 2.4.8-canary.1
+
+### Patch Changes
+
+- Updated dependencies [b4e960a]
+  - mcp-use@1.9.0-canary.1
+  - @mcp-use/inspector@0.10.2-canary.1
+
+## 2.4.8-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d726bfa]
+  - @mcp-use/inspector@0.10.2-canary.0
+  - mcp-use@1.8.2-canary.0
+
+## 2.4.7
+
+### Patch Changes
+
+- Updated dependencies [4bf21f3]
+  - @mcp-use/inspector@0.10.1
+  - mcp-use@1.8.1
+
+## 2.4.7-canary.0
+
+### Patch Changes
+
+- Updated dependencies [33a1a69]
+  - @mcp-use/inspector@0.10.1-canary.0
+  - mcp-use@1.8.1-canary.0
+
+## 2.4.6
+
+### Patch Changes
+
+- Updated dependencies [00b19c5]
+  - @mcp-use/inspector@0.10.0
+  - mcp-use@1.8.0
+
 ## 2.4.6-canary.0
 
 ### Patch Changes

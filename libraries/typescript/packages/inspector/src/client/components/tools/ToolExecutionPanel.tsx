@@ -1,9 +1,14 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { Play, Save } from "lucide-react";
+import { Play, Save, X } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
 import { Spinner } from "@/client/components/ui/spinner";
 import { ToolInputForm } from "./ToolInputForm";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/client/components/ui/tooltip";
 
 interface ToolExecutionPanelProps {
   selectedTool: Tool | null;
@@ -13,6 +18,7 @@ interface ToolExecutionPanelProps {
   onArgChange: (key: string, value: string) => void;
   onExecute: () => void;
   onSave: () => void;
+  onCancel?: () => void;
 }
 
 export function ToolExecutionPanel({
@@ -23,7 +29,10 @@ export function ToolExecutionPanel({
   onArgChange,
   onExecute,
   onSave,
+  onCancel,
 }: ToolExecutionPanelProps) {
+  const [showCancelButton, setShowCancelButton] = useState(false);
+
   // Handle Cmd/Ctrl + Enter keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -35,11 +44,16 @@ export function ToolExecutionPanel({
           onExecute();
         }
       }
+      // Escape key to cancel execution
+      if (event.key === "Escape" && isExecuting && onCancel) {
+        event.preventDefault();
+        onCancel();
+      }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTool, isExecuting, isConnected, onExecute]);
+  }, [selectedTool, isExecuting, isConnected, onExecute, onCancel]);
 
   if (!selectedTool) {
     return (
@@ -73,27 +87,66 @@ export function ToolExecutionPanel({
                 <Save className="h-4 w-4" />
                 <span className="hidden sm:inline">Save</span>
               </Button>
-              <Button
-                onClick={onExecute}
-                disabled={isExecuting || !isConnected}
-                size="sm"
-                className="lg:size-default pr-1! gap-0"
-              >
-                {isExecuting ? (
-                  <>
-                    <Spinner className="mr-2" />
-                    <span className="hidden sm:inline">Executing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Execute</span>
-                    <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
-                      ⌘↵
-                    </span>
-                  </>
-                )}
-              </Button>
+              {isExecuting && onCancel ? (
+                <Tooltip open={showCancelButton ? undefined : false}>
+                  <TooltipTrigger asChild>
+                    <div
+                      onMouseEnter={() => setShowCancelButton(true)}
+                      onMouseLeave={() => setShowCancelButton(false)}
+                      className="relative"
+                    >
+                      <Button
+                        onClick={onCancel}
+                        variant={showCancelButton ? "destructive" : "default"}
+                        size="sm"
+                        className="lg:size-default gap-2 transition-all"
+                      >
+                        {showCancelButton ? (
+                          <>
+                            <X className="h-4 w-4" />
+                            <span className="hidden sm:inline">Cancel</span>
+                            <span className="hidden sm:inline text-[12px] border border-current p-1 rounded-full ml-2">
+                              Esc
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Spinner className="mr-2" />
+                            <span className="hidden sm:inline">
+                              Executing...
+                            </span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Hover to cancel (or press Esc)</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  onClick={onExecute}
+                  disabled={isExecuting || !isConnected}
+                  size="sm"
+                  className="lg:size-default pr-1! gap-0"
+                >
+                  {isExecuting ? (
+                    <>
+                      <Spinner className="mr-2" />
+                      <span className="hidden sm:inline">Executing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Execute</span>
+                      <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
+                        ⌘↵
+                      </span>
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
           {selectedTool.description && (

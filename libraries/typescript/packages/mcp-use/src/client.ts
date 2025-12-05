@@ -3,6 +3,9 @@ import path from "node:path";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { BaseMCPClient } from "./client/base.js";
 import type { ExecutionResult } from "./client/codeExecutor.js";
@@ -53,6 +56,18 @@ export interface MCPClientOptions {
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  /**
+   * Optional callback function to handle elicitation requests from servers.
+   * When provided, the client will declare elicitation capability and handle
+   * `elicitation/create` requests by calling this callback.
+   *
+   * Elicitation allows servers to request additional information from users:
+   * - Form mode: Collect structured data with JSON schema validation
+   * - URL mode: Direct users to external URLs for sensitive interactions
+   */
+  elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 }
 
 // Export executor classes and utilities for external use
@@ -84,6 +99,9 @@ export class MCPClient extends BaseMCPClient {
   private _samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  private _elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 
   constructor(
     config?: string | Record<string, any>,
@@ -121,6 +139,7 @@ export class MCPClient extends BaseMCPClient {
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;
     this._samplingCallback = options?.samplingCallback;
+    this._elicitationCallback = options?.elicitationCallback;
 
     if (this.codeMode) {
       this._setupCodeModeConnector();
@@ -161,6 +180,7 @@ export class MCPClient extends BaseMCPClient {
   ): BaseConnector {
     return createConnectorFromConfig(serverConfig, {
       samplingCallback: this._samplingCallback,
+      elicitationCallback: this._elicitationCallback,
     });
   }
 

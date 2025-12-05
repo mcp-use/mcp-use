@@ -1,5 +1,165 @@
 # mcp-use
 
+## 1.9.0
+
+### Minor Changes
+
+- 4fc04a9: feat: added support for elicitation in inspector
+- 4fc04a9: ## Elicitation Support
+
+  Added comprehensive elicitation support following MCP specification, enabling servers to request user input through clients.
+
+  ### New Features
+  - **Simplified API**: `ctx.elicit(message, zodSchema)` and `ctx.elicit(message, url)` with automatic mode detection
+  - **Form Mode**: Collect structured data with Zod schema validation and full TypeScript type inference
+  - **URL Mode**: Direct users to external URLs for sensitive operations (OAuth, credentials)
+  - **Server-Side Validation**: Automatic Zod validation of returned data with clear error messages
+  - **Client Support**: Added `elicitationCallback` to MCPClient and `onElicitation` to React `useMcp` hook
+  - **Type Safety**: Return types automatically inferred from Zod schemas
+  - **Configurable Timeout**: Optional timeout parameter (default: no timeout, waits indefinitely like sampling)
+
+  ### Improvements
+  - Reuses official SDK's `toJsonSchemaCompat` for Zod → JSON Schema conversion
+  - Automatic `elicitationId` generation for URL mode requests
+  - 5-minute default timeout for user interactions
+  - Defense-in-depth validation (client optional, server required)
+  - Backwards compatible with verbose API
+
+  ### Documentation
+  - Added `/typescript/server/elicitation` - Server-side usage guide
+  - Updated `/typescript/client/elicitation` - Client-side implementation guide
+  - Added to docs navigation
+  - Comprehensive examples with validation scenarios
+
+  ### Testing
+  - **Unit Tests**: 14 tests covering Zod conversion and validation (`tests/unit/server/elicitation.test.ts`)
+  - **Integration Tests**: 14 tests covering full client-server flow (`tests/integration/elicitation.test.ts`)
+  - **Manual Tests**: Basic functionality and comprehensive validation test suites
+  - **Total**: 28 automated tests + manual test suites
+  - **Status**: All tests passing ✅
+
+  ### Examples
+  - Created `examples/server/elicitation-test/` with 4 working tools
+  - Included basic functionality test client
+  - Included comprehensive validation test client (7 scenarios)
+  - Added timeout configuration examples
+  - All examples working
+
+### Patch Changes
+
+- 4fc04a9: fix: fix transport bug
+- Updated dependencies [4fc04a9]
+- Updated dependencies [4fc04a9]
+- Updated dependencies [4fc04a9]
+  - @mcp-use/inspector@0.11.0
+  - @mcp-use/cli@2.4.8
+
+## 1.9.0-canary.3
+
+### Patch Changes
+
+- b0d1ffe: fix: fix transport bug
+- Updated dependencies [b0d1ffe]
+  - @mcp-use/inspector@0.11.0-canary.3
+  - @mcp-use/cli@2.4.8-canary.3
+
+## 1.9.0-canary.2
+
+### Minor Changes
+
+- b56c907: feat: added support for elicitation in inspector
+
+### Patch Changes
+
+- Updated dependencies [b56c907]
+  - @mcp-use/inspector@0.11.0-canary.2
+  - @mcp-use/cli@2.4.8-canary.2
+
+## 1.9.0-canary.1
+
+### Minor Changes
+
+- b4e960a: ## Elicitation Support
+
+  Added comprehensive elicitation support following MCP specification, enabling servers to request user input through clients.
+
+  ### New Features
+  - **Simplified API**: `ctx.elicit(message, zodSchema)` and `ctx.elicit(message, url)` with automatic mode detection
+  - **Form Mode**: Collect structured data with Zod schema validation and full TypeScript type inference
+  - **URL Mode**: Direct users to external URLs for sensitive operations (OAuth, credentials)
+  - **Server-Side Validation**: Automatic Zod validation of returned data with clear error messages
+  - **Client Support**: Added `elicitationCallback` to MCPClient and `onElicitation` to React `useMcp` hook
+  - **Type Safety**: Return types automatically inferred from Zod schemas
+  - **Configurable Timeout**: Optional timeout parameter (default: no timeout, waits indefinitely like sampling)
+
+  ### Improvements
+  - Reuses official SDK's `toJsonSchemaCompat` for Zod → JSON Schema conversion
+  - Automatic `elicitationId` generation for URL mode requests
+  - 5-minute default timeout for user interactions
+  - Defense-in-depth validation (client optional, server required)
+  - Backwards compatible with verbose API
+
+  ### Documentation
+  - Added `/typescript/server/elicitation` - Server-side usage guide
+  - Updated `/typescript/client/elicitation` - Client-side implementation guide
+  - Added to docs navigation
+  - Comprehensive examples with validation scenarios
+
+  ### Testing
+  - **Unit Tests**: 14 tests covering Zod conversion and validation (`tests/unit/server/elicitation.test.ts`)
+  - **Integration Tests**: 14 tests covering full client-server flow (`tests/integration/elicitation.test.ts`)
+  - **Manual Tests**: Basic functionality and comprehensive validation test suites
+  - **Total**: 28 automated tests + manual test suites
+  - **Status**: All tests passing ✅
+
+  ### Examples
+  - Created `examples/server/elicitation/` with 4 working tools
+  - Included basic functionality test client
+  - Included comprehensive validation test client (7 scenarios)
+  - Added timeout configuration examples
+  - All examples working
+
+### Patch Changes
+
+- @mcp-use/cli@2.4.8-canary.1
+- @mcp-use/inspector@0.10.2-canary.1
+
+## 1.8.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d726bfa]
+  - @mcp-use/inspector@0.10.2-canary.0
+  - @mcp-use/cli@2.4.8-canary.0
+
+## 1.8.1
+
+### Patch Changes
+
+- Updated dependencies [4bf21f3]
+  - @mcp-use/inspector@0.10.1
+  - @mcp-use/cli@2.4.7
+
+## 1.8.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [33a1a69]
+  - @mcp-use/inspector@0.10.1-canary.0
+  - @mcp-use/cli@2.4.7-canary.0
+
+## 1.8.0
+
+### Minor Changes
+
+- 00b19c5: Add sampling support in inspector and fixed long running sampling requests (were timing out after 60s)
+
+### Patch Changes
+
+- Updated dependencies [00b19c5]
+  - @mcp-use/inspector@0.10.0
+  - @mcp-use/cli@2.4.6
+
 ## 1.8.0-canary.0
 
 ### Minor Changes
