@@ -95,6 +95,7 @@ a {
 .carousel-item-bg img {
   width: 100px;
   user-select: none;
+  -webkit-user-select: none;
   -webkit-user-drag: none;
 }
 
@@ -106,6 +107,7 @@ a {
   border-radius: inherit;
   border: 3px solid transparent;
   backdrop-filter: blur(0px) saturate(4.2) brightness(2.5) contrast(2.5);
+  -webkit-backdrop-filter: blur(0px) saturate(4.2) brightness(2.5) contrast(2.5);
   mask:
     linear-gradient(#fff 0 100%) border-box,
     linear-gradient(#fff 0 100%) padding-box;

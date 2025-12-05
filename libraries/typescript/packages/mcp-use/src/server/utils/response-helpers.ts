@@ -571,97 +571,51 @@ export function binary(base64Data: string, mimeType: string): CallToolResult {
 }
 
 /**
- * Configuration for widget response utility
+ * Configuration for widget response utility (runtime data only)
  */
 export interface WidgetResponseConfig {
-  /** Widget name from resources folder */
-  name: string;
   /** Structured data to pass to the widget */
   data: Record<string, any>;
-  /** Optional text message (defaults to "Displaying {name}") */
+  /** Optional text message for the response */
   message?: string;
-  /** Status text while tool is invoking */
-  invoking?: string;
-  /** Status text after tool has invoked */
-  invoked?: string;
-  /** Whether the widget can initiate tool calls (defaults to true) */
-  widgetAccessible?: boolean;
-  /** Whether this tool result can produce a widget (defaults to true) */
-  resultCanProduceWidget?: boolean;
-  /** Optional build ID for cache busting (usually auto-set by server) */
-  buildId?: string;
 }
 
 /**
  * Create a widget response for MCP tools
  *
- * Returns a complete tool result configured to display an OpenAI Apps SDK widget.
- * This allows any tool to return a widget, not just auto-registered widget tools.
+ * Returns runtime data for a widget. The widget configuration (name, invoking, invoked, etc.)
+ * should be set on the tool's `widget` property at registration time.
  *
- * The widget must exist in your resources folder and be registered with the server
- * using `server.uiResource()`.
- *
- * @param config - Widget response configuration
- * @returns CallToolResult with widget metadata and structured content
+ * @param config - Runtime data for the widget
+ * @returns CallToolResult with structured content for the widget
  *
  * @example
  * ```typescript
  * server.tool({
  *   name: 'get-weather',
  *   schema: z.object({ city: z.string() }),
- *   cb: async ({ city }) => {
- *     const weatherData = await fetchWeather(city);
- *     return widget({
- *       name: 'weather-display',
- *       data: weatherData,
- *       message: `Showing weather for ${city}`
- *     });
+ *   widget: {
+ *     name: 'weather-display',
+ *     invoking: 'Fetching weather...',
+ *     invoked: 'Weather loaded'
  *   }
+ * }, async ({ city }) => {
+ *   const weatherData = await fetchWeather(city);
+ *   return widget({
+ *     data: weatherData,
+ *     message: `Weather for ${city}`
+ *   });
  * })
  * ```
  */
 export function widget(config: WidgetResponseConfig): CallToolResult {
-  const {
-    name,
-    data,
-    message,
-    invoking,
-    invoked,
-    widgetAccessible = true,
-    resultCanProduceWidget = true,
-    buildId,
-  } = config;
-
-  // Generate a unique URI with random ID for each invocation
-  // This matches the pattern in mcp-server.ts lines 1094-1099
-  const randomId = Math.random().toString(36).substring(2, 15);
-  const buildIdPart = buildId ? `-${buildId}` : "";
-  const uniqueUri = `ui://widget/${name}${buildIdPart}-${randomId}.html`;
-
-  // Build the metadata object
-  const metadata: Record<string, unknown> = {
-    "openai/outputTemplate": uniqueUri,
-    "openai/widgetAccessible": widgetAccessible,
-    "openai/resultCanProduceWidget": resultCanProduceWidget,
-  };
-
-  // Add optional invocation status messages
-  if (invoking) {
-    metadata["openai/toolInvocation/invoking"] = invoking;
-  }
-  if (invoked) {
-    metadata["openai/toolInvocation/invoked"] = invoked;
-  }
-
-  // Default message
-  const displayMessage = message || `Displaying ${name}`;
+  const { data, message } = config;
 
   return {
-    _meta: metadata,
     content: [
       {
         type: "text",
-        text: displayMessage,
+        text: message || "",
       },
     ],
     // structuredContent will be injected as window.openai.toolOutput by Apps SDK

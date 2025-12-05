@@ -208,4 +208,46 @@ export interface ToolDefinition<
   annotations?: ToolAnnotations;
   /** Metadata for the tool */
   _meta?: Record<string, unknown>;
+  /**
+   * Configuration for tools that return a widget via the widget() helper.
+   * Sets up all the required metadata at registration time for proper widget rendering.
+   *
+   * @example
+   * ```typescript
+   * server.tool({
+   *   name: "get-weather",
+   *   schema: z.object({ city: z.string() }),
+   *   widget: {
+   *     name: "weather-display",  // Must match a widget in resources/
+   *     invoking: "Fetching weather data...",
+   *     invoked: "Weather loaded"
+   *   }
+   * }, async ({ city }) => {
+   *   const data = await fetchWeather(city);
+   *   return widget({
+   *     name: "weather-display",
+   *     data: { city, ...data }
+   *   });
+   * });
+   * ```
+   */
+  widget?: ToolWidgetConfig;
+}
+
+/**
+ * Configuration for a tool that returns a widget.
+ * This is set at registration time and configures all the metadata
+ * needed for proper widget rendering in Inspector and ChatGPT.
+ */
+export interface ToolWidgetConfig {
+  /** Widget name from resources folder */
+  name: string;
+  /** Status text while tool is invoking (defaults to "Loading {name}...") */
+  invoking?: string;
+  /** Status text after tool has invoked (defaults to "{name} ready") */
+  invoked?: string;
+  /** Whether the widget can initiate tool calls (defaults to true) */
+  widgetAccessible?: boolean;
+  /** Whether this tool result can produce a widget (defaults to true) */
+  resultCanProduceWidget?: boolean;
 }

@@ -79,7 +79,7 @@ import type {
   ReadResourceTemplateCallback,
 } from "./types/resource.js";
 
-export class MCPServer {
+class MCPServerClass {
   /**
    * Native MCP server instance from @modelcontextprotocol/sdk
    * Exposed publicly for advanced use cases
@@ -137,6 +137,12 @@ export class MCPServer {
       }
     >(),
   };
+
+  /**
+   * Storage for widget definitions, used to inject metadata into tool responses
+   * when using the widget() helper with returnsWidget option
+   */
+  public widgetDefinitions = new Map<string, Record<string, unknown>>();
 
   /**
    * Resource subscription manager for tracking and notifying resource updates
@@ -223,14 +229,81 @@ export class MCPServer {
         boolean
       >
     ) => {
-      const actualCallback = callback || toolDefinition.cb;
+      // Auto-add widget metadata if widget config is set
+      // This matches the metadata structure used by auto-registered widget tools
+      const widgetConfig = toolDefinition.widget;
+      const widgetName = widgetConfig?.name;
+
+      if (widgetConfig && widgetName) {
+        const buildIdPart = self.buildId ? `-${self.buildId}` : "";
+        const outputTemplate = `ui://widget/${widgetName}${buildIdPart}.html`;
+
+        toolDefinition._meta = {
+          ...toolDefinition._meta,
+          "openai/outputTemplate": outputTemplate,
+          "openai/toolInvocation/invoking":
+            widgetConfig.invoking ?? `Loading ${widgetName}...`,
+          "openai/toolInvocation/invoked":
+            widgetConfig.invoked ?? `${widgetName} ready`,
+          "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
+          "openai/resultCanProduceWidget":
+            widgetConfig.resultCanProduceWidget ?? true,
+        };
+      }
+
+      let actualCallback = callback || toolDefinition.cb;
+
+      // If widget config is set, wrap the callback to inject widget metadata into response
+      if (widgetConfig && widgetName && actualCallback) {
+        const originalCallback = actualCallback;
+        actualCallback = (async (params: any, ctx: any) => {
+          const result = await originalCallback(params, ctx);
+
+          // Look up the widget definition and inject its metadata into the response
+          const widgetDef = self.widgetDefinitions.get(widgetName);
+
+          if (result && typeof result === "object") {
+            // Generate unique URI for this invocation
+            const randomId = Math.random().toString(36).substring(2, 15);
+            const buildIdPart = self.buildId ? `-${self.buildId}` : "";
+            const uniqueUri = `ui://widget/${widgetName}${buildIdPart}-${randomId}.html`;
+
+            // Build response metadata
+            const responseMeta: Record<string, unknown> = {
+              ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
+              "openai/outputTemplate": uniqueUri,
+              "openai/toolInvocation/invoking":
+                widgetConfig.invoking ?? `Loading ${widgetName}...`,
+              "openai/toolInvocation/invoked":
+                widgetConfig.invoked ?? `${widgetName} ready`,
+              "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
+              "openai/resultCanProduceWidget":
+                widgetConfig.resultCanProduceWidget ?? true,
+            };
+
+            // Set _meta on the result
+            (result as any)._meta = responseMeta;
+
+            // Update message if empty
+            if (
+              (result as any).content?.[0]?.type === "text" &&
+              !(result as any).content[0].text
+            ) {
+              (result as any).content[0].text = `Displaying ${widgetName}`;
+            }
+          }
+
+          return result;
+        }) as typeof actualCallback;
+      }
+
       if (actualCallback) {
         self.registrationRecipes.tools.set(toolDefinition.name, {
           config: toolDefinition as any,
           handler: actualCallback as any,
         });
       }
-      return originalTool.call(self, toolDefinition, callback as any);
+      return originalTool.call(self, toolDefinition, actualCallback as any);
     }) as typeof originalTool;
 
     this.prompt = (<HasOAuth extends boolean = false>(
@@ -947,7 +1020,22 @@ export class MCPServer {
   }
 }
 
-export type McpServerInstance = MCPServer & HonoType;
+export type McpServerInstance = MCPServerClass & HonoType;
+
+// Type alias for use in type annotations (e.g., function parameters)
+export type MCPServer = MCPServerClass;
+
+// Interface to properly type the MCPServer constructor
+export interface MCPServerConstructor {
+  new (config: ServerConfig): McpServerInstance;
+  prototype: MCPServerClass;
+}
+
+// Export MCPServer constructor with proper return typing
+// This allows both: `function foo(server: MCPServer)` and `new MCPServer()`
+// TypeScript allows both a type and a const with the same name (declaration merging)
+// eslint-disable-next-line @typescript-eslint/no-redeclare, no-redeclare
+export const MCPServer: MCPServerConstructor = MCPServerClass as any;
 
 /**
  * Create a new MCP server instance
@@ -1026,7 +1114,7 @@ export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> = {}
 ): McpServerInstance {
-  const instance = new MCPServer({
+  const instance = new MCPServerClass({
     name,
     version: config.version || "1.0.0",
     description: config.description,

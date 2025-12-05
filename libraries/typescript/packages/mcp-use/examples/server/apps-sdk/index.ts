@@ -123,6 +123,12 @@ server.tool(
     name: "get-current-weather",
     description: "Get current weather for a city",
     schema: z.object({ city: z.string() }),
+    // Widget config sets all registration-time metadata
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
   },
   async ({ city }) => {
     // Fetch weather data (mock for demo)
@@ -134,9 +140,8 @@ server.tool(
       windSpeed: 10,
     };
 
-    // Return widget with the fetched data
+    // Return widget with runtime data only
     return widget({
-      name: "weather-display",
       data: {
         city,
         temperature: weather.temperature,
@@ -145,54 +150,6 @@ server.tool(
         windSpeed: weather.windSpeed,
       },
       message: `Current weather in ${city}`,
-      invoking: "Fetching weather data...",
-      invoked: "Weather data loaded",
-    });
-  }
-);
-
-// Get weather forecast - also uses the weather-display widget
-server.tool(
-  {
-    name: "get-weather-forecast",
-    description: "Get weather forecast for tomorrow in a city",
-    inputs: {
-      city: {
-        type: "string",
-        description: "The city name",
-      },
-    },
-  },
-  async ({ city }: { city: string }) => {
-    // Fetch forecast data (mock - add 3 degrees for tomorrow)
-    const cityLower = city.toLowerCase();
-    const today = weatherData[cityLower] || {
-      temperature: 20,
-      conditions: "unknown",
-      humidity: 50,
-      windSpeed: 10,
-    };
-
-    const tomorrow = {
-      temperature: today.temperature + 3,
-      conditions: "sunny",
-      humidity: today.humidity - 5,
-      windSpeed: today.windSpeed + 2,
-    };
-
-    // Return widget with the forecast data
-    return widget({
-      name: "weather-display",
-      data: {
-        city: `${city} (Tomorrow)`,
-        temperature: tomorrow.temperature,
-        conditions: tomorrow.conditions,
-        humidity: tomorrow.humidity,
-        windSpeed: tomorrow.windSpeed,
-      },
-      message: `Weather forecast for ${city}`,
-      invoking: "Fetching forecast...",
-      invoked: "Forecast loaded",
     });
   }
 );

@@ -35,6 +35,8 @@ export interface UIResourceServer {
   readonly serverHost: string;
   readonly serverPort?: number;
   readonly serverBaseUrl?: string;
+  /** Storage for widget definitions, used to inject metadata into tool responses */
+  widgetDefinitions: Map<string, Record<string, unknown>>;
   resource: (
     definition: ResourceDefinition | ResourceDefinitionWithoutCallback,
     callback?: any
@@ -91,6 +93,14 @@ export function uiResourceRegistration<T extends UIResourceServer>(
   definition: UIResourceDefinition
 ): T {
   const displayName = definition.title || definition.name;
+
+  // Store widget definition for use by tools with returnsWidget option
+  if (definition.type === "appsSdk" && definition._meta) {
+    server.widgetDefinitions.set(
+      definition.name,
+      definition._meta as Record<string, unknown>
+    );
+  }
 
   // Determine resource URI and mimeType based on type
   let resourceUri: string;
@@ -194,88 +204,101 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     });
   }
 
-  // Register the tool - returns UIResource with parameters
-  // For Apps SDK, include the outputTemplate metadata
-  const toolMetadata: Record<string, unknown> = definition._meta || {};
+  // Check if tool should be registered (defaults to true for backward compatibility)
+  // Check direct property first (from programmatic API), then fall back to _meta (from file-based widgets)
+  const widgetMetadata = definition._meta?.["mcp-use/widget"] as
+    | { exposeAsTool?: boolean }
+    | undefined;
+  const exposeAsTool =
+    definition.exposeAsTool ?? widgetMetadata?.exposeAsTool ?? true;
 
-  if (definition.type === "appsSdk" && definition.appsSdkMetadata) {
-    // Add Apps SDK tool metadata
-    toolMetadata["openai/outputTemplate"] = resourceUri;
+  // Register the tool only if exposeAsTool is not false
+  // Note: Resources and resource templates are always registered regardless of exposeAsTool
+  // because custom tools may reference them via the widget() helper
+  if (exposeAsTool) {
+    // For Apps SDK, include the outputTemplate metadata
+    const toolMetadata: Record<string, unknown> = definition._meta || {};
 
-    // Copy over tool-relevant metadata fields from appsSdkMetadata
-    const toolMetadataFields = [
-      "openai/toolInvocation/invoking",
-      "openai/toolInvocation/invoked",
-      "openai/widgetAccessible",
-      "openai/resultCanProduceWidget",
-    ] as const;
+    if (definition.type === "appsSdk" && definition.appsSdkMetadata) {
+      // Add Apps SDK tool metadata
+      toolMetadata["openai/outputTemplate"] = resourceUri;
 
-    for (const field of toolMetadataFields) {
-      if (definition.appsSdkMetadata[field] !== undefined) {
-        toolMetadata[field] = definition.appsSdkMetadata[field];
+      // Copy over tool-relevant metadata fields from appsSdkMetadata
+      const toolMetadataFields = [
+        "openai/toolInvocation/invoking",
+        "openai/toolInvocation/invoked",
+        "openai/widgetAccessible",
+        "openai/resultCanProduceWidget",
+      ] as const;
+
+      for (const field of toolMetadataFields) {
+        if (definition.appsSdkMetadata[field] !== undefined) {
+          toolMetadata[field] = definition.appsSdkMetadata[field];
+        }
       }
     }
-  }
 
-  server.tool(
-    {
-      name: definition.name,
-      title: definition.title,
-      description: definition.description,
-      inputs: convertPropsToInputs(definition.props),
-      _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
-    },
-    async (params: Record<string, unknown>) => {
-      // Create the UIResource with user-provided params
-      const uiResource = await createWidgetUIResource(
-        definition,
-        params,
-        serverConfig
-      );
-
-      // For Apps SDK, return _meta at top level with only text in content
-      if (definition.type === "appsSdk") {
-        // Generate a unique URI with random ID for each invocation
-        const randomId = Math.random().toString(36).substring(2, 15);
-        const uniqueUri = generateWidgetUri(
-          definition.name,
-          server.buildId,
-          ".html",
-          randomId
+    server.tool(
+      {
+        name: definition.name,
+        title: definition.title,
+        description: definition.description,
+        inputs: convertPropsToInputs(definition.props),
+        annotations: definition.toolAnnotations,
+        _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
+      },
+      async (params: Record<string, unknown>) => {
+        // Create the UIResource with user-provided params
+        const uiResource = await createWidgetUIResource(
+          definition,
+          params,
+          serverConfig
         );
 
-        // Update toolMetadata with the unique URI
-        const uniqueToolMetadata = {
-          ...toolMetadata,
-          "openai/outputTemplate": uniqueUri,
-        };
+        // For Apps SDK, return _meta at top level with only text in content
+        if (definition.type === "appsSdk") {
+          // Generate a unique URI with random ID for each invocation
+          const randomId = Math.random().toString(36).substring(2, 15);
+          const uniqueUri = generateWidgetUri(
+            definition.name,
+            server.buildId,
+            ".html",
+            randomId
+          );
 
+          // Update toolMetadata with the unique URI
+          const uniqueToolMetadata = {
+            ...toolMetadata,
+            "openai/outputTemplate": uniqueUri,
+          };
+
+          return {
+            _meta: uniqueToolMetadata,
+            content: [
+              {
+                type: "text" as const,
+                text: `Displaying ${displayName}`,
+              },
+            ],
+            // structuredContent will be injected as window.openai.toolOutput by Apps SDK
+            structuredContent: params,
+          };
+        }
+
+        // For other types, return standard response
         return {
-          _meta: uniqueToolMetadata,
           content: [
             {
               type: "text" as const,
               text: `Displaying ${displayName}`,
+              description: `Show MCP-UI widget for ${displayName}`,
             },
+            uiResource,
           ],
-          // structuredContent will be injected as window.openai.toolOutput by Apps SDK
-          structuredContent: params,
         };
       }
-
-      // For other types, return standard response
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Displaying ${displayName}`,
-            description: `Show MCP-UI widget for ${displayName}`,
-          },
-          uiResource,
-        ],
-      };
-    }
-  );
+    );
+  }
 
   return server;
 }

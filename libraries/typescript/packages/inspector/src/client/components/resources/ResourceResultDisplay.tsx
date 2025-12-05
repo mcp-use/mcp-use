@@ -43,17 +43,17 @@ interface ResourceResultDisplayProps {
 function extractErrorMessage(
   result: ReadResourceResult | { error?: string; isError?: boolean }
 ): string | null {
-  // Check if this is an error result object
-  if ("isError" in result && !result.isError) {
-    return null;
-  }
-
-  // Handle error property directly
+  // Handle direct error property
   if ("error" in result && result.error) {
     return result.error;
   }
 
-  // ReadResourceResult has contents (plural), not content
+  // Only extract text content as error if isError is explicitly true
+  if (!("isError" in result && result.isError)) {
+    return null;
+  }
+
+  // isError is true - extract error message from contents
   if ("contents" in result && Array.isArray(result.contents)) {
     const textContents = result.contents
       .filter(
@@ -67,12 +67,7 @@ function extractErrorMessage(
     }
   }
 
-  // If isError is true but no explicit error, return generic message
-  if ("isError" in result && result.isError) {
-    return "An error occurred";
-  }
-
-  return null;
+  return "An error occurred";
 }
 
 export function ResourceResultDisplay({

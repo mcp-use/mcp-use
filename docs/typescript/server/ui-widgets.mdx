@@ -348,6 +348,69 @@ function MyWidget() {
 ```
 
 
+## Custom Tools with Widgets
+
+You can create custom tools that return widgets instead of relying solely on automatic widget registration. This is useful when you need to:
+- Fetch data before displaying the widget
+- Use different tool parameters than widget props
+- Have multiple tools use the same widget
+- Add custom logic or validation
+
+### Using the widget() Helper
+
+The `widget()` helper returns runtime data for a widget. Combine it with the `widget` config on the tool definition to set up all registration-time metadata:
+
+```typescript
+import { widget } from 'mcp-use/server';
+import { z } from 'zod';
+
+server.tool({
+  name: 'get-weather',
+  description: 'Get current weather for a city',
+  schema: z.object({
+    city: z.string().describe('City name')
+  }),
+  // Widget config sets all registration-time metadata
+  widget: {
+    name: 'weather-display',      // Must match a widget in resources/
+    invoking: 'Fetching weather data...',
+    invoked: 'Weather data loaded'
+  }
+}, async ({ city }) => {
+  // Fetch weather data from API
+  const weatherData = await fetchWeatherAPI(city);
+  
+  // Return widget with runtime data only
+  return widget({
+    data: {
+      city,
+      temperature: weatherData.temp,
+      conditions: weatherData.conditions,
+      humidity: weatherData.humidity,
+      windSpeed: weatherData.windSpeed
+    },
+    message: `Current weather in ${city}`
+  });
+});
+```
+
+**Key Points:**
+- **`widget: { name, invoking, invoked, ... }`** - Configures all widget metadata at registration time
+- **`widget()` helper** - Returns only runtime data (structured content and optional message)
+- **Widget must exist** - The widget name must match a `.tsx` file or folder in `resources/`
+- **Disable auto-registration** - Set `exposeAsTool: false` in the widget's metadata if you only want it accessible through custom tools:
+
+```tsx
+// resources/weather-display/widget.tsx
+export const widgetMetadata: WidgetMetadata = {
+  description: 'Display weather information',
+  inputs: propSchema,
+  exposeAsTool: false  // Only accessible via custom tools
+};
+```
+
+See [Tools Guide](./tools#returning-widgets-from-tools) for more information about the `returnsWidget` option.
+
 ## Configuration
 
 ### Base URL for Production
