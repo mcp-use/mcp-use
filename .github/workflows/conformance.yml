@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       python_only:
-        description: "Run only Python conformance tests"
+        description: 'Run only Python conformance tests'
         type: boolean
         default: false
       typescript_only:
-        description: "Run only TypeScript conformance tests"
+        description: 'Run only TypeScript conformance tests'
         type: boolean
         default: false
   push:
@@ -16,25 +16,25 @@ on:
       - main
       - canary
     paths:
-      - "libraries/python/mcp_use/server/**"
-      - "libraries/python/pyproject.toml"
-      - "libraries/typescript/packages/mcp-use/src/server/**"
-      - "libraries/typescript/packages/mcp-use/package.json"
-      - "libraries/python/tests/integration/servers_for_testing/conformance_server.py"
-      - "libraries/typescript/packages/mcp-use/examples/server/conformance/**"
-      - ".github/workflows/conformance.yml"
+      - 'libraries/python/mcp_use/server/**'
+      - 'libraries/python/pyproject.toml'
+      - 'libraries/typescript/packages/mcp-use/src/server/**'
+      - 'libraries/typescript/packages/mcp-use/package.json'
+      - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
+      - 'libraries/typescript/packages/mcp-use/examples/server/conformance/**'
+      - '.github/workflows/conformance.yml'
   pull_request:
     branches:
       - main
       - canary
     paths:
-      - "libraries/python/mcp_use/server/**"
-      - "libraries/python/pyproject.toml"
-      - "libraries/typescript/packages/mcp-use/src/server/**"
-      - "libraries/typescript/packages/mcp-use/package.json"
-      - "libraries/python/tests/integration/servers_for_testing/conformance_server.py"
-      - "libraries/typescript/packages/mcp-use/examples/server/conformance/**"
-      - ".github/workflows/conformance.yml"
+      - 'libraries/python/mcp_use/server/**'
+      - 'libraries/python/pyproject.toml'
+      - 'libraries/typescript/packages/mcp-use/src/server/**'
+      - 'libraries/typescript/packages/mcp-use/package.json'
+      - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
+      - 'libraries/typescript/packages/mcp-use/examples/server/conformance/**'
+      - '.github/workflows/conformance.yml'
 
 jobs:
   conformance-python:
@@ -50,7 +50,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -67,7 +67,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
 
       - name: Start Python conformance server
         working-directory: libraries/python
@@ -84,42 +84,6 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           grep -E "(SUMMARY|✓|✗|Total:)" python-conformance-results.txt >> $GITHUB_STEP_SUMMARY || true
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-      - name: Calculate Python badge values
-        id: python-badge
-        run: |
-          PASSED=$(grep -c "✓" python-conformance-results.txt || echo "0")
-          FAILED=$(grep -c "✗" python-conformance-results.txt || echo "0")
-          TOTAL=$((PASSED + FAILED))
-
-          if [ $TOTAL -eq 0 ]; then
-            echo "message=no tests" >> $GITHUB_OUTPUT
-            echo "color=lightgrey" >> $GITHUB_OUTPUT
-          else
-            RATE=$(echo "scale=0; $PASSED * 100 / $TOTAL" | bc)
-            {
-              echo "message=$PASSED/$TOTAL ($RATE%)"
-            } >> $GITHUB_OUTPUT
-            
-            if [ $PASSED -eq $TOTAL ]; then
-              echo "color=brightgreen" >> $GITHUB_OUTPUT
-            elif [ $(echo "$RATE >= 60" | bc) -eq 1 ]; then
-              echo "color=yellow" >> $GITHUB_OUTPUT
-            else
-              echo "color=red" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-      - name: Create Python conformance badge
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
-        uses: schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_SECRET }}
-          gistID: ${{ secrets.CONFORMANCE_GIST_ID }}
-          filename: python-conformance.json
-          label: MCP Conformance (PY)
-          message: ${{ steps.python-badge.outputs.message }}
-          color: ${{ steps.python-badge.outputs.color }}
 
       - name: Upload Python conformance results
         uses: actions/upload-artifact@v4
@@ -143,7 +107,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -165,7 +129,7 @@ jobs:
       - name: Start TypeScript conformance server
         working-directory: libraries/typescript/packages/mcp-use/examples/server/conformance
         run: |
-          PORT=3000 npx tsx src/server.ts &
+          npx tsx src/server.ts &
           sleep 5
 
       - name: Run conformance tests against TypeScript server
@@ -176,42 +140,6 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           grep -E "(SUMMARY|✓|✗|Total:)" typescript-conformance-results.txt >> $GITHUB_STEP_SUMMARY || true
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-      - name: Calculate TypeScript badge values
-        id: typescript-badge
-        run: |
-          PASSED=$(grep -c "✓" typescript-conformance-results.txt || echo "0")
-          FAILED=$(grep -c "✗" typescript-conformance-results.txt || echo "0")
-          TOTAL=$((PASSED + FAILED))
-
-          if [ $TOTAL -eq 0 ]; then
-            echo "message=no tests" >> $GITHUB_OUTPUT
-            echo "color=lightgrey" >> $GITHUB_OUTPUT
-          else
-            RATE=$(echo "scale=0; $PASSED * 100 / $TOTAL" | bc)
-            {
-              echo "message=$PASSED/$TOTAL ($RATE%)"
-            } >> $GITHUB_OUTPUT
-            
-            if [ $PASSED -eq $TOTAL ]; then
-              echo "color=brightgreen" >> $GITHUB_OUTPUT
-            elif [ $(echo "$RATE >= 60" | bc) -eq 1 ]; then
-              echo "color=yellow" >> $GITHUB_OUTPUT
-            else
-              echo "color=red" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-      - name: Create TypeScript conformance badge
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
-        uses: schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GIST_SECRET }}
-          gistID: ${{ secrets.CONFORMANCE_GIST_ID }}
-          filename: typescript-conformance.json
-          label: MCP Conformance (TS)
-          message: ${{ steps.typescript-badge.outputs.message }}
-          color: ${{ steps.typescript-badge.outputs.color }}
 
       - name: Upload TypeScript conformance results
         uses: actions/upload-artifact@v4
@@ -251,7 +179,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-
+            
             async function fetchBaselineForBranch(branch) {
               try {
                 // Find the last successful workflow run for this branch
@@ -319,7 +247,7 @@ jobs:
                 return false;
               }
             }
-
+            
             // Fetch baselines for both branches
             await fetchBaselineForBranch('main');
             await fetchBaselineForBranch('canary');
@@ -336,7 +264,7 @@ jobs:
             unzip -q main-baseline/typescript.zip -d main-baseline/
             echo "Extracted main TypeScript baseline"
           fi
-
+          
           # Extract canary baseline
           if [ -f canary-baseline/python.zip ]; then
             unzip -q canary-baseline/python.zip -d canary-baseline/
@@ -383,19 +311,19 @@ jobs:
             
             echo "{\"passed\":$passed,\"failed\":$failed,\"rate\":\"$rate\",\"tests\":{$tests}}"
           }
-
+          
           # Parse current result files
           PY_JSON=$(parse_results "python-results/python-conformance-results.txt")
           TS_JSON=$(parse_results "typescript-results/typescript-conformance-results.txt")
-
+          
           # Parse main baseline results
           MAIN_PY_JSON=$(parse_results "main-baseline/python-conformance-results.txt")
           MAIN_TS_JSON=$(parse_results "main-baseline/typescript-conformance-results.txt")
-
+          
           # Parse canary baseline results
           CANARY_PY_JSON=$(parse_results "canary-baseline/python-conformance-results.txt")
           CANARY_TS_JSON=$(parse_results "canary-baseline/typescript-conformance-results.txt")
-
+          
           # Save to files for multiline handling
           echo "$PY_JSON" > py_results.json
           echo "$TS_JSON" > ts_results.json
@@ -408,7 +336,7 @@ jobs:
         run: |
           echo "# MCP Conformance Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
+          
           echo "## Python Server" >> $GITHUB_STEP_SUMMARY
           if [ -f python-results/python-conformance-results.txt ]; then
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -417,7 +345,7 @@ jobs:
           else
             echo "⚠️ No results available" >> $GITHUB_STEP_SUMMARY
           fi
-
+          
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## TypeScript Server" >> $GITHUB_STEP_SUMMARY
           if [ -f typescript-results/typescript-conformance-results.txt ]; then
@@ -456,4 +384,3 @@ jobs:
             main_ts_results.json
             canary_py_results.json
             canary_ts_results.json
-

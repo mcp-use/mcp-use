@@ -39,9 +39,8 @@ export async function mountMcp(
   const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
   // Map to store transports by session ID (following official Hono example from PR #1209)
-  // Using the dynamically imported type
-  type TransportType = InstanceType<typeof FetchStreamableHTTPServerTransport>;
-  const transports = new Map<string, TransportType>();
+  // Use 'any' to support both HTTP and stdio transports
+  const transports = new Map<string, any>();
 
   // Start idle cleanup interval if configured
   let idleCleanupInterval: NodeJS.Timeout | undefined;
