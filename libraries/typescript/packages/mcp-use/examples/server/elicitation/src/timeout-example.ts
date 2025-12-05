@@ -6,10 +6,11 @@
  * - Optional: Specify timeout in milliseconds
  */
 
-import { createMCPServer } from "../../../../dist/src/server/index.js";
+import { MCPServer } from "../../../../dist/src/server/index.js";
 import { z } from "zod";
 
-const server = createMCPServer("timeout-example", {
+const server = new MCPServer({
+  name: "timeout-example",
   version: "1.0.0",
 });
 

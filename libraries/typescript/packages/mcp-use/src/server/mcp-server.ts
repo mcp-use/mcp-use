@@ -70,7 +70,7 @@ import {
 } from "./utils/index.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
 
-export class McpServer {
+export class MCPServer {
   /**
    * Native MCP server instance from @modelcontextprotocol/sdk
    * Exposed publicly for advanced use cases
@@ -141,7 +141,7 @@ export class McpServer {
    * access to Hono methods while preserving MCP server functionality.
    *
    * @param config - Server configuration including name, version, and description
-   * @returns A proxied McpServer instance that supports both MCP and Hono methods
+   * @returns A proxied MCPServer instance that supports both MCP and Hono methods
    */
   constructor(config: ServerConfig) {
     this.config = config;
@@ -630,7 +630,7 @@ export class McpServer {
 
     const result = await mountMcpHelper(
       this.app,
-      this, // Pass the McpServer instance so mountMcp can call getServerForSession()
+      this, // Pass the MCPServer instance so mountMcp can call getServerForSession()
       this.sessions,
       this.config,
       isProductionModeHelper()
@@ -855,7 +855,7 @@ export class McpServer {
   }
 }
 
-export type McpServerInstance = McpServer & HonoType;
+export type McpServerInstance = MCPServer & HonoType;
 
 /**
  * Create a new MCP server instance
@@ -924,7 +924,7 @@ export function createMCPServer(
   name: string,
   config: Partial<ServerConfig> = {}
 ): McpServerInstance {
-  const instance = new McpServer({
+  const instance = new MCPServer({
     name,
     version: config.version || "1.0.0",
     description: config.description,

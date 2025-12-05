@@ -1,8 +1,9 @@
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 import type { RawHtmlUIResource, RemoteDomUIResource } from "mcp-use/server";
 
 // Create an MCP server with MCP-UI UIResource support
-const server = createMCPServer("uiresource-mcp-server", {
+const server = new MCPServer({
+  name: "uiresource-mcp-server",
   version: "1.0.0",
   description: "MCP server demonstrating all UIResource types",
   baseUrl: process.env.MCP_URL, // Full base URL (e.g., https://myserver.com)

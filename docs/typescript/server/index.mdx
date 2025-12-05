@@ -135,11 +135,12 @@ The easiest way to start is with `create-mcp-use-app`, which provides a working 
 For manual setup, here's a minimal example:
 
 ```typescript
-import { createMCPServer, text, object } from 'mcp-use/server'
+import { MCPServer, text, object } from 'mcp-use/server'
 import { z } from 'zod'
 
 // Create server instance
-const server = createMCPServer('my-mcp-server', {
+const server = new MCPServer({
+  name: 'my-mcp-server',
   version: '1.0.0',
   description: 'My first MCP server',
 })
@@ -182,7 +183,7 @@ The mcp-use server framework is designed around a modular architecture that seam
 The framework is built on six fundamental components that work together:
 
 ### **Server Instance**
-The main `McpServer` class created via `createMCPServer()`. It orchestrates all MCP functionality, manages the Express application, and handles client connections.
+The main `MCPServer` class created via `new MCPServer()`. It orchestrates all MCP functionality, manages the Express application, and handles client connections.
 
 **Learn more**: See [Configuration](/typescript/server/configuration) for server setup options.
 

@@ -30,9 +30,12 @@ Notifications only work in **stateful mode** where clients maintain persistent s
 Send a notification to all connected clients:
 
 ```typescript
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 
-const server = createMCPServer("my-server");
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0"
+});
 
 // Later, send to all connected clients
 await server.sendNotification("custom/status-update", {
@@ -213,9 +216,12 @@ await server.sendNotification("custom/data-updated", {
 Clients can notify the server when their available roots (directories/files) change. Register a handler to respond to these changes:
 
 ```typescript
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 
-const server = createMCPServer("my-server");
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0"
+});
 
 // Handle roots/list_changed from clients
 server.onRootsChanged(async (roots) => {

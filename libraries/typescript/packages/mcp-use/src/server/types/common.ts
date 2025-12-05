@@ -56,10 +56,15 @@ export interface ServerConfig {
    * @example
    * ```typescript
    * // Development: No need to set (allows all origins)
-   * const server = createMCPServer('my-server');
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0'
+   * });
    *
    * // Production: Explicitly set allowed origins
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   allowedOrigins: [
    *     'https://myapp.com',
    *     'https://app.myapp.com'
@@ -91,10 +96,15 @@ export interface ServerConfig {
    * @example
    * ```typescript
    * // Default behavior (compatible with ChatGPT and other non-compliant clients)
-   * const server = createMCPServer('my-server');
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0'
+   * });
    *
    * // Use strict MCP spec behavior (requires compliant clients)
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   autoCreateSessionOnInvalidId: false
    * });
    * ```
@@ -117,10 +127,12 @@ export interface ServerConfig {
    *
    * @example
    * ```typescript
-   * import { createMCPServer, oauthSupabaseProvider } from 'mcp-use/server';
+   * import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server';
    *
    * // Supabase OAuth
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   oauth: oauthSupabaseProvider({
    *     projectId: 'my-project',
    *     jwtSecret: process.env.SUPABASE_JWT_SECRET
@@ -128,7 +140,9 @@ export interface ServerConfig {
    * });
    *
    * // Auth0 OAuth
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   oauth: oauthAuth0Provider({
    *     domain: 'my-tenant.auth0.com',
    *     audience: 'https://my-api.com'
@@ -136,7 +150,9 @@ export interface ServerConfig {
    * });
    *
    * // Keycloak OAuth
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   oauth: oauthKeycloakProvider({
    *     serverUrl: 'https://keycloak.example.com',
    *     realm: 'my-realm',

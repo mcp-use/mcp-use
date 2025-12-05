@@ -71,9 +71,10 @@ The server automatically handles subscription requests and tracks which sessions
 When a resource changes, use `server.notifyResourceUpdated()` to notify all subscribed clients:
 
 ```typescript
-import { createMCPServer, object } from 'mcp-use/server';
+import { MCPServer, object } from 'mcp-use/server';
 
-const server = createMCPServer('config-server', {
+const server = new MCPServer({
+  name: 'config-server',
   version: '1.0.0',
 });
 

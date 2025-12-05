@@ -1,7 +1,8 @@
-import { createMCPServer, text, object, markdown } from "mcp-use/server";
+import { MCPServer, text, object, markdown } from "mcp-use/server";
 import { z } from "zod";
 
-const server = createMCPServer("simple-example-server", {
+const server = new MCPServer({
+  name: "simple-example-server",
   version: "1.0.0",
   description: "A simple MCP server example",
 });

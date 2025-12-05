@@ -1,4 +1,8 @@
-export { createMCPServer, type McpServerInstance } from "./mcp-server.js";
+export {
+  MCPServer,
+  createMCPServer,
+  type McpServerInstance,
+} from "./mcp-server.js";
 
 // Re-export tool context types
 export type {

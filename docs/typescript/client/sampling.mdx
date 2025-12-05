@@ -89,10 +89,10 @@ function MyComponent() {
 When building MCP servers, tools can request sampling using the context parameter:
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 import type { ToolContext } from 'mcp-use/server'
 
-const server = createMCPServer({
+const server = new MCPServer({
   name: 'MyServer',
   version: '1.0.0'
 })
@@ -173,7 +173,7 @@ const result = await ctx.sample(
 You can also use `server.createMessage()` directly if you need more control:
 
 ```typescript
-const server = createMCPServer({
+const server = new MCPServer({
   name: 'MyServer',
   version: '1.0.0'
 })

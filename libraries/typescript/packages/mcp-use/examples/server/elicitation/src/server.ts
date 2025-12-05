@@ -1,12 +1,9 @@
-import {
-  createMCPServer,
-  text,
-  error,
-} from "../../../../dist/src/server/index.js";
+import { MCPServer, text, error } from "../../../../dist/src/server/index.js";
 import { z } from "zod";
 
 // Create an MCP server with elicitation support
-const server = createMCPServer("elicitation-example-server", {
+const server = new MCPServer({
+  name: "elicitation-example-server",
   version: "1.0.0",
   description:
     "An MCP server example demonstrating elicitation capabilities (form and URL modes)",

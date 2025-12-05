@@ -22,10 +22,11 @@ When a tool needs user input, it can use `ctx.elicit()` to send a request to the
 Use the `elicit()` method on the context object within tool callbacks. The API automatically detects the mode from your parameters:
 
 ```typescript
-import { createMCPServer, text } from 'mcp-use/server';
+import { MCPServer, text } from 'mcp-use/server';
 import { z } from 'zod';
 
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
 });
 

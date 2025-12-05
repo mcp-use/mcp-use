@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
-import { createMCPServer } from "../../src/server/index.js";
+import { MCPServer } from "../../src/server/index.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type {
@@ -25,7 +25,8 @@ describe("Elicitation Integration Tests", () => {
 
   beforeAll(async () => {
     // Create test server
-    server = createMCPServer("test-elicitation-server", {
+    server = new MCPServer({
+      name: "test-elicitation-server",
       version: "1.0.0",
     });
 

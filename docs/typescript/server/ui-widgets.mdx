@@ -355,7 +355,9 @@ function MyWidget() {
 Set the `MCP_URL` environment variable or pass `baseUrl`:
 
 ```typescript
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
   baseUrl: process.env.MCP_URL || 'https://myserver.com'
 });
 ```
@@ -365,7 +367,7 @@ This ensures:
 - Apps SDK CSP automatically includes your server
 
 Preferably set the variable at build time to have statically generated widget assets paths. 
-If you don't set it at build time you must set it at runtime either by passing the `baseUrl` option to the `createMCPServer` function or by setting the `MCP_URL` environment variable.
+If you don't set it at build time you must set it at runtime either by passing the `baseUrl` option to the `MCPServer` constructor or by setting the `MCP_URL` environment variable.
 
 ### Environment Variables
 

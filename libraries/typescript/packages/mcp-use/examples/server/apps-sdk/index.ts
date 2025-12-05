@@ -1,6 +1,7 @@
-import { createMCPServer, object } from "mcp-use/server";
+import { MCPServer, object } from "mcp-use/server";
 
-const server = createMCPServer("test-app", {
+const server = new MCPServer({
+  name: "test-app",
   version: "1.0.0",
   description: "Test MCP server with automatic UI widget registration",
 });

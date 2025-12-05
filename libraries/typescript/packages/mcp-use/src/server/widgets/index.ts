@@ -5,7 +5,7 @@
  * development and production modes.
  */
 
-import type { McpServer } from "../mcp-server.js";
+import type { MCPServer } from "../mcp-server.js";
 import { isDeno } from "../utils/runtime.js";
 import { isProductionMode, getCSPUrls } from "../utils/index.js";
 import { mountWidgetsDev } from "./mount-widgets-dev.js";
@@ -73,7 +73,7 @@ export {
  * @returns Promise that resolves when all widgets are mounted
  */
 export async function mountWidgets(
-  server: McpServer,
+  server: MCPServer,
   options?: {
     baseRoute?: string;
     resourcesDir?: string;

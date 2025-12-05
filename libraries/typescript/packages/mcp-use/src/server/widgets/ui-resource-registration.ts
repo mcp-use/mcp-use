@@ -63,8 +63,8 @@ export interface UIResourceServerContext {
  *
  * @example
  * ```typescript
- * // Usage in McpServer class
- * class McpServer {
+ * // Usage in MCPServer class
+ * class MCPServer {
  *   public uiResource = uiResourceRegistration;
  *
  *   // ... other methods

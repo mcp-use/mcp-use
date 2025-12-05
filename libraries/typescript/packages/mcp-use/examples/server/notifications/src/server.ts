@@ -25,7 +25,7 @@
  * 3. Or open the Inspector at http://localhost:3000/inspector
  */
 
-import { createMCPServer } from "../../../../dist/src/server/index.js";
+import { MCPServer } from "../../../../dist/src/server/index.js";
 
 // Track current mode
 let currentMode: "ping" | "pong" = "ping";
@@ -35,7 +35,8 @@ const getToolDescription = () =>
   `Returns "${currentMode.toUpperCase()}!" - Current mode: ${currentMode}`;
 
 // Create an MCP server
-const server = createMCPServer("notification-example", {
+const server = new MCPServer({
+  name: "notification-example",
   version: "1.0.0",
   description: "Example server demonstrating bidirectional notifications",
 });

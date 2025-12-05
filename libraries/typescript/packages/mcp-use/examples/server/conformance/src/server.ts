@@ -9,7 +9,7 @@
 import { setTimeout as sleep } from "timers/promises";
 
 import {
-  createMCPServer,
+  MCPServer,
   text,
   image,
   resource,
@@ -22,7 +22,8 @@ import {
 import { z } from "zod";
 
 // Create server instance
-const server = createMCPServer("ConformanceTestServer", {
+const server = new MCPServer({
+  name: "ConformanceTestServer",
   version: "1.0.0",
   description:
     "MCP Conformance Test Server implementing all supported features.",
