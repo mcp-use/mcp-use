@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.10.0-canary.3
+
+### Patch Changes
+
+- 1379b00: chore: fix types
+- Updated dependencies [1379b00]
+  - @mcp-use/inspector@0.12.0-canary.3
+  - @mcp-use/cli@2.5.0-canary.3
+
 ## 1.10.0-canary.2
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.8.0-canary.2
+
+### Patch Changes
+
+- 1379b00: chore: fix types
+
 ## 0.8.0-canary.1
 
 ### Minor Changes
