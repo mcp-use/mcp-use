@@ -33,3 +33,6 @@ export {
   requireAnyScope,
 } from "./utils.js";
 export type { AuthInfo } from "./utils.js";
+
+// Export setup
+export { setupOAuthForServer, type OAuthSetupState } from "./setup.js";

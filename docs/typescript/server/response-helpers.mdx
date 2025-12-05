@@ -1,0 +1,488 @@
+---
+title: "Response Helpers"
+description: "Utility functions for creating standardized MCP tool and resource responses"
+icon: "drill"
+---
+![mcp-use helpers](/images/ts-helpers.png)
+
+Response helpers are utility functions that simplify creating standardized responses for MCP tools, resources, and prompts. Instead of manually constructing `CallToolResult` objects, these helpers provide a clean, type-safe API with automatic MIME type handling.
+
+
+## Why Use Response Helpers?
+
+Response helpers provide several benefits:
+- **Consistency**: Standardized response format across your server
+- **Type Safety**: TypeScript types ensure correct usage
+- **Less Boilerplate**: No need to manually construct response objects
+- **MIME Type Handling**: Automatic content type detection and metadata
+- **Composability**: Easily combine multiple content types with `mix()`
+
+## Basic Text and Content Types
+
+### text()
+
+Returns plain text content. The most common response type for tools and resources.
+
+```typescript
+import { text } from 'mcp-use/server';
+
+server.tool({
+  name: 'greet',
+  schema: z.object({ name: z.string() }),
+  async ({ name }) => text(`Hello, ${name}!`)
+});
+
+server.resource(
+  { name: 'greeting', uri: 'app://greeting' },
+  async () => text('Hello World!')
+);
+```
+
+**Returns**: `CallToolResult` with `text/plain` MIME type
+
+### markdown()
+
+Returns Markdown formatted content.
+
+```typescript
+import { markdown } from 'mcp-use/server';
+
+server.resource(
+  { name: 'readme', uri: 'doc://readme' },
+  async () => markdown('# Welcome\n\nGetting started with our API...')
+);
+
+server.tool({
+  name: 'format-docs',
+  async () => markdown('## Documentation\n\n- Item 1\n- Item 2')
+});
+```
+
+**Returns**: `CallToolResult` with `text/markdown` MIME type
+
+### html()
+
+Returns HTML content for web display.
+
+```typescript
+import { html } from 'mcp-use/server';
+
+server.resource(
+  { name: 'page', uri: 'ui://dashboard' },
+  async () => html('<h1>Dashboard</h1><p>Welcome to your dashboard</p>')
+);
+
+server.tool({
+  name: 'generate-report',
+  async ({ data }) => html(`
+    <div class="report">
+      <h2>Report</h2>
+      <table>
+        <tr><td>Total</td><td>${data.total}</td></tr>
+      </table>
+    </div>
+  `)
+});
+```
+
+**Returns**: `CallToolResult` with `text/html` MIME type
+
+### xml()
+
+Returns XML formatted content.
+
+```typescript
+import { xml } from 'mcp-use/server';
+
+server.resource(
+  { name: 'sitemap', uri: 'data://sitemap' },
+  async () => xml('<?xml version="1.0"?><urlset>...</urlset>')
+);
+```
+
+**Returns**: `CallToolResult` with `text/xml` MIME type
+
+### css()
+
+Returns CSS stylesheet content.
+
+```typescript
+import { css } from 'mcp-use/server';
+
+server.resource(
+  { name: 'styles', uri: 'asset://theme.css' },
+  async () => css('body { margin: 0; padding: 0; font-family: sans-serif; }')
+);
+```
+
+**Returns**: `CallToolResult` with `text/css` MIME type
+
+### javascript()
+
+Returns JavaScript code content.
+
+```typescript
+import { javascript } from 'mcp-use/server';
+
+server.resource(
+  { name: 'script', uri: 'asset://main.js' },
+  async () => javascript('console.log("Application started");')
+);
+```
+
+**Returns**: `CallToolResult` with `text/javascript` MIME type
+
+## Structured Data
+
+### object()
+
+Returns JSON object with both text representation and typed structured content.
+
+```typescript
+import { object } from 'mcp-use/server';
+
+server.tool({
+  name: 'get-user-info',
+  schema: z.object({ userId: z.string() }),
+  async ({ userId }) => {
+    const user = await fetchUser(userId);
+    return object({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      createdAt: user.createdAt
+    });
+  }
+});
+
+server.resource(
+  { name: 'config', uri: 'config://settings' },
+  async () => object({ theme: 'dark', version: '1.0', debug: false })
+);
+```
+
+**Returns**: `TypedCallToolResult<T>` with:
+- Text content: Pretty-printed JSON string
+- Structured content: Typed object data
+- MIME type: `application/json`
+
+<Tip>
+The `object()` helper includes both stringified JSON for backwards compatibility as specified by the protocol and the new structured data property. 
+</Tip>
+
+### array()
+
+Returns array data wrapped in an object with a `data` field.
+
+```typescript
+import { array } from 'mcp-use/server';
+
+server.tool({
+  name: 'list-items',
+  async () => {
+    const items = await getItems();
+    return array(items);
+  }
+});
+```
+
+**Returns**: `TypedCallToolResult<{ data: T }>` with structured content
+
+<Note>
+Arrays are automatically wrapped in an object with a `data` field. If you pass an array to `object()`, it will automatically call `array()` internally.
+</Note>
+
+## Media Content
+
+### image()
+
+Returns image content with base64 data or data URL.
+
+```typescript
+import { image } from 'mcp-use/server';
+
+server.tool({
+  name: 'generate-chart',
+  async ({ data }) => {
+    const chartImage = await generateChart(data);
+    return image(chartImage, 'image/png');
+  }
+});
+
+server.resource(
+  { name: 'logo', uri: 'asset://logo' },
+  async () => image(base64LogoData, 'image/png')
+);
+```
+
+**Parameters**:
+- `data`: Base64 string or data URL
+- `mimeType`: Image MIME type (default: `'image/png'`)
+
+**Returns**: `CallToolResult` with image content and metadata
+
+### audio()
+
+Returns audio content. Supports both base64 data and file paths.
+
+```typescript
+import { audio } from 'mcp-use/server';
+
+// With base64 data (synchronous)
+server.tool({
+  name: 'generate-audio',
+  async () => audio(base64AudioData, 'audio/wav')
+});
+
+// With file path (asynchronous)
+server.resource(
+  { name: 'notification', uri: 'audio://notification' },
+  async () => await audio('./sounds/notification.wav')
+);
+```
+
+**Parameters**:
+- `dataOrPath`: Base64 audio data or file path
+- `mimeType`: Audio MIME type (optional, inferred from extension for files)
+
+**Returns**: `CallToolResult` (sync) or `Promise<CallToolResult>` (async for files)
+
+**Supported formats**: WAV, MP3, OGG, M4A, WebM, FLAC, AAC
+
+<Warning>
+When using file paths, make sure to `await` the result as the file is read asynchronously.
+</Warning>
+
+### binary()
+
+Returns arbitrary binary content as base64.
+
+```typescript
+import { binary } from 'mcp-use/server';
+
+server.resource(
+  { name: 'document', uri: 'file://document.pdf' },
+  async () => {
+    const pdfData = await readFile('./document.pdf');
+    const base64 = pdfData.toString('base64');
+    return binary(base64, 'application/pdf');
+  }
+);
+```
+
+**Parameters**:
+- `base64Data`: Base64-encoded binary data
+- `mimeType`: Content MIME type
+
+**Returns**: `CallToolResult` with binary metadata
+
+## Resource Embedding
+
+### resource()
+
+Creates embedded resource content. Supports two patterns:
+
+**Pattern 1: Three arguments (uri, mimeType, text)**
+
+```typescript
+import { resource } from 'mcp-use/server';
+
+server.tool({
+  name: 'get-config',
+  async () => resource(
+    'config://app',
+    'application/json',
+    JSON.stringify({ api: 'v2', timeout: 30 })
+  )
+});
+```
+
+**Pattern 2: Two arguments (uri, content helper result)**
+
+```typescript
+import { resource, text, object } from 'mcp-use/server';
+
+// With text helper
+server.tool({
+  name: 'get-greeting',
+  async () => resource('test://greeting', text('Hello'))
+});
+
+// With object helper
+server.tool({
+  name: 'get-data',
+  async () => resource('data://user', object({ id: 1, name: 'Alice' }))
+});
+```
+
+**Returns**: `CallToolResult` with embedded resource content
+
+## Error Handling
+
+### error()
+
+Returns an error response with the `isError` flag set.
+
+```typescript
+import { error, text } from 'mcp-use/server';
+
+server.tool({
+  name: 'divide',
+  schema: z.object({
+    a: z.number(),
+    b: z.number()
+  }),
+  async ({ a, b }) => {
+    if (b === 0) {
+      return error('Division by zero is not allowed');
+    }
+    return text(`Result: ${a / b}`);
+  }
+});
+
+server.tool({
+  name: 'fetch-data',
+  async ({ url }) => {
+    try {
+      const data = await fetch(url);
+      return object(data);
+    } catch (err) {
+      return error(`Failed to fetch data: ${err.message}`);
+    }
+  }
+});
+```
+
+**Returns**: `CallToolResult` with `isError: true`
+
+<Tip>
+Using `error()` provides a standardized way to communicate failures to clients while maintaining consistent response structure.
+</Tip>
+
+## Mixed Content
+
+### mix()
+
+Combines multiple content types into a single response. Perfect for returning text with images, resources, or multiple content items together.
+
+```typescript
+import { mix, text, image, resource, object } from 'mcp-use/server';
+
+// Text + Image
+server.tool({
+  name: 'generate-report',
+  async ({ data }) => {
+    const chart = await generateChart(data);
+    return mix(
+      text('Analysis complete. See chart below:'),
+      image(chart, 'image/png')
+    );
+  }
+});
+
+// Text + Image + Resource
+server.tool({
+  name: 'test_multiple_content_types',
+  async () => mix(
+    text('Multiple content types test:'),
+    image(RED_PIXEL_PNG, 'image/png'),
+    resource(
+      'test://mixed-content-resource',
+      object({ test: 'data', value: 123 })
+    )
+  )
+});
+
+// Multiple text messages
+server.tool({
+  name: 'batch-process',
+  async ({ items }) => {
+    const results = [];
+    for (const item of items) {
+      const result = await processItem(item);
+      results.push(text(`Processed ${item}: ${result}`));
+    }
+    return mix(...results);
+  }
+});
+```
+
+**Returns**: `CallToolResult` with merged content array and combined metadata
+
+<Note>
+The `mix()` helper merges content arrays and combines `structuredContent` and `_meta` objects from all inputs, allowing complex multi-part responses.
+</Note>
+
+## Widget Responses
+
+### widget()
+
+Creates a response that displays an OpenAI Apps SDK widget (ChatGPT integration).
+
+
+<Warning>
+Then **`name`** should correspond to the name of the widget file or the folder name in the resources folder.
+</Warning>
+
+```typescript
+import { widget } from 'mcp-use/server';
+
+server.tool({
+  name: 'show-weather',
+  schema: z.object({ city: z.string() }),
+  async ({ city }) => {
+    const weatherData = await fetchWeather(city);
+    return widget({
+      name: 'weather-display',
+      data: weatherData,
+      message: `Showing weather for ${city}`,
+      invoking: 'Fetching weather data...',
+      invoked: 'Weather data loaded',
+      widgetAccessible: true,
+      resultCanProduceWidget: true
+    });
+  }
+});
+```
+
+**Configuration**:
+- `name`: Widget name (must exist in resources folder)
+- `data`: Structured data passed to the widget
+- `message`: Display message (default: "Displaying {name}")
+- `invoking`: Status while tool is running (optional)
+- `invoked`: Status after completion (optional)
+- `widgetAccessible`: Whether widget can call tools (default: true)
+
+**Returns**: `CallToolResult` with OpenAI widget metadata
+
+## Type Safety
+
+Response helpers are fully typed for TypeScript users:
+
+```typescript
+import { object, TypedCallToolResult } from 'mcp-use/server';
+
+// Type inference
+const response = object({ userId: '123', name: 'Alice' });
+// response type: TypedCallToolResult<{ userId: string; name: string }>
+
+// Explicit typing
+interface UserData {
+  userId: string;
+  email: string;
+  role: 'admin' | 'user';
+}
+
+function getUserResponse(user: UserData): TypedCallToolResult<UserData> {
+  return object(user);
+}
+```
+
+
+## Next Steps
+
+- [Tools](./tools) - Learn about creating MCP tools
+- [Resources](./resources) - Managing static and dynamic content
+- [Prompts](./prompts) - Building interactive prompts
+- [UI Widgets](./ui-widgets) - Creating OpenAI Apps SDK widgets
+

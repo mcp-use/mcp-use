@@ -28,11 +28,13 @@ const server = createMCPServer("my-mcp-server", {
  * Define MCP tools
  * Docs: https://docs.mcp-use.com/typescript/server/tools
  */
-server.tool({
-  name: "fetch-weather",
-  description: "Fetch the weather for a city",
-  inputs: [{ name: "city", type: "string", required: true }],
-  cb: async (params: Record<string, any>) => {
+server.tool(
+  {
+    name: "fetch-weather",
+    description: "Fetch the weather for a city",
+    inputs: [{ name: "city", type: "string", required: true }],
+  },
+  async (params: Record<string, any>) => {
     const city = params.city as string;
     const response = await fetch(`https://wttr.in/${city}?format=j1`);
     const data: any = await response.json();
@@ -45,8 +47,8 @@ server.tool({
         },
       ],
     };
-  },
-});
+  }
+);
 
 /*
  * Define MCP resources
@@ -75,11 +77,13 @@ server.resource({
  * Define MCP prompts
  * Docs: https://docs.mcp-use.com/typescript/server/prompts
  */
-server.prompt({
-  name: "review-code",
-  description: "Review code for best practices and potential issues",
-  args: [{ name: "code", type: "string", required: true }],
-  cb: async (params: Record<string, any>) => {
+server.prompt(
+  {
+    name: "review-code",
+    description: "Review code for best practices and potential issues",
+    args: [{ name: "code", type: "string", required: true }],
+  },
+  async (params: Record<string, any>) => {
     const { code } = params;
     return {
       messages: [
@@ -92,8 +96,8 @@ server.prompt({
         },
       ],
     };
-  },
-});
+  }
+);
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 console.log(`Server running on port ${PORT}`);

@@ -1,0 +1,313 @@
+---
+title: "Introduction"
+description: "Build AI agents powered by MCP servers"
+icon: "list-start"
+---
+
+# MCP Agents
+
+**mcp-use** provides a complete agent framework for building AI applications that leverage MCP servers. The MCPAgent combines LLM integration, tool orchestration, and memory management to create powerful, autonomous AI agents.
+
+## Key Features
+
+- **LLM Integration**: Support for OpenAI, Anthropic, Google, and Groq
+- **Automatic tool calling**: Agents automatically select and execute appropriate tools
+- **Multi-server orchestration**: Connect to multiple MCP servers simultaneously
+- **Structured output**: Type-safe responses with Zod schema validation
+- **Streaming support**: Real-time streaming of agent responses
+- **Memory management**: Built-in conversation history and context management
+
+## Installation
+
+The agent framework is included with the mcp-use package:
+
+<CodeGroup>
+```bash npm
+npm install mcp-use
+```
+```bash pnpm
+pnpm add mcp-use
+```
+```bash yarn
+yarn add mcp-use
+```
+</CodeGroup>
+
+You'll also need an LLM provider SDK:
+
+<CodeGroup>
+```bash OpenAI
+npm install openai
+```
+```bash Anthropic
+npm install @anthropic-ai/sdk
+```
+```bash Google
+npm install @google/generative-ai
+```
+```bash Groq
+npm install groq-sdk
+```
+</CodeGroup>
+
+## Quick Start
+
+Here's a basic example of creating and running an agent:
+
+```typescript
+import { MCPClient } from 'mcp-use'
+import { MCPAgent } from 'mcp-use/agent'
+import OpenAI from 'openai'
+
+// Configure MCP servers
+const config = {
+  mcpServers: {
+    filesystem: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', './workspace']
+    }
+  }
+}
+
+// Create client
+const client = new MCPClient(config)
+await client.createAllSessions()
+
+// Initialize LLM
+const llm = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
+
+// Create agent
+const agent = new MCPAgent({
+  llm,
+  client,
+  model: 'gpt-4',
+  systemPrompt: 'You are a helpful assistant with access to file system tools.'
+})
+
+// Run agent
+const result = await agent.run('List all TypeScript files in the workspace')
+console.log(result)
+
+// Cleanup
+await client.closeAllSessions()
+```
+
+## Architecture Overview
+
+The MCPAgent framework is built around several core components that work together to enable intelligent, tool-using AI applications.
+
+### **Agent Core**
+
+The `MCPAgent` class orchestrates all agent functionality, managing LLM interactions, tool execution, and response generation.
+
+**Learn more**: [Agent Configuration →](/typescript/agent/agent-configuration)
+
+### **LLM Integration**
+
+Native support for multiple LLM providers with a unified interface. Each provider is automatically detected and configured based on the LLM instance you provide.
+
+**Supported providers**:
+- OpenAI (GPT-3.5, GPT-4, GPT-4 Turbo)
+- Anthropic (Claude 3 family)
+- Google (Gemini models)
+- Groq (Llama, Mixtral, and more)
+
+**Learn more**: [LLM Integration →](/typescript/agent/llm-integration)
+
+### **Tool Orchestration**
+
+Agents automatically discover tools from connected MCP servers and intelligently select the right tools for each task. The framework handles:
+
+- Tool discovery and schema conversion
+- Automatic tool selection by the LLM
+- Parameter validation and type safety
+- Error handling and retries
+- Multi-step workflows
+
+**Learn more**: [Client Configuration →](/typescript/client/client-configuration)
+
+### **Structured Output**
+
+Generate type-safe responses with Zod schema validation. The agent can return structured data instead of plain text, enabling programmatic use of agent results.
+
+```typescript
+import { z } from 'zod'
+
+const result = await agent.run('Analyze the file structure', {
+  schema: z.object({
+    totalFiles: z.number(),
+    fileTypes: z.array(z.string()),
+    largestFile: z.string()
+  })
+})
+
+// result is fully typed!
+console.log(result.totalFiles)
+```
+
+**Learn more**: [Structured Output →](/typescript/agent/structured-output)
+
+### **Streaming**
+
+Stream agent responses in real-time for better user experience and immediate feedback:
+
+```typescript
+for await (const chunk of agent.stream('Write a report')) {
+  if (chunk.type === 'text') {
+    process.stdout.write(chunk.content)
+  }
+}
+```
+
+**Learn more**: [Streaming →](/typescript/agent/streaming)
+
+### **Interactive Patterns**
+
+Build interactive, multi-turn conversations where agents can ask questions, request clarification, and maintain context:
+
+```typescript
+const conversation = agent.createConversation()
+
+await conversation.send('Analyze the sales data')
+await conversation.send('Now compare it with last quarter')
+await conversation.send('Generate a summary report')
+```
+
+**Learn more**: [Interactive Chat Patterns →](/typescript/agent/interactive-chat-patterns)
+
+## Agent Lifecycle
+
+Understanding the agent lifecycle helps you build robust applications:
+
+```typescript
+// 1. Initialize client and connect to servers
+const client = new MCPClient(config)
+await client.createAllSessions()
+
+// 2. Create agent with LLM and configuration
+const agent = new MCPAgent({ llm, client, model })
+
+// 3. Run agent tasks
+const result = await agent.run('Your task here')
+
+// 4. Clean up resources
+await client.closeAllSessions()
+```
+
+## MCPAgent API
+
+The `MCPAgent` class provides a clean API for agent interactions:
+
+```typescript
+class MCPAgent {
+  // Basic execution
+  run(prompt: string, options?: RunOptions): Promise<string>
+  
+  // Streaming
+  stream(prompt: string, options?: StreamOptions): AsyncIterator<Chunk>
+  
+  // Structured output
+  run<T>(prompt: string, options: { schema: ZodSchema<T> }): Promise<T>
+  
+  // Conversation management
+  createConversation(): Conversation
+  
+  // Configuration
+  updateSystemPrompt(prompt: string): void
+}
+```
+
+## Advanced Features
+
+### Server Manager
+
+For multi-server setups, the Server Manager helps agents intelligently route tool calls to the appropriate server:
+
+**Learn more**: [Server Manager →](/typescript/agent/server-manager)
+
+### Custom Agents
+
+Build specialized agents by extending the base `MCPAgent` class:
+
+**Learn more**: [Building Custom Agents →](/typescript/agent/building-custom-agents)
+
+### Observability
+
+Monitor and debug your agents with built-in observability features:
+
+**Learn more**: [Observability →](/typescript/agent/observability)
+
+## Best Practices
+
+### API Key Management
+
+Always use environment variables for API keys:
+
+```typescript
+// .env file
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+// In your code
+import { config } from 'dotenv'
+config()
+
+const llm = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
+```
+
+### Error Handling
+
+Always handle potential errors:
+
+```typescript
+try {
+  const result = await agent.run(prompt)
+  console.log(result)
+} catch (error) {
+  if (error.code === 'RATE_LIMIT') {
+    // Handle rate limiting
+  } else {
+    // Handle other errors
+  }
+}
+```
+
+### Resource Cleanup
+
+Clean up resources when done:
+
+```typescript
+try {
+  await agent.run(prompt)
+} finally {
+  await client.closeAllSessions()
+}
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
+    Configure your agent and LLM settings
+  </Card>
+  <Card title="LLM Integration" icon="brain" href="/typescript/agent/llm-integration">
+    Integrate with OpenAI, Anthropic, Google, or Groq
+  </Card>
+  <Card title="Structured Output" icon="brackets-curly" href="/typescript/agent/structured-output">
+    Generate type-safe responses with Zod schemas
+  </Card>
+  <Card title="Streaming" icon="wave-pulse" href="/typescript/agent/streaming">
+    Stream agent responses in real-time
+  </Card>
+  <Card title="Interactive Patterns" icon="messages" href="/typescript/agent/interactive-chat-patterns">
+    Build multi-turn conversations
+  </Card>
+  <Card title="Custom Agents" icon="code" href="/typescript/agent/building-custom-agents">
+    Extend the agent framework for your needs
+  </Card>
+</CardGroup>
+

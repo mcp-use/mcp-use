@@ -1,0 +1,156 @@
+---
+title: "Supabase Provider"
+description: "Configure Supabase OAuth authentication"
+icon: "); -webkit-mask-image: url('https://simpleicons.org/icons/supabase.svg'); mask-image: url('https://simpleicons.org/icons/supabase.svg');/*"
+---
+
+## Setup
+
+### 1. Create Supabase Project
+
+1. Go to [Supabase Dashboard](https://app.supabase.com/)
+2. Create a new project or select existing one
+3. Note your **Project ID** and **API URL**
+
+### 2. Get JWT Secret (HS256 Only)
+
+For HS256 tokens (legacy):
+
+1. Go to **Project Settings** → **API**
+2. Copy the **JWT Secret** under "JWT Settings"
+
+For ES256 tokens (new):
+- No JWT secret needed, JWKS is used automatically
+
+### 3. Configure Authentication
+
+1. Go to **Authentication** → **Providers**
+2. Enable desired authentication providers (Email, Google, GitHub, etc.)
+3. Configure redirect URLs
+
+## Configuration
+
+### Basic Configuration (ES256)
+
+For new Supabase projects using ES256 tokens:
+
+```typescript
+import { McpServer, supabase } from 'mcp-use/server'
+
+const server = new McpServer({
+  name: 'my-server',
+  version: '1.0.0',
+  oauth: supabase({
+    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
+    // ES256 tokens use JWKS automatically
+  })
+})
+
+server.listen(3000)
+```
+
+### Configuration with HS256 (Legacy)
+
+For projects still using HS256 tokens:
+
+```typescript
+const server = new McpServer({
+  oauth: supabase({
+    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
+    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!
+  })
+})
+```
+
+### Environment Variables
+
+```bash
+# .env
+MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=eyJhbGci...
+MCP_USE_OAUTH_SUPABASE_JWT_SECRET=your-jwt-secret  # Only for HS256
+```
+
+### Full Configuration Options
+
+```typescript
+const server = new McpServer({
+  oauth: supabase({
+    // Required
+    projectId: 'your-project-id',
+    
+    // Required for HS256 tokens (legacy)
+    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,
+    
+    // Optional: Supabase URL (defaults to supabase.co)
+    supabaseUrl: 'https://your-project-id.supabase.co',
+    
+    // OAuth mode: 'proxy' (default) or 'direct'
+    mode: 'proxy',
+    
+    // JWT verification
+    verifyJwt: process.env.NODE_ENV === 'production',
+    
+    // Custom user info extraction
+    getUserInfo: (payload) => ({
+      userId: payload.sub,
+      email: payload.email,
+      name: payload.user_metadata?.name,
+      roles: payload.app_metadata?.roles || [],
+      permissions: payload.app_metadata?.permissions || [],
+    })
+  })
+})
+```
+
+## Token Types
+
+### ES256 (Recommended)
+
+New Supabase projects use ES256 tokens with JWKS:
+
+```typescript
+const server = new McpServer({
+  oauth: supabase({
+    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!
+    // No jwtSecret needed - uses JWKS automatically
+  })
+})
+```
+
+**Benefits:**
+- More secure (asymmetric encryption)
+- No shared secret to manage
+- Automatic key rotation support
+
+### HS256 (Legacy)
+
+Older projects may still use HS256:
+
+```typescript
+const server = new McpServer({
+  oauth: supabase({
+    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
+    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!
+  })
+})
+```
+
+**Check your token type:**
+1. Go to Supabase Dashboard → **Project Settings** → **API**
+2. Look for "JWT Algorithm" in JWT Settings
+3. If it says "HS256", you need the JWT secret
+4. If it says "ES256", omit the JWT secret
+
+## Resources
+
+- [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase)
+- [Supabase Documentation](https://supabase.com/docs)
+- [Supabase Auth](https://supabase.com/docs/guides/auth)
+- [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
+
+## Next Steps
+
+- [User Context](/typescript/server/authentication/user-context) - Access user information
+

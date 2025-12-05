@@ -3,6 +3,37 @@
  */
 
 import type { OAuthProvider } from "../oauth/providers/types.js";
+import type { z } from "zod";
+
+/**
+ * Converts Zod optional fields to TypeScript optional properties.
+ * Transforms { field: T | undefined } to { field?: T }
+ *
+ * This utility enables natural destructuring patterns in callbacks:
+ * - async ({message}) => ... (without type annotation)
+ * - async ({message = "default"}) => ... (with default value)
+ *
+ * Without this, Zod's z.string().optional() produces { message: string | undefined }
+ * which requires the property to be present (though it can be undefined).
+ * This type makes it truly optional: { message?: string }
+ *
+ * Used across all callback types: tools, prompts, and resources.
+ */
+export type OptionalizeUndefinedFields<T> = {
+  [K in keyof T as undefined extends T[K] ? K : never]?: Exclude<
+    T[K],
+    undefined
+  >;
+} & {
+  [K in keyof T as undefined extends T[K] ? never : K]: T[K];
+};
+
+/**
+ * Infer input type from a Zod schema with proper optional field handling
+ */
+export type InferZodInput<S> = S extends z.ZodTypeAny
+  ? OptionalizeUndefinedFields<z.infer<S>>
+  : Record<string, any>;
 
 export interface ServerConfig {
   name: string;
@@ -25,10 +56,15 @@ export interface ServerConfig {
    * @example
    * ```typescript
    * // Development: No need to set (allows all origins)
-   * const server = createMCPServer('my-server');
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0'
+   * });
    *
    * // Production: Explicitly set allowed origins
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   allowedOrigins: [
    *     'https://myapp.com',
    *     'https://app.myapp.com'
@@ -60,10 +96,15 @@ export interface ServerConfig {
    * @example
    * ```typescript
    * // Default behavior (compatible with ChatGPT and other non-compliant clients)
-   * const server = createMCPServer('my-server');
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0'
+   * });
    *
    * // Use strict MCP spec behavior (requires compliant clients)
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   autoCreateSessionOnInvalidId: false
    * });
    * ```
@@ -86,10 +127,12 @@ export interface ServerConfig {
    *
    * @example
    * ```typescript
-   * import { createMCPServer, oauthSupabaseProvider } from 'mcp-use/server';
+   * import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server';
    *
    * // Supabase OAuth
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   oauth: oauthSupabaseProvider({
    *     projectId: 'my-project',
    *     jwtSecret: process.env.SUPABASE_JWT_SECRET
@@ -97,7 +140,9 @@ export interface ServerConfig {
    * });
    *
    * // Auth0 OAuth
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   oauth: oauthAuth0Provider({
    *     domain: 'my-tenant.auth0.com',
    *     audience: 'https://my-api.com'
@@ -105,7 +150,9 @@ export interface ServerConfig {
    * });
    *
    * // Keycloak OAuth
-   * const server = createMCPServer('my-server', {
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
    *   oauth: oauthKeycloakProvider({
    *     serverUrl: 'https://keycloak.example.com',
    *     realm: 'my-realm',
@@ -122,7 +169,7 @@ export interface InputDefinition {
   type: "string" | "number" | "boolean" | "object" | "array";
   description?: string;
   required?: boolean;
-  default?: any;
+  default?: unknown;
 }
 
 /**

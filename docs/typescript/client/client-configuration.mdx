@@ -1,21 +1,67 @@
 ---
 title: "Client Configuration"
-description: "Configure MCPClient for connecting to MCP servers"
-icon: "server"
+description: "Configure your MCP client to connect to servers"
+icon: "cog"
 ---
 
-# Client Configuration
+The MCPClient is your gateway to connecting with MCP servers. This guide covers all configuration options for establishing connections, managing sessions, and customizing client behavior.
 
 <Info>
-This guide covers MCPClient configuration options for connecting to MCP servers. For agent configuration, see the [Agent Configuration](/typescript/agent/agent-configuration) guide.
+**Looking for agent configuration?** If you're building AI agents that interact with MCP servers, see the [Agent Configuration](/typescript/agent/agent-configuration) guide instead.
 </Info>
 
+## Quick Start
 
-## MCP Server Configuration
+<CodeGroup>
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
 
-mcp_use supports any MCP server through a flexible configuration system. (For a list of awesome servers you can visit https://github.com/punkpeye/awesome-mcp-servers or https://github.com/appcypher/awesome-mcp-servers which have an amazing collection of them)
+// Configure your MCP servers
+const config = {
+    mcpServers: {
+        playwright: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            env: { DISPLAY: ':1' }
+        }
+    }
+}
 
-The configuration is defined in a JSON file with the following structure:
+const client = new MCPClient(config)
+```
+
+```typescript TypeScript
+import { MCPClient } from 'mcp-use'
+
+// Configure your MCP servers
+const config = {
+    mcpServers: {
+        playwright: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            env: { DISPLAY: ':1' }
+        }
+    }
+}
+
+const client = new MCPClient(config)
+```
+</CodeGroup>
+
+
+## Server Configuration
+
+The MCPClient uses a flexible configuration system that supports any MCP server, regardless of connection type.
+
+<Tip>
+**Looking for MCP servers?** Check out these curated lists:
+- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers)
+- [appcypher/awesome-mcp-servers](https://github.com/appcypher/awesome-mcp-servers)
+</Tip>
+
+### Configuration Structure
+
+Server configuration is defined as a JavaScript object:
 
 ```json
 {
@@ -31,26 +77,31 @@ The configuration is defined in a JSON file with the following structure:
 }
 ```
 
-MCP servers can use different connection types (STDIO, HTTP). For details on these connection types and how to configure them, see the [Connection Types](./connection-types) guide.
-Each server entry in the `mcpServers` object has a `server_name` and then specific options depending on how `mcp-use` should connect to and/or manage the server.
+### Configuration Parameters
 
-- `server_name`: (Required) A unique string identifier for this MCP server configuration. This name is used to select the server, for example, in `agent.run(..., server_name="your_server_name")`.
+Each server entry requires a unique name and connection-specific parameters. The client automatically detects the connection type based on the provided configuration.
 
-**For STDIO-based servers (local):**
-These are servers that `mcp-use` will start and manage as local child processes, communicating via their standard input/output streams.
+**Common Parameters:**
+- `server_name`: Unique identifier for the server (used as the object key)
 
-- `command`: (Required) The executable command to start the server (e.g., `"npx"`, `"python"`).
-- `args`: (Optional) An array of string arguments to pass to the `command` (e.g., `["-y", "@playwright/mcp@latest"]`).
-- `env`: (Optional) An object defining environment variables to set for the server's process (e.g., `{"DISPLAY": ":1"}`).
+**STDIO Servers (Local Process):**
 
-**For HTTP/HTTPS-based servers (SSE and Streamable HTTP)**
+For servers that run as local child processes:
 
-These are servers that are typically already running and accessible via an HTTP(S) endpoint. `mcp-use` acts as an HTTP client to communicate with them.
+- `command`: Executable command to start the server (e.g., `"npx"`, `"python"`)
+- `args`: Array of command-line arguments
+- `env`: Environment variables for the server process
 
-- `url`: (Required) The full URL where the MCP server is listening (e.g., `"http://localhost:7777/mcp"`, `"https://api.example.com/mcp"`).
-- `headers`: (Optional) An object containing custom HTTP headers to be sent with every request to this server (e.g., for authentication: `{"Authorization": "Bearer your_api_token"}`).
+**HTTP/HTTPS Servers (Remote):**
 
-Additional options might be available depending on the specific connection type or wrappers used. Always refer to the [Connection Types](./connection-types) documentation for the most detailed and up-to-date specifications for each type.
+For servers accessible via HTTP endpoints:
+
+- `url`: Full URL to the MCP server endpoint
+- `headers`: Custom HTTP headers (useful for authentication)
+
+<Info>
+The client automatically infers the connection type based on your configuration. Use `command` for STDIO servers or `url` for HTTP servers. See [Connection Types](./connection-types) for detailed information.
+</Info>
 
 ### Example Configuration
 
@@ -109,7 +160,6 @@ There are several ways to create an MCPClient:
 
 Create configuration programmatically:
 
-<CodeGroup>
 ```typescript TypeScript
 import { MCPClient } from 'mcp-use'
 
@@ -125,23 +175,6 @@ const config = {
 
 const client = new MCPClient(config)
 ```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-const config = {
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: { DISPLAY: ':1' }
-        }
-    }
-}
-
-const client = new MCPClient(config)
-```
-</CodeGroup>
 
 ### From Configuration File
 

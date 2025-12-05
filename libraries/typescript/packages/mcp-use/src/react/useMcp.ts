@@ -363,12 +363,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
 
         return "success";
-      } catch (err: any) {
-        const errorMessage = err?.message || String(err);
+      } catch (err: unknown) {
+        const error = err as Error & { code?: number; message?: string };
+        const errorMessage = error?.message || String(err);
 
         // Handle 401 errors
         if (
-          err.code === 401 ||
+          error.code === 401 ||
           errorMessage.includes("401") ||
           errorMessage.includes("Unauthorized")
         ) {
@@ -442,7 +443,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
 
         // Handle other errors
-        failConnection(errorMessage, err);
+        failConnection(
+          errorMessage,
+          error instanceof Error ? error : new Error(String(error))
+        );
         return "failed";
       }
     };

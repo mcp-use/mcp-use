@@ -34,6 +34,8 @@
         <img src="https://static.pepy.tech/badge/mcp-use" /></a>
     <a href="https://docs.mcp-use.com/python" alt="Python Documentation">
         <img src="https://img.shields.io/badge/python-docs-red" /></a>
+    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Conformance">
+        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-conformance.json" /></a>
     <br/>
     <a href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript" alt="Typescript Documentation">
         <img src="https://img.shields.io/badge/typescript-repo-grey?labelColor=white&logo=typescript" alt="Badge"></a>
@@ -43,6 +45,8 @@
         <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
     <a href="https://docs.mcp-use.com/typescript" alt="Typescript Documentation">
         <img src="https://img.shields.io/badge/typescript-docs-red" /></a>
+    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Conformance">
+        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-conformance.json" /></a>
     <a href="https://pkg.pr.new/~/mcp-use/mcp-use" alt="Open PR Package Preview">
         <img src="https://pkg.pr.new/badge/mcp-use/mcp-use" /></a>
     <br/>

@@ -47,11 +47,13 @@ server.get("/api/fruits", (c) => {
 });
 
 // Brand Info Tool - Returns brand information
-server.tool({
-  name: "get-brand-info",
-  description:
-    "Get information about the brand, including company details, mission, and values",
-  cb: async () => {
+server.tool(
+  {
+    name: "get-brand-info",
+    description:
+      "Get information about the brand, including company details, mission, and values",
+  },
+  async () => {
     return {
       content: [
         {
@@ -91,8 +93,8 @@ server.tool({
         },
       ],
     };
-  },
-});
+  }
+);
 
 server.listen().then(() => {
   console.log(`Server running`);

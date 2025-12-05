@@ -1,27 +1,23 @@
 ---
 title: "Resources"
-description: "How to use resources from the client"
-icon: "file"
+description: "Read content and data from MCP servers"
+icon: "folder-open"
 ---
 
-# Resources
+Resources provide URI-based access to content and data exposed by MCP servers. They enable your applications to read configuration files, documentation, database records, API responses, and any other information that servers want to make available.
 
-Resources in MCP provide structured access to information that AI models need to understand context. They represent data sources that can be retrieved and used by AI applications, such as files, database records, API responses, or any other structured information.
+## Understanding Resources
 
-## What are Resources?
+In the MCP protocol, resources are content sources that clients can read via URIs. Each resource has:
 
-Resources are context data sources with:
-- **URI-based identification** for consistent addressing
-- **Structured access patterns** with defined schemas
-- **Multiple content types** (text, JSON, binary data)
-- **Dynamic or static content** that can change over time
+- **Unique URI**: Resources are identified and accessed by unique URIs
+- **Content types**: Support for text, JSON, binary, and other MIME types
+- **Static or dynamic**: Content can be fixed or generated on-demand
+- **Template support**: Parameterized resources for dynamic content generation
 
-Common examples include:
-- Configuration files and documents
-- Database records and query results
-- API responses and external data
-- Calendar events and schedules
-- User preferences and settings
+<Tip>
+**Think of resources as endpoints**: Just like REST APIs have endpoints, MCP servers expose resources via URIs. The key difference is that resources are designed for AI context and can include rich metadata.
+</Tip>
 
 ## Types of Resources
 
@@ -109,27 +105,13 @@ listResources().catch(console.error)
 ```
 </CodeGroup>
 
-### Automatic Resource List Update
+### Dynamic Resource Lists
 
-When servers send `ResourceListChangedNotification`, it signals that the resource list has changed. The `list_resources()` method always fetches fresh data from the server, ensuring you get up-to-date information.
+<Info>
+Resources can be added, removed, or modified at runtime. Servers notify clients of changes via `ResourceListChangedNotification`, ensuring your application always has access to the latest available resources.
+</Info>
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server
-
-    Note over Server: Server Changes State
-    Server->>Server: disable(resource)
-    Server->>Client: ResourceListChangedNotification
-    Client->>Client: Log notification
-
-    Note over Client: User Calls list_resources()
-    Client->>Server: list_resources()
-    Server-->>Client: [updated resources]
-    Client->>Client: Return fresh data
-```
-
-**Important:** Always use `await session.list_resources()` instead of the deprecated `session.resources` property to ensure you get fresh data:
+Always use `listResources()` to get fresh data from the server:
 
 <CodeGroup>
 ```typescript TypeScript

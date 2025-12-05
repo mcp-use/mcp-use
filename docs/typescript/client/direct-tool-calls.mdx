@@ -1,26 +1,32 @@
 ---
-title: Direct Tool Calls
-description: Learn how to call MCP tools directly without using an LLM
-icon: "phone-outgoing"
+title: "Direct Tool Calls"
+description: "Call MCP tools programmatically without AI"
+icon: "phone"
 ---
 
-# Direct Tool Calls
-
-MCP-Use allows you to call MCP server tools directly without needing an LLM or agent. This is useful when you want to use MCP servers as a simple interface to various tools and APIs, or when you need programmatic control over tool execution.
+Direct tool calls enable you to invoke MCP server tools programmatically without an LLM or agent. This is perfect when you know exactly what tool to call and don't need AI to make decisions.
 
 ## When to Use Direct Tool Calls
 
-Direct tool calls are appropriate when:
+Use direct tool calls when you need:
 
-- You know exactly which tool to call and with what parameters
-- You don't need an LLM to make decisions about tool selection
-- You want to integrate MCP tools into existing Python applications
-- You need deterministic, programmatic control over tool execution
+- **Deterministic execution**: Known tool with known parameters
+- **Programmatic control**: Integrate MCP tools into existing applications
+- **No AI overhead**: Simple tool invocation without LLM reasoning
+- **Custom workflows**: Build your own tool orchestration logic
 
-<Note>
-  Direct tool calls will not work for tools that require sampling/completion, as
-  these need an LLM to generate responses.
-</Note>
+<Warning>
+**Sampling Limitation**: Direct tool calls don't support tools that require sampling/completion capabilities, as these need an LLM to generate responses.
+</Warning>
+
+## Use Cases
+
+Direct tool calls are ideal for:
+
+- **Automation scripts**: Scheduled tasks and workflows
+- **API wrappers**: Simplify MCP tool access
+- **Testing**: Verify tool behavior programmatically
+- **Integration**: Connect MCP tools to existing systems
 
 ## Basic Example
 

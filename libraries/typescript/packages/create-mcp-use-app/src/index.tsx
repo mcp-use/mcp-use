@@ -332,7 +332,7 @@ function listTemplates(): void {
   for (const template of availableTemplates) {
     const packageJsonPath = join(templatesDir, template, "package.json");
     let description = "MCP server template";
-    
+
     if (existsSync(packageJsonPath)) {
       try {
         const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
@@ -341,12 +341,19 @@ function listTemplates(): void {
         // Use default description
       }
     }
-    
-    console.log(chalk.cyan(`  ${template.padEnd(15)}`), chalk.gray(description));
+
+    console.log(
+      chalk.cyan(`  ${template.padEnd(15)}`),
+      chalk.gray(description)
+    );
   }
-  
+
   console.log("");
-  console.log(chalk.gray("💡 Use with: npx create-mcp-use-app my-project --template <template>"));
+  console.log(
+    chalk.gray(
+      "💡 Use with: npx create-mcp-use-app my-project --template <template>"
+    )
+  );
   console.log("");
 }
 
@@ -355,7 +362,11 @@ program
   .description("Create a new MCP server project")
   .version(packageJson.version)
   .argument("[project-name]", "Name of the MCP server project")
-  .option("-t, --template <template>", "Template to use (starter, mcp-ui, apps-sdk)", "starter")
+  .option(
+    "-t, --template <template>",
+    "Template to use (starter, mcp-ui, apps-sdk)",
+    "starter"
+  )
   .option("--list-templates", "List all available templates")
   .option("--install", "Install dependencies after creating project")
   .option("--no-git", "Skip initializing a git repository")
@@ -836,20 +847,24 @@ function ProjectNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
 
   const handleSubmit = (val: string) => {
     const trimmed = val.trim();
-    
+
     if (!trimmed) {
       setError("Project name is required");
       return;
     }
     if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
-      setError("Project name can only contain letters, numbers, hyphens, and underscores");
+      setError(
+        "Project name can only contain letters, numbers, hyphens, and underscores"
+      );
       return;
     }
     if (existsSync(join(process.cwd(), trimmed))) {
-      setError(`Directory "${trimmed}" already exists! Please choose a different name.`);
+      setError(
+        `Directory "${trimmed}" already exists! Please choose a different name.`
+      );
       return;
     }
-    
+
     onSubmit(trimmed);
   };
 
@@ -860,11 +875,7 @@ function ProjectNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
       </Box>
       <Box>
         <Text color="cyan">❯ </Text>
-        <TextInput
-          value={value}
-          onChange={setValue}
-          onSubmit={handleSubmit}
-        />
+        <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
       </Box>
       {error && (
         <Box marginTop={1}>
@@ -889,18 +900,24 @@ async function promptForProjectName(): Promise<string> {
 }
 
 // Ink component for template selection
-function TemplateSelector({ onSelect }: { onSelect: (template: string) => void }) {
+function TemplateSelector({
+  onSelect,
+}: {
+  onSelect: (template: string) => void;
+}) {
   const templatesDir = join(__dirname, "templates");
-  
+
   if (!existsSync(templatesDir)) {
     return (
       <Box flexDirection="column">
-        <Text color="red">❌ Templates directory not found at: {templatesDir}</Text>
-        <Text color="yellow">   __dirname: {__dirname}</Text>
+        <Text color="red">
+          ❌ Templates directory not found at: {templatesDir}
+        </Text>
+        <Text color="yellow"> __dirname: {__dirname}</Text>
       </Box>
     );
   }
-  
+
   const availableTemplates = readdirSync(templatesDir, { withFileTypes: true })
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
@@ -918,7 +935,7 @@ function TemplateSelector({ onSelect }: { onSelect: (template: string) => void }
   const items = availableTemplates.map((template) => {
     const packageJsonPath = join(templatesDir, template, "package.json");
     let description = "MCP server template";
-    
+
     if (existsSync(packageJsonPath)) {
       try {
         const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
@@ -927,7 +944,7 @@ function TemplateSelector({ onSelect }: { onSelect: (template: string) => void }
         // Use default description
       }
     }
-    
+
     return {
       label: `${template} - ${description}`,
       value: template,
@@ -939,10 +956,7 @@ function TemplateSelector({ onSelect }: { onSelect: (template: string) => void }
       <Box marginBottom={1}>
         <Text bold>Select a template:</Text>
       </Box>
-      <SelectInput
-        items={items}
-        onSelect={(item) => onSelect(item.value)}
-      />
+      <SelectInput items={items} onSelect={(item) => onSelect(item.value)} />
     </Box>
   );
 }

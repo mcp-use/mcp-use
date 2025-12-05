@@ -1,0 +1,139 @@
+---
+title: "Updates"
+description: "New updates and improvements"
+icon: "sparkles"
+rss: true
+tag: "New"
+---
+
+<Update label="v1.9.0 - December 2024">
+  ## Elicitation Support
+  Added comprehensive elicitation support following MCP specification, enabling servers to request user input through clients.
+
+  - **New**: Simplified API with `ctx.elicit(message, zodSchema)` and `ctx.elicit(message, url)` with automatic mode detection
+  - **New**: Form Mode for structured data collection with Zod schema validation and full TypeScript type inference
+  - **New**: URL Mode to direct users to external URLs for sensitive operations (OAuth, credentials)
+  - **New**: Server-side validation with automatic Zod validation and clear error messages
+  - **New**: Client support via `elicitationCallback` to MCPClient and `onElicitation` to React `useMcp` hook
+  - **Enhancement**: Type-safe return types automatically inferred from Zod schemas
+  - **Enhancement**: Configurable timeout with 5-minute default for user interactions
+  - **Fix**: Transport bug fixes
+</Update>
+
+<Update label="v1.8.0 - November 2024">
+  ## Sampling Support
+  Added sampling support in inspector with improved timeout handling for long-running requests.
+
+  - **New**: LLM sampling capabilities in inspector
+  - **Fix**: Long running sampling requests no longer timeout after 60 seconds
+  - **Enhancement**: Better handling of extended sampling operations
+</Update>
+
+<Update label="v1.7.0 - November 2024">
+  ## OAuth Authentication System
+  Complete OAuth 2.0 support with built-in providers and enhanced server capabilities.
+
+  - **New**: Complete OAuth 2.0 authentication framework with built-in providers (Auth0, WorkOS, Supabase, Keycloak)
+  - **New**: OAuth middleware and routes for server-side OAuth flow handling with automatic token management
+  - **New**: OAuth callback component in inspector for authentication flows
+  - **New**: Context storage with async local storage for request-scoped context in servers
+  - **New**: Response helpers for standardized HTTP responses and error handling
+  - **New**: Runtime detection utilities for Node.js, Bun, and Deno environments
+  - **New**: Server authentication examples for Auth0, WorkOS, and Supabase
+  - **Enhancement**: Enhanced useMcp hook with improved connection management and OAuth support
+  - **Enhancement**: Enhanced inspector dashboard with OAuth configuration UI
+  - **Enhancement**: Better authentication flow handling with OAuth integration
+  - **Enhancement**: Enhanced HTTP connectors with OAuth token handling
+  - **Fix**: Dependency optimizations and AI SDK updates
+</Update>
+
+<Update label="v1.6.0 - November 2024">
+  ## Notifications & Sampling
+  Bidirectional notification support and LLM sampling capabilities.
+
+  - **New**: Bidirectional notification support between clients and servers with handler registration
+  - **New**: LLM sampling allowing MCP tools to request completions from connected clients
+  - **New**: Widget build ID support for cache busting in widget UI resources
+  - **New**: Inspector notifications tab with real-time display
+  - **New**: Server capabilities modal showing supported MCP features
+  - **Enhancement**: Refactored HTTP transport to reuse sessions across requests with configurable idle timeout
+  - **Enhancement**: Session management with tracking and automatic cleanup
+  - **Enhancement**: Roots support in connectors and session API
+  - **Enhancement**: Session event handling API for notification registration
+  - **Enhancement**: Server methods for session management and targeted notifications
+  - **Enhancement**: Enhanced search_tools with metadata (total_tools, namespaces, result_count)
+  - **Enhancement**: RPC message logging support in inspector
+</Update>
+
+<Update label="v1.5.0 - October 2024">
+  ## OpenAI Apps SDK Integration
+  Major release with comprehensive OpenAI Apps SDK support and widget system.
+
+  - **New**: McpUseProvider component combining React setup (StrictMode, ThemeProvider, BrowserRouter, ErrorBoundary)
+  - **New**: WidgetControls component with debug overlay and view controls (fullscreen, PIP)
+  - **New**: useWidget hook for type-safe React adapter to OpenAI Apps SDK API
+  - **New**: ErrorBoundary component for graceful error handling
+  - **New**: Image component handling data URLs and public file paths
+  - **New**: ThemeProvider for consistent theme management
+  - **New**: WidgetInspectorControls for inspector-specific debugging
+  - **New**: Console proxy toggle for iframe console logs
+  - **New**: Product search result widget template with carousel and accordion components
+  - **New**: Folder-based widget support with automatic detection
+  - **New**: Public folder support for static assets
+  - **Enhancement**: Enhanced SSR configuration with proper Vite settings
+  - **Enhancement**: Improved OpenAI component renderer with better height calculation
+  - **Enhancement**: Enhanced tool result display with multiple content types
+  - **Enhancement**: Resizable panels with collapse support
+  - **Enhancement**: Better widget security headers and CSP configuration
+</Update>
+
+<Update label="v1.4.0 - October 2024">
+  ## Code Mode
+  Introduced code execution capabilities for agents.
+
+  - **New**: Code Mode feature allowing agents to execute code using MCP tools
+  - **New**: VMCodeExecutor for local execution environments
+  - **New**: E2BCodeExecutor for remote execution in cloud sandboxes
+  - **New**: CodeModeConnector for tool discovery and execution
+  - **Enhancement**: Enhanced MCPClient with code execution configuration
+  - **Enhancement**: Comprehensive tests for code execution functionality
+</Update>
+
+<Update label="v1.3.0 - October 2024">
+  ## Edge Runtime Support
+  Migrated to Hono framework for edge runtime compatibility.
+
+  - **Major**: Migrated from Express to Hono framework for edge runtime support (Cloudflare Workers, Deno Deploy, Supabase)
+  - **New**: Runtime detection for Deno and Node.js environments
+  - **New**: Connect middleware adapter for compatibility
+  - **New**: `getHandler()` method for edge deployment
+  - **New**: Supabase deployment documentation and templates
+  - **Enhancement**: Improved MCPAgent message detection with robust helpers for different LangChain formats
+  - **Enhancement**: Fixed server base URL handling for proper connection and routing
+  - **Enhancement**: Better auto-connection logic with error handling and retry mechanisms
+  - **Enhancement**: Enhanced useMcp hook with improved connection state management
+</Update>
+
+<Update label="v1.2.0 - October 2024">
+  ## LangChain 1.0.0 Support
+  Updated to support LangChain 1.0.0 with improved compatibility.
+
+  - **Major**: Support for LangChain 1.0.0
+  - **Fix**: Model type compatibility for LangChain 1.0.0
+  - **Fix**: Apps SDK metadata setup from widget build
+  - **Enhancement**: Set CLI and inspector as dependencies
+</Update>
+
+<Update label="v1.1.0 - October 2024">
+  ## Apps SDK Initial Integration
+  First integration of OpenAI Apps SDK support.
+
+  - **New**: OpenAI Apps SDK integration with UI resource type
+  - **New**: Enhanced MCP-UI adapter for Apps SDK metadata
+  - **New**: Resource URI format supporting `ui://widget/` scheme
+  - **New**: Tool definitions with Apps SDK-specific metadata
+  - **Enhancement**: Comprehensive test suite for Apps SDK resources
+  - **Refactor**: Renamed `fn` to `cb` in tool and prompt definitions for consistency
+  - **Refactor**: Updated resource definitions to use `readCallback`
+</Update>
+

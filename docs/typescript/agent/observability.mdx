@@ -1,32 +1,43 @@
 ---
 title: "Observability"
-description: "Trace and monitor your MCP agents with Langfuse integration"
+description: "Monitor and debug your agents in production"
 icon: "eye"
 ---
 
-## Overview
+Observability gives you visibility into your agent's behavior in production, enabling debugging, performance optimization, and understanding of how your agents use tools and interact with LLMs.
 
-MCP-use provides **optional observability integration** to help you debug, monitor, and optimize your AI agents. Observability gives you visibility into:
+## Why Observability Matters
 
-- **Agent execution flow** with detailed step-by-step tracing
-- **Tool usage patterns** and performance metrics
-- **LLM calls** with token usage and costs
-- **Error tracking** and debugging information
-- **Conversation analytics** across sessions
+As agents become more complex, understanding their behavior becomes crucial:
+
+- **Debug issues**: See exactly what happened when something goes wrong
+- **Optimize performance**: Identify slow tool calls or inefficient patterns
+- **Monitor costs**: Track LLM token usage and API costs
+- **Improve quality**: Understand tool usage patterns and agent decisions
+- **Production insights**: Monitor agent behavior in real-world scenarios
 
 <Warning>
-**Completely Optional**: Observability is entirely opt-in and requires zero code changes to your existing workflows.
+**Completely Optional**: Observability is opt-in and requires no code changes. Simply set environment variables to enable automatic tracing.
 </Warning>
 
-## Supported Platforms
+## What Gets Traced
 
-MCP-use currently integrates with:
+When observability is enabled, mcp-use automatically captures:
 
-- **[Langfuse](https://langfuse.com)** (v3.38.x+) - Open-source LLM observability with self-hosting options
-  - Requires: `langfuse@^3.38.0` and `langfuse-langchain@^3.38.0`
-  - ⚠️ Use the correct package names: `langfuse` and `langfuse-langchain` (NOT `@langfuse/core` or `@langfuse/langchain`)
+- **Full execution traces**: Complete agent workflow from start to finish
+- **LLM calls**: Model usage, prompts, completions, and token counts
+- **Tool execution**: Which tools were called, with what parameters, and their results
+- **Performance metrics**: Execution times for each step
+- **Errors and exceptions**: Full context when things go wrong
+- **Conversation flow**: Multi-turn conversation tracking
 
-The platform automatically initializes when you import `mcp-use` if the required environment variables are set.
+## Langfuse Integration
+
+[Langfuse](https://langfuse.com) is an open-source LLM observability platform that integrates seamlessly with mcp-use.
+
+<Info>
+**Self-Hosted or Cloud**: Langfuse offers both cloud-hosted and self-hosted options, giving you full control over your observability data.
+</Info>
 
 ## What Gets Traced
 

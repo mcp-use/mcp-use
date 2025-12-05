@@ -61,7 +61,7 @@ async function main() {
         // After refresh, we can access the updated tools
         setTimeout(() => {
           try {
-            const tools = session.connector.tools;
+            const tools = session.tools;
             console.log(`  ✓ Tools refreshed: ${tools.length} tool(s)`);
             tools.forEach((t) => console.log(`    - ${t.name}`));
           } catch {
@@ -125,11 +125,11 @@ async function main() {
   console.log("[Init] Initializing session...");
   await session.initialize();
 
-  const serverInfo = session.connector.serverInfo;
+  const serverInfo = session.serverInfo;
   console.log(`[Init] ✓ Server: ${serverInfo?.name} v${serverInfo?.version}`);
 
   // Show initial tools
-  const tools = session.connector.tools;
+  const tools = session.tools;
   console.log(`[Init] ✓ Initial tools: ${tools.length}`);
   tools.forEach((t) => console.log(`  - ${t.name}: ${t.description}`));
 
@@ -167,7 +167,7 @@ async function main() {
     "\n[Demo] 🔧 Calling 'toggle-mode' tool (triggers tools/list_changed)..."
   );
   try {
-    const result = await session.connector.callTool("toggle-mode", {});
+    const result = await session.callTool("toggle-mode", {});
     const text = (result.content[0] as any)?.text || "No response";
     console.log(`[Demo] ✓ Response: ${text.split("\n")[0]}`);
   } catch (error) {
@@ -180,7 +180,7 @@ async function main() {
   // Call ping-pong to see the new mode
   console.log("\n[Demo] 🏓 Calling 'ping-pong' tool to verify mode change...");
   try {
-    const result = await session.connector.callTool("ping-pong", {});
+    const result = await session.callTool("ping-pong", {});
     const text = (result.content[0] as any)?.text || "No response";
     console.log(`[Demo] ✓ Response: ${text}`);
   } catch (error) {

@@ -6,21 +6,24 @@
  * - Optional: Specify timeout in milliseconds
  */
 
-import { createMCPServer } from "../../../../dist/src/server/index.js";
+import { MCPServer } from "../../../../dist/src/server/index.js";
 import { z } from "zod";
 
-const server = createMCPServer("timeout-example", {
+const server = new MCPServer({
+  name: "timeout-example",
   version: "1.0.0",
 });
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3003;
 
 // Example 1: No timeout (default - waits indefinitely)
-server.tool({
-  name: "collect-feedback",
-  description: "Collect user feedback with no timeout",
-  inputs: [],
-  cb: async (params, ctx) => {
+server.tool(
+  {
+    name: "collect-feedback",
+    description: "Collect user feedback with no timeout",
+    inputs: [],
+  },
+  async (params, ctx) => {
     // No timeout specified - waits indefinitely for user
     const result = await ctx.elicit(
       "Please provide your feedback (take your time)",
@@ -44,15 +47,17 @@ server.tool({
     return {
       content: [{ type: "text", text: "No feedback provided" }],
     };
-  },
-});
+  }
+);
 
 // Example 2: With timeout for time-sensitive operations
-server.tool({
-  name: "quick-confirmation",
-  description: "Quick confirmation with 30-second timeout",
-  inputs: [],
-  cb: async (params, ctx) => {
+server.tool(
+  {
+    name: "quick-confirmation",
+    description: "Quick confirmation with 30-second timeout",
+    inputs: [],
+  },
+  async (params, ctx) => {
     try {
       // 30-second timeout for quick yes/no
       const result = await ctx.elicit(
@@ -91,15 +96,17 @@ server.tool({
         isError: true,
       };
     }
-  },
-});
+  }
+);
 
 // Example 3: URL mode with timeout
-server.tool({
-  name: "timed-authorization",
-  description: "Authorization with 2-minute timeout",
-  inputs: [],
-  cb: async (params, ctx) => {
+server.tool(
+  {
+    name: "timed-authorization",
+    description: "Authorization with 2-minute timeout",
+    inputs: [],
+  },
+  async (params, ctx) => {
     try {
       const authUrl = "https://example.com/oauth/authorize";
 
@@ -130,8 +137,8 @@ server.tool({
         isError: true,
       };
     }
-  },
-});
+  }
+);
 
 await server.listen(PORT);
 console.log(`🚀 Timeout Example Server running on port ${PORT}`);

@@ -91,7 +91,7 @@ async function main() {
     {
       mcpServers: {
         sampling: {
-          url: "http://localhost:3001/mcp",
+          url: "http://localhost:3000/mcp",
         },
       },
     },

@@ -21,6 +21,7 @@ repos:
       - id: check-yaml
         exclude: (pnpm-lock\.yaml|package-lock\.json)$
       - id: check-added-large-files
+        exclude: \.mp4$
       - id: debug-statements
         files: ^libraries/python/.*\.py$
 

@@ -493,10 +493,11 @@ Beyond being a powerful MCP client, mcp-use also provides a complete server fram
 ### Quick Server Setup
 
 ```ts
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
 // Create your MCP server
-const server = createMCPServer('my-awesome-server', {
+const server = new MCPServer({
+  name: 'my-awesome-server',
   version: '1.0.0',
   description: 'My MCP server with tools, resources, and prompts',
 })
@@ -557,9 +558,9 @@ mcp-use provides a unified `uiResource()` method for registering interactive UI 
 #### Quick Start
 
 ```ts
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-const server = createMCPServer('my-server', { version: '1.0.0' })
+const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
 
 // Register a widget - creates both tool and resource automatically
 server.uiResource({
@@ -691,7 +692,8 @@ npx @mcp-use/cli start
 ### Advanced Server Configuration
 
 ```ts
-const server = createMCPServer('advanced-server', {
+const server = new MCPServer({
+  name: 'advanced-server',
   version: '1.0.0',
   description: 'Advanced MCP server with custom configuration',
   // Custom inspector path (default: /inspector)
@@ -746,7 +748,8 @@ const app = express()
 app.get('/api/health', (req, res) => res.send('OK'))
 
 // Mount MCP server
-const mcpServer = createMCPServer('integrated-server', {
+const mcpServer = new MCPServer({
+  name: 'integrated-server',
   /* ... */
 })
 mountMCPServer(app, mcpServer, {

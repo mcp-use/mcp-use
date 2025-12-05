@@ -61,14 +61,20 @@ export class KeycloakOAuthProvider implements OAuthProvider {
     }
   }
 
-  getUserInfo(payload: any): UserInfo {
+  getUserInfo(payload: Record<string, unknown>): UserInfo {
     // Extract realm roles
-    const realmRoles = payload.realm_access?.roles || [];
+    const realmAccess = payload.realm_access as
+      | Record<string, unknown>
+      | undefined;
+    const realmRoles = (realmAccess?.roles as string[]) || [];
 
     // Extract client roles (if clientId is specified)
+    const resourceAccess = payload.resource_access as
+      | Record<string, Record<string, unknown>>
+      | undefined;
     const clientRoles =
       (this.config.clientId &&
-        payload.resource_access?.[this.config.clientId]?.roles) ||
+        ((resourceAccess?.[this.config.clientId]?.roles as string[]) || [])) ||
       [];
 
     // Combine all roles
@@ -88,17 +94,18 @@ export class KeycloakOAuthProvider implements OAuthProvider {
       );
     }
 
+    const scope = payload.scope as string | undefined;
     return {
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      username: payload.preferred_username,
-      nickname: payload.preferred_username,
-      picture: payload.picture,
+      userId: payload.sub as string,
+      email: payload.email as string | undefined,
+      name: payload.name as string | undefined,
+      username: payload.preferred_username as string | undefined,
+      nickname: payload.preferred_username as string | undefined,
+      picture: payload.picture as string | undefined,
       roles: allRoles,
       permissions,
       // Include scope as well
-      scopes: payload.scope ? payload.scope.split(" ") : [],
+      scopes: scope ? scope.split(" ") : [],
       // Keycloak-specific claims
       email_verified: payload.email_verified,
       given_name: payload.given_name,

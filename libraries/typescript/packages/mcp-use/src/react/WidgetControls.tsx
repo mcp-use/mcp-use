@@ -274,8 +274,9 @@ export function WidgetControls({
       const args = toolArgs.trim() ? JSON.parse(toolArgs) : {};
       const result = await callTool(toolName, args);
       setActionResult(`Success: ${JSON.stringify(result, null, 2)}`);
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -284,8 +285,9 @@ export function WidgetControls({
       setActionResult("Sending follow-up message...");
       await sendFollowUpMessage(followUpMessage);
       setActionResult("Follow-up message sent successfully");
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -293,8 +295,9 @@ export function WidgetControls({
     try {
       openExternal(externalUrl);
       setActionResult(`Opened external link: ${externalUrl}`);
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -305,8 +308,9 @@ export function WidgetControls({
       setActionResult(`Requesting display mode: ${mode}...`);
       const result = await requestDisplayMode(mode);
       setActionResult(`Display mode granted: ${result.mode}`);
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -318,8 +322,9 @@ export function WidgetControls({
       setActionResult("Setting state...");
       await setState(newState);
       setActionResult(`State updated: ${JSON.stringify(newState, null, 2)}`);
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 

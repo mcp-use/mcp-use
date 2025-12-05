@@ -1,21 +1,49 @@
 ---
-title: "Agent Structured Output"
-description: "Get strongly-typed Pydantic models with intelligent retry logic"
-icon: "shapes"
+title: "Structured Output"
+description: "Type-safe responses with Zod schema validation"
+icon: "brackets-curly"
 ---
 
-# Agent Structured Output
+Structured output enables agents to return type-safe, validated data instead of plain text. By defining a Zod schema, you get automatic validation, type inference, and intelligent retry logic when data is incomplete.
 
-The MCPAgent supports structured output, allowing you to get strongly-typed Pydantic models instead of plain text responses. The agent becomes **schema-aware** and will intelligently retry to gather missing information until all required fields can be populated.
+## How Structured Output Works
 
-## How it Works
+When you provide a Zod schema to the agent:
 
-When you provide an `output_schema` parameter, the agent:
+1. **Schema awareness**: Agent understands exactly what data structure to return
+2. **Automatic validation**: Responses are validated against your schema
+3. **Type safety**: Full TypeScript type inference from your schema
+4. **Intelligent retries**: Agent automatically gathers missing required fields
+5. **Guaranteed structure**: You always get data matching your schema or an error
 
-1. **Understands requirements** - The agent knows exactly what information it needs to collect
-2. **Attempts structured output** - At completion points, tries to format the result into your schema
-3. **Intelligently retries** - If required fields are missing, continues execution to gather the missing data
-4. **Validates completeness** - Only finishes when all required fields can be populated
+<Info>
+**Zod Integration**: We use Zod for schema definition because it provides excellent TypeScript integration, runtime validation, and clear error messages.
+</Info>
+
+## Benefits
+
+### Type Safety
+
+Get full TypeScript types automatically inferred from your schema:
+
+```typescript
+const schema = z.object({
+  name: z.string(),
+  age: z.number()
+})
+
+const result = await agent.run(prompt, { schema })
+// result.name is string
+// result.age is number
+```
+
+### Automatic Retry
+
+If the agent's first response is missing required fields, it automatically tries again to gather the missing information.
+
+### Validation
+
+Responses are validated at runtime, ensuring your code always receives correctly structured data.
 
 ## Basic Example
 

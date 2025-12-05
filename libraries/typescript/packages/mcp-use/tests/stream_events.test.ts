@@ -46,6 +46,7 @@ vi.mock("../src/adapters/langchain_adapter.js", () => {
 
 describe("mCPAgent streamEvents()", () => {
   let agent: MCPAgent;
+  // Using any for test mocks is acceptable for flexibility
   let mockClient: any;
   let mockLLM: any;
 
@@ -212,8 +213,10 @@ describe("mCPAgent streamEvents()", () => {
       events.push(event);
     }
 
-    // Should add user message and AI response to history
-    expect(addToHistorySpy).toHaveBeenCalledTimes(2);
+    // Should add all messages from execution (user message, tool calls, tool outputs, and AI response)
+    // With the new memory behavior, we store all messages, not just user query and final response
+    expect(addToHistorySpy).toHaveBeenCalled();
+    expect(addToHistorySpy.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("should track telemetry", async () => {

@@ -1,18 +1,33 @@
 ---
 title: "Notifications"
-description: "Receive notifications from MCP servers and send notifications to servers"
-icon: "bell-ring"
+description: "Handle real-time updates from MCP servers"
+icon: "bell"
 ---
 
-MCP supports bidirectional notifications between clients and servers. Notifications are one-way JSON-RPC messages that don't require a response.
+Notifications enable real-time, one-way communication between clients and servers. They're used to signal events, state changes, and updates without requiring a response, making them perfect for keeping your application synchronized with server state.
 
-**Server → Client**: Servers send notifications to signal events like `tools/list_changed`, `resources/list_changed`, or custom events.
+## Understanding Notifications
 
-**Client → Server**: Clients send notifications like `roots/list_changed` when their roots change.
+MCP notifications are JSON-RPC messages without response requirements. They enable:
 
-<Note>
-For information on sending notifications from your server, see [Server Notifications](/typescript/server/notifications).
-</Note>
+- **Real-time updates**: Get notified when server state changes
+- **List synchronization**: Tools, resources, and prompts list updates
+- **Custom events**: Server-specific notifications for your application
+- **Progress tracking**: Monitor long-running operations
+
+<Info>
+**Bidirectional**: Both clients and servers can send notifications. Servers notify clients of changes, while clients notify servers of environment changes like root directories.
+</Info>
+
+## Notification Flow
+
+**Server → Client**: Event notifications (tool lists changed, progress updates, custom events)
+
+**Client → Server**: Environment notifications (roots changed, configuration updates)
+
+<Tip>
+For information on sending notifications from your MCP server, see the [Server Notifications](/typescript/server/notifications) guide.
+</Tip>
 
 ## Receiving Notifications (Server → Client)
 

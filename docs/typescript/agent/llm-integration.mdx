@@ -1,20 +1,45 @@
 ---
 title: "LLM Integration"
-description: "Integrate any LLM with mcp_use through LangChain"
-icon: "brain"
+description: "Connect agents to OpenAI, Anthropic, Google, and more"
+icon: "sparkles"
 ---
 
-# LLM Integration Guide
+The MCPAgent works with any modern LLM provider through native SDK integration. Connect to OpenAI, Anthropic, Google, Groq, or any other provider that supports tool calling - no additional wrappers required.
 
-mcp_use supports integration with **any** Language Learning Model (LLM) that is compatible with LangChain. This guide covers how to use different LLM providers with mcp_use and emphasizes the flexibility to use any LangChain-supported model.
+## Supported Providers
 
-<Note>
-**Key Requirement**: Your chosen LLM must support **tool calling** (also known as function calling) to work with MCP tools. Most modern LLMs support this feature.
-</Note>
+The agent framework includes native support for major LLM providers:
 
-## Universal LLM Support
+<Info>
+**Native Integration**: Unlike other frameworks, mcp-use integrates directly with provider SDKs. This means better performance, simpler configuration, and access to the latest features without waiting for wrapper updates.
+</Info>
 
-mcp_use leverages LangChain's architecture to support any LLM that implements the LangChain interface. This means you can use virtually any model from any provider, including:
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    GPT-4, GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo
+  </Card>
+  <Card title="Anthropic" icon="anthropic">
+    Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
+  </Card>
+  <Card title="Google" icon="google">
+    Gemini Pro, Gemini Flash, Gemini Ultra
+  </Card>
+  <Card title="Groq" icon="zap">
+    Llama 3.1, Mixtral, and more (ultra-fast inference)
+  </Card>
+</CardGroup>
+
+## Requirements
+
+Your chosen LLM must support:
+
+- **Tool calling**: Also known as function calling - required for MCP tool execution
+- **Structured output**: For type-safe responses (optional but recommended)
+- **Streaming**: For real-time response streaming (optional)
+
+<Tip>
+Most modern LLMs support these features. Check your provider's documentation to confirm tool calling support.
+</Tip>
 
 <CardGroup cols={2}>
   <Card title="OpenAI" icon="robot">

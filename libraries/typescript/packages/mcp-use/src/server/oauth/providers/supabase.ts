@@ -83,14 +83,19 @@ export class SupabaseOAuthProvider implements OAuthProvider {
     }
   }
 
-  getUserInfo(payload: any): UserInfo {
+  getUserInfo(payload: Record<string, unknown>): UserInfo {
+    const userMetadata = payload.user_metadata as
+      | Record<string, unknown>
+      | undefined;
     return {
-      userId: payload.sub || payload.user_id,
-      email: payload.email,
-      name: payload.user_metadata?.name || payload.user_metadata?.full_name,
-      username: payload.user_metadata?.username,
-      picture: payload.user_metadata?.avatar_url,
-      roles: payload.role ? [payload.role] : [],
+      userId: (payload.sub || payload.user_id) as string,
+      email: payload.email as string | undefined,
+      name: (userMetadata?.name || userMetadata?.full_name) as
+        | string
+        | undefined,
+      username: userMetadata?.username as string | undefined,
+      picture: userMetadata?.avatar_url as string | undefined,
+      roles: payload.role ? [payload.role as string] : [],
       permissions: payload.aal ? [`aal:${payload.aal}`] : [],
       // Include Supabase-specific claims
       aal: payload.aal, // Authentication Assurance Level

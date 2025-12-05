@@ -1,26 +1,23 @@
 ---
 title: "Tools"
-description: "How to use tools from the client"
-icon: "hammer"
+description: "Invoke server functions from your MCP client"
+icon: "wrench"
 ---
 
-# Tools
+Tools are executable functions that MCP servers expose to clients. They enable your applications to perform actions, retrieve data, and interact with external systems through a standardized interface with type-safe parameters and structured results.
 
-Tools in MCP are server-implemented functions that enable AI models to perform specific actions. They represent capabilities that a server exposes to clients, allowing AI applications to interact with external systems, execute commands, or manipulate data.
+## Understanding Tools
 
-## What are Tools?
+In the MCP protocol, tools represent server capabilities that clients can invoke. Each tool is a well-defined function with:
 
-Tools are well-defined functions with:
-- **JSON Schema definitions** that specify their inputs and outputs
-- **Single, focused operations** that perform one specific task
-- **User approval requirement** before execution for security
+- **Schema-based validation**: Parameters are validated using JSON Schema
+- **Type-safe execution**: Input and output structures are clearly defined
+- **Asynchronous operation**: All tool calls support async execution
+- **Error handling**: Built-in error reporting and handling
 
-Common examples include:
-- File operations (read, write, delete)
-- Web browsing and data fetching
-- Database queries
-- API calls to external services
-- System commands
+<Tip>
+**Common Use Cases**: Tools can perform file operations, make API calls, query databases, execute system commands, process data, and much more. Each MCP server exposes its own set of specialized tools.
+</Tip>
 
 ## Listing Available Tools
 
@@ -98,27 +95,15 @@ listTools().catch(console.error)
 ```
 </CodeGroup>
 
-### Automatic Tool List Update
+### Dynamic Tool Lists
 
-When servers send `ToolListChangedNotification`, it signals that the tool list has changed. The `list_tools()` method always fetches fresh data from the server, ensuring you get up-to-date information.
+<Info>
+MCP servers can dynamically add, remove, or modify tools at runtime. When this happens, servers send a `ToolListChangedNotification` to inform clients that the tool list has changed.
+</Info>
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server
+The `listTools()` method always fetches fresh data from the server, ensuring you have the most current information:
 
-    Note over Server: Server Changes State
-    Server->>Server: disable(tool)
-    Server->>Client: ToolListChangedNotification
-    Client->>Client: Log notification
-
-    Note over Client: User Calls list_tools()
-    Client->>Server: list_tools()
-    Server-->>Client: [updated tools]
-    Client->>Client: Return fresh data
-```
-
-**Important:** Always use `await session.list_tools()` instead of the deprecated `session.tools` property to ensure you get fresh data:
+**Important:** Always use `await session.listTools()` instead of the deprecated `session.tools` property:
 
 <CodeGroup>
 ```typescript TypeScript
@@ -218,7 +203,11 @@ callToolExample().catch(console.error)
 
 ## Timeout Configuration
 
-The MCP SDK uses a default timeout of 60 seconds for tool calls. For long-running operations, you can configure custom timeout settings:
+<Tip>
+The default timeout for tool calls is 60 seconds. For long-running operations like data processing or external API calls, you should configure appropriate timeout values.
+</Tip>
+
+Configure custom timeouts for tool execution:
 
 <CodeGroup>
 ```typescript TypeScript

@@ -18,7 +18,7 @@ import { checkClientFiles, getClientDistPath } from "./shared-utils.js";
  *
  * const server = createMCPServer('my-server')
  * mountInspector(server) // Mounts at /inspector
- * mountInspector(server, { autoConnectUrl: 'http://localhost:3001/mcp' }) // With auto-connect
+ * mountInspector(server, { autoConnectUrl: 'http://localhost:3000/mcp' }) // With auto-connect
  * ```
  */
 export function mountInspector(

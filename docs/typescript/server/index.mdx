@@ -4,18 +4,16 @@ description: "Build MCP servers with mcp-use server framework"
 icon: "list-start"
 ---
 
-# MCP Server Framework
+# MCP Server
 
-**mcp-use** is the complete MCP server framework for TypeScript. 
-It combines the official Model Context Protocol SDK with Express.js and React to enable both MCP protocol communication and HTTP endpoints for UI widgets and custom routes.
-You can expose UI components to chat clients like ChatGPT, Claude, and MCP-UI compatible ones.
+**mcp-use** has a complete MCP server framework implementation for TypeScript. 
+It improves the official Model Context Protocol SDK with support for Edge Runtime, ChatGPT Apps SDK and MCP-UI. In addition, it supports all official MCP features and achieves a conformance score of 100/100 based on the official MCP Conformance Tests.
 
 ## Key Features
 
 - **Full MCP compatibility**: MCP servers built with mcp-use are 100% compatible with the MCP specs.
-- **UI Widgets in React**: mcp-use automatically registers all React components in your `resources/` folder as MCP tools and resources.
 - **Apps SDK & MCP-UI support**: UI widgets are compatible with Apps SDK for ChatGPT and MCP-UI resources. [UI Widgets](/typescript/server/ui-widgets).
-- **Express Integration**: Built-in Express server for HTTP endpoints, static file serving, and custom routes.
+- **Edge runtime support**: Built-in Edge runtime support
 - **Built-in Inspector**: An handy MCP inspector is launched for you to test you MCP server.
 - **One command to get started**: Use `npx create-mcp-use-app` command to scaffold a complete MCP server.
 
@@ -27,19 +25,19 @@ The easiest way to get started is to use the `create-mcp-use-app` command, which
 
 <CodeGroup>
 ```bash npm
-npx create-mcp-use-app@latest my-mcp-server
+npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
 npm run dev
 ```
 
 ```bash pnpm
-pnpm create mcp-use-app@latest my-mcp-server
+pnpm create mcp-use-app my-mcp-server
 cd my-mcp-server
 pnpm dev
 ```
 
 ```bash yarn
-yarn create mcp-use-app@latest my-mcp-server
+yarn create mcp-use-app my-mcp-server
 cd my-mcp-server
 yarn dev
 ```
@@ -60,8 +58,8 @@ After creation, your project will have this structure:
 ```
 my-mcp-server/
 ├── resources/
-│   └── component.ts # MCP-UI / OpenAI Apps SDK example
-├── index.ts   # MCP server entry point
+│   └── component.tsx  # React widgets for Apps SDK and MCP-UI
+├── index.ts           # MCP server entry point, you can add tools and rest endpoints here
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -72,204 +70,211 @@ my-mcp-server/
 Commands:
 
 <CodeGroup>
-```bash npm
-npm run dev   # start the development server
-npm run build # build the server
-npm run start # start the production server
-```
-
-```bash pnpm
-pnpm dev   # start the development server
-pnpm build # build the server
-pnpm start # start the production server
-```
-
 ```bash yarn
 yarn dev   # start the development server
 yarn build # build the server
 yarn start # start the production server
+yarn deploy # deploy the server to mcp-use cloud
+```
+```bash npm
+npm run dev   # start the development server
+npm run build # build the server
+npm run start # start the production server
+npm run deploy # deploy the server to mcp-use cloud
+```
+```bash pnpm
+pnpm dev   # start the development server
+pnpm build # build the server
+pnpm start # start the production server
+pnpm deploy # deploy the server to mcp-use cloud
 ```
 </CodeGroup>
 
 When you run your MCP server, it will be available at:
 - **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
-- **MCP Inspector**: `http://localhost:3000/inspector` - It will automatically launch an [MCP Inspector](/inspector) for you to test you MCP server.
+- **MCP Inspector**: `http://localhost:3000/inspector` 
 
 
 ### Deploy Your MCP Server
 You can deploy your MCP server on any platform. Build your MCP server with `npm run build` and start the production server with `npm run start`.
 Or you can deploy it on [mcp-use Cloud](https://mcp-use.com).
+For detailed instructions, see the [Deploy Your Server](/typescript/server/deployment-mcp-use) guide.
+
+
+
 
 ### Next Steps
 
 - [Core features](/typescript/server/tools): Learn how to create MCP tools, prompts and resources.
 - [UI Widgets](/typescript/server/ui-widgets): Expose UI components to chat clients compatible with ChatGPT Apps SDK and MCP-UI.
 - [Configuration](/typescript/server/configuration): Advanced configuration and deployment options.
+- [Deploy Your Server](/typescript/server/deployment-mcp-use) - Deploy to production with one command
 
 
 ### Manual Installation
 
 If you prefer to set up manually or add mcp-use to an existing project, install the package via npm:
 
-```bash
+<CodeGroup>
+```bash npm
 npm install mcp-use
 ```
-
-For development and testing, you can also install the optional inspector UI:
-
-```bash
-npm install --save-dev @mcp-use/cli
+```bash pnpm
+pnpm add mcp-use
 ```
+```bash yarn
+yarn add mcp-use
+```
+</CodeGroup>
 
-## Quick Start
+
+## Example server file
 
 The easiest way to start is with `create-mcp-use-app`, which provides a working example. After running the scaffold command above, your server is ready to go!
 
 For manual setup, here's a minimal example:
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer, text, object } from 'mcp-use/server'
+import { z } from 'zod'
 
 // Create server instance
-const server = createMCPServer('my-mcp-server', {
+const server = new MCPServer({
+  name: 'my-mcp-server',
   version: '1.0.0',
   description: 'My first MCP server',
-  baseUrl: process.env.MCP_URL || "http://localhost:3000"
 })
 
 // Define a simple tool
 server.tool({
   name: 'greet',
   description: 'Greet someone by name',
-  inputs: [
-    { name: 'name', type: 'string', required: true }
-  ],
-  cb: async ({ name }) => {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Hello, ${name}! Welcome to MCP.`
-        }
-      ]
-    }
-  }
-})
+  schema: z.object({
+    name: z.string().describe('The name of the person to greet'),
+  })
+}, async ({ name }) => 
+    text(`Hello, ${name}! Welcome to MCP.`)
+)
 
 // Define a resource
 server.resource({
   name: 'config',
   uri: 'config://settings',
-  mimeType: 'application/json',
   description: 'Server configuration',
-  readCallback: async () => ({
-    contents: [{
-      uri: 'config://settings',
-      mimeType: 'application/json',
-      text: JSON.stringify({
-        theme: 'dark',
-        language: 'en'
-      })
-    }]
-  })
-})
+}, async () => 
+    object({
+      theme: 'dark',
+      language: 'en'
+    })
+)
 
 // Start the server
-server.listen(3000)
+await server.listen(3000)
 ```
 
 When you run this server, it will be available at:
 - **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
-- **Inspector UI**: `http://localhost:3000/inspector` - Development and testing interface (if @mcp-use/inspector is installed)
+- **Inspector UI**: `http://localhost:3000/inspector` - Development and testing interface
 
 ## Architecture Overview
 
-The MCP server framework is built on several core concepts:
+The mcp-use server framework is designed around a modular architecture that seamlessly integrates MCP protocol features with Express.js flexibility. Understanding this architecture helps you build powerful, production-ready MCP servers.
 
-### 1. **Server Instance**
-The main server object created via `createMCPServer()`. It manages all MCP functionality and HTTP endpoints.
+The framework is built on six fundamental components that work together:
 
-### 2. **Tools**
-Functions that MCP clients can invoke with parameters. Tools perform actions and return results.
+### **Server Instance**
+The main `MCPServer` class created via `new MCPServer()`. It orchestrates all MCP functionality, manages the Express application, and handles client connections.
 
-### 3. **Resources**
-Static or dynamic content that clients can read. Resources can be simple files or complex data structures.
+**Learn more**: See [Configuration](/typescript/server/configuration) for server setup options.
 
-### 4. **Prompts**
-Template-based prompt generation for AI models, accepting parameters to create structured prompts.
+### **Tools**
+Executable functions that MCP clients can invoke with typed parameters. Tools perform actions, fetch data, or trigger operations and return structured results.
 
-### 5. **UI Resources**
-Interactive widgets that can be embedded in web applications, supporting both MCP-UI and OpenAI Apps SDK formats.
+**Learn more**: [Tools Guide →](/typescript/server/tools)
 
-### 6. **Express Integration**
-Full access to Express.js functionality for adding custom routes, middleware, and static file serving.
+### **Resources**
+Static or dynamic content accessible via URIs. Resources can be configuration files, documentation, data feeds, or any content that clients need to read.
 
-## Core Components
+**Learn more**: [Resources Guide →](/typescript/server/resources)
 
-### McpServer Class
+### **Prompts**
+Reusable, parameterized templates for AI model interactions. Prompts standardize how your server generates context for LLM conversations.
 
-The main server class that orchestrates all functionality:
+**Learn more**: [Prompts Guide →](/typescript/server/prompts)
+
+### **UI Widgets**
+Rich, interactive React components that render in chat clients. Widgets are automatically registered from your `resources/` folder and work with both ChatGPT Apps SDK and MCP-UI.
+
+<img src="./images/apps-sdk-widget.png" alt="Apps SDK UI Widget Example" style={{maxWidth: '600px', borderRadius: '8px', margin: '1rem 0', boxShadow: '0 2px 12px rgba(0,0,0,0.08)'}} />
+
+**Key features:**
+- **Automatic Registration**: Drop `.tsx` files in `resources/` and they become MCP tools
+- **Zero Boilerplate**: No manual `server.tool()` or `server.uiResource()` calls needed
+- **Hot Module Replacement**: Changes reflect instantly during development
+- **Type-Safe Props**: Zod schemas provide full TypeScript type safety
+- **Interactive**: Widgets can call tools, manage state, and respond to user actions
+
+**Learn more**: [UI Widgets Guide →](/typescript/server/ui-widgets)
+
+### **Custom Endpoints Integration**
+Full Express.js and Hono functionality for custom routes, middleware, authentication, static file serving, and more. The server instance is also an Express app.
+
+```typescript
+// Add custom routes
+server.get('/api/mango', (req, res) => {
+  res.json({ fruit: 'mango' })
+})
+```
+
+**Learn more**: [API Reference →](/typescript/server/api-reference)
+
+
+## McpServer API
+
+The `McpServer` class provides a clean, chainable API:
 
 ```typescript
 class McpServer {
-  constructor(config: ServerConfig)
-
   // MCP Protocol Methods
   tool(definition: ToolDefinition): this
   resource(definition: ResourceDefinition): this
   resourceTemplate(definition: ResourceTemplateDefinition): this
   prompt(definition: PromptDefinition): this
   uiResource(definition: UIResourceDefinition): this
-
-  // Server Control
+  
   listen(port?: number): Promise<void>
 
-  // Express proxy - all Express methods available
-  // e.g., server.get(), server.post(), server.use()
+  // Hono/Express proxy - all HTTP methods available
+  // Examples: get(), post(), use(), static(), route()
 }
 ```
 
-### Type System
-
-The framework provides comprehensive TypeScript types for all components:
-
-- `ServerConfig` - Server configuration
-- `ToolDefinition` - Tool configuration and callbacks
-- `ResourceDefinition` - Resource configuration and read callbacks
-- `PromptDefinition` - Prompt template configuration
-- `UIResourceDefinition` - UI widget configuration
-- `InputDefinition` - Parameter definitions for tools and prompts
-
-## MCP Protocol Support
-
-The server fully implements the MCP protocol specification:
-
-- **Transport**: HTTP with Server-Sent Events (SSE) for streaming
-- **Tools**: Function execution with typed parameters
-- **Resources**: Content serving with MIME types and annotations
-- **Prompts**: Template-based prompt generation
-- **Resource Templates**: Dynamic resource generation with URI parameters
-
-## UI Widget System
-
-The framework supports multiple UI widget formats:
-
-### MCP-UI Widgets
-- External URL widgets (iframe-based)
-- Raw HTML widgets
-- Remote DOM scripting
-
-### OpenAI Apps SDK
-- Text/HTML+Skybridge format
-- Widget CSP configuration
-- Tool output templates
+**Additional Features:**
+- **[OAuth Authentication](/typescript/server/authentication)**: Configure OAuth providers for secure authentication
+- **[Sampling](/typescript/client/sampling)**: Request LLM completions from the client during tool execution
+- **[Notifications](/typescript/server/notifications)**: Send real-time notifications to connected clients
+- **[Inspector UI](/inspector)**: Interactive debugging interface automatically served at `/inspector` endpoint
 
 ## Next Steps
 
-- [Getting Started Guide](./getting-started) - Detailed setup and first server
-- [API Reference](./api-reference) - Complete API documentation
-- [Tools Guide](./tools) - Building and configuring tools
-- **[Deploy Your Server](./deployment-mcp-use)** - Deploy to production with one command
-- [Resources Guide](./resources) - Static and dynamic resources
-- [UI Widgets](./ui-widgets) - Creating interactive widgets
-- [Examples](./examples) - Real-world implementation examples
+<CardGroup cols={3}>
+  <Card title="Tools" icon="wrench" href="/typescript/server/tools">
+    Build executable functions with parameters and validation
+  </Card>
+  <Card title="Resources" icon="folder-open" href="/typescript/server/resources">
+    Expose static and dynamic content via URI-based resources
+  </Card>
+  <Card title="Prompts" icon="message-square" href="/typescript/server/prompts">
+    Create reusable prompt templates for AI interactions
+  </Card>
+  <Card title="UI Widgets" icon="palette" href="/typescript/server/ui-widgets">
+    Build interactive React components with auto-registration
+  </Card>
+  <Card title="Configuration" icon="cog" href="/typescript/server/configuration">
+    Configure your server for production deployment
+  </Card>
+  <Card title="Deploy to Production" icon="rocket" href="/typescript/server/deployment-mcp-use">
+    Deploy your server to mcp-use Cloud with one command
+  </Card>
+</CardGroup>
+

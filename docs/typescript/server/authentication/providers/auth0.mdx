@@ -1,0 +1,170 @@
+---
+title: "Auth0 Provider"
+description: "Configure Auth0 OAuth 2.1 authentication"
+icon: "); -webkit-mask-image: url('https://simpleicons.org/icons/auth0.svg'); mask-image: url('https://simpleicons.org/icons/auth0.svg');/*"
+---
+
+## Setup
+
+### 1. Create Auth0 Application
+
+1. Go to [Auth0 Dashboard](https://manage.auth0.com/)
+2. Navigate to **Applications** → **Create Application**
+3. Choose **Single Page Application** or **Machine to Machine**
+4. Note your **Domain** and **Client ID**
+
+### 2. Configure Application
+
+In your Auth0 application settings:
+
+**Allowed Callback URLs:**
+```bash
+http://localhost:3000/callback // for testing
+https://yourdomain.com/callback
+```
+
+**Allowed Web Origins:**
+```bash
+http://localhost:3000 // for testing
+https://yourdomain.com
+```
+
+**Advanced Settings → Grant Types:**
+- ✅ Authorization Code
+- ✅ Refresh Token
+
+### 3. Create an API
+
+1. Navigate to **APIs** → **Create API**
+2. Set **Name**: Your API name
+3. Set **Identifier**: `https://your-api.example.com` (this becomes your audience)
+4. Leave **Signing Algorithm** as RS256
+
+## Configuration
+
+### Basic Configuration
+
+```typescript
+import { McpServer, auth0 } from 'mcp-use/server'
+
+const server = new McpServer({
+  name: 'my-server',
+  version: '1.0.0',
+  oauth: auth0({
+    domain: process.env.MCP_USE_OAUTH_AUTH0_DOMAIN!, // 'your-tenant.auth0.com'
+    audience: process.env.MCP_USE_OAUTH_AUTH0_AUDIENCE!, // 'https://your-api.example.com'
+  })
+})
+
+server.listen(3000)
+```
+
+### Environment Variables
+
+```bash
+# .env
+MCP_USE_OAUTH_AUTH0_DOMAIN=your-tenant.auth0.com
+MCP_USE_OAUTH_AUTH0_AUDIENCE=https://your-api.example.com
+```
+
+### Full Configuration Options
+
+```typescript
+const server = new McpServer({
+  oauth: auth0({
+    // Required
+    domain: 'your-tenant.auth0.com',
+    audience: 'https://your-api.example.com',
+    
+    // Optional
+    clientId: process.env.AUTH0_CLIENT_ID,
+    clientSecret: process.env.AUTH0_CLIENT_SECRET,
+    
+    // OAuth mode: 'proxy' (default) or 'direct'
+    mode: 'proxy',
+    
+    // JWT verification (should be true in production)
+    verifyJwt: process.env.NODE_ENV === 'production',
+    
+    // Custom scopes
+    scopes: ['openid', 'profile', 'email', 'offline_access'],
+    
+    // Custom user info extraction
+    getUserInfo: (payload) => ({
+      userId: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      roles: payload['https://myapp.com/roles'] || [],
+      permissions: payload.permissions || [],
+    })
+  })
+})
+```
+
+
+## Permissions
+
+### Configure Permissions
+
+1. In Auth0 Dashboard → APIs → Your API
+2. Go to **Permissions** tab
+3. Add permissions:
+   - `read:documents`
+   - `write:documents`
+   - `delete:documents`
+
+### Assign Permissions
+
+**Via Rules/Actions:**
+```javascript
+exports.onExecutePostLogin = async (event, api) => {
+  const permissions = event.authorization?.permissions || [];
+  api.accessToken.setCustomClaim('permissions', permissions);
+};
+```
+
+**Via Machine-to-Machine:**
+1. Go to Applications → Your App → APIs
+2. Authorize the API
+3. Select specific permissions
+
+### Check Permissions
+
+```typescript
+server.tool({
+  name: 'delete-document',
+  schema: z.object({ documentId: z.string() }),
+}, async ({ documentId }, context) => {
+  if (!context.auth.permissions?.includes('delete:documents')) {
+    return error('Forbidden: delete:documents permission required')
+  }
+  
+  await db.documents.delete({ id: documentId })
+  return text('Document deleted')
+})
+```
+
+## Testing
+
+### Using MCP Inspector
+
+The Inspector includes full Auth0 OAuth support:
+
+```typescript
+server.listen(3000)
+console.log('🔍 Inspector: http://localhost:3000/inspector')
+```
+
+Open the Inspector and authenticate with Auth0.
+
+## Resources
+
+- [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0)
+- [Auth0 Documentation](https://auth0.com/docs)
+- [Auth0 Actions](https://auth0.com/docs/customize/actions)
+- [Auth0 APIs](https://auth0.com/docs/get-started/apis)
+
+## Next Steps
+
+- [User Context](/typescript/server/authentication/user-context) - Access user information
+

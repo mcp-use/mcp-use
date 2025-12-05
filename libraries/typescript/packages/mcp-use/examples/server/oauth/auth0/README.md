@@ -98,10 +98,10 @@ Create a `.env` file or export:
 ```bash
 # Required: Your Auth0 tenant domain (from auth0 tenants list)
 DOMAIN=$(auth0 tenants list --json | jq -r '.[] | select(.active == true) | .name')
-export AUTH0_DOMAIN="${DOMAIN}"
+export MCP_USE_OAUTH_AUTH0_DOMAIN="${DOMAIN}"
 
 # Required: API audience (must match the API identifier above)
-export AUTH0_AUDIENCE="http://localhost:3001/"
+export MCP_USE_OAUTH_AUTH0_AUDIENCE="http://localhost:3001/"
 
 # Optional: Server port (defaults to 3001)
 export PORT=3001
@@ -377,8 +377,8 @@ export VERIFY_JWT=false
 ### "JWT verification failed"
 
 Common causes:
-- **Wrong audience**: Ensure `AUTH0_AUDIENCE` matches your API identifier exactly (including trailing slash)
-- **Wrong issuer**: Verify `AUTH0_DOMAIN` is correct (without `https://` prefix)
+- **Wrong audience**: Ensure `MCP_USE_OAUTH_AUTH0_AUDIENCE` matches your API identifier exactly (including trailing slash)
+- **Wrong issuer**: Verify `MCP_USE_OAUTH_AUTH0_DOMAIN` is correct (without `https://` prefix)
 - **Expired token**: Access tokens expire after a configured time (default 1 hour)
 - **Invalid signature**: Token may be from a different Auth0 tenant
 

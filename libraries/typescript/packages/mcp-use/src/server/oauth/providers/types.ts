@@ -19,14 +19,14 @@ export interface OAuthProvider {
    * @returns The decoded and verified token payload
    * @throws Error if token is invalid or verification fails
    */
-  verifyToken(token: string): Promise<any>;
+  verifyToken(token: string): Promise<{ payload: Record<string, unknown> }>;
 
   /**
    * Extract user information from a verified token payload
    * @param payload - The verified JWT payload
    * @returns User information object
    */
-  getUserInfo(payload: any): UserInfo;
+  getUserInfo(payload: Record<string, unknown>): UserInfo;
 
   /**
    * Get the OAuth issuer URL
@@ -84,7 +84,7 @@ export interface UserInfo {
   picture?: string;
   roles?: string[];
   permissions?: string[];
-  [key: string]: any; // Allow additional custom claims
+  [key: string]: unknown; // Allow additional custom claims
 }
 
 /**
@@ -147,8 +147,8 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   tokenEndpoint: string;
   scopesSupported?: string[];
   grantTypesSupported?: string[];
-  verifyToken: (token: string) => Promise<any>;
-  getUserInfo?: (payload: any) => UserInfo;
+  verifyToken: (token: string) => Promise<{ payload: Record<string, unknown> }>;
+  getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
 }
 
 /**

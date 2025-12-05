@@ -25,7 +25,7 @@
  * 3. Or open the Inspector at http://localhost:3000/inspector
  */
 
-import { createMCPServer } from "../../../../dist/src/server/index.js";
+import { MCPServer } from "../../../../dist/src/server/index.js";
 
 // Track current mode
 let currentMode: "ping" | "pong" = "ping";
@@ -35,7 +35,8 @@ const getToolDescription = () =>
   `Returns "${currentMode.toUpperCase()}!" - Current mode: ${currentMode}`;
 
 // Create an MCP server
-const server = createMCPServer("notification-example", {
+const server = new MCPServer({
+  name: "notification-example",
   version: "1.0.0",
   description: "Example server demonstrating bidirectional notifications",
 });
@@ -53,11 +54,13 @@ server.onRootsChanged(async (roots) => {
 });
 
 // The main ping/pong tool - its behavior changes based on mode
-server.tool({
-  name: "ping-pong",
-  description: "Dynamic tool that responds with current mode (ping or pong)",
-  inputs: [],
-  cb: async () => {
+server.tool(
+  {
+    name: "ping-pong",
+    description: "Dynamic tool that responds with current mode (ping or pong)",
+    inputs: [],
+  },
+  async () => {
     return {
       content: [
         {
@@ -66,16 +69,18 @@ server.tool({
         },
       ],
     };
-  },
-});
+  }
+);
 
 // Toggle mode and send list_changed notification
-server.tool({
-  name: "toggle-mode",
-  description:
-    "Toggle between ping and pong mode, then notify all clients to refresh tools",
-  inputs: [],
-  cb: async () => {
+server.tool(
+  {
+    name: "toggle-mode",
+    description:
+      "Toggle between ping and pong mode, then notify all clients to refresh tools",
+    inputs: [],
+  },
+  async () => {
     const oldMode = currentMode;
     currentMode = currentMode === "ping" ? "pong" : "ping";
 
@@ -98,15 +103,17 @@ server.tool({
         },
       ],
     };
-  },
-});
+  }
+);
 
 // Tool to check current mode
-server.tool({
-  name: "get-mode",
-  description: "Check the current ping/pong mode",
-  inputs: [],
-  cb: async () => {
+server.tool(
+  {
+    name: "get-mode",
+    description: "Check the current ping/pong mode",
+    inputs: [],
+  },
+  async () => {
     return {
       content: [
         {
@@ -115,22 +122,24 @@ server.tool({
         },
       ],
     };
-  },
-});
+  }
+);
 
 // Broadcast custom notification
-server.tool({
-  name: "broadcast",
-  description: "Send a custom notification to all connected clients",
-  inputs: [
-    {
-      name: "message",
-      type: "string",
-      description: "The message to broadcast",
-      required: true,
-    },
-  ],
-  cb: async ({ message }: { message: string }) => {
+server.tool(
+  {
+    name: "broadcast",
+    description: "Send a custom notification to all connected clients",
+    inputs: [
+      {
+        name: "message",
+        type: "string",
+        description: "The message to broadcast",
+        required: true,
+      },
+    ],
+  },
+  async ({ message }: { message: string }) => {
     const sessions = server.getActiveSessions();
 
     await server.sendNotification("custom/broadcast", {
@@ -147,8 +156,8 @@ server.tool({
         },
       ],
     };
-  },
-});
+  }
+);
 
 // Send welcome notification after 5 seconds
 setTimeout(async () => {

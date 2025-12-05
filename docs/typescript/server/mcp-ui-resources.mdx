@@ -1,30 +1,25 @@
 ---
-title: "MCP-UI Primitives"
+title: "MCP-UI"
 description: "Build interactive UI widgets with MCP-UI framework"
 icon: "wallpaper"
 ---
 
-# MCP-UI Resources
-
 MCP-UI Resources enable you to build rich, interactive user interfaces that work seamlessly with MCP servers. These widgets can be embedded in MCP-compatible clients to provide visual interfaces alongside your tools and resources.
 
-## Overview
+MCP-UI resources follow the proposed MCP-UI specification [here](https://github.com/idosal/mcp-ui/blob/main/SPEC.md).
 
-MCP-UI is a framework for creating interactive widgets that:
-- Render as web components in MCP clients
-- Communicate with MCP servers through tools
-- Support multiple rendering modes (iframe, inline, remote DOM)
-- Provide full React/JavaScript capabilities
+<Warning>
+The MCP-UI resources are not directly related to the Apps SDK widgets, we recommend using the [Apps SDK widgets](/typescript/server/ui-widgets) instead.
+</Warning>
 
 ## Resource Types
 
 ### 1. External URL Resources
 
-Iframe-based widgets served from your MCP server:
+Iframe-based widgets served from your MCP server
 
-:::warning Deprecated
-External URL resources are now built automatically by `mcp-use/server` `setupWidgetRoutes`. Consider using the newer widget approach instead.
-:::
+Check an example here [mcp-ui-example](https://github.com/idosal/mcp-ui/tree/main/examples/server/mcp-ui)
+
 
 ```typescript
 server.uiResource({
@@ -61,13 +56,15 @@ server.uiResource({
 - Can include external resources
 - Full JavaScript capabilities
 
-:::note
+<Tip>
 External URLs are automatically built and configured by the `setupWidgetRoutes` function in `mcp-use/server`. Routes are generated based on your widget definitions without manual setup.
-:::
+</Tip>
 
 ### 2. Raw HTML Resources
 
 Inline HTML content rendered directly:
+
+Check an example here [mcp-ui-example](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-ui/index.ts#L38)
 
 ```typescript
 server.uiResource({
@@ -140,6 +137,8 @@ server.uiResource({
 
 JavaScript-driven dynamic interfaces:
 
+Check an example here [mcp-ui-example](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-ui/index.ts#L136)
+
 ```typescript
 server.uiResource({
   type: 'remoteDom',
@@ -211,22 +210,11 @@ server.uiResource({
 ```
 my-mcp-server/
 ├── resources/
-│   ├── dashboard.tsx
 │   ├── kanban-board.tsx
-│   └── data-table.tsx
 ├── src/
-│   └── server.ts
-└── dist/
-    └── resources/
-        └── mcp-use/
-            └── widgets/
-                ├── dashboard/
-                │   └── index.html
-                ├── kanban-board/
-                │   └── index.html
-                └── data-table/
-                    └── index.html
+   └── server.ts
 ```
+
 
 ### Example: Kanban Board Widget
 
@@ -394,346 +382,9 @@ export default function KanbanBoard() {
 }
 ```
 
-## Accessing MCP Tools from Widgets
-
-### Using PostMessage API
-
-Widgets can communicate with the MCP server:
-
-```javascript
-// In your widget
-function callMCPTool(toolName, params) {
-  return new Promise((resolve, reject) => {
-    const messageId = Math.random().toString(36)
-
-    // Listen for response
-    const handler = (event) => {
-      if (event.data.id === messageId) {
-        window.removeEventListener('message', handler)
-        if (event.data.error) {
-          reject(event.data.error)
-        } else {
-          resolve(event.data.result)
-        }
-      }
-    }
-
-    window.addEventListener('message', handler)
-
-    // Send request to parent
-    window.parent.postMessage({
-      type: 'mcp-tool-call',
-      id: messageId,
-      tool: toolName,
-      params: params
-    }, '*')
-  })
-}
-
-// Usage
-async function refreshData() {
-  try {
-    const data = await callMCPTool('get_tasks', {
-      project: 'my-project'
-    })
-    updateUI(data)
-  } catch (error) {
-    console.error('Failed to fetch tasks:', error)
-  }
-}
-```
-
-### Direct API Calls
-
-Widgets can also call server APIs directly:
-
-```javascript
-async function fetchData() {
-  try {
-    const response = await fetch('/api/widget-data', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        widget: 'dashboard',
-        params: { timeRange: '7d' }
-      })
-    })
-
-    const data = await response.json()
-    updateDashboard(data)
-  } catch (error) {
-    console.error('API error:', error)
-  }
-}
-```
-
-## Widget Parameters
-
-### Defining Parameters
-
-```typescript
-server.uiResource({
-  type: 'externalUrl',
-  name: 'data_viewer',
-  widget: 'data-viewer',
-  props: {
-    // String parameter
-    title: {
-      type: 'string',
-      description: 'Widget title',
-      required: false,
-      default: 'Data Viewer'
-    },
-
-    // Number parameter
-    pageSize: {
-      type: 'number',
-      description: 'Items per page',
-      required: false,
-      default: 20
-    },
-
-    // Boolean parameter
-    showFilters: {
-      type: 'boolean',
-      description: 'Show filter controls',
-      required: false,
-      default: true
-    },
-
-    // Object parameter
-    config: {
-      type: 'object',
-      description: 'Widget configuration',
-      required: false
-    },
-
-    // Array parameter
-    data: {
-      type: 'array',
-      description: 'Initial data',
-      required: true
-    }
-  }
-})
-```
-
-### Accessing Parameters in Widgets
-
-```javascript
-// Parse URL parameters
-const params = new URLSearchParams(window.location.search)
-
-// Simple parameters
-const title = params.get('title') || 'Default Title'
-const pageSize = parseInt(params.get('pageSize') || '20')
-const showFilters = params.get('showFilters') === 'true'
-
-// Complex parameters (JSON)
-let config = {}
-let data = []
-
-try {
-  const configParam = params.get('config')
-  if (configParam) {
-    config = JSON.parse(configParam)
-  }
-
-  const dataParam = params.get('data')
-  if (dataParam) {
-    data = JSON.parse(dataParam)
-  }
-} catch (e) {
-  console.error('Failed to parse parameters:', e)
-}
-```
-
-## Development Workflow
-
-### 1. Setup Development Environment
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-### 2. Create Widget Component
-
-```tsx
-// resources/my-widget.tsx
-import React from 'react'
-
-export default function MyWidget() {
-  return (
-    <div>
-      <h1>My Widget</h1>
-      {/* Widget implementation */}
-    </div>
-  )
-}
-```
-
-### 3. Register Widget in Server
-
-```typescript
-// src/server.ts
-server.uiResource({
-  type: 'externalUrl',
-  name: 'my-widget',
-  widget: 'my-widget',
-  title: 'My Widget',
-  description: 'Custom widget implementation'
-})
-```
-
-### 4. Test with Inspector
-
-The widget will be available at:
-- Widget URL: `http://localhost:3000/mcp-use/widgets/my-widget`
-- Inspector: `http://localhost:3000/inspector`
-
-## Best Practices
-
-### 1. Performance Optimization
-
-```javascript
-// Debounce expensive operations
-function debounce(func, wait) {
-  let timeout
-  return function(...args) {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => func.apply(this, args), wait)
-  }
-}
-
-const handleSearch = debounce((query) => {
-  searchData(query)
-}, 300)
-```
-
-### 2. Error Handling
-
-```javascript
-// Graceful error handling
-try {
-  const data = await fetchData()
-  renderWidget(data)
-} catch (error) {
-  console.error('Widget error:', error)
-  renderErrorState('Failed to load widget data')
-}
-```
-
-### 3. Responsive Design
-
-```css
-/* Mobile-first responsive design */
-.widget-container {
-  padding: 10px;
-}
-
-@media (min-width: 768px) {
-  .widget-container {
-    padding: 20px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .widget-container {
-    padding: 30px;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-}
-```
-
-### 4. State Management
-
-```javascript
-// Use React hooks for state
-const [state, setState] = useState(initialState)
-const [loading, setLoading] = useState(false)
-const [error, setError] = useState(null)
-
-// Or use a state management library
-import { create } from 'zustand'
-
-const useStore = create((set) => ({
-  tasks: [],
-  addTask: (task) => set((state) => ({
-    tasks: [...state.tasks, task]
-  })),
-  updateTask: (id, updates) => set((state) => ({
-    tasks: state.tasks.map(task =>
-      task.id === id ? { ...task, ...updates } : task
-    )
-  }))
-}))
-```
-
-## Security Considerations
-
-### Content Security Policy
-
-```typescript
-// Configure CSP for widgets
-server.use(helmet.contentSecurityPolicy({
-  directives: {
-    defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "'unsafe-inline'"],
-    styleSrc: ["'self'", "'unsafe-inline'"],
-    imgSrc: ["'self'", "data:", "https:"],
-    connectSrc: ["'self'"],
-    frameSrc: ["'self'"]
-  }
-}))
-```
-
-### Input Sanitization
-
-```javascript
-// Always sanitize user input
-function sanitizeHTML(str) {
-  const temp = document.createElement('div')
-  temp.textContent = str
-  return temp.innerHTML
-}
-
-// Use when displaying user content
-element.innerHTML = sanitizeHTML(userInput)
-```
-
-## Troubleshooting
-
-### Widget Not Loading
-
-1. Check server is running: `http://localhost:3000/health`
-2. Verify widget registration in server
-3. Check browser console for errors
-4. Ensure correct widget name in URL
-
-### Parameters Not Working
-
-1. Check parameter encoding in URL
-2. Verify parameter parsing in widget
-3. Check for JSON parsing errors
-4. Validate parameter types match definition
-
-### Styling Issues
-
-1. Check CSS file is imported
-2. Verify CSS specificity
-3. Check for conflicting styles
-4. Test in different browsers
 
 ## Next Steps
 
-- [Apps SDK Resources](./apps-sdk-resources) - OpenAI Apps SDK integration
 - [UI Widgets](./ui-widgets) - General widget guide
 - [Templates](./templates) - Project templates overview
 - [Examples](./examples) - Complete implementations

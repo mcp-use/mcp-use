@@ -14,16 +14,25 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { Context } from "hono";
 
 /**
- * AsyncLocalStorage instance for storing Hono request context
+ * Request context data stored in AsyncLocalStorage
+ */
+interface RequestContextData {
+  honoContext: Context;
+  sessionId?: string;
+}
+
+/**
+ * AsyncLocalStorage instance for storing request context
  * Each async operation chain maintains its own isolated context
  */
-const requestContextStorage = new AsyncLocalStorage<Context>();
+const requestContextStorage = new AsyncLocalStorage<RequestContextData>();
 
 /**
  * Execute a function with a request context stored in AsyncLocalStorage
  *
  * @param context - Hono Context object to store
  * @param fn - Function to execute within this context
+ * @param sessionId - Optional session ID to store with the context
  * @returns Promise resolving to the function's return value
  *
  * @example
@@ -39,9 +48,10 @@ const requestContextStorage = new AsyncLocalStorage<Context>();
  */
 export async function runWithContext<T>(
   context: Context,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  sessionId?: string
 ): Promise<T> {
-  return requestContextStorage.run(context, fn);
+  return requestContextStorage.run({ honoContext: context, sessionId }, fn);
 }
 
 /**
@@ -60,7 +70,16 @@ export async function runWithContext<T>(
  * ```
  */
 export function getRequestContext(): Context | undefined {
-  return requestContextStorage.getStore();
+  return requestContextStorage.getStore()?.honoContext;
+}
+
+/**
+ * Get the current session ID from AsyncLocalStorage
+ *
+ * @returns The session ID for the current async operation, or undefined if not in a request context
+ */
+export function getSessionId(): string | undefined {
+  return requestContextStorage.getStore()?.sessionId;
 }
 
 /**

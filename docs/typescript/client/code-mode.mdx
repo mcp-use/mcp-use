@@ -1,20 +1,42 @@
 ---
 title: "Code Mode"
-description: "Using MCP tools via JavaScript/TypeScript code execution"
+description: "Enable AI agents to write code for tool interactions"
 icon: "code"
 tag: "New"
 ---
 
-Code Execution Mode allows agents to interact with MCP tools by writing and executing JavaScript/TypeScript code instead of calling tools individually. This approach can significantly improve efficiency for complex tasks, data processing, and multi-step workflows.
+Code Mode enables AI agents to interact with MCP tools by writing and executing JavaScript/TypeScript code instead of making individual tool calls. This dramatically improves efficiency for complex tasks, data processing, and multi-step workflows.
 
-Based on [Anthropic's research on code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp), this feature enables agents to process data more efficiently and reduce context usage.
+## Why Code Mode?
 
-<Note>
-  Code Execution Mode runs code in sandboxed environments. The default VM
-  executor provides basic isolation, while the E2B executor provides strong
-  cloud-based isolation. Choose the appropriate executor based on your security
-  requirements.
-</Note>
+Based on [Anthropic's research on code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp), code mode provides:
+
+- **Better efficiency**: Batch multiple operations in a single code execution
+- **Reduced context**: Less back-and-forth between agent and tools
+- **Complex logic**: Enable sophisticated data processing and transformations
+- **Natural workflow**: Agents write code the way developers do
+
+<Warning>
+**Security Considerations**: Code Mode executes user-generated code. Always use appropriate sandboxing:
+- **VM Executor**: Basic local sandboxing for trusted environments
+- **E2B Executor**: Strong cloud-based isolation for production use
+</Warning>
+
+## Execution Modes
+
+### VM Executor (Default)
+
+Local execution with basic sandboxing. Good for:
+- Development and testing
+- Trusted environments
+- Fast local execution
+
+### E2B Executor (Recommended for Production)
+
+Cloud-based sandboxing with strong isolation. Best for:
+- Production deployments
+- Untrusted code execution
+- Enhanced security requirements
 
 ## Quick Start
 

@@ -12,7 +12,7 @@
  */
 
 import {
-  createMCPServer,
+  MCPServer,
   oauthSupabaseProvider,
   error,
   object,
@@ -28,7 +28,8 @@ if (!SUPABASE_ANON_KEY) {
 }
 
 // Create MCP server with OAuth auto-configured from environment variables!
-const server = createMCPServer("supabase-oauth-example", {
+const server = new MCPServer({
+  name: "supabase-oauth-example",
   version: "1.0.0",
   description: "MCP server with Supabase OAuth authentication",
   // 🎉 Zero-config! OAuth is fully configured via MCP_USE_OAUTH_* environment variables

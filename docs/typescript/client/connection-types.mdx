@@ -1,23 +1,41 @@
 ---
 title: "Connection Types"
-description: "Understanding the different connection types for MCP servers"
+description: "Understanding STDIO, HTTP, and WebSocket connections"
 icon: "cable"
 ---
 
-# Connection Types for MCP Servers
+MCP servers communicate with clients using different transport protocols. The mcp-use client supports multiple connection types, each optimized for different use cases and deployment scenarios.
 
-MCP servers can communicate with clients using different connection protocols, each with its own advantages and use cases. This guide explains the primary connection types supported by mcp_use:
+## Overview
 
-## Standard Input/Output (STDIO)
+The client supports three primary connection types:
 
-STDIO connections run the MCP server as a child process and communicate through standard input and output streams.
+- **STDIO**: Local process communication via standard input/output
+- **HTTP/SSE**: Remote servers via HTTP with Server-Sent Events
+- **WebSocket**: Bidirectional streaming communication
 
-### Characteristics:
+<Tip>
+The connection type is automatically detected based on your server configuration. You don't need to specify it explicitly - just provide the appropriate parameters (command for STDIO, url for HTTP/WebSocket).
+</Tip>
 
-- **Local Operation**: The server runs as a child process on the same machine
-- **Simplicity**: Easy to set up with minimal configuration
-- **Security**: No network exposure, ideal for sensitive operations
-- **Performance**: Low latency for local operations
+## STDIO (Standard Input/Output)
+
+STDIO connections launch and manage MCP servers as local child processes, communicating through standard input and output streams.
+
+### When to Use STDIO
+
+- **Local development**: Testing servers on your local machine
+- **Security-sensitive operations**: No network exposure required
+- **File system access**: Direct access to local files and resources
+- **Simple deployment**: No need for network configuration
+
+### Characteristics
+
+- Servers run as child processes
+- Communication via stdin/stdout
+- Automatic process lifecycle management
+- Zero network latency
+- No external dependencies
 
 ### Configuration Example:
 
@@ -33,9 +51,23 @@ STDIO connections run the MCP server as a child process and communicate through 
 }
 ```
 
-## HTTP Connections
+## HTTP/SSE (Server-Sent Events)
 
-HTTP connections communicate with MCP servers over standard HTTP/HTTPS protocols.
+HTTP connections communicate with MCP servers over standard HTTP/HTTPS protocols, using Server-Sent Events for real-time updates.
+
+### When to Use HTTP
+
+- **Remote servers**: Connecting to servers hosted elsewhere
+- **Production deployment**: Servers behind load balancers or API gateways
+- **Authentication**: Servers requiring OAuth or API key authentication
+- **Scalability**: Multiple clients connecting to the same server
+
+### Characteristics
+
+- Servers accessible via HTTP(S) endpoints
+- Support for custom headers (authentication, etc.)
+- Compatible with standard web infrastructure
+- Server-Sent Events for notifications
 
 ### Configuration Example:
 
@@ -52,25 +84,56 @@ HTTP connections communicate with MCP servers over standard HTTP/HTTPS protocols
 }
 ```
 
-## Choosing the Right Connection Type
+## Connection Type Selection
 
-The choice of connection type depends on your specific use case:
+The client automatically detects the appropriate connection type based on your configuration:
 
-1. **STDIO**: Best for local development, testing, and enhanced security scenarios where network exposure is a concern
+| Configuration | Connection Type | Use Case |
+|--------------|----------------|----------|
+| `command` + `args` | STDIO | Local process servers |
+| `url: http://...` | HTTP/SSE | Remote HTTP servers |
+| `url: ws://...` | WebSocket | WebSocket servers |
 
-2. **HTTP**: Ideal for stateless operations, simple integrations, and when working with existing HTTP infrastructure
+<Info>
+**Automatic Detection**: You never need to specify the connection type explicitly. The client analyzes your configuration and selects the appropriate transport protocol automatically.
+</Info>
 
-When configuring your mcp_use environment, you can specify the connection type in your configuration file as shown in the examples above.
+## Best Practices
 
-## Using Connection Types
+### For Development
 
-Connection types are automatically inferred from your configuration file based on the parameters provided:
+Use STDIO connections for local development:
+- Faster iteration with direct process control
+- No network configuration needed
+- Easy debugging with process logs
 
-For example:
+### For Production
 
-- If your configuration includes `command` and `args`, a local STDIO connection will be used
-- If your configuration has a `url` starting with `http://` or `https://`, an HTTP connection will be used
+Use HTTP connections for production deployments:
+- Better scalability and load distribution
+- Support for authentication and authorization
+- Compatible with existing infrastructure
+- Easier monitoring and logging
 
-This automatic inference simplifies the configuration process and ensures the appropriate connection type is used without requiring explicit specification.
+### Security Considerations
 
-For more details on connection configuration, see the [Configuration Guide](/typescript/getting-started/configuration).
+- **STDIO**: Most secure, no network exposure
+- **HTTP**: Use HTTPS in production, implement authentication
+- **WebSocket**: Use WSS (WebSocket Secure) for encrypted connections
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Client Configuration" icon="cog" href="/typescript/client/client-configuration">
+    Learn about all configuration options
+  </Card>
+  <Card title="Multi-Server Setup" icon="network" href="/typescript/client/multi-server-setup">
+    Connect to multiple servers simultaneously
+  </Card>
+  <Card title="Authentication" icon="shield" href="/typescript/client/authentication">
+    Secure your connections with OAuth
+  </Card>
+  <Card title="Sandbox Mode" icon="box" href="/typescript/client/sandbox">
+    Secure execution environment for code
+  </Card>
+</CardGroup>

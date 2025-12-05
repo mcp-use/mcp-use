@@ -1047,7 +1047,11 @@ export class MCPAgent {
       // Convert messages to format expected by LangChain agent
       const langchainHistory: BaseMessage[] = [];
       for (const msg of historyToUse) {
-        if (this._isHumanMessageLike(msg) || this._isAIMessageLike(msg)) {
+        if (
+          this._isHumanMessageLike(msg) ||
+          this._isAIMessageLike(msg) ||
+          this._isToolMessageLike(msg)
+        ) {
           langchainHistory.push(msg);
         }
       }
@@ -1240,9 +1244,11 @@ export class MCPAgent {
 
       // 4. Update conversation history
       if (this.memoryEnabled) {
-        this.addToHistory(new HumanMessage(query));
-        if (finalOutput) {
-          this.addToHistory(new AIMessage(finalOutput));
+        // Store all messages from execution (including tool calls and tool outputs)
+        // Extract messages from current execution (skip the messages that were already in history)
+        const newMessages = accumulatedMessages.slice(langchainHistory.length);
+        for (const msg of newMessages) {
+          this.addToHistory(msg);
         }
       }
 
@@ -1832,7 +1838,9 @@ export class MCPAgent {
           chunkCount++;
 
           // Print the chunk for debugging
-          logger.info(`Chunk ${chunkCount}: ${JSON.stringify(chunk, null, 2)}`);
+          logger.debug(
+            `Chunk ${chunkCount}: ${JSON.stringify(chunk, null, 2)}`
+          );
 
           // Handle different chunk types
           if (typeof chunk === "string") {
@@ -1855,7 +1863,9 @@ export class MCPAgent {
           }
 
           if (chunkCount % 10 === 0) {
-            logger.info(`🔄 Structured output streaming: ${chunkCount} chunks`);
+            logger.debug(
+              `🔄 Structured output streaming: ${chunkCount} chunks`
+            );
           }
         }
 

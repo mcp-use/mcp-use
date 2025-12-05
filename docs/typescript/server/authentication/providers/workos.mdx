@@ -1,0 +1,549 @@
+---
+title: "WorkOS Provider"
+description: "Configure WorkOS OAuth"
+icon: "); -webkit-mask-image: url('/images/workos.svg'); mask-image: url('/images/workos.svg');/*"
+---
+
+## Setup
+
+### 1. Create WorkOS Account
+
+1. Sign up at [WorkOS Dashboard](https://dashboard.workos.com/)
+2. Create a new project or select existing one
+3. Note your **API Key** and **Client ID**
+
+### 2. Configure OAuth
+
+1. Navigate to **Configuration** → **Redirects**
+2. Add your redirect URIs:
+   ```bash
+   http://localhost:3000/callback // for testing
+   https://yourdomain.com/callback // for production
+   ```
+
+### 3. Set Up SSO Connections
+
+For enterprise SSO, configure directory connections:
+
+1. Go to **Directory Sync** or **SSO** in dashboard
+2. Create a connection for your organization
+3. Configure with SAML, OIDC, or directory provider (Okta, Azure AD, Google Workspace, etc.)
+
+## Configuration
+
+### Basic Configuration
+
+```typescript
+import { McpServer, workos } from 'mcp-use/server'
+
+const server = new McpServer({
+  name: 'my-server',
+  version: '1.0.0',
+  oauth: workos({
+    subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
+    // Optional: for WorkOS API calls
+    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
+    // Optional: for pre-registered OAuth client
+    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
+  })
+})
+
+await server.listen(3000)
+```
+
+### Environment Variables
+
+```bash
+# .env
+MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-subdomain  # Required
+MCP_USE_OAUTH_WORKOS_API_KEY=sk_live_...       # Optional
+MCP_USE_OAUTH_WORKOS_CLIENT_ID=client_...      # Optional
+```
+
+### Full Configuration Options
+
+```typescript
+const server = new McpServer({
+  oauth: workos({
+    // Required
+    subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
+    
+    // Optional: WorkOS API key for making API calls
+    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
+    
+    // Optional: Pre-registered OAuth client ID
+    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
+    
+    // JWT verification (recommended for production)
+    verifyJwt: process.env.NODE_ENV === 'production',
+    
+    // Custom user info extraction
+    getUserInfo: (payload) => ({
+      userId: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      organizationId: payload.org_id,
+      roles: payload.roles || [],
+    })
+  })
+})
+```
+
+## OAuth Mode
+
+WorkOS supports **Dynamic Client Registration (DCR)** where MCP clients register themselves automatically:
+
+```typescript
+const server = new McpServer({
+  oauth: workos({
+    subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
+    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY, // Optional, for API calls
+  })
+})
+```
+
+Alternatively, use a **pre-registered OAuth client**:
+
+```typescript
+const server = new McpServer({
+  oauth: workos({
+    subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
+    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID!, // Pre-registered client
+    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
+  })
+})
+```
+
+## Enterprise SSO
+
+### Organization-Specific Login
+
+Direct users to their organization's SSO:
+
+```typescript
+// Client-side
+const authUrl = new URL('https://api.workos.com/sso/authorize')
+authUrl.searchParams.set('client_id', clientId)
+authUrl.searchParams.set('redirect_uri', redirectUri)
+authUrl.searchParams.set('response_type', 'code')
+authUrl.searchParams.set('organization', 'org_123') // Specific organization
+authUrl.searchParams.set('state', state)
+
+window.location.href = authUrl.toString()
+```
+
+Server configuration:
+```typescript
+const server = new McpServer({
+  oauth: workos({
+    subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
+    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
+    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
+  })
+})
+```
+
+### Connection-Specific Login
+
+Direct users to a specific SSO connection:
+
+```typescript
+// Client-side
+authUrl.searchParams.set('connection', 'conn_123') // Specific connection
+```
+
+## User Information
+
+### Standard Claims
+
+WorkOS provides standard OIDC claims:
+
+```typescript
+server.tool({
+  name: 'get-profile',
+  cb: async (params, context) => {
+    return json({
+      userId: context.auth.userId,      // sub claim
+      email: context.auth.email,        // email
+      name: context.auth.name,          // name
+      firstName: context.auth.given_name,
+      lastName: context.auth.family_name,
+      organizationId: context.auth.org_id
+    })
+  }
+})
+```
+
+### Organization Information
+
+Access organization context:
+
+```typescript
+server.tool({
+  name: 'get-org-data',
+  cb: async (params, context) => {
+    const orgId = context.auth.org_id
+    
+    if (!orgId) {
+      return error('No organization context')
+    }
+    
+    // Fetch organization-specific data
+    const data = await db.data.findMany({
+      where: { organizationId: orgId }
+    })
+    
+    return json({ data })
+  }
+})
+```
+
+### Custom User Info Extraction
+
+```typescript
+const server = new McpServer({
+  oauth: workos({
+    subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
+    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
+    
+    getUserInfo: (payload) => ({
+      userId: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      firstName: payload.given_name,
+      lastName: payload.family_name,
+      organizationId: payload.org_id,
+      organizationName: payload.org_name,
+      roles: payload.roles || [],
+      idpId: payload.idp_id,
+      connectionId: payload.connection_id,
+    })
+  })
+})
+```
+
+## Directory Sync
+
+WorkOS Directory Sync provides user and group information from identity providers.
+
+### Access Directory Data
+
+```typescript
+import { WorkOS } from '@workos-inc/node'
+
+const workos = new WorkOS(process.env.MCP_USE_OAUTH_WORKOS_API_KEY!)
+
+server.tool({
+  name: 'get-team-members',
+  description: 'Get team members from directory',
+  cb: async (params, context) => {
+    const orgId = context.auth.org_id
+    
+    // Get directory users
+    const { data: users } = await workos.directorySync.listUsers({
+      directory: orgId
+    })
+    
+    return json({ users })
+  }
+})
+
+server.tool({
+  name: 'get-user-groups',
+  description: 'Get user groups from directory',
+  cb: async (params, context) => {
+    const userId = context.auth.userId
+    
+    // Get user groups
+    const { data: groups } = await workos.directorySync.listGroups({
+      user: userId
+    })
+    
+    return json({ groups })
+  }
+})
+```
+
+## Role-Based Access Control
+
+### Using Directory Groups
+
+Map directory groups to application roles:
+
+```typescript
+const GROUP_TO_ROLE_MAP = {
+  'Engineering': 'developer',
+  'Management': 'admin',
+  'Sales': 'viewer'
+}
+
+server.tool({
+  name: 'protected-action',
+  cb: async (params, context) => {
+    const orgId = context.auth.org_id
+    const userId = context.auth.userId
+    
+    // Get user's directory groups
+    const { data: groups } = await workos.directorySync.listGroups({
+      user: userId
+    })
+    
+    // Map groups to roles
+    const roles = groups
+      .map(g => GROUP_TO_ROLE_MAP[g.name])
+      .filter(Boolean)
+    
+    if (!roles.includes('admin')) {
+      return error('Forbidden: Admin role required')
+    }
+    
+    return text('Action completed')
+  }
+})
+```
+
+### Using Custom Roles
+
+Store roles in your database:
+
+```typescript
+server.tool({
+  name: 'admin-action',
+  cb: async (params, context) => {
+    // Get user roles from database
+    const user = await db.users.findUnique({
+      where: { id: context.auth.userId },
+      select: { roles: true }
+    })
+    
+    if (!user?.roles.includes('admin')) {
+      return error('Forbidden: Admin role required')
+    }
+    
+    return text('Admin action completed')
+  }
+})
+```
+
+## Multi-Tenant Applications
+
+Handle multiple organizations:
+
+```typescript
+server.tool({
+  name: 'get-documents',
+  description: 'Get organization documents',
+  cb: async (params, context) => {
+    const orgId = context.auth.org_id
+    
+    if (!orgId) {
+      return error('Organization context required')
+    }
+    
+    // Filter by organization
+    const documents = await db.documents.findMany({
+      where: { organizationId: orgId }
+    })
+    
+    return json({ documents })
+  }
+})
+
+server.tool({
+  name: 'create-document',
+  schema: z.object({
+    title: z.string(),
+    content: z.string()
+  }),
+  cb: async ({ title, content }, context) => {
+    const orgId = context.auth.org_id
+    
+    const doc = await db.documents.create({
+      data: {
+        title,
+        content,
+        organizationId: orgId,
+        createdBy: context.auth.userId
+      }
+    })
+    
+    return text(`Document created: ${doc.id}`)
+  }
+})
+```
+
+## Testing
+
+### Get Test Token
+
+Use WorkOS Dashboard to get a test token:
+
+1. Go to Dashboard → **API Keys**
+2. Use test API key for development
+3. Create a test user in Directory Sync
+
+### Using curl
+
+```bash
+# Get access token
+curl https://api.workos.com/sso/token \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_id": "client_...",
+    "client_secret": "sk_test_...",
+    "grant_type": "authorization_code",
+    "code": "auth_code_..."
+  }'
+
+# Use access token
+TOKEN="access_token_..."
+
+curl http://localhost:3000/mcp/messages \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"method":"tools/list"}'
+```
+
+### MCP Inspector
+
+```typescript
+server.listen(3000)
+console.log('🔍 Inspector: http://localhost:3000/inspector')
+```
+
+## Common Issues
+
+### "Organization Required" Error
+
+**Problem:** SSO requires organization parameter
+
+**Solution:** Provide organization in auth URL:
+```typescript
+authUrl.searchParams.set('organization', 'org_123')
+```
+
+Or configure in server:
+```typescript
+oauth: workos({
+  organization: process.env.WORKOS_ORGANIZATION
+})
+```
+
+### "Invalid Client" Error
+
+**Problem:** Client ID doesn't match or is invalid
+
+**Solution:** Verify client ID matches WorkOS Dashboard exactly:
+```bash
+# Check environment variable
+echo $MCP_USE_OAUTH_WORKOS_CLIENT_ID
+# Should start with: client_
+```
+
+### Directory Sync Not Working
+
+**Problem:** Can't access directory data
+
+**Solution:**
+1. Ensure Directory Sync is enabled for organization
+2. Verify API key has correct permissions
+3. Check connection status in WorkOS Dashboard
+
+## Complete Example
+
+```typescript
+import { McpServer, workos, text, error, json } from 'mcp-use/server'
+import { WorkOS } from '@workos-inc/node'
+import { z } from 'zod'
+
+const workosClient = new WorkOS(process.env.MCP_USE_OAUTH_WORKOS_API_KEY!)
+
+const server = new McpServer({
+  name: 'workos-example',
+  version: '1.0.0',
+  oauth: workos({
+    subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
+    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY!,
+    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
+    
+    getUserInfo: (payload) => ({
+      userId: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      organizationId: payload.org_id,
+      organizationName: payload.org_name,
+    })
+  })
+})
+
+server.tool({
+  name: 'get-profile',
+  description: 'Get user profile with organization',
+  cb: async (params, context) => {
+    return json({
+      user: {
+        id: context.auth.userId,
+        email: context.auth.email,
+        name: context.auth.name
+      },
+      organization: {
+        id: context.auth.organizationId,
+        name: context.auth.organizationName
+      }
+    })
+  }
+})
+
+server.tool({
+  name: 'get-team',
+  description: 'Get team members from directory',
+  cb: async (params, context) => {
+    const orgId = context.auth.organizationId
+    
+    const { data: users } = await workosClient.directorySync.listUsers({
+      directory: orgId,
+      limit: 100
+    })
+    
+    return json({ teamMembers: users })
+  }
+})
+
+server.tool({
+  name: 'create-org-document',
+  description: 'Create organization document',
+  schema: z.object({
+    title: z.string(),
+    content: z.string()
+  }),
+  cb: async ({ title, content }, context) => {
+    const doc = await db.documents.create({
+      data: {
+        title,
+        content,
+        organizationId: context.auth.organizationId,
+        createdBy: context.auth.userId
+      }
+    })
+    
+    return text(`Document created: ${doc.id}`)
+  }
+})
+
+server.listen(3000)
+console.log('🔒 WorkOS server: http://localhost:3000')
+console.log('🔍 Inspector: http://localhost:3000/inspector')
+```
+
+## Resources
+
+- [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos)
+- [WorkOS Documentation](https://workos.com/docs)
+- [WorkOS SSO Guide](https://workos.com/docs/sso/guide)
+- [Directory Sync](https://workos.com/docs/directory-sync)
+
+## Next Steps
+
+- [User Context](/typescript/server/authentication/user-context) - Access user information
+

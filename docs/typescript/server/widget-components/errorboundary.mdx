@@ -1,10 +1,8 @@
 ---
-title: "ErrorBoundary"
+title: "<ErrorBoundary />"
 description: "Error boundary component for graceful error handling in widgets"
 icon: "bug"
 ---
-
-# ErrorBoundary
 
 The `ErrorBoundary` component catches React errors anywhere in the child component tree, logs those errors, and displays a friendly fallback UI instead of crashing the entire widget.
 
@@ -13,6 +11,10 @@ The `ErrorBoundary` component catches React errors anywhere in the child compone
 ```typescript
 import { ErrorBoundary } from 'mcp-use/react';
 ```
+
+<Tip>
+  You can use `<McpUseProvider />` to automatically include the `<ErrorBoundary />` component.
+</Tip>
 
 ## Props
 
@@ -67,30 +69,6 @@ Errors are automatically logged to the console with:
 
 This helps with debugging during development.
 
-## Best Practices
-
-1. **Use McpUseProvider**: For most cases, use `McpUseProvider` which includes `ErrorBoundary` automatically
-2. **Wrap at widget level**: Wrap your entire widget, not individual components
-3. **Handle errors gracefully**: Consider what fallback UI makes sense for your widget
-
-## Example: Custom Error Handling
-
-If you need custom error handling, you can wrap specific parts:
-
-```tsx
-import { ErrorBoundary } from 'mcp-use/react';
-
-function MyWidget() {
-  return (
-    <div>
-      <ErrorBoundary>
-        <RiskyComponent />
-      </ErrorBoundary>
-      <SafeComponent />
-    </div>
-  );
-}
-```
 
 ## Related Components
 

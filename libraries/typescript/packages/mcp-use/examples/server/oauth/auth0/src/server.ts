@@ -11,17 +11,13 @@
  */
 
 // @ts-nocheck
-import {
-  createMCPServer,
-  oauthAuth0Provider,
-  error,
-  object,
-} from "mcp-use/server";
+import { MCPServer, oauthAuth0Provider, error, object } from "mcp-use/server";
 
 declare const process: { env: Record<string, string> };
 
 // Create MCP server with OAuth auto-configured from environment variables!
-const server = createMCPServer("auth0-oauth-example", {
+const server = new MCPServer({
+  name: "auth0-oauth-example",
   version: "1.0.0",
   description: "MCP server with Auth0 OAuth authentication",
   // 🎉 Zero-config! OAuth is fully configured via MCP_USE_OAUTH_* environment variables

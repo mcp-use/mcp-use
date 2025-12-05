@@ -4,15 +4,13 @@ description: "Install mcp_use and get your development environment ready"
 icon: "download"
 ---
 
-## Installing mcp-use
-
 <Info>
   **Prerequisites**:
   - Install [Node.js](https://nodejs.org/) (version 18 or higher)
   - npm, pnpm, or yarn package manager
 </Info>
 
-### Option 1: Create an MCP Server (for Building Servers)
+### MCP Servers
 
 The fastest way to scaffold a new MCP server project is to use `create-mcp-use-app`:
 
@@ -44,10 +42,54 @@ This command will:
 
 <Tip>
 Check out [UI Widgets](/typescript/server/ui-widgets) with support to MCP-UI and OpenAI Apps SDK for ChatGPT.
-
 </Tip>
 
-### Option 2: Install as a Library (for MCP Agents)
+You can also install mcp-use as a library and build your own MCP server from scratch.
+<CodeGroup>
+```bash npm
+npm install mcp-use
+```
+
+```bash pnpm
+pnpm add mcp-use
+```
+
+```bash yarn
+yarn add mcp-use
+```
+</CodeGroup>
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  description: "My custom MCP server",
+});
+
+// Define a tool
+server.tool("get_weather", {
+  description: "Get weather for a city",
+  parameters: z.object({
+    city: z.string().describe("City name"),
+  }),
+  execute: async ({ city }) => {
+    return { temperature: 72, condition: "sunny", city };
+  },
+});
+
+// Start server with auto-inspector
+server.listen(3000);
+// 🎉 Inspector at http://localhost:3000/inspector
+```
+
+Check out the examples [here](https://github.com/mcp-use/mcp-use/tree/main/examples/server).
+
+Visit the [MCP Server](/typescript/server) documentation for more details.
+
+### MCP Agent & Client
 
 Install mcp_use using your preferred package manager:
 
@@ -65,245 +107,20 @@ yarn add mcp-use
 ```
 </CodeGroup>
 
-Then install your preferred LangChain provider:
-
-<CodeGroup>
-```bash npm
-npm install @langchain/openai dotenv
-```
-
-```bash pnpm
-pnpm add @langchain/openai dotenv
-```
-
-```bash yarn
-yarn add @langchain/openai dotenv
-```
-</CodeGroup>
-
-
-## Setting Up Your First Project
-
-<Steps>
-  <Step title="Create your MCP server or install the library">
-    Use `create-mcp-use-app` for MCP servers or `npm install` for agents (see above).
-  </Step>
-  <Step title="Configure your LLM provider">
-    Choose and install your preferred LangChain provider.
-  </Step>
-  <Step title="Set up environment variables">
-    Create a `.env` file for your API keys:
-
-    ```bash .env
-    OPENAI_API_KEY=your_openai_key_here
-    ANTHROPIC_API_KEY=your_anthropic_key_here
-    GROQ_API_KEY=your_groq_key_here
-    GOOGLE_API_KEY=your_google_key_here
-    ```
-  </Step>
-  <Step title="Verify installation">
-    Test your installation with a simple script:
-
-    <CodeGroup>
-```typescript TypeScript
-import { MCPAgent, MCPClient } from 'mcp-use'
-console.log('mcp-use installed successfully!')
-```
-</CodeGroup>
-  </Step>
-</Steps>
-
-## Development Installation
-If you want to contribute or use the latest features, install from source:
-
-<CodeGroup>
-```bash TypeScript (Git Clone)
-git clone https://github.com/mcp-use/mcp-use.git
-cd mcp-use/libraries/typescript
-pnpm install
-pnpm run build
-```
-</CodeGroup>
-
-## Installing MCP Servers
-
-mcp-use connects to MCP servers that provide the actual tools.
-<Tip>
-  Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) repository for a comprehensive list of available servers.
-</Tip>
-
-## Environment Setup
-
-### Environment Variables
-
-Create a `.env` file in your project root:
-
-```bash .env
-# LLM Provider Keys
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GROQ_API_KEY=gsk_...
-GOOGLE_API_KEY=AI...
-
-# Optional: Logging level
-LOG_LEVEL=INFO
-
-# Optional: MCP server paths
-MCP_SERVER_PATH=/path/to/mcp/servers
-```
-
-Load environment variables in your scripts:
-
-<CodeGroup>
-```typescript TypeScript
-import { config } from 'dotenv'
-
-config()
-
-// Your API keys are now available as environment variables
-const openaiKey = process.env.OPENAI_API_KEY
-```
-
-```typescript TypeScript
-import { config } from 'dotenv'
-
-config()
-
-// Your API keys are now available as environment variables
-const openaiKey = process.env.OPENAI_API_KEY
-```
-</CodeGroup>
-
-## Verification
-
-Verify your installation works correctly:
-
-<CodeGroup>
-```typescript TypeScript
-import { config } from 'dotenv'
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
-
-async function verifyInstallation() {
-    config()
-
-    // Simple configuration for testing
-    const configuration = {
-        mcpServers: {
-            test: {
-                command: 'echo',
-                args: ['Hello from MCP!']
-            }
-        }
-    }
-
-    try {
-        const client = new MCPClient(configuration)
-        console.log('✅ MCPClient created successfully')
-
-        const llm = new ChatOpenAI({ model: 'gpt-3.5-turbo' })
-        console.log('✅ LLM initialized successfully')
-
-        const agent = new MCPAgent({ llm, client })
-        console.log('✅ MCPAgent created successfully')
-
-        console.log('\n🎉 Installation verified! You\'re ready to use mcp_use.')
-
-        // Clean up
-        await client.closeAllSessions()
-
-    } catch (error) {
-        console.error('❌ Verification failed:', error)
-        console.error('Please check your installation and API keys.')
-    }
-}
-
-verifyInstallation().catch(console.error)
-```
-
-```typescript TypeScript
-import { config } from 'dotenv'
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
-
-async function verifyInstallation() {
-    config()
-
-    // Simple configuration for testing
-    const configuration = {
-        mcpServers: {
-            test: {
-                command: 'echo',
-                args: ['Hello from MCP!']
-            }
-        }
-    }
-
-    try {
-        const client = new MCPClient(configuration)
-        console.log('✅ MCPClient created successfully')
-
-        const llm = new ChatOpenAI({ model: 'gpt-3.5-turbo' })
-        console.log('✅ LLM initialized successfully')
-
-        const agent = new MCPAgent({ llm, client })
-        console.log('✅ MCPAgent created successfully')
-
-        console.log('\n🎉 Installation verified! You\'re ready to use mcp_use.')
-
-        // Clean up
-        await client.closeAllSessions()
-
-    } catch (error) {
-        console.error('❌ Verification failed:', error)
-        console.error('Please check your installation and API keys.')
-    }
-}
-
-verifyInstallation().catch(console.error)
-```
-</CodeGroup>
-
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Quick Start" icon="rocket" href="/typescript/getting-started/quickstart">
-    Follow our quickstart guide to build your first agent
+<CardGroup cols={3}>
+  <Card title="Agent" icon="brain" href="/typescript/agent">
+    Build AI Agents with tool calling capabilities through MCP connections
   </Card>
-  <Card title="Configuration" icon="gear" href="/typescript/getting-started/configuration">
-    Learn how to configure MCP servers
+  <Card title="Client" icon="router" href="/typescript/client">
+    A full featured MCP Client implementation for TypeScript
   </Card>
-  <Card title="LLM Integration" icon="brain" href="/typescript/agent/llm-integration">
-    Explore different LLM providers and their setup
-  </Card>
-  <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
-    Browse real-world examples and use cases
+  <Card title="Server" icon="server" href="/typescript/server">
+    The MCP Server framework implementation for TypeScript, with Apps SDK and MCP-UI support
   </Card>
 </CardGroup>
 
-## Troubleshooting
-
-<AccordionGroup>
-  <Accordion title="Import errors or module not found">
-    Make sure mcp_use is installed and accessible:
-    ```bash
-    npm list mcp-use
-    ```
-  </Accordion>
-  <Accordion title="API key errors">
-    Verify your `.env` file is in the correct location and your API keys are valid:
-    ```bash
-    cat .env  # Check file contents
-    ```
-  </Accordion>
-  <Accordion title="MCP server not found">
-    Ensure your MCP servers are properly installed and accessible:
-    ```bash
-    which npx  # For Node.js-based servers
-    ```
-  </Accordion>
-</AccordionGroup>
-
-<Warning>
-  **Tool Calling Required**: Only models with tool calling capabilities can be used with mcp_use. Make sure your chosen model supports function calling or tool use.
-</Warning>
+<Tip>
+**Need Help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or [Github](https://github.com/mcp-use/mcp-use) communities.
+</Tip>

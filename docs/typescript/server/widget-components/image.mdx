@@ -1,10 +1,9 @@
 ---
-title: "Image"
+title: "<Image />"
 description: "Image component that handles both data URLs and public file paths for widgets"
 icon: "image"
 ---
 
-# Image
 
 The `Image` component automatically handles image sources, supporting both data URLs and public file paths. It automatically prefixes relative paths with the MCP public URL, making it easy to use images from your `public/` folder.
 
@@ -65,37 +64,6 @@ When using images from your `public/` folder, use paths relative to the public r
 
 The component automatically resolves these to the correct URL using `window.__mcpPublicUrl`.
 
-## Development vs Production
-
-- **Development**: Images are served from the dev server's `/mcp-use/public/` route
-- **Production**: Images are served from the built `dist/public/` folder
-
-The component handles both cases automatically.
-
-## Fallback Behavior
-
-If `window.__mcpPublicUrl` is not available (e.g., in standalone mode), the component falls back to using the source path as-is. This ensures the component works in all environments.
-
-## Example: Product Widget
-
-```tsx
-import { Image } from 'mcp-use/react';
-import { useWidget } from 'mcp-use/react';
-
-function ProductWidget() {
-  const { props } = useWidget<{ productId: string; imagePath: string }>();
-  
-  return (
-    <div>
-      <Image 
-        src={props.imagePath} 
-        alt={`Product ${props.productId}`}
-        className="w-full h-64 object-cover rounded-lg"
-      />
-    </div>
-  );
-}
-```
 
 ## Related Utilities
 
