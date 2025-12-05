@@ -122,14 +122,9 @@ server.tool(
   {
     name: "get-current-weather",
     description: "Get current weather for a city",
-    inputs: {
-      city: {
-        type: "string",
-        description: "The city name",
-      },
-    },
+    schema: z.object({ city: z.string() }),
   },
-  async ({ city }: { city: string }) => {
+  async ({ city }) => {
     // Fetch weather data (mock for demo)
     const cityLower = city.toLowerCase();
     const weather = weatherData[cityLower] || {
