@@ -3,6 +3,7 @@ import type {
   CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { ResourceAnnotations } from "./common.js";
+import type { ToolAnnotations } from "./tool.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import type { McpContext } from "./context.js";
@@ -320,6 +321,10 @@ interface BaseUIResourceDefinition {
   annotations?: ResourceAnnotations;
   /** Encoding for the resource content (defaults to 'text') */
   encoding?: UIEncoding;
+  /** Control automatic tool registration (defaults to true) */
+  exposeAsTool?: boolean;
+  /** Tool annotations when registered as a tool */
+  toolAnnotations?: ToolAnnotations;
 
   _meta?: Record<string, unknown>;
 }

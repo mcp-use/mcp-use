@@ -195,10 +195,12 @@ export function uiResourceRegistration<T extends UIResourceServer>(
   }
 
   // Check if tool should be registered (defaults to true for backward compatibility)
+  // Check direct property first (from programmatic API), then fall back to _meta (from file-based widgets)
   const widgetMetadata = definition._meta?.["mcp-use/widget"] as
     | { exposeAsTool?: boolean }
     | undefined;
-  const exposeAsTool = widgetMetadata?.exposeAsTool ?? true;
+  const exposeAsTool =
+    definition.exposeAsTool ?? widgetMetadata?.exposeAsTool ?? true;
 
   // Register the tool only if exposeAsTool is not false
   // Note: Resources and resource templates are always registered regardless of exposeAsTool
@@ -232,6 +234,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         title: definition.title,
         description: definition.description,
         inputs: convertPropsToInputs(definition.props),
+        annotations: definition.toolAnnotations,
         _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
       },
       async (params: Record<string, unknown>) => {
