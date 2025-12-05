@@ -10,6 +10,15 @@ import type { SessionData } from "../sessions/index.js";
 import { startIdleCleanup } from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
 import { generateUUID } from "../utils/runtime.js";
+import type { McpServer as OfficialMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+/**
+ * Interface for McpServer instance required by mountMcp
+ */
+export interface McpServerInstance {
+  getServerForSession(): OfficialMcpServer;
+  cleanupSessionSubscriptions?(sessionId: string): void;
+}
 
 /**
  * Mount MCP server endpoints at /mcp and /sse
@@ -19,7 +28,7 @@ import { generateUUID } from "../utils/runtime.js";
  */
 export async function mountMcp(
   app: HonoType,
-  mcpServerInstance: any, // The McpServer instance with getServerForSession() method
+  mcpServerInstance: McpServerInstance,
   sessions: Map<string, SessionData>,
   config: ServerConfig,
   isProductionMode: boolean
@@ -30,6 +39,7 @@ export async function mountMcp(
   const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
   // Map to store transports by session ID (following official Hono example from PR #1209)
+  // Use 'any' to support both HTTP and stdio transports
   const transports = new Map<string, any>();
 
   // Start idle cleanup interval if configured
@@ -68,7 +78,6 @@ export async function mountMcp(
       sessionIdGenerator: () => generateUUID(),
 
       onsessioninitialized: (sid: string) => {
-        console.log(`[MCP] Session initialized: ${sid}`);
         transports.set(sid, transport);
         sessions.set(sid, {
           transport,
@@ -80,7 +89,6 @@ export async function mountMcp(
       },
 
       onsessionclosed: (sid: string) => {
-        console.log(`[MCP] Session closed: ${sid}`);
         transports.delete(sid);
         sessions.delete(sid);
         // Clean up resource subscriptions for this session
@@ -99,10 +107,6 @@ export async function mountMcp(
   for (const endpoint of ["/mcp", "/sse"]) {
     app.on(["GET", "POST", "DELETE"], endpoint, handleRequest);
   }
-
-  console.log(
-    `[MCP] Server mounted at /mcp and /sse (using FetchStreamableHTTPServerTransport - Web Standard APIs)`
-  );
 
   return { mcpMounted: true, idleCleanupInterval };
 }
