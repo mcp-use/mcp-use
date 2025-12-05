@@ -77,6 +77,20 @@ export async function mountMcp(
           context: c,
           honoContext: c,
         });
+
+        // Capture client capabilities after initialization completes
+        // The server.oninitialized callback fires after the client sends the initialized notification
+        server.server.oninitialized = () => {
+          const clientCapabilities = server.server.getClientCapabilities();
+          if (clientCapabilities && sessions.has(sid)) {
+            const session = sessions.get(sid)!;
+            session.clientCapabilities = clientCapabilities;
+            console.log(
+              `[MCP] Captured client capabilities for session ${sid}:`,
+              Object.keys(clientCapabilities)
+            );
+          }
+        };
       },
 
       onsessionclosed: (sid: string) => {

@@ -108,13 +108,22 @@ interface ReadResourceCallbackBivariant<HasOAuth extends boolean> {
 
 /**
  * Helper interface for bivariant parameter checking on resource template callbacks.
+ *
+ * Supports multiple callback signatures:
+ * - `async () => ...` - No parameters
+ * - `async (uri) => ...` - Just URI
+ * - `async (uri, params) => ...` - URI and parameters
+ * - `async (uri, params, ctx) => ...` - URI, parameters, and context
+ *
+ * The implementation checks callback.length to determine which signature to use.
+ *
  * @internal
  */
 interface ReadResourceTemplateCallbackBivariant<HasOAuth extends boolean> {
   bivarianceHack(
-    uri: URL,
-    params: Record<string, any>,
-    ctx: EnhancedResourceContext<HasOAuth>
+    uri?: URL,
+    params?: Record<string, any>,
+    ctx?: EnhancedResourceContext<HasOAuth>
   ): Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
 }
 
@@ -171,6 +180,54 @@ export interface ResourceTemplateDefinitionWithoutCallback {
   resourceTemplate: ResourceTemplateConfig;
   title?: string;
   description?: string;
+  annotations?: ResourceAnnotations;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Flat resource template definition with readCallback (new API)
+ *
+ * Simplified structure where uriTemplate is directly on the definition object
+ * instead of nested in a resourceTemplate property.
+ */
+export interface FlatResourceTemplateDefinition<
+  HasOAuth extends boolean = false,
+> {
+  /** Unique identifier for the template */
+  name: string;
+  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  uriTemplate: string;
+  /** Optional title for the resource */
+  title?: string;
+  /** Optional description of the resource */
+  description?: string;
+  /** MIME type of the resource content */
+  mimeType?: string;
+  /** Optional annotations for the resource */
+  annotations?: ResourceAnnotations;
+  /** Async callback function that returns the resource content */
+  readCallback: ReadResourceTemplateCallback<HasOAuth>;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Flat resource template definition without readCallback (new API with separate callback parameter)
+ *
+ * Simplified structure where uriTemplate is directly on the definition object
+ * instead of nested in a resourceTemplate property.
+ */
+export interface FlatResourceTemplateDefinitionWithoutCallback {
+  /** Unique identifier for the template */
+  name: string;
+  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  uriTemplate: string;
+  /** Optional title for the resource */
+  title?: string;
+  /** Optional description of the resource */
+  description?: string;
+  /** MIME type of the resource content */
+  mimeType?: string;
+  /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   _meta?: Record<string, unknown>;
 }

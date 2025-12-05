@@ -30,6 +30,8 @@ export {
   ResourceTemplateConfig,
   ResourceTemplateDefinition,
   ResourceTemplateDefinitionWithoutCallback,
+  FlatResourceTemplateDefinition,
+  FlatResourceTemplateDefinitionWithoutCallback,
   ResourceDefinition,
   ResourceDefinitionWithoutCallback,
   EnhancedResourceContext,
@@ -59,6 +61,7 @@ export {
   InferToolInput,
   InferToolOutput,
   EnhancedToolContext,
+  ToolAnnotations,
 } from "./tool.js";
 
 // Prompt types
@@ -68,4 +71,6 @@ export {
   PromptDefinitionWithoutCallback,
   InferPromptInput,
   EnhancedPromptContext,
+  GetPromptResult,
+  PromptResult,
 } from "./prompt.js";

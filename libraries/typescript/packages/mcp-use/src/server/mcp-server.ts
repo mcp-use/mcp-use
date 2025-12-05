@@ -281,6 +281,17 @@ export class McpServer {
             extraSendNotification
           );
 
+        // Find the sessionId by looking up the session in the sessions map
+        let sessionId: string | undefined;
+        if (session) {
+          for (const [id, s] of this.sessions.entries()) {
+            if (s === session) {
+              sessionId = id;
+              break;
+            }
+          }
+        }
+
         // Use the session server's native createMessage and elicitInput
         // These are already properly connected to the transport
         const createMessageWithLogging = async (params: any, options?: any) => {
@@ -310,7 +321,10 @@ export class McpServer {
           newServer.server.elicitInput.bind(newServer.server),
           progressToken,
           sendNotification,
-          session?.logLevel
+          session?.logLevel,
+          session?.clientCapabilities,
+          sessionId,
+          this.sessions
         );
 
         const executeCallback = async () => {
@@ -413,26 +427,39 @@ export class McpServer {
     // Resource Templates
     for (const [_name, recipe] of this.registrationRecipes.resourceTemplates) {
       const { config, handler } = recipe;
+
+      // Detect structure type: flat (uriTemplate on config) vs nested (resourceTemplate.uriTemplate)
+      const isFlatStructure = "uriTemplate" in config;
+
+      // Extract uriTemplate and metadata based on structure
+      const uriTemplate = isFlatStructure
+        ? (config as any).uriTemplate
+        : config.resourceTemplate.uriTemplate;
+
+      const mimeType = isFlatStructure
+        ? (config as any).mimeType
+        : config.resourceTemplate.mimeType;
+
+      const templateDescription = isFlatStructure
+        ? undefined
+        : config.resourceTemplate.description;
+
       // Create ResourceTemplate instance from SDK
-      const template = new ResourceTemplate(
-        config.resourceTemplate.uriTemplate,
-        {
-          list: undefined,
-          complete: undefined,
-        }
-      );
+      const template = new ResourceTemplate(uriTemplate, {
+        list: undefined,
+        complete: undefined,
+      });
 
       // Create metadata object
       const metadata: any = {};
       if (config.title) {
         metadata.title = config.title;
       }
-      if (config.description || config.resourceTemplate.description) {
-        metadata.description =
-          config.description || config.resourceTemplate.description;
+      if (config.description || templateDescription) {
+        metadata.description = config.description || templateDescription;
       }
-      if (config.resourceTemplate.mimeType) {
-        metadata.mimeType = config.resourceTemplate.mimeType;
+      if (mimeType) {
+        metadata.mimeType = mimeType;
       }
       if (config.annotations) {
         metadata.annotations = config.annotations;
@@ -444,10 +471,7 @@ export class McpServer {
         metadata,
         async (uri: URL) => {
           // Parse URI parameters from the template
-          const params = this.parseTemplateUri(
-            config.resourceTemplate.uriTemplate,
-            uri.toString()
-          );
+          const params = this.parseTemplateUri(uriTemplate, uri.toString());
           const result = await handler(uri, params);
 
           // If it's already a ReadResourceResult, return as-is

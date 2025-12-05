@@ -99,4 +99,8 @@ export type {
   WidgetConfig,
   WidgetManifest,
   WidgetProps,
+  // MCP SDK type re-exports
+  ToolAnnotations,
+  GetPromptResult,
+  PromptResult,
 } from "./types/index.js";

@@ -14,11 +14,11 @@ graph LR
 ```
 
 
-| Section | Description |
-|---------|-------------|
-| [Agent](#mcp-agent) | An AI Agent with tool calling capabilities through MCP connections |
-| [Client](#mcp-client) | A full featured MCP Client implementation for TypeScript |
-| [Server](#mcp-server) | The MCP Server framework implementation for TypeScript, with Apps SDK and MCP-UI support |
+| Section | Description | |
+|---------|-------------|---------|
+| [Agent](#mcp-agent) | An AI Agent with tool calling capabilities through MCP connections | [Examples](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/agent) |
+| [Client](#mcp-client) | A full featured MCP Client implementation for TypeScript with node, browser and react support | [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples/client) |
+| [Server](#mcp-server) | The MCP Server framework implementation for TypeScript, with Apps SDK and MCP-UI support | [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples/server) |
 
 
 ## MCP Agent
@@ -76,7 +76,7 @@ await client.closeAllSessions()
 ```
 
 <Tip>
-For multi-server setups, tool restrictions, and advanced configuration options, see the [Configuration Overview](/typescript/getting-started/configuration).
+For multi-server setups, tool restrictions, and advanced configuration options, see the [Agent Configuration](/typescript/agent/agent-configuration) and [Client Configuration](/typescript/client/client-configuration) guides.
 </Tip>
 
 For a complete overview of the mcp-use MCP Agent, see the [MCP Agent](/typescript/agent) documentation.
@@ -233,7 +233,7 @@ For detailed instructions, see the [Deploy Your Server](/typescript/server/deplo
 ## Next Steps
 
 <CardGroup cols={3}>
-  <Card title="Configuration" icon="cog" href="/typescript/getting-started/configuration">
+  <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
     Configure your Agent and connected MCP servers
   </Card>
   <Card title="UI Widgets" icon="app-window-mac" href="/typescript/server/ui-widgets">

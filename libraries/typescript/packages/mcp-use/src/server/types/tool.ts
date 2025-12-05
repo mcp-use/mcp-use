@@ -5,6 +5,9 @@ import type { McpContext } from "./context.js";
 import type { z } from "zod";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 
+// Re-export MCP SDK types for convenience
+export type { ToolAnnotations };
+
 /**
  * Enhanced Tool Context that combines ToolContext methods with Hono request context.
  *

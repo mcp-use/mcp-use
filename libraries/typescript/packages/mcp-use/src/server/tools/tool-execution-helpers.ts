@@ -511,7 +511,104 @@ function createLogMethod(
 }
 
 /**
- * Create enhanced context with sample, elicit, reportProgress, and log methods
+ * Create client capability checker object
+ */
+function createClientCapabilityChecker(
+  clientCapabilities: Record<string, any> | undefined
+) {
+  const caps = clientCapabilities || {};
+
+  return {
+    can(capability: string): boolean {
+      return capability in caps;
+    },
+
+    capabilities(): Record<string, any> {
+      return { ...caps }; // Return a copy to prevent mutation
+    },
+  };
+}
+
+/**
+ * Create sendNotification method for current session
+ */
+function createSendNotificationMethod(
+  sessionId: string | undefined,
+  sessions: Map<string, SessionData> | undefined
+):
+  | ((method: string, params?: Record<string, unknown>) => Promise<void>)
+  | undefined {
+  if (!sessionId || !sessions) {
+    return undefined;
+  }
+
+  return async (method: string, params?: Record<string, unknown>) => {
+    const session = sessions.get(sessionId);
+    if (!session?.sendNotification) {
+      console.warn(
+        `[MCP] Cannot send notification to session ${sessionId} - no sendNotification function`
+      );
+      return;
+    }
+
+    try {
+      await session.sendNotification({
+        method,
+        params: params || {},
+      });
+    } catch (error) {
+      console.error(
+        `[MCP] Error sending notification to session ${sessionId}:`,
+        error
+      );
+    }
+  };
+}
+
+/**
+ * Create sendNotificationToSession method for any session
+ */
+function createSendNotificationToSessionMethod(
+  sessions: Map<string, SessionData> | undefined
+):
+  | ((
+      sessionId: string,
+      method: string,
+      params?: Record<string, unknown>
+    ) => Promise<boolean>)
+  | undefined {
+  if (!sessions) {
+    return undefined;
+  }
+
+  return async (
+    sessionId: string,
+    method: string,
+    params?: Record<string, unknown>
+  ): Promise<boolean> => {
+    const session = sessions.get(sessionId);
+    if (!session?.sendNotification) {
+      return false;
+    }
+
+    try {
+      await session.sendNotification({
+        method,
+        params: params || {},
+      });
+      return true;
+    } catch (error) {
+      console.error(
+        `[MCP] Error sending notification to session ${sessionId}:`,
+        error
+      );
+      return false;
+    }
+  };
+}
+
+/**
+ * Create enhanced context with sample, elicit, reportProgress, log, client, session, and notification methods
  */
 export function createEnhancedContext(
   baseContext: Context | undefined,
@@ -527,7 +624,10 @@ export function createEnhancedContext(
         params: Record<string, any>;
       }) => Promise<void>)
     | undefined,
-  minLogLevel?: string
+  minLogLevel?: string,
+  clientCapabilities?: Record<string, any>,
+  sessionId?: string,
+  sessions?: Map<string, SessionData>
 ): any {
   const enhancedContext = baseContext ? Object.create(baseContext) : {};
 
@@ -545,6 +645,30 @@ export function createEnhancedContext(
   );
 
   enhancedContext.log = createLogMethod(sendNotification, minLogLevel);
+
+  enhancedContext.client = createClientCapabilityChecker(clientCapabilities);
+
+  // Add session information
+  if (sessionId) {
+    enhancedContext.session = {
+      sessionId,
+    };
+  }
+
+  // Add notification methods
+  const sendNotificationMethod = createSendNotificationMethod(
+    sessionId,
+    sessions
+  );
+  if (sendNotificationMethod) {
+    enhancedContext.sendNotification = sendNotificationMethod;
+  }
+
+  const sendNotificationToSessionMethod =
+    createSendNotificationToSessionMethod(sessions);
+  if (sendNotificationToSessionMethod) {
+    enhancedContext.sendNotificationToSession = sendNotificationToSessionMethod;
+  }
 
   return enhancedContext;
 }

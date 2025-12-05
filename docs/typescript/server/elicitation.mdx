@@ -53,19 +53,15 @@ server.tool({
 });
 ```
 
-## Form Mode - Structured Data Collection
+## Form Mode
 
 Form mode allows you to collect structured data from users with Zod schema validation. **Use this for non-sensitive information only.**
-
-### Simplified API
 
 ```typescript
 const result = await ctx.elicit(message, zodSchema);
 // Mode is automatically inferred as "form" from the Zod schema parameter
 // result.data is automatically typed based on the Zod schema
 ```
-
-### Zod Schema Support
 
 Use Zod schemas to define the structure and validation rules for user input. Benefits:
 
@@ -76,7 +72,7 @@ Use Zod schemas to define the structure and validation rules for user input. Ben
 - **Defaults**: Use `.default()` for default values
 - **Optional fields**: Use `.optional()` for optional properties
 
-## Server-Side Validation
+### Server-Side Validation
 
 <Note>
 **Automatic Validation with mcp-use**: When using the mcp-use server library's simplified API with Zod schemas (`ctx.elicit(message, zodSchema)`), the server automatically validates the returned data against your schema. This is a convenience feature provided by mcp-use. Invalid data is rejected with clear error messages before reaching your tool logic.
@@ -91,7 +87,7 @@ The validation flow:
 5. **Server Validation**: Server validates data against the original Zod schema
 6. **Type Safety**: Validated data is returned with correct TypeScript types
 
-### What Gets Validated
+#### What Gets Validated
 
 The server validates:
 
@@ -103,7 +99,7 @@ The server validates:
 - **Enums**: Values must be from allowed options
 - **Custom Validators**: Any Zod refinements and transforms
 
-### Validation Error Handling
+#### Validation Error Handling
 
 When validation fails, the error is caught and can be handled:
 
@@ -135,7 +131,7 @@ server.tool({
 });
 ```
 
-### Validation Examples
+#### Validation Examples
 
 **Valid Data**:
 ```typescript
@@ -167,7 +163,7 @@ server.tool({
 // ❌ Fails: "Invalid input: expected number, received string"
 ```
 
-### Default Values
+#### Default Values
 
 Fields with `.default()` are automatically filled if missing:
 
@@ -184,7 +180,7 @@ const result = await ctx.elicit(
 // result.data will be: { theme: 'light', notifications: true }
 ```
 
-### Example: Simple Contact Form
+#### Example: Simple Contact Form
 
 ```typescript
 import { z } from 'zod';
@@ -217,43 +213,7 @@ server.tool({
   });
 ```
 
-### Example: With Enums and Arrays
-
-```typescript
-import { z } from 'zod';
-import { text, error } from 'mcp-use/server';
-
-server.tool({
-  name: 'create-task',
-  description: 'Create a task with user input',
-}, async (params, ctx) => {
-    const result = await ctx.elicit(
-      'Enter task details',
-      z.object({
-        title: z.string().min(1).describe('Task title'),
-        priority: z
-          .enum(['low', 'medium', 'high', 'urgent'])
-          .default('medium')
-          .describe('Priority level'),
-        tags: z
-          .array(z.enum(['bug', 'feature', 'docs', 'refactor']))
-          .optional()
-          .describe('Task tags'),
-      })
-    );
-
-    // result.data is typed as:
-    // { title: string, priority: 'low' | 'medium' | 'high' | 'urgent', tags?: ('bug' | 'feature' | 'docs' | 'refactor')[] }
-    if (result.action === 'accept') {
-      const task = result.data;
-      return text(`Created ${task.priority} priority task: ${task.title}`);
-    }
-
-    return text('Task creation cancelled');
-  });
-```
-
-## URL Mode - External Navigation
+## URL Mode
 
 URL mode directs users to external URLs for sensitive operations. **This mode MUST be used for:**
 
@@ -266,8 +226,6 @@ URL mode directs users to external URLs for sensitive operations. **This mode MU
 <Warning>
 **Security Requirement**: Never use form mode for sensitive data. URL mode ensures credentials and sensitive information do not pass through the MCP client, maintaining proper security boundaries per the MCP specification.
 </Warning>
-
-### Simplified API
 
 ```typescript
 const result = await ctx.elicit(message, urlString);
@@ -307,30 +265,6 @@ server.tool({
   });
 ```
 
-### Example: Service Connection
-
-```typescript
-import { text } from 'mcp-use/server';
-server.tool({
-  name: 'setup-api-credentials',
-  description: 'Set up API credentials for a service',
-}, async ({ serviceName }, ctx) => {
-    // Generate a secure credential collection URL
-    const credentialUrl = `https://your-server.com/setup/${serviceName}?session=${generateSecureToken()}`;
-
-    // Simplified URL mode API
-    const result = await ctx.elicit(
-      `Configure your ${serviceName} API credentials securely`,
-      credentialUrl
-    );
-
-    if (result.action === 'accept') {
-      return text(`✅ ${serviceName} credentials configured successfully`);
-    }
-
-    return text(`${serviceName} setup not completed`);
-  });
-```
 
 ## Response Handling
 
@@ -350,8 +284,6 @@ interface ElicitResult {
 | **accept** | User provided valid input or completed the action | Check `result.data` for form mode input |
 | **decline** | User explicitly declined the request | User chose not to provide information |
 | **cancel** | User cancelled without making a choice | User dismissed or closed the request |
-
-### Handling All Response Types
 
 Always handle all three response actions appropriately:
 
@@ -456,106 +388,6 @@ server.tool({
       return error(`Error: ${error instanceof Error ? error.message : String(error)}. Please ensure your client supports elicitation.`);
     }
   });
-```
-
-## Security Best Practices
-
-<Warning>
-**Critical Security Rules**:
-
-1. **Never collect sensitive data via form mode** - Always use URL mode for passwords, API keys, tokens, or personal information
-2. **Validate on the server** - Don't trust client-side validation alone
-3. **Use HTTPS for URL mode** - All URL mode elicitations should use secure HTTPS URLs
-4. **Bind to user identity** - Associate elicitation requests with authenticated user sessions
-5. **Verify completion** - For URL mode, verify the action was completed through a secure callback
-</Warning>
-
-### DO NOT Do This ❌
-
-```typescript
-// WRONG: Collecting sensitive data via form mode
-server.tool({
-  name: 'bad-auth-example',
-}, async (params, ctx) => {
-    // ❌ NEVER DO THIS!
-    const result = await ctx.elicit('Enter your credentials', z.object({ password: z.string(), apiKey: z.string() }));
-    // This violates MCP security requirements
-  });
-```
-
-### DO This Instead ✅
-
-```typescript
-// CORRECT: Using URL mode for sensitive data
-server.tool({
-  name: 'good-auth-example',
-}, async (params, ctx) => {
-    // ✅ Correct approach
-    const result = await ctx.elicit('Please authenticate securely', 'https://your-secure-server.com/auth');
-
-    if (result.action === 'accept') {
-      // Verify completion server-side
-      // Tokens are stored on your server, never pass through client
-    }
-  });
-```
-
-## Complete Example Server
-
-Here's a complete example showing both form and URL mode with the simplified API:
-
-```typescript
-import { createMCPServer } from 'mcp-use/server';
-import { z } from 'zod';
-import { text } from 'mcp-use/server';
-
-const server = createMCPServer('elicitation-demo', {
-  version: '1.0.0',
-  description: 'Server demonstrating elicitation patterns',
-});
-
-// Form mode: Collect preferences with Zod schema
-server.tool({
-  name: 'set-preferences',
-  description: 'Configure user preferences',
-}, async (params, ctx) => {
-    // Simplified API: ctx.elicit(message, zodSchema)
-    const result = await ctx.elicit(
-      'Configure your preferences',
-      z.object({
-        theme: z.enum(['light', 'dark', 'auto']).default('auto').describe('UI theme'),
-        notifications: z.boolean().default(true).describe('Enable notifications'),
-        language: z.enum(['en', 'es', 'fr', 'de']).default('en').describe('Language'),
-      })
-    );
-
-    // result.data is typed: { theme: 'light' | 'dark' | 'auto', notifications: boolean, language: 'en' | 'es' | 'fr' | 'de' }
-    if (result.action === 'accept') {
-      const prefs = result.data;
-      return text(`Preferences saved: ${prefs.theme} theme, notifications ${prefs.notifications ? 'enabled' : 'disabled'}`);
-    }
-
-    return text('Preferences not updated');
-  });
-
-// URL mode: OAuth authorization
-server.tool({
-  name: 'authorize-service',
-  description: 'Authorize external service',
-}, async ({ service }, ctx) => {
-    const authUrl = generateOAuthUrl(service);
-
-    // Simplified API: ctx.elicit(message, url)
-    const result = await ctx.elicit(`Authorize ${service} to access your data`, authUrl);
-
-    if (result.action === 'accept') {
-      return text(`✅ ${service} authorized successfully`);
-    }
-
-    return text(`Authorization for ${service} not completed`);
-  });
-
-await server.listen(3000);
 ```
 
 ## Working Example

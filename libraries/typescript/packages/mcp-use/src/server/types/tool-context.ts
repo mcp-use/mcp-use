@@ -303,4 +303,131 @@ export interface ToolContext {
     message: string,
     logger?: string
   ) => Promise<void>;
+
+  /**
+   * Client capability interface
+   * Provides access to client capabilities advertised during initialization
+   */
+  client: {
+    /**
+     * Check if client supports a specific capability
+     * @param capability - Capability name (e.g., "sampling", "elicitation", "roots")
+     * @returns true if client advertised this capability, false otherwise
+     *
+     * @example
+     * ```typescript
+     * if (ctx.client.can('sampling')) {
+     *   const result = await ctx.sample('Analyze this');
+     * } else {
+     *   // Fallback to non-sampling logic
+     * }
+     * ```
+     */
+    can(capability: string): boolean;
+
+    /**
+     * Get all client capabilities
+     * @returns Object containing all capabilities advertised by the client, or empty object if none
+     *
+     * @example
+     * ```typescript
+     * const caps = ctx.client.capabilities();
+     * console.log(caps);
+     * // { sampling: {}, roots: { listChanged: true }, elicitation: { form: {}, url: {} } }
+     * ```
+     */
+    capabilities(): Record<string, any>;
+  };
+
+  /**
+   * Session information for the current tool execution
+   * Provides access to the session ID and other metadata
+   */
+  session: {
+    /**
+     * Unique identifier for the current session
+     * Can be used with ctx.sendNotificationToSession() to target this session from other tools
+     */
+    sessionId: string;
+  };
+
+  /**
+   * Send a notification to the current session (the client that called this tool)
+   *
+   * This is a convenience method that sends a notification only to the session
+   * that initiated the current tool execution. For broadcasting to all sessions,
+   * use server.sendNotification() instead.
+   *
+   * @param method - The notification method name (e.g., "custom/my-notification")
+   * @param params - Optional parameters to include in the notification
+   * @returns Promise that resolves when the notification is sent
+   *
+   * @example
+   * ```typescript
+   * server.tool({
+   *   name: 'process_data',
+   *   cb: async (params, ctx) => {
+   *     // Send progress update to the current session
+   *     await ctx.sendNotification('custom/processing', {
+   *       status: 'started',
+   *       timestamp: Date.now()
+   *     });
+   *
+   *     // Do work...
+   *
+   *     await ctx.sendNotification('custom/processing', {
+   *       status: 'completed'
+   *     });
+   *
+   *     return { content: [{ type: 'text', text: 'Done' }] };
+   *   }
+   * });
+   * ```
+   */
+  sendNotification: (
+    method: string,
+    params?: Record<string, unknown>
+  ) => Promise<void>;
+
+  /**
+   * Send a notification to a specific session by ID
+   *
+   * This allows sending notifications to any connected session, not just the
+   * current one. Useful for cross-session communication or coordinating between
+   * multiple clients.
+   *
+   * @param sessionId - The target session ID (can get from ctx.session.sessionId or server.getActiveSessions())
+   * @param method - The notification method name (e.g., "custom/my-notification")
+   * @param params - Optional parameters to include in the notification
+   * @returns Promise<boolean> - true if notification was sent, false if session not found
+   *
+   * @example
+   * ```typescript
+   * server.tool({
+   *   name: 'notify_others',
+   *   cb: async (params, ctx) => {
+   *     const mySessionId = ctx.session.sessionId;
+   *
+   *     // Notify another specific session
+   *     const success = await ctx.sendNotificationToSession(
+   *       params.targetSessionId,
+   *       'custom/message',
+   *       { from: mySessionId, text: 'Hello!' }
+   *     );
+   *
+   *     return {
+   *       content: [{
+   *         type: 'text',
+   *         text: success ? 'Notification sent' : 'Session not found'
+   *       }]
+   *     };
+   *   }
+   * });
+   * ```
+   */
+  sendNotificationToSession: (
+    sessionId: string,
+    method: string,
+    params?: Record<string, unknown>
+  ) => Promise<boolean>;
 }

@@ -159,7 +159,7 @@ export function toolRegistration<
       const extraSendNotification = extra?.sendNotification;
 
       // Find session context and extract metadata
-      const { requestContext, progressToken, sendNotification } =
+      const { requestContext, session, progressToken, sendNotification } =
         findSessionContext(
           this.sessions,
           initialRequestContext,
@@ -173,7 +173,9 @@ export function toolRegistration<
         this.createMessage.bind(this),
         this.server.server.elicitInput.bind(this.server.server),
         progressToken,
-        sendNotification
+        sendNotification,
+        session?.logLevel,
+        session?.clientCapabilities
       );
 
       // Execute callback

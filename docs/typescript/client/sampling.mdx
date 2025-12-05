@@ -1,14 +1,29 @@
 ---
 title: "Sampling"
-description: "Enable LLM sampling capabilities for MCP tools"
-icon: "pipette"
+description: "Enable tools to request LLM completions"
+icon: "sparkles"
 ---
 
-# Sampling
+Sampling enables MCP tools to request LLM completions during their execution. This powerful feature allows servers to dynamically generate content, make decisions, or process data using AI models while executing tool calls.
 
 <Info>
-Sampling allows MCP tools to request LLM completions during their execution.
+**What is Sampling?** Sampling is when an MCP server calls back to the client requesting an LLM completion. This enables tools to leverage AI capabilities without directly integrating with LLM providers.
 </Info>
+
+## Understanding Sampling
+
+Sampling creates a callback mechanism where:
+
+1. Client calls a tool on the server
+2. Server requests an LLM completion from the client
+3. Client executes the LLM call and returns results
+4. Server continues execution with the LLM response
+
+This pattern is useful for:
+- Content generation within tools
+- Dynamic decision making
+- Data transformation and analysis
+- Interactive workflows
 
 ## Configuration
 

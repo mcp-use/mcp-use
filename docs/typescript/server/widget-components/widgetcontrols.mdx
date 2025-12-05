@@ -1,12 +1,14 @@
 ---
-title: "WidgetControls"
+title: "<WidgetControls />"
 description: "Wrapper component that adds control buttons for widget debugging and view controls"
 icon: "settings"
 ---
 
-# WidgetControls
+The `<WidgetControls />` component adds control buttons for widget debugging and view controls (fullscreen/pip). It combines debug button and view controls with shared hover logic, making it easy to add development and testing capabilities to your widgets.
 
-The `WidgetControls` component adds control buttons for widget debugging and view controls (fullscreen/pip). It combines debug button and view controls with shared hover logic, making it easy to add development and testing capabilities to your widgets.
+<Tip>
+  You can use `<McpUseProvider viewControls />` to automatically include the `<WidgetControls />` component.
+</Tip>
 
 ## Import
 
@@ -92,20 +94,6 @@ Control buttons can be positioned in 8 different locations:
 </WidgetControls>
 ```
 
-## Hover Behavior
-
-All control buttons share the same hover logic:
-
-- **Hidden by default**: Controls are invisible (`opacity-0`) until hovered
-- **Show on hover**: Controls become visible (`opacity-100`) when hovering over the widget
-- **Smooth transition**: 200ms transition for smooth appearance/disappearance
-
-This keeps the UI clean while making controls easily accessible when needed.
-
-## Dev Mode Detection
-
-When running in the inspector's dev widget proxy (`/inspector/api/dev-widget/`), the controls are automatically hidden since the inspector provides its own debugging interface. This prevents duplicate controls.
-
 ## Usage with McpUseProvider
 
 `WidgetControls` is automatically included when using `McpUseProvider` with the `debugger` or `viewControls` props:
@@ -119,21 +107,6 @@ import { McpUseProvider } from 'mcp-use/react';
 ```
 
 This is the recommended approach as it also includes other necessary providers.
-
-## Standalone Usage
-
-You can also use `WidgetControls` standalone if you're managing other providers yourself:
-
-```tsx
-import { WidgetControls } from 'mcp-use/react';
-import { ThemeProvider } from 'mcp-use/react';
-
-<ThemeProvider>
-  <WidgetControls debugger viewControls position="top-left">
-    <MyWidget />
-  </WidgetControls>
-</ThemeProvider>
-```
 
 ## Related Components
 

@@ -1,0 +1,176 @@
+---
+title: "User Context"
+description: "Accessing authenticated user information in your MCP tools"
+icon: "user"
+---
+
+Once OAuth is configured, all tool callbacks receive authenticated user information via the context parameter. This enables you to build personalized, user-aware tools and implement access control patterns.
+
+The authenticated user information is available in the `context.auth` property:
+
+```typescript
+server.tool({
+  name: 'create-document',
+  schema: z.object({
+    title: z.string(),
+    content: z.string()
+  }),
+  cb: async ({ title, content }, context) => {
+    // Access authenticated user
+    const user = context.auth
+    
+    // User info available:
+    console.log('User ID:', user.userId)         // Unique user identifier
+    console.log('Email:', user.email)            // User email
+    console.log('Name:', user.name)              // Display name
+    console.log('Roles:', user.roles)            // User roles
+    console.log('Permissions:', user.permissions) // Permissions
+    
+    // Create document with user context
+    const doc = await db.documents.create({
+      title,
+      content,
+      createdBy: user.userId,
+      createdByName: user.name
+    })
+    
+    return text(`Document created by ${user.name}`)
+  }
+})
+```
+
+## User Info Type
+
+The `context.auth` object contains the following fields:
+
+```typescript
+interface UserInfo {
+  userId: string              // Unique user identifier (from 'sub' claim)
+  email?: string              // User email
+  name?: string               // Full name
+  username?: string           // Username
+  nickname?: string           // Nickname or display name
+  picture?: string            // Profile picture URL
+  roles?: string[]            // User roles
+  permissions?: string[]      // User permissions
+  scopes?: string[]           // OAuth scopes granted
+  
+  // Provider-specific fields
+  [key: string]: any          // Additional claims from provider
+}
+```
+
+### Standard Fields
+
+#### userId (required)
+The unique identifier for the user, extracted from the JWT `sub` claim. Always present and guaranteed to be unique.
+
+```typescript
+const userId = context.auth.userId // "auth0|507f1f77bcf86cd799439011"
+```
+
+#### email
+The user's email address. Available when the `email` scope is granted.
+
+```typescript
+const email = context.auth.email // "user@example.com"
+```
+
+#### name
+The user's full name or display name.
+
+```typescript
+const name = context.auth.name // "John Doe"
+```
+
+#### username
+The user's username, if different from email.
+
+```typescript
+const username = context.auth.username // "johndoe"
+```
+
+#### picture
+URL to the user's profile picture.
+
+```typescript
+const picture = context.auth.picture // "https://avatar.example.com/user.jpg"
+```
+
+### Authorization Fields
+
+#### roles
+Array of role names assigned to the user. Used for role-based access control (RBAC).
+
+```typescript
+const roles = context.auth.roles // ["editor", "reviewer"]
+
+// Check if user has admin role
+if (context.auth.roles?.includes('admin')) {
+  // Allow admin action
+}
+```
+
+#### permissions
+Array of specific permissions granted to the user. More granular than roles.
+
+```typescript
+const permissions = context.auth.permissions 
+// ["documents:read", "documents:write", "users:read"]
+
+// Check for specific permission
+if (context.auth.permissions?.includes('documents:delete')) {
+  // Allow document deletion
+}
+```
+
+#### scopes
+OAuth scopes granted during authentication.
+
+```typescript
+const scopes = context.auth.scopes // ["openid", "profile", "email"]
+
+// Check if user granted email scope
+if (context.auth.scopes?.includes('email')) {
+  // Access email information
+}
+```
+
+
+## Extracting Custom Claims
+
+If you need to extract custom claims differently, use the `getUserInfo` function in your OAuth configuration:
+
+```typescript
+import { McpServer, auth0 } from 'mcp-use/server'
+
+const server = new McpServer({
+  oauth: auth0({
+    domain: 'your-tenant.auth0.com',
+    audience: 'https://your-api.example.com',
+    
+    // Custom user info extraction
+    getUserInfo: (payload) => {
+      return {
+        userId: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        // Extract custom claims
+        organizationId: payload['https://myapp.com/org_id'],
+        roles: payload['https://myapp.com/roles'] || [],
+        permissions: payload.permissions || [],
+        // Include all other claims
+        ...payload
+      }
+    }
+  })
+})
+```
+
+## Next Steps
+
+- [RBAC](/typescript/server/authentication/rbac) - Implement role-based access control
+- [Security](/typescript/server/authentication/security) - Security best practices
+- [Testing](/typescript/server/authentication/testing) - Test with different user contexts
+- [OAuth Providers](/typescript/server/authentication/providers/auth0) - Configure user claims per provider
+

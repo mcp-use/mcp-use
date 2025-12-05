@@ -7,6 +7,11 @@ import type { z } from "zod";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import type { McpContext } from "./context.js";
 
+// Re-export MCP SDK types for convenience
+export type { GetPromptResult };
+// Alias for better naming
+export type { GetPromptResult as PromptResult };
+
 /**
  * Enhanced Prompt Context that provides access to request context.
  *

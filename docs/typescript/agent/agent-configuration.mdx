@@ -1,22 +1,41 @@
 ---
 title: "Agent Configuration"
-description: "Configure MCPAgent behavior and LLM integration"
+description: "Configure your agents and LLM settings"
 icon: "cog"
 ---
 
-# Agent Configuration
+Configure your MCPAgent to customize behavior, set LLM parameters, enable features, and optimize for your specific use case. This guide covers all configuration options available when creating and running agents.
 
 <Info>
-This guide covers MCPAgent configuration options for customizing agent behavior and LLM integration. For client configuration, see the [Client Configuration](/typescript/client/client-configuration) guide.
+**Looking for client configuration?** This guide covers agent-specific configuration. For MCP client and server connection setup, see the [Client Configuration](/typescript/client/client-configuration) guide.
 </Info>
 
-## API Keys
+## Basic Configuration
+
+Create an agent with minimal configuration:
+
+```typescript
+import { MCPAgent } from 'mcp-use/agent'
+import { MCPClient } from 'mcp-use'
+import OpenAI from 'openai'
+
+const client = new MCPClient(config)
+await client.createAllSessions()
+
+const llm = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  model: 'gpt-4'
+})
+```
+
+## API Key Management
 
 <Warning>
-Never hardcode API keys in your source code. Always use environment variables for security.
+**Security First**: Never hardcode API keys in source code. Always use environment variables or secure secret management systems.
 </Warning>
-
-Since agents use LLM providers that require API keys, you need to configure them properly:
 
 <Tabs>
   <Tab title=".env File (Recommended)">
@@ -502,6 +521,104 @@ Control when and how the agent initializes:
 ## Error Handling
 
 Configure how the agent handles errors:
+
+## Common Configuration Patterns
+
+### Development Setup
+
+<CodeGroup>
+```typescript TypeScript
+// Simple development configuration
+import { config } from 'dotenv'
+import { loadConfigFile, MCPAgent, MCPClient } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+
+config()
+
+const configuration = await loadConfigFile('dev-config.json')
+const client = new MCPClient(configuration)
+const agent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o' }),
+    client,
+    maxSteps: 10,
+    verbose: true
+})
+```
+
+```typescript TypeScript
+// Simple development configuration
+import { config } from 'dotenv'
+import { loadConfigFile, MCPAgent, MCPClient } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+
+config()
+
+const configuration = await loadConfigFile('dev-config.json')
+const client = new MCPClient(configuration)
+const agent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o' }),
+    client,
+    maxSteps: 10,
+    verbose: true
+})
+```
+</CodeGroup>
+
+### Production Setup
+
+<CodeGroup>
+```typescript TypeScript
+// Production configuration with restrictions
+const agent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.1 }),
+    client,
+    maxSteps: 30,
+    disallowedTools: ['file_system', 'shell'],
+    useServerManager: true,
+    memoryEnabled: true
+})
+```
+
+```typescript TypeScript
+// Production configuration with restrictions
+const agent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.1 }),
+    client,
+    maxSteps: 30,
+    disallowedTools: ['file_system', 'shell'],
+    useServerManager: true,
+    memoryEnabled: true
+})
+```
+</CodeGroup>
+
+### Multi-Server Setup
+
+<CodeGroup>
+```typescript TypeScript
+// Complex multi-server configuration
+const config = await loadConfigFile('multi-server.json')
+const client = new MCPClient(config)
+const agent = new MCPAgent({
+    llm,
+    client,
+    useServerManager: true,  // Auto-select servers
+    systemPrompt: 'You have access to web browsing, file operations, and API tools.'
+})
+```
+
+```typescript TypeScript
+// Complex multi-server configuration
+const config = await loadConfigFile('multi-server.json')
+const client = new MCPClient(config)
+const agent = new MCPAgent({
+    llm,
+    client,
+    useServerManager: true,  // Auto-select servers
+    systemPrompt: 'You have access to web browsing, file operations, and API tools.'
+})
+```
+</CodeGroup>
 
 ## Best Practices
 
