@@ -108,6 +108,13 @@ export class StdioConnector extends BaseConnector {
       logger.debug(
         `Successfully connected to MCP implementation: ${this.command}`
       );
+
+      // Track connector initialization
+      this.trackConnectorInit({
+        serverCommand: this.command,
+        serverArgs: this.args,
+        publicIdentifier: `${this.command} ${this.args.join(" ")}`,
+      });
     } catch (err) {
       logger.error(`Failed to connect to MCP implementation: ${err}`);
       await this.cleanupResources();

@@ -19,6 +19,7 @@ import { createConnectorFromConfig, loadConfigFile } from "./config.js";
 import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
 import { MCPSession } from "./session.js";
+import { Telemetry } from "./telemetry/index.js";
 
 export type CodeExecutorFunction = (
   code: string,
@@ -144,6 +145,25 @@ export class MCPClient extends BaseMCPClient {
     if (this.codeMode) {
       this._setupCodeModeConnector();
     }
+
+    this._trackClientInit();
+  }
+
+  private _trackClientInit(): void {
+    const servers = Object.keys(this.config.mcpServers ?? {});
+    const hasSamplingCallback = !!this._samplingCallback;
+    const hasElicitationCallback = !!this._elicitationCallback;
+
+    Telemetry.getInstance()
+      .trackMCPClientInit({
+        codeMode: this.codeMode,
+        sandbox: false, // Sandbox not supported in TS yet
+        allCallbacks: hasSamplingCallback && hasElicitationCallback,
+        verify: false, // No verify option in TS client
+        servers,
+        numServers: servers.length,
+      })
+      .catch((e) => logger.debug(`Failed to track MCPClient init: ${e}`));
   }
 
   public static fromDict(

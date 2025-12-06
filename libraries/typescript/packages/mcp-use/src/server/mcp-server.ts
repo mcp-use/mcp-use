@@ -9,6 +9,7 @@ import type {
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
+import { Telemetry } from "../telemetry/index.js";
 
 import { uiResourceRegistration, mountWidgets } from "./widgets/index.js";
 import { mountInspectorUI } from "./inspector/index.js";
@@ -96,7 +97,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     return this.nativeServer;
   }
 
-  private config: ServerConfig;
+  public config: ServerConfig;
   public app: HonoType;
   private mcpMounted = false;
   private inspectorMounted = false;
@@ -116,14 +117,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       | ((c: any, next: any) => Promise<Response | void>)
       | undefined,
   };
-  private oauthProvider?: OAuthProvider;
+  public oauthProvider?: OAuthProvider;
   private oauthMiddleware?: (c: any, next: any) => Promise<Response | void>;
 
   /**
-   * Storage for registration "recipes" that can be replayed on new server instances
+   * Storage for registrations that can be replayed on new server instances
    * Following the official SDK pattern where each session gets its own server instance
+   * @internal Exposed for telemetry purposes
    */
-  private registrationRecipes = {
+  public registrations = {
     tools: new Map<string, { config: ToolDefinition; handler: ToolCallback }>(),
     prompts: new Map<
       string,
@@ -203,7 +205,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     this.oauthProvider = config.oauth;
 
-    // Wrap registration methods to capture recipes for multi-session support
+    // Wrap registration methods to capture registrations for multi-session support
     this.wrapRegistrationMethods();
 
     // Return proxied instance that allows direct access to Hono methods
@@ -211,7 +213,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
-   * Wrap registration methods to capture recipes following official SDK pattern.
+   * Wrap registration methods to capture registrations following official SDK pattern.
    * Each session will get a fresh server instance with all registrations replayed.
    */
   private wrapRegistrationMethods(): void {
@@ -302,7 +304,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
 
       if (actualCallback) {
-        self.registrationRecipes.tools.set(toolDefinition.name, {
+        self.registrations.tools.set(toolDefinition.name, {
           config: toolDefinition as any,
           handler: actualCallback as any,
         });
@@ -318,7 +320,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     ) => {
       const actualCallback = callback || (promptDefinition as any).cb;
       if (actualCallback) {
-        self.registrationRecipes.prompts.set(promptDefinition.name, {
+        self.registrations.prompts.set(promptDefinition.name, {
           config: promptDefinition as any,
           handler: actualCallback as any,
         });
@@ -340,7 +342,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         callback || (resourceDefinition as any).readCallback;
       if (actualCallback) {
         const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
-        self.registrationRecipes.resources.set(resourceKey, {
+        self.registrations.resources.set(resourceKey, {
           config: resourceDefinition as any,
           handler: actualCallback as any,
         });
@@ -359,7 +361,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       const actualCallback =
         callback || (templateDefinition as any).readCallback;
       if (actualCallback) {
-        self.registrationRecipes.resourceTemplates.set(
+        self.registrations.resourceTemplates.set(
           templateDefinition.name,
           {
             config: templateDefinition as any,
@@ -394,8 +396,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     // Replay all registrations on the new server
     // Tools - with context wrapping for ctx.sample(), ctx.elicit()
-    for (const [name, recipe] of this.registrationRecipes.tools) {
-      const { config, handler: actualCallback } = recipe;
+    for (const [name, registration] of this.registrations.tools) {
+      const { config, handler: actualCallback } = registration;
       let inputSchema: Record<string, any>;
       if (config.schema) {
         inputSchema = this.convertZodSchemaToParams(config.schema);
@@ -485,11 +487,31 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           return await (actualCallback as any)(params);
         };
 
-        if (requestContext) {
-          return await runWithContext(requestContext, executeCallback);
-        }
+        const startTime = Date.now();
+        let success = true;
+        let errorType: string | null = null;
 
-        return await executeCallback();
+        try {
+          const result = requestContext
+            ? await runWithContext(requestContext, executeCallback)
+            : await executeCallback();
+          return result;
+        } catch (err) {
+          success = false;
+          errorType = err instanceof Error ? err.name : "unknown_error";
+          throw err;
+        } finally {
+          const executionTimeMs = Date.now() - startTime;
+          Telemetry.getInstance()
+            .trackServerToolCall({
+              toolName: name,
+              lengthInputArgument: JSON.stringify(params).length,
+              success,
+              errorType,
+              executionTimeMs,
+            })
+            .catch((e) => console.debug(`Failed to track tool call: ${e}`));
+        }
       };
 
       newServer.registerTool(
@@ -506,8 +528,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     // Prompts
-    for (const [name, recipe] of this.registrationRecipes.prompts) {
-      const { config, handler } = recipe;
+    for (const [name, registration] of this.registrations.prompts) {
+      const { config, handler } = registration;
 
       // Determine input schema - prefer schema over args
       let argsSchema: Record<string, z.ZodSchema> | undefined;
@@ -525,17 +547,35 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         params: Record<string, unknown>,
         extra?: any
       ) => {
-        const result = await (handler as any)(params, extra);
+        let success = true;
+        let errorType: string | null = null;
 
-        // If it's already a GetPromptResult, return as-is
-        if ("messages" in result && Array.isArray(result.messages)) {
-          return result as any;
+        try {
+          const result = await (handler as any)(params, extra);
+
+          // If it's already a GetPromptResult, return as-is
+          if ("messages" in result && Array.isArray(result.messages)) {
+            return result as any;
+          }
+
+          // Convert CallToolResult to GetPromptResult
+          const { convertToolResultToPromptResult } =
+            await import("./prompts/conversion.js");
+          return convertToolResultToPromptResult(result) as any;
+        } catch (err) {
+          success = false;
+          errorType = err instanceof Error ? err.name : "unknown_error";
+          throw err;
+        } finally {
+          Telemetry.getInstance()
+            .trackServerPromptCall({
+              name,
+              description: config.description ?? null,
+              success,
+              errorType,
+            })
+            .catch((e) => console.debug(`Failed to track prompt call: ${e}`));
         }
-
-        // Convert CallToolResult to GetPromptResult
-        const { convertToolResultToPromptResult } =
-          await import("./prompts/conversion.js");
-        return convertToolResultToPromptResult(result) as any;
       };
 
       newServer.registerPrompt(
@@ -550,20 +590,47 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     // Resources
-    for (const [_key, recipe] of this.registrationRecipes.resources) {
-      const { config, handler } = recipe;
+    for (const [_key, registration] of this.registrations.resources) {
+      const { config, handler } = registration;
       // Wrap handler to support both CallToolResult and ReadResourceResult
       const wrappedHandler = async (extra?: any) => {
-        const result = await (handler as any)(extra);
-        // If it's already a ReadResourceResult, return as-is
-        if ("contents" in result && Array.isArray(result.contents)) {
-          return result as any;
+        let success = true;
+        let errorType: string | null = null;
+        let contents: any[] = [];
+
+        try {
+          const result = await (handler as any)(extra);
+          // If it's already a ReadResourceResult, return as-is
+          if ("contents" in result && Array.isArray(result.contents)) {
+            contents = result.contents;
+            return result as any;
+          }
+          // Convert CallToolResult to ReadResourceResult
+          // Import convertToolResultToResourceResult dynamically to avoid circular dependencies
+          const { convertToolResultToResourceResult } =
+            await import("./resources/conversion.js");
+          const converted = convertToolResultToResourceResult(config.uri, result) as any;
+          contents = converted.contents || [];
+          return converted;
+        } catch (err) {
+          success = false;
+          errorType = err instanceof Error ? err.name : "unknown_error";
+          throw err;
+        } finally {
+          Telemetry.getInstance()
+            .trackServerResourceCall({
+              name: config.name,
+              description: config.description ?? null,
+              contents: contents.map((c: any) => ({
+                mime_type: c.mimeType ?? null,
+                text: c.text ? `[text: ${c.text.length} chars]` : null,
+                blob: c.blob ? `[blob: ${c.blob.length} bytes]` : null,
+              })),
+              success,
+              errorType,
+            })
+            .catch((e) => console.debug(`Failed to track resource call: ${e}`));
         }
-        // Convert CallToolResult to ReadResourceResult
-        // Import convertToolResultToResourceResult dynamically to avoid circular dependencies
-        const { convertToolResultToResourceResult } =
-          await import("./resources/conversion.js");
-        return convertToolResultToResourceResult(config.uri, result) as any;
       };
 
       newServer.registerResource(
@@ -579,8 +646,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     // Resource Templates
-    for (const [_name, recipe] of this.registrationRecipes.resourceTemplates) {
-      const { config, handler } = recipe;
+    for (const [_name, registration] of this.registrations.resourceTemplates) {
+      const { config, handler } = registration;
 
       // Detect structure type: flat (uriTemplate on config) vs nested (resourceTemplate.uriTemplate)
       const isFlatStructure = "uriTemplate" in config;
@@ -624,22 +691,49 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         template,
         metadata as any,
         async (uri: URL, extra?: any) => {
-          // Parse URI parameters from the template
-          const params = this.parseTemplateUri(uriTemplate, uri.toString());
-          const result = await (handler as any)(uri, params, extra);
+          let success = true;
+          let errorType: string | null = null;
+          let contents: any[] = [];
 
-          // If it's already a ReadResourceResult, return as-is
-          if ("contents" in result && Array.isArray(result.contents)) {
-            return result as any;
+          try {
+            // Parse URI parameters from the template
+            const params = this.parseTemplateUri(uriTemplate, uri.toString());
+            const result = await (handler as any)(uri, params, extra);
+
+            // If it's already a ReadResourceResult, return as-is
+            if ("contents" in result && Array.isArray(result.contents)) {
+              contents = result.contents;
+              return result as any;
+            }
+
+            // Convert CallToolResult to ReadResourceResult
+            const { convertToolResultToResourceResult } =
+              await import("./resources/conversion.js");
+            const converted = convertToolResultToResourceResult(
+              uri.toString(),
+              result
+            ) as any;
+            contents = converted.contents || [];
+            return converted;
+          } catch (err) {
+            success = false;
+            errorType = err instanceof Error ? err.name : "unknown_error";
+            throw err;
+          } finally {
+            Telemetry.getInstance()
+              .trackServerResourceCall({
+                name: config.name,
+                description: config.description ?? null,
+                contents: contents.map((c: any) => ({
+                  mimeType: c.mimeType ?? null,
+                  text: c.text ? `[text: ${c.text.length} chars]` : null,
+                  blob: c.blob ? `[blob: ${c.blob.length} bytes]` : null,
+                })),
+                success,
+                errorType,
+              })
+              .catch((e) => console.debug(`Failed to track resource template call: ${e}`));
           }
-
-          // Convert CallToolResult to ReadResourceResult
-          const { convertToolResultToResourceResult } =
-            await import("./resources/conversion.js");
-          return convertToolResultToResourceResult(
-            uri.toString(),
-            result
-          ) as any;
         }
       );
     }
@@ -912,10 +1006,19 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Log registered items before starting server
     this.logRegisteredItems();
 
+    // Track server run event
+    this._trackServerRun("http");
+
     // Start server using runtime-aware helper
     await startServer(this.app, this.serverPort, this.serverHost, {
       onDenoRequest: rewriteSupabaseRequest,
     });
+  }
+
+  private _trackServerRun(transport: string): void {
+    Telemetry.getInstance()
+      .trackServerRunFromServer(this, transport)
+      .catch((e) => console.debug(`Failed to track server run: ${e}`));
   }
 
   /**
@@ -975,6 +1078,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     console.log("[MCP] Mounting inspector");
     await this.mountInspector();
     console.log("[MCP] Mounted inspector");
+
+    const provider = options?.provider || "fetch";
+    this._trackServerRun(provider);
 
     // Wrap the fetch handler to ensure it always returns a Promise<Response>
     const fetchHandler = this.app.fetch.bind(this.app);
