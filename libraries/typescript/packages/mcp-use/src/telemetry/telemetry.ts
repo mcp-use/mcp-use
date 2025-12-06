@@ -233,6 +233,14 @@ export class Telemetry {
     return this._source;
   }
 
+  /**
+   * Check if telemetry is enabled.
+   * Returns false if telemetry was disabled via environment variable or if not in Node.js environment.
+   */
+  get isEnabled(): boolean {
+    return this._posthogClient !== null || this._scarfClient !== null;
+  }
+
   get userId(): string {
     if (this._currUserId) {
       return this._currUserId;
@@ -380,6 +388,7 @@ export class Telemetry {
   // ============================================================================
 
   async trackAgentExecution(data: MCPAgentExecutionEventData): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new MCPAgentExecutionEvent(data);
     await this.capture(event);
   }
@@ -389,16 +398,19 @@ export class Telemetry {
   // ============================================================================
 
   async trackServerRun(data: ServerRunEventData): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new ServerRunEvent(data);
     await this.capture(event);
   }
 
   async trackServerInitialize(data: ServerInitializeEventData): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new ServerInitializeEvent(data);
     await this.capture(event);
   }
 
   async trackServerToolCall(data: ServerToolCallEventData): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new ServerToolCallEvent(data);
     await this.capture(event);
   }
@@ -406,16 +418,19 @@ export class Telemetry {
   async trackServerResourceCall(
     data: ServerResourceCallEventData
   ): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new ServerResourceCallEvent(data);
     await this.capture(event);
   }
 
   async trackServerPromptCall(data: ServerPromptCallEventData): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new ServerPromptCallEvent(data);
     await this.capture(event);
   }
 
   async trackServerContext(data: ServerContextEventData): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new ServerContextEvent(data);
     await this.capture(event);
   }
@@ -425,11 +440,13 @@ export class Telemetry {
   // ============================================================================
 
   async trackMCPClientInit(data: MCPClientInitEventData): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new MCPClientInitEvent(data);
     await this.capture(event);
   }
 
   async trackConnectorInit(data: ConnectorInitEventData): Promise<void> {
+    if (!this.isEnabled) return;
     const event = new ConnectorInitEvent(data);
     await this.capture(event);
   }
