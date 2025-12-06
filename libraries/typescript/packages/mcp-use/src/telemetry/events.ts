@@ -158,6 +158,91 @@ export interface ServerRunEventData {
   mcpUiResources?: any | null;
 }
 
+/**
+ * Interface for MCPServer data needed for telemetry tracking.
+ * This allows the telemetry layer to extract data from an MCPServer instance
+ * without importing the full MCPServer class (avoiding circular dependencies).
+ */
+export interface MCPServerTelemetryInfo {
+  registeredTools: string[];
+  registeredPrompts: string[];
+  registeredResources: string[];
+  config: { name: string; description?: string };
+  serverBaseUrl?: string;
+  oauthProvider?: unknown;
+  registrations: {
+    tools: Map<string, { config: { name: string; title?: string; description?: string; schema?: unknown; outputSchema?: unknown }; handler: unknown }>;
+    prompts: Map<string, { config: { name: string; title?: string; description?: string; args?: unknown }; handler: unknown }>;
+    resources: Map<string, { config: { name: string; title?: string; description?: string; uri?: string; mimeType?: string }; handler: unknown }>;
+    resourceTemplates: Map<string, { config: { name: string; title?: string; description?: string }; handler: unknown }>;
+  };
+}
+
+/**
+ * Creates ServerRunEventData from an MCPServer-like object.
+ * This centralizes the data extraction logic in the telemetry layer.
+ */
+export function createServerRunEventData(
+  server: MCPServerTelemetryInfo,
+  transport: string
+): ServerRunEventData {
+  const toolRegistrations = Array.from(server.registrations.tools.values());
+  const promptRegistrations = Array.from(server.registrations.prompts.values());
+  const resourceRegistrations = Array.from(server.registrations.resources.values());
+  const templateRegistrations = Array.from(server.registrations.resourceTemplates.values());
+
+  return {
+    transport,
+    toolsNumber: server.registeredTools.length,
+    resourcesNumber: server.registeredResources.length,
+    promptsNumber: server.registeredPrompts.length,
+    auth: !!server.oauthProvider,
+    name: server.config.name,
+    description: server.config.description ?? null,
+    baseUrl: server.serverBaseUrl ?? null,
+    toolNames: server.registeredTools.length > 0 ? server.registeredTools : null,
+    resourceNames: server.registeredResources.length > 0 ? server.registeredResources : null,
+    promptNames: server.registeredPrompts.length > 0 ? server.registeredPrompts : null,
+    tools: toolRegistrations.length > 0
+      ? toolRegistrations.map((r) => ({
+          name: r.config.name,
+          title: r.config.title ?? null,
+          description: r.config.description ?? null,
+          input_schema: r.config.schema ? JSON.stringify(r.config.schema) : null,
+          output_schema: r.config.outputSchema ? JSON.stringify(r.config.outputSchema) : null,
+        }))
+      : null,
+    resources: resourceRegistrations.length > 0
+      ? resourceRegistrations.map((r) => ({
+          name: r.config.name,
+          title: r.config.title ?? null,
+          description: r.config.description ?? null,
+          uri: r.config.uri ?? null,
+          mime_type: r.config.mimeType ?? null,
+        }))
+      : null,
+    prompts: promptRegistrations.length > 0
+      ? promptRegistrations.map((r) => ({
+          name: r.config.name,
+          title: r.config.title ?? null,
+          description: r.config.description ?? null,
+          args: r.config.args ? JSON.stringify(r.config.args) : null,
+        }))
+      : null,
+    templates: templateRegistrations.length > 0
+      ? templateRegistrations.map((r) => ({
+          name: r.config.name,
+          title: r.config.title ?? null,
+          description: r.config.description ?? null,
+        }))
+      : null,
+    capabilities: {
+      logging: true,
+      resources: { subscribe: true, listChanged: true },
+    },
+  };
+}
+
 export class ServerRunEvent extends BaseTelemetryEvent {
   constructor(private data: ServerRunEventData) {
     super();

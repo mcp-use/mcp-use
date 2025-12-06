@@ -9,6 +9,7 @@ import type {
   ServerContextEventData,
   MCPClientInitEventData,
   ConnectorInitEventData,
+  MCPServerTelemetryInfo,
 } from "./events.js";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -26,6 +27,7 @@ import {
   ServerContextEvent,
   MCPClientInitEvent,
   ConnectorInitEvent,
+  createServerRunEventData,
 } from "./events.js";
 import { getPackageVersion } from "./utils.js";
 
@@ -397,8 +399,18 @@ export class Telemetry {
   // Server Events
   // ============================================================================
 
-  async trackServerRun(data: ServerRunEventData): Promise<void> {
+  /**
+   * Track server run event directly from an MCPServer instance.
+   * This extracts the necessary data from the server and creates the event.
+   * @param server - The MCPServer instance (or any object conforming to MCPServerTelemetryInfo)
+   * @param transport - The transport type (e.g., "http", "stdio", "supabase")
+   */
+  async trackServerRunFromServer(
+    server: MCPServerTelemetryInfo,
+    transport: string
+  ): Promise<void> {
     if (!this.isEnabled) return;
+    const data = createServerRunEventData(server, transport);
     const event = new ServerRunEvent(data);
     await this.capture(event);
   }
