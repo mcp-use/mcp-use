@@ -1,6 +1,14 @@
 import type {
   BaseTelemetryEvent,
   MCPAgentExecutionEventData,
+  ServerRunEventData,
+  ServerInitializeEventData,
+  ServerToolCallEventData,
+  ServerResourceCallEventData,
+  ServerPromptCallEventData,
+  ServerContextEventData,
+  MCPClientInitEventData,
+  ConnectorInitEventData,
 } from "./events.js";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -8,7 +16,17 @@ import * as path from "node:path";
 import { PostHog } from "posthog-node";
 import { generateUUID } from "../server/utils/runtime.js";
 import { logger } from "../logging.js";
-import { MCPAgentExecutionEvent } from "./events.js";
+import {
+  MCPAgentExecutionEvent,
+  ServerRunEvent,
+  ServerInitializeEvent,
+  ServerToolCallEvent,
+  ServerResourceCallEvent,
+  ServerPromptCallEvent,
+  ServerContextEvent,
+  MCPClientInitEvent,
+  ConnectorInitEvent,
+} from "./events.js";
 import { getPackageVersion } from "./utils.js";
 
 // Environment detection function
@@ -357,8 +375,62 @@ export class Telemetry {
     }
   }
 
+  // ============================================================================
+  // Agent Events
+  // ============================================================================
+
   async trackAgentExecution(data: MCPAgentExecutionEventData): Promise<void> {
     const event = new MCPAgentExecutionEvent(data);
+    await this.capture(event);
+  }
+
+  // ============================================================================
+  // Server Events
+  // ============================================================================
+
+  async trackServerRun(data: ServerRunEventData): Promise<void> {
+    const event = new ServerRunEvent(data);
+    await this.capture(event);
+  }
+
+  async trackServerInitialize(data: ServerInitializeEventData): Promise<void> {
+    const event = new ServerInitializeEvent(data);
+    await this.capture(event);
+  }
+
+  async trackServerToolCall(data: ServerToolCallEventData): Promise<void> {
+    const event = new ServerToolCallEvent(data);
+    await this.capture(event);
+  }
+
+  async trackServerResourceCall(
+    data: ServerResourceCallEventData
+  ): Promise<void> {
+    const event = new ServerResourceCallEvent(data);
+    await this.capture(event);
+  }
+
+  async trackServerPromptCall(data: ServerPromptCallEventData): Promise<void> {
+    const event = new ServerPromptCallEvent(data);
+    await this.capture(event);
+  }
+
+  async trackServerContext(data: ServerContextEventData): Promise<void> {
+    const event = new ServerContextEvent(data);
+    await this.capture(event);
+  }
+
+  // ============================================================================
+  // Client Events
+  // ============================================================================
+
+  async trackMCPClientInit(data: MCPClientInitEventData): Promise<void> {
+    const event = new MCPClientInitEvent(data);
+    await this.capture(event);
+  }
+
+  async trackConnectorInit(data: ConnectorInitEventData): Promise<void> {
+    const event = new ConnectorInitEvent(data);
     await this.capture(event);
   }
 
