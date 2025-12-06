@@ -120,6 +120,54 @@ agent = MCPAgent(
 - `disallowed_tools`: List of tool names that should not be available to the agent (optional)
 - `use_server_manager`: Enable dynamic server selection (default: False)
 
+## Sending Files with HumanMessage
+
+Pass files directly inside a `HumanMessage` instead of using a separate parameter. The agent accepts either a plain string or a `HumanMessage`, so you can include both text and file content together:
+
+<CodeGroup>
+```python Python
+import asyncio
+import base64
+from pathlib import Path
+
+from langchain_core.messages import HumanMessage
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+async def main():
+    client = MCPClient.from_config_file("config.json")
+    agent = MCPAgent(
+        llm=ChatOpenAI(model="gpt-4o-mini", temperature=0),
+        client=client,
+    )
+
+    file_bytes = Path("notes.txt").read_bytes()
+    human_message = HumanMessage(
+        content=[
+            {"type": "text", "text": "Summarize the attached notes."},
+            {
+                "type": "input_file",
+                "input": {
+                    "name": "notes.txt",
+                    "mime_type": "text/plain",
+                    "data": base64.b64encode(file_bytes).decode("utf-8"),
+                },
+            },
+        ]
+    )
+
+    async for step in agent.stream(human_message, max_steps=10):
+        print(step)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+</CodeGroup>
+
+<Note>
+Remote agents currently accept text-only `HumanMessage` content. Use a local agent when you need to pass files.
+</Note>
+
 ## Tool Access Control
 
 You can restrict which tools are available to the agent for security or to limit its capabilities. Here's a complete example showing how to set up an agent with restricted tool access:
