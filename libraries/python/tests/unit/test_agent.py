@@ -233,3 +233,80 @@ class TestMCPAgentStream:
 
             assert history_was_used, "External history was not used"
             assert outputs[-1] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_stream_wraps_string_query_as_human_message(self):
+        """String queries are wrapped into HumanMessage for execution."""
+        llm = self._mock_llm()
+        client = MagicMock(spec=MCPClient)
+        agent = MCPAgent(llm=llm, client=client)
+        agent.callbacks = []
+        agent.telemetry = MagicMock()
+
+        executor = MagicMock()
+        captured_inputs = []
+
+        async def _init_side_effect():
+            agent._agent_executor = executor
+            agent._initialized = True
+
+        async def mock_astream(inputs, stream_mode=None, config=None):
+            captured_inputs.append(inputs)
+            yield {"agent": {"messages": [AIMessage(content="wrapped")]}}
+
+        executor.astream = MagicMock(side_effect=mock_astream)
+
+        with patch.object(MCPAgent, "initialize", side_effect=_init_side_effect):
+            outputs = []
+            async for item in agent.stream("plain string query", max_steps=2):
+                outputs.append(item)
+
+        used_message = captured_inputs[0]["messages"][-1]
+        assert isinstance(used_message, HumanMessage)
+        assert used_message.content == "plain string query"
+        assert outputs[-1] == "wrapped"
+
+    @pytest.mark.asyncio
+    async def test_stream_accepts_human_message_with_files(self):
+        """HumanMessage queries with file content are passed through."""
+        llm = self._mock_llm()
+        client = MagicMock(spec=MCPClient)
+        agent = MCPAgent(llm=llm, client=client)
+        agent.callbacks = []
+        agent.telemetry = MagicMock()
+
+        executor = MagicMock()
+        captured_inputs = []
+
+        human_message = HumanMessage(
+            content=[
+                {"type": "text", "text": "Summarize the attached file"},
+                {
+                    "type": "input_file",
+                    "input": {
+                        "name": "notes.txt",
+                        "mime_type": "text/plain",
+                        "data": "ZmlsZSBjb250ZW50",  # base64 for "file content"
+                    },
+                },
+            ]
+        )
+
+        async def _init_side_effect():
+            agent._agent_executor = executor
+            agent._initialized = True
+
+        async def mock_astream(inputs, stream_mode=None, config=None):
+            captured_inputs.append(inputs)
+            yield {"agent": {"messages": [AIMessage(content="done")]}}
+
+        executor.astream = MagicMock(side_effect=mock_astream)
+
+        with patch.object(MCPAgent, "initialize", side_effect=_init_side_effect):
+            outputs = []
+            async for item in agent.stream(human_message, max_steps=3):
+                outputs.append(item)
+
+        used_message = captured_inputs[0]["messages"][-1]
+        assert used_message is human_message
+        assert outputs[-1] == "done"
