@@ -29,7 +29,7 @@ export interface Resource {
   /** URI pattern from ResourceDefinition.uri */
   uri?: string | null;
   /** MIME type from ResourceDefinition.mimeType */
-  mimeType?: string | null;
+  mime_type?: string | null;
 }
 
 /**
@@ -47,7 +47,7 @@ export interface Prompt {
  * Content info for telemetry - matches MCP SDK content structure
  */
 export interface Content {
-  mimeType?: string | null;
+  mime_type?: string | null;
   text?: string | null;
   blob?: string | null;
 }
@@ -184,9 +184,9 @@ export class ServerRunEvent extends BaseTelemetryEvent {
       resources: this.data.resources ?? null,
       prompts: this.data.prompts ?? null,
       templates: this.data.templates ?? null,
-      capabilities: this.data.capabilities ?? null,
-      apps_sdk_resources: this.data.appsSdkResources ?? null,
-      mcp_ui_resources: this.data.mcpUiResources ?? null,
+      capabilities: this.data.capabilities ? JSON.stringify(this.data.capabilities) : null,
+      apps_sdk_resources: this.data.appsSdkResources ? JSON.stringify(this.data.appsSdkResources) : null,
+      mcp_ui_resources: this.data.mcpUiResources ? JSON.stringify(this.data.mcpUiResources) : null,
     };
   }
 }
@@ -214,8 +214,8 @@ export class ServerInitializeEvent extends BaseTelemetryEvent {
   get properties(): Record<string, any> {
     return {
       protocol_version: this.data.protocolVersion,
-      client_info: this.data.clientInfo,
-      client_capabilities: this.data.clientCapabilities,
+      client_info: JSON.stringify(this.data.clientInfo),
+      client_capabilities: JSON.stringify(this.data.clientCapabilities),
       session_id: this.data.sessionId ?? null,
     };
   }
