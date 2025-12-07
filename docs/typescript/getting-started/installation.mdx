@@ -163,15 +163,6 @@ config()
 // Your API keys are now available as environment variables
 const openaiKey = process.env.OPENAI_API_KEY
 ```
-
-```typescript TypeScript
-import { config } from 'dotenv'
-
-config()
-
-// Your API keys are now available as environment variables
-const openaiKey = process.env.OPENAI_API_KEY
-```
 </CodeGroup>
 
 ## Verification
@@ -179,48 +170,6 @@ const openaiKey = process.env.OPENAI_API_KEY
 Verify your installation works correctly:
 
 <CodeGroup>
-```typescript TypeScript
-import { config } from 'dotenv'
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
-
-async function verifyInstallation() {
-    config()
-
-    // Simple configuration for testing
-    const configuration = {
-        mcpServers: {
-            test: {
-                command: 'echo',
-                args: ['Hello from MCP!']
-            }
-        }
-    }
-
-    try {
-        const client = new MCPClient(configuration)
-        console.log('✅ MCPClient created successfully')
-
-        const llm = new ChatOpenAI({ model: 'gpt-3.5-turbo' })
-        console.log('✅ LLM initialized successfully')
-
-        const agent = new MCPAgent({ llm, client })
-        console.log('✅ MCPAgent created successfully')
-
-        console.log('\n🎉 Installation verified! You\'re ready to use mcp_use.')
-
-        // Clean up
-        await client.closeAllSessions()
-
-    } catch (error) {
-        console.error('❌ Verification failed:', error)
-        console.error('Please check your installation and API keys.')
-    }
-}
-
-verifyInstallation().catch(console.error)
-```
-
 ```typescript TypeScript
 import { config } from 'dotenv'
 import { ChatOpenAI } from '@langchain/openai'

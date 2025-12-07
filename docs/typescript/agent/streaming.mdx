@@ -47,43 +47,6 @@ async function stepStreamingExample() {
 
 stepStreamingExample().catch(console.error)
 ```
-
-```typescript TypeScript
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
-
-async function stepStreamingExample() {
-    // Setup agent
-    const config = {
-        mcpServers: {
-            playwright: {
-                command: 'npx',
-                args: ['@playwright/mcp@latest']
-            }
-        }
-    }
-
-    const client = new MCPClient(config)
-    const llm = new ChatOpenAI({ model: 'gpt-4' })
-    const agent = new MCPAgent({ llm, client })
-
-    // Stream the agent's steps
-    console.log('🤖 Agent is working...')
-    console.log('-'.repeat(50))
-
-    for await (const step of agent.stream('Search for the latest Python news and summarize it')) {
-        console.log(`\n🔧 Tool: ${step.action.tool}`)
-        console.log(`📝 Input: ${JSON.stringify(step.action.toolInput)}`)
-        const result = step.observation.substring(0, 100)
-        console.log(`📄 Result: ${result}${step.observation.length > 100 ? '...' : ''}`)
-    }
-
-    console.log('\n🎉 Done!')
-    await client.closeAllSessions()
-}
-
-stepStreamingExample().catch(console.error)
-```
 </CodeGroup>
 
 ## Low-Level Event Streaming
@@ -91,45 +54,6 @@ stepStreamingExample().catch(console.error)
 For more granular control, use the `stream_events` method to get real-time output events:
 
 <CodeGroup>
-```typescript TypeScript
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
-
-async function basicStreamingExample() {
-    // Setup agent
-    const config = {
-        mcpServers: {
-            playwright: {
-                command: 'npx',
-                args: ['@playwright/mcp@latest']
-            }
-        }
-    }
-
-    const client = new MCPClient(config)
-    const llm = new ChatOpenAI({ model: 'gpt-4' })
-    const agent = new MCPAgent({ llm, client })
-
-    // Stream the agent's response
-    console.log('Agent is working...')
-
-    for await (const event of agent.streamEvents('Search for the latest Python news and summarize it')) {
-        if (event.event === 'on_chat_model_stream') {
-            // Stream LLM output token by token
-            const text = event.data?.chunk?.text
-            if (text) {
-                process.stdout.write(text)
-            }
-        }
-    }
-
-    console.log('\n\nDone!')
-    await client.closeAllSessions()
-}
-
-basicStreamingExample().catch(console.error)
-```
-
 ```typescript TypeScript
 import { ChatOpenAI } from '@langchain/openai'
 import { MCPAgent, MCPClient } from 'mcp-use'
