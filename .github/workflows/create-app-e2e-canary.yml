@@ -1,0 +1,160 @@
+name: Create App E2E (Canary)
+
+permissions:
+  actions: read
+  contents: read
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["TypeScript Release"]
+    types:
+      - completed
+    branches:
+      - canary
+
+jobs:
+  check-published:
+    name: Check if packages were published
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Download deployment marker
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: railway-deploy-marker
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      
+      - name: Check if packages were published
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "Manual trigger, will run e2e tests"
+          elif [ -f .railway-deploy-marker ] && grep -q "packages_published=true" .railway-deploy-marker; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "Packages were published, will run e2e tests"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "No packages were published, skipping e2e tests"
+          fi
+
+  wait-for-npm:
+    name: Wait for packages on npm
+    needs: check-published
+    if: needs.check-published.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for canary packages to be available on npm
+        run: |
+          echo "Waiting for canary packages to be available on npm..."
+          
+          MAX_RETRIES=30
+          SLEEP_TIME=20
+          
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i/$MAX_RETRIES: Checking npm registry..."
+            
+            # Check all three packages
+            if npm view mcp-use@canary version && \
+               npm view @mcp-use/cli@canary version && \
+               npm view @mcp-use/inspector@canary version; then
+              echo "All canary packages are available on npm"
+              exit 0
+            fi
+            
+            echo "Packages not yet available, waiting ${SLEEP_TIME}s..."
+            sleep $SLEEP_TIME
+          done
+          
+          echo "Timeout waiting for canary packages"
+          exit 1
+
+  e2e-npm:
+    name: e2e/npm/${{ matrix.template }}
+    needs: wait-for-npm
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [starter, mcp-ui, apps-sdk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      
+      - name: Create app with npm and canary flag
+        run: |
+          npx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --canary
+          echo "Project created successfully"
+      
+      - name: Install dependencies
+        working-directory: test-app-${{ matrix.template }}
+        run: |
+          npm install
+          echo "Dependencies installed"
+      
+      - name: Run dev server and kill it
+        working-directory: test-app-${{ matrix.template }}
+        run: |
+          npm run dev &
+          DEV_PID=$!
+          sleep 5
+          kill $DEV_PID 2>/dev/null || true
+          wait $DEV_PID 2>/dev/null || true
+          echo "Dev server started and stopped successfully"
+      
+      - name: Build project
+        working-directory: test-app-${{ matrix.template }}
+        run: |
+          npm run build
+          echo "Build completed successfully"
+
+  e2e-yarn:
+    name: e2e/yarn/${{ matrix.template }}
+    needs: wait-for-npm
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [starter, mcp-ui, apps-sdk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Setup Yarn
+        run: corepack enable
+      
+      - name: Create app with yarn and canary flag
+        run: |
+          yarn dlx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --canary
+          echo "Project created successfully"
+      
+      - name: Install dependencies
+        working-directory: test-app-${{ matrix.template }}
+        run: |
+          yarn install
+          echo "Dependencies installed"
+      
+      - name: Run dev server and kill it
+        working-directory: test-app-${{ matrix.template }}
+        run: |
+          yarn dev &
+          DEV_PID=$!
+          sleep 5
+          kill $DEV_PID 2>/dev/null || true
+          wait $DEV_PID 2>/dev/null || true
+          echo "Dev server started and stopped successfully"
+      
+      - name: Build project
+        working-directory: test-app-${{ matrix.template }}
+        run: |
+          yarn build
+          echo "Build completed successfully"
