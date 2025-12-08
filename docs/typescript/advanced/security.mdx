@@ -31,21 +31,6 @@ if (!openaiKey) {
     throw new Error('OPENAI_API_KEY environment variable is required')
 }
 ```
-
-```typescript TypeScript
-import { config } from 'dotenv'
-
-// Load environment variables from .env file
-config()
-
-// Access API keys securely
-const openaiKey = process.env.OPENAI_API_KEY
-const anthropicKey = process.env.ANTHROPIC_API_KEY
-
-if (!openaiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is required')
-}
-```
 </CodeGroup>
 
 ### .env File Security
@@ -97,27 +82,7 @@ For production environments, use proper secrets management:
 
     // Usage
     const openaiKey = await getSecret('prod/mcp-use/openai-key')
-    ```
-
-```typescript TypeScript
-    import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
-
-    async function getSecret(secretName: string, regionName = 'us-east-1') {
-        const client = new SecretsManagerClient({ region: regionName })
-
-        try {
-            const response = await client.send(
-                new GetSecretValueCommand({ SecretId: secretName })
-            )
-            return response.SecretString
-        } catch (error) {
-            throw error
-        }
-    }
-
-    // Usage
-    const openaiKey = await getSecret('prod/mcp-use/openai-key')
-    ```
+```
 </CodeGroup>
   </Tab>
   <Tab title="Azure Key Vault">
@@ -135,22 +100,7 @@ For production environments, use proper secrets management:
     // Usage
     const secret = await client.getSecret('openai-api-key')
     const openaiKey = secret.value
-    ```
-
-```typescript TypeScript
-    import { SecretClient } from '@azure/keyvault-secrets'
-    import { DefaultAzureCredential } from '@azure/identity'
-
-    const credential = new DefaultAzureCredential()
-    const client = new SecretClient(
-        'https://vault-name.vault.azure.net/',
-        credential
-    )
-
-    // Usage
-    const secret = await client.getSecret('openai-api-key')
-    const openaiKey = secret.value
-    ```
+```
 </CodeGroup>
   </Tab>
   <Tab title="HashiCorp Vault">
@@ -166,20 +116,7 @@ For production environments, use proper secrets management:
     // Read secret
     const response = await client.read('secret/data/mcp-use/api-keys')
     const openaiKey = response.data.data.openai_key
-    ```
-
-```typescript TypeScript
-    import vault from 'node-vault'
-
-    const client = vault({
-        endpoint: 'https://vault.example.com',
-        token: process.env.VAULT_TOKEN
-    })
-
-    // Read secret
-    const response = await client.read('secret/data/mcp-use/api-keys')
-    const openaiKey = response.data.data.openai_key
-    ```
+```
 </CodeGroup>
   </Tab>
 </Tabs>

@@ -44,29 +44,6 @@ const client = new MCPClient(config, {
   samplingCallback
 })
 ```
-
-```typescript TypeScript
-// Using with React hook
-import { useMcp } from 'mcp-use/react'
-
-function MyComponent() {
-  const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
-    samplingCallback: async (params) => {
-      // Your sampling implementation
-      const response = await yourLlm.complete(params.messages[0].content.text)
-      return {
-        role: 'assistant',
-        content: { type: 'text', text: response },
-        model: 'your-model-name',
-        stopReason: 'endTurn'
-      }
-    }
-  })
-  
-  // ... rest of component
-}
-```
 </CodeGroup>
 
 ## Creating Sampling-Enabled Tools

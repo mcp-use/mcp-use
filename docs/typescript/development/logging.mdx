@@ -66,29 +66,12 @@ logger.level = 'info'   // INFO level
 logger.level = 'debug'  // DEBUG level (full verbose output)
 logger.level = 'warn'   // Turn off debug (WARNING level)
 ```
-
-```typescript TypeScript
-import { logger } from 'mcp-use'
-
-// Set the logger level
-logger.level = 'info'   // INFO level
-logger.level = 'debug'  // DEBUG level (full verbose output)
-logger.level = 'warn'   // Turn off debug (WARNING level)
-```
 </CodeGroup>
 
 <Tip>
 You can conditionally enable debugging based on environment or configuration:
 
 <CodeGroup>
-```typescript TypeScript
-import { logger } from 'mcp-use'
-
-if (process.env.ENVIRONMENT === 'development') {
-    logger.level = 'debug'
-}
-```
-
 ```typescript TypeScript
 import { logger } from 'mcp-use'
 
@@ -132,17 +115,6 @@ if (process.env.ENVIRONMENT === 'development') {
 If you only want to increase verbosity for the agent component without enabling full debug mode for the entire package, you can use the `verbose` parameter when creating an MCPAgent:
 
 <CodeGroup>
-```typescript TypeScript
-import { MCPAgent } from 'mcp-use'
-
-// Create agent with increased verbosity
-const agent = new MCPAgent({
-    llm: yourLlm,
-    client: yourClient,
-    verbose: true  // Only shows debug messages from the agent
-})
-```
-
 ```typescript TypeScript
 import { MCPAgent } from 'mcp-use'
 

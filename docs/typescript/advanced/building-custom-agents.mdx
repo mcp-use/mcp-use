@@ -84,61 +84,12 @@ async function main() {
 
 main().catch(console.error)
 ```
-
-```typescript TypeScript
-import { ChatOpenAI } from '@langchain/openai'
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
-import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
-import { MCPClient, LangChainAdapter, loadConfigFile } from 'mcp-use'
-
-async function main() {
-    // Initialize the MCP client
-    const config = await loadConfigFile('path/to/config.json')
-    const client = new MCPClient(config)
-
-    // Create adapter instance
-    const adapter = new LangChainAdapter()
-
-    // Get LangChain tools directly from the client with a single line
-    const tools = await adapter.createTools(client)
-
-    // Initialize your language model
-    const llm = new ChatOpenAI({ model: 'gpt-4o' })
-
-    // Create a prompt template
-    const prompt = ChatPromptTemplate.fromMessages([
-        ['system', 'You are a helpful assistant with access to powerful tools.'],
-        new MessagesPlaceholder('chat_history'),
-        ['human', '{input}'],
-        new MessagesPlaceholder('agent_scratchpad'),
-    ])
-
-    // Create the agent
-    const agent = createToolCallingAgent({ llm, tools, prompt })
-
-    // Create the agent executor
-    const agentExecutor = new AgentExecutor({ agent, tools, verbose: true })
-
-    // Run the agent
-    const result = await agentExecutor.invoke({ input: 'What can you do?' })
-    console.log(result.output)
-
-    await client.closeAllSessions()
-}
-
-main().catch(console.error)
-```
 </CodeGroup>
 
 <Tip>
 **One-Line Tool Creation**: The API simplifies tool creation - all you need is to create an adapter instance and call its `create_tools` method:
 
 <CodeGroup>
-```typescript TypeScript
-const adapter = new LangChainAdapter()
-const tools = await adapter.createTools(client)
-```
-
 ```typescript TypeScript
 const adapter = new LangChainAdapter()
 const tools = await adapter.createTools(client)
@@ -182,24 +133,6 @@ Here's a simple template for creating a new adapter:
 Once you've implemented your adapter, you can use it with the simplified API:
 
 <CodeGroup>
-```typescript TypeScript
-import { YourFrameworkAdapter } from './your-module'
-import { MCPClient, loadConfigFile } from 'mcp-use'
-
-// Initialize the client
-const config = await loadConfigFile('config.json')
-const client = new MCPClient(config)
-
-// Create an adapter instance
-const adapter = new YourFrameworkAdapter()
-
-// Get tools with a single line
-const tools = await adapter.createTools(client)
-
-// Use the tools with your framework
-const agent = yourFramework.createAgent({ tools })
-```
-
 ```typescript TypeScript
 import { YourFrameworkAdapter } from './your-module'
 import { MCPClient, loadConfigFile } from 'mcp-use'

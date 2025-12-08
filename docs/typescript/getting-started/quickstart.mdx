@@ -184,55 +184,7 @@ Here's a simple example to get you started:
   }
 
   main().catch(console.error)
-  ```
-
-```typescript TypeScript
-  import { ChatOpenAI } from '@langchain/openai'
-  import { config } from 'dotenv'
-  import { MCPAgent, MCPClient } from 'mcp-use'
-
-  async function main() {
-      // Load environment variables
-      config()
-
-      // Create configuration object
-      const configuration = {
-        mcpServers: {
-          playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: {
-              DISPLAY: ':1'
-            }
-          }
-        }
-      }
-
-      // Create MCPClient from configuration object
-      const client = new MCPClient(configuration)
-
-      // Create LLM
-      const llm = new ChatOpenAI({ model: 'gpt-4o' })
-
-      // Create agent with the client
-      const agent = new MCPAgent({
-        llm,
-        client,
-        maxSteps: 30
-      })
-
-      // Run the query
-      const result = await agent.run(
-          'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
-      )
-      console.log(`\nResult: ${result}`)
-
-      // Clean up
-      await client.closeAllSessions()
-  }
-
-  main().catch(console.error)
-  ```
+```
 </CodeGroup>
 
 ### Configuration Options
@@ -245,14 +197,7 @@ You can also load servers configuration from a config file:
 
   const config = await loadConfigFile("browser_mcp.json")
   const client = new MCPClient(config)
-  ```
-
-```typescript TypeScript
-  import { loadConfigFile } from 'mcp-use'
-
-  const config = await loadConfigFile("browser_mcp.json")
-  const client = new MCPClient(config)
-  ```
+```
 </CodeGroup>
 
 Example configuration file (`browser_mcp.json`):
@@ -298,22 +243,7 @@ Stream agent responses as they're generated:
           process.stdout.write(event.data?.chunk?.text || '')
       }
   }
-  ```
-
-```typescript TypeScript
-  // Stream intermediate steps
-  for await (const step of agent.stream("your query here")) {
-      console.log(`Tool: ${step.action.tool}`)
-      console.log(`Result: ${step.observation}`)
-  }
-
-  // Or stream token-level events
-  for await (const event of agent.streamEvents("your query here")) {
-      if (event.event === 'on_chat_model_stream') {
-          process.stdout.write(event.data?.chunk?.text || '')
-      }
-  }
-  ```
+```
 </CodeGroup>
 
 <Tip>

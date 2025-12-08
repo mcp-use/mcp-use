@@ -125,22 +125,6 @@ const config = {
 
 const client = new MCPClient(config)
 ```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-const config = {
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: { DISPLAY: ':1' }
-        }
-    }
-}
-
-const client = new MCPClient(config)
-```
 </CodeGroup>
 
 ### From Configuration File
@@ -148,13 +132,6 @@ const client = new MCPClient(config)
 Load configuration from a JSON file:
 
 <CodeGroup>
-```typescript TypeScript
-import { MCPClient, loadConfigFile } from 'mcp-use'
-
-const config = await loadConfigFile('config.json')
-const client = new MCPClient(config)
-```
-
 ```typescript TypeScript
 import { MCPClient, loadConfigFile } from 'mcp-use'
 
@@ -169,11 +146,6 @@ const client = new MCPClient(config)
 Enable sandboxed execution:
 
 <CodeGroup>
-```typescript TypeScript
-// Note: Sandbox mode is not yet supported in the TypeScript library
-// This is a planned feature for a future release
-```
-
 ```typescript TypeScript
 // Note: Sandbox mode is not yet supported in the TypeScript library
 // This is a planned feature for a future release
