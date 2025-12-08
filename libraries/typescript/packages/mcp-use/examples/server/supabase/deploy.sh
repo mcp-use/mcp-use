@@ -382,8 +382,21 @@ if [ -d "dist/resources/widgets" ]; then
     print_info "Uploading widgets to storage bucket: $BUCKET_NAME"
     
     # Upload widgets to storage (upload contents, preserving directory structure)
-    # Use . to copy contents while preserving paths
-    if supabase storage cp -r "dist/resources/widgets/." "ss:///${BUCKET_NAME}/" --experimental 2>&1; then
+    # Copy each widget subdirectory individually to preserve paths
+    UPLOAD_SUCCESS=true
+    cd dist/resources/widgets
+    for widget_dir in */; do
+        if [ -d "$widget_dir" ]; then
+            widget_name=$(basename "$widget_dir")
+            print_info "Uploading widget: $widget_name"
+            if ! supabase storage cp -r "$widget_dir" "ss:///${BUCKET_NAME}/${widget_name}/" --experimental 2>&1; then
+                UPLOAD_SUCCESS=false
+            fi
+        fi
+    done
+    cd - > /dev/null
+    
+    if [ "$UPLOAD_SUCCESS" = true ]; then
         print_success "Widgets uploaded successfully"
         
         # Important: The bucket must be public for widgets to be accessible
