@@ -48,10 +48,10 @@ const tabs = [
   { id: "tools", label: "Tools", icon: Wrench },
   { id: "prompts", label: "Prompts", icon: MessageSquare },
   { id: "resources", label: "Resources", icon: FolderOpen },
-  { id: "chat", label: "Chat", icon: MessageCircle },
   { id: "sampling", label: "Sampling", icon: Hash },
   { id: "elicitation", label: "Elicitation", icon: CheckSquare },
   { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "chat", label: "Chat", icon: MessageCircle },
 ];
 
 function getTabCount(tabId: string, server: MCPConnection): number {

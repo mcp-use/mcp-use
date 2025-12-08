@@ -1,6 +1,7 @@
 ---
-title: Deploying to mcp-use Cloud
+title: mcp-use Cloud
 description: Deploy your MCP server to mcp-use cloud with one command
+icon: "); -webkit-mask-image: url('/images/logo-mcp-use.svg'); mask-image: url('/images/logo-mcp-use.svg');/*"
 ---
 
 Deploy your MCP server to **mcp-use cloud**, the recommended deployment platform for mcp-use servers. With a single command, you can deploy your server and get a production-ready URL.
@@ -12,16 +13,40 @@ Deploy your MCP server to **mcp-use cloud**, the recommended deployment platform
 
 Deploy your MCP server in one command:
 
-```bash
+<CodeGroup>
+```bash npm
 # Install the CLI (if you are using create-mcp-use-app this step is not needed)
 npm install -g @mcp-use/cli
 
 # Login to mcp-use cloud
-yarn run mcp-use login
+npm run mcp-use login
 
 # Deploy your server
-yarn run mcp-use deploy
+npm run mcp-use deploy
 ```
+
+```bash yarn
+# Install the CLI (if you are using create-mcp-use-app this step is not needed)
+yarn global add @mcp-use/cli
+
+# Login to mcp-use cloud
+yarn mcp-use login
+
+# Deploy your server
+yarn mcp-use deploy
+```
+
+```bash pnpm
+# Install the CLI (if you are using create-mcp-use-app this step is not needed)
+pnpm add -g @mcp-use/cli
+
+# Login to mcp-use cloud
+pnpm mcp-use login
+
+# Deploy your server
+pnpm mcp-use deploy
+```
+</CodeGroup>
 
 That's it! Your server will be built and deployed automatically.
 
@@ -49,17 +74,6 @@ This approach:
 - ✅ Uses the latest commit from your branch
 - ✅ No need to upload source code manually
 
-### Example Project Structure
-
-```
-my-mcp-server/
-├── package.json          # Detects build/start commands
-├── src/
-│   └── index.ts         # Server entry point
-├── resources/           # UI widgets (auto-registered)
-│   └── weather.tsx
-└── dist/               # Build output (excluded from upload)
-```
 
 ## After Deployment
 

@@ -4,11 +4,12 @@ import type {
   Resource,
   ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { BrowserMCPClient } from "../client/browser.js";
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
+import { Tel } from "../telemetry/index.js";
 import { assert } from "../utils/assert.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
@@ -196,8 +197,23 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
       }
       connectingRef.current = false;
+
+      // Track failed connection
+      if (url) {
+        Tel.getInstance()
+          .trackUseMcpConnection({
+            url,
+            transportType: transportType,
+            success: false,
+            errorType: connectionError?.name || "UnknownError",
+            hasOAuth: !!authProviderRef.current,
+            hasSampling: !!samplingCallback,
+            hasElicitation: !!onElicitation,
+          })
+          .catch(() => {});
+      }
     },
-    [addLog]
+    [addLog, url, transportType, samplingCallback, onElicitation]
   );
 
   /**
@@ -341,6 +357,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
 
+        // Track successful connection
+        Tel.getInstance()
+          .trackUseMcpConnection({
+            url,
+            transportType: transportTypeParam,
+            success: true,
+            hasOAuth: !!authProviderRef.current,
+            hasSampling: !!samplingCallback,
+            hasElicitation: !!onElicitation,
+          })
+          .catch(() => {});
+
         // Get tools, resources, prompts from session connector
         setTools(session.connector.tools || []);
         const resourcesResult = await session.connector.listAllResources();
@@ -363,12 +391,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
 
         return "success";
-      } catch (err: any) {
-        const errorMessage = err?.message || String(err);
+      } catch (err: unknown) {
+        const error = err as Error & { code?: number; message?: string };
+        const errorMessage = error?.message || String(err);
 
         // Handle 401 errors
         if (
-          err.code === 401 ||
+          error.code === 401 ||
           errorMessage.includes("401") ||
           errorMessage.includes("Unauthorized")
         ) {
@@ -384,7 +413,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             // This happens because 401 occurs before OAuth flow starts
             try {
               const { auth } =
-                await import("@modelcontextprotocol/sdk/client/auth.js");
+                await import("@mcp-use/modelcontextprotocol-sdk/client/auth.js");
               const baseUrl = new URL(url).origin;
 
               // Trigger auth to generate the URL, but it will be blocked by preventAutoAuth
@@ -442,7 +471,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
 
         // Handle other errors
-        failConnection(errorMessage, err);
+        failConnection(
+          errorMessage,
+          error instanceof Error ? error : new Error(String(error))
+        );
         return "failed";
       }
     };
@@ -547,6 +579,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
       }
       addLog("info", `Calling tool: ${name}`, args);
+      const startTime = Date.now();
       try {
         const serverName = "inspector-server";
         const session = clientRef.current.getSession(serverName);
@@ -559,9 +592,30 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           options
         );
         addLog("info", `Tool "${name}" call successful:`, result);
+
+        // Track successful tool call
+        Tel.getInstance()
+          .trackUseMcpToolCall({
+            toolName: name,
+            success: true,
+            executionTimeMs: Date.now() - startTime,
+          })
+          .catch(() => {});
+
         return result;
       } catch (err) {
         addLog("error", `Tool "${name}" call failed:`, err);
+
+        // Track failed tool call
+        Tel.getInstance()
+          .trackUseMcpToolCall({
+            toolName: name,
+            success: false,
+            errorType: err instanceof Error ? err.name : "UnknownError",
+            executionTimeMs: Date.now() - startTime,
+          })
+          .catch(() => {});
+
         throw err;
       }
     },
@@ -654,19 +708,19 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Generate a fresh authorization URL and redirect immediately
         // We need to manually trigger what the SDK would do
         const { auth } =
-          await import("@modelcontextprotocol/sdk/client/auth.js");
+          await import("@mcp-use/modelcontextprotocol-sdk/client/auth.js");
 
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
         const baseUrl = new URL(url).origin;
         auth(freshAuthProvider, {
           serverUrl: baseUrl,
-        }).catch((err) => {
+        }).catch((err: unknown) => {
           // This is expected to "fail" with redirect - the auth flow continues in the popup/redirect
           addLog(
             "info",
             "OAuth flow initiated:",
-            err?.message || "Redirecting..."
+            err instanceof Error ? err.message : "Redirecting..."
           );
         });
       } catch (authError) {
@@ -792,9 +846,28 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
         const result = await session.connector.readResource(uri);
         addLog("info", "Resource read successful:", result);
+
+        // Track successful resource read
+        Tel.getInstance()
+          .trackUseMcpResourceRead({
+            resourceUri: uri,
+            success: true,
+          })
+          .catch(() => {});
+
         return result;
       } catch (err) {
         addLog("error", "Resource read failed:", err);
+
+        // Track failed resource read
+        Tel.getInstance()
+          .trackUseMcpResourceRead({
+            resourceUri: uri,
+            success: false,
+            errorType: err instanceof Error ? err.name : "UnknownError",
+          })
+          .catch(() => {});
+
         throw err;
       }
     },

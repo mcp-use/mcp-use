@@ -1,133 +1,31 @@
-import {
-  createMCPServer,
-  type ToolContext,
-} from "../../../../dist/src/server/index.js";
+import { MCPServer, text } from "../../../../dist/src/server/index.js";
+import { z } from "zod";
 
-// Create an MCP server with sampling support
-const server = createMCPServer("sampling-example-server", {
+const server = new MCPServer({
+  name: "sampling-example-server",
   version: "1.0.0",
   description: "An MCP server example demonstrating sampling capabilities",
 });
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
-
 /**
- * Example tool that uses sampling to analyze sentiment.
- *
- * The ctx.sample() function automatically:
- * - Sends progress notifications every 5 seconds while waiting for the LLM
- * - Has no timeout by default (waits indefinitely)
- * - Resets client-side timeouts when resetTimeoutOnProgress is enabled
+ * Example 1: Full control API with all options
+ * Use this when you need fine-grained control over model preferences, system prompts, etc.
  */
-server.tool({
-  name: "analyze-sentiment",
-  description:
-    "Analyze the sentiment of text using the client's LLM. Requires a client with sampling support.",
-  inputs: [
-    {
-      name: "text",
-      type: "string",
-      required: true,
-      description: "The text to analyze for sentiment",
-    },
-  ],
-  cb: async (params, ctx) => {
-    try {
-      // Request LLM analysis through sampling
-      // Progress notifications are sent automatically every 5 seconds
-      const prompt = `Analyze the sentiment of the following text as positive, negative, or neutral.
-Just output a single word - 'positive', 'negative', or 'neutral'.
-
-Text to analyze: ${params.text}`;
-
-      const result = await ctx.sample(
-        {
-          messages: [
-            {
-              role: "user",
-              content: { type: "text", text: prompt },
-            },
-          ],
-          modelPreferences: {
-            intelligencePriority: 0.8,
-            speedPriority: 0.5,
-          },
-          maxTokens: 100,
-        },
-        {
-          // Optional: custom progress handling
-          onProgress: ({
-            message,
-          }: {
-            progress: number;
-            total?: number;
-            message: string;
-          }) => console.log(`[Progress] ${message}`),
-          // Optional: custom progress interval (default: 5000ms)
-          // progressIntervalMs: 3000,
-          // Optional: timeout (default: no timeout)
-          // timeout: 120000, // 2 minutes
-        }
-      );
-
-      // Extract text from result
-      const content = Array.isArray(result.content)
-        ? result.content[0]
-        : result.content;
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Sentiment Analysis Result: ${content.text || "Unable to analyze sentiment"}`,
-          },
-        ],
-      };
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error during sampling: ${error.message || String(error)}`,
-          },
-        ],
-        isError: true,
-      };
-    }
+server.tool(
+  {
+    name: "analyze-sentiment",
+    description:
+      "Analyze sentiment using full control API with custom model preferences and progress tracking.",
+    schema: z.object({
+      text: z.string(),
+    }),
   },
-});
+  async (params, ctx) => {
+    const prompt = `Analyze the sentiment of the following text as positive, negative, or neutral. Just output a single word - 'positive', 'negative', or 'neutral'. The text to analyze is: ${params.text}`;
 
-/**
- * Example tool that uses sampling for text summarization.
- * Uses default options - no timeout, progress every 5 seconds.
- */
-server.tool({
-  name: "summarize-text",
-  description:
-    "Summarize text using the client's LLM. Requires a client with sampling support.",
-  inputs: [
-    {
-      name: "text",
-      type: "string",
-      required: true,
-      description: "The text to summarize",
-    },
-    {
-      name: "maxLength",
-      type: "number",
-      required: false,
-      description: "Maximum length of the summary in words (default: 50)",
-    },
-  ],
-  cb: async (params, ctx) => {
-    try {
-      const maxLength = params.maxLength || 50;
-      const prompt = `Summarize the following text in ${maxLength} words or less:
-
-${params.text}`;
-
-      // Simple call - progress is automatic
-      const result = await ctx.sample({
+    // Full control API - complete params object
+    const result = await ctx.sample(
+      {
         messages: [
           {
             role: "user",
@@ -135,119 +33,70 @@ ${params.text}`;
           },
         ],
         modelPreferences: {
-          intelligencePriority: 0.7,
-          speedPriority: 0.6,
+          intelligencePriority: 0.8,
+          speedPriority: 0.5,
         },
-        maxTokens: 200,
-      });
+        maxTokens: 100,
+      },
+      {
+        // Optional: custom progress handling
+        onProgress: ({ message }) => console.log(`[Progress] ${message}`),
+        // Optional: custom progress interval (default: 5000ms)
+        // progressIntervalMs: 3000,
+        // Optional: timeout (default: no timeout)
+        // timeout: 120000, // 2 minutes
+      }
+    );
 
-      const content = Array.isArray(result.content)
-        ? result.content[0]
-        : result.content;
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Summary: ${content.text || "Unable to generate summary"}`,
-          },
-        ],
-      };
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error during sampling: ${error.message || String(error)}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  },
-});
+    return text(`Sentiment: ${(result.content as any[])?.at(0)?.text}`);
+  }
+);
 
 /**
- * Example tool using server.createMessage() directly.
- * Note: This bypasses the automatic progress handling of ctx.sample().
- * Use ctx.sample() when you need automatic progress notifications.
+ * Example 2: Simplified string API - just pass a prompt
+ * Perfect for simple cases where you don't need custom model preferences
  */
-server.tool({
-  name: "translate-text",
-  description:
-    "Translate text to another language using the client's LLM. Requires a client with sampling support.",
-  inputs: [
-    {
-      name: "text",
-      type: "string",
-      required: true,
-      description: "The text to translate",
-    },
-    {
-      name: "targetLanguage",
-      type: "string",
-      required: true,
-      description: "The target language (e.g., 'Spanish', 'French', 'German')",
-    },
-  ],
-  cb: async (params, ctx) => {
-    try {
-      const result = await ctx.sample({
-        messages: [
-          {
-            role: "user",
-            content: {
-              type: "text",
-              text: `Translate the following text to ${params.targetLanguage}:\n\n${params.text}`,
-            },
-          },
-        ],
-        systemPrompt:
-          "You are a professional translator. Provide only the translation, no additional commentary.",
-        modelPreferences: {
-          intelligencePriority: 0.9,
-          speedPriority: 0.4,
-        },
-        maxTokens: 500,
-      });
-
-      const content = Array.isArray(result.content)
-        ? result.content[0]
-        : result.content;
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Translation: ${content.text || "Unable to translate"}`,
-          },
-        ],
-      };
-    } catch (error: any) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error during translation: ${error.message || String(error)}. Make sure the client supports sampling.`,
-          },
-        ],
-        isError: true,
-      };
-    }
+server.tool(
+  {
+    name: "analyze-sentiment-simple",
+    description:
+      "Analyze sentiment using simplified string API (recommended for most cases).",
+    schema: z.object({
+      text: z.string(),
+    }),
   },
-});
+  async (params, ctx) => {
+    // ✨ New simplified API - just pass a string!
+    // Automatically uses sensible defaults: maxTokens=1000, no model preference
+    const res = await ctx.sample(
+      `Analyze the sentiment of the following text as positive, negative, or neutral. Just output a single word - 'positive', 'negative', or 'neutral'. The text to analyze is: ${params.text}`
+    );
+    return text(`Sentiment: ${(res.content as any[])?.at(0)?.text}`);
+  }
+);
 
-// Start the server
-await server.listen(PORT);
-console.log(`🚀 Sampling Example Server running on port ${PORT}`);
-console.log(`📊 Inspector available at http://localhost:${PORT}/inspector`);
-console.log(`🔧 MCP endpoint at http://localhost:${PORT}/mcp`);
-console.log(`
-💡 This server requires a client with sampling support to use the tools.
-   See examples/client/sampling-client.ts for a client example.
+/**
+ * Example 3: Simplified API with custom options
+ * String prompt + options for when you need some customization
+ */
+server.tool(
+  {
+    name: "analyze-sentiment-with-options",
+    description:
+      "Analyze sentiment using simplified API with custom maxTokens and timeout.",
+    schema: z.object({
+      text: z.string(),
+    }),
+  },
+  async (params, ctx) => {
+    // String prompt with options - best of both worlds!
+    const res = await ctx.sample(`Analyze the sentiment: ${params.text}`, {
+      maxTokens: 50, // Custom token limit
+      temperature: 0.3, // Lower temperature for consistent results
+      timeout: 30000, // 30 second timeout
+    });
+    return text(`Sentiment: ${(res.content as any[])?.at(0)?.text}`);
+  }
+);
 
-📝 The ctx.sample() function automatically:
-   - Sends progress notifications every 5 seconds
-   - Has no timeout by default (waits indefinitely for LLM response)
-   - Prevents client-side timeouts when resetTimeoutOnProgress is enabled
-`);
+await server.listen();

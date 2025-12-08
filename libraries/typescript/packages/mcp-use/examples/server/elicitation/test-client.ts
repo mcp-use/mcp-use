@@ -2,14 +2,14 @@
  * Simple test client to verify elicitation implementation
  */
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
 import {
   ElicitRequestSchema,
   type ElicitRequestFormParams,
   type ElicitRequestURLParams,
   type ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 const SERVER_URL = "http://localhost:3002/mcp";
 

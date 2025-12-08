@@ -28,6 +28,13 @@ export type { StoredState } from "./auth/types.js";
 // Export logging (uses browser console in browser environments)
 export { Logger, logger } from "./logging.js";
 
+// Export unified telemetry (auto-detects browser/Node.js)
+export { Tel, Telemetry, setTelemetrySource } from "./telemetry/index.js";
+
+// Backwards compatibility aliases
+export { Tel as BrowserTelemetry } from "./telemetry/index.js";
+export { setTelemetrySource as setBrowserTelemetrySource } from "./telemetry/index.js";
+
 // Export observability
 export {
   type ObservabilityConfig,
@@ -48,4 +55,7 @@ export type {
   OAuthClientInformation,
   OAuthMetadata,
   OAuthTokens,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
+
+// Export version information (global)
+export { getPackageVersion, VERSION } from "./version.js";

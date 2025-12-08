@@ -1,22 +1,23 @@
 ---
 title: "Multi-Server Setup"
-description: "Configure and manage multiple MCP servers for complex workflows"
-icon: "split"
+description: "Connect to multiple MCP servers simultaneously"
+icon: "network"
 ---
 
-This guide shows you how to configure and use multiple MCP servers simultaneously with mcp_use, enabling complex workflows that span different domains.
+Multi-server setup enables your applications to connect to multiple MCP servers simultaneously, combining capabilities from different sources to build powerful, integrated workflows.
 
-## Overview
+## Why Use Multiple Servers?
 
-Using multiple MCP servers allows your agent to access a diverse set of tools from different sources. For example, you might want to:
+Combining multiple MCP servers allows you to:
 
-- **Web scraping** with Playwright + **File operations** with filesystem server
-- **Database queries** with SQLite + **API calls** with HTTP server
-- **Code execution** with Python server + **Git operations** with GitHub server
+- **Compose capabilities**: Combine tools from different domains (file operations + database + web)
+- **Specialize**: Use dedicated servers for specific tasks
+- **Scale**: Distribute workload across multiple servers
+- **Integrate**: Connect to both local and remote services
 
-<Info>
-The `MCPClient` can manage multiple servers, and the optional `ServerManager` can dynamically select the appropriate server for each task.
-</Info>
+<Tip>
+**Common Patterns**: Web scraping with Playwright + File operations with filesystem server, Database queries with SQLite + API calls with HTTP server, Code execution + Git operations + Documentation generation.
+</Tip>
 
 ## Basic Multi-Server Configuration
 
@@ -688,7 +689,7 @@ const agent = new MCPAgent({
   <Card title="Server Manager" icon="server" href="/typescript/agent/server-manager">
     Learn more about dynamic server selection and management
   </Card>
-  <Card title="Security Guide" icon="shield" href="/typescript/advanced/security">
+  <Card title="Security Guide" icon="shield" href="/typescript/development/security">
     Best practices for secure multi-server configurations
   </Card>
   <Card title="Agent Configuration" icon="zap" href="/typescript/agent/agent-configuration">

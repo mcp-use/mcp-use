@@ -1,13 +1,13 @@
 import type {
   Client,
   ClientOptions,
-} from "@modelcontextprotocol/sdk/client/index.js";
-import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
+} from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
+import type { RequestOptions } from "@mcp-use/modelcontextprotocol-sdk/shared/protocol.js";
 import {
   ListRootsRequestSchema,
   CreateMessageRequestSchema,
   ElicitRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type {
   CallToolResult,
   CreateMessageRequest,
@@ -18,9 +18,11 @@ import type {
   Notification,
   Root,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import { logger } from "../logging.js";
+import { Telemetry } from "../telemetry/index.js";
+import type { ConnectorInitEventData } from "../telemetry/events.js";
 
 /**
  * Handler function for server notifications
@@ -82,7 +84,7 @@ export abstract class BaseConnector {
   protected client: Client | null = null;
   protected connectionManager: ConnectionManager<any> | null = null;
   protected toolsCache: Tool[] | null = null;
-  protected capabilitiesCache: any = null;
+  protected capabilitiesCache: Record<string, unknown> | null = null;
   protected serverInfoCache: { name: string; version?: string } | null = null;
   protected connected = false;
   protected readonly opts: ConnectorInitOptions;
@@ -95,6 +97,22 @@ export abstract class BaseConnector {
     if (opts.roots) {
       this.rootsCache = [...opts.roots];
     }
+  }
+
+  /**
+   * Track connector initialization event
+   * Should be called by subclasses after successful connection
+   */
+  protected trackConnectorInit(
+    data: Omit<ConnectorInitEventData, "connectorType">
+  ): void {
+    const connectorType = this.constructor.name;
+    Telemetry.getInstance()
+      .trackConnectorInit({
+        connectorType,
+        ...data,
+      })
+      .catch((e) => logger.debug(`Failed to track connector init: ${e}`));
   }
 
   /**
@@ -236,7 +254,7 @@ export abstract class BaseConnector {
     // Handle roots/list requests from the server
     this.client.setRequestHandler(
       ListRootsRequestSchema,
-      async (_request, _extra) => {
+      async (_request: unknown, _extra: unknown) => {
         logger.debug(
           `Server requested roots list, returning ${this.rootsCache.length} root(s)`
         );
@@ -263,7 +281,7 @@ export abstract class BaseConnector {
     // Handle sampling/createMessage requests from the server
     this.client.setRequestHandler(
       CreateMessageRequestSchema,
-      async (request, _extra) => {
+      async (request: CreateMessageRequest, _extra: unknown) => {
         logger.debug("Server requested sampling, forwarding to callback");
         return await this.opts.samplingCallback!(request.params);
       }
@@ -293,7 +311,10 @@ export abstract class BaseConnector {
     // Handle elicitation/create requests from the server
     this.client.setRequestHandler(
       ElicitRequestSchema,
-      async (request, _extra) => {
+      async (
+        request: { params: ElicitRequestFormParams | ElicitRequestURLParams },
+        _extra: unknown
+      ) => {
         logger.debug("Server requested elicitation, forwarding to callback");
         return await this.opts.elicitationCallback!(request.params);
       }
@@ -346,7 +367,7 @@ export abstract class BaseConnector {
 
     // Cache server capabilities for callers who need them.
     const capabilities = this.client.getServerCapabilities();
-    this.capabilitiesCache = capabilities;
+    this.capabilitiesCache = (capabilities as Record<string, unknown>) || null;
 
     // Cache server info from the initialize response
     const serverInfo = this.client.getServerVersion();
@@ -374,8 +395,8 @@ export abstract class BaseConnector {
   }
 
   /** Expose cached server capabilities. */
-  get serverCapabilities(): any {
-    return this.capabilitiesCache;
+  get serverCapabilities(): Record<string, unknown> {
+    return this.capabilitiesCache || {};
   }
 
   /** Expose cached server info. */
@@ -460,15 +481,17 @@ export abstract class BaseConnector {
       let cursor: string | undefined = undefined;
 
       do {
-        const result = await this.client.listResources({ cursor }, options);
+        const result: { resources?: any[]; nextCursor?: string } =
+          await this.client.listResources({ cursor }, options);
         allResources.push(...(result.resources || []));
         cursor = result.nextCursor;
       } while (cursor);
 
       return { resources: allResources };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
-      if (err.code === -32601) {
+      if (error.code === -32601) {
         logger.debug("Server advertised resources but method not found");
         return { resources: [] };
       }
@@ -546,9 +569,10 @@ export abstract class BaseConnector {
     try {
       logger.debug("Listing prompts");
       return await this.client.listPrompts();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
-      if (err.code === -32601) {
+      if (error.code === -32601) {
         logger.debug("Server advertised prompts but method not found");
         return { prompts: [] };
       }

@@ -20,8 +20,14 @@ import { StdioConnector } from "./src/connectors/stdio.js";
 import { WebSocketConnector } from "./src/connectors/websocket.js";
 
 import { Logger, logger } from "./src/logging.js";
-import { MCPSession, Notification, Root } from "./src/session.js";
-import type { CreateMessageRequest } from "@modelcontextprotocol/sdk/types.js";
+import {
+  MCPSession,
+  type CallToolResult,
+  type Notification,
+  type Root,
+  type Tool,
+} from "./src/session.js";
+import type { CreateMessageRequest } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 export { BaseAdapter, LangChainAdapter } from "./src/adapters/index.js";
 // Export AI SDK utilities
@@ -38,6 +44,9 @@ export {
 
 // Export telemetry utilities
 export { setTelemetrySource, Telemetry } from "./src/telemetry/index.js";
+
+// Export version information (global)
+export { getPackageVersion, VERSION } from "./src/version.js";
 
 // Export OAuth helper (legacy - for backward compatibility)
 export {
@@ -81,12 +90,13 @@ export {
   MCPAgent,
   MCPClient,
   MCPSession,
-  Notification,
   RemoteAgent,
-  Root,
   StdioConnector,
   WebSocketConnector,
 };
+
+// Export session-related types
+export type { CallToolResult, Notification, Root, Tool };
 
 // Export notification types for handling server notifications
 export type { NotificationHandler };
@@ -125,7 +135,7 @@ export {
 export type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 /**
  * Type alias for the params property of CreateMessageRequest.

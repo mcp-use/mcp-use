@@ -1,20 +1,27 @@
 ---
-title: Building Custom Agents
-description: Learn how to build custom agents using MCPClient and integrate tools with different agent frameworks
-icon: "paintbrush"
+title: "Building Custom Agents"
+description: "Extend and customize the agent framework"
+icon: "code"
 ---
 
-# Building Custom Agents
+While the MCPAgent provides a complete, ready-to-use solution, you may want to build custom agents for specialized use cases, integration with existing systems, or advanced behavior.
 
-MCP-Use provides flexible options for building custom agents that can utilize MCP tools. This guide will show you how to create your own agents by leveraging the existing adapters, particularly focusing on the LangChain adapter.
+## Why Build Custom Agents?
 
-<Info>
-**Why Build Custom Agents?** While MCP-Use provides a built-in `MCPAgent` class, custom agents give you maximum flexibility to integrate with existing systems, implement specialized behavior, or use different agent frameworks.
-</Info>
+Build custom agents when you need:
 
-## Overview
+- **Specialized behavior**: Implement domain-specific logic or workflows
+- **Integration**: Connect with existing agent frameworks or systems
+- **Advanced control**: Fine-tune every aspect of agent behavior
+- **Unique patterns**: Implement custom decision-making or tool selection logic
 
-MCP-Use allows you to:
+<Tip>
+**Start with MCPAgent**: Before building a custom agent, consider if the built-in `MCPAgent` can meet your needs with configuration options like custom system prompts, structured output, or server manager.
+</Tip>
+
+## Architecture Overview
+
+Building custom agents with mcp-use involves:
 
 <CardGroup cols={3}>
   <Card title="Access Tools" icon="plug">

@@ -1,5 +1,114 @@
 # @mcp-use/inspector
 
+## 0.12.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [f0fc5a2]
+  - mcp-use@1.10.0-canary.11
+
+## 0.12.0-canary.10
+
+### Patch Changes
+
+- 0633fbd: fix: build mcp use first
+  - mcp-use@1.10.0-canary.10
+
+## 0.12.0-canary.9
+
+### Patch Changes
+
+- 79ce293: fix: use tool meta instead of result for appssdk
+  - mcp-use@1.10.0-canary.9
+
+## 0.12.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [54ccbd8]
+  - mcp-use@1.10.0-canary.8
+
+## 0.12.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [48b0133]
+  - mcp-use@1.10.0-canary.7
+
+## 0.12.0-canary.6
+
+### Patch Changes
+
+- c4fe367: chore: replace official sdk with fork in imports
+- Updated dependencies [c4fe367]
+  - mcp-use@1.10.0-canary.6
+
+## 0.12.0-canary.5
+
+### Patch Changes
+
+- 4d61e84: chore: switch official sdk from npm to fork with edge runtime support
+- Updated dependencies [4d61e84]
+  - mcp-use@1.10.0-canary.5
+
+## 0.12.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [4f8c871]
+  - mcp-use@1.10.0-canary.4
+
+## 0.12.0-canary.3
+
+### Patch Changes
+
+- 1379b00: chore: fix types
+- Updated dependencies [1379b00]
+  - mcp-use@1.10.0-canary.3
+
+## 0.12.0-canary.2
+
+### Minor Changes
+
+- 96e4097: ## Breaking Changes
+  - **Server API**: Renamed `createMCPServer()` factory function to `MCPServer` class constructor. The factory function is still available for backward compatibility but new code should use `new MCPServer({ name, ... })`.
+  - **Session API**: Replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct methods: `session.tools`, `session.callTool()`, `session.listResources()`, `session.readResource()`, etc.
+  - **OAuth Environment Variables**: Standardized OAuth env vars to `MCP_USE_OAUTH_*` prefix (e.g., `AUTH0_DOMAIN` → `MCP_USE_OAUTH_AUTH0_DOMAIN`).
+
+  ## New Features
+  - **Client Capabilities API**: Added `ctx.client.can()` and `ctx.client.capabilities()` to check client capabilities in tool callbacks.
+  - **Session Notifications**: Added `ctx.sendNotification()` and `ctx.sendNotificationToSession()` for sending notifications from tool callbacks.
+  - **Session Info**: Added `ctx.session.sessionId` to access current session ID in tool callbacks.
+  - **Resource Template Flat Structure**: Resource templates now support flat structure with `uriTemplate` directly on definition (in addition to nested structure).
+  - **Resource Template Callback Signatures**: Resource template callbacks now support multiple signatures: `()`, `(uri)`, `(uri, params)`, `(uri, params, ctx)`.
+  - **Type Exports**: Added exports for `CallToolResult`, `Tool`, `ToolAnnotations`, `PromptResult`, `GetPromptResult` types.
+
+  ## Improvements
+  - **Type Inference**: Enhanced type inference for resource template callbacks with better overload support.
+  - **Client Capabilities Tracking**: Server now captures and stores client capabilities during initialization.
+  - **Session Methods**: Added convenience methods to `MCPSession` for all MCP operations (listResources, readResource, subscribeToResource, listPrompts, getPrompt, etc.).
+  - **Documentation**: Major documentation refactoring and restructuring for better organization.
+
+### Patch Changes
+
+- Updated dependencies [96e4097]
+  - mcp-use@1.10.0-canary.2
+
+## 0.11.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [94f4852]
+  - mcp-use@1.9.1-canary.1
+
+## 0.11.1-canary.0
+
+### Patch Changes
+
+- 4d1aa19: fix: refactor to use https://github.com/modelcontextprotocol/typescript-sdk/pull/1209
+- Updated dependencies [4d1aa19]
+  - mcp-use@1.9.1-canary.0
+
 ## 0.11.0
 
 ### Minor Changes

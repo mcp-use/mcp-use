@@ -24,16 +24,17 @@ pnpm add mcp-use
 ## Quick Start
 
 ```typescript
-import { create } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
 // Create an MCP server
-const mcp = create('my-mcp-server', {
+const server = new MCPServer({
+  name: 'my-mcp-server',
   version: '0.1.0',
   description: 'My awesome MCP server',
 })
 
 // Define a resource
-mcp.resource({
+server.resource({
   uri: 'dir://desktop',
   name: 'Desktop Directory',
   description: 'Lists files on the desktop',
@@ -44,7 +45,7 @@ mcp.resource({
 })
 
 // Define a tool
-mcp.tool({
+server.tool({
   name: 'greet',
   description: 'Greets a person',
   inputs: [
@@ -61,7 +62,7 @@ mcp.tool({
 })
 
 // Define a prompt
-mcp.prompt({
+server.prompt({
   name: 'introduction',
   description: 'Generates an introduction',
   args: [
@@ -78,25 +79,43 @@ mcp.prompt({
 })
 
 // Start the server
-mcp.serve().catch(console.error)
+await server.listen(3000)
 ```
 
 ## API Reference
 
-### `create(name, config?)`
+### `new MCPServer(config)`
 
-Creates a new MCP server instance.
+Creates a new MCP server instance using the class constructor (recommended).
+
+**Parameters:**
+
+- `config` (object): Server configuration
+  - `name` (string): The server name
+  - `version` (string): Server version (default: '1.0.0')
+  - `description` (string, optional): Server description
+  - `host` (string, optional): Hostname for widget URLs (default: 'localhost')
+  - `baseUrl` (string, optional): Full base URL (overrides host:port)
+  - `allowedOrigins` (string[], optional): Allowed origins for DNS rebinding protection
+  - `sessionIdleTimeoutMs` (number, optional): Idle timeout for sessions (default: 300000)
+  - `oauth` (OAuthProvider, optional): OAuth authentication configuration
+
+**Returns:** `MCPServer` instance
+
+### `createMCPServer(name, config?)` (Legacy)
+
+Creates a new MCP server instance using the factory function. This is kept for backward compatibility.
 
 **Parameters:**
 
 - `name` (string): The server name
-- `config` (object, optional): Server configuration
-  - `version` (string): Server version (default: '1.0.0')
-  - `description` (string): Server description
+- `config` (object, optional): Server configuration (same as above, except `name` is passed separately)
 
-**Returns:** `McpServer` instance
+**Returns:** `McpServerInstance` (same as `MCPServer`)
 
-### `mcp.resource(definition)`
+**Note:** The factory function internally uses `new MCPServer()`. For new code, prefer the class constructor.
+
+### `server.resource(definition)`
 
 Defines a resource that can be accessed by clients.
 
@@ -108,7 +127,7 @@ Defines a resource that can be accessed by clients.
 - `definition.mimeType` (string, optional): MIME type
 - `definition.readCallback` (function): Async callback function that returns the resource content
 
-### `mcp.tool(definition)`
+### `server.tool(definition)`
 
 Defines a tool that can be called by clients.
 
@@ -123,7 +142,7 @@ Defines a tool that can be called by clients.
   - `required` (boolean, optional): Whether parameter is required
 - `definition.cb` (function): Async callback function that processes the tool call
 
-### `mcp.prompt(definition)`
+### `server.prompt(definition)`
 
 Defines a prompt template.
 
@@ -134,7 +153,7 @@ Defines a prompt template.
 - `definition.args` (array, optional): Prompt arguments (same structure as tool inputs)
 - `definition.cb` (function): Async callback function that generates the prompt content
 
-### `mcp.template(definition)`
+### `server.resourceTemplate(definition)`
 
 Defines a resource template with parameterized URIs.
 
@@ -146,9 +165,12 @@ Defines a resource template with parameterized URIs.
 - `definition.mimeType` (string, optional): MIME type
 - `definition.readCallback` (function): Async callback function that processes template parameters
 
-### `mcp.serve()`
+### `server.listen(port?)`
 
 Starts the MCP server. Returns a Promise that resolves when the server is running.
+
+**Parameters:**
+- `port` (number, optional): Port number to listen on (default: 3000, or PORT environment variable)
 
 ## Examples
 
@@ -157,14 +179,15 @@ Starts the MCP server. Returns a Promise that resolves when the server is runnin
 ```typescript
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { create } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-const mcp = create('filesystem-server', {
+const server = new MCPServer({
+  name: 'filesystem-server',
   version: '1.0.0',
 })
 
 // Resource for listing directory contents
-mcp.resource({
+server.resource({
   uri: 'fs://list',
   name: 'Directory Listing',
   description: 'Lists files in a directory',
@@ -175,7 +198,7 @@ mcp.resource({
 })
 
 // Tool for reading files
-mcp.tool({
+server.tool({
   name: 'read-file',
   description: 'Read the contents of a file',
   inputs: [
@@ -192,20 +215,21 @@ mcp.tool({
   },
 })
 
-mcp.serve().catch(console.error)
+await server.listen(3000)
 ```
 
 ### Weather Server
 
 ```typescript
-import { create } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-const mcp = create('weather-server', {
+const server = new MCPServer({
+  name: 'weather-server',
   version: '1.0.0',
 })
 
 // Weather resource
-mcp.resource({
+server.resource({
   uri: 'weather://current',
   name: 'Current Weather',
   description: 'Current weather information',
@@ -221,7 +245,7 @@ mcp.resource({
 })
 
 // Weather tool
-mcp.tool({
+server.tool({
   name: 'get-weather',
   description: 'Get weather for a specific location',
   inputs: [
@@ -238,20 +262,20 @@ mcp.tool({
   },
 })
 
-mcp.serve().catch(console.error)
+await server.listen(3000)
 ```
 
 ## Advanced Usage
 
 ### Custom Transport
 
-The server uses stdio transport by default, but you can extend the `McpServer` class to use different transports:
+The server uses HTTP transport by default, but you can extend the `MCPServer` class to use different transports:
 
 ```typescript
 import { WebSocketServerTransport } from '@modelcontextprotocol/sdk/server/websocket.js'
-import { McpServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-class CustomMcpServer extends McpServer {
+class CustomMCPServer extends MCPServer {
   async serveWithWebSocket(port: number) {
     const transport = new WebSocketServerTransport(port)
     await this.server.connect(transport)
@@ -262,7 +286,7 @@ class CustomMcpServer extends McpServer {
 ### Error Handling
 
 ```typescript
-mcp.tool({
+server.tool({
   name: 'risky-operation',
   description: 'An operation that might fail',
   cb: async ({ input }) => {

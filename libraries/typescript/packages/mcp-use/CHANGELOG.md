@@ -1,5 +1,126 @@
 # mcp-use
 
+## 1.10.0-canary.11
+
+### Patch Changes
+
+- f0fc5a2: add browser tel
+  - @mcp-use/cli@2.5.0-canary.11
+  - @mcp-use/inspector@0.12.0-canary.11
+
+## 1.10.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [0633fbd]
+  - @mcp-use/inspector@0.12.0-canary.10
+  - @mcp-use/cli@2.5.0-canary.10
+
+## 1.10.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [79ce293]
+  - @mcp-use/inspector@0.12.0-canary.9
+  - @mcp-use/cli@2.5.0-canary.9
+
+## 1.10.0-canary.8
+
+### Patch Changes
+
+- 54ccbd8: fix: codeql warns
+  - @mcp-use/cli@2.5.0-canary.8
+  - @mcp-use/inspector@0.12.0-canary.8
+
+## 1.10.0-canary.7
+
+### Patch Changes
+
+- 48b0133: feat: improve tel
+  - @mcp-use/cli@2.5.0-canary.7
+  - @mcp-use/inspector@0.12.0-canary.7
+
+## 1.10.0-canary.6
+
+### Patch Changes
+
+- c4fe367: chore: replace official sdk with fork in imports
+- Updated dependencies [c4fe367]
+  - @mcp-use/inspector@0.12.0-canary.6
+  - @mcp-use/cli@2.5.0-canary.6
+
+## 1.10.0-canary.5
+
+### Patch Changes
+
+- 4d61e84: chore: switch official sdk from npm to fork with edge runtime support
+- Updated dependencies [4d61e84]
+  - @mcp-use/inspector@0.12.0-canary.5
+  - @mcp-use/cli@2.5.0-canary.5
+
+## 1.10.0-canary.4
+
+### Patch Changes
+
+- 4f8c871: chore: trigger canary
+  - @mcp-use/cli@2.5.0-canary.4
+  - @mcp-use/inspector@0.12.0-canary.4
+
+## 1.10.0-canary.3
+
+### Patch Changes
+
+- 1379b00: chore: fix types
+- Updated dependencies [1379b00]
+  - @mcp-use/inspector@0.12.0-canary.3
+  - @mcp-use/cli@2.5.0-canary.3
+
+## 1.10.0-canary.2
+
+### Minor Changes
+
+- 96e4097: ## Breaking Changes
+  - **Server API**: Renamed `createMCPServer()` factory function to `MCPServer` class constructor. The factory function is still available for backward compatibility but new code should use `new MCPServer({ name, ... })`.
+  - **Session API**: Replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct methods: `session.tools`, `session.callTool()`, `session.listResources()`, `session.readResource()`, etc.
+  - **OAuth Environment Variables**: Standardized OAuth env vars to `MCP_USE_OAUTH_*` prefix (e.g., `AUTH0_DOMAIN` → `MCP_USE_OAUTH_AUTH0_DOMAIN`).
+
+  ## New Features
+  - **Client Capabilities API**: Added `ctx.client.can()` and `ctx.client.capabilities()` to check client capabilities in tool callbacks.
+  - **Session Notifications**: Added `ctx.sendNotification()` and `ctx.sendNotificationToSession()` for sending notifications from tool callbacks.
+  - **Session Info**: Added `ctx.session.sessionId` to access current session ID in tool callbacks.
+  - **Resource Template Flat Structure**: Resource templates now support flat structure with `uriTemplate` directly on definition (in addition to nested structure).
+  - **Resource Template Callback Signatures**: Resource template callbacks now support multiple signatures: `()`, `(uri)`, `(uri, params)`, `(uri, params, ctx)`.
+  - **Type Exports**: Added exports for `CallToolResult`, `Tool`, `ToolAnnotations`, `PromptResult`, `GetPromptResult` types.
+
+  ## Improvements
+  - **Type Inference**: Enhanced type inference for resource template callbacks with better overload support.
+  - **Client Capabilities Tracking**: Server now captures and stores client capabilities during initialization.
+  - **Session Methods**: Added convenience methods to `MCPSession` for all MCP operations (listResources, readResource, subscribeToResource, listPrompts, getPrompt, etc.).
+  - **Documentation**: Major documentation refactoring and restructuring for better organization.
+
+### Patch Changes
+
+- Updated dependencies [96e4097]
+  - @mcp-use/inspector@0.12.0-canary.2
+  - @mcp-use/cli@2.5.0-canary.2
+
+## 1.9.1-canary.1
+
+### Patch Changes
+
+- 94f4852: fix: getServerBase url was not called anymore, fixed
+  - @mcp-use/cli@2.4.9-canary.1
+  - @mcp-use/inspector@0.11.1-canary.1
+
+## 1.9.1-canary.0
+
+### Patch Changes
+
+- 4d1aa19: fix: refactor to use https://github.com/modelcontextprotocol/typescript-sdk/pull/1209
+- Updated dependencies [4d1aa19]
+  - @mcp-use/inspector@0.11.1-canary.0
+  - @mcp-use/cli@2.4.9-canary.0
+
 ## 1.9.0
 
 ### Minor Changes

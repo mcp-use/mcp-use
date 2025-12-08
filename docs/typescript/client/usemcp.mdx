@@ -1,13 +1,25 @@
 ---
 title: "useMcp Hook"
-description: "React hook for connecting to and interacting with MCP servers"
-icon: "webhook"
+description: "React integration for MCP client connections"
+icon: "react"
 tag: "New"
 ---
 
-# useMcp Hook
+The `useMcp` React hook provides a complete, batteries-included solution for connecting React applications to MCP servers. It manages connections, authentication, tool calls, and state synchronization automatically.
 
-The `useMcp` hook provides a complete React interface for MCP server connections. It handles connection management, authentication, tool execution, and AI chat—all with automatic reconnection and OAuth support.
+## Features
+
+The hook provides:
+
+- **Automatic connection management**: Handles connect, disconnect, and reconnect
+- **OAuth support**: Complete OAuth flow with token management
+- **Tool execution**: Call tools with automatic error handling
+- **Real-time state**: Reactive state updates for UI synchronization
+- **Type safety**: Full TypeScript support with automatic type inference
+
+<Tip>
+**Perfect for React Apps**: The hook handles all the complexity of MCP connections, letting you focus on building your UI. Just call `useMcp()` and you're ready to go.
+</Tip>
 
 ## Basic Usage
 
