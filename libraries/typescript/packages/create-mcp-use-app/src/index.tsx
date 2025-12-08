@@ -15,7 +15,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ora from "ora";
 import React, { useState } from "react";
@@ -162,6 +162,22 @@ function tryGitInit(root: string): boolean {
   }
 }
 
+// Helper function to recursively find tar files in a directory
+function findTarFilesRecursive(dir: string, files: string[] = []): string[] {
+  const entries = readdirSync(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      findTarFilesRecursive(fullPath, files);
+    } else if (entry.name.endsWith(".tgz")) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
 // Helper function to find and validate tar files in a directory
 function findTarFiles(tarDirectory: string): Record<string, string> {
   const absPath = resolve(tarDirectory);
@@ -171,26 +187,28 @@ function findTarFiles(tarDirectory: string): Record<string, string> {
     process.exit(1);
   }
 
-  const files = readdirSync(absPath);
+  // Recursively find all .tgz files
+  const allTarFiles = findTarFilesRecursive(absPath);
   const tarFiles: Record<string, string> = {};
 
   // Define the required packages and their tar file patterns
   const packagePatterns = [
-    { name: "mcp-use", pattern: /^mcp-use-.*\.tgz$/, exclude: /cli|inspector/ },
-    { name: "@mcp-use/cli", pattern: /^mcp-use-cli-.*\.tgz$/ },
-    { name: "@mcp-use/inspector", pattern: /^mcp-use-inspector-.*\.tgz$/ },
+    { name: "mcp-use", pattern: /mcp-use-.*\.tgz$/, exclude: /cli|inspector/ },
+    { name: "@mcp-use/cli", pattern: /mcp-use-cli-.*\.tgz$/ },
+    { name: "@mcp-use/inspector", pattern: /mcp-use-inspector-.*\.tgz$/ },
   ];
 
   for (const { name, pattern, exclude } of packagePatterns) {
-    const found = files.find((file) => {
-      const matches = pattern.test(file);
+    const found = allTarFiles.find((filePath) => {
+      const fileName = basename(filePath);
+      const matches = pattern.test(fileName);
       if (!matches) return false;
-      if (exclude) return !exclude.test(file);
+      if (exclude) return !exclude.test(fileName);
       return true;
     });
 
     if (found) {
-      tarFiles[name] = resolve(absPath, found);
+      tarFiles[name] = found;
     }
   }
 
@@ -207,7 +225,7 @@ function findTarFiles(tarDirectory: string): Record<string, string> {
     console.error(chalk.yellow(`   Searched in: ${absPath}`));
     console.error(
       chalk.yellow(
-        `   Found files: ${files.filter((f) => f.endsWith(".tgz")).join(", ") || "none"}`
+        `   Found .tgz files: ${allTarFiles.map((f) => basename(f)).join(", ") || "none"}`
       )
     );
     process.exit(1);
