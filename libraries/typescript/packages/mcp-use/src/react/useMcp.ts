@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { BrowserMCPClient } from "../client/browser.js";
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
+import { Tel } from "../telemetry/index.js";
 import { assert } from "../utils/assert.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
@@ -196,8 +197,23 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
       }
       connectingRef.current = false;
+
+      // Track failed connection
+      if (url) {
+        Tel.getInstance()
+          .trackUseMcpConnection({
+            url,
+            transportType: transportType,
+            success: false,
+            errorType: connectionError?.name || "UnknownError",
+            hasOAuth: !!authProviderRef.current,
+            hasSampling: !!samplingCallback,
+            hasElicitation: !!onElicitation,
+          })
+          .catch(() => {});
+      }
     },
-    [addLog]
+    [addLog, url, transportType, samplingCallback, onElicitation]
   );
 
   /**
@@ -340,6 +356,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
+
+        // Track successful connection
+        Tel.getInstance()
+          .trackUseMcpConnection({
+            url,
+            transportType: transportTypeParam,
+            success: true,
+            hasOAuth: !!authProviderRef.current,
+            hasSampling: !!samplingCallback,
+            hasElicitation: !!onElicitation,
+          })
+          .catch(() => {});
 
         // Get tools, resources, prompts from session connector
         setTools(session.connector.tools || []);
@@ -551,6 +579,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
       }
       addLog("info", `Calling tool: ${name}`, args);
+      const startTime = Date.now();
       try {
         const serverName = "inspector-server";
         const session = clientRef.current.getSession(serverName);
@@ -563,9 +592,30 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           options
         );
         addLog("info", `Tool "${name}" call successful:`, result);
+
+        // Track successful tool call
+        Tel.getInstance()
+          .trackUseMcpToolCall({
+            toolName: name,
+            success: true,
+            executionTimeMs: Date.now() - startTime,
+          })
+          .catch(() => {});
+
         return result;
       } catch (err) {
         addLog("error", `Tool "${name}" call failed:`, err);
+
+        // Track failed tool call
+        Tel.getInstance()
+          .trackUseMcpToolCall({
+            toolName: name,
+            success: false,
+            errorType: err instanceof Error ? err.name : "UnknownError",
+            executionTimeMs: Date.now() - startTime,
+          })
+          .catch(() => {});
+
         throw err;
       }
     },
@@ -796,9 +846,28 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
         const result = await session.connector.readResource(uri);
         addLog("info", "Resource read successful:", result);
+
+        // Track successful resource read
+        Tel.getInstance()
+          .trackUseMcpResourceRead({
+            resourceUri: uri,
+            success: true,
+          })
+          .catch(() => {});
+
         return result;
       } catch (err) {
         addLog("error", "Resource read failed:", err);
+
+        // Track failed resource read
+        Tel.getInstance()
+          .trackUseMcpResourceRead({
+            resourceUri: uri,
+            success: false,
+            errorType: err instanceof Error ? err.name : "UnknownError",
+          })
+          .catch(() => {});
+
         throw err;
       }
     },

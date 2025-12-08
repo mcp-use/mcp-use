@@ -1,6 +1,8 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { WebSocketConnector } from "../connectors/websocket.js";
+import { logger } from "../logging.js";
+import { Tel } from "../telemetry/index.js";
 import { getPackageVersion } from "../version.js";
 import { BaseMCPClient } from "./base.js";
 
@@ -24,6 +26,25 @@ export class BrowserMCPClient extends BaseMCPClient {
 
   constructor(config?: Record<string, any>) {
     super(config);
+    this._trackClientInit();
+  }
+
+  private _trackClientInit(): void {
+    const servers = Object.keys(this.config.mcpServers ?? {});
+
+    Tel.getInstance()
+      .trackMCPClientInit({
+        codeMode: false, // Browser client doesn't support code mode
+        sandbox: false, // Sandbox not supported in browser
+        allCallbacks: false, // Will be set per-server
+        verify: false,
+        servers,
+        numServers: servers.length,
+        isBrowser: true, // Browser MCPClient
+      })
+      .catch((e) =>
+        logger.debug(`Failed to track BrowserMCPClient init: ${e}`)
+      );
   }
 
   public static fromDict(cfg: Record<string, any>): BrowserMCPClient {

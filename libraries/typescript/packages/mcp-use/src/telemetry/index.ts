@@ -1,5 +1,3 @@
-import { Telemetry } from "./telemetry.js";
-
 export {
   BaseTelemetryEvent,
   MCPAgentExecutionEvent,
@@ -11,6 +9,8 @@ export {
   ServerContextEvent,
   MCPClientInitEvent,
   ConnectorInitEvent,
+  ClientAddServerEvent,
+  ClientRemoveServerEvent,
 } from "./events.js";
 
 export type {
@@ -23,21 +23,26 @@ export type {
   ServerContextEventData,
   MCPClientInitEventData,
   ConnectorInitEventData,
+  ClientAddServerEventInput,
+  ClientRemoveServerEventInput,
   Tool,
   Resource,
   Prompt,
   Content,
 } from "./events.js";
 
-export { Telemetry } from "./telemetry.js";
+export {
+  Telemetry,
+  Tel,
+  setTelemetrySource,
+  isBrowserEnvironment,
+} from "./telemetry.js";
+
+export type { RuntimeEnvironment } from "./telemetry.js";
+
 export {
   extractModelInfo,
   getModelName,
   getModelProvider,
   getPackageVersion,
 } from "./utils.js";
-
-// Convenience function to set telemetry source globally
-export function setTelemetrySource(source: string): void {
-  Telemetry.getInstance().setSource(source);
-}
