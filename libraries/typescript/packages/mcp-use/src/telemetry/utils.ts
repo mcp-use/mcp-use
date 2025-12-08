@@ -1,14 +1,6 @@
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-import { VERSION } from "./version.js";
-
-/**
- * Get the package version.
- * The version is embedded at build time via scripts/generate-version.mjs
- * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
- */
-export function getPackageVersion(): string {
-  return VERSION;
-}
+// Re-export from global version module for backward compatibility
+export { VERSION, getPackageVersion } from "../version.js";
 
 export function getModelProvider(llm: BaseLanguageModel): string {
   // Use LangChain's standard _llm_type property for identification

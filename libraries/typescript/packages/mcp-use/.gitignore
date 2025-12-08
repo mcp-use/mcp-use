@@ -61,4 +61,4 @@ conf.yaml
 .claude
 
 # Auto-generated files
-src/telemetry/version.ts
+src/version.ts

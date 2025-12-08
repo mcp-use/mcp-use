@@ -10,6 +10,7 @@ import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
 import { Telemetry } from "../telemetry/index.js";
+import { getPackageVersion } from "../version.js";
 
 import { uiResourceRegistration, mountWidgets } from "./widgets/index.js";
 import { mountInspectorUI } from "./inspector/index.js";
@@ -86,6 +87,14 @@ import type {
 } from "./types/resource.js";
 
 class MCPServerClass<HasOAuth extends boolean = false> {
+  /**
+   * Get the mcp-use package version.
+   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+   */
+  public static getPackageVersion(): string {
+    return getPackageVersion();
+  }
+
   /**
    * Native MCP server instance from @modelcontextprotocol/sdk
    * Exposed publicly for advanced use cases

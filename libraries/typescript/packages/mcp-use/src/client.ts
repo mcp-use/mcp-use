@@ -20,6 +20,7 @@ import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
 import { MCPSession } from "./session.js";
 import { Telemetry } from "./telemetry/index.js";
+import { getPackageVersion } from "./version.js";
 
 export type CodeExecutorFunction = (
   code: string,
@@ -89,6 +90,14 @@ export {
  * - Code execution mode
  */
 export class MCPClient extends BaseMCPClient {
+  /**
+   * Get the mcp-use package version.
+   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+   */
+  public static getPackageVersion(): string {
+    return getPackageVersion();
+  }
+
   public codeMode: boolean = false;
   private _codeExecutor: BaseCodeExecutor | null = null;
   private _customCodeExecutor: CodeExecutorFunction | null = null;

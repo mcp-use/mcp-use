@@ -45,6 +45,9 @@ export {
 // Export telemetry utilities
 export { setTelemetrySource, Telemetry } from "./src/telemetry/index.js";
 
+// Export version information (global)
+export { getPackageVersion, VERSION } from "./src/version.js";
+
 // Export OAuth helper (legacy - for backward compatibility)
 export {
   createOAuthMCPConfig,

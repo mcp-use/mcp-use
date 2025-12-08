@@ -49,3 +49,6 @@ export type {
   OAuthMetadata,
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+
+// Export version information (global)
+export { getPackageVersion, VERSION } from "./version.js";
