@@ -36,6 +36,8 @@ on:
       - 'libraries/typescript/packages/mcp-use/examples/server/conformance/**'
       - '.github/workflows/conformance.yml'
 
+permissions:
+  contents: read
 jobs:
   conformance-test:
     name: Run Conformance Tests
