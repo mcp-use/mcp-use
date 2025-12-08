@@ -526,6 +526,7 @@ export interface MCPClientInitEventData {
   verify: boolean;
   servers: string[];
   numServers: number;
+  isBrowser: boolean; // true for BrowserMCPClient, false for Node.js MCPClient
 }
 
 export class MCPClientInitEvent extends BaseTelemetryEvent {
@@ -545,6 +546,7 @@ export class MCPClientInitEvent extends BaseTelemetryEvent {
       verify: this.data.verify,
       servers: this.data.servers,
       num_servers: this.data.numServers,
+      is_browser: this.data.isBrowser,
     };
   }
 }
@@ -577,6 +579,76 @@ export class ConnectorInitEvent extends BaseTelemetryEvent {
       server_args: this.data.serverArgs ?? null,
       server_url: this.data.serverUrl ?? null,
       public_identifier: this.data.publicIdentifier ?? null,
+    };
+  }
+}
+
+// ============================================================================
+// ClientAddServerEvent
+// ============================================================================
+
+/**
+ * Raw input data for tracking server addition.
+ * The event class will extract the necessary properties.
+ */
+export interface ClientAddServerEventInput {
+  serverName: string;
+  serverConfig: Record<string, any>;
+}
+
+export class ClientAddServerEvent extends BaseTelemetryEvent {
+  constructor(private data: ClientAddServerEventInput) {
+    super();
+  }
+
+  get name(): string {
+    return "client_add_server";
+  }
+
+  get properties(): Record<string, any> {
+    const { serverName, serverConfig } = this.data;
+    const url = serverConfig.url;
+
+    return {
+      server_name: serverName,
+      server_url_domain: url ? this._extractHostname(url) : null,
+      transport: serverConfig.transport ?? null,
+      has_auth: !!(serverConfig.authToken || serverConfig.authProvider),
+    };
+  }
+
+  private _extractHostname(url: string): string | null {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return null;
+    }
+  }
+}
+
+// ============================================================================
+// ClientRemoveServerEvent
+// ============================================================================
+
+/**
+ * Raw input data for tracking server removal.
+ */
+export interface ClientRemoveServerEventInput {
+  serverName: string;
+}
+
+export class ClientRemoveServerEvent extends BaseTelemetryEvent {
+  constructor(private data: ClientRemoveServerEventInput) {
+    super();
+  }
+
+  get name(): string {
+    return "client_remove_server";
+  }
+
+  get properties(): Record<string, any> {
+    return {
+      server_name: this.data.serverName,
     };
   }
 }
