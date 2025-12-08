@@ -1,7 +1,6 @@
 import type {
   BaseTelemetryEvent,
   MCPAgentExecutionEventData,
-  ServerRunEventData,
   ServerInitializeEventData,
   ServerToolCallEventData,
   ServerResourceCallEventData,
