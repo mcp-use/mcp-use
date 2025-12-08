@@ -222,8 +222,15 @@ jobs:
           cd libraries/typescript
           pnpm changeset publish
 
-          # Push git tags from repo root
+          # Capture new tags created by changeset before pushing
           cd ../..
+          NEW_TAGS=$(git tag --points-at HEAD)
+          echo "📦 Tags created: $NEW_TAGS"
+
+          # Save tags to a file for the next step
+          echo "$NEW_TAGS" > .release-tags
+
+          # Push git tags
           git push --follow-tags
 
           echo "✅ Published packages to npm using trusted publishing and pushed tags"
@@ -274,46 +281,58 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Fetch all tags
-          git fetch --tags
-
-          # Get tags from the last commit (the publish commit creates tags)
-          TAGS=$(git tag --points-at HEAD)
-
-          if [ -z "$TAGS" ]; then
-            echo "ℹ️  No tags found on current commit"
+          # Check if tags file exists
+          if [ ! -f .release-tags ]; then
+            echo "ℹ️  No release tags file found"
             exit 0
           fi
 
-          # Get the date for the release title
-          RELEASE_DATE=$(date +"%Y-%m-%d")
-          
-          # Generate release notes combining all packages
-          RELEASE_NOTES="# TypeScript Packages Release - $RELEASE_DATE"$'\n\n'
-          RELEASE_NOTES+="## 📦 Published Packages"$'\n\n'
-          
-          # Track the first/main tag for the release name
-          MAIN_TAG=""
-          
-          # Loop through all tags to build combined release notes
+          # Read tags from the saved file
+          TAGS=$(cat .release-tags)
+
+          if [ -z "$TAGS" ]; then
+            echo "ℹ️  No tags found in release tags file"
+            exit 0
+          fi
+
+          echo "📦 Creating individual GitHub releases for: $TAGS"
+
+          # Loop through each tag and create individual releases
           for TAG in $TAGS; do
-            if [ -z "$MAIN_TAG" ]; then
-              MAIN_TAG="$TAG"
+            echo ""
+            echo "Processing tag: $TAG"
+            
+            # Check if release already exists
+            if gh release view "$TAG" &>/dev/null; then
+              echo "⚠️  Release for $TAG already exists, skipping"
+              continue
             fi
             
-            echo "Processing $TAG..."
-            
             # Extract package name and version
-            PACKAGE_NAME=$(echo "$TAG" | sed 's/@[0-9].*//')
-            VERSION=$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+.*')
+            # Handle both @scope/package@version and package@version formats
+            if [[ "$TAG" == @*@* ]]; then
+              # Format: @scope/package@version
+              PACKAGE_NAME=$(echo "$TAG" | sed 's/@[0-9].*//')
+              VERSION=$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+.*')
+              PACKAGE_DIR=$(echo "$PACKAGE_NAME" | sed 's/@.*\///')
+            else
+              # Format: package@version
+              PACKAGE_NAME=$(echo "$TAG" | sed 's/@[0-9].*//')
+              VERSION=$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+.*')
+              PACKAGE_DIR="$PACKAGE_NAME"
+            fi
             
-            # Add package header
-            RELEASE_NOTES+="### \`$TAG\`"$'\n\n'
+            echo "  Package: $PACKAGE_NAME"
+            echo "  Version: $VERSION"
+            echo "  Directory: $PACKAGE_DIR"
             
-            # Try to extract changelog for this version
-            CHANGELOG_FILE="libraries/typescript/packages/${PACKAGE_NAME##*\/}/CHANGELOG.md"
+            # Find and extract changelog
+            CHANGELOG_FILE="libraries/typescript/packages/${PACKAGE_DIR}/CHANGELOG.md"
+            RELEASE_NOTES=""
             
             if [ -f "$CHANGELOG_FILE" ]; then
+              echo "  Found CHANGELOG at: $CHANGELOG_FILE"
+              
               # Extract the changelog for this specific version
               PACKAGE_CHANGELOG=$(awk -v ver="$VERSION" '
                 /^## / {
@@ -325,23 +344,36 @@ jobs:
               ' "$CHANGELOG_FILE")
               
               if [ -n "$PACKAGE_CHANGELOG" ]; then
-                RELEASE_NOTES+="$PACKAGE_CHANGELOG"$'\n\n'
+                RELEASE_NOTES="$PACKAGE_CHANGELOG"
               else
-                RELEASE_NOTES+="_No changelog entry found for this version._"$'\n\n'
+                RELEASE_NOTES="Release $VERSION of $PACKAGE_NAME"
+                echo "  ⚠️  No changelog entry found for version $VERSION"
               fi
             else
-              RELEASE_NOTES+="_No CHANGELOG.md found._"$'\n\n'
+              RELEASE_NOTES="Release $VERSION of $PACKAGE_NAME"
+              echo "  ⚠️  No CHANGELOG.md found at: $CHANGELOG_FILE"
             fi
             
-            RELEASE_NOTES+="---"$'\n\n'
+            # Determine if this should be marked as latest
+            LATEST_FLAG=""
+            if [ "$PACKAGE_NAME" = "mcp-use" ]; then
+              LATEST_FLAG="--latest"
+              echo "  📌 Marking as latest release"
+            fi
+            
+            # Create the release
+            RELEASE_TITLE="$PACKAGE_NAME $VERSION"
+            echo "  Creating release: $RELEASE_TITLE"
+            
+            if gh release create "$TAG" \
+              --title "$RELEASE_TITLE" \
+              --notes "$RELEASE_NOTES" \
+              $LATEST_FLAG; then
+              echo "  ✅ Created release for $TAG"
+            else
+              echo "  ❌ Failed to create release for $TAG"
+            fi
           done
 
-          # Create a single consolidated release using the first tag
-          RELEASE_TITLE="TypeScript Release - $RELEASE_DATE"
-          
-          gh release create "$MAIN_TAG" \
-            --title "$RELEASE_TITLE" \
-            --notes "$RELEASE_NOTES" \
-            --latest || echo "⚠️  Failed to create release (may already exist)"
-          
-          echo "✅ Created consolidated GitHub release: $RELEASE_TITLE"
+          echo ""
+          echo "✅ Finished creating GitHub releases"
