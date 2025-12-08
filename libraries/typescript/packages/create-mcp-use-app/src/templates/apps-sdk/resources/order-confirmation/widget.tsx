@@ -1,6 +1,13 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
-import { Icon } from "@openai/apps-sdk-ui/components/Icon";
+import {
+  CheckCircle,
+  Clock,
+  ArrowRight,
+  Archive,
+  Info,
+  Check,
+} from "@openai/apps-sdk-ui/components/Icon";
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { Link } from "react-router";
@@ -41,18 +48,18 @@ const OrderConfirmation: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (status: string): string => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "pending":
-        return "clock";
+        return Clock;
       case "confirmed":
-        return "check-circle";
+        return CheckCircle;
       case "shipped":
-        return "truck";
+        return ArrowRight;
       case "delivered":
-        return "package";
+        return Archive;
       default:
-        return "info";
+        return Info;
     }
   };
 
@@ -63,7 +70,7 @@ const OrderConfirmation: React.FC = () => {
           {/* Success Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Icon name="check-circle" className="w-8 h-8 text-success" />
+              <CheckCircle className="w-8 h-8 text-success" />
             </div>
             <h2 className="heading-xl mb-2">Order Confirmed!</h2>
             <p className="text-secondary">
@@ -81,7 +88,7 @@ const OrderConfirmation: React.FC = () => {
               <div
                 className={`flex items-center gap-2 ${getStatusColor(props.status)}`}
               >
-                <Icon name={getStatusIcon(props.status)} />
+                {React.createElement(getStatusIcon(props.status))}
                 <span className="font-medium capitalize">{props.status}</span>
               </div>
             </div>
@@ -143,22 +150,22 @@ const OrderConfirmation: React.FC = () => {
           {/* What's Next */}
           <div className="bg-info/10 rounded-2xl p-6 mb-6">
             <h3 className="heading-sm mb-3 flex items-center gap-2">
-              <Icon name="info" className="text-info" />
+              <Info className="text-info" />
               What happens next?
             </h3>
             <ul className="space-y-2 text-sm text-secondary">
               <li className="flex items-start gap-2">
-                <Icon name="check" className="text-success mt-0.5" />
+                <Check className="text-success mt-0.5" />
                 <span>You'll receive an email confirmation shortly</span>
               </li>
               <li className="flex items-start gap-2">
-                <Icon name="check" className="text-success mt-0.5" />
+                <Check className="text-success mt-0.5" />
                 <span>
                   We'll send you tracking information when your order ships
                 </span>
               </li>
               <li className="flex items-start gap-2">
-                <Icon name="check" className="text-success mt-0.5" />
+                <Check className="text-success mt-0.5" />
                 <span>
                   Your fresh fruits will arrive within 3-5 business days
                 </span>
@@ -169,7 +176,8 @@ const OrderConfirmation: React.FC = () => {
           {/* Action Buttons */}
           <div className="flex gap-3">
             <Button
-              variant="primary"
+              variant="solid"
+              color="primary"
               onClick={() => sendFollowUpMessage("Show me more fruits to buy")}
               className="flex-1"
             >
@@ -177,13 +185,14 @@ const OrderConfirmation: React.FC = () => {
             </Button>
             <Button
               variant="outline"
+              color="secondary"
               onClick={() =>
                 sendFollowUpMessage(
                   `Show me the status of order ${props.orderId}`
                 )
               }
             >
-              <Icon name="package" />
+              <Archive />
               Track Order
             </Button>
           </div>

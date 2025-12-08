@@ -1,5 +1,5 @@
 import { Button } from "@openai/apps-sdk-ui/components/Button";
-import { Icon } from "@openai/apps-sdk-ui/components/Icon";
+import { Plus } from "@openai/apps-sdk-ui/components/Icon";
 import { Image, useWidget } from "mcp-use/react";
 import React, { useState } from "react";
 
@@ -91,8 +91,9 @@ export const CarouselItem: React.FC<CarouselItemProps> = ({
           )}
 
           <Button
-            variant={inStock ? "primary" : "ghost"}
-            size="small"
+            variant={inStock ? "solid" : "ghost"}
+            color={inStock ? "primary" : "secondary"}
+            size="sm"
             onClick={handleAddToCart}
             disabled={!inStock || isAdding}
             className="w-full"
@@ -101,7 +102,7 @@ export const CarouselItem: React.FC<CarouselItemProps> = ({
               "Adding..."
             ) : inStock ? (
               <>
-                <Icon name="plus" />
+                <Plus />
                 Add to Cart
               </>
             ) : (

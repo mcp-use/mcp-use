@@ -1,6 +1,13 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
-import { Icon } from "@openai/apps-sdk-ui/components/Icon";
+import {
+  Heart,
+  Check,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Search,
+} from "@openai/apps-sdk-ui/components/Icon";
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import React, { useState } from "react";
 import { Link } from "react-router";
@@ -101,7 +108,7 @@ const ProductDetails: React.FC = () => {
                 {/* Nutritional Info */}
                 <div className="bg-surface rounded-2xl p-6 mb-6">
                   <h3 className="heading-md mb-4 flex items-center gap-2">
-                    <Icon name="heart" className="text-danger" />
+                    <Heart className="text-danger" />
                     Nutritional Information
                   </h3>
                   <div className="grid grid-cols-3 gap-4">
@@ -131,15 +138,15 @@ const ProductDetails: React.FC = () => {
                   <h3 className="heading-sm mb-3">Why you'll love it</h3>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
-                      <Icon name="check" className="text-success" />
+                      <Check className="text-success" />
                       <span>Fresh and hand-picked</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <Icon name="check" className="text-success" />
+                      <Check className="text-success" />
                       <span>Sustainably sourced</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <Icon name="check" className="text-success" />
+                      <Check className="text-success" />
                       <span>Delivered within 3-5 days</span>
                     </li>
                   </ul>
@@ -153,22 +160,24 @@ const ProductDetails: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
-                      size="small"
+                      color="secondary"
+                      size="sm"
                       onClick={decrementQuantity}
                       disabled={quantity <= 1 || !props.inStock}
                     >
-                      <Icon name="minus" />
+                      <Minus />
                     </Button>
                     <span className="w-12 text-center font-semibold text-lg">
                       {quantity}
                     </span>
                     <Button
                       variant="outline"
-                      size="small"
+                      color="secondary"
+                      size="sm"
                       onClick={incrementQuantity}
                       disabled={quantity >= props.stockCount || !props.inStock}
                     >
-                      <Icon name="plus" />
+                      <Plus />
                     </Button>
                   </div>
                   <span className="text-secondary ml-auto">
@@ -181,7 +190,8 @@ const ProductDetails: React.FC = () => {
 
                 <div className="flex gap-3">
                   <Button
-                    variant="primary"
+                    variant="solid"
+                    color="primary"
                     onClick={handleAddToCart}
                     disabled={!props.inStock || isAdding}
                     className="flex-1"
@@ -190,18 +200,19 @@ const ProductDetails: React.FC = () => {
                       "Adding..."
                     ) : (
                       <>
-                        <Icon name="shopping-cart" />
+                        <ShoppingBag />
                         Add to Cart
                       </>
                     )}
                   </Button>
                   <Button
                     variant="outline"
+                    color="secondary"
                     onClick={() =>
                       sendFollowUpMessage(`Show me other ${props.color} fruits`)
                     }
                   >
-                    <Icon name="search" />
+                    <Search />
                     Similar
                   </Button>
                 </div>

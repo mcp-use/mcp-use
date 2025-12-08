@@ -1,6 +1,11 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
-import { Icon } from "@openai/apps-sdk-ui/components/Icon";
+import {
+  ShoppingBag,
+  Minus,
+  Plus,
+  Trash,
+} from "@openai/apps-sdk-ui/components/Icon";
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import React, { useState } from "react";
 import { Link } from "react-router";
@@ -82,16 +87,14 @@ const CartView: React.FC = () => {
         <AppsSDKUIProvider linkComponent={Link}>
           <div className="bg-surface-elevated border border-default rounded-3xl p-8">
             <div className="text-center py-12">
-              <Icon
-                name="shopping-cart"
-                className="w-16 h-16 mx-auto mb-4 text-secondary"
-              />
+              <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-secondary" />
               <h2 className="heading-xl mb-2">Your cart is empty</h2>
               <p className="text-md text-secondary mb-6">
                 Start adding some delicious fruits to your cart!
               </p>
               <Button
-                variant="primary"
+                variant="solid"
+                color="primary"
                 onClick={() =>
                   sendFollowUpMessage("Show me some fruits to buy")
                 }
@@ -113,7 +116,8 @@ const CartView: React.FC = () => {
             <h2 className="heading-xl">Shopping Cart</h2>
             <Button
               variant="ghost"
-              size="small"
+              color="secondary"
+              size="sm"
               onClick={handleClearCart}
               disabled={isProcessing}
             >
@@ -148,26 +152,28 @@ const CartView: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
-                    size="small"
+                    color="secondary"
+                    size="sm"
                     onClick={() =>
                       handleUpdateQuantity(item.productId, item.quantity - 1)
                     }
                     disabled={isProcessing || item.quantity <= 1}
                   >
-                    <Icon name="minus" />
+                    <Minus />
                   </Button>
                   <span className="w-8 text-center font-medium">
                     {item.quantity}
                   </span>
                   <Button
                     variant="ghost"
-                    size="small"
+                    color="secondary"
+                    size="sm"
                     onClick={() =>
                       handleUpdateQuantity(item.productId, item.quantity + 1)
                     }
                     disabled={isProcessing}
                   >
-                    <Icon name="plus" />
+                    <Plus />
                   </Button>
                 </div>
 
@@ -179,13 +185,14 @@ const CartView: React.FC = () => {
 
                 <Button
                   variant="ghost"
-                  size="small"
+                  color="secondary"
+                  size="sm"
                   onClick={() =>
                     handleRemoveItem(item.productId, item.productName)
                   }
                   disabled={isProcessing}
                 >
-                  <Icon name="trash" />
+                  <Trash />
                 </Button>
               </div>
             ))}
@@ -202,7 +209,8 @@ const CartView: React.FC = () => {
             </div>
 
             <Button
-              variant="primary"
+              variant="solid"
+              color="primary"
               onClick={handleCheckout}
               disabled={isProcessing}
               className="w-full"
