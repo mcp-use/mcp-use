@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   products,
   getProductById,
-  searchProducts,
   getInventoryStatus,
 } from "./src/data/products";
 import { getCart } from "./src/data/cart";
@@ -78,48 +77,22 @@ server.get("/api/fruits", (c) => {
   );
 });
 
-// Search Products - Find fruits by filters
+// Brand Info Tool - Returns brand information
 server.tool(
   {
-    name: "search-products",
+    name: "get-brand-info",
     description:
-      "Search and filter fruits in the shop. Use this to help users discover products based on their preferences like color, price range, or specific keywords. Returns a list of matching products that can be displayed with the product-search-result widget. Great for both vague requests ('show me some fruits') and specific ones ('red fruits under $5').",
-    inputs: z.object({
-      color: z
-        .string()
-        .optional()
-        .describe(
-          "Filter by fruit color (e.g., 'red', 'yellow', 'orange', 'green')"
-        ),
-      minPrice: z
-        .number()
-        .optional()
-        .describe("Minimum price in dollars (e.g., 2.99)"),
-      maxPrice: z
-        .number()
-        .optional()
-        .describe("Maximum price in dollars (e.g., 5.99)"),
-      inStockOnly: z
-        .boolean()
-        .optional()
-        .describe("Only show products that are currently in stock"),
-      query: z
-        .string()
-        .optional()
-        .describe("Search by product name or description keywords"),
-    }),
+      "Get information about the brand, including company details, mission, and values",
   },
-  async (params) => {
-    const results = searchProducts(params);
-
+  async () => {
     return {
       content: [
         {
           type: "text",
           text: JSON.stringify(
             {
-              count: results.length,
-              products: results.map((p) => ({
+              count: products.length,
+              products: products.map((p) => ({
                 id: p.id,
                 name: p.name,
                 price: p.price,
@@ -142,7 +115,7 @@ server.tool(
     name: "get-product-details",
     description:
       "Get comprehensive details about a specific fruit including price, description, nutritional information, and stock status. Use this when a user asks about a specific product or wants to learn more before purchasing. The detailed information can be displayed with the product-details widget for a rich visual experience.",
-    inputs: z.object({
+    schema: z.object({
       productId: z
         .string()
         .describe(
@@ -184,7 +157,7 @@ server.tool(
     name: "get-product-inventory",
     description:
       "Check real-time inventory and stock levels for specific fruits. Use this to answer questions about product availability ('Is mango in stock?') or to verify stock before adding items to cart. Returns current stock count and availability status.",
-    inputs: z.object({
+    schema: z.object({
       productId: z
         .string()
         .describe(
@@ -226,7 +199,7 @@ server.tool(
     name: "get-user-cart",
     description:
       "Retrieve the user's current shopping cart with all items, quantities, and total price. Use this to show what's in the cart, answer questions about cart contents, or before proceeding to checkout. The cart can be beautifully displayed using the cart-view widget.",
-    inputs: z.object({
+    schema: z.object({
       sessionId: z
         .string()
         .optional()
@@ -278,7 +251,7 @@ server.tool(
     name: "add-to-cart",
     description:
       "Add a fruit to the user's shopping cart. Use this when the user wants to purchase a product or add items to their cart. Specify the product ID and quantity. Returns the updated cart summary which can be displayed using the cart-view widget. After adding, consider showing a confirmation message.",
-    inputs: z.object({
+    schema: z.object({
       productId: z
         .string()
         .describe(
@@ -344,7 +317,7 @@ server.tool(
     name: "update-cart-item",
     description:
       "Update the quantity of a specific fruit in the shopping cart. Use this when the user wants to change how many of an item they want to purchase. Set quantity to 0 to remove the item. Returns the updated cart state.",
-    inputs: z.object({
+    schema: z.object({
       productId: z
         .string()
         .describe("The unique identifier of the fruit to update"),
@@ -408,7 +381,7 @@ server.tool(
     name: "remove-from-cart",
     description:
       "Remove a specific fruit from the shopping cart completely. Use this when the user wants to delete an item from their cart. Returns the updated cart state.",
-    inputs: z.object({
+    schema: z.object({
       productId: z
         .string()
         .describe("The unique identifier of the fruit to remove"),
@@ -453,7 +426,7 @@ server.tool(
     name: "clear-cart",
     description:
       "Remove all items from the shopping cart. Use this when the user wants to start over or empty their cart completely. Returns an empty cart state.",
-    inputs: z.object({
+    schema: z.object({
       sessionId: z
         .string()
         .optional()
@@ -493,7 +466,7 @@ server.tool(
     name: "place-order",
     description:
       "Process the user's cart and place an order. Use this when the user is ready to checkout and complete their purchase. Returns order confirmation details including order ID, items, total, and estimated delivery date. The order details can be displayed with the order-confirmation widget. Note: This will clear the cart after placing the order.",
-    inputs: z.object({
+    schema: z.object({
       sessionId: z
         .string()
         .optional()

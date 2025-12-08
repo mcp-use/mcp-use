@@ -1,5 +1,102 @@
 # mcp-use
 
+## 1.10.0
+
+### Minor Changes
+
+- 6ec11cd: ## Breaking Changes
+  - **Server API**: Renamed `createMCPServer()` factory function to `MCPServer` class constructor. The factory function is still available for backward compatibility but new code should use `new MCPServer({ name, ... })`.
+  - **Session API**: Replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct methods: `session.tools`, `session.callTool()`, `session.listResources()`, `session.readResource()`, etc.
+  - **OAuth Environment Variables**: Standardized OAuth env vars to `MCP_USE_OAUTH_*` prefix (e.g., `AUTH0_DOMAIN` → `MCP_USE_OAUTH_AUTH0_DOMAIN`).
+
+  ## New Features
+  - **Client Capabilities API**: Added `ctx.client.can()` and `ctx.client.capabilities()` to check client capabilities in tool callbacks.
+  - **Session Notifications**: Added `ctx.sendNotification()` and `ctx.sendNotificationToSession()` for sending notifications from tool callbacks.
+  - **Session Info**: Added `ctx.session.sessionId` to access current session ID in tool callbacks.
+  - **Resource Template Flat Structure**: Resource templates now support flat structure with `uriTemplate` directly on definition (in addition to nested structure).
+  - **Resource Template Callback Signatures**: Resource template callbacks now support multiple signatures: `()`, `(uri)`, `(uri, params)`, `(uri, params, ctx)`.
+  - **Type Exports**: Added exports for `CallToolResult`, `Tool`, `ToolAnnotations`, `PromptResult`, `GetPromptResult` types.
+
+  ## Improvements
+  - **Type Inference**: Enhanced type inference for resource template callbacks with better overload support.
+  - **Client Capabilities Tracking**: Server now captures and stores client capabilities during initialization.
+  - **Session Methods**: Added convenience methods to `MCPSession` for all MCP operations (listResources, readResource, subscribeToResource, listPrompts, getPrompt, etc.).
+  - **Documentation**: Major documentation refactoring and restructuring for better organization.
+
+- 6ec11cd: feat: added support for elicitation in inspector
+- 6ec11cd: ## Elicitation Support
+
+  Added comprehensive elicitation support following MCP specification, enabling servers to request user input through clients.
+
+  ### New Features
+  - **Simplified API**: `ctx.elicit(message, zodSchema)` and `ctx.elicit(message, url)` with automatic mode detection
+  - **Form Mode**: Collect structured data with Zod schema validation and full TypeScript type inference
+  - **URL Mode**: Direct users to external URLs for sensitive operations (OAuth, credentials)
+  - **Server-Side Validation**: Automatic Zod validation of returned data with clear error messages
+  - **Client Support**: Added `elicitationCallback` to MCPClient and `onElicitation` to React `useMcp` hook
+  - **Type Safety**: Return types automatically inferred from Zod schemas
+  - **Configurable Timeout**: Optional timeout parameter (default: no timeout, waits indefinitely like sampling)
+
+  ### Improvements
+  - Reuses official SDK's `toJsonSchemaCompat` for Zod → JSON Schema conversion
+  - Automatic `elicitationId` generation for URL mode requests
+  - 5-minute default timeout for user interactions
+  - Defense-in-depth validation (client optional, server required)
+  - Backwards compatible with verbose API
+
+  ### Documentation
+  - Added `/typescript/server/elicitation` - Server-side usage guide
+  - Updated `/typescript/client/elicitation` - Client-side implementation guide
+  - Added to docs navigation
+  - Comprehensive examples with validation scenarios
+
+  ### Testing
+  - **Unit Tests**: 14 tests covering Zod conversion and validation (`tests/unit/server/elicitation.test.ts`)
+  - **Integration Tests**: 14 tests covering full client-server flow (`tests/integration/elicitation.test.ts`)
+  - **Manual Tests**: Basic functionality and comprehensive validation test suites
+  - **Total**: 28 automated tests + manual test suites
+  - **Status**: All tests passing ✅
+
+  ### Examples
+  - Created `examples/server/elicitation-test/` with 4 working tools
+  - Included basic functionality test client
+  - Included comprehensive validation test client (7 scenarios)
+  - Added timeout configuration examples
+  - All examples working
+
+### Patch Changes
+
+- 6ec11cd: fix: refactor to use https://github.com/modelcontextprotocol/typescript-sdk/pull/1209
+- 6ec11cd: fix: codeql warns
+- 6ec11cd: chore: switch official sdk from npm to fork with edge runtime support
+- 6ec11cd: fix: getServerBase url was not called anymore, fixed
+- 6ec11cd: chore: trigger canary
+- 6ec11cd: fix: fix transport bug
+- 6ec11cd: chore: replace official sdk with fork in imports
+- 6ec11cd: add browser tel
+- 6ec11cd: chore: fix types
+- 6ec11cd: feat: improve tel
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+- Updated dependencies [6ec11cd]
+  - @mcp-use/inspector@0.12.0
+  - @mcp-use/cli@2.5.0
+
+## 1.10.0-canary.11
+
+### Patch Changes
+
+- f0fc5a2: add browser tel
+  - @mcp-use/cli@2.5.0-canary.11
+  - @mcp-use/inspector@0.12.0-canary.11
+
 ## 1.10.0-canary.10
 
 ### Patch Changes

@@ -577,6 +577,9 @@ importers:
       langfuse-langchain:
         specifier: ^3.38.6
         version: 3.38.6(langchain@1.0.4(@langchain/core@1.0.4(@opentelemetry/api@1.9.0)(openai@6.8.1(ws@8.18.3)(zod@4.1.13)))(@opentelemetry/api@1.9.0)(openai@6.8.1(ws@8.18.3)(zod@4.1.13))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod-to-json-schema@3.25.0(zod@4.1.13)))
+      posthog-js:
+        specifier: ^1.302.2
+        version: 1.302.2
       posthog-node:
         specifier: ^5.14.1
         version: 5.14.1
@@ -1766,6 +1769,9 @@ packages:
 
   '@posthog/core@1.6.0':
     resolution: {integrity: sha512-Tbh8UACwbb7jFdDC7wwXHtfNzO+4wKh3VbyMHmp2UBe6w1jliJixexTJNfkqdGZm+ht3M10mcKvGGPnoZ2zLBg==}
+
+  '@posthog/core@1.7.1':
+    resolution: {integrity: sha512-kjK0eFMIpKo9GXIbts8VtAknsoZ18oZorANdtuTj1CbgS28t4ZVq//HAWhnxEuXRTrtkd+SUJ6Ux3j2Af8NCuA==}
 
   '@preact/signals-core@1.12.1':
     resolution: {integrity: sha512-BwbTXpj+9QutoZLQvbttRg5x3l5468qaV2kufh+51yha1c53ep5dY4kTuZR35+3pAZxpfQerGJiQqg34ZNZ6uA==}
@@ -3745,6 +3751,9 @@ packages:
   core-js-compat@3.46.0:
     resolution: {integrity: sha512-p9hObIIEENxSV8xIu+V68JjSeARg6UVMG5mR+JEUguG3sI6MsiS1njz2jHmyJDvA+8jX/sytkBHup6kxhM9law==}
 
+  core-js@3.47.0:
+    resolution: {integrity: sha512-c3Q2VVkGAUyupsjRnaNX6u8Dq2vAdzm9iuPj5FW0fRxzlxgq9Q39MDq10IvmQSpLgHQNyQzQmOo6bgGHmH3NNg==}
+
   cors@2.8.5:
     resolution: {integrity: sha512-KIHbLJqu73RGr/hnbrO9uBeixNGuvSQjul/jdFvS/KFSIH1hWVd1ng7zOHx+YrEfInLG7q4n6GHQ9cDtxv/P6g==}
     engines: {node: '>= 0.10'}
@@ -4463,6 +4472,9 @@ packages:
 
   fecha@4.2.3:
     resolution: {integrity: sha512-OP2IUU6HeYKJi3i0z4A19kHMQoLVs4Hc+DPqqxI2h/DPZHTm/vjsfC6P0b4jCMy14XizLBqvndQ+UilD7707Jw==}
+
+  fflate@0.4.8:
+    resolution: {integrity: sha512-FJqqoDBR00Mdj9ppamLa/Y7vxm+PRmNWA67N846RvsoYVMKB4q3y/de5PA7gUmRMYK/8CMz2GDZQmCRN1wBcWA==}
 
   figures@6.1.0:
     resolution: {integrity: sha512-d+l3qxjSesT4V7v2fh+QnmFnUWv9lSpjarhShNTgBOfA0ttejbQUAlHLitbjkoRiDulW0OPoQPYIGhIC8ohejg==}
@@ -6055,6 +6067,9 @@ packages:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
     engines: {node: ^10 || ^12 || >=14}
 
+  posthog-js@1.302.2:
+    resolution: {integrity: sha512-4voih22zQe7yHA7DynlQ3B7kgzJOaKIjzV7K3jJ2Qf+UDXd1ZgO7xYmLWYVtuKEvD1OXHbKk/fPhUTZeHEWpBw==}
+
   posthog-node@5.14.1:
     resolution: {integrity: sha512-NbqZMCwHectzfeFOeLqes1fPg/V5bsKhrBfyH1qHEcDb4ZHcbDARcqLE6JDhwMDQKa4YHkInXHITYscMuPylFw==}
     engines: {node: '>=20'}
@@ -6062,6 +6077,9 @@ packages:
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
     engines: {node: '>=20'}
+
+  preact@10.28.0:
+    resolution: {integrity: sha512-rytDAoiXr3+t6OIP3WGlDd0ouCUG1iCWzkcY3++Nreuoi17y6T5i/zRhe6uYfoVcxq6YU+sBtJouuRDsq8vvqA==}
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -7103,6 +7121,9 @@ packages:
 
   web-namespaces@2.0.1:
     resolution: {integrity: sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ==}
+
+  web-vitals@4.2.4:
+    resolution: {integrity: sha512-r4DIlprAGwJ7YM11VZp4R884m0Vmgr6EAKe3P+kO0PPj3Unqyvv59rczf6UiGcb9Z8QxZVcqKNwv/g0WNdWwsw==}
 
   which-boxed-primitive@1.1.1:
     resolution: {integrity: sha512-TbX3mj8n0odCBFVlY8AxkqcHASw3L60jIuF8jFP78az3C2YhmGvqbHBpAjTRH2/xqYunrJ9g1jSyjCjpoWzIAA==}
@@ -8277,6 +8298,10 @@ snapshots:
   '@pkgr/core@0.2.9': {}
 
   '@posthog/core@1.6.0':
+    dependencies:
+      cross-spawn: 7.0.6
+
+  '@posthog/core@1.7.1':
     dependencies:
       cross-spawn: 7.0.6
 
@@ -10269,6 +10294,8 @@ snapshots:
     dependencies:
       browserslist: 4.28.0
 
+  core-js@3.47.0: {}
+
   cors@2.8.5:
     dependencies:
       object-assign: 4.1.1
@@ -11191,6 +11218,8 @@ snapshots:
 
   fecha@4.2.3:
     optional: true
+
+  fflate@0.4.8: {}
 
   figures@6.1.0:
     dependencies:
@@ -12987,11 +13016,21 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  posthog-js@1.302.2:
+    dependencies:
+      '@posthog/core': 1.7.1
+      core-js: 3.47.0
+      fflate: 0.4.8
+      preact: 10.28.0
+      web-vitals: 4.2.4
+
   posthog-node@5.14.1:
     dependencies:
       '@posthog/core': 1.6.0
 
   powershell-utils@0.1.0: {}
+
+  preact@10.28.0: {}
 
   prelude-ls@1.2.1: {}
 
@@ -14241,6 +14280,8 @@ snapshots:
       - supports-color
 
   web-namespaces@2.0.1: {}
+
+  web-vitals@4.2.4: {}
 
   which-boxed-primitive@1.1.1:
     dependencies:

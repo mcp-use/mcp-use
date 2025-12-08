@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.10.0-canary.10",
+  "version": "1.10.0",
   "packageManager": "pnpm@10.6.1",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents, Clients and Servers with support for ChatGPT Apps, Code Mode, OAuth, Notifications, Sampling, Observability and more.",
   "author": "mcp-use, Inc.",
@@ -167,6 +167,7 @@
     "hono": "^4.10.7",
     "jose": "^6.1.2",
     "langchain": "^1.1.1",
+    "posthog-js": "^1.302.2",
     "posthog-node": "^5.14.1",
     "ws": "^8.18.3",
     "zod": "^4.1.13"

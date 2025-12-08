@@ -382,7 +382,7 @@ if [ -d "dist/resources/widgets" ]; then
     print_info "Uploading widgets to storage bucket: $BUCKET_NAME"
     
     # Upload widgets to storage (upload contents, not the folder itself)
-    if supabase storage cp -r dist/resources/widgets/* "ss:///${BUCKET_NAME}/" --experimental 2>&1; then
+    if supabase storage cp -r dist/resources/widgets/ "ss:///${BUCKET_NAME}/" --experimental 2>&1; then
         print_success "Widgets uploaded successfully"
         
         # Important: The bucket must be public for widgets to be accessible
@@ -390,7 +390,7 @@ if [ -d "dist/resources/widgets" ]; then
         print_warning "The storage bucket needs to be set to PUBLIC for widgets to be accessible"
         echo ""
         echo "Please follow these steps:"
-        echo -e "  1. Go to: ${BLUE}https://supabase.com/dashboard/project/$PROJECT_ID/storage/files/buckets/$BUCKET_NAME${NC}"
+        echo -e "  1. Go to: ${BLUE}https://supabase.com/dashboard/project/$PROJECT_ID/storage/files/buckets/$BUCKET_NAME${NC}?edit=true"
         echo "  2. Click on the bucket settings (gear icon)"
         echo -e "  3. Find 'Bucket Settings' and toggle '${BLUE}Public${NC}' ON"
         echo "  4. Save the changes"
@@ -410,7 +410,7 @@ fi
 if [ -d "dist/public" ]; then
     print_info "Uploading public files to storage bucket: $BUCKET_NAME"
     
-    if supabase storage cp -r dist/public/* "ss:///${BUCKET_NAME}/public/" --experimental 2>&1; then
+    if supabase storage cp -r dist/public "ss:///${BUCKET_NAME}/public/" --experimental 2>&1; then
         print_success "Public files uploaded successfully"
     else
         print_warning "Public file upload failed"
