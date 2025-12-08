@@ -161,11 +161,11 @@ export class OAuthHelper {
     const authRequiredPatterns = [
       /api\.githubcopilot\.com/i, // GitHub Copilot
       /api\.github\.com/i, // GitHub API
-      /[a-z0-9-]+\.googleapis\.com/i, // Google APIs
+      /[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.googleapis\.com/i, // Google APIs (DNS-safe, max 63 chars per label)
       /api\.openai\.com/i, // OpenAI
       /api\.anthropic\.com/i, // Anthropic
-      /[a-z0-9-]+\.atlassian\.net/i, // Atlassian (Jira, Confluence)
-      /[a-z0-9-]+\.slack\.com/i, // Slack
+      /[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.atlassian\.net/i, // Atlassian (Jira, Confluence)
+      /[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.slack\.com/i, // Slack
       /api\.notion\.com/i, // Notion
       /api\.linear\.app/i, // Linear
     ];
@@ -175,7 +175,7 @@ export class OAuthHelper {
       /localhost/i, // Local development
       /127\.0\.0\.1/, // Local development
       /\.local/i, // Local development
-      /mcp\.[a-z0-9-]+\.com/i, // Generic MCP server pattern (often public)
+      /mcp\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.com/i, // Generic MCP server pattern (often public)
     ];
 
     // Check no-auth patterns first
