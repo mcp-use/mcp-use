@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.12.0-canary.9
+
+### Patch Changes
+
+- 79ce293: fix: use tool meta instead of result for appssdk
+  - mcp-use@1.10.0-canary.9
+
 ## 0.12.0-canary.8
 
 ### Patch Changes
