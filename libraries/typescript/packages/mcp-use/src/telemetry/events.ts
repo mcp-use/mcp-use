@@ -154,8 +154,12 @@ export interface ServerRunEventData {
   prompts?: Prompt[] | null;
   templates?: Prompt[] | null;
   capabilities?: Record<string, any> | null;
-  appsSdkResources?: any | null;
-  mcpUiResources?: any | null;
+  appsSdkResources?: Resource[] | null;
+  appsSdkResourcesNumber?: number;
+  mcpUiResources?: Resource[] | null;
+  mcpUiResourcesNumber?: number;
+  mcpAppsResources?: Resource[] | null;
+  mcpAppsResourcesNumber?: number;
 }
 
 /**
@@ -191,6 +195,26 @@ export function createServerRunEventData(
   const resourceRegistrations = Array.from(server.registrations.resources.values());
   const templateRegistrations = Array.from(server.registrations.resourceTemplates.values());
 
+  // Map all resources to the Resource format
+  const allResources: Resource[] = resourceRegistrations.map((r) => ({
+    name: r.config.name,
+    title: r.config.title ?? null,
+    description: r.config.description ?? null,
+    uri: r.config.uri ?? null,
+    mime_type: r.config.mimeType ?? null,
+  }));
+
+  // Filter resources by mime_type
+  const appsSdkResources = allResources.filter(
+    (r) => r.mime_type === "text/html+skybridge"
+  );
+  const mcpUiResources = allResources.filter(
+    (r) => r.mime_type === "text/uri-list" || r.mime_type === "text/html"
+  );
+  const mcpAppsResources = allResources.filter(
+    (r) => r.mime_type === "text/html+mcp"
+  );
+
   return {
     transport,
     toolsNumber: server.registeredTools.length,
@@ -212,15 +236,7 @@ export function createServerRunEventData(
           output_schema: r.config.outputSchema ? JSON.stringify(r.config.outputSchema) : null,
         }))
       : null,
-    resources: resourceRegistrations.length > 0
-      ? resourceRegistrations.map((r) => ({
-          name: r.config.name,
-          title: r.config.title ?? null,
-          description: r.config.description ?? null,
-          uri: r.config.uri ?? null,
-          mime_type: r.config.mimeType ?? null,
-        }))
-      : null,
+    resources: allResources.length > 0 ? allResources : null,
     prompts: promptRegistrations.length > 0
       ? promptRegistrations.map((r) => ({
           name: r.config.name,
@@ -240,6 +256,12 @@ export function createServerRunEventData(
       logging: true,
       resources: { subscribe: true, listChanged: true },
     },
+    appsSdkResources: appsSdkResources.length > 0 ? appsSdkResources : null,
+    appsSdkResourcesNumber: appsSdkResources.length,
+    mcpUiResources: mcpUiResources.length > 0 ? mcpUiResources : null,
+    mcpUiResourcesNumber: mcpUiResources.length,
+    mcpAppsResources: mcpAppsResources.length > 0 ? mcpAppsResources : null,
+    mcpAppsResourcesNumber: mcpAppsResources.length,
   };
 }
 
@@ -271,7 +293,11 @@ export class ServerRunEvent extends BaseTelemetryEvent {
       templates: this.data.templates ?? null,
       capabilities: this.data.capabilities ? JSON.stringify(this.data.capabilities) : null,
       apps_sdk_resources: this.data.appsSdkResources ? JSON.stringify(this.data.appsSdkResources) : null,
+      apps_sdk_resources_number: this.data.appsSdkResourcesNumber ?? 0,
       mcp_ui_resources: this.data.mcpUiResources ? JSON.stringify(this.data.mcpUiResources) : null,
+      mcp_ui_resources_number: this.data.mcpUiResourcesNumber ?? 0,
+      mcp_apps_resources: this.data.mcpAppsResources ? JSON.stringify(this.data.mcpAppsResources) : null,
+      mcp_apps_resources_number: this.data.mcpAppsResourcesNumber ?? 0,
     };
   }
 }
