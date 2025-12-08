@@ -1,6 +1,6 @@
 {
   "imports": {
-    "@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1209",
+    "@modelcontextprotocol/sdk": "https://raw.githubusercontent.com/mcp-use/mcp-ts-sdk-fork/v1.24.3-mcp-use.1/src/index.ts",
     "mcp-use/server": "npm:mcp-use/server"
   },
   "compilerOptions": {
