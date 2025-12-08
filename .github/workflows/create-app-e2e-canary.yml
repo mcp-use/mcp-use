@@ -5,6 +5,7 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["TypeScript Release"]
     types:
@@ -16,11 +17,12 @@ jobs:
   check-published:
     name: Check if packages were published
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
       - name: Download deployment marker
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
           name: railway-deploy-marker
@@ -31,7 +33,10 @@ jobs:
       - name: Check if packages were published
         id: check
         run: |
-          if [ -f .railway-deploy-marker ] && grep -q "packages_published=true" .railway-deploy-marker; then
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "Manual trigger, will run e2e tests"
+          elif [ -f .railway-deploy-marker ] && grep -q "packages_published=true" .railway-deploy-marker; then
             echo "should_run=true" >> $GITHUB_OUTPUT
             echo "Packages were published, will run e2e tests"
           else
