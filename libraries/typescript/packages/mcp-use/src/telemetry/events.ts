@@ -175,10 +175,51 @@ export interface MCPServerTelemetryInfo {
   serverBaseUrl?: string;
   oauthProvider?: unknown;
   registrations: {
-    tools: Map<string, { config: { name: string; title?: string; description?: string; schema?: unknown; outputSchema?: unknown }; handler: unknown }>;
-    prompts: Map<string, { config: { name: string; title?: string; description?: string; args?: unknown }; handler: unknown }>;
-    resources: Map<string, { config: { name: string; title?: string; description?: string; uri?: string; mimeType?: string }; handler: unknown }>;
-    resourceTemplates: Map<string, { config: { name: string; title?: string; description?: string }; handler: unknown }>;
+    tools: Map<
+      string,
+      {
+        config: {
+          name: string;
+          title?: string;
+          description?: string;
+          schema?: unknown;
+          outputSchema?: unknown;
+        };
+        handler: unknown;
+      }
+    >;
+    prompts: Map<
+      string,
+      {
+        config: {
+          name: string;
+          title?: string;
+          description?: string;
+          args?: unknown;
+        };
+        handler: unknown;
+      }
+    >;
+    resources: Map<
+      string,
+      {
+        config: {
+          name: string;
+          title?: string;
+          description?: string;
+          uri?: string;
+          mimeType?: string;
+        };
+        handler: unknown;
+      }
+    >;
+    resourceTemplates: Map<
+      string,
+      {
+        config: { name: string; title?: string; description?: string };
+        handler: unknown;
+      }
+    >;
   };
 }
 
@@ -192,8 +233,12 @@ export function createServerRunEventData(
 ): ServerRunEventData {
   const toolRegistrations = Array.from(server.registrations.tools.values());
   const promptRegistrations = Array.from(server.registrations.prompts.values());
-  const resourceRegistrations = Array.from(server.registrations.resources.values());
-  const templateRegistrations = Array.from(server.registrations.resourceTemplates.values());
+  const resourceRegistrations = Array.from(
+    server.registrations.resources.values()
+  );
+  const templateRegistrations = Array.from(
+    server.registrations.resourceTemplates.values()
+  );
 
   // Map all resources to the Resource format
   const allResources: Resource[] = resourceRegistrations.map((r) => ({
@@ -224,34 +269,44 @@ export function createServerRunEventData(
     name: server.config.name,
     description: server.config.description ?? null,
     baseUrl: server.serverBaseUrl ?? null,
-    toolNames: server.registeredTools.length > 0 ? server.registeredTools : null,
-    resourceNames: server.registeredResources.length > 0 ? server.registeredResources : null,
-    promptNames: server.registeredPrompts.length > 0 ? server.registeredPrompts : null,
-    tools: toolRegistrations.length > 0
-      ? toolRegistrations.map((r) => ({
-          name: r.config.name,
-          title: r.config.title ?? null,
-          description: r.config.description ?? null,
-          input_schema: r.config.schema ? JSON.stringify(r.config.schema) : null,
-          output_schema: r.config.outputSchema ? JSON.stringify(r.config.outputSchema) : null,
-        }))
-      : null,
+    toolNames:
+      server.registeredTools.length > 0 ? server.registeredTools : null,
+    resourceNames:
+      server.registeredResources.length > 0 ? server.registeredResources : null,
+    promptNames:
+      server.registeredPrompts.length > 0 ? server.registeredPrompts : null,
+    tools:
+      toolRegistrations.length > 0
+        ? toolRegistrations.map((r) => ({
+            name: r.config.name,
+            title: r.config.title ?? null,
+            description: r.config.description ?? null,
+            input_schema: r.config.schema
+              ? JSON.stringify(r.config.schema)
+              : null,
+            output_schema: r.config.outputSchema
+              ? JSON.stringify(r.config.outputSchema)
+              : null,
+          }))
+        : null,
     resources: allResources.length > 0 ? allResources : null,
-    prompts: promptRegistrations.length > 0
-      ? promptRegistrations.map((r) => ({
-          name: r.config.name,
-          title: r.config.title ?? null,
-          description: r.config.description ?? null,
-          args: r.config.args ? JSON.stringify(r.config.args) : null,
-        }))
-      : null,
-    templates: templateRegistrations.length > 0
-      ? templateRegistrations.map((r) => ({
-          name: r.config.name,
-          title: r.config.title ?? null,
-          description: r.config.description ?? null,
-        }))
-      : null,
+    prompts:
+      promptRegistrations.length > 0
+        ? promptRegistrations.map((r) => ({
+            name: r.config.name,
+            title: r.config.title ?? null,
+            description: r.config.description ?? null,
+            args: r.config.args ? JSON.stringify(r.config.args) : null,
+          }))
+        : null,
+    templates:
+      templateRegistrations.length > 0
+        ? templateRegistrations.map((r) => ({
+            name: r.config.name,
+            title: r.config.title ?? null,
+            description: r.config.description ?? null,
+          }))
+        : null,
     capabilities: {
       logging: true,
       resources: { subscribe: true, listChanged: true },
@@ -291,12 +346,20 @@ export class ServerRunEvent extends BaseTelemetryEvent {
       resources: this.data.resources ?? null,
       prompts: this.data.prompts ?? null,
       templates: this.data.templates ?? null,
-      capabilities: this.data.capabilities ? JSON.stringify(this.data.capabilities) : null,
-      apps_sdk_resources: this.data.appsSdkResources ? JSON.stringify(this.data.appsSdkResources) : null,
+      capabilities: this.data.capabilities
+        ? JSON.stringify(this.data.capabilities)
+        : null,
+      apps_sdk_resources: this.data.appsSdkResources
+        ? JSON.stringify(this.data.appsSdkResources)
+        : null,
       apps_sdk_resources_number: this.data.appsSdkResourcesNumber ?? 0,
-      mcp_ui_resources: this.data.mcpUiResources ? JSON.stringify(this.data.mcpUiResources) : null,
+      mcp_ui_resources: this.data.mcpUiResources
+        ? JSON.stringify(this.data.mcpUiResources)
+        : null,
       mcp_ui_resources_number: this.data.mcpUiResourcesNumber ?? 0,
-      mcp_apps_resources: this.data.mcpAppsResources ? JSON.stringify(this.data.mcpAppsResources) : null,
+      mcp_apps_resources: this.data.mcpAppsResources
+        ? JSON.stringify(this.data.mcpAppsResources)
+        : null,
       mcp_apps_resources_number: this.data.mcpAppsResourcesNumber ?? 0,
     };
   }

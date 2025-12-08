@@ -300,7 +300,9 @@ describe("MCPAgent Telemetry Integration", () => {
       });
 
       // Verify execution time is reasonable (> 0)
-      expect(captureCall[0].properties.execution_time_ms).toBeGreaterThanOrEqual(0);
+      expect(
+        captureCall[0].properties.execution_time_ms
+      ).toBeGreaterThanOrEqual(0);
     });
 
     it("should track manageConnector parameter", async () => {
@@ -501,4 +503,3 @@ describe("MCPAgent Telemetry Integration", () => {
     });
   });
 });
-

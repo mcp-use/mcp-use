@@ -87,8 +87,9 @@ export async function mountMcp(
         server.server.oninitialized = () => {
           const clientCapabilities = server.server.getClientCapabilities();
           const clientInfo = (server.server as any).getClientInfo?.() || {};
-          const protocolVersion = (server.server as any).getProtocolVersion?.() || "unknown";
-          
+          const protocolVersion =
+            (server.server as any).getProtocolVersion?.() || "unknown";
+
           if (clientCapabilities && sessions.has(sid)) {
             const session = sessions.get(sid)!;
             session.clientCapabilities = clientCapabilities;
@@ -106,7 +107,9 @@ export async function mountMcp(
               clientCapabilities: clientCapabilities || {},
               sessionId: sid,
             })
-            .catch((e) => console.debug(`Failed to track server initialize: ${e}`));
+            .catch((e) =>
+              console.debug(`Failed to track server initialize: ${e}`)
+            );
         };
       },
 

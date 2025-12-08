@@ -535,7 +535,9 @@ function createLogMethod(
         contextType: "notification",
         notificationType: "message",
       })
-      .catch((e) => console.debug(`Failed to track notification context: ${e}`));
+      .catch((e) =>
+        console.debug(`Failed to track notification context: ${e}`)
+      );
   };
 }
 

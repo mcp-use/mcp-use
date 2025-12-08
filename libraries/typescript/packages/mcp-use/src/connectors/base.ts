@@ -103,7 +103,9 @@ export abstract class BaseConnector {
    * Track connector initialization event
    * Should be called by subclasses after successful connection
    */
-  protected trackConnectorInit(data: Omit<ConnectorInitEventData, "connectorType">): void {
+  protected trackConnectorInit(
+    data: Omit<ConnectorInitEventData, "connectorType">
+  ): void {
     const connectorType = this.constructor.name;
     Telemetry.getInstance()
       .trackConnectorInit({

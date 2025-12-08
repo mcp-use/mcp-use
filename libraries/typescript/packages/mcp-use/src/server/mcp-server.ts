@@ -361,13 +361,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       const actualCallback =
         callback || (templateDefinition as any).readCallback;
       if (actualCallback) {
-        self.registrations.resourceTemplates.set(
-          templateDefinition.name,
-          {
-            config: templateDefinition as any,
-            handler: actualCallback as any,
-          }
-        );
+        self.registrations.resourceTemplates.set(templateDefinition.name, {
+          config: templateDefinition as any,
+          handler: actualCallback as any,
+        });
       }
       return originalResourceTemplate.call(
         self,
@@ -609,7 +606,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           // Import convertToolResultToResourceResult dynamically to avoid circular dependencies
           const { convertToolResultToResourceResult } =
             await import("./resources/conversion.js");
-          const converted = convertToolResultToResourceResult(config.uri, result) as any;
+          const converted = convertToolResultToResourceResult(
+            config.uri,
+            result
+          ) as any;
           contents = converted.contents || [];
           return converted;
         } catch (err) {
@@ -732,7 +732,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
                 success,
                 errorType,
               })
-              .catch((e) => console.debug(`Failed to track resource template call: ${e}`));
+              .catch((e) =>
+                console.debug(`Failed to track resource template call: ${e}`)
+              );
           }
         }
       );

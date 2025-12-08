@@ -300,7 +300,13 @@ export default PostHog;
   const viteServer = await createServer({
     root: tempDir,
     base: baseRoute + "/",
-    plugins: [nodeStubsPlugin, ssrCssPlugin, watchResourcesPlugin, tailwindcss(), react()],
+    plugins: [
+      nodeStubsPlugin,
+      ssrCssPlugin,
+      watchResourcesPlugin,
+      tailwindcss(),
+      react(),
+    ],
     resolve: {
       alias: {
         "@": pathHelpers.join(getCwd(), resourcesDir),

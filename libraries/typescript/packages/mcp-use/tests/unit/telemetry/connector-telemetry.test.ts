@@ -34,9 +34,7 @@ describe("Connector Telemetry Integration", () => {
   describe("BaseConnector trackConnectorInit method", () => {
     it("should add connector type automatically when calling trackConnectorInit", async () => {
       // Import BaseConnector to test the protected method
-      const { BaseConnector } = await import(
-        "../../../src/connectors/base.js"
-      );
+      const { BaseConnector } = await import("../../../src/connectors/base.js");
 
       // Create a test subclass to access the protected method
       class TestConnector extends BaseConnector {
@@ -65,9 +63,7 @@ describe("Connector Telemetry Integration", () => {
     });
 
     it("should include serverCommand and serverArgs for stdio-like connectors", async () => {
-      const { BaseConnector } = await import(
-        "../../../src/connectors/base.js"
-      );
+      const { BaseConnector } = await import("../../../src/connectors/base.js");
 
       class StdioLikeConnector extends BaseConnector {
         public async connect(): Promise<void> {
@@ -95,9 +91,7 @@ describe("Connector Telemetry Integration", () => {
     });
 
     it("should include serverUrl for http-like connectors", async () => {
-      const { BaseConnector } = await import(
-        "../../../src/connectors/base.js"
-      );
+      const { BaseConnector } = await import("../../../src/connectors/base.js");
 
       class HttpLikeConnector extends BaseConnector {
         public async connect(): Promise<void> {
@@ -125,9 +119,8 @@ describe("Connector Telemetry Integration", () => {
 
   describe("ConnectorInitEvent data structure", () => {
     it("should have correct properties for HTTP connector style data", async () => {
-      const { ConnectorInitEvent } = await import(
-        "../../../src/telemetry/events.js"
-      );
+      const { ConnectorInitEvent } =
+        await import("../../../src/telemetry/events.js");
 
       const event = new ConnectorInitEvent({
         connectorType: "HttpConnector",
@@ -148,9 +141,8 @@ describe("Connector Telemetry Integration", () => {
     });
 
     it("should have correct properties for Stdio connector style data", async () => {
-      const { ConnectorInitEvent } = await import(
-        "../../../src/telemetry/events.js"
-      );
+      const { ConnectorInitEvent } =
+        await import("../../../src/telemetry/events.js");
 
       const event = new ConnectorInitEvent({
         connectorType: "StdioConnector",
@@ -267,9 +259,7 @@ describe("Connector Telemetry Integration", () => {
       // Note: This test would require mocking the HTTP transport
       // For now, we verify the BaseConnector method works correctly
       // Full integration test would require setting up a mock HTTP server
-      const { BaseConnector } = await import(
-        "../../../src/connectors/base.js"
-      );
+      const { BaseConnector } = await import("../../../src/connectors/base.js");
 
       class TestHttpConnector extends BaseConnector {
         public async connect(): Promise<void> {
@@ -294,9 +284,7 @@ describe("Connector Telemetry Integration", () => {
     });
 
     it("should track StdioConnector init when connect() is called", async () => {
-      const { BaseConnector } = await import(
-        "../../../src/connectors/base.js"
-      );
+      const { BaseConnector } = await import("../../../src/connectors/base.js");
 
       class TestStdioConnector extends BaseConnector {
         public async connect(): Promise<void> {

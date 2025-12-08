@@ -81,9 +81,7 @@ describe("MCPServer Telemetry Integration", () => {
 
   describe("trackServerRunFromServer", () => {
     it("should track server run on listen() with http transport", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "test-server",
@@ -117,9 +115,7 @@ describe("MCPServer Telemetry Integration", () => {
     });
 
     it("should track server run on getHandler() with provider transport", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "supabase-server",
@@ -136,9 +132,7 @@ describe("MCPServer Telemetry Integration", () => {
     });
 
     it("should track server run on getHandler() with cloudflare provider", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "cloudflare-server",
@@ -155,9 +149,7 @@ describe("MCPServer Telemetry Integration", () => {
     });
 
     it("should track server run on getHandler() with default fetch transport", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "fetch-server",
@@ -174,9 +166,7 @@ describe("MCPServer Telemetry Integration", () => {
     });
 
     it("should include registered tools, prompts, and resources counts", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "full-server",
@@ -184,22 +174,17 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       // Register tools
-      server.tool(
-        { name: "tool1", description: "Tool 1" },
-        async () => ({ content: [{ type: "text", text: "result" }] })
-      );
-      server.tool(
-        { name: "tool2", description: "Tool 2" },
-        async () => ({ content: [{ type: "text", text: "result" }] })
-      );
+      server.tool({ name: "tool1", description: "Tool 1" }, async () => ({
+        content: [{ type: "text", text: "result" }],
+      }));
+      server.tool({ name: "tool2", description: "Tool 2" }, async () => ({
+        content: [{ type: "text", text: "result" }],
+      }));
 
       // Register prompt
-      server.prompt(
-        { name: "prompt1", description: "Prompt 1" },
-        async () => ({
-          messages: [{ role: "user", content: { type: "text", text: "test" } }],
-        })
-      );
+      server.prompt({ name: "prompt1", description: "Prompt 1" }, async () => ({
+        messages: [{ role: "user", content: { type: "text", text: "test" } }],
+      }));
 
       // Register resource
       server.resource(
@@ -225,9 +210,7 @@ describe("MCPServer Telemetry Integration", () => {
 
   describe("trackServerToolCall", () => {
     it("should wrap tool handlers with telemetry tracking in getServerForSession", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
       const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
 
       const server = new MCPServer({
@@ -258,22 +241,22 @@ describe("MCPServer Telemetry Integration", () => {
 
       // Spy on telemetry to verify it would be called
       const telemetry = Telemetry.getInstance();
-      const trackSpy = vi.spyOn(telemetry, "trackServerToolCall").mockResolvedValue();
+      const trackSpy = vi
+        .spyOn(telemetry, "trackServerToolCall")
+        .mockResolvedValue();
 
       // Verify the tool handler wrapping includes telemetry
       // The actual execution happens through the SDK's request handling,
       // but we can verify the wrapping code exists by checking that getServerForSession
       // creates a server with the tool registered
       // (The telemetry tracking happens in the finally block of the wrapped handler)
-      
+
       // Clear the spy since we're just verifying the pattern exists
       trackSpy.mockRestore();
     });
 
     it("should verify telemetry tracking code exists in wrapped handlers", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "error-tool-server",
@@ -296,7 +279,7 @@ describe("MCPServer Telemetry Integration", () => {
       // Verify getServerForSession creates wrapped handlers
       const sessionServer = server.getServerForSession();
       expect(sessionServer).toBeDefined();
-      
+
       // The telemetry tracking is in the finally block of the wrapped handler
       // created in getServerForSession(). Actual execution testing would require
       // calling through the SDK's request handling mechanism.
@@ -305,9 +288,7 @@ describe("MCPServer Telemetry Integration", () => {
 
   describe("trackServerResourceCall", () => {
     it("should wrap resource handlers with telemetry tracking in getServerForSession", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "resource-server",
@@ -323,7 +304,11 @@ describe("MCPServer Telemetry Integration", () => {
         },
         async () => ({
           contents: [
-            { uri: "file://test.txt", text: "Hello, World!", mimeType: "text/plain" },
+            {
+              uri: "file://test.txt",
+              text: "Hello, World!",
+              mimeType: "text/plain",
+            },
           ],
         })
       );
@@ -335,16 +320,14 @@ describe("MCPServer Telemetry Integration", () => {
       // Get a session server - resources are wrapped with telemetry in getServerForSession
       const sessionServer = server.getServerForSession();
       expect(sessionServer).toBeDefined();
-      
+
       // The telemetry tracking is in the finally block of the wrapped handler
       // created in getServerForSession(). Actual execution testing would require
       // calling through the SDK's request handling mechanism.
     });
 
     it("should track resource template call", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "template-server",
@@ -373,9 +356,7 @@ describe("MCPServer Telemetry Integration", () => {
 
   describe("trackServerPromptCall", () => {
     it("should wrap prompt handlers with telemetry tracking in getServerForSession", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "prompt-server",
@@ -406,7 +387,7 @@ describe("MCPServer Telemetry Integration", () => {
       // Get a session server - prompts are wrapped with telemetry in getServerForSession
       const sessionServer = server.getServerForSession();
       expect(sessionServer).toBeDefined();
-      
+
       // The telemetry tracking is in the finally block of the wrapped handler
       // created in getServerForSession(). Actual execution testing would require
       // calling through the SDK's request handling mechanism.
@@ -415,9 +396,7 @@ describe("MCPServer Telemetry Integration", () => {
 
   describe("server registration tracking", () => {
     it("should track all registered items in registrations map", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "full-registration-server",
@@ -425,22 +404,17 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       // Register multiple items
-      server.tool(
-        { name: "tool1", description: "Tool 1" },
-        async () => ({ content: [{ type: "text", text: "result" }] })
-      );
+      server.tool({ name: "tool1", description: "Tool 1" }, async () => ({
+        content: [{ type: "text", text: "result" }],
+      }));
 
-      server.tool(
-        { name: "tool2", description: "Tool 2" },
-        async () => ({ content: [{ type: "text", text: "result" }] })
-      );
+      server.tool({ name: "tool2", description: "Tool 2" }, async () => ({
+        content: [{ type: "text", text: "result" }],
+      }));
 
-      server.prompt(
-        { name: "prompt1", description: "Prompt 1" },
-        async () => ({
-          messages: [{ role: "user", content: { type: "text", text: "test" } }],
-        })
-      );
+      server.prompt({ name: "prompt1", description: "Prompt 1" }, async () => ({
+        messages: [{ role: "user", content: { type: "text", text: "test" } }],
+      }));
 
       server.resource(
         { name: "resource1", uri: "file://r1", description: "Resource 1" },
@@ -462,9 +436,7 @@ describe("MCPServer Telemetry Integration", () => {
 
   describe("getServerForSession creates wrapped handlers", () => {
     it("should create session server with wrapped tool handlers", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "session-server",
@@ -488,9 +460,7 @@ describe("MCPServer Telemetry Integration", () => {
     });
 
     it("should create session server with wrapped prompt handlers", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "session-prompt-server",
@@ -511,9 +481,7 @@ describe("MCPServer Telemetry Integration", () => {
     });
 
     it("should create session server with wrapped resource handlers", async () => {
-      const { MCPServer } = await import(
-        "../../../src/server/mcp-server.js"
-      );
+      const { MCPServer } = await import("../../../src/server/mcp-server.js");
 
       const server = new MCPServer({
         name: "session-resource-server",
@@ -521,7 +489,11 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       server.resource(
-        { name: "session_resource", uri: "file://session", description: "A session resource" },
+        {
+          name: "session_resource",
+          uri: "file://session",
+          description: "A session resource",
+        },
         async () => ({
           contents: [{ uri: "file://session", text: "session content" }],
         })
@@ -534,4 +506,3 @@ describe("MCPServer Telemetry Integration", () => {
     });
   });
 });
-

@@ -294,7 +294,12 @@ export class Telemetry {
         try {
           // For serverless environments, flush immediately to prevent data loss
           // See: https://posthog.com/docs/libraries/node#short-lived-processes-like-serverless-environments
-          const posthogOptions: { host: string; disableGeoip: boolean; flushAt?: number; flushInterval?: number } = {
+          const posthogOptions: {
+            host: string;
+            disableGeoip: boolean;
+            flushAt?: number;
+            flushInterval?: number;
+          } = {
             host: this.HOST,
             disableGeoip: false,
           };
@@ -304,7 +309,10 @@ export class Telemetry {
             posthogOptions.flushInterval = 0; // Don't wait for interval
           }
 
-          this._posthogClient = new PostHog(this.PROJECT_API_KEY, posthogOptions);
+          this._posthogClient = new PostHog(
+            this.PROJECT_API_KEY,
+            posthogOptions
+          );
         } catch (e) {
           logger.warn(`Failed to initialize PostHog telemetry: ${e}`);
           this._posthogClient = null;

@@ -223,4 +223,3 @@ describe("MCPClient Telemetry Integration", () => {
     });
   });
 });
-
