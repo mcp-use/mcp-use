@@ -25,7 +25,14 @@ export const Carousel: React.FC<CarouselProps> = ({ mcpUrl }) => {
         throw new Error("Failed to fetch fruits");
       }
       return response.json() as Promise<
-        Array<{ fruit: string; color: string }>
+        Array<{
+          fruit: string;
+          color: string;
+          name?: string;
+          price?: number;
+          inStock?: boolean;
+          stockCount?: number;
+        }>
       >;
     },
     enabled: !!mcpUrl, // Only run query if mcpUrl is available
@@ -50,11 +57,15 @@ export const Carousel: React.FC<CarouselProps> = ({ mcpUrl }) => {
           </div>
         ) : (
           <Animate className="flex gap-4">
-            {items?.map((item: { fruit: string; color: string }) => (
+            {items?.map((item) => (
               <CarouselItem
                 key={item.fruit}
                 fruit={item.fruit}
                 color={item.color}
+                name={item.name}
+                price={item.price}
+                inStock={item.inStock}
+                stockCount={item.stockCount}
               />
             ))}
           </Animate>
