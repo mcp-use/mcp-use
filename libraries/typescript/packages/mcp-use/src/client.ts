@@ -19,7 +19,7 @@ import { createConnectorFromConfig, loadConfigFile } from "./config.js";
 import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
 import { MCPSession } from "./session.js";
-import { Telemetry } from "./telemetry/index.js";
+import { Tel } from "./telemetry/index.js";
 import { getPackageVersion } from "./version.js";
 
 export type CodeExecutorFunction = (
@@ -163,7 +163,7 @@ export class MCPClient extends BaseMCPClient {
     const hasSamplingCallback = !!this._samplingCallback;
     const hasElicitationCallback = !!this._elicitationCallback;
 
-    Telemetry.getInstance()
+    Tel.getInstance()
       .trackMCPClientInit({
         codeMode: this.codeMode,
         sandbox: false, // Sandbox not supported in TS yet
@@ -171,6 +171,7 @@ export class MCPClient extends BaseMCPClient {
         verify: false, // No verify option in TS client
         servers,
         numServers: servers.length,
+        isBrowser: false, // Node.js MCPClient
       })
       .catch((e) => logger.debug(`Failed to track MCPClient init: ${e}`));
   }
