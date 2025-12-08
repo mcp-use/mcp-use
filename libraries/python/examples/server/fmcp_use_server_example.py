@@ -11,6 +11,7 @@ server = MCPServer(
     version="0.1.0",
     instructions="This is an example server with a simple echo tool.",
     debug=True,
+    pretty_print_jsonrpc=True,
 )
 
 
@@ -25,11 +26,10 @@ def lupo_tool(a: int, b: int) -> str:
     description="Echoes back the message you provide.",
     annotations=ToolAnnotations(
         title="Echo",
-        destructiveHint=True,
-        dangerousHint=True,
-        sensitiveHint=True,
-        identityHint=True,
-        openWorldHint=True,
+        readOnlyHint=False,
+        destructiveHint=False,
+        openWorldHint=False,
+        idempotentHint=False,
     ),
     structured_output=True,
 )
