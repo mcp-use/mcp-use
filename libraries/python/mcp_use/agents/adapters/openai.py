@@ -15,7 +15,7 @@ def _sanitize_for_tool_name(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_]+", "_", name).strip("_")[:64]
 
 
-class OpenAIMCPAdapter(BaseAdapter):
+class OpenAIMCPAdapter(BaseAdapter[dict[str, Any]]):
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new OpenAI adapter.
 
@@ -34,7 +34,7 @@ class OpenAIMCPAdapter(BaseAdapter):
         self.resources: list[dict[str, Any]] = []
         self.prompts: list[dict[str, Any]] = []
 
-    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> dict[str, Any]:
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> dict[str, Any] | None:
         """Convert an MCP tool to the OpenAI tool format."""
         if mcp_tool.name in self.disallowed_tools:
             return None
@@ -53,7 +53,7 @@ class OpenAIMCPAdapter(BaseAdapter):
             },
         }
 
-    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> dict[str, Any]:
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> dict[str, Any] | None:
         """Convert an MCP resource to a readable tool in OpenAI format."""
         # Sanitize the name to be a valid function name for OpenAI
         tool_name = _sanitize_for_tool_name(f"resource_{mcp_resource.name}")
@@ -76,7 +76,7 @@ class OpenAIMCPAdapter(BaseAdapter):
             },
         }
 
-    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> dict[str, Any]:
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> dict[str, Any] | None:
         """Convert an MCP prompt to a usable tool in OpenAI format."""
         if mcp_prompt.name in self.disallowed_tools:
             return None

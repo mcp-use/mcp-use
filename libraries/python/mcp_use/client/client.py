@@ -16,7 +16,9 @@ from mcp_use.client.connectors.sandbox import SandboxOptions
 from mcp_use.client.middleware import Middleware, default_logging_middleware
 from mcp_use.client.session import MCPSession
 from mcp_use.logging import logger
-from mcp_use.telemetry.telemetry import telemetry
+from mcp_use.telemetry.telemetry import Telemetry, telemetry
+
+_telemetry = Telemetry()
 
 if TYPE_CHECKING:
     from mcp_use.client.code_executor import CodeExecutor
@@ -65,6 +67,7 @@ class MCPClient:
         self.logging_callback = logging_callback
         self.code_mode = code_mode
         self._code_executor: CodeExecutor | None = None
+        self._record_telemetry = True
         # Add default logging middleware if no middleware provided, or prepend it to existing middleware
         default_middleware = [default_logging_middleware]
         if middleware:
@@ -82,6 +85,21 @@ class MCPClient:
         # If code mode is enabled, create internal code mode connector
         if self.code_mode:
             self._setup_code_mode_connector()
+
+        servers_list = list(self.config.get("mcpServers", {}).keys()) if self.config else []
+        _telemetry.track_client_init(
+            code_mode=self.code_mode,
+            sandbox=self.sandbox,
+            all_callbacks=(
+                self.sampling_callback is not None
+                and self.elicitation_callback is not None
+                and self.message_handler is not None
+                and self.logging_callback is not None
+            ),
+            verify=self.verify if self.verify is not None else True,
+            servers=servers_list,
+            num_servers=len(servers_list),
+        )
 
     @classmethod
     def from_dict(
@@ -240,7 +258,7 @@ class MCPClient:
             json.dump(self.config, f, indent=2)
 
     @telemetry("client_create_session")
-    async def create_session(self, server_name: str, auto_initialize: bool = True) -> MCPSession:
+    async def create_session(self, server_name: str, auto_initialize: bool = True) -> MCPSession | None:
         """Create a session for the specified server.
 
         Args:
@@ -278,6 +296,8 @@ class MCPClient:
 
         # Create the session
         session = MCPSession(connector)
+        session._record_telemetry = False
+        connector._record_telemetry = False
         if auto_initialize:
             await session.initialize()
         self.sessions[server_name] = session

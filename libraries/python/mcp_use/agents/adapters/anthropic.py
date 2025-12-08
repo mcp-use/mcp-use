@@ -15,7 +15,7 @@ def _sanitize_for_tool_name(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_]+", "_", name).strip("_")[:64]
 
 
-class AnthropicMCPAdapter(BaseAdapter):
+class AnthropicMCPAdapter(BaseAdapter[dict[str, Any]]):
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new Anthropic adapter.
 
@@ -34,7 +34,7 @@ class AnthropicMCPAdapter(BaseAdapter):
         self.resources: list[dict[str, Any]] = []
         self.prompts: list[dict[str, Any]] = []
 
-    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> dict[str, Any]:
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> dict[str, Any] | None:
         """Convert an MCP tool to the Anthropic tool format."""
         if mcp_tool.name in self.disallowed_tools:
             return None
@@ -46,7 +46,7 @@ class AnthropicMCPAdapter(BaseAdapter):
         fixed_schema = self.fix_schema(mcp_tool.inputSchema)
         return {"name": mcp_tool.name, "description": mcp_tool.description, "input_schema": fixed_schema}
 
-    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> dict[str, Any]:
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> dict[str, Any] | None:
         """Convert an MCP resource to a readable tool in Anthropic format."""
         tool_name = _sanitize_for_tool_name(f"resource_{mcp_resource.name}")
 
@@ -63,7 +63,7 @@ class AnthropicMCPAdapter(BaseAdapter):
             "input_schema": {"type": "object", "properties": {}},
         }
 
-    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> dict[str, Any]:
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> dict[str, Any] | None:
         """Convert an MCP prompt to a usable tool in Anthropic format."""
         if mcp_prompt.name in self.disallowed_tools:
             return None

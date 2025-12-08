@@ -5,7 +5,7 @@ This module provides the abstract base class that all MCP tool adapters should i
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 from mcp.types import Prompt, Resource, Tool
 
@@ -18,7 +18,7 @@ from mcp_use.telemetry.telemetry import telemetry
 T = TypeVar("T")
 
 
-class BaseAdapter(ABC):
+class BaseAdapter(Generic[T], ABC):
     """Abstract base class for converting MCP tools to other framework formats.
 
     This class defines the common interface that all adapter implementations
@@ -41,6 +41,8 @@ class BaseAdapter(ABC):
         self.tools: list[T] = []
         self.resources: list[T] = []
         self.prompts: list[T] = []
+
+        self._record_telemetry = True
 
     def parse_result(self, tool_result: Any) -> str:
         """Parse the result from any MCP operation (tool, resource, or prompt) into a string.
@@ -65,7 +67,6 @@ class BaseAdapter(ABC):
             # Fallback for unexpected types
             return str(tool_result)
 
-    @telemetry("adapter_fix_schema")
     def fix_schema(self, schema: Any) -> Any:
         """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
 
@@ -105,6 +106,7 @@ class BaseAdapter(ABC):
         await self.create_resources(client)
         await self.create_prompts(client)
 
+    @telemetry("adapter_create_tools")
     async def create_tools(self, client: MCPClient) -> list[T]:
         """Create tools from the MCPClient instance.
 
@@ -119,6 +121,7 @@ class BaseAdapter(ABC):
 
         return self.tools
 
+    @telemetry("adapter_create_resources")
     async def create_resources(self, client: MCPClient) -> list[T]:
         """Create resources from the MCPClient instance.
 
@@ -133,6 +136,7 @@ class BaseAdapter(ABC):
 
         return self.resources
 
+    @telemetry("adapter_create_prompts")
     async def create_prompts(self, client: MCPClient) -> list[T]:
         """Create prompts from the MCPClient instance.
 
@@ -160,7 +164,7 @@ class BaseAdapter(ABC):
         # Check if we already have tools for this connector
         if connector in self._connector_tool_map:
             logger.debug(f"Returning {len(self._connector_tool_map[connector])} existing tools for connector")
-            return self._connector_tool_map[connector]
+            return list(self._connector_tool_map[connector])  # type: ignore
 
         if not await self._ensure_connector_initialized(connector):
             return []
@@ -182,7 +186,6 @@ class BaseAdapter(ABC):
 
         return connector_tools
 
-    @telemetry("adapter_load_resources")
     async def load_resources_for_connector(self, connector: BaseConnector):
         """Dynamically load resources for a specific connector.
 
@@ -194,7 +197,7 @@ class BaseAdapter(ABC):
         """
         if connector in self._connector_resource_map:
             logger.debug(f"Returning {len(self._connector_resource_map[connector])} existing resources for connector")
-            return self._connector_resource_map[connector]
+            return list(self._connector_resource_map[connector])
 
         if not await self._ensure_connector_initialized(connector):
             return []
@@ -210,9 +213,8 @@ class BaseAdapter(ABC):
             f"Loaded {len(connector_resources)} new resources for connector: "
             f"{[getattr(r, 'name', str(r)) for r in connector_resources]}"
         )
-        return connector_resources
+        return list(self._connector_resource_map[connector])
 
-    @telemetry("adapter_load_prompts")
     async def load_prompts_for_connector(self, connector: BaseConnector) -> list[T]:
         """Dynamically load prompts for a specific connector.
 
@@ -224,7 +226,7 @@ class BaseAdapter(ABC):
         """
         if connector in self._connector_prompt_map:
             logger.debug(f"Returning {len(self._connector_prompt_map[connector])} existing prompts for connector")
-            return self._connector_prompt_map[connector]
+            return list(self._connector_prompt_map[connector])
 
         if not await self._ensure_connector_initialized(connector):
             return []
@@ -240,20 +242,20 @@ class BaseAdapter(ABC):
             f"Loaded {len(connector_prompts)} new prompts for connector: "
             f"{[getattr(p, 'name', str(p)) for p in connector_prompts]}"
         )
-        return connector_prompts
+        return list(connector_prompts)
 
     @abstractmethod
-    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> T:
+    def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> T | None:
         """Convert an MCP tool to the target framework's tool format."""
         pass
 
     @abstractmethod
-    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> T:
+    def _convert_resource(self, mcp_resource: Resource, connector: BaseConnector) -> T | None:
         """Convert an MCP resource to the target framework's resource format."""
         pass
 
     @abstractmethod
-    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> T:
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> T | None:
         """Convert an MCP prompt to the target framework's prompt format."""
         pass
 
@@ -296,7 +298,7 @@ class BaseAdapter(ABC):
         Returns:
             True if the connector is initialized and has tools, False otherwise.
         """
-        return hasattr(connector, "tools") and connector.tools
+        return bool(getattr(connector, "tools", None))
 
     async def _ensure_connector_initialized(self, connector: BaseConnector) -> bool:
         """Ensure a connector is initialized.

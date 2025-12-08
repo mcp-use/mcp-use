@@ -8,7 +8,7 @@ from mcp_use.agents.adapters.base import BaseAdapter
 from mcp_use.client.connectors.base import BaseConnector
 
 try:
-    from google.genai import types
+    from google.genai import types  # type: ignore
 except ImportError as e:
     raise ImportError(
         "google-genai is required for GoogleMCPAdapter. Install it with: uv pip install google-genai"
@@ -22,7 +22,7 @@ def _sanitize_for_tool_name(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_]+", "_", name).strip("_")[:64]
 
 
-class GoogleMCPAdapter(BaseAdapter):
+class GoogleMCPAdapter(BaseAdapter[types.FunctionDeclaration]):
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new Google adapter.
 
@@ -74,7 +74,7 @@ class GoogleMCPAdapter(BaseAdapter):
         )
         return function_declaration
 
-    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> types.FunctionDeclaration:
+    def _convert_prompt(self, mcp_prompt: Prompt, connector: BaseConnector) -> types.FunctionDeclaration | None:
         """Convert an MCP prompt to a usable tool in Google format."""
         if mcp_prompt.name in self.disallowed_tools:
             return None
