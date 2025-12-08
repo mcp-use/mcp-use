@@ -43,7 +43,7 @@
     "build:client": "vite build",
     "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
     "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
-    "prepublishOnly": "pnpm build",
+    "prepublishOnly": "pnpm --filter mcp-use build && pnpm build",
     "start": "node dist/server/server.js",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
