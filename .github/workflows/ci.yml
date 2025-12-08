@@ -955,50 +955,8 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath $(find ./packages -name 'create-mcp-use-app-*.tgz' -type f | head -n1))
-          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }} --dev
+          npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app-npm-${{ matrix.template }} --template ${{ matrix.template }} --tar ./packages
           echo "✅ Project created successfully with template ${{ matrix.template }}"
-      - name: Replace workspace deps with file references
-        working-directory: test-app-npm-${{ matrix.template }}
-        shell: bash
-        run: |
-          # Get absolute paths to tarballs
-          MCP_USE_TGZ=$(realpath $(find ../packages -name 'mcp-use-*.tgz' -not -name '*cli*' -not -name '*inspector*' -type f | head -n1))
-          CLI_TGZ=$(realpath $(find ../packages -name 'mcp-use-cli-*.tgz' -type f | head -n1))
-          INSPECTOR_TGZ=$(realpath $(find ../packages -name 'mcp-use-inspector-*.tgz' -type f | head -n1))
-          
-          echo "Using tarballs:"
-          echo "  mcp-use: $MCP_USE_TGZ"
-          echo "  cli: $CLI_TGZ"
-          echo "  inspector: $INSPECTOR_TGZ"
-          
-          # Replace workspace:* with file: references in package.json
-          # Use node for cross-platform JSON manipulation
-          MCP_USE_TGZ="$MCP_USE_TGZ" CLI_TGZ="$CLI_TGZ" INSPECTOR_TGZ="$INSPECTOR_TGZ" node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            
-            const replacements = {
-              'mcp-use': 'file:' + process.env.MCP_USE_TGZ,
-              '@mcp-use/cli': 'file:' + process.env.CLI_TGZ,
-              '@mcp-use/inspector': 'file:' + process.env.INSPECTOR_TGZ
-            };
-            
-            for (const [name, newVersion] of Object.entries(replacements)) {
-              if (pkg.dependencies && pkg.dependencies[name] === 'workspace:*') {
-                pkg.dependencies[name] = newVersion;
-                console.log('Replaced ' + name + ' with ' + newVersion);
-              }
-              if (pkg.devDependencies && pkg.devDependencies[name] === 'workspace:*') {
-                pkg.devDependencies[name] = newVersion;
-                console.log('Replaced ' + name + ' (dev) with ' + newVersion);
-              }
-            }
-            
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-          "
-          
-          echo "Updated package.json:"
-          cat package.json
       - name: Install dependencies with npm
         working-directory: test-app-npm-${{ matrix.template }}
         shell: bash
@@ -1055,50 +1013,8 @@ jobs:
         shell: bash
         run: |
           PACKAGE_PATH=$(realpath $(find ./packages -name 'create-mcp-use-app-*.tgz' -type f | head -n1))
-          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }} --dev
+          yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app-yarn-${{ matrix.template }} --template ${{ matrix.template }} --tar ./packages
           echo "✅ Project created successfully with template ${{ matrix.template }}"
-      - name: Replace workspace deps with file references
-        working-directory: test-app-yarn-${{ matrix.template }}
-        shell: bash
-        run: |
-          # Get absolute paths to tarballs
-          MCP_USE_TGZ=$(realpath $(find ../packages -name 'mcp-use-*.tgz' -not -name '*cli*' -not -name '*inspector*' -type f | head -n1))
-          CLI_TGZ=$(realpath $(find ../packages -name 'mcp-use-cli-*.tgz' -type f | head -n1))
-          INSPECTOR_TGZ=$(realpath $(find ../packages -name 'mcp-use-inspector-*.tgz' -type f | head -n1))
-          
-          echo "Using tarballs:"
-          echo "  mcp-use: $MCP_USE_TGZ"
-          echo "  cli: $CLI_TGZ"
-          echo "  inspector: $INSPECTOR_TGZ"
-          
-          # Replace workspace:* with file: references in package.json
-          # Use node for cross-platform JSON manipulation
-          MCP_USE_TGZ="$MCP_USE_TGZ" CLI_TGZ="$CLI_TGZ" INSPECTOR_TGZ="$INSPECTOR_TGZ" node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            
-            const replacements = {
-              'mcp-use': 'file:' + process.env.MCP_USE_TGZ,
-              '@mcp-use/cli': 'file:' + process.env.CLI_TGZ,
-              '@mcp-use/inspector': 'file:' + process.env.INSPECTOR_TGZ
-            };
-            
-            for (const [name, newVersion] of Object.entries(replacements)) {
-              if (pkg.dependencies && pkg.dependencies[name] === 'workspace:*') {
-                pkg.dependencies[name] = newVersion;
-                console.log('Replaced ' + name + ' with ' + newVersion);
-              }
-              if (pkg.devDependencies && pkg.devDependencies[name] === 'workspace:*') {
-                pkg.devDependencies[name] = newVersion;
-                console.log('Replaced ' + name + ' (dev) with ' + newVersion);
-              }
-            }
-            
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-          "
-          
-          echo "Updated package.json:"
-          cat package.json
       - name: Install dependencies with yarn
         working-directory: test-app-yarn-${{ matrix.template }}
         shell: bash

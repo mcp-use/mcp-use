@@ -162,6 +162,60 @@ function tryGitInit(root: string): boolean {
   }
 }
 
+// Helper function to find and validate tar files in a directory
+function findTarFiles(tarDirectory: string): Record<string, string> {
+  const absPath = resolve(tarDirectory);
+
+  if (!existsSync(absPath)) {
+    console.error(chalk.red(`❌ Tar directory not found: ${tarDirectory}`));
+    process.exit(1);
+  }
+
+  const files = readdirSync(absPath);
+  const tarFiles: Record<string, string> = {};
+
+  // Define the required packages and their tar file patterns
+  const packagePatterns = [
+    { name: "mcp-use", pattern: /^mcp-use-.*\.tgz$/, exclude: /cli|inspector/ },
+    { name: "@mcp-use/cli", pattern: /^mcp-use-cli-.*\.tgz$/ },
+    { name: "@mcp-use/inspector", pattern: /^mcp-use-inspector-.*\.tgz$/ },
+  ];
+
+  for (const { name, pattern, exclude } of packagePatterns) {
+    const found = files.find((file) => {
+      const matches = pattern.test(file);
+      if (!matches) return false;
+      if (exclude) return !exclude.test(file);
+      return true;
+    });
+
+    if (found) {
+      tarFiles[name] = resolve(absPath, found);
+    }
+  }
+
+  // Check if all required packages are found
+  const required = ["mcp-use", "@mcp-use/cli", "@mcp-use/inspector"];
+  const missing = required.filter((pkg) => !tarFiles[pkg]);
+
+  if (missing.length > 0) {
+    console.error(chalk.red("❌ Missing required tar files:"));
+    missing.forEach((pkg) => {
+      console.error(chalk.red(`   - ${pkg}`));
+    });
+    console.error("");
+    console.error(chalk.yellow(`   Searched in: ${absPath}`));
+    console.error(
+      chalk.yellow(
+        `   Found files: ${files.filter((f) => f.endsWith(".tgz")).join(", ") || "none"}`
+      )
+    );
+    process.exit(1);
+  }
+
+  return tarFiles;
+}
+
 const program = new Command();
 
 // Render logo as ASCII art
@@ -178,12 +232,19 @@ const packageJson = JSON.parse(
 // Read current package versions from workspace
 function getCurrentPackageVersions(
   isDevelopment: boolean = false,
-  useCanary: boolean = false
+  useCanary: boolean = false,
+  useTar: boolean = false,
+  tarFiles?: Record<string, string>
 ) {
   const versions: Record<string, string> = {};
 
   try {
-    if (isDevelopment) {
+    if (useTar && tarFiles) {
+      // In tar mode, use file: references to local tar files
+      versions["mcp-use"] = `file:${tarFiles["mcp-use"]}`;
+      versions["@mcp-use/cli"] = `file:${tarFiles["@mcp-use/cli"]}`;
+      versions["@mcp-use/inspector"] = `file:${tarFiles["@mcp-use/inspector"]}`;
+    } else if (isDevelopment) {
       // In development mode, use workspace dependencies for all packages
       versions["mcp-use"] = "workspace:*";
       versions["@mcp-use/cli"] = "workspace:*";
@@ -227,7 +288,8 @@ function processTemplateFile(
   filePath: string,
   versions: Record<string, string>,
   isDevelopment: boolean = false,
-  useCanary: boolean = false
+  useCanary: boolean = false,
+  useTar: boolean = false
 ) {
   const content = readFileSync(filePath, "utf-8");
   let processedContent = content;
@@ -242,7 +304,21 @@ function processTemplateFile(
   }
 
   // Handle workspace dependencies based on mode
-  if (isDevelopment) {
+  if (useTar) {
+    // In tar mode, replace workspace:* with file: references
+    processedContent = processedContent.replace(
+      /"mcp-use": "workspace:\*"/,
+      `"mcp-use": "${versions["mcp-use"]}"`
+    );
+    processedContent = processedContent.replace(
+      /"@mcp-use\/cli": "workspace:\*"/,
+      `"@mcp-use/cli": "${versions["@mcp-use/cli"]}"`
+    );
+    processedContent = processedContent.replace(
+      /"@mcp-use\/inspector": "workspace:\*"/,
+      `"@mcp-use/inspector": "${versions["@mcp-use/inspector"]}"`
+    );
+  } else if (isDevelopment) {
     // Keep workspace dependencies for development
     processedContent = processedContent.replace(
       /"mcp-use": "\^[^"]+"/,
@@ -372,6 +448,10 @@ program
   .option("--no-git", "Skip initializing a git repository")
   .option("--dev", "Use workspace dependencies for development")
   .option("--canary", "Use canary versions of packages")
+  .option(
+    "--tar <directory>",
+    "Use local tar files from directory for dependencies"
+  )
   .option("--yarn", "Use yarn as package manager")
   .option("--npm", "Use npm as package manager")
   .option("--pnpm", "Use pnpm as package manager")
@@ -385,6 +465,7 @@ program
         git: boolean;
         dev: boolean;
         canary: boolean;
+        tar?: string;
         yarn?: boolean;
         npm?: boolean;
         pnpm?: boolean;
@@ -395,6 +476,20 @@ program
         if (options.listTemplates) {
           listTemplates();
           process.exit(0);
+        }
+
+        // Validate that --tar, --dev, and --canary are mutually exclusive
+        const modeFlags = [options.tar, options.dev, options.canary].filter(
+          Boolean
+        );
+        if (modeFlags.length > 1) {
+          console.error(
+            chalk.red("❌ Cannot use --tar, --dev, and --canary together")
+          );
+          console.error(
+            chalk.yellow("   Please choose only one dependency mode")
+          );
+          process.exit(1);
         }
 
         let selectedTemplate = options.template;
@@ -481,7 +576,19 @@ program
         const validatedTemplate = validateTemplateName(selectedTemplate);
 
         // Get current package versions
-        const versions = getCurrentPackageVersions(options.dev, options.canary);
+        let tarFiles: Record<string, string> | undefined;
+        const useTar = !!options.tar;
+
+        if (useTar && options.tar) {
+          tarFiles = findTarFiles(options.tar);
+        }
+
+        const versions = getCurrentPackageVersions(
+          options.dev,
+          options.canary,
+          useTar,
+          tarFiles
+        );
 
         // Copy template files
         await copyTemplate(
@@ -489,7 +596,8 @@ program
           validatedTemplate,
           versions,
           options.dev,
-          options.canary
+          options.canary,
+          useTar
         );
 
         // Update package.json with project name
@@ -641,7 +749,11 @@ program
 
         console.log("");
         console.log(chalk.green("✅ MCP server created successfully!"));
-        if (options.dev) {
+        if (options.tar) {
+          console.log(
+            chalk.magenta("📦 Tar mode: Using local tar files for dependencies")
+          );
+        } else if (options.dev) {
           console.log(
             chalk.yellow("🔧 Development mode: Using workspace dependencies")
           );
@@ -748,7 +860,8 @@ async function copyTemplate(
   template: string,
   versions: Record<string, string>,
   isDevelopment: boolean = false,
-  useCanary: boolean = false
+  useCanary: boolean = false,
+  useTar: boolean = false
 ) {
   const templatePath = join(__dirname, "templates", template);
 
@@ -787,7 +900,8 @@ async function copyTemplate(
     projectPath,
     versions,
     isDevelopment,
-    useCanary
+    useCanary,
+    useTar
   );
 }
 
@@ -796,7 +910,8 @@ function copyDirectoryWithProcessing(
   dest: string,
   versions: Record<string, string>,
   isDevelopment: boolean,
-  useCanary: boolean = false
+  useCanary: boolean = false,
+  useTar: boolean = false
 ) {
   const entries = readdirSync(src, { withFileTypes: true });
 
@@ -811,7 +926,8 @@ function copyDirectoryWithProcessing(
         destPath,
         versions,
         isDevelopment,
-        useCanary
+        useCanary,
+        useTar
       );
     } else {
       // Process files that might contain version placeholders
@@ -820,7 +936,8 @@ function copyDirectoryWithProcessing(
           srcPath,
           versions,
           isDevelopment,
-          useCanary
+          useCanary,
+          useTar
         );
         writeFileSync(destPath, processedContent);
       } else {
