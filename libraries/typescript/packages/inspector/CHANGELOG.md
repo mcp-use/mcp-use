@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.12.0-canary.10
+
+### Patch Changes
+
+- 0633fbd: fix: build mcp use first
+  - mcp-use@1.10.0-canary.10
+
 ## 0.12.0-canary.9
 
 ### Patch Changes
