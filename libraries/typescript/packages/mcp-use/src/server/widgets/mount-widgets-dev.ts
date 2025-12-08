@@ -266,10 +266,41 @@ if (container && Component) {
     },
   };
 
+  // Create a plugin to provide browser stubs for Node.js-only packages
+  // posthog-node is server-side telemetry that can't run in browser
+  const nodeStubsPlugin = {
+    name: "node-stubs",
+    enforce: "pre" as const,
+    resolveId(id: string) {
+      // Stub posthog-node and its subpaths for browser
+      if (id === "posthog-node" || id.startsWith("posthog-node/")) {
+        return "\0virtual:posthog-node-stub";
+      }
+      return null;
+    },
+    load(id: string) {
+      if (id === "\0virtual:posthog-node-stub") {
+        // Return a browser-compatible stub that mimics posthog-node API
+        return `
+export class PostHog {
+  constructor() {}
+  capture() {}
+  identify() {}
+  alias() {}
+  flush() { return Promise.resolve(); }
+  shutdown() { return Promise.resolve(); }
+}
+export default PostHog;
+`;
+      }
+      return null;
+    },
+  };
+
   const viteServer = await createServer({
     root: tempDir,
     base: baseRoute + "/",
-    plugins: [ssrCssPlugin, watchResourcesPlugin, tailwindcss(), react()],
+    plugins: [nodeStubsPlugin, ssrCssPlugin, watchResourcesPlugin, tailwindcss(), react()],
     resolve: {
       alias: {
         "@": pathHelpers.join(getCwd(), resourcesDir),
@@ -290,12 +321,15 @@ if (container && Component) {
     // Explicitly tell Vite to watch files outside root
     // This is needed because widget entry files import from resources directory
     optimizeDeps: {
-      // Don't optimize dependencies that might change
-      exclude: [],
+      // Exclude Node.js-only packages from browser bundling
+      // posthog-node is for server-side telemetry and doesn't work in browser
+      exclude: ["posthog-node"],
     },
     ssr: {
       // Force Vite to transform these packages in SSR instead of using external requires
       noExternal: ["@openai/apps-sdk-ui", "react-router"],
+      // Mark Node.js-only packages as external in SSR mode
+      external: ["posthog-node"],
     },
     define: {
       // Define process.env for SSR context
