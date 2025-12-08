@@ -1,5 +1,9 @@
 name: Create App E2E (Canary)
 
+permissions:
+  actions: read
+  contents: read
+
 on:
   workflow_run:
     workflows: ["TypeScript Release"]
