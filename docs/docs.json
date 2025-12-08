@@ -373,6 +373,7 @@
                       "python/api-reference/mcp_use_server_logging_state"
                     ]
                   },
+                  "python/api-reference/mcp_use_server_middleware_middleware",
                   "python/api-reference/mcp_use_server_router",
                   "python/api-reference/mcp_use_server_runner",
                   "python/api-reference/mcp_use_server_server",

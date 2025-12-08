@@ -1,0 +1,401 @@
+---
+title: "Middleware"
+description: "Middleware API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/middleware/middleware.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/middleware/middleware.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/middleware/middleware.py</a>
+</Callout>
+
+## CallNext
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> CallNext</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.middleware.middleware import CallNext
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="args" required="True" >   Parameter value </ParamField>
+><ParamField body="kwargs" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(args, kwargs):
+```
+
+</Card>
+<Card type="info">
+### `method` __call__
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[T]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Awaitable[R]" />
+
+**Signature**
+```python wrap
+def __call__(context: ServerMiddlewareContext[T]):
+```
+
+</Card>
+
+</div>
+
+## Middleware
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> Middleware</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.middleware.middleware import Middleware
+```
+
+<Card type="info">
+### `method` __call__
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[T]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[T, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def __call__(context: ServerMiddlewareContext[T], call_next: CallNext[T, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_call_tool
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_call_tool(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_get_prompt
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_get_prompt(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_initialize
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_initialize(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_list_prompts
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_list_prompts(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_list_resources
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_list_resources(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_list_tools
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_list_tools(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_read_resource
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_read_resource(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_request
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_request(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+</div>
+
+## MiddlewareManager
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MiddlewareManager</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.middleware.middleware import MiddlewareManager
+```
+
+<Card type="info">
+### `method` __init__
+
+**Signature**
+```python wrap
+def __init__():
+```
+
+</Card>
+<Card type="info">
+### `method` add_middleware
+
+
+**Parameters**
+><ParamField body="middleware" type="Middleware" required="True" >   Middleware instance </ParamField>
+
+**Signature**
+```python wrap
+def add_middleware(middleware: Middleware):
+```
+
+</Card>
+
+<Card type="info">
+### `method` process_request
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="handler" type="Callable[[ServerMiddlewareContext[Any]], Awaitable[Any]]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def process_request(
+context: ServerMiddlewareContext[Any],
+    handler: Callable[[ServerMiddlewareContext[Any]],
+    Awaitable[Any]]
+):
+```
+
+</Card>
+
+</div>
+
+## ServerMiddlewareContext
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ServerMiddlewareContext</div>
+
+Immutable context passed through server middleware pipeline.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.middleware.middleware import ServerMiddlewareContext
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="message" type="T" required="True" >   Parameter value </ParamField>
+<ParamField body="method" type="str" required="True" >   String value </ParamField>
+<ParamField body="timestamp" type="datetime" required="True" >   Parameter value </ParamField>
+<ParamField body="transport" type="str" required="True" >   String value </ParamField>
+<ParamField body="session_id" type="str | None" required="True" >   MCP session instance </ParamField>
+<ParamField body="headers" type="dict[str, str] | None" required="True" >   Dictionary of key-value pairs </ParamField>
+<ParamField body="client_ip" type="str | None" required="True" >   MCP client instance </ParamField>
+<ParamField body="metadata" type="dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="message" type="T" required="True" >   Parameter value </ParamField>
+><ParamField body="method" type="str" required="True" >   String value </ParamField>
+><ParamField body="timestamp" type="datetime" required="True" >   Parameter value </ParamField>
+><ParamField body="transport" type="str" required="True" >   String value </ParamField>
+><ParamField body="session_id" type="str | None" default="None" >   MCP session instance </ParamField>
+><ParamField body="headers" type="dict[str, str] | None" default="None" >   Dictionary of key-value pairs </ParamField>
+><ParamField body="client_ip" type="str | None" default="None" >   MCP client instance </ParamField>
+><ParamField body="metadata" type="dict[str, Any]" default="<factory>" >   Dictionary of key-value pairs </ParamField>
+
+**Signature**
+```python wrap
+def __init__(message: T, method: str, timestamp: datetime, transport: str, session_id: str | None = None, headers: dict[str, str] | None = None, client_ip: str | None = None, metadata: dict[str, Any] = <factory>):
+```
+
+</Card>
+<Card type="info">
+### `method` copy
+
+
+**Parameters**
+><ParamField body="kwargs" type="Any" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="ServerMiddlewareContext[T]" />
+
+**Signature**
+```python wrap
+def copy(kwargs: Any):
+```
+
+</Card>
+
+</div>
+
+## ServerResponseContext
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ServerResponseContext</div>
+
+Optional response wrapper for middleware outputs.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.middleware.middleware import ServerResponseContext
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="result" type="R | None" required="True" >   Parameter value </ParamField>
+<ParamField body="error" type="Exception | None" required="True" >   Parameter value </ParamField>
+<ParamField body="metadata" type="dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="result" type="R | None" default="None" >   Parameter value </ParamField>
+><ParamField body="error" type="Exception | None" default="None" >   Parameter value </ParamField>
+><ParamField body="metadata" type="dict[str, Any]" default="<factory>" >   Dictionary of key-value pairs </ParamField>
+
+**Signature**
+```python wrap
+def __init__(result: R | None = None, error: Exception | None = None, metadata: dict[str, Any] = <factory>):
+```
+
+</Card>
+</div>
