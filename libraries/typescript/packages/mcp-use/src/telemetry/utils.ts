@@ -1,20 +1,13 @@
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-import * as fs from "node:fs";
-import * as path from "node:path";
+import { VERSION } from "./version.js";
 
+/**
+ * Get the package version.
+ * The version is embedded at build time via scripts/generate-version.mjs
+ * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+ */
 export function getPackageVersion(): string {
-  try {
-    // Check if we're in a Node.js environment with file system access
-    if (typeof __dirname === "undefined" || typeof fs === "undefined") {
-      return "unknown";
-    }
-
-    const packagePath = path.join(__dirname, "../../package.json");
-    const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf-8"));
-    return packageJson.version || "unknown";
-  } catch {
-    return "unknown";
-  }
+  return VERSION;
 }
 
 export function getModelProvider(llm: BaseLanguageModel): string {

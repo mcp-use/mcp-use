@@ -73,7 +73,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "generate:version": "node scripts/generate-version.mjs",
+    "build": "npm run generate:version && rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",
     "test:unit": "vitest run --exclude tests/integration/**",
