@@ -1,4 +1,4 @@
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { Play, Save } from "lucide-react";
 import { useEffect } from "react";
 import { Button } from "@/client/components/ui/button";

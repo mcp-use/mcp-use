@@ -20,7 +20,7 @@ import { generateUUID } from "../utils/runtime.js";
 export async function mountMcp(
   app: HonoType,
   mcpServerInstance: {
-    getServerForSession: () => import("@modelcontextprotocol/sdk/server/mcp.js").McpServer;
+    getServerForSession: () => import("@mcp-use/modelcontextprotocol-sdk/server/mcp.js").McpServer;
     cleanupSessionSubscriptions?: (sessionId: string) => void;
   }, // The McpServer instance with getServerForSession() method
   sessions: Map<string, SessionData>,
@@ -28,7 +28,7 @@ export async function mountMcp(
   isProductionMode: boolean
 ): Promise<{ mcpMounted: boolean; idleCleanupInterval?: NodeJS.Timeout }> {
   const { FetchStreamableHTTPServerTransport } =
-    await import("@modelcontextprotocol/sdk/experimental/fetch-streamable-http/index.js");
+    await import("@mcp-use/modelcontextprotocol-sdk/experimental/fetch-streamable-http/index.js");
 
   const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 

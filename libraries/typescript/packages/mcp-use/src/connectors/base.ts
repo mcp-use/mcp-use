@@ -1,13 +1,13 @@
 import type {
   Client,
   ClientOptions,
-} from "@modelcontextprotocol/sdk/client/index.js";
-import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
+} from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
+import type { RequestOptions } from "@mcp-use/modelcontextprotocol-sdk/shared/protocol.js";
 import {
   ListRootsRequestSchema,
   CreateMessageRequestSchema,
   ElicitRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type {
   CallToolResult,
   CreateMessageRequest,
@@ -18,7 +18,7 @@ import type {
   Notification,
   Root,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import { logger } from "../logging.js";
 
@@ -236,7 +236,7 @@ export abstract class BaseConnector {
     // Handle roots/list requests from the server
     this.client.setRequestHandler(
       ListRootsRequestSchema,
-      async (_request, _extra) => {
+      async (_request: unknown, _extra: unknown) => {
         logger.debug(
           `Server requested roots list, returning ${this.rootsCache.length} root(s)`
         );
@@ -263,7 +263,7 @@ export abstract class BaseConnector {
     // Handle sampling/createMessage requests from the server
     this.client.setRequestHandler(
       CreateMessageRequestSchema,
-      async (request, _extra) => {
+      async (request: CreateMessageRequest, _extra: unknown) => {
         logger.debug("Server requested sampling, forwarding to callback");
         return await this.opts.samplingCallback!(request.params);
       }
@@ -293,7 +293,10 @@ export abstract class BaseConnector {
     // Handle elicitation/create requests from the server
     this.client.setRequestHandler(
       ElicitRequestSchema,
-      async (request, _extra) => {
+      async (
+        request: { params: ElicitRequestFormParams | ElicitRequestURLParams },
+        _extra: unknown
+      ) => {
         logger.debug("Server requested elicitation, forwarding to callback");
         return await this.opts.elicitationCallback!(request.params);
       }
@@ -460,7 +463,8 @@ export abstract class BaseConnector {
       let cursor: string | undefined = undefined;
 
       do {
-        const result = await this.client.listResources({ cursor }, options);
+        const result: { resources?: any[]; nextCursor?: string } =
+          await this.client.listResources({ cursor }, options);
         allResources.push(...(result.resources || []));
         cursor = result.nextCursor;
       } while (cursor);

@@ -12,7 +12,7 @@ import type {
   ElicitResult,
   CallToolResult,
   ElicitRequest,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { runWithContext, getRequestContext } from "../context-storage.js";
 import type {
   ToolDefinition,

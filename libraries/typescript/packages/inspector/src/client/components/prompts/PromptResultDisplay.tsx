@@ -2,7 +2,7 @@ import { Check, Clock, Copy, Zap } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
 import { NotFound } from "../ui/not-found";
 import { JSONDisplay } from "../shared/JSONDisplay";
-import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import type { GetPromptResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 export interface PromptResult {
   promptName: string;

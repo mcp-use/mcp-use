@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { Play, Save, X, Code } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
 import { Spinner } from "@/client/components/ui/spinner";

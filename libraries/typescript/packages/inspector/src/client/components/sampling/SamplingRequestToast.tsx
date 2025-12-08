@@ -1,4 +1,4 @@
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CreateMessageResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { DEFAULT_SAMPLING_RESPONSE } from "@/client/types/sampling";
 
 interface SamplingRequestToastProps {
