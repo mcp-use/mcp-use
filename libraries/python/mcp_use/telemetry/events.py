@@ -1,34 +1,29 @@
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any
-
-
-class BaseTelemetryEvent(ABC):
-    """Base class for all telemetry events"""
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Event name for tracking"""
-        pass
-
-    @property
-    @abstractmethod
-    def properties(self) -> dict[str, Any]:
-        """Event properties to send with the event"""
-        pass
+from dataclasses import dataclass, field
 
 
 @dataclass
-class MCPAgentExecutionEvent(BaseTelemetryEvent):
-    """Comprehensive event for tracking complete MCP agent execution"""
+class BaseEvent:
+    language: str = field(default="python", init=False)
+    mcp_use_version: str = field(default="unknown", init=False)
+    source: str = field(default="python", init=False)
 
-    # Execution method and context
-    execution_method: str  # "run" or "astream"
-    query: str  # The actual user query
+
+class GenericTelemetryEvent(BaseEvent):
+    def __init__(self, EVENT_NAME: str, **properties):
+        super().__init__()
+        self.EVENT_NAME = EVENT_NAME
+        for key, value in properties.items():
+            setattr(self, key, value)
+
+
+@dataclass
+class MCPAgentExecutionEvent(BaseEvent):
+    EVENT_NAME: str = field(default="mcp_agent_execution", init=False)
+
+    execution_method: str
+    query: str
+    query_length: int
     success: bool
-
-    # Agent configuration
     model_provider: str
     model_name: str
     server_count: int
@@ -38,114 +33,222 @@ class MCPAgentExecutionEvent(BaseTelemetryEvent):
     max_steps_configured: int
     memory_enabled: bool
     use_server_manager: bool
-
     # Execution PARAMETERS
     max_steps_used: int | None
     manage_connector: bool
     external_history_used: bool
-
     # Execution results
     steps_taken: int | None = None
     tools_used_count: int | None = None
     tools_used_names: list[str] | None = None
-    response: str | None = None  # The actual response
+    response: str | None = None
+    response_length: int | None = None
     execution_time_ms: int | None = None
     error_type: str | None = None
-
     # Context
     conversation_history_length: int | None = None
 
-    @property
-    def name(self) -> str:
-        return "mcp_agent_execution"
 
-    @property
-    def properties(self) -> dict[str, Any]:
-        return {
-            # Core execution info
-            "execution_method": self.execution_method,
-            "query": self.query,
-            "query_length": len(self.query),
-            "success": self.success,
-            # Agent configuration
-            "model_provider": self.model_provider,
-            "model_name": self.model_name,
-            "server_count": self.server_count,
-            "server_identifiers": self.server_identifiers,
-            "total_tools_available": self.total_tools_available,
-            "tools_available_names": self.tools_available_names,
-            "max_steps_configured": self.max_steps_configured,
-            "memory_enabled": self.memory_enabled,
-            "use_server_manager": self.use_server_manager,
-            # Execution parameters (always include, even if None)
-            "max_steps_used": self.max_steps_used,
-            "manage_connector": self.manage_connector,
-            "external_history_used": self.external_history_used,
-            # Execution results (always include, even if None)
-            "steps_taken": self.steps_taken,
-            "tools_used_count": self.tools_used_count,
-            "tools_used_names": self.tools_used_names,
-            "response": self.response,
-            "response_length": len(self.response) if self.response else None,
-            "execution_time_ms": self.execution_time_ms,
-            "error_type": self.error_type,
-            "conversation_history_length": self.conversation_history_length,
-        }
+@dataclass
+class ServerRunEvent(BaseEvent):
+    EVENT_NAME: str = field(default="server_run", init=False)
+
+    transport: str
+    tools_number: int
+    resources_number: int
+    prompts_number: int
+    auth: bool
+    name: str
+    description: str | None = None
+    base_url: str | None = None
+    tool_names: list[str] | None = None
+    resource_names: list[str] | None = None
+    prompt_names: list[str] | None = None
+    tools: list["TelemetryTool"] | None = None
+    resources: list["TelemetryResource"] | None = None
+    prompts: list["TelemetryPrompt"] | None = None
+    templates: list["TelemetryPrompt"] | None = None
+    capabilities: str | None = None  # JSON stringified ServerCapabilities
+    apps_sdk_resources: str | None = None  # JSON stringified
+    mcp_ui_resources: str | None = None  # JSON stringified
 
 
 @dataclass
-class FeatureUsageEvent(BaseTelemetryEvent):
-    """Event for tracking feature usage across the library"""
+class ServerInitializeEvent(BaseEvent):
+    """Event for tracking server initialization calls"""
 
-    feature_name: str
-    class_name: str
-    method_name: str
-    success: bool
-    execution_time_ms: int | None = None
-    error_type: str | None = None
-    additional_properties: dict[str, Any] | None = None
+    EVENT_NAME: str = field(default="server_initialize_call", init=False)
 
-    @property
-    def name(self) -> str:
-        return "feature_usage"
-
-    @property
-    def properties(self) -> dict[str, Any]:
-        props = {
-            "feature_name": self.feature_name,
-            "class_name": self.class_name,
-            "method_name": self.method_name,
-            "success": self.success,
-            "execution_time_ms": self.execution_time_ms,
-            "error_type": self.error_type,
-        }
-        if self.additional_properties:
-            props.update(self.additional_properties)
-        return props
+    protocol_version: str
+    client_info: "TelemetryClientInfo"
+    client_capabilities: str  # JSON stringified capabilities
+    session_id: str | None = None
 
 
 @dataclass
-class CLICommandEvent(BaseTelemetryEvent):
-    """Event for tracking CLI command usage"""
+class ServerToolCallEvent(BaseEvent):
+    """Event for tracking server tool calls"""
 
-    command: str
+    EVENT_NAME: str = field(default="server_tool_call", init=False)
+
+    tool_name: str
+    length_input_argument: int
     success: bool
-    execution_time_ms: int | None = None
     error_type: str | None = None
-    additional_properties: dict[str, Any] | None = None
+    execution_time_ms: int | None = None
+
+
+@dataclass
+class ServerResourceCallEvent(BaseEvent):
+    """Event for tracking server resource calls"""
+
+    EVENT_NAME: str = field(default="server_resource_call", init=False)
+
+    name: str
+    description: str | None
+    contents: list["TelemetryContent"]
+    success: bool
+    error_type: str | None = None
+
+
+@dataclass
+class ServerPromptCallEvent(BaseEvent):
+    """Event for tracking server prompt calls"""
+
+    EVENT_NAME: str = field(default="server_prompt_call", init=False)
+
+    name: str
+    description: str | None
+    success: bool
+    error_type: str | None = None
+
+
+@dataclass
+class ServerContextEvent(BaseEvent):
+    """Event for tracking server context operations (sample, elicit, notification)"""
+
+    context_type: str = ""  # "sample", "elicit", or "notification"
+    notification_type: str | None = None
 
     @property
-    def name(self) -> str:
-        return "cli_command"
+    def EVENT_NAME(self) -> str:
+        """Dynamic event name based on context type"""
+        return f"server_context_{self.context_type}"
 
-    @property
-    def properties(self) -> dict[str, Any]:
-        props = {
-            "command": self.command,
-            "success": self.success,
-            "execution_time_ms": self.execution_time_ms,
-            "error_type": self.error_type,
-        }
-        if self.additional_properties:
-            props.update(self.additional_properties)
-        return props
+
+@dataclass
+class MCPClientInitEvent(BaseEvent):
+    """Event for tracking MCP client initialization"""
+
+    EVENT_NAME: str = field(default="mcpclient_init", init=False)
+
+    code_mode: bool
+    sandbox: bool
+    all_callbacks: bool
+    verify: bool
+    servers: list[str]
+    num_servers: int
+
+
+@dataclass
+class ConnectorInitEvent(BaseEvent):
+    """Event for tracking connector initialization"""
+
+    EVENT_NAME: str = field(default="connector_init", init=False)
+
+    connector_type: str
+    server_command: str | None = None
+    server_args: list[str] | None = None
+    server_url: str | None = None
+    public_identifier: str | None = None
+
+
+# Supporting dataclasses for telemetry - simplified versions of MCP types
+
+
+@dataclass
+class TelemetryTool:
+    """Tool info for telemetry - simplified version of Tool type"""
+
+    name: str
+    title: str | None = None
+    description: str | None = None
+    input_schema: str | None = None  # JSON stringified schema
+    output_schema: str | None = None  # JSON stringified schema
+
+
+@dataclass
+class TelemetryResource:
+    """Resource info for telemetry - simplified version of Resource type"""
+
+    name: str
+    title: str | None = None
+    description: str | None = None
+    uri: str | None = None  # URI pattern
+    mimeType: str | None = None  # MIME type
+
+
+@dataclass
+class TelemetryPrompt:
+    """Prompt info for telemetry - simplified version of Prompt type"""
+
+    name: str
+    title: str | None = None
+    description: str | None = None
+    args: str | None = None  # JSON stringified args
+
+
+@dataclass
+class TelemetryContent:
+    """Content info for telemetry - simplified version of Content type"""
+
+    mimeType: str | None = None
+    text: str | None = None  # Summarized as "[text: N chars]"
+    blob: str | None = None  # Summarized as "[blob: N bytes]"
+
+
+@dataclass
+class TelemetryClientInfo:
+    """Client info for telemetry - simplified version of ClientInfo type"""
+
+    name: str
+    version: str
+    title: str | None = None
+    description: str | None = None
+    websiteUrl: str | None = None
+
+
+# Type alias for all telemetry events
+TelemetryEvent = (
+    GenericTelemetryEvent
+    | MCPAgentExecutionEvent
+    | ServerRunEvent
+    | ServerInitializeEvent
+    | ServerToolCallEvent
+    | ServerResourceCallEvent
+    | ServerPromptCallEvent
+    | ServerContextEvent
+    | MCPClientInitEvent
+    | ConnectorInitEvent
+)
+
+# Export all event classes
+__all__ = [
+    "BaseEvent",
+    "GenericTelemetryEvent",
+    "MCPAgentExecutionEvent",
+    "ServerRunEvent",
+    "ServerInitializeEvent",
+    "ServerToolCallEvent",
+    "ServerResourceCallEvent",
+    "ServerPromptCallEvent",
+    "ServerContextEvent",
+    "MCPClientInitEvent",
+    "ConnectorInitEvent",
+    "TelemetryTool",
+    "TelemetryResource",
+    "TelemetryPrompt",
+    "TelemetryContent",
+    "TelemetryClientInfo",
+    "TelemetryEvent",
+]
