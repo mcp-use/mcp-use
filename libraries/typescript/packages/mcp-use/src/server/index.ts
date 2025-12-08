@@ -4,6 +4,9 @@ export {
   type McpServerInstance,
 } from "./mcp-server.js";
 
+// Export version information (global)
+export { getPackageVersion, VERSION } from "../version.js";
+
 // Re-export tool context types
 export type {
   ToolContext,

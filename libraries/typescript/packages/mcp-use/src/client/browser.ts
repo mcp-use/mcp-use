@@ -1,6 +1,7 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { WebSocketConnector } from "../connectors/websocket.js";
+import { getPackageVersion } from "../version.js";
 import { BaseMCPClient } from "./base.js";
 
 /**
@@ -13,6 +14,14 @@ import { BaseMCPClient } from "./base.js";
  * - All base client functionality
  */
 export class BrowserMCPClient extends BaseMCPClient {
+  /**
+   * Get the mcp-use package version.
+   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+   */
+  public static getPackageVersion(): string {
+    return getPackageVersion();
+  }
+
   constructor(config?: Record<string, any>) {
     super(config);
   }

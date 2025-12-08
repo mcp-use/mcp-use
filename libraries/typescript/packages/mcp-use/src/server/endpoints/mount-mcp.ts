@@ -10,6 +10,7 @@ import type { SessionData } from "../sessions/index.js";
 import { startIdleCleanup } from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
 import { generateUUID } from "../utils/runtime.js";
+import { Telemetry } from "../../telemetry/index.js";
 
 /**
  * Mount MCP server endpoints at /mcp and /sse
@@ -85,6 +86,10 @@ export async function mountMcp(
         // The server.oninitialized callback fires after the client sends the initialized notification
         server.server.oninitialized = () => {
           const clientCapabilities = server.server.getClientCapabilities();
+          const clientInfo = (server.server as any).getClientInfo?.() || {};
+          const protocolVersion =
+            (server.server as any).getProtocolVersion?.() || "unknown";
+
           if (clientCapabilities && sessions.has(sid)) {
             const session = sessions.get(sid)!;
             session.clientCapabilities = clientCapabilities;
@@ -93,6 +98,18 @@ export async function mountMcp(
               Object.keys(clientCapabilities)
             );
           }
+
+          // Track server initialize event
+          Telemetry.getInstance()
+            .trackServerInitialize({
+              protocolVersion: String(protocolVersion),
+              clientInfo: clientInfo || {},
+              clientCapabilities: clientCapabilities || {},
+              sessionId: sid,
+            })
+            .catch((e) =>
+              console.debug(`Failed to track server initialize: ${e}`)
+            );
         };
       },
 

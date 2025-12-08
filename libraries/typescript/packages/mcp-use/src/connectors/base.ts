@@ -21,6 +21,8 @@ import type {
 } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import { logger } from "../logging.js";
+import { Telemetry } from "../telemetry/index.js";
+import type { ConnectorInitEventData } from "../telemetry/events.js";
 
 /**
  * Handler function for server notifications
@@ -95,6 +97,22 @@ export abstract class BaseConnector {
     if (opts.roots) {
       this.rootsCache = [...opts.roots];
     }
+  }
+
+  /**
+   * Track connector initialization event
+   * Should be called by subclasses after successful connection
+   */
+  protected trackConnectorInit(
+    data: Omit<ConnectorInitEventData, "connectorType">
+  ): void {
+    const connectorType = this.constructor.name;
+    Telemetry.getInstance()
+      .trackConnectorInit({
+        connectorType,
+        ...data,
+      })
+      .catch((e) => logger.debug(`Failed to track connector init: ${e}`));
   }
 
   /**

@@ -25,6 +25,7 @@ import type {
   ElicitUrlParams,
 } from "../types/index.js";
 import type { SessionData } from "../sessions/session-manager.js";
+import { Telemetry } from "../../telemetry/index.js";
 
 // Re-export SessionData for backwards compatibility
 export type { SessionData };
@@ -333,6 +334,14 @@ export function createSampleMethod(
         `Sampling timed out after ${timeout}ms`
       );
       console.log("[SAMPLING DEBUG] Got result:", result);
+
+      // Track sample context event
+      Telemetry.getInstance()
+        .trackServerContext({
+          contextType: "sample",
+        })
+        .catch((e) => console.debug(`Failed to track sample context: ${e}`));
+
       return result;
     } catch (error) {
       console.error("[SAMPLING DEBUG] Error during sampling:", error);
@@ -374,6 +383,13 @@ export function createElicitMethod(
     const sdkTimeout = timeout && timeout !== Infinity ? timeout : 2147483647;
 
     const result = await elicitInput(sdkParams, { timeout: sdkTimeout });
+
+    // Track elicit context event
+    Telemetry.getInstance()
+      .trackServerContext({
+        contextType: "elicit",
+      })
+      .catch((e) => console.debug(`Failed to track elicit context: ${e}`));
 
     if (zodSchema && result.action === "accept" && result.data) {
       try {
@@ -512,6 +528,16 @@ function createLogMethod(
         logger: logger || "tool",
       },
     });
+
+    // Track notification context event
+    Telemetry.getInstance()
+      .trackServerContext({
+        contextType: "notification",
+        notificationType: "message",
+      })
+      .catch((e) =>
+        console.debug(`Failed to track notification context: ${e}`)
+      );
   };
 }
 

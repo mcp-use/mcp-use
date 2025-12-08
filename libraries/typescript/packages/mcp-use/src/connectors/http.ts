@@ -296,6 +296,12 @@ export class HttpConnector extends BaseConnector {
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
       );
+
+      // Track connector initialization
+      this.trackConnectorInit({
+        serverUrl: this.baseUrl,
+        publicIdentifier: `${this.baseUrl} (streamable-http)`,
+      });
     } catch (err) {
       // Clean up partial resources before throwing
       await this.cleanupResources();
@@ -359,6 +365,12 @@ export class HttpConnector extends BaseConnector {
       logger.debug(
         `Successfully connected to MCP implementation via HTTP/SSE: ${baseUrl}`
       );
+
+      // Track connector initialization
+      this.trackConnectorInit({
+        serverUrl: this.baseUrl,
+        publicIdentifier: `${this.baseUrl} (sse)`,
+      });
     } catch (err) {
       // Clean up partial resources before throwing
       await this.cleanupResources();

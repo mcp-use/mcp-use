@@ -25,6 +25,7 @@ import { ServerManager } from "../managers/server_manager.js";
 import { ObservabilityManager } from "../observability/index.js";
 import type { MCPSession } from "../session.js";
 import { extractModelInfo, Telemetry } from "../telemetry/index.js";
+import { getPackageVersion } from "../version.js";
 import { createSystemMessage } from "./prompts/system_prompt_builder.js";
 import {
   DEFAULT_SYSTEM_PROMPT_TEMPLATE,
@@ -56,6 +57,14 @@ export interface AgentStep {
 }
 
 export class MCPAgent {
+  /**
+   * Get the mcp-use package version.
+   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+   */
+  public static getPackageVersion(): string {
+    return getPackageVersion();
+  }
+
   private llm?: LanguageModel;
   private client?: MCPClient;
   private connectors: BaseConnector[];
