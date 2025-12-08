@@ -410,7 +410,7 @@ fi
 if [ -d "dist/public" ]; then
     print_info "Uploading public files to storage bucket: $BUCKET_NAME"
     
-    if supabase storage cp -r dist/public/ "ss:///${BUCKET_NAME}/public/" --experimental 2>&1; then
+    if supabase storage cp -r dist/public "ss:///${BUCKET_NAME}/public/" --experimental 2>&1; then
         print_success "Public files uploaded successfully"
     else
         print_warning "Public file upload failed"
