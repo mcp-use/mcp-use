@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import type {
   BaseTelemetryEvent,
   MCPAgentExecutionEventData,
@@ -10,10 +11,6 @@ import type {
   ConnectorInitEventData,
   MCPServerTelemetryInfo,
 } from "./events.js";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { PostHog } from "posthog-node";
 import { generateUUID } from "../server/utils/runtime.js";
 import { logger } from "../logging.js";
 import {
@@ -26,6 +23,8 @@ import {
   ServerContextEvent,
   MCPClientInitEvent,
   ConnectorInitEvent,
+  ClientAddServerEvent,
+  ClientRemoveServerEvent,
   createServerRunEventData,
 } from "./events.js";
 import { getPackageVersion } from "./utils.js";
@@ -81,19 +80,18 @@ function detectRuntimeEnvironment(): RuntimeEnvironment {
       return "edge";
     }
 
+    // Check for browser FIRST (before Node.js check)
+    // In browser, window and document are defined
+    if (typeof window !== "undefined" && typeof document !== "undefined") {
+      return "browser";
+    }
+
     // Check for Node.js
     if (
       typeof process !== "undefined" &&
-      typeof process.versions?.node !== "undefined" &&
-      typeof fs !== "undefined" &&
-      typeof fs.existsSync === "function"
+      typeof process.versions?.node !== "undefined"
     ) {
       return "node";
-    }
-
-    // Check for browser
-    if (typeof window !== "undefined" && typeof document !== "undefined") {
-      return "browser";
     }
 
     return "unknown";
@@ -142,11 +140,10 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
 }
 
 /**
- * Check if we're in a Node.js environment (for backwards compatibility)
+ * Check if we're in a browser environment
  */
-function isNodeJSEnvironment(): boolean {
-  const env = getRuntimeEnvironment();
-  return env === "node" || env === "bun";
+export function isBrowserEnvironment(): boolean {
+  return getRuntimeEnvironment() === "browser";
 }
 
 // Simple Scarf event logger implementation
@@ -185,49 +182,36 @@ class ScarfEventLogger {
   }
 }
 
-function getCacheHome(): string {
-  // Return a safe fallback for non-Node.js environments
-  if (!isNodeJSEnvironment()) {
-    return "/tmp/mcp_use_cache";
-  }
+// PostHog types for both Node and Browser
+type PostHogNodeClient = {
+  capture: (params: {
+    distinctId: string;
+    event: string;
+    properties?: Record<string, any>;
+  }) => void;
+  flush: () => void;
+  shutdown: () => void;
+};
 
-  // XDG_CACHE_HOME for Linux and manually set envs
-  const envVar = process.env.XDG_CACHE_HOME;
-  if (envVar && path.isAbsolute(envVar)) {
-    return envVar;
-  }
+type PostHogBrowserClient = {
+  capture: (eventName: string, properties?: Record<string, any>) => void;
+  identify: (distinctId: string, properties?: Record<string, any>) => void;
+  reset: () => void;
+  opt_out_capturing: () => void;
+  opt_in_capturing: () => void;
+};
 
-  const platform = process.platform;
-  const homeDir = os.homedir();
-
-  if (platform === "win32") {
-    const appdata = process.env.LOCALAPPDATA || process.env.APPDATA;
-    if (appdata) {
-      return appdata;
-    }
-    return path.join(homeDir, "AppData", "Local");
-  } else if (platform === "darwin") {
-    // macOS
-    return path.join(homeDir, "Library", "Caches");
-  } else {
-    // Linux or other Unix
-    return path.join(homeDir, ".cache");
-  }
-}
-
+/**
+ * Unified Telemetry class that works in both Node.js and browser environments.
+ *
+ * Automatically detects the runtime environment and uses the appropriate
+ * PostHog library (posthog-node for Node.js, posthog-js for browser).
+ *
+ * Usage: Tel.getInstance().trackMCPClientInit(...)
+ */
 export class Telemetry {
   private static instance: Telemetry | null = null;
 
-  private readonly USER_ID_PATH = path.join(
-    getCacheHome(),
-    "mcp_use_3",
-    "telemetry_user_id"
-  );
-  private readonly VERSION_DOWNLOAD_PATH = path.join(
-    getCacheHome(),
-    "mcp_use",
-    "download_version"
-  );
   private readonly PROJECT_API_KEY =
     "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI";
   private readonly HOST = "https://eu.i.posthog.com";
@@ -236,11 +220,17 @@ export class Telemetry {
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;
-  private _posthogClient: PostHog | null = null;
+  private _posthogNodeClient: PostHogNodeClient | null = null;
+  private _posthogBrowserClient: PostHogBrowserClient | null = null;
+  private _posthogLoading: Promise<void> | null = null;
   private _scarfClient: ScarfEventLogger | null = null;
   private _runtimeEnvironment: RuntimeEnvironment;
   private _storageCapability: StorageCapability;
   private _source: string;
+
+  // Node.js specific paths (lazily computed)
+  private _userIdPath: string | null = null;
+  private _versionDownloadPath: string | null = null;
 
   private constructor() {
     // Detect runtime environment
@@ -253,30 +243,20 @@ export class Telemetry {
         process.env?.MCP_USE_TELEMETRY_SOURCE) ||
       this._runtimeEnvironment;
 
-    // Safely access environment variables
-    const telemetryDisabled =
-      (typeof process !== "undefined" &&
-        process.env?.MCP_USE_ANONYMIZED_TELEMETRY?.toLowerCase() === "false") ||
-      false;
+    // Check if telemetry is disabled
+    const telemetryDisabled = this._checkTelemetryDisabled();
 
     // All environments except "unknown" can support telemetry
-    // posthog-node works in Node.js, Bun, Cloudflare Workers, Edge, Deno, etc.
-    // See: https://posthog.com/docs/libraries/cloudflare-workers
     const canSupportTelemetry = this._runtimeEnvironment !== "unknown";
 
-    // Serverless/edge environments need immediate flushing
-    const isServerlessEnvironment = [
-      "cloudflare-workers",
-      "edge",
-      "deno",
-    ].includes(this._runtimeEnvironment);
-
     if (telemetryDisabled) {
-      this._posthogClient = null;
+      this._posthogNodeClient = null;
+      this._posthogBrowserClient = null;
       this._scarfClient = null;
-      logger.debug("Telemetry disabled via environment variable");
+      logger.debug("Telemetry disabled via environment/localStorage");
     } else if (!canSupportTelemetry) {
-      this._posthogClient = null;
+      this._posthogNodeClient = null;
+      this._posthogBrowserClient = null;
       this._scarfClient = null;
       logger.debug(
         `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
@@ -286,41 +266,8 @@ export class Telemetry {
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable."
       );
 
-      // Initialize PostHog
-      // posthog-node works in Node.js, Bun, Cloudflare Workers, Edge, and other serverless environments
-      // Browser requires posthog-js which is a different package
-      if (this._runtimeEnvironment !== "browser") {
-        try {
-          // For serverless environments, flush immediately to prevent data loss
-          // See: https://posthog.com/docs/libraries/node#short-lived-processes-like-serverless-environments
-          const posthogOptions: {
-            host: string;
-            disableGeoip: boolean;
-            flushAt?: number;
-            flushInterval?: number;
-          } = {
-            host: this.HOST,
-            disableGeoip: false,
-          };
-
-          if (isServerlessEnvironment) {
-            posthogOptions.flushAt = 1; // Send events immediately
-            posthogOptions.flushInterval = 0; // Don't wait for interval
-          }
-
-          this._posthogClient = new PostHog(
-            this.PROJECT_API_KEY,
-            posthogOptions
-          );
-        } catch (e) {
-          logger.warn(`Failed to initialize PostHog telemetry: ${e}`);
-          this._posthogClient = null;
-        }
-      } else {
-        // Browser environment would need posthog-js (different package)
-        // For now, only use Scarf in browser
-        this._posthogClient = null;
-      }
+      // Initialize PostHog based on environment
+      this._posthogLoading = this._initPostHog();
 
       // Initialize Scarf (works in all environments with fetch)
       try {
@@ -329,6 +276,104 @@ export class Telemetry {
         logger.warn(`Failed to initialize Scarf telemetry: ${e}`);
         this._scarfClient = null;
       }
+    }
+  }
+
+  private _checkTelemetryDisabled(): boolean {
+    // Check environment variable (Node.js)
+    if (
+      typeof process !== "undefined" &&
+      process.env?.MCP_USE_ANONYMIZED_TELEMETRY?.toLowerCase() === "false"
+    ) {
+      return true;
+    }
+
+    // Check localStorage (Browser)
+    if (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("MCP_USE_ANONYMIZED_TELEMETRY") === "false"
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private async _initPostHog(): Promise<void> {
+    const isBrowser = this._runtimeEnvironment === "browser";
+
+    if (isBrowser) {
+      await this._initPostHogBrowser();
+    } else {
+      await this._initPostHogNode();
+    }
+  }
+
+  private async _initPostHogBrowser(): Promise<void> {
+    try {
+      // Dynamic import of posthog-js
+      const posthogModule = await import("posthog-js");
+      const posthog = (posthogModule as any).default || posthogModule.posthog;
+
+      if (!posthog || typeof posthog.init !== "function") {
+        throw new Error("posthog-js module did not export expected interface");
+      }
+
+      // Initialize PostHog for browser
+      posthog.init(this.PROJECT_API_KEY, {
+        api_host: this.HOST,
+        persistence: "localStorage",
+        autocapture: false, // We only want explicit captures
+        capture_pageview: false, // We don't want automatic pageview tracking
+        disable_session_recording: true, // No session recording
+        loaded: () => {
+          logger.debug("PostHog browser client initialized");
+        },
+      });
+
+      this._posthogBrowserClient = posthog as PostHogBrowserClient;
+    } catch (e) {
+      logger.warn(`Failed to initialize PostHog browser telemetry: ${e}`);
+      this._posthogBrowserClient = null;
+    }
+  }
+
+  private async _initPostHogNode(): Promise<void> {
+    try {
+      // Dynamic import of posthog-node
+      const { PostHog } = await import("posthog-node");
+
+      // Serverless/edge environments need immediate flushing
+      const isServerlessEnvironment = [
+        "cloudflare-workers",
+        "edge",
+        "deno",
+      ].includes(this._runtimeEnvironment);
+
+      const posthogOptions: {
+        host: string;
+        disableGeoip: boolean;
+        flushAt?: number;
+        flushInterval?: number;
+      } = {
+        host: this.HOST,
+        disableGeoip: false,
+      };
+
+      if (isServerlessEnvironment) {
+        posthogOptions.flushAt = 1; // Send events immediately
+        posthogOptions.flushInterval = 0; // Don't wait for interval
+      }
+
+      this._posthogNodeClient = new PostHog(
+        this.PROJECT_API_KEY,
+        posthogOptions
+      );
+
+      logger.debug("PostHog Node.js client initialized");
+    } catch (e) {
+      logger.warn(`Failed to initialize PostHog Node.js telemetry: ${e}`);
+      this._posthogNodeClient = null;
     }
   }
 
@@ -372,10 +417,13 @@ export class Telemetry {
 
   /**
    * Check if telemetry is enabled.
-   * Returns false if telemetry was disabled via environment variable or if not in Node.js environment.
    */
   get isEnabled(): boolean {
-    return this._posthogClient !== null || this._scarfClient !== null;
+    return (
+      this._posthogNodeClient !== null ||
+      this._posthogBrowserClient !== null ||
+      this._scarfClient !== null
+    );
   }
 
   get userId(): string {
@@ -386,10 +434,10 @@ export class Telemetry {
     try {
       switch (this._storageCapability) {
         case "filesystem":
-          this._currUserId = this.getUserIdFromFilesystem();
+          this._currUserId = this._getUserIdFromFilesystem();
           break;
         case "localStorage":
-          this._currUserId = this.getUserIdFromLocalStorage();
+          this._currUserId = this._getUserIdFromLocalStorage();
           break;
         case "session-only":
         default:
@@ -402,11 +450,8 @@ export class Telemetry {
       }
 
       // Track package download for persistent storage types
-      // Note: We pass the userId directly to avoid circular dependency
-      // (trackPackageDownload accesses this.userId which would cause issues)
       if (this._storageCapability === "filesystem" && this._currUserId) {
-        // Note: We can't await here since this is a getter, so we fire and forget
-        this.trackPackageDownloadInternal(this._currUserId, {
+        this._trackPackageDownloadInternal(this._currUserId, {
           triggered_by: "user_id_property",
         }).catch((e) => logger.debug(`Failed to track package download: ${e}`));
       }
@@ -421,25 +466,38 @@ export class Telemetry {
   /**
    * Get or create user ID from filesystem (Node.js/Bun)
    */
-  private getUserIdFromFilesystem(): string {
-    const isFirstTime = !fs.existsSync(this.USER_ID_PATH);
+  private _getUserIdFromFilesystem(): string {
+    // Lazy import of Node.js modules
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const path = require("node:path");
+
+    if (!this._userIdPath) {
+      this._userIdPath = path.join(
+        this._getCacheHome(os, path),
+        "mcp_use_3",
+        "telemetry_user_id"
+      );
+    }
+
+    const isFirstTime = !fs.existsSync(this._userIdPath);
 
     if (isFirstTime) {
-      logger.debug(`Creating user ID path: ${this.USER_ID_PATH}`);
-      fs.mkdirSync(path.dirname(this.USER_ID_PATH), { recursive: true });
+      logger.debug(`Creating user ID path: ${this._userIdPath}`);
+      fs.mkdirSync(path.dirname(this._userIdPath), { recursive: true });
       const newUserId = generateUUID();
-      fs.writeFileSync(this.USER_ID_PATH, newUserId);
-      logger.debug(`User ID path created: ${this.USER_ID_PATH}`);
+      fs.writeFileSync(this._userIdPath, newUserId);
+      logger.debug(`User ID path created: ${this._userIdPath}`);
       return newUserId;
     }
 
-    return fs.readFileSync(this.USER_ID_PATH, "utf-8").trim();
+    return fs.readFileSync(this._userIdPath, "utf-8").trim();
   }
 
   /**
    * Get or create user ID from localStorage (Browser)
    */
-  private getUserIdFromLocalStorage(): string {
+  private _getUserIdFromLocalStorage(): string {
     try {
       let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
 
@@ -457,71 +515,112 @@ export class Telemetry {
     }
   }
 
+  private _getCacheHome(os: any, path: any): string {
+    // XDG_CACHE_HOME for Linux and manually set envs
+    const envVar = process.env.XDG_CACHE_HOME;
+    if (envVar && path.isAbsolute(envVar)) {
+      return envVar;
+    }
+
+    const platform = process.platform;
+    const homeDir = os.homedir();
+
+    if (platform === "win32") {
+      const appdata = process.env.LOCALAPPDATA || process.env.APPDATA;
+      if (appdata) {
+        return appdata;
+      }
+      return path.join(homeDir, "AppData", "Local");
+    } else if (platform === "darwin") {
+      // macOS
+      return path.join(homeDir, "Library", "Caches");
+    } else {
+      // Linux or other Unix
+      return path.join(homeDir, ".cache");
+    }
+  }
+
   async capture(event: BaseTelemetryEvent): Promise<void> {
-    logger.debug(
-      `CAPTURE: posthog: ${this._posthogClient !== null}, scarf: ${this._scarfClient !== null}`
-    );
-    if (!this._posthogClient && !this._scarfClient) {
+    // Wait for PostHog to load if it's still initializing
+    if (this._posthogLoading) {
+      await this._posthogLoading;
+    }
+
+    if (
+      !this._posthogNodeClient &&
+      !this._posthogBrowserClient &&
+      !this._scarfClient
+    ) {
       return;
     }
 
-    // Send to PostHog
-    if (this._posthogClient) {
+    // Add metadata to all events
+    const properties = { ...event.properties };
+    properties.mcp_use_version = getPackageVersion();
+    properties.language = "typescript";
+    properties.source = this._source;
+    properties.runtime = this._runtimeEnvironment;
+
+    // Send to PostHog (Node.js)
+    if (this._posthogNodeClient) {
       try {
-        // Add metadata to all events
-        const properties = { ...event.properties };
-        properties.mcp_use_version = getPackageVersion();
-        properties.language = "typescript"; // SDK language (always typescript for this package)
-        properties.source = this._source; // Runtime environment or custom source
-        properties.runtime = this._runtimeEnvironment; // Detected runtime
-
-        logger.debug(`CAPTURE: PostHog Event ${event.name}`);
-        logger.debug(
-          `CAPTURE: PostHog Properties ${JSON.stringify(properties)}`
-        );
-
-        this._posthogClient.capture({
+        logger.debug(`CAPTURE: PostHog Node Event ${event.name}`);
+        this._posthogNodeClient.capture({
           distinctId: this.userId,
           event: event.name,
           properties,
         });
       } catch (e) {
-        logger.debug(`Failed to track PostHog event ${event.name}: ${e}`);
+        logger.debug(`Failed to track PostHog Node event ${event.name}: ${e}`);
+      }
+    }
+
+    // Send to PostHog (Browser)
+    if (this._posthogBrowserClient) {
+      try {
+        logger.debug(`CAPTURE: PostHog Browser Event ${event.name}`);
+        this._posthogBrowserClient.capture(event.name, {
+          ...properties,
+          distinct_id: this.userId,
+        });
+      } catch (e) {
+        logger.debug(
+          `Failed to track PostHog Browser event ${event.name}: ${e}`
+        );
       }
     }
 
     // Send to Scarf
     if (this._scarfClient) {
       try {
-        // Add metadata to all events
-        const properties: Record<string, any> = {};
-        properties.mcp_use_version = getPackageVersion();
-        properties.user_id = this.userId;
-        properties.event = event.name;
-        properties.language = "typescript"; // SDK language
-        properties.source = this._source; // Runtime environment or custom source
-        properties.runtime = this._runtimeEnvironment; // Detected runtime
-
-        await this._scarfClient.logEvent(properties);
+        const scarfProperties: Record<string, any> = {
+          ...properties,
+          user_id: this.userId,
+          event: event.name,
+        };
+        await this._scarfClient.logEvent(scarfProperties);
       } catch (e) {
         logger.debug(`Failed to track Scarf event ${event.name}: ${e}`);
       }
     }
   }
 
+  // ============================================================================
+  // Package Download Tracking (Node.js only)
+  // ============================================================================
+
   /**
    * Track package download event.
    * This is a public wrapper that safely accesses userId.
    */
   async trackPackageDownload(properties?: Record<string, any>): Promise<void> {
-    return this.trackPackageDownloadInternal(this.userId, properties);
+    return this._trackPackageDownloadInternal(this.userId, properties);
   }
 
   /**
    * Internal method to track package download with explicit userId.
-   * This avoids circular dependency when called from the userId getter.
    */
-  private async trackPackageDownloadInternal(
+  private async _trackPackageDownloadInternal(
     userId: string,
     properties?: Record<string, any>
   ): Promise<void> {
@@ -535,34 +634,46 @@ export class Telemetry {
     }
 
     try {
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const os = require("node:os");
+
+      if (!this._versionDownloadPath) {
+        this._versionDownloadPath = path.join(
+          this._getCacheHome(os, path),
+          "mcp_use",
+          "download_version"
+        );
+      }
+
       const currentVersion = getPackageVersion();
       let shouldTrack = false;
       let firstDownload = false;
 
       // Check if version file exists
-      if (!fs.existsSync(this.VERSION_DOWNLOAD_PATH)) {
+      if (!fs.existsSync(this._versionDownloadPath)) {
         // First download
         shouldTrack = true;
         firstDownload = true;
 
         // Create directory and save version
-        fs.mkdirSync(path.dirname(this.VERSION_DOWNLOAD_PATH), {
+        fs.mkdirSync(path.dirname(this._versionDownloadPath), {
           recursive: true,
         });
-        fs.writeFileSync(this.VERSION_DOWNLOAD_PATH, currentVersion);
+        fs.writeFileSync(this._versionDownloadPath, currentVersion);
       } else {
         // Read saved version
         const savedVersion = fs
-          .readFileSync(this.VERSION_DOWNLOAD_PATH, "utf-8")
+          .readFileSync(this._versionDownloadPath, "utf-8")
           .trim();
 
-        // Compare versions (simple string comparison for now)
+        // Compare versions
         if (currentVersion > savedVersion) {
           shouldTrack = true;
           firstDownload = false;
 
           // Update saved version
-          fs.writeFileSync(this.VERSION_DOWNLOAD_PATH, currentVersion);
+          fs.writeFileSync(this._versionDownloadPath, currentVersion);
         }
       }
 
@@ -570,7 +681,6 @@ export class Telemetry {
         logger.debug(
           `Tracking package download event with properties: ${JSON.stringify(properties)}`
         );
-        // Add metadata to event
         const eventProperties = { ...(properties || {}) };
         eventProperties.mcp_use_version = currentVersion;
         eventProperties.user_id = userId;
@@ -603,9 +713,6 @@ export class Telemetry {
 
   /**
    * Track server run event directly from an MCPServer instance.
-   * This extracts the necessary data from the server and creates the event.
-   * @param server - The MCPServer instance (or any object conforming to MCPServerTelemetryInfo)
-   * @param transport - The transport type (e.g., "http", "stdio", "supabase")
    */
   async trackServerRunFromServer(
     server: MCPServerTelemetryInfo,
@@ -665,37 +772,168 @@ export class Telemetry {
     await this.capture(event);
   }
 
-  flush(): void {
-    // Flush PostHog
-    if (this._posthogClient) {
+  async trackClientAddServer(
+    serverName: string,
+    serverConfig: Record<string, any>
+  ): Promise<void> {
+    if (!this.isEnabled) return;
+    const event = new ClientAddServerEvent({ serverName, serverConfig });
+    await this.capture(event);
+  }
+
+  async trackClientRemoveServer(serverName: string): Promise<void> {
+    if (!this.isEnabled) return;
+    const event = new ClientRemoveServerEvent({ serverName });
+    await this.capture(event);
+  }
+
+  // ============================================================================
+  // React Hook / Browser specific events
+  // ============================================================================
+
+  async trackUseMcpConnection(data: {
+    url: string;
+    transportType: string;
+    success: boolean;
+    errorType?: string | null;
+    connectionTimeMs?: number | null;
+    hasOAuth: boolean;
+    hasSampling: boolean;
+    hasElicitation: boolean;
+  }): Promise<void> {
+    if (!this.isEnabled) return;
+
+    await this.capture({
+      name: "usemcp_connection",
+      properties: {
+        url_domain: new URL(data.url).hostname, // Only domain for privacy
+        transport_type: data.transportType,
+        success: data.success,
+        error_type: data.errorType ?? null,
+        connection_time_ms: data.connectionTimeMs ?? null,
+        has_oauth: data.hasOAuth,
+        has_sampling: data.hasSampling,
+        has_elicitation: data.hasElicitation,
+      },
+    });
+  }
+
+  async trackUseMcpToolCall(data: {
+    toolName: string;
+    success: boolean;
+    errorType?: string | null;
+    executionTimeMs?: number | null;
+  }): Promise<void> {
+    if (!this.isEnabled) return;
+
+    await this.capture({
+      name: "usemcp_tool_call",
+      properties: {
+        tool_name: data.toolName,
+        success: data.success,
+        error_type: data.errorType ?? null,
+        execution_time_ms: data.executionTimeMs ?? null,
+      },
+    });
+  }
+
+  async trackUseMcpResourceRead(data: {
+    resourceUri: string;
+    success: boolean;
+    errorType?: string | null;
+  }): Promise<void> {
+    if (!this.isEnabled) return;
+
+    await this.capture({
+      name: "usemcp_resource_read",
+      properties: {
+        resource_uri_scheme: data.resourceUri.split(":")[0], // Only scheme for privacy
+        success: data.success,
+        error_type: data.errorType ?? null,
+      },
+    });
+  }
+
+  // ============================================================================
+  // Browser-specific Methods
+  // ============================================================================
+
+  /**
+   * Identify the current user (useful for linking sessions)
+   * Browser only - no-op in Node.js
+   */
+  identify(userId: string, properties?: Record<string, any>): void {
+    if (this._posthogBrowserClient) {
       try {
-        this._posthogClient.flush();
+        this._posthogBrowserClient.identify(userId, properties);
+      } catch (e) {
+        logger.debug(`Failed to identify user: ${e}`);
+      }
+    }
+  }
+
+  /**
+   * Reset the user identity (useful for logout)
+   * Browser only - no-op in Node.js
+   */
+  reset(): void {
+    if (this._posthogBrowserClient) {
+      try {
+        this._posthogBrowserClient.reset();
+      } catch (e) {
+        logger.debug(`Failed to reset user: ${e}`);
+      }
+    }
+    this._currUserId = null;
+  }
+
+  // ============================================================================
+  // Node.js-specific Methods
+  // ============================================================================
+
+  /**
+   * Flush the telemetry queue (Node.js only)
+   */
+  flush(): void {
+    if (this._posthogNodeClient) {
+      try {
+        this._posthogNodeClient.flush();
         logger.debug("PostHog client telemetry queue flushed");
       } catch (e) {
         logger.debug(`Failed to flush PostHog client: ${e}`);
       }
     }
-
-    // Scarf events are sent immediately, no flush needed
-    if (this._scarfClient) {
-      logger.debug("Scarf telemetry events sent immediately (no flush needed)");
-    }
   }
 
+  /**
+   * Shutdown the telemetry client (Node.js only)
+   */
   shutdown(): void {
-    // Shutdown PostHog
-    if (this._posthogClient) {
+    if (this._posthogNodeClient) {
       try {
-        this._posthogClient.shutdown();
+        this._posthogNodeClient.shutdown();
         logger.debug("PostHog client shutdown successfully");
       } catch (e) {
         logger.debug(`Error shutting down PostHog client: ${e}`);
       }
     }
-
-    // Scarf doesn't require explicit shutdown
-    if (this._scarfClient) {
-      logger.debug("Scarf telemetry client shutdown (no action needed)");
-    }
   }
+}
+
+// ============================================================================
+// Convenience Alias and Functions
+// ============================================================================
+
+/**
+ * Alias for Telemetry - shorter name for convenience
+ *
+ * Usage: Tel.getInstance().trackMCPClientInit(...)
+ */
+export const Tel = Telemetry;
+
+/**
+ * Convenience function to set telemetry source globally
+ */
+export function setTelemetrySource(source: string): void {
+  Tel.getInstance().setSource(source);
 }
