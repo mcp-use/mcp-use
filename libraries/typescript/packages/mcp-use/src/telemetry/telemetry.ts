@@ -31,41 +31,123 @@ import {
 } from "./events.js";
 import { getPackageVersion } from "./utils.js";
 
-// Environment detection function
-function isNodeJSEnvironment(): boolean {
+// ============================================================================
+// Runtime Environment Detection
+// ============================================================================
+
+/**
+ * Detected runtime environment types
+ */
+export type RuntimeEnvironment =
+  | "node"
+  | "browser"
+  | "cloudflare-workers"
+  | "edge"
+  | "deno"
+  | "bun"
+  | "unknown";
+
+/**
+ * Storage capabilities for user ID persistence
+ */
+type StorageCapability = "filesystem" | "localStorage" | "session-only";
+
+const USER_ID_STORAGE_KEY = "mcp_use_user_id";
+
+/**
+ * Detect the current runtime environment
+ */
+function detectRuntimeEnvironment(): RuntimeEnvironment {
   try {
-    // Check for Cloudflare Workers specifically
+    // Check for Bun
+    if (typeof (globalThis as any).Bun !== "undefined") {
+      return "bun";
+    }
+
+    // Check for Deno
+    if (typeof (globalThis as any).Deno !== "undefined") {
+      return "deno";
+    }
+
+    // Check for Cloudflare Workers
     if (
       typeof navigator !== "undefined" &&
       navigator.userAgent?.includes("Cloudflare-Workers")
     ) {
-      return false;
+      return "cloudflare-workers";
     }
 
-    // Check for other edge runtime indicators
+    // Check for Edge runtime (Vercel Edge, etc.)
+    if (typeof (globalThis as any).EdgeRuntime !== "undefined") {
+      return "edge";
+    }
+
+    // Check for Node.js
     if (
-      typeof (globalThis as any).EdgeRuntime !== "undefined" ||
-      typeof (globalThis as any).Deno !== "undefined"
+      typeof process !== "undefined" &&
+      typeof process.versions?.node !== "undefined" &&
+      typeof fs !== "undefined" &&
+      typeof fs.existsSync === "function"
     ) {
-      return false;
+      return "node";
     }
 
-    // Check for Node.js specific globals that are not available in edge environments
-    const hasNodeGlobals =
-      typeof process !== "undefined" &&
-      typeof process.platform !== "undefined" &&
-      typeof __dirname !== "undefined";
+    // Check for browser
+    if (typeof window !== "undefined" && typeof document !== "undefined") {
+      return "browser";
+    }
 
-    // Check for Node.js modules
-    const hasNodeModules =
-      typeof fs !== "undefined" &&
-      typeof os !== "undefined" &&
-      typeof fs.existsSync === "function";
-
-    return hasNodeGlobals && hasNodeModules;
+    return "unknown";
   } catch {
-    return false;
+    return "unknown";
   }
+}
+
+/**
+ * Determine storage capability based on runtime environment
+ */
+function getStorageCapability(env: RuntimeEnvironment): StorageCapability {
+  switch (env) {
+    case "node":
+    case "bun":
+      return "filesystem";
+    case "browser":
+      // Check if localStorage is actually available (might be disabled)
+      try {
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem("__mcp_use_test__", "1");
+          localStorage.removeItem("__mcp_use_test__");
+          return "localStorage";
+        }
+      } catch {
+        // localStorage might be disabled (private browsing, etc.)
+      }
+      return "session-only";
+    case "deno":
+      // Deno has file system access but needs permissions
+      // For now, treat as session-only to be safe
+      return "session-only";
+    default:
+      return "session-only";
+  }
+}
+
+// Cache the detected environment
+let cachedEnvironment: RuntimeEnvironment | null = null;
+
+function getRuntimeEnvironment(): RuntimeEnvironment {
+  if (cachedEnvironment === null) {
+    cachedEnvironment = detectRuntimeEnvironment();
+  }
+  return cachedEnvironment;
+}
+
+/**
+ * Check if we're in a Node.js environment (for backwards compatibility)
+ */
+function isNodeJSEnvironment(): boolean {
+  const env = getRuntimeEnvironment();
+  return env === "node" || env === "bun";
 }
 
 // Simple Scarf event logger implementation
@@ -157,11 +239,20 @@ export class Telemetry {
   private _currUserId: string | null = null;
   private _posthogClient: PostHog | null = null;
   private _scarfClient: ScarfEventLogger | null = null;
-  private _source: string = "typescript";
+  private _runtimeEnvironment: RuntimeEnvironment;
+  private _storageCapability: StorageCapability;
+  private _source: string;
 
   private constructor() {
-    // Check if we're in a Node.js environment first
-    const isNodeJS = isNodeJSEnvironment();
+    // Detect runtime environment
+    this._runtimeEnvironment = getRuntimeEnvironment();
+    this._storageCapability = getStorageCapability(this._runtimeEnvironment);
+
+    // Set source from environment variable, or use detected runtime environment
+    this._source =
+      (typeof process !== "undefined" &&
+        process.env?.MCP_USE_TELEMETRY_SOURCE) ||
+      this._runtimeEnvironment;
 
     // Safely access environment variables
     const telemetryDisabled =
@@ -169,21 +260,27 @@ export class Telemetry {
         process.env?.MCP_USE_ANONYMIZED_TELEMETRY?.toLowerCase() === "false") ||
       false;
 
-    // Check for source from environment variable, default to 'typescript'
-    this._source =
-      (typeof process !== "undefined" &&
-        process.env?.MCP_USE_TELEMETRY_SOURCE) ||
-      "typescript";
+    // All environments except "unknown" can support telemetry
+    // posthog-node works in Node.js, Bun, Cloudflare Workers, Edge, Deno, etc.
+    // See: https://posthog.com/docs/libraries/cloudflare-workers
+    const canSupportTelemetry = this._runtimeEnvironment !== "unknown";
+
+    // Serverless/edge environments need immediate flushing
+    const isServerlessEnvironment = [
+      "cloudflare-workers",
+      "edge",
+      "deno",
+    ].includes(this._runtimeEnvironment);
 
     if (telemetryDisabled) {
       this._posthogClient = null;
       this._scarfClient = null;
       logger.debug("Telemetry disabled via environment variable");
-    } else if (!isNodeJS) {
+    } else if (!canSupportTelemetry) {
       this._posthogClient = null;
       this._scarfClient = null;
       logger.debug(
-        "Telemetry disabled - non-Node.js environment detected (e.g., Cloudflare Workers)"
+        `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
       );
     } else {
       logger.info(
@@ -191,17 +288,34 @@ export class Telemetry {
       );
 
       // Initialize PostHog
-      try {
-        this._posthogClient = new PostHog(this.PROJECT_API_KEY, {
-          host: this.HOST,
-          disableGeoip: false,
-        });
-      } catch (e) {
-        logger.warn(`Failed to initialize PostHog telemetry: ${e}`);
+      // posthog-node works in Node.js, Bun, Cloudflare Workers, Edge, and other serverless environments
+      // Browser requires posthog-js which is a different package
+      if (this._runtimeEnvironment !== "browser") {
+        try {
+          // For serverless environments, flush immediately to prevent data loss
+          // See: https://posthog.com/docs/libraries/node#short-lived-processes-like-serverless-environments
+          const posthogOptions: { host: string; disableGeoip: boolean; flushAt?: number; flushInterval?: number } = {
+            host: this.HOST,
+            disableGeoip: false,
+          };
+
+          if (isServerlessEnvironment) {
+            posthogOptions.flushAt = 1; // Send events immediately
+            posthogOptions.flushInterval = 0; // Don't wait for interval
+          }
+
+          this._posthogClient = new PostHog(this.PROJECT_API_KEY, posthogOptions);
+        } catch (e) {
+          logger.warn(`Failed to initialize PostHog telemetry: ${e}`);
+          this._posthogClient = null;
+        }
+      } else {
+        // Browser environment would need posthog-js (different package)
+        // For now, only use Scarf in browser
         this._posthogClient = null;
       }
 
-      // Initialize Scarf
+      // Initialize Scarf (works in all environments with fetch)
       try {
         this._scarfClient = new ScarfEventLogger(this.SCARF_GATEWAY_URL, 3000);
       } catch (e) {
@@ -209,6 +323,20 @@ export class Telemetry {
         this._scarfClient = null;
       }
     }
+  }
+
+  /**
+   * Get the detected runtime environment
+   */
+  get runtimeEnvironment(): RuntimeEnvironment {
+    return this._runtimeEnvironment;
+  }
+
+  /**
+   * Get the storage capability for this environment
+   */
+  get storageCapability(): StorageCapability {
+    return this._storageCapability;
   }
 
   static getInstance(): Telemetry {
@@ -248,31 +376,33 @@ export class Telemetry {
       return this._currUserId;
     }
 
-    // If we're not in a Node.js environment, just return a static user ID
-    if (!isNodeJSEnvironment()) {
-      this._currUserId = this.UNKNOWN_USER_ID;
-      return this._currUserId;
-    }
-
     try {
-      const isFirstTime = !fs.existsSync(this.USER_ID_PATH);
-
-      if (isFirstTime) {
-        logger.debug(`Creating user ID path: ${this.USER_ID_PATH}`);
-        fs.mkdirSync(path.dirname(this.USER_ID_PATH), { recursive: true });
-        const newUserId = generateUUID();
-        fs.writeFileSync(this.USER_ID_PATH, newUserId);
-        this._currUserId = newUserId;
-        logger.debug(`User ID path created: ${this.USER_ID_PATH}`);
-      } else {
-        this._currUserId = fs.readFileSync(this.USER_ID_PATH, "utf-8").trim();
+      switch (this._storageCapability) {
+        case "filesystem":
+          this._currUserId = this.getUserIdFromFilesystem();
+          break;
+        case "localStorage":
+          this._currUserId = this.getUserIdFromLocalStorage();
+          break;
+        case "session-only":
+        default:
+          // Generate a session-based ID (prefixed to identify it's not persistent)
+          this._currUserId = `session-${generateUUID()}`;
+          logger.debug(
+            `Using session-based user ID (${this._runtimeEnvironment} environment)`
+          );
+          break;
       }
 
-      // Always check for version-based download tracking
-      // Note: We can't await here since this is a getter, so we fire and forget
-      this.trackPackageDownload({
-        triggered_by: "user_id_property",
-      }).catch((e) => logger.debug(`Failed to track package download: ${e}`));
+      // Track package download for persistent storage types
+      // Note: We pass the userId directly to avoid circular dependency
+      // (trackPackageDownload accesses this.userId which would cause issues)
+      if (this._storageCapability === "filesystem" && this._currUserId) {
+        // Note: We can't await here since this is a getter, so we fire and forget
+        this.trackPackageDownloadInternal(this._currUserId, {
+          triggered_by: "user_id_property",
+        }).catch((e) => logger.debug(`Failed to track package download: ${e}`));
+      }
     } catch (e) {
       logger.debug(`Failed to get/create user ID: ${e}`);
       this._currUserId = this.UNKNOWN_USER_ID;
@@ -281,7 +411,49 @@ export class Telemetry {
     return this._currUserId;
   }
 
+  /**
+   * Get or create user ID from filesystem (Node.js/Bun)
+   */
+  private getUserIdFromFilesystem(): string {
+    const isFirstTime = !fs.existsSync(this.USER_ID_PATH);
+
+    if (isFirstTime) {
+      logger.debug(`Creating user ID path: ${this.USER_ID_PATH}`);
+      fs.mkdirSync(path.dirname(this.USER_ID_PATH), { recursive: true });
+      const newUserId = generateUUID();
+      fs.writeFileSync(this.USER_ID_PATH, newUserId);
+      logger.debug(`User ID path created: ${this.USER_ID_PATH}`);
+      return newUserId;
+    }
+
+    return fs.readFileSync(this.USER_ID_PATH, "utf-8").trim();
+  }
+
+  /**
+   * Get or create user ID from localStorage (Browser)
+   */
+  private getUserIdFromLocalStorage(): string {
+    try {
+      let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
+
+      if (!userId) {
+        userId = generateUUID();
+        localStorage.setItem(USER_ID_STORAGE_KEY, userId);
+        logger.debug(`Created new browser user ID`);
+      }
+
+      return userId;
+    } catch (e) {
+      logger.debug(`localStorage access failed: ${e}`);
+      // Fallback to session-based
+      return `session-${generateUUID()}`;
+    }
+  }
+
   async capture(event: BaseTelemetryEvent): Promise<void> {
+    logger.debug(
+      `CAPTURE: posthog: ${this._posthogClient !== null}, scarf: ${this._scarfClient !== null}`
+    );
     if (!this._posthogClient && !this._scarfClient) {
       return;
     }
@@ -289,11 +461,17 @@ export class Telemetry {
     // Send to PostHog
     if (this._posthogClient) {
       try {
-        // Add package version, language flag, and source to all events
+        // Add metadata to all events
         const properties = { ...event.properties };
         properties.mcp_use_version = getPackageVersion();
-        properties.language = "typescript";
-        properties.source = this._source;
+        properties.language = "typescript"; // SDK language (always typescript for this package)
+        properties.source = this._source; // Runtime environment or custom source
+        properties.runtime = this._runtimeEnvironment; // Detected runtime
+
+        logger.debug(`CAPTURE: PostHog Event ${event.name}`);
+        logger.debug(
+          `CAPTURE: PostHog Properties ${JSON.stringify(properties)}`
+        );
 
         this._posthogClient.capture({
           distinctId: this.userId,
@@ -305,16 +483,17 @@ export class Telemetry {
       }
     }
 
-    // Send to Scarf (when implemented)
+    // Send to Scarf
     if (this._scarfClient) {
       try {
-        // Add package version, user_id, language flag, and source to all events
+        // Add metadata to all events
         const properties: Record<string, any> = {};
         properties.mcp_use_version = getPackageVersion();
         properties.user_id = this.userId;
         properties.event = event.name;
-        properties.language = "typescript";
-        properties.source = this._source;
+        properties.language = "typescript"; // SDK language
+        properties.source = this._source; // Runtime environment or custom source
+        properties.runtime = this._runtimeEnvironment; // Detected runtime
 
         await this._scarfClient.logEvent(properties);
       } catch (e) {
@@ -323,13 +502,28 @@ export class Telemetry {
     }
   }
 
+  /**
+   * Track package download event.
+   * This is a public wrapper that safely accesses userId.
+   */
   async trackPackageDownload(properties?: Record<string, any>): Promise<void> {
+    return this.trackPackageDownloadInternal(this.userId, properties);
+  }
+
+  /**
+   * Internal method to track package download with explicit userId.
+   * This avoids circular dependency when called from the userId getter.
+   */
+  private async trackPackageDownloadInternal(
+    userId: string,
+    properties?: Record<string, any>
+  ): Promise<void> {
     if (!this._scarfClient) {
       return;
     }
 
-    // Skip tracking in non-Node.js environments
-    if (!isNodeJSEnvironment()) {
+    // Only track downloads in filesystem environments (can persist version)
+    if (this._storageCapability !== "filesystem") {
       return;
     }
 
@@ -369,14 +563,15 @@ export class Telemetry {
         logger.debug(
           `Tracking package download event with properties: ${JSON.stringify(properties)}`
         );
-        // Add package version, user_id, language flag, and source to event
+        // Add metadata to event
         const eventProperties = { ...(properties || {}) };
         eventProperties.mcp_use_version = currentVersion;
-        eventProperties.user_id = this.userId;
+        eventProperties.user_id = userId;
         eventProperties.event = "package_download";
         eventProperties.first_download = firstDownload;
         eventProperties.language = "typescript";
         eventProperties.source = this._source;
+        eventProperties.runtime = this._runtimeEnvironment;
 
         await this._scarfClient.logEvent(eventProperties);
       }
