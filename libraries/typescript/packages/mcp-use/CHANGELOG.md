@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.10.0-canary.7
+
+### Patch Changes
+
+- 48b0133: feat: improve tel
+  - @mcp-use/cli@2.5.0-canary.7
+  - @mcp-use/inspector@0.12.0-canary.7
+
 ## 1.10.0-canary.6
 
 ### Patch Changes
