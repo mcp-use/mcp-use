@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.10.0-canary.8
+
+### Patch Changes
+
+- 54ccbd8: fix: codeql warns
+  - @mcp-use/cli@2.5.0-canary.8
+  - @mcp-use/inspector@0.12.0-canary.8
+
 ## 1.10.0-canary.7
 
 ### Patch Changes
