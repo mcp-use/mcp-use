@@ -1,12 +1,15 @@
 import {
   McpServer as OfficialMcpServer,
   ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+} from "@mcp-use/modelcontextprotocol-sdk/server/mcp.js";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import {
+  McpError,
+  ErrorCode,
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
 import { Telemetry } from "../telemetry/index.js";

@@ -1,8 +1,8 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { Client } from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
 import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
-} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+} from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
 import { logger } from "../logging.js";
 import { SseConnectionManager } from "../task_managers/sse.js";
 import type { ConnectorInitOptions } from "./base.js";
@@ -69,24 +69,32 @@ export class HttpConnector extends BaseConnector {
       logger.info("🔄 Attempting streamable HTTP transport...");
       await this.connectWithStreamableHttp(baseUrl);
       logger.info("✅ Successfully connected via streamable HTTP");
-    } catch (err) {
+    } catch (err: unknown) {
       // Check if this is a 4xx error that indicates we should try SSE fallback
       let fallbackReason = "Unknown error";
       let is401Error = false;
 
       if (err instanceof StreamableHTTPError) {
-        is401Error = err.code === 401;
+        // TypeScript type narrowing - check properties exist
+        const streamableErr = err as StreamableHTTPError & {
+          code: number;
+          message: string;
+        };
+        is401Error = streamableErr.code === 401;
 
         // Check for "Missing session ID" error (HTTP 400 from FastMCP)
-        if (err.code === 400 && err.message.includes("Missing session ID")) {
+        if (
+          streamableErr.code === 400 &&
+          streamableErr.message.includes("Missing session ID")
+        ) {
           fallbackReason =
             "Server requires session ID (FastMCP compatibility) - using SSE transport";
           logger.warn(`⚠️  ${fallbackReason}`);
-        } else if (err.code === 404 || err.code === 405) {
-          fallbackReason = `Server returned ${err.code} - server likely doesn't support streamable HTTP`;
+        } else if (streamableErr.code === 404 || streamableErr.code === 405) {
+          fallbackReason = `Server returned ${streamableErr.code} - server likely doesn't support streamable HTTP`;
           logger.debug(fallbackReason);
         } else {
-          fallbackReason = `Server returned ${err.code}: ${err.message}`;
+          fallbackReason = `Server returned ${streamableErr.code}: ${streamableErr.message}`;
           logger.debug(fallbackReason);
         }
       } else if (err instanceof Error) {

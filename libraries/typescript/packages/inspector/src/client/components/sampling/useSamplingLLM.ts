@@ -3,7 +3,7 @@ import type { LLMConfig } from "../chat/types";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 interface UseSamplingLLMProps {
   llmConfig: LLMConfig | null;

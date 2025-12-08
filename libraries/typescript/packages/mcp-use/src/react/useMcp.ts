@@ -4,7 +4,7 @@ import type {
   Resource,
   ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { BrowserMCPClient } from "../client/browser.js";
@@ -385,7 +385,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             // This happens because 401 occurs before OAuth flow starts
             try {
               const { auth } =
-                await import("@modelcontextprotocol/sdk/client/auth.js");
+                await import("@mcp-use/modelcontextprotocol-sdk/client/auth.js");
               const baseUrl = new URL(url).origin;
 
               // Trigger auth to generate the URL, but it will be blocked by preventAutoAuth
@@ -658,19 +658,19 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Generate a fresh authorization URL and redirect immediately
         // We need to manually trigger what the SDK would do
         const { auth } =
-          await import("@modelcontextprotocol/sdk/client/auth.js");
+          await import("@mcp-use/modelcontextprotocol-sdk/client/auth.js");
 
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
         const baseUrl = new URL(url).origin;
         auth(freshAuthProvider, {
           serverUrl: baseUrl,
-        }).catch((err) => {
+        }).catch((err: unknown) => {
           // This is expected to "fail" with redirect - the auth flow continues in the popup/redirect
           addLog(
             "info",
             "OAuth flow initiated:",
-            err?.message || "Redirecting..."
+            err instanceof Error ? err.message : "Redirecting..."
           );
         });
       } catch (authError) {

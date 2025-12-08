@@ -16,6 +16,9 @@ export default defineConfig({
   keepNames: true,
   dts: false, // We run tsc separately for declarations
   external: [
+    // Keep MCP SDK external (peer dependency)
+    "@modelcontextprotocol/sdk",
+    "@mcp-use/modelcontextprotocol-sdk",
     // Keep Tailwind CSS and its dependencies external (native modules)
     "tailwindcss",
     "@tailwindcss/vite",

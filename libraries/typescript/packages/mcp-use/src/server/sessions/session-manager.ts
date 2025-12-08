@@ -6,8 +6,8 @@
  */
 
 import type { Context } from "hono";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Transport } from "@mcp-use/modelcontextprotocol-sdk/shared/transport.js";
+import type { McpServer } from "@mcp-use/modelcontextprotocol-sdk/server/mcp.js";
 
 /**
  * Session data stored for each active MCP session

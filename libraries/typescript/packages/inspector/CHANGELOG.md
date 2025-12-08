@@ -1,5 +1,21 @@
 # @mcp-use/inspector
 
+## 0.12.0-canary.6
+
+### Patch Changes
+
+- c4fe367: chore: replace official sdk with fork in imports
+- Updated dependencies [c4fe367]
+  - mcp-use@1.10.0-canary.6
+
+## 0.12.0-canary.5
+
+### Patch Changes
+
+- 4d61e84: chore: switch official sdk from npm to fork with edge runtime support
+- Updated dependencies [4d61e84]
+  - mcp-use@1.10.0-canary.5
+
 ## 0.12.0-canary.4
 
 ### Patch Changes

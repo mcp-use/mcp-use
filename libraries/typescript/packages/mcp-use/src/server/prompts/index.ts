@@ -2,7 +2,7 @@ import type { z } from "zod";
 import type {
   GetPromptResult,
   CallToolResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type {
   PromptDefinition,
   PromptDefinitionWithoutCallback,

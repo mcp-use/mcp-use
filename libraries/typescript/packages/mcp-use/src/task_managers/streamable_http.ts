@@ -1,5 +1,5 @@
-import type { StreamableHTTPClientTransportOptions } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { StreamableHTTPClientTransportOptions } from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
+import { StreamableHTTPClientTransport } from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
 import { logger } from "../logging.js";
 import { ConnectionManager } from "./base.js";
 
