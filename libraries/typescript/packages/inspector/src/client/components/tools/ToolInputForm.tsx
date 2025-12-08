@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/client/components/ui/select";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 interface ToolInputFormProps {
   selectedTool: Tool;

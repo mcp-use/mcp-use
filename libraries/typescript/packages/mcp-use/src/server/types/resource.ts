@@ -1,7 +1,7 @@
 import type {
   ReadResourceResult,
   CallToolResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
 import type { AdaptersConfig } from "@mcp-ui/server";

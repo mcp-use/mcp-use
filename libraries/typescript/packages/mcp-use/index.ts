@@ -27,7 +27,7 @@ import {
   type Root,
   type Tool,
 } from "./src/session.js";
-import type { CreateMessageRequest } from "@modelcontextprotocol/sdk/types.js";
+import type { CreateMessageRequest } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 export { BaseAdapter, LangChainAdapter } from "./src/adapters/index.js";
 // Export AI SDK utilities
@@ -132,7 +132,7 @@ export {
 export type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 /**
  * Type alias for the params property of CreateMessageRequest.

@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { E2BExecutorOptions, MCPClient } from "../../client.js";
 import { logger } from "../../logging.js";
 import { BaseCodeExecutor, type ExecutionResult } from "./base.js";

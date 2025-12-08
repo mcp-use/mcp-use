@@ -48,4 +48,4 @@ export type {
   OAuthClientInformation,
   OAuthMetadata,
   OAuthTokens,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";

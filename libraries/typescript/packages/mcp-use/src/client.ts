@@ -6,7 +6,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { BaseMCPClient } from "./client/base.js";
 import type { ExecutionResult } from "./client/codeExecutor.js";
 import {

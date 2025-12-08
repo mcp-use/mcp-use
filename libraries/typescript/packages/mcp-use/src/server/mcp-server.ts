@@ -1,12 +1,15 @@
 import {
   McpServer as OfficialMcpServer,
   ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+} from "@mcp-use/modelcontextprotocol-sdk/server/mcp.js";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import {
+  McpError,
+  ErrorCode,
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
 
@@ -86,7 +89,7 @@ import type {
 
 class MCPServerClass<HasOAuth extends boolean = false> {
   /**
-   * Native MCP server instance from @modelcontextprotocol/sdk
+   * Native MCP server instance from @mcp-use/modelcontextprotocol-sdk
    * Exposed publicly for advanced use cases
    */
   public readonly nativeServer: OfficialMcpServer;

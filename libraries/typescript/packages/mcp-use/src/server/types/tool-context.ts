@@ -9,7 +9,7 @@ import type {
   CreateMessageRequest,
   CreateMessageResult,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { z } from "zod";
 
 /**

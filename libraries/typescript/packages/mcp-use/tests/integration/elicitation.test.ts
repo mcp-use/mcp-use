@@ -5,16 +5,16 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
-import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
+import { toJsonSchemaCompat } from "@mcp-use/modelcontextprotocol-sdk/server/zod-json-schema-compat.js";
 import { MCPServer } from "../../src/server/index.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
 import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import { ElicitRequestSchema } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 describe("Elicitation Integration Tests", () => {
   let server: any;

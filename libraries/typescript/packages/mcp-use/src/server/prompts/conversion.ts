@@ -2,7 +2,7 @@ import type {
   CallToolResult,
   GetPromptResult,
   PromptMessage,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 /**
  * Check if a result is a GetPromptResult (has 'messages' array)
