@@ -4,19 +4,37 @@ import inspect
 import logging
 import os
 import time
-from typing import TYPE_CHECKING, cast
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, cast
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import AnyFunction
+from mcp.types import (
+    AnyFunction,
+    CallToolRequest,
+    GetPromptRequest,
+    InitializeRequest,
+    ListPromptsRequest,
+    ListResourcesRequest,
+    ListToolsRequest,
+    ReadResourceRequest,
+    ServerResult,
+)
 
 from mcp_use.server.context import Context as MCPContext
 from mcp_use.server.logging import MCPLoggingMiddleware
+from mcp_use.server.middleware import (
+    Middleware,
+    MiddlewareManager,
+    ServerMiddlewareContext,
+    TelemetryMiddleware,
+)
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
 from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.server.utils.signals import setup_signal_handlers
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
+from mcp_use.telemetry.utils import track_server_run_from_server
 
 if TYPE_CHECKING:
     from mcp.server.session import ServerSession
@@ -33,9 +51,10 @@ class MCPServer(FastMCP):
 
     def __init__(
         self,
-        name: str,
+        name: str | None = None,
         version: str | None = None,
         instructions: str | None = None,
+        middleware: list[Middleware] | None = None,
         debug: bool = False,
         mcp_path: str = "/mcp",
         docs_path: str = "/docs",
@@ -66,6 +85,14 @@ class MCPServer(FastMCP):
         self.openmcp_path = openmcp_path
         self.show_inspector_logs = show_inspector_logs
         self.pretty_print_jsonrpc = pretty_print_jsonrpc
+        self._transport_type: TransportType = "streamable-http"
+
+        self.middleware_manager = MiddlewareManager()
+        self.middleware_manager.add_middleware(TelemetryMiddleware())
+
+        if middleware:
+            for middleware_instance in middleware:
+                self.middleware_manager.add_middleware(middleware_instance)
 
         # Add dev routes only in DEBUG=1 and above
         if self.debug_level >= 1:
@@ -205,6 +232,40 @@ class MCPServer(FastMCP):
 
         return app
 
+    def _wrap_handlers_with_middleware(self) -> None:
+        """Wrap MCP request handlers with middleware chain."""
+        handlers = self._mcp_server.request_handlers
+
+        def wrap_request(request_cls: type, method: str) -> None:
+            if request_cls not in handlers:
+                return
+
+            original = handlers[request_cls]
+
+            async def wrapped(request: Any) -> ServerResult:
+                context = ServerMiddlewareContext(
+                    message=request.params,
+                    method=method,
+                    timestamp=datetime.now(UTC),
+                    transport=self._transport_type,
+                    session_id=self._get_session_id(),
+                )
+
+                async def call_original(_: ServerMiddlewareContext[Any]) -> Any:
+                    return await original(request)
+
+                return await self.middleware_manager.process_request(context, call_original)
+
+            handlers[request_cls] = wrapped
+
+        wrap_request(InitializeRequest, "initialize")
+        wrap_request(CallToolRequest, "tools/call")
+        wrap_request(ReadResourceRequest, "resources/read")
+        wrap_request(GetPromptRequest, "prompts/get")
+        wrap_request(ListToolsRequest, "tools/list")
+        wrap_request(ListResourcesRequest, "resources/list")
+        wrap_request(ListPromptsRequest, "prompts/list")
+
     def run(  # type: ignore[override]
         self,
         transport: TransportType = "streamable-http",
@@ -222,24 +283,10 @@ class MCPServer(FastMCP):
             reload: Whether to enable auto-reload
             run_debug: Whether to enable debug mode (adds /docs and /openmcp.json endpoints)
         """
-        # Track server run with configuration (non-private parameters)
-        _telemetry.telemetry(
-            feature_name="server_run",
-            class_name="MCPServer",
-            method_name="run",
-            success=True,
-            additional_properties={
-                "transport": transport,
-                "debug": self.debug or run_debug,
-                "reload": reload,
-                "pretty_print_jsonrpc": self.pretty_print_jsonrpc,
-                "show_inspector_logs": self.show_inspector_logs,
-                # Count tools, resources, prompts
-                "tool_count": len(list(self._tool_manager._tools)),
-                "resource_count": len(list(self._resource_manager._resources)),
-                "prompt_count": len(list(self._prompt_manager._prompts)),
-            },
-        )
+        self._transport_type = transport
+        track_server_run_from_server(self, transport, host, port, _telemetry)
+
+        self._wrap_handlers_with_middleware()
 
         runner = ServerRunner(self)
         runner.run(transport=transport, host=host, port=port, reload=reload, debug=run_debug)
@@ -265,3 +312,16 @@ class MCPServer(FastMCP):
             return self._mcp_server.request_context
         except LookupError:
             return None
+
+    def _get_session_id(self) -> str | None:
+        session = self._current_session()
+        if session is None:
+            return None
+
+        try:
+            return session.session_id  # type: ignore[attr-defined]
+        except AttributeError:
+            try:
+                return session.id  # type: ignore[attr-defined]
+            except AttributeError:
+                return None
