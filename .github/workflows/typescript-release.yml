@@ -218,6 +218,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e  # Exit immediately if any command fails
+          
           # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
           pnpm changeset publish
@@ -225,13 +227,23 @@ jobs:
           # Capture new tags created by changeset before pushing
           cd ../..
           NEW_TAGS=$(git tag --points-at HEAD)
+          
+          if [ -z "$NEW_TAGS" ]; then
+            echo "⚠️  No tags were created by changeset publish"
+            exit 0
+          fi
+          
           echo "📦 Tags created: $NEW_TAGS"
 
           # Save tags to a file for the next step
           echo "$NEW_TAGS" > .release-tags
 
-          # Push git tags
-          git push --follow-tags
+          # Push git tags - fail immediately if this doesn't work
+          if ! git push --follow-tags; then
+            echo "❌ Failed to push tags to remote"
+            rm -f .release-tags  # Clean up tags file since push failed
+            exit 1
+          fi
 
           echo "✅ Published packages to npm using trusted publishing and pushed tags"
 
