@@ -1,5 +1,8 @@
 name: Sync inspector subfolder to mcp-use/inspector
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
