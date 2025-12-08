@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.12.0-canary.6
+
+### Patch Changes
+
+- c4fe367: chore: replace official sdk with fork in imports
+- Updated dependencies [c4fe367]
+  - mcp-use@1.10.0-canary.6
+
 ## 0.12.0-canary.5
 
 ### Patch Changes
