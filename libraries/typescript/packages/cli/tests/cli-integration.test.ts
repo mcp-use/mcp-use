@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
  * These tests spawn the actual CLI and verify command behavior
  */
 
-const CLI_PATH = join(__dirname, "../dist/index.js");
+const CLI_PATH = join(__dirname, "../dist/index.cjs");
 const TEST_TIMEOUT = 30000;
 
 /**
