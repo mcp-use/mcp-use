@@ -12,6 +12,8 @@ interface ToolsTabHeaderProps {
   onSearchBlur: () => void;
   onTabSwitch: () => void;
   searchInputRef: React.RefObject<HTMLInputElement>;
+  onRefresh?: () => void | Promise<void>;
+  isRefreshing?: boolean;
 }
 
 export function ToolsTabHeader({
@@ -25,6 +27,8 @@ export function ToolsTabHeader({
   onSearchBlur,
   onTabSwitch,
   searchInputRef,
+  onRefresh,
+  isRefreshing,
 }: ToolsTabHeaderProps) {
   return (
     <ListTabHeader
@@ -45,6 +49,8 @@ export function ToolsTabHeader({
       onSearchBlur={onSearchBlur}
       onTabSwitch={onTabSwitch}
       searchInputRef={searchInputRef}
+      onRefresh={onRefresh}
+      isRefreshing={isRefreshing}
     />
   );
 }

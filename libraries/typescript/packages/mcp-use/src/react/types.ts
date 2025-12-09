@@ -168,6 +168,12 @@ export type UseMcpResult = {
     }
   ) => Promise<any>;
   /**
+   * Function to list tools from the MCP server.
+   * @returns A promise that resolves when tools are refreshed.
+   * @throws If the client is not in the 'ready' state.
+   */
+  listTools: () => Promise<void>;
+  /**
    * Function to list resources from the MCP server.
    * @returns A promise that resolves when resources are refreshed.
    * @throws If the client is not in the 'ready' state.

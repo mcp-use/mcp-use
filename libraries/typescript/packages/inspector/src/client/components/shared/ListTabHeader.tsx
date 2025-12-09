@@ -7,7 +7,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import type { LucideIcon } from "lucide-react";
-import { Search } from "lucide-react";
+import { Search, RefreshCw } from "lucide-react";
 import { Kbd } from "../ui/kbd";
 
 interface ListTabHeaderProps {
@@ -45,6 +45,10 @@ interface ListTabHeaderProps {
   primaryTabName: string;
   /** Name of the secondary tab (for comparison) */
   secondaryTabName: string;
+  /** Optional callback to refresh the primary tab content */
+  onRefresh?: () => void | Promise<void>;
+  /** Whether refresh is currently in progress */
+  isRefreshing?: boolean;
 }
 
 export function ListTabHeader({
@@ -64,6 +68,8 @@ export function ListTabHeader({
   onTabSwitch,
   searchInputRef,
   primaryTabName,
+  onRefresh,
+  isRefreshing = false,
 }: ListTabHeaderProps) {
   const isPrimaryTab = activeTab === primaryTabName;
 
@@ -99,6 +105,26 @@ export function ListTabHeader({
                     <Kbd>F</Kbd>
                   </TooltipContent>
                 </Tooltip>
+                {onRefresh && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onRefresh}
+                        disabled={isRefreshing}
+                        className="h-8 w-8 p-0"
+                      >
+                        <RefreshCw
+                          className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                        />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Refresh {primaryTabTitle.toLowerCase()}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </>
             )}
           </>

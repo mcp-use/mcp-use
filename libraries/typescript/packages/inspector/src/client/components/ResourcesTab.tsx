@@ -37,6 +37,7 @@ interface ResourcesTabProps {
   readResource: (uri: string) => Promise<any>;
   serverId: string;
   isConnected: boolean;
+  refreshResources?: () => Promise<void>;
 }
 
 export function ResourcesTab({
@@ -45,7 +46,21 @@ export function ResourcesTab({
   readResource,
   serverId,
   isConnected,
+  refreshResources,
 }: ResourcesTabProps & { ref?: React.RefObject<ResourcesTabRef | null> }) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!refreshResources || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refreshResources();
+    } catch (err) {
+      console.error("[ResourcesTab] Failed to refresh resources:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshResources, isRefreshing]);
   // State
   const [selectedResource, setSelectedResource] = useState<Resource | null>(
     null
@@ -387,6 +402,8 @@ export function ResourcesTab({
                   searchInputRef={
                     searchInputRef as React.RefObject<HTMLInputElement>
                   }
+                  onRefresh={handleRefresh}
+                  isRefreshing={isRefreshing}
                 />
                 <div className="flex flex-col h-full">
                   <ResourcesList

@@ -782,6 +782,47 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   }, [url, addLog, disconnect]);
 
   /**
+   * Refresh the list of available tools from the server
+   *
+   * Updates the `tools` state with the latest tool list.
+   *
+   * @throws {Error} If client is not ready
+   *
+   * @example
+   * ```typescript
+   * await mcp.listTools()
+   * console.log(mcp.tools)  // Updated tool list
+   * ```
+   */
+  const listTools = useCallback(async () => {
+    if (stateRef.current !== "ready" || !clientRef.current) {
+      throw new Error(
+        `MCP client is not ready (current state: ${state}). Cannot list tools.`
+      );
+    }
+    addLog("info", "Listing tools");
+    try {
+      const serverName = "inspector-server";
+      const session = clientRef.current.getSession(serverName);
+      if (!session) {
+        throw new Error("No active session found");
+      }
+      // Call listTools on the client to refresh the cache
+      // The connector will automatically update its cache when we call the client's listTools
+      const result = await session.connector.client.listTools();
+      // Manually update the connector's cache since refreshToolsCache is protected
+      // Access the private cache through the connector's internal structure
+      (session.connector as any).toolsCache = (result.tools ?? []) as Tool[];
+      // Update state from the connector's cache
+      setTools(session.connector.tools || []);
+      addLog("info", "Tools listed successfully");
+    } catch (err) {
+      addLog("error", "List tools failed:", err);
+      throw err;
+    }
+  }, [state]);
+
+  /**
    * Refresh the list of available resources from the server
    *
    * Updates the `resources` state with the latest resource list.
@@ -1118,6 +1159,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     client: clientRef.current,
     callTool,
     readResource,
+    listTools,
     listResources,
     listPrompts,
     getPrompt,

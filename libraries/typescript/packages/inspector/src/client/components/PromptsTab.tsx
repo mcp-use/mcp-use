@@ -39,6 +39,7 @@ interface PromptsTabProps {
   callPrompt: (name: string, args?: Record<string, unknown>) => Promise<any>;
   serverId: string;
   isConnected: boolean;
+  refreshPrompts?: () => Promise<void>;
 }
 
 const SAVED_PROMPTS_KEY = "mcp-inspector-saved-prompts";
@@ -49,7 +50,21 @@ export function PromptsTab({
   callPrompt,
   serverId,
   isConnected,
+  refreshPrompts,
 }: PromptsTabProps & { ref?: React.RefObject<PromptsTabRef | null> }) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!refreshPrompts || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refreshPrompts();
+    } catch (err) {
+      console.error("[PromptsTab] Failed to refresh prompts:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshPrompts, isRefreshing]);
   // State
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [selectedSavedPrompt, setSelectedSavedPrompt] =
@@ -512,6 +527,8 @@ export function PromptsTab({
                   searchInputRef={
                     searchInputRef as React.RefObject<HTMLInputElement>
                   }
+                  onRefresh={handleRefresh}
+                  isRefreshing={isRefreshing}
                 />
                 {activeTab === "prompts" ? (
                   <PromptsList

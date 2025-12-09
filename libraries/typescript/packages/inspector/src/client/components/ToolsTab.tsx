@@ -55,6 +55,7 @@ interface ToolsTabProps {
   readResource: (uri: string) => Promise<any>;
   serverId: string;
   isConnected: boolean;
+  refreshTools?: () => Promise<void>;
 }
 
 const SAVED_REQUESTS_KEY = "mcp-inspector-saved-requests";
@@ -66,7 +67,21 @@ export function ToolsTab({
   readResource,
   serverId,
   isConnected,
+  refreshTools,
 }: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!refreshTools || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refreshTools();
+    } catch (err) {
+      console.error("[ToolsTab] Failed to refresh tools:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshTools, isRefreshing]);
   // State
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [selectedSavedRequest, setSelectedSavedRequest] =
@@ -788,6 +803,8 @@ export function ToolsTab({
                   searchInputRef={
                     searchInputRef as React.RefObject<HTMLInputElement>
                   }
+                  onRefresh={handleRefresh}
+                  isRefreshing={isRefreshing}
                 />
                 {activeTab === "tools" ? (
                   <ToolsList

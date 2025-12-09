@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Search, RefreshCw } from "lucide-react";
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
@@ -19,6 +19,8 @@ interface ResourcesTabHeaderProps {
   onSearchBlur: () => void;
   onTabSwitch: () => void;
   searchInputRef: React.RefObject<HTMLInputElement>;
+  onRefresh?: () => void | Promise<void>;
+  isRefreshing?: boolean;
 }
 
 export function ResourcesTabHeader({
@@ -29,6 +31,8 @@ export function ResourcesTabHeader({
   onSearchChange,
   onSearchBlur,
   searchInputRef,
+  onRefresh,
+  isRefreshing = false,
 }: ResourcesTabHeaderProps) {
   return (
     <div className="flex flex-row items-center justify-between p-4 sm:p-4 py-3 gap-2">
@@ -60,6 +64,26 @@ export function ResourcesTabHeader({
                 <Kbd>F</Kbd>
               </TooltipContent>
             </Tooltip>
+            {onRefresh && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onRefresh}
+                    disabled={isRefreshing}
+                    className="h-8 w-8 p-0"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Refresh resources
+                </TooltipContent>
+              </Tooltip>
+            )}
           </>
         ) : (
           <Input
