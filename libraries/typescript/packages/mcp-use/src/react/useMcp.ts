@@ -807,12 +807,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       if (!session) {
         throw new Error("No active session found");
       }
-      // Call listTools on the client to refresh the cache
-      // The connector will automatically update its cache when we call the client's listTools
-      const result = await session.connector.client.listTools();
-      // Manually update the connector's cache since refreshToolsCache is protected
-      // Access the private cache through the connector's internal structure
-      (session.connector as any).toolsCache = (result.tools ?? []) as Tool[];
+      // Call listTools on the connector to refresh the cache
+      await session.connector.listTools();
       // Update state from the connector's cache
       setTools(session.connector.tools || []);
       addLog("info", "Tools listed successfully");

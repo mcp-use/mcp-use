@@ -329,43 +329,16 @@ function McpConnectionWrapper({
     setNotifications([]);
   }, []);
 
-  const onNotificationReceived = useCallback(
-    (notification: MCPNotification) => {
-      setNotifications((prev) => {
-        // Prune oldest if we exceed max
-        const updated = [notification, ...prev];
-        if (updated.length > MAX_NOTIFICATIONS) {
-          return updated.slice(0, MAX_NOTIFICATIONS);
-        }
-        return updated;
-      });
-
-      // Auto-refresh when list change notifications are received
-      if (mcpHook.state === "ready" && mcpHook.client) {
-        switch (notification.method) {
-          case "notifications/tools/list_changed":
-            // Refresh tools
-            mcpHook.listTools?.().catch((err) => {
-              console.error("[McpContext] Failed to refresh tools:", err);
-            });
-            break;
-          case "notifications/resources/list_changed":
-            // Refresh resources
-            mcpHook.listResources?.().catch((err) => {
-              console.error("[McpContext] Failed to refresh resources:", err);
-            });
-            break;
-          case "notifications/prompts/list_changed":
-            // Refresh prompts
-            mcpHook.listPrompts?.().catch((err) => {
-              console.error("[McpContext] Failed to refresh prompts:", err);
-            });
-            break;
-        }
+  const onNotificationReceived = useCallback((notification: MCPNotification) => {
+    setNotifications((prev) => {
+      // Prune oldest if we exceed max
+      const updated = [notification, ...prev];
+      if (updated.length > MAX_NOTIFICATIONS) {
+        return updated.slice(0, MAX_NOTIFICATIONS);
       }
-    },
-    [mcpHook.state, mcpHook.client, mcpHook.listTools, mcpHook.listResources, mcpHook.listPrompts]
-  );
+      return updated;
+    });
+  }, []);
 
   // Sampling handlers
   const approveSampling = useCallback(
@@ -426,7 +399,7 @@ function McpConnectionWrapper({
         const requestId = `sampling-${requestIdCounter.current++}`;
         const newRequest = {
           id: requestId,
-          request: { params },
+          request: { method: "sampling/createMessage" as const, params },
           timestamp: Date.now(),
           serverName: name,
           resolve,
@@ -594,6 +567,35 @@ function McpConnectionWrapper({
   useEffect(() => {
     onUpdateRef.current = onUpdate;
   }, [onUpdate]);
+
+  // Auto-refresh when list_changed notifications are received
+  useEffect(() => {
+    if (notifications.length === 0) return;
+    
+    const latestNotification = notifications[0];
+    if (mcpHook.state !== "ready" || !mcpHook.client) return;
+
+    switch (latestNotification.method) {
+      case "notifications/tools/list_changed":
+        mcpHook.listTools?.().catch((err) => {
+          console.error("[McpContext] Failed to refresh tools:", err);
+        });
+        break;
+      case "notifications/resources/list_changed":
+        mcpHook.listResources?.().catch((err) => {
+          console.error("[McpContext] Failed to refresh resources:", err);
+        });
+        break;
+      case "notifications/prompts/list_changed":
+        mcpHook.listPrompts?.().catch((err) => {
+          console.error("[McpContext] Failed to refresh prompts:", err);
+        });
+        break;
+      default:
+        // Other notifications are not auto-refreshed
+        break;
+    }
+  }, [notifications, mcpHook.state, mcpHook.client, mcpHook.listTools, mcpHook.listResources, mcpHook.listPrompts]);
 
   // Create a stable connection object
   // Only update when data actually changes
@@ -839,22 +841,22 @@ export function McpProvider({ children }: { children: ReactNode }) {
               pendingSamplingRequests: [],
               approveSampling: EMPTY_APPROVE_SAMPLING,
               rejectSampling: EMPTY_REJECT_SAMPLING,
-          pendingElicitationRequests: [],
-          approveElicitation: EMPTY_APPROVE_ELICITATION,
-          rejectElicitation: EMPTY_REJECT_ELICITATION,
-          callTool: async () => {},
-          readResource: async () => {},
-          listPrompts: async () => {},
-          getPrompt: async () => {},
-          refreshTools: async () => {},
-          refreshResources: async () => {},
-          refreshPrompts: async () => {},
-          authenticate: () => {},
-          retry: () => {},
-          clearStorage: () => {},
-          disconnect: () => {},
-          client: null,
-        }))
+              pendingElicitationRequests: [],
+              approveElicitation: EMPTY_APPROVE_ELICITATION,
+              rejectElicitation: EMPTY_REJECT_ELICITATION,
+              callTool: async () => {},
+              readResource: async () => {},
+              listPrompts: async () => {},
+              getPrompt: async () => {},
+              refreshTools: async () => {},
+              refreshResources: async () => {},
+              refreshPrompts: async () => {},
+              authenticate: () => {},
+              retry: () => {},
+              clearStorage: () => {},
+              disconnect: () => {},
+              client: null,
+            }))
           );
         }
       }
@@ -954,6 +956,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
                 readResource: async () => {},
                 listPrompts: async () => {},
                 getPrompt: async () => {},
+                refreshTools: async () => {},
+                refreshResources: async () => {},
+                refreshPrompts: async () => {},
                 authenticate: () => {},
                 retry: () => {},
                 clearStorage: () => {},
@@ -1019,6 +1024,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
             readResource: async () => {},
             listPrompts: async () => {},
             getPrompt: async () => {},
+            refreshTools: async () => {},
+            refreshResources: async () => {},
+            refreshPrompts: async () => {},
             authenticate: () => {},
             retry: () => {},
             clearStorage: () => {},
@@ -1071,6 +1079,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
           readResource: async () => {},
           listPrompts: async () => {},
           getPrompt: async () => {},
+          refreshTools: async () => {},
+          refreshResources: async () => {},
+          refreshPrompts: async () => {},
           authenticate: () => {},
           retry: () => {},
           clearStorage: () => {},

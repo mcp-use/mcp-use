@@ -79,9 +79,7 @@ export function ResourcesTabHeader({
                     />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  Refresh resources
-                </TooltipContent>
+                <TooltipContent side="bottom">Refresh resources</TooltipContent>
               </Tooltip>
             )}
           </>
