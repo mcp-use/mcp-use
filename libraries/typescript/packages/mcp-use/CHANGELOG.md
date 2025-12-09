@@ -1,5 +1,19 @@
 # mcp-use
 
+## 1.11.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: removed websocket transport support
+
+### Patch Changes
+
+- e302f8d: chore: added support for node >= 18 and commonjs
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - @mcp-use/cli@2.6.0-canary.3
+  - @mcp-use/inspector@0.13.0-canary.3
+
 ## 1.10.1-canary.2
 
 ### Patch Changes

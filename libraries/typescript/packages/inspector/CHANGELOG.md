@@ -1,5 +1,17 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: removed websocket transport support
+
+### Patch Changes
+
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - mcp-use@1.11.0-canary.3
+
 ## 0.12.1-canary.2
 
 ### Patch Changes
