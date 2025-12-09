@@ -42,4 +42,4 @@ jobs:
         run: pnpm build
 
       - name: Publish Preview Packages
-        run: pnpm dlx pkg-pr-new publish './libraries/typescript/packages/*'
+        run: pnpm dlx pkg-pr-new publish './libraries/typescript/packages/*' --pnpm
