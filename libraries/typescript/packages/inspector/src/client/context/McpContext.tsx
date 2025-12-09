@@ -329,16 +329,19 @@ function McpConnectionWrapper({
     setNotifications([]);
   }, []);
 
-  const onNotificationReceived = useCallback((notification: MCPNotification) => {
-    setNotifications((prev) => {
-      // Prune oldest if we exceed max
-      const updated = [notification, ...prev];
-      if (updated.length > MAX_NOTIFICATIONS) {
-        return updated.slice(0, MAX_NOTIFICATIONS);
-      }
-      return updated;
-    });
-  }, []);
+  const onNotificationReceived = useCallback(
+    (notification: MCPNotification) => {
+      setNotifications((prev) => {
+        // Prune oldest if we exceed max
+        const updated = [notification, ...prev];
+        if (updated.length > MAX_NOTIFICATIONS) {
+          return updated.slice(0, MAX_NOTIFICATIONS);
+        }
+        return updated;
+      });
+    },
+    []
+  );
 
   // Sampling handlers
   const approveSampling = useCallback(
@@ -571,7 +574,7 @@ function McpConnectionWrapper({
   // Auto-refresh when list_changed notifications are received
   useEffect(() => {
     if (notifications.length === 0) return;
-    
+
     const latestNotification = notifications[0];
     if (mcpHook.state !== "ready" || !mcpHook.client) return;
 
@@ -595,7 +598,14 @@ function McpConnectionWrapper({
         // Other notifications are not auto-refreshed
         break;
     }
-  }, [notifications, mcpHook.state, mcpHook.client, mcpHook.listTools, mcpHook.listResources, mcpHook.listPrompts]);
+  }, [
+    notifications,
+    mcpHook.state,
+    mcpHook.client,
+    mcpHook.listTools,
+    mcpHook.listResources,
+    mcpHook.listPrompts,
+  ]);
 
   // Create a stable connection object
   // Only update when data actually changes

@@ -13,6 +13,33 @@ import { generateUUID } from "../utils/runtime.js";
 import { Telemetry } from "../../telemetry/index.js";
 
 /**
+ * Helper function to check if a request body is an initialize request
+ * @param request - The Web Standard Request object
+ * @returns Promise that resolves to true if the request is an initialize request, false otherwise
+ */
+async function isInitializeRequest(request: Request): Promise<boolean> {
+  // GET requests (SSE) don't have a body, so they can't be initialize requests
+  if (request.method === "GET" || request.method === "HEAD") {
+    return false;
+  }
+
+  try {
+    // Clone the request to avoid consuming the original body stream
+    const clonedRequest = request.clone();
+    const body = await clonedRequest.json().catch(() => null);
+
+    if (!body || typeof body !== "object") {
+      return false;
+    }
+
+    // Check if it's an initialize request
+    return body.method === "initialize";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Mount MCP server endpoints at /mcp and /sse
  *
  * Uses FetchStreamableHTTPServerTransport (Web Standard APIs) for proper bidirectional communication.
@@ -32,6 +59,8 @@ export async function mountMcp(
     await import("@mcp-use/modelcontextprotocol-sdk/experimental/fetch-streamable-http/index.js");
 
   const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
+  const autoCreateSessionOnInvalidId =
+    config.autoCreateSessionOnInvalidId ?? true; // Default: true
 
   // Map to store transports by session ID (following official Hono example from PR #1209)
   const transports = new Map<string, any>();
@@ -73,6 +102,25 @@ export async function mountMcp(
 
       // Pass Web Standard Request directly - no adapter needed!
       return transport.handleRequest(c.req.raw);
+    }
+
+    // Handle invalid session IDs
+    if (sessionId && !transports.has(sessionId)) {
+      // Check if autoCreateSessionOnInvalidId is enabled
+      if (!autoCreateSessionOnInvalidId) {
+        // MCP spec compliant: return 404 for invalid session IDs
+        return new Response(null, { status: 404 });
+      }
+
+      // Check if this is an initialize request
+      const isInitialize = await isInitializeRequest(c.req.raw);
+
+      if (!isInitialize) {
+        // Not an initialize request with invalid session ID - return 404 to force reinitialize
+        return new Response(null, { status: 404 });
+      }
+
+      // It's an initialize request - fall through to create new session
     }
 
     // For new sessions or initialization, create new transport and server

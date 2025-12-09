@@ -20,6 +20,45 @@ const DEFAULT_RETRY_DELAY = 5000;
 type TransportType = "http" | "sse";
 
 /**
+ * Helper function to detect if an error is a 404 (invalid session ID)
+ * @param err - The error to check
+ * @returns true if the error indicates a 404/invalid session, false otherwise
+ */
+function is404Error(err: unknown): boolean {
+  if (!err) return false;
+
+  // Check for error code
+  if (typeof err === "object" && "code" in err) {
+    const code = (err as any).code;
+    if (code === 404 || code === "404") {
+      return true;
+    }
+  }
+
+  // Check for status code
+  if (typeof err === "object" && "status" in err) {
+    const status = (err as any).status;
+    if (status === 404) {
+      return true;
+    }
+  }
+
+  // Check error message for 404 indicators
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  const errorString = String(err);
+
+  return (
+    errorMessage.includes("404") ||
+    errorMessage.includes("Not Found") ||
+    errorString.includes("404") ||
+    errorString.includes("Not Found") ||
+    // Check for "Server not initialized" which indicates invalid session
+    errorMessage.includes("Server not initialized") ||
+    errorString.includes("Server not initialized")
+  );
+}
+
+/**
  * React hook for connecting to and interacting with MCP servers
  *
  * Provides a complete interface for MCP server connections including:
@@ -73,6 +112,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
+    maxRetries, // undefined = unlimited retries
     wrapTransport,
     onNotification,
     samplingCallback,
@@ -100,6 +140,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   const connectAttemptRef = useRef<number>(0);
+  const retryCountRef = useRef<number>(0);
   const authTimeoutRef = useRef<number | null>(null);
 
   // --- Refs for values used in callbacks ---
@@ -357,6 +398,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
 
+        // Reset retry count on successful connection
+        retryCountRef.current = 0;
+
         // Track successful connection
         Tel.getInstance()
           .trackUseMcpConnection({
@@ -606,6 +650,59 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       } catch (err) {
         addLog("error", `Tool "${name}" call failed:`, err);
 
+        // Check if this is a 404 error (invalid session ID)
+        if (is404Error(err)) {
+          // Check if we've exceeded max retries
+          const shouldRetry =
+            maxRetries === undefined || retryCountRef.current < maxRetries;
+
+          if (shouldRetry) {
+            retryCountRef.current += 1;
+            addLog(
+              "warn",
+              `Tool call failed with 404 (invalid session ID). Clearing storage and reconnecting... (attempt ${retryCountRef.current}${maxRetries !== undefined ? `/${maxRetries}` : ""})`
+            );
+
+            // Clear storage to remove invalid session
+            if (authProviderRef.current) {
+              authProviderRef.current.clearStorage();
+            }
+
+            // Disconnect and trigger reconnection
+            disconnect();
+
+            // Set state to failed so retry can be called
+            if (isMountedRef.current) {
+              setState("failed");
+              setError("Session expired. Reconnecting...");
+            }
+
+            // Attempt to reconnect automatically
+            setTimeout(() => {
+              if (isMountedRef.current && stateRef.current === "failed") {
+                addLog(
+                  "info",
+                  `Attempting automatic reconnection after 404 error... (attempt ${retryCountRef.current}${maxRetries !== undefined ? `/${maxRetries}` : ""})`
+                );
+                connect();
+              }
+            }, 1000);
+          } else {
+            addLog(
+              "error",
+              `Tool call failed with 404 (invalid session ID). Max retries (${maxRetries}) exceeded.`
+            );
+            if (isMountedRef.current) {
+              setState("failed");
+              setError(
+                `Session expired. Max retry attempts (${maxRetries}) exceeded. Please reconnect manually.`
+              );
+            }
+            // Reset retry count for next time
+            retryCountRef.current = 0;
+          }
+        }
+
         // Track failed tool call
         Tel.getInstance()
           .trackUseMcpToolCall({
@@ -619,7 +716,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         throw err;
       }
     },
-    [state]
+    [state, disconnect, connect, addLog]
   );
 
   /**
@@ -896,6 +993,59 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       } catch (err) {
         addLog("error", "Resource read failed:", err);
 
+        // Check if this is a 404 error (invalid session ID)
+        if (is404Error(err)) {
+          // Check if we've exceeded max retries
+          const shouldRetry =
+            maxRetries === undefined || retryCountRef.current < maxRetries;
+
+          if (shouldRetry) {
+            retryCountRef.current += 1;
+            addLog(
+              "warn",
+              `Resource read failed with 404 (invalid session ID). Clearing storage and reconnecting... (attempt ${retryCountRef.current}${maxRetries !== undefined ? `/${maxRetries}` : ""})`
+            );
+
+            // Clear storage to remove invalid session
+            if (authProviderRef.current) {
+              authProviderRef.current.clearStorage();
+            }
+
+            // Disconnect and trigger reconnection
+            disconnect();
+
+            // Set state to failed so retry can be called
+            if (isMountedRef.current) {
+              setState("failed");
+              setError("Session expired. Reconnecting...");
+            }
+
+            // Attempt to reconnect automatically
+            setTimeout(() => {
+              if (isMountedRef.current && stateRef.current === "failed") {
+                addLog(
+                  "info",
+                  `Attempting automatic reconnection after 404 error... (attempt ${retryCountRef.current}${maxRetries !== undefined ? `/${maxRetries}` : ""})`
+                );
+                connect();
+              }
+            }, 1000);
+          } else {
+            addLog(
+              "error",
+              `Resource read failed with 404 (invalid session ID). Max retries (${maxRetries}) exceeded.`
+            );
+            if (isMountedRef.current) {
+              setState("failed");
+              setError(
+                `Session expired. Max retry attempts (${maxRetries}) exceeded. Please reconnect manually.`
+              );
+            }
+            // Reset retry count for next time
+            retryCountRef.current = 0;
+          }
+        }
+
         // Track failed resource read
         Tel.getInstance()
           .trackUseMcpResourceRead({
@@ -908,7 +1058,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         throw err;
       }
     },
-    [state]
+    [state, disconnect, connect, addLog]
   );
 
   /**

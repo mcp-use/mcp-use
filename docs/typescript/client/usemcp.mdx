@@ -126,6 +126,7 @@ interface UseMcpOptions {
   // Reconnection
   autoRetry?: boolean | number             // Auto-retry on failure (boolean or delay in ms)
   autoReconnect?: boolean | number         // Auto-reconnect on drop (boolean or delay in ms, default: 3000)
+  maxRetries?: number                      // Max automatic reconnection attempts after 404 errors (default: unlimited)
 
   // Client info
   clientConfig?: {
@@ -517,11 +518,14 @@ const llm = new ChatOllama({ model: 'llama2' })
 
 ## Error Handling
 
+The hook automatically handles 404 errors (invalid session IDs) that occur after server restarts by clearing the session and reconnecting. You can configure the maximum number of retry attempts.
+
 ```typescript
 function RobustConnection() {
   const mcp = useMcp({
     url: 'http://localhost:3000/mcp',
     autoRetry: 5000,  // Auto-retry every 5 seconds on failure
+    maxRetries: 3,    // Limit automatic reconnection attempts after 404 errors
   })
 
   // Monitor errors
@@ -534,6 +538,9 @@ function RobustConnection() {
         alert('Add your Authorization header in settings')
       } else if (mcp.error?.includes('ECONNREFUSED')) {
         alert('Server is not running on ' + url)
+      } else if (mcp.error?.includes('Max retry attempts')) {
+        // Max retries exceeded - user needs to manually reconnect
+        alert('Session expired. Please reconnect manually.')
       }
     }
   }, [mcp.state, mcp.error])
@@ -550,6 +557,29 @@ function RobustConnection() {
   )
 }
 ```
+
+### Automatic Reconnection After Server Restart
+
+When the server restarts, the client may have an old session ID. The hook automatically detects 404 errors (invalid session) and reconnects:
+
+- **Default behavior**: Unlimited retries (keeps trying to reconnect)
+- **With `maxRetries`**: Stops after the specified number of attempts
+
+```typescript
+// Unlimited retries (default)
+const mcp = useMcp({
+  url: 'http://localhost:3000/mcp'
+  // Will keep retrying indefinitely on 404 errors
+})
+
+// Limited retries
+const mcp = useMcp({
+  url: 'http://localhost:3000/mcp',
+  maxRetries: 3  // Stop after 3 failed reconnection attempts
+})
+```
+
+When `maxRetries` is exceeded, the connection enters `'failed'` state with an error message indicating manual reconnection is needed. You can then call `mcp.retry()` to manually reconnect.
 
 
 ## API Reference
