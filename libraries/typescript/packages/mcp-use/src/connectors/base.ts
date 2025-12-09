@@ -454,7 +454,9 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
     const result = await this.client.listTools(undefined, options);
-    return (result.tools ?? []) as Tool[];
+    this.toolsCache = (result.tools ?? []) as Tool[];
+    logger.debug(`Refreshed tools cache: ${this.toolsCache.length} tools`);
+    return this.toolsCache;
   }
 
   /**

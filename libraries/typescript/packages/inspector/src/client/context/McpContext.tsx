@@ -94,6 +94,9 @@ export interface MCPConnection {
   readResource: (uri: string) => Promise<any>;
   listPrompts: (serverName?: string) => Promise<void>;
   getPrompt: (name: string, args: any) => Promise<any>;
+  refreshTools: () => Promise<void>;
+  refreshResources: () => Promise<void>;
+  refreshPrompts: () => Promise<void>;
   authenticate: () => void;
   retry: () => void;
   clearStorage: () => void;
@@ -399,7 +402,7 @@ function McpConnectionWrapper({
         const requestId = `sampling-${requestIdCounter.current++}`;
         const newRequest = {
           id: requestId,
-          request: { params },
+          request: { method: "sampling/createMessage" as const, params },
           timestamp: Date.now(),
           serverName: name,
           resolve,
@@ -568,6 +571,42 @@ function McpConnectionWrapper({
     onUpdateRef.current = onUpdate;
   }, [onUpdate]);
 
+  // Auto-refresh when list_changed notifications are received
+  useEffect(() => {
+    if (notifications.length === 0) return;
+
+    const latestNotification = notifications[0];
+    if (mcpHook.state !== "ready" || !mcpHook.client) return;
+
+    switch (latestNotification.method) {
+      case "notifications/tools/list_changed":
+        mcpHook.listTools?.().catch((err) => {
+          console.error("[McpContext] Failed to refresh tools:", err);
+        });
+        break;
+      case "notifications/resources/list_changed":
+        mcpHook.listResources?.().catch((err) => {
+          console.error("[McpContext] Failed to refresh resources:", err);
+        });
+        break;
+      case "notifications/prompts/list_changed":
+        mcpHook.listPrompts?.().catch((err) => {
+          console.error("[McpContext] Failed to refresh prompts:", err);
+        });
+        break;
+      default:
+        // Other notifications are not auto-refreshed
+        break;
+    }
+  }, [
+    notifications,
+    mcpHook.state,
+    mcpHook.client,
+    mcpHook.listTools,
+    mcpHook.listResources,
+    mcpHook.listPrompts,
+  ]);
+
   // Create a stable connection object
   // Only update when data actually changes
   useEffect(() => {
@@ -615,6 +654,9 @@ function McpConnectionWrapper({
           readResource: mcpHook.readResource,
           listPrompts: mcpHook.listPrompts,
           getPrompt: mcpHook.getPrompt,
+          refreshTools: mcpHook.listTools || (async () => {}),
+          refreshResources: mcpHook.listResources || (async () => {}),
+          refreshPrompts: mcpHook.listPrompts || (async () => {}),
           authenticate: mcpHook.authenticate,
           retry: mcpHook.retry,
           clearStorage: mcpHook.clearStorage,
@@ -681,6 +723,9 @@ function McpConnectionWrapper({
         readResource: mcpHook.readResource,
         listPrompts: mcpHook.listPrompts,
         getPrompt: mcpHook.getPrompt,
+        refreshTools: mcpHook.listTools || (async () => {}),
+        refreshResources: mcpHook.listResources || (async () => {}),
+        refreshPrompts: mcpHook.listPrompts || (async () => {}),
         authenticate: mcpHook.authenticate,
         retry: mcpHook.retry,
         clearStorage: mcpHook.clearStorage,
@@ -738,6 +783,8 @@ function McpConnectionWrapper({
     mcpHook.readResource,
     mcpHook.listPrompts,
     mcpHook.getPrompt,
+    mcpHook.listTools,
+    mcpHook.listResources,
     mcpHook.authenticate,
     mcpHook.retry,
     mcpHook.clearStorage,
@@ -811,6 +858,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
               readResource: async () => {},
               listPrompts: async () => {},
               getPrompt: async () => {},
+              refreshTools: async () => {},
+              refreshResources: async () => {},
+              refreshPrompts: async () => {},
               authenticate: () => {},
               retry: () => {},
               clearStorage: () => {},
@@ -916,6 +966,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
                 readResource: async () => {},
                 listPrompts: async () => {},
                 getPrompt: async () => {},
+                refreshTools: async () => {},
+                refreshResources: async () => {},
+                refreshPrompts: async () => {},
                 authenticate: () => {},
                 retry: () => {},
                 clearStorage: () => {},
@@ -981,6 +1034,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
             readResource: async () => {},
             listPrompts: async () => {},
             getPrompt: async () => {},
+            refreshTools: async () => {},
+            refreshResources: async () => {},
+            refreshPrompts: async () => {},
             authenticate: () => {},
             retry: () => {},
             clearStorage: () => {},
@@ -1033,6 +1089,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
           readResource: async () => {},
           listPrompts: async () => {},
           getPrompt: async () => {},
+          refreshTools: async () => {},
+          refreshResources: async () => {},
+          refreshPrompts: async () => {},
           authenticate: () => {},
           retry: () => {},
           clearStorage: () => {},

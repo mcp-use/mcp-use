@@ -69,6 +69,8 @@ export type UseMcpOptions = {
   timeout?: number;
   /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */
   sseReadTimeout?: number;
+  /** Maximum number of automatic reconnection attempts after 404 errors (default: unlimited/undefined) */
+  maxRetries?: number;
   /** Optional callback to wrap the transport before passing it to the Client. Useful for logging, monitoring, or other transport-level interceptors. */
   wrapTransport?: (transport: any, serverId: string) => any;
   /** Callback function that is invoked when a notification is received from the MCP server */
@@ -167,6 +169,12 @@ export type UseMcpResult = {
       signal?: AbortSignal;
     }
   ) => Promise<any>;
+  /**
+   * Function to list tools from the MCP server.
+   * @returns A promise that resolves when tools are refreshed.
+   * @throws If the client is not in the 'ready' state.
+   */
+  listTools: () => Promise<void>;
   /**
    * Function to list resources from the MCP server.
    * @returns A promise that resolves when resources are refreshed.

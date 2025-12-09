@@ -52,6 +52,7 @@ export function LayoutContent({
           readResource={selectedServer.readResource}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
+          refreshTools={selectedServer.refreshTools}
         />
       </div>
       <div
@@ -64,6 +65,7 @@ export function LayoutContent({
           callPrompt={selectedServer.getPrompt}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
+          refreshPrompts={selectedServer.refreshPrompts}
         />
       </div>
       <div
@@ -76,6 +78,7 @@ export function LayoutContent({
           readResource={selectedServer.readResource}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
+          refreshResources={selectedServer.refreshResources}
         />
       </div>
       <div
