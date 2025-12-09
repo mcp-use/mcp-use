@@ -93,15 +93,10 @@ export function ServerConnectionModal({
     try {
       const parsedUrl = new URL(url.trim());
       const isValid =
-        parsedUrl.protocol === "http:" ||
-        parsedUrl.protocol === "https:" ||
-        parsedUrl.protocol === "ws:" ||
-        parsedUrl.protocol === "wss:";
+        parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 
       if (!isValid) {
-        toast.error(
-          "Invalid URL protocol. Please use http://, https://, ws://, or wss://"
-        );
+        toast.error("Invalid URL protocol. Please use http:// or https://");
         return;
       }
     } catch (error) {
@@ -138,7 +133,6 @@ export function ServerConnectionModal({
 
     // Map UI transport type to actual transport type
     // "SSE" in UI means "Streamable HTTP" which uses 'http' transport
-    // "WebSocket" in UI means "WebSocket" which uses 'sse' transport
     const actualTransportType = transportType === "SSE" ? "http" : "sse";
 
     onConnect({

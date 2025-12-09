@@ -99,6 +99,23 @@ export class MCPSession {
   }
 
   /**
+   * List all available tools from the MCP server.
+   * This method fetches fresh tools from the server, unlike the `tools` getter which returns cached tools.
+   *
+   * @param options - Optional request options
+   * @returns Array of available tools
+   *
+   * @example
+   * ```typescript
+   * const tools = await session.listTools();
+   * console.log(`Available tools: ${tools.map(t => t.name).join(", ")}`);
+   * ```
+   */
+  async listTools(options?: RequestOptions): Promise<Tool[]> {
+    return this.connector.listTools(options);
+  }
+
+  /**
    * Get the server capabilities advertised during initialization.
    *
    * @returns Server capabilities object
