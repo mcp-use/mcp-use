@@ -65,8 +65,7 @@ class ConnectServerTool(MCPServerTool):
             num_tools = len(server_tools)
 
             return (
-                f"Connected to MCP server '{server_name}'. "
-                f"{num_tools} tools, resources, and prompts are now available."
+                f"Connected to MCP server '{server_name}'. {num_tools} tools, resources, and prompts are now available."
             )
 
         except Exception as e:
