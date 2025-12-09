@@ -6,6 +6,14 @@ from datetime import datetime
 from functools import partial
 from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
 
+from mcp.types import (
+    CallToolRequestParams,
+    GetPromptRequestParams,
+    InitializeRequestParams,
+    PaginatedRequestParams,
+    ReadResourceRequestParams,
+)
+
 T = TypeVar("T")
 R = TypeVar("R")
 
@@ -73,25 +81,53 @@ class Middleware:
     async def on_request(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
         return await call_next(context)
 
-    async def on_initialize(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+    async def on_initialize(
+        self,
+        context: ServerMiddlewareContext[InitializeRequestParams],
+        call_next: CallNext[InitializeRequestParams, Any],
+    ) -> Any:
         return await call_next(context)
 
-    async def on_call_tool(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+    async def on_call_tool(
+        self,
+        context: ServerMiddlewareContext[CallToolRequestParams],
+        call_next: CallNext[CallToolRequestParams, Any],
+    ) -> Any:
         return await call_next(context)
 
-    async def on_read_resource(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+    async def on_read_resource(
+        self,
+        context: ServerMiddlewareContext[ReadResourceRequestParams],
+        call_next: CallNext[ReadResourceRequestParams, Any],
+    ) -> Any:
         return await call_next(context)
 
-    async def on_get_prompt(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+    async def on_get_prompt(
+        self,
+        context: ServerMiddlewareContext[GetPromptRequestParams],
+        call_next: CallNext[GetPromptRequestParams, Any],
+    ) -> Any:
         return await call_next(context)
 
-    async def on_list_tools(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+    async def on_list_tools(
+        self,
+        context: ServerMiddlewareContext[PaginatedRequestParams | None],
+        call_next: CallNext[PaginatedRequestParams | None, Any],
+    ) -> Any:
         return await call_next(context)
 
-    async def on_list_resources(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+    async def on_list_resources(
+        self,
+        context: ServerMiddlewareContext[PaginatedRequestParams | None],
+        call_next: CallNext[PaginatedRequestParams | None, Any],
+    ) -> Any:
         return await call_next(context)
 
-    async def on_list_prompts(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+    async def on_list_prompts(
+        self,
+        context: ServerMiddlewareContext[PaginatedRequestParams | None],
+        call_next: CallNext[PaginatedRequestParams | None, Any],
+    ) -> Any:
         return await call_next(context)
 
 
