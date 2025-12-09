@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.10.1-canary.1
+
+### Patch Changes
+
+- 2bb2278: fix: allow agent to access resources and prompts
+  - @mcp-use/cli@2.5.1-canary.1
+  - @mcp-use/inspector@0.12.1-canary.1
+
 ## 1.10.1-canary.0
 
 ### Patch Changes
