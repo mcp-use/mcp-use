@@ -9,7 +9,8 @@
   "homepage": "https://github.com/mcp-use/mcp-use#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcp-use/mcp-use.git"
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/mcp-use"
   },
   "bugs": {
     "url": "https://github.com/mcp-use/mcp-use/issues"
