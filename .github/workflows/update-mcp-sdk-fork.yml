@@ -9,7 +9,7 @@ on:
 
 jobs:
   update-mcp-sdk:
-    name: Check and Update @modelcontextprotocol/sdk Fork
+    name: Check and Update @mcp-use/modelcontextprotocol-sdk Fork
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -36,9 +36,8 @@ jobs:
       - name: Check for new version
         id: check-version
         run: |
-          # Get current version from package.json (extract from git URL)
-          CURRENT_GIT_URL=$(node -p "require('./libraries/typescript/packages/mcp-use/package.json').dependencies['@modelcontextprotocol/sdk']")
-          CURRENT_VERSION=$(echo "$CURRENT_GIT_URL" | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+-mcp-use\.[0-9]+' || echo "unknown")
+          # Get current version from package.json
+          CURRENT_VERSION=$(node -p "require('./libraries/typescript/packages/mcp-use/package.json').dependencies['@mcp-use/modelcontextprotocol-sdk']")
           echo "Current version: $CURRENT_VERSION"
           
           # Fetch latest version from fork's GitHub tags
@@ -88,15 +87,14 @@ jobs:
       - name: Update package files
         if: steps.check-version.outputs.should_update == 'true'
         run: |
-          LATEST_TAG="${{ steps.check-version.outputs.latest_tag }}"
-          GIT_URL="git+https://github.com/mcp-use/mcp-ts-sdk-fork.git#${LATEST_TAG}"
+          LATEST_VERSION="${{ steps.check-version.outputs.latest_version }}"
           
           # Update mcp-use package.json
           node -e "
           const fs = require('fs');
           const path = './libraries/typescript/packages/mcp-use/package.json';
           const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-          pkg.dependencies['@modelcontextprotocol/sdk'] = '$GIT_URL';
+          pkg.dependencies['@mcp-use/modelcontextprotocol-sdk'] = '$LATEST_VERSION';
           fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
           "
           
@@ -105,17 +103,16 @@ jobs:
           const fs = require('fs');
           const path = './libraries/typescript/packages/inspector/package.json';
           const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-          pkg.dependencies['@modelcontextprotocol/sdk'] = '$GIT_URL';
+          pkg.dependencies['@mcp-use/modelcontextprotocol-sdk'] = '$LATEST_VERSION';
           fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
           "
           
           # Update deno.json
-          DENO_URL="https://raw.githubusercontent.com/mcp-use/mcp-ts-sdk-fork/${LATEST_TAG}/src/index.ts"
           node -e "
           const fs = require('fs');
           const path = './libraries/typescript/packages/mcp-use/tests/deno/deno.json';
           const config = JSON.parse(fs.readFileSync(path, 'utf8'));
-          config.imports['@modelcontextprotocol/sdk'] = '$DENO_URL';
+          config.imports['@mcp-use/modelcontextprotocol-sdk'] = 'npm:@mcp-use/modelcontextprotocol-sdk@^$LATEST_VERSION';
           fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
           "
           
@@ -136,9 +133,9 @@ jobs:
           "@mcp-use/inspector": patch
           ---
           
-          chore(deps): update @modelcontextprotocol/sdk fork to ${LATEST_VERSION}
+          chore(deps): update @mcp-use/modelcontextprotocol-sdk to ${LATEST_VERSION}
           
-          Updated @modelcontextprotocol/sdk dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}.
+          Updated @mcp-use/modelcontextprotocol-sdk dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}.
           This uses the mcp-use fork with edge runtime support.
           EOF
           
@@ -176,7 +173,7 @@ jobs:
           git add libraries/typescript/.changeset/*.md
           
           # Commit changes
-          git commit -m "chore(deps): update @modelcontextprotocol/sdk fork to ${LATEST_VERSION}"
+          git commit -m "chore(deps): update @mcp-use/modelcontextprotocol-sdk to ${LATEST_VERSION}"
           
           # Push branch
           git push origin "$BRANCH_NAME"
@@ -184,7 +181,7 @@ jobs:
           # Create PR body
           PR_BODY="## 🔄 Dependency Update
 
-          This PR updates the \`@modelcontextprotocol/sdk\` fork from \`${CURRENT_VERSION}\` to \`${LATEST_VERSION}\`.
+          This PR updates the \`@mcp-use/modelcontextprotocol-sdk\` from \`${CURRENT_VERSION}\` to \`${LATEST_VERSION}\`.
 
           ### 📦 Changes
 
@@ -222,7 +219,7 @@ jobs:
           gh pr create \
             --base canary \
             --head "$BRANCH_NAME" \
-            --title "chore(deps): update @modelcontextprotocol/sdk fork to ${LATEST_VERSION}" \
+            --title "chore(deps): update @mcp-use/modelcontextprotocol-sdk to ${LATEST_VERSION}" \
             --body "$PR_BODY"
           
           echo "✅ Created Pull Request: $BRANCH_NAME → canary"
