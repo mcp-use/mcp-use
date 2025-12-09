@@ -1,0 +1,46 @@
+name: TypeScript PR Preview
+
+on:
+  pull_request:
+    branches:
+      - main
+      - canary
+    paths:
+      - "libraries/typescript/**"
+      - ".github/workflows/typescript-pr-preview.yml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    name: Publish PR Preview
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
+
+      - name: Publish Preview Packages
+        run: pnpm dlx pkg-pr-new publish './packages/*'

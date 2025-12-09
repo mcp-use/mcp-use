@@ -256,7 +256,8 @@ export abstract class BaseAdapter<T> {
   ): Promise<T[]> {
     const resources: T[] = [];
     for (const connector of connectors) {
-      const connectorResources = await this.loadResourcesForConnector(connector);
+      const connectorResources =
+        await this.loadResourcesForConnector(connector);
       resources.push(...connectorResources);
     }
 

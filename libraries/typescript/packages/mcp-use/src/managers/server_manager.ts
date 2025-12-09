@@ -142,8 +142,12 @@ export class ServerManager implements IServerManager {
 
           try {
             tools = await this.adapter.createToolsFromConnectors([connector]);
-            resources = await this.adapter.createResourcesFromConnectors([connector]);
-            prompts = await this.adapter.createPromptsFromConnectors([connector]);
+            resources = await this.adapter.createResourcesFromConnectors([
+              connector,
+            ]);
+            prompts = await this.adapter.createPromptsFromConnectors([
+              connector,
+            ]);
           } catch (toolFetchError) {
             logger.error(
               `Failed to create tools/resources/prompts from connector for server '${serverName}': ${toolFetchError}`

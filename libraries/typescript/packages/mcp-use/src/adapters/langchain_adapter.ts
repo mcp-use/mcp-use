@@ -79,10 +79,15 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     connector: BaseConnector
   ): StructuredToolInterface | null {
     const sanitizeName = (name: string): string => {
-      return name.replace(/[^A-Za-z0-9_]+/g, "_").toLowerCase().replace(/^_+|_+$/g, "");
+      return name
+        .replace(/[^A-Za-z0-9_]+/g, "_")
+        .toLowerCase()
+        .replace(/^_+|_+$/g, "");
     };
 
-    const resourceName = sanitizeName(mcpResource.name || `resource_${mcpResource.uri}`);
+    const resourceName = sanitizeName(
+      mcpResource.name || `resource_${mcpResource.uri}`
+    );
     const resourceUri = mcpResource.uri;
 
     const tool = new DynamicStructuredTool({
@@ -137,13 +142,9 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     if (mcpPrompt.arguments && mcpPrompt.arguments.length > 0) {
       const schemaFields: Record<string, ZodTypeAny> = {};
       for (const arg of mcpPrompt.arguments) {
-        let zodType: ZodTypeAny = z.string();
-        // Map MCP argument types to Zod types
-        if (arg.type === "number") {
-          zodType = z.number();
-        } else if (arg.type === "boolean") {
-          zodType = z.boolean();
-        }
+        // All arguments default to string type since type is not available in Prompt definition
+        // (Note: MCP spec includes type, but SDK TypeScript types don't)
+        const zodType: ZodTypeAny = z.string();
 
         if (arg.required !== false) {
           schemaFields[arg.name] = zodType;
@@ -151,7 +152,10 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
           schemaFields[arg.name] = zodType.optional();
         }
       }
-      argsSchema = Object.keys(schemaFields).length > 0 ? z.object(schemaFields) : z.object({}).optional();
+      argsSchema =
+        Object.keys(schemaFields).length > 0
+          ? z.object(schemaFields)
+          : z.object({}).optional();
     }
 
     const tool = new DynamicStructuredTool({
@@ -159,7 +163,9 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
       description: mcpPrompt.description || "",
       schema: argsSchema,
       func: async (input: Record<string, any>): Promise<string> => {
-        logger.debug(`Prompt tool: "${mcpPrompt.name}" called with args: ${JSON.stringify(input)}`);
+        logger.debug(
+          `Prompt tool: "${mcpPrompt.name}" called with args: ${JSON.stringify(input)}`
+        );
         try {
           const result = await connector.getPrompt(mcpPrompt.name, input);
           if (result.messages && result.messages.length > 0) {
@@ -169,7 +175,9 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
                   return msg;
                 }
                 if (msg.content) {
-                  return typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+                  return typeof msg.content === "string"
+                    ? msg.content
+                    : JSON.stringify(msg.content);
                 }
                 return JSON.stringify(msg);
               })

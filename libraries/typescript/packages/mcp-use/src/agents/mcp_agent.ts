@@ -340,9 +340,15 @@ export class MCPAgent {
         }
 
         // Create LangChain tools, resources, and prompts using the adapter with connectors
-        const tools = await this.adapter.createToolsFromConnectors(this.connectors);
-        const resources = await this.adapter.createResourcesFromConnectors(this.connectors);
-        const prompts = await this.adapter.createPromptsFromConnectors(this.connectors);
+        const tools = await this.adapter.createToolsFromConnectors(
+          this.connectors
+        );
+        const resources = await this.adapter.createResourcesFromConnectors(
+          this.connectors
+        );
+        const prompts = await this.adapter.createPromptsFromConnectors(
+          this.connectors
+        );
         this._tools = [...tools, ...resources, ...prompts];
         this._tools.push(...this.additionalTools);
         logger.info(
