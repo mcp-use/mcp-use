@@ -102,8 +102,20 @@ class BaseAdapter(ABC):
     async def create_all(self, client: MCPClient) -> None:
         """Create tools, resources, and prompts from an MCPClient instance."""
         await self.create_tools(client)
-        await self.create_resources(client)
-        await self.create_prompts(client)
+        try:
+            await self.create_resources(client)
+        except Exception as e:
+            logger.warning(f"Failed to create resources: {e}")
+            self.resources = []
+        try:
+            await self.create_prompts(client)
+        except Exception as e:
+            logger.warning(f"Failed to create prompts: {e}")
+            self.prompts = []
+        logger.debug(
+            f"Adapter create_all completed: {len(self.tools)} tools, "
+            f"{len(self.resources)} resources, {len(self.prompts)} prompts"
+        )
 
     async def create_tools(self, client: MCPClient) -> list[T]:
         """Create tools from the MCPClient instance.
