@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "packageManager": "pnpm@10.6.1",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents, Clients and Servers with support for ChatGPT Apps, Code Mode, OAuth, Notifications, Sampling, Observability and more.",
   "author": "mcp-use, Inc.",
@@ -73,7 +73,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "generate:version": "node scripts/generate-version.mjs",
+    "build": "npm run generate:version && rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",
     "test:unit": "vitest run --exclude tests/integration/**",
@@ -119,7 +120,7 @@
     "example:server:sampling": "tsx examples/server/sampling/src/server.ts",
     "example:client:sampling": "tsx examples/client/sampling-client.ts",
     "example:server:elicitation": "tsx examples/server/elicitation/src/server.ts",
-    "example:sampling": "lsof -ti:3001 | xargs kill -9 2>/dev/null; tsx examples/server/sampling/src/server.ts & sleep 3 && tsx examples/client/sampling-client.ts",
+    "example:sampling": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/sampling/src/server.ts & sleep 3 && tsx examples/client/sampling-client.ts",
     "example:server:oauth:supabase": "tsx examples/server/oauth/supabase/src/server.ts",
     "example:client:oauth:auth0": "tsx examples/server/oauth/auth0/src/server.ts",
     "example:client:oauth:workos": "tsx examples/server/oauth/workos/src/server.ts",
@@ -161,10 +162,12 @@
     "@mcp-ui/server": "^5.15.0",
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
-    "@modelcontextprotocol/sdk": "https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194",
+    "@mcp-use/modelcontextprotocol-sdk": "1.24.3-mcp-use.1",
+    "express": "^5.2.0",
     "hono": "^4.10.7",
     "jose": "^6.1.2",
     "langchain": "^1.1.1",
+    "posthog-js": "^1.302.2",
     "posthog-node": "^5.14.1",
     "ws": "^8.18.3",
     "zod": "^4.1.13"

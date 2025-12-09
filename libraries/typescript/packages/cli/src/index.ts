@@ -384,10 +384,39 @@ if (container && Component) {
       await fs.mkdir(metadataTempDir, { recursive: true });
 
       const { createServer } = await import("vite");
+
+      // Plugin to provide browser stubs for Node.js-only packages
+      const nodeStubsPlugin = {
+        name: "node-stubs",
+        enforce: "pre" as const,
+        resolveId(id: string) {
+          if (id === "posthog-node" || id.startsWith("posthog-node/")) {
+            return "\0virtual:posthog-node-stub";
+          }
+          return null;
+        },
+        load(id: string) {
+          if (id === "\0virtual:posthog-node-stub") {
+            return `
+export class PostHog {
+  constructor() {}
+  capture() {}
+  identify() {}
+  alias() {}
+  flush() { return Promise.resolve(); }
+  shutdown() { return Promise.resolve(); }
+}
+export default PostHog;
+`;
+          }
+          return null;
+        },
+      };
+
       const metadataServer = await createServer({
         root: metadataTempDir,
         cacheDir: path.join(metadataTempDir, ".vite-cache"),
-        plugins: [tailwindcss(), react()],
+        plugins: [nodeStubsPlugin, tailwindcss(), react()],
         resolve: {
           alias: {
             "@": resourcesDir,
@@ -396,9 +425,15 @@ if (container && Component) {
         server: {
           middlewareMode: true,
         },
+        optimizeDeps: {
+          // Exclude Node.js-only packages from browser bundling
+          exclude: ["posthog-node"],
+        },
         ssr: {
           // Force Vite to transform these packages in SSR instead of using external requires
           noExternal: ["@openai/apps-sdk-ui", "react-router"],
+          // Mark Node.js-only packages as external in SSR mode
+          external: ["posthog-node"],
         },
         define: {
           // Define process.env for SSR context

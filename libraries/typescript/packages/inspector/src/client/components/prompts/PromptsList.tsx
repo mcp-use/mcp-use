@@ -1,4 +1,4 @@
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { MessageSquare } from "lucide-react";
 import { ListItem } from "@/client/components/shared";
 import { Badge } from "@/client/components/ui/badge";

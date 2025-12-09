@@ -4,7 +4,7 @@ import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { Textarea } from "@/client/components/ui/textarea";
 import { Checkbox } from "@/client/components/ui/checkbox";
-import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ElicitResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { PendingElicitationRequest } from "@/client/types/elicitation";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import { toast } from "sonner";

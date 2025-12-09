@@ -1,9 +1,20 @@
 export {
+  MCPServer,
   createMCPServer,
   type McpServerInstance,
-  type ToolContext,
-  type SampleOptions,
 } from "./mcp-server.js";
+
+// Export version information (global)
+export { getPackageVersion, VERSION } from "../version.js";
+
+// Re-export tool context types
+export type {
+  ToolContext,
+  SampleOptions,
+  ElicitOptions,
+  ElicitFormParams,
+  ElicitUrlParams,
+} from "./types/tool-context.js";
 
 export * from "./types/index.js";
 
@@ -14,7 +25,7 @@ export {
   hasRequestContext,
 } from "./context-storage.js";
 
-// Response helper utilities for tool results
+// Response helper utilities for tools and resources
 export {
   text,
   image,
@@ -23,6 +34,15 @@ export {
   object,
   array,
   widget,
+  mix,
+  audio,
+  // MIME-specific helpers for resources
+  html,
+  markdown,
+  xml,
+  css,
+  javascript,
+  binary,
   type WidgetResponseConfig,
   type TypedCallToolResult,
 } from "./utils/response-helpers.js";
@@ -57,7 +77,7 @@ export {
   createRemoteDomResource,
   createUIResourceFromDefinition,
   type UrlConfig,
-} from "./adapters/mcp-ui-adapter.js";
+} from "./widgets/mcp-ui-adapter.js";
 
 // Middleware adapter utility functions
 export {
@@ -86,4 +106,8 @@ export type {
   WidgetConfig,
   WidgetManifest,
   WidgetProps,
+  // MCP SDK type re-exports
+  ToolAnnotations,
+  GetPromptResult,
+  PromptResult,
 } from "./types/index.js";

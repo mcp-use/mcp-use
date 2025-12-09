@@ -12,12 +12,7 @@
  * - MCP_USE_OAUTH_WORKOS_API_KEY (optional, but needed for API calls)
  */
 
-import {
-  createMCPServer,
-  oauthWorkOSProvider,
-  error,
-  object,
-} from "mcp-use/server";
+import { MCPServer, oauthWorkOSProvider, error, object } from "mcp-use/server";
 
 declare const process: { env: Record<string, string> };
 
@@ -31,7 +26,8 @@ if (!WORKOS_API_KEY) {
 }
 
 // Create MCP server with OAuth auto-configured from environment variables!
-const server = createMCPServer("workos-oauth-example", {
+const server = new MCPServer({
+  name: "workos-oauth-example",
   version: "1.0.0",
   description: "MCP server with WorkOS AuthKit OAuth authentication",
   // 🎉 Zero-config! OAuth is fully configured via MCP_USE_OAUTH_* environment variables

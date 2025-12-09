@@ -13,7 +13,7 @@ import {
 import type {
   CreateMessageResult,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { PendingSamplingRequest } from "@/client/types/sampling";
 import type { PendingElicitationRequest } from "@/client/types/elicitation";
 import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";

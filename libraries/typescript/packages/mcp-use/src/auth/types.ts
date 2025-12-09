@@ -1,4 +1,4 @@
-import type { OAuthMetadata } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { OAuthMetadata } from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
 
 /**
  * Internal type for storing OAuth state in localStorage during the OAuth flow.

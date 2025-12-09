@@ -55,9 +55,10 @@ my-apps-sdk-server/
 Let's examine the server entry point (`index.ts`):
 
 ```typescript
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 
-const server = createMCPServer("my-apps-sdk-server", {
+const server = new MCPServer({
+  name: "my-apps-sdk-server",
   version: "1.0.0",
   description: "MCP server with OpenAI Apps SDK integration",
   // Optional: Set baseUrl for production CSP configuration
@@ -353,7 +354,9 @@ The build process:
 When `baseUrl` is set, CSP is automatically configured:
 
 ```typescript
-const server = createMCPServer("my-server", {
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
   baseUrl: process.env.MCP_URL, // Required for production
 });
 ```
@@ -500,7 +503,6 @@ appsSdkMetadata: {
 ## Next Steps
 
 - [UI Widgets Overview](./ui-widgets) - Deep dive into automatic widget registration
-- [Apps SDK Resources](./apps-sdk-resources) - Apps SDK primitives and metadata
 - [Project Templates](./templates) - Explore available templates
 - [Deployment Guide](./deployment-mcp-use) - Deploy your server to production
 
@@ -509,9 +511,10 @@ appsSdkMetadata: {
 Here's a complete example combining everything:
 
 ```typescript
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 
-const server = createMCPServer("weather-app", {
+const server = new MCPServer({
+  name: "weather-app",
   version: "1.0.0",
   description: "Weather app with interactive widgets",
   baseUrl: process.env.MCP_URL || "http://localhost:3000",

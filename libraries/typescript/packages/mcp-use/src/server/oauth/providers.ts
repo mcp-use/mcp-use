@@ -78,14 +78,18 @@ export interface CustomProviderConfig {
  *
  * @example Zero-config with environment variables
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthSupabaseProvider()
  * });
  * ```
  *
  * @example With explicit configuration
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthSupabaseProvider({
  *     projectId: 'my-project',
  *     jwtSecret: process.env.SUPABASE_JWT_SECRET
@@ -128,14 +132,18 @@ export function oauthSupabaseProvider(
  *
  * @example Zero-config with environment variables
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthAuth0Provider()
  * });
  * ```
  *
  * @example With explicit configuration
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthAuth0Provider({
  *     domain: 'my-tenant.auth0.com',
  *     audience: 'https://my-api.com'
@@ -184,14 +192,18 @@ export function oauthAuth0Provider(
  *
  * @example Zero-config with environment variables
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthKeycloakProvider()
  * });
  * ```
  *
  * @example With explicit configuration
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthKeycloakProvider({
  *     serverUrl: 'https://keycloak.example.com',
  *     realm: 'my-realm',
@@ -257,7 +269,9 @@ export function oauthKeycloakProvider(
  *
  * @example Dynamic Client Registration (recommended)
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthWorkOSProvider({
  *     subdomain: 'my-company'
  *   })
@@ -266,7 +280,9 @@ export function oauthKeycloakProvider(
  *
  * @example Pre-registered OAuth Client
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthWorkOSProvider({
  *     subdomain: 'my-company',
  *     clientId: 'client_01KB5DRXBDDY1VGCBKY108SKJW'
@@ -326,7 +342,9 @@ export function oauthWorkOSProvider(
  *
  * @example
  * ```typescript
- * const server = createMCPServer('my-server', {
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
  *   oauth: oauthCustomProvider({
  *     issuer: 'https://oauth.example.com',
  *     jwksUrl: 'https://oauth.example.com/.well-known/jwks.json',
