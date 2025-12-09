@@ -170,7 +170,8 @@
     "posthog-js": "^1.302.2",
     "posthog-node": "^5.14.1",
     "ws": "^8.18.3",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "@modelcontextprotocol/sdk": "git+https://github.com/mcp-use/mcp-ts-sdk-fork.git#v1.24.3-mcp-use.1"
   },
   "optionalDependencies": {
     "chalk": "^5.6.2",

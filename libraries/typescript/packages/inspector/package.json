@@ -105,7 +105,8 @@
     "react-syntax-highlighter": "^16.1.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "vite-express": "^0.21.1"
+    "vite-express": "^0.21.1",
+    "@modelcontextprotocol/sdk": "git+https://github.com/mcp-use/mcp-ts-sdk-fork.git#v1.24.3-mcp-use.1"
   },
   "publishConfig": {
     "access": "public"

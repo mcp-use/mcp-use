@@ -381,6 +381,9 @@ importers:
       '@mcp-use/modelcontextprotocol-sdk':
         specifier: 1.24.3-mcp-use.1
         version: 1.24.3-mcp-use.1(@cfworker/json-schema@4.1.1)(zod@4.1.13)
+      '@modelcontextprotocol/sdk':
+        specifier: git+https://github.com/mcp-use/mcp-ts-sdk-fork.git#v1.24.3-mcp-use.1
+        version: https://codeload.github.com/mcp-use/mcp-ts-sdk-fork/tar.gz/d549cacdb44f56a77f126984c53ace885c002ce6(@cfworker/json-schema@4.1.1)(zod@4.1.13)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -559,6 +562,9 @@ importers:
       '@mcp-use/modelcontextprotocol-sdk':
         specifier: 1.24.3-mcp-use.1
         version: 1.24.3-mcp-use.1(@cfworker/json-schema@4.1.1)(zod@4.1.13)
+      '@modelcontextprotocol/sdk':
+        specifier: git+https://github.com/mcp-use/mcp-ts-sdk-fork.git#v1.24.3-mcp-use.1
+        version: https://codeload.github.com/mcp-use/mcp-ts-sdk-fork/tar.gz/d549cacdb44f56a77f126984c53ace885c002ce6(@cfworker/json-schema@4.1.1)(zod@4.1.13)
       express:
         specifier: ^5.2.0
         version: 5.2.1
@@ -1644,6 +1650,17 @@ packages:
 
   '@modelcontextprotocol/sdk@1.23.0':
     resolution: {integrity: sha512-MCGd4K9aZKvuSqdoBkdMvZNcYXCkZRYVs/Gh92mdV5IHbctX9H9uIvd4X93+9g8tBbXv08sxc/QHXTzf8y65bA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@cfworker/json-schema': ^4.1.1
+      zod: ^4.1.13
+    peerDependenciesMeta:
+      '@cfworker/json-schema':
+        optional: true
+
+  '@modelcontextprotocol/sdk@https://codeload.github.com/mcp-use/mcp-ts-sdk-fork/tar.gz/d549cacdb44f56a77f126984c53ace885c002ce6':
+    resolution: {tarball: https://codeload.github.com/mcp-use/mcp-ts-sdk-fork/tar.gz/d549cacdb44f56a77f126984c53ace885c002ce6}
+    version: 1.24.3-mcp-use.1
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -8165,6 +8182,28 @@ snapshots:
       express-rate-limit: 7.5.1(express@5.2.1)
       pkce-challenge: 5.0.0
       raw-body: 3.0.1
+      zod: 4.1.13
+      zod-to-json-schema: 3.25.0(zod@4.1.13)
+    optionalDependencies:
+      '@cfworker/json-schema': 4.1.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@modelcontextprotocol/sdk@https://codeload.github.com/mcp-use/mcp-ts-sdk-fork/tar.gz/d549cacdb44f56a77f126984c53ace885c002ce6(@cfworker/json-schema@4.1.1)(zod@4.1.13)':
+    dependencies:
+      ajv: 8.17.1
+      ajv-formats: 3.0.1(ajv@8.17.1)
+      content-type: 1.0.5
+      cors: 2.8.5
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.0.6
+      express: 5.2.1
+      express-rate-limit: 7.5.1(express@5.2.1)
+      jose: 6.1.2
+      json-schema-typed: 8.0.2
+      pkce-challenge: 5.0.0
+      raw-body: 3.0.2
       zod: 4.1.13
       zod-to-json-schema: 3.25.0(zod@4.1.13)
     optionalDependencies:
