@@ -64,7 +64,10 @@ class ConnectServerTool(MCPServerTool):
             server_tools = self.server_manager._server_tools.get(server_name, [])
             num_tools = len(server_tools)
 
-            return f"Connected to MCP server '{server_name}'. {num_tools} tools, resources, and prompts are now available."
+            return (
+                f"Connected to MCP server '{server_name}'. "
+                f"{num_tools} tools, resources, and prompts are now available."
+            )
 
         except Exception as e:
             logger.error(f"Error connecting to server '{server_name}': {e}")

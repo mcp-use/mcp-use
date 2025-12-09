@@ -17,9 +17,6 @@ jobs:
   preview:
     name: Publish PR Preview
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: libraries/typescript
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -37,10 +34,12 @@ jobs:
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
 
       - name: Install Dependencies
+        working-directory: libraries/typescript
         run: pnpm install --no-frozen-lockfile
 
       - name: Build Packages
+        working-directory: libraries/typescript
         run: pnpm build
 
       - name: Publish Preview Packages
-        run: pnpm dlx pkg-pr-new publish './packages/*'
+        run: pnpm dlx pkg-pr-new publish './libraries/typescript/packages/*'
