@@ -9,7 +9,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mcp-use/mcp-use.git",
-    "directory": "packages/inspector"
+    "directory": "libraries/typescript/packages/inspector"
   },
   "bugs": {
     "url": "https://github.com/mcp-use/mcp-use/issues"
