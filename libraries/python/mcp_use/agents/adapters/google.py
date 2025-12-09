@@ -23,6 +23,8 @@ def _sanitize_for_tool_name(name: str) -> str:
 
 
 class GoogleMCPAdapter(BaseAdapter[types.FunctionDeclaration]):
+    framework = "google"
+
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new Google adapter.
 

@@ -29,6 +29,8 @@ from mcp_use.logging import logger
 class LangChainAdapter(BaseAdapter[BaseTool]):
     """Adapter for converting MCP tools to LangChain tools."""
 
+    framework = "langchain"
+
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new LangChain adapter.
 

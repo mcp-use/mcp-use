@@ -16,6 +16,8 @@ def _sanitize_for_tool_name(name: str) -> str:
 
 
 class OpenAIMCPAdapter(BaseAdapter[dict[str, Any]]):
+    framework = "openai"
+
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new OpenAI adapter.
 

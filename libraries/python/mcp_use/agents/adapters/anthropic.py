@@ -16,6 +16,8 @@ def _sanitize_for_tool_name(name: str) -> str:
 
 
 class AnthropicMCPAdapter(BaseAdapter[dict[str, Any]]):
+    framework = "anthropic"
+
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new Anthropic adapter.
 

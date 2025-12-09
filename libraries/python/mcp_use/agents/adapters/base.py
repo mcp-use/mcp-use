@@ -25,6 +25,8 @@ class BaseAdapter(Generic[T], ABC):
     should follow to ensure consistency across different frameworks.
     """
 
+    framework = "unknown"
+
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new adapter.
 
@@ -100,14 +102,14 @@ class BaseAdapter(Generic[T], ABC):
         sessions = client.get_all_active_sessions()
         return [session.connector for session in sessions.values()]
 
-    @telemetry("adapter_create_all")
+    @telemetry("adapter_create_all", {"framework": framework})
     async def create_all(self, client: MCPClient) -> None:
         """Create tools, resources, and prompts from an MCPClient instance."""
         await self.create_tools(client)
         await self.create_resources(client)
         await self.create_prompts(client)
 
-    @telemetry("adapter_create_tools")
+    @telemetry("adapter_create_tools", {"framework": framework})
     async def create_tools(self, client: MCPClient) -> list[T]:
         """Create tools from the MCPClient instance.
 
@@ -122,7 +124,7 @@ class BaseAdapter(Generic[T], ABC):
 
         return self.tools
 
-    @telemetry("adapter_create_resources")
+    @telemetry("adapter_create_resources", {"framework": framework})
     async def create_resources(self, client: MCPClient) -> list[T]:
         """Create resources from the MCPClient instance.
 
@@ -137,7 +139,7 @@ class BaseAdapter(Generic[T], ABC):
 
         return self.resources
 
-    @telemetry("adapter_create_prompts")
+    @telemetry("adapter_create_prompts", {"framework": framework})
     async def create_prompts(self, client: MCPClient) -> list[T]:
         """Create prompts from the MCPClient instance.
 
