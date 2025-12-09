@@ -42,6 +42,7 @@ export async function mountMcp(
     idleCleanupInterval = startIdleCleanup(
       sessions,
       idleTimeoutMs,
+      transports,
       mcpServerInstance
     );
   }
@@ -49,6 +50,14 @@ export async function mountMcp(
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
     const sessionId = c.req.header("mcp-session-id");
+
+    // Handle HEAD requests for keep-alive/health checks
+    if (c.req.method === "HEAD") {
+      if (sessionId && sessions.has(sessionId)) {
+        sessions.get(sessionId)!.lastAccessedAt = Date.now();
+      }
+      return new Response(null, { status: 200 });
+    }
 
     if (sessionId && transports.has(sessionId)) {
       // Reuse existing transport for this session
@@ -131,7 +140,7 @@ export async function mountMcp(
 
   // Mount the handler for all HTTP methods on both /mcp and /sse
   for (const endpoint of ["/mcp", "/sse"]) {
-    app.on(["GET", "POST", "DELETE"], endpoint, handleRequest);
+    app.on(["GET", "POST", "DELETE", "HEAD"], endpoint, handleRequest);
   }
 
   console.log(

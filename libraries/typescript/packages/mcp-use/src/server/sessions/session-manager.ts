@@ -43,16 +43,18 @@ export interface SessionData {
  * Start idle session cleanup interval
  *
  * Monitors sessions and removes them if they've been inactive for too long.
- * Note: This only cleans up our session metadata. The transport manages
- * its own session state.
+ * Also cleans up the associated transports to prevent "Server not initialized" errors
+ * when clients try to reconnect with expired session IDs.
  *
  * @param sessions - Map of active sessions
  * @param idleTimeoutMs - Idle timeout in milliseconds
+ * @param transports - Optional map of transports by session ID (to close on cleanup)
  * @param mcpServerInstance - Optional MCP server instance for cleanup callbacks
  */
 export function startIdleCleanup(
   sessions: Map<string, SessionData>,
   idleTimeoutMs: number,
+  transports?: Map<string, { close?: () => Promise<void> | void }>,
   mcpServerInstance?: {
     cleanupSessionSubscriptions?: (sessionId: string) => void;
   }
@@ -76,9 +78,24 @@ export function startIdleCleanup(
         `[MCP] Cleaning up ${expiredSessions.length} idle session(s)`
       );
       for (const sessionId of expiredSessions) {
+        // Close transport first to prevent "Server not initialized" errors on reconnect
+        const transport = transports?.get(sessionId);
+        if (transport?.close) {
+          Promise.resolve(transport.close()).catch((e) => {
+            console.warn(
+              `[MCP] Error closing transport for session ${sessionId}:`,
+              e
+            );
+          });
+        }
+        transports?.delete(sessionId);
+
         sessions.delete(sessionId);
         // Clean up resource subscriptions for this session if mcpServerInstance provided
         mcpServerInstance?.cleanupSessionSubscriptions?.(sessionId);
+        console.log(
+          `[MCP] Cleaned up resource subscriptions for session ${sessionId}`
+        );
       }
     }
   }, 60000); // Check every minute
