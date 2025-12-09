@@ -91,8 +91,18 @@ export class HttpConnector extends BaseConnector {
             "Server requires session ID (FastMCP compatibility) - using SSE transport";
           logger.warn(`⚠️  ${fallbackReason}`);
         } else if (streamableErr.code === 404 || streamableErr.code === 405) {
-          fallbackReason = `Server returned ${streamableErr.code} - server likely doesn't support streamable HTTP`;
-          logger.debug(fallbackReason);
+          // Check if this is an OPTIONS request failure (FastMCP compatibility issue)
+          const isOptionsError =
+            streamableErr.message?.includes("OPTIONS") ||
+            streamableErr.message?.toLowerCase().includes("method not allowed");
+          if (isOptionsError && streamableErr.code === 405) {
+            fallbackReason =
+              "Server doesn't support OPTIONS requests (FastMCP compatibility) - using SSE transport";
+            logger.warn(`⚠️  ${fallbackReason}`);
+          } else {
+            fallbackReason = `Server returned ${streamableErr.code} - server likely doesn't support streamable HTTP`;
+            logger.debug(fallbackReason);
+          }
         } else {
           fallbackReason = `Server returned ${streamableErr.code}: ${streamableErr.message}`;
           logger.debug(fallbackReason);
@@ -118,8 +128,19 @@ export class HttpConnector extends BaseConnector {
           errorStr.includes("405 Method Not Allowed") ||
           errorStr.includes("404 Not Found")
         ) {
-          fallbackReason = "Server doesn't support streamable HTTP (405/404)";
-          logger.debug(fallbackReason);
+          // Check if this is an OPTIONS request failure (FastMCP compatibility issue)
+          const isOptionsError =
+            errorStr.includes("OPTIONS") ||
+            errorMsg.includes("OPTIONS") ||
+            errorStr.toLowerCase().includes("method not allowed");
+          if (isOptionsError) {
+            fallbackReason =
+              "Server doesn't support OPTIONS requests (FastMCP compatibility) - using SSE transport";
+            logger.warn(`⚠️  ${fallbackReason}`);
+          } else {
+            fallbackReason = "Server doesn't support streamable HTTP (405/404)";
+            logger.debug(fallbackReason);
+          }
         } else {
           fallbackReason = `Streamable HTTP failed: ${err.message}`;
           logger.debug(fallbackReason);
@@ -260,6 +281,23 @@ export class HttpConnector extends BaseConnector {
             const wrappedError = new Error(
               `Session ID error: ${errMsg}. The SDK should automatically extract session ID from initialize response.`
             );
+            wrappedError.cause = connectErr;
+            throw wrappedError;
+          }
+          // Check for OPTIONS-related errors (FastMCP compatibility issue)
+          // These can occur as network errors when CORS preflight fails
+          if (
+            errMsg.includes("405") ||
+            errMsg.includes("Method Not Allowed") ||
+            (errMsg.includes("Failed to fetch") &&
+              this.headers &&
+              Object.keys(this.headers).length > 0)
+          ) {
+            // Wrap it to ensure outer catch detects it as a 405/OPTIONS error
+            const wrappedError = new Error(
+              `OPTIONS request failed (FastMCP compatibility): ${errMsg}`
+            ) as any;
+            wrappedError.code = 405;
             wrappedError.cause = connectErr;
             throw wrappedError;
           }
