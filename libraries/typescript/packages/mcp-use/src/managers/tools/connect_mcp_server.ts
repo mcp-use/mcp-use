@@ -43,17 +43,26 @@ export class ConnectMCPServerTool extends MCPServerTool<
         session = await this.manager.client.createSession(serverName);
       }
       this.manager.activeServer = serverName;
-      if (this.manager.serverTools[serverName]) {
+      if (!this.manager.serverTools[serverName]) {
         const connector: BaseConnector = session.connector;
         const tools: StructuredToolInterface[] =
           await this.manager.adapter.createToolsFromConnectors([connector]);
-        this.manager.serverTools[serverName] = tools;
+        const resources: StructuredToolInterface[] =
+          await this.manager.adapter.createResourcesFromConnectors([connector]);
+        const prompts: StructuredToolInterface[] =
+          await this.manager.adapter.createPromptsFromConnectors([connector]);
+        const allItems = [...tools, ...resources, ...prompts];
+        this.manager.serverTools[serverName] = allItems;
         this.manager.initializedServers[serverName] = true;
+        logger.debug(
+          `Loaded ${allItems.length} items for server '${serverName}': ` +
+            `${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
+        );
       }
       const serverTools: StructuredToolInterface[] =
         this.manager.serverTools[serverName] || [];
       const numTools: number = serverTools.length;
-      return `Connected to MCP server '${serverName}'. ${numTools} tools are now available.`;
+      return `Connected to MCP server '${serverName}'. ${numTools} tools, resources, and prompts are now available.`;
     } catch (error) {
       logger.error(
         `Error connecting to server '${serverName}': ${String(error)}`

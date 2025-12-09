@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "0.8.0",
+  "version": "0.8.1-canary.0",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
@@ -9,7 +9,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mcp-use/mcp-use.git",
-    "directory": "packages/create-mcp-use-app"
+    "directory": "libraries/typescript/packages/create-mcp-use-app"
   },
   "bugs": {
     "url": "https://github.com/mcp-use/mcp-use/issues"
