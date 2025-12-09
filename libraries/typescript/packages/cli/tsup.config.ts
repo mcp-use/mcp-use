@@ -7,6 +7,6 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  noExternal: ["chalk"],
+  noExternal: ["chalk", "open", "globby"],
   shims: true,
 });

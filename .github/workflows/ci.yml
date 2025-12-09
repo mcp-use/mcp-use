@@ -582,7 +582,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     name: typescript-lint (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -619,7 +619,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     name: typescript-build (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -654,7 +654,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -693,7 +693,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -724,7 +724,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     defaults:
       run:
         working-directory: libraries/typescript

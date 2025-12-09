@@ -12,7 +12,7 @@ While modern JavaScript and TypeScript projects use ESM (ES Modules), many exist
 
 ## Requirements
 
-- Node.js 18.0.0 or higher
+- Node.js 20.19.0 or higher
 - Optional: `OPENAI_API_KEY` environment variable for the agent example
 
 ## Usage
@@ -108,7 +108,7 @@ pnpm build
 
 ### Error: The engine "node" is incompatible
 
-Make sure you're using Node.js 18.0.0 or higher:
+Make sure you're using Node.js 20.19.0 or higher:
 
 ```bash
 node --version
