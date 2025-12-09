@@ -92,15 +92,19 @@ def __call__(context: ServerMiddlewareContext[T], call_next: CallNext[T, Any]):
 
 
 **Parameters**
-><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
-><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="context" type="ServerMiddlewareContext[CallToolRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[CallToolRequestParams, Any]" required="True" >   Parameter value </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Any" />
 
 **Signature**
 ```python wrap
-def on_call_tool(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+def on_call_tool(
+context: ServerMiddlewareContext[CallToolRequestParams],
+    call_next: CallNext[CallToolRequestParams,
+    Any]
+):
 ```
 
 </Card>
@@ -110,15 +114,19 @@ def on_call_tool(context: ServerMiddlewareContext[Any], call_next: CallNext[Any,
 
 
 **Parameters**
-><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
-><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="context" type="ServerMiddlewareContext[GetPromptRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[GetPromptRequestParams, Any]" required="True" >   Parameter value </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Any" />
 
 **Signature**
 ```python wrap
-def on_get_prompt(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+def on_get_prompt(
+context: ServerMiddlewareContext[GetPromptRequestParams],
+    call_next: CallNext[GetPromptRequestParams,
+    Any]
+):
 ```
 
 </Card>
@@ -128,15 +136,19 @@ def on_get_prompt(context: ServerMiddlewareContext[Any], call_next: CallNext[Any
 
 
 **Parameters**
-><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
-><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="context" type="ServerMiddlewareContext[InitializeRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[InitializeRequestParams, Any]" required="True" >   Parameter value </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Any" />
 
 **Signature**
 ```python wrap
-def on_initialize(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+def on_initialize(
+context: ServerMiddlewareContext[InitializeRequestParams],
+    call_next: CallNext[InitializeRequestParams,
+    Any]
+):
 ```
 
 </Card>
@@ -146,15 +158,19 @@ def on_initialize(context: ServerMiddlewareContext[Any], call_next: CallNext[Any
 
 
 **Parameters**
-><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
-><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="context" type="ServerMiddlewareContext[PaginatedRequestParams | None]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[PaginatedRequestParams | None, Any]" required="True" >   Parameter value </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Any" />
 
 **Signature**
 ```python wrap
-def on_list_prompts(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+def on_list_prompts(
+context: ServerMiddlewareContext[PaginatedRequestParams | None],
+    call_next: CallNext[PaginatedRequestParams | None,
+    Any]
+):
 ```
 
 </Card>
@@ -164,15 +180,19 @@ def on_list_prompts(context: ServerMiddlewareContext[Any], call_next: CallNext[A
 
 
 **Parameters**
-><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
-><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="context" type="ServerMiddlewareContext[PaginatedRequestParams | None]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[PaginatedRequestParams | None, Any]" required="True" >   Parameter value </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Any" />
 
 **Signature**
 ```python wrap
-def on_list_resources(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+def on_list_resources(
+context: ServerMiddlewareContext[PaginatedRequestParams | None],
+    call_next: CallNext[PaginatedRequestParams | None,
+    Any]
+):
 ```
 
 </Card>
@@ -182,15 +202,19 @@ def on_list_resources(context: ServerMiddlewareContext[Any], call_next: CallNext
 
 
 **Parameters**
-><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
-><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="context" type="ServerMiddlewareContext[PaginatedRequestParams | None]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[PaginatedRequestParams | None, Any]" required="True" >   Parameter value </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Any" />
 
 **Signature**
 ```python wrap
-def on_list_tools(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+def on_list_tools(
+context: ServerMiddlewareContext[PaginatedRequestParams | None],
+    call_next: CallNext[PaginatedRequestParams | None,
+    Any]
+):
 ```
 
 </Card>
@@ -200,15 +224,19 @@ def on_list_tools(context: ServerMiddlewareContext[Any], call_next: CallNext[Any
 
 
 **Parameters**
-><ParamField body="context" type="ServerMiddlewareContext[Any]" required="True" >   Parameter value </ParamField>
-><ParamField body="call_next" type="CallNext[Any, Any]" required="True" >   Parameter value </ParamField>
+><ParamField body="context" type="ServerMiddlewareContext[ReadResourceRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[ReadResourceRequestParams, Any]" required="True" >   Parameter value </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Any" />
 
 **Signature**
 ```python wrap
-def on_read_resource(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+def on_read_resource(
+context: ServerMiddlewareContext[ReadResourceRequestParams],
+    call_next: CallNext[ReadResourceRequestParams,
+    Any]
+):
 ```
 
 </Card>
