@@ -300,6 +300,7 @@ export class MCPAgent {
         if (this.client.codeMode) {
           const codeModeSession = this.sessions["code_mode"];
           if (codeModeSession) {
+            // Code mode only uses tools, not resources or prompts
             this._tools = await this.adapter.createToolsFromConnectors([
               codeModeSession.connector,
             ]);
@@ -310,9 +311,20 @@ export class MCPAgent {
             );
           }
         } else {
-          this._tools = await LangChainAdapter.createTools(this.client);
+          // Create tools, resources, and prompts from the client
+          const tools = await this.adapter.createToolsFromConnectors(
+            Object.values(this.sessions).map((session) => session.connector)
+          );
+          const resources = await this.adapter.createResourcesFromConnectors(
+            Object.values(this.sessions).map((session) => session.connector)
+          );
+          const prompts = await this.adapter.createPromptsFromConnectors(
+            Object.values(this.sessions).map((session) => session.connector)
+          );
+          this._tools = [...tools, ...resources, ...prompts];
           logger.info(
-            `🛠️ Created ${this._tools.length} LangChain tools from client`
+            `🛠️ Created ${this._tools.length} LangChain items from client: ` +
+              `${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
           );
         }
         this._tools.push(...this.additionalTools);
@@ -327,13 +339,15 @@ export class MCPAgent {
           }
         }
 
-        // Create LangChain tools using the adapter with connectors
-        this._tools = await this.adapter.createToolsFromConnectors(
-          this.connectors
-        );
+        // Create LangChain tools, resources, and prompts using the adapter with connectors
+        const tools = await this.adapter.createToolsFromConnectors(this.connectors);
+        const resources = await this.adapter.createResourcesFromConnectors(this.connectors);
+        const prompts = await this.adapter.createPromptsFromConnectors(this.connectors);
+        this._tools = [...tools, ...resources, ...prompts];
         this._tools.push(...this.additionalTools);
         logger.info(
-          `🛠️ Created ${this._tools.length} LangChain tools from connectors`
+          `🛠️ Created ${this._tools.length} LangChain items from connectors: ` +
+            `${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
         );
       }
 

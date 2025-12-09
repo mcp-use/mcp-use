@@ -119,6 +119,30 @@ export abstract class BaseAdapter<T> {
   ): T | null | undefined;
 
   /**
+   * Convert an MCP resource to the target framework's tool format.
+   *
+   * @param mcpResource The MCP resource definition to convert.
+   * @param connector    The connector that provides this resource.
+   * @returns            The converted resource as a tool, or null / undefined if no tool should be produced.
+   */
+  protected abstract convertResource?(
+    mcpResource: Record<string, any>,
+    connector: BaseConnector
+  ): T | null | undefined;
+
+  /**
+   * Convert an MCP prompt to the target framework's tool format.
+   *
+   * @param mcpPrompt The MCP prompt definition to convert.
+   * @param connector The connector that provides this prompt.
+   * @returns         The converted prompt as a tool, or null / undefined if no tool should be produced.
+   */
+  protected abstract convertPrompt?(
+    mcpPrompt: Record<string, any>,
+    connector: BaseConnector
+  ): T | null | undefined;
+
+  /**
    * Create tools from MCP tools in all provided connectors.
    *
    * @param connectors List of MCP connectors to create tools from.
@@ -135,6 +159,128 @@ export abstract class BaseAdapter<T> {
 
     logger.debug(`Available tools: ${tools.length}`);
     return tools;
+  }
+
+  /**
+   * Dynamically load resources for a specific connector.
+   *
+   * @param connector The connector to load resources for.
+   * @returns         The list of resources that were loaded in the target framework's format.
+   */
+  async loadResourcesForConnector(connector: BaseConnector): Promise<T[]> {
+    const connectorResources: T[] = [];
+
+    // Make sure the connector is initialized
+    const success = await this.ensureConnectorInitialized(connector);
+    if (!success) {
+      return [];
+    }
+
+    try {
+      // Get resources from connector
+      const resourcesResult = await connector.listAllResources();
+      const resources = resourcesResult?.resources || [];
+
+      // Convert and collect resources
+      if (this.convertResource) {
+        for (const resource of resources) {
+          const converted = this.convertResource(resource, connector);
+          if (converted) {
+            connectorResources.push(converted);
+          }
+        }
+      }
+
+      logger.debug(
+        `Loaded ${connectorResources.length} new resources for connector: ${connectorResources
+          .map((r: any) => r?.name ?? String(r))
+          .join(", ")}`
+      );
+    } catch (err) {
+      logger.warn(`Error loading resources for connector: ${err}`);
+    }
+
+    return connectorResources;
+  }
+
+  /**
+   * Dynamically load prompts for a specific connector.
+   *
+   * @param connector The connector to load prompts for.
+   * @returns         The list of prompts that were loaded in the target framework's format.
+   */
+  async loadPromptsForConnector(connector: BaseConnector): Promise<T[]> {
+    const connectorPrompts: T[] = [];
+
+    // Make sure the connector is initialized
+    const success = await this.ensureConnectorInitialized(connector);
+    if (!success) {
+      return [];
+    }
+
+    try {
+      // Get prompts from connector
+      const promptsResult = await connector.listPrompts();
+      const prompts = promptsResult?.prompts || [];
+
+      // Convert and collect prompts
+      if (this.convertPrompt) {
+        for (const prompt of prompts) {
+          const converted = this.convertPrompt(prompt, connector);
+          if (converted) {
+            connectorPrompts.push(converted);
+          }
+        }
+      }
+
+      logger.debug(
+        `Loaded ${connectorPrompts.length} new prompts for connector: ${connectorPrompts
+          .map((p: any) => p?.name ?? String(p))
+          .join(", ")}`
+      );
+    } catch (err) {
+      logger.warn(`Error loading prompts for connector: ${err}`);
+    }
+
+    return connectorPrompts;
+  }
+
+  /**
+   * Create resources from MCP resources in all provided connectors.
+   *
+   * @param connectors List of MCP connectors to create resources from.
+   * @returns         A promise that resolves with all converted resources.
+   */
+  public async createResourcesFromConnectors(
+    connectors: BaseConnector[]
+  ): Promise<T[]> {
+    const resources: T[] = [];
+    for (const connector of connectors) {
+      const connectorResources = await this.loadResourcesForConnector(connector);
+      resources.push(...connectorResources);
+    }
+
+    logger.debug(`Available resources: ${resources.length}`);
+    return resources;
+  }
+
+  /**
+   * Create prompts from MCP prompts in all provided connectors.
+   *
+   * @param connectors List of MCP connectors to create prompts from.
+   * @returns         A promise that resolves with all converted prompts.
+   */
+  public async createPromptsFromConnectors(
+    connectors: BaseConnector[]
+  ): Promise<T[]> {
+    const prompts: T[] = [];
+    for (const connector of connectors) {
+      const connectorPrompts = await this.loadPromptsForConnector(connector);
+      prompts.push(...connectorPrompts);
+    }
+
+    logger.debug(`Available prompts: ${prompts.length}`);
+    return prompts;
   }
 
   /**

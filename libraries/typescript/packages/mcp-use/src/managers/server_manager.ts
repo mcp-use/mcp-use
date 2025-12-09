@@ -137,24 +137,30 @@ export class ServerManager implements IServerManager {
         if (session) {
           const connector: BaseConnector = session.connector;
           let tools: StructuredToolInterface[] = [];
+          let resources: StructuredToolInterface[] = [];
+          let prompts: StructuredToolInterface[] = [];
 
           try {
             tools = await this.adapter.createToolsFromConnectors([connector]);
+            resources = await this.adapter.createResourcesFromConnectors([connector]);
+            prompts = await this.adapter.createPromptsFromConnectors([connector]);
           } catch (toolFetchError) {
             logger.error(
-              `Failed to create tools from connector for server '${serverName}': ${toolFetchError}`
+              `Failed to create tools/resources/prompts from connector for server '${serverName}': ${toolFetchError}`
             );
             continue;
           }
 
+          const allItems = [...tools, ...resources, ...prompts];
           const cachedTools = this.serverTools[serverName];
-          const toolsChanged = !cachedTools || !isEqual(cachedTools, tools);
+          const toolsChanged = !cachedTools || !isEqual(cachedTools, allItems);
 
           if (toolsChanged) {
-            this.serverTools[serverName] = tools;
+            this.serverTools[serverName] = allItems;
             this.initializedServers[serverName] = true;
             logger.debug(
-              `Prefetched ${tools.length} tools for server '${serverName}'.`
+              `Prefetched ${allItems.length} items for server '${serverName}': ` +
+                `${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts.`
             );
           } else {
             logger.debug(
