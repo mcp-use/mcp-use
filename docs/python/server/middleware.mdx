@@ -1,0 +1,63 @@
+---
+title: Middleware
+description: Add middleware to intercept and modify MCP requests
+icon: "layers"
+---
+
+Use middleware to run cross-cutting logic (logging, auth, rate limiting, validation, caching) around MCP requests.
+
+## Hooks (typed)
+
+- `on_request` (all requests)
+- `on_initialize`
+- `on_call_tool`
+- `on_read_resource`
+- `on_get_prompt`
+- `on_list_tools/resources/prompts`
+
+All hooks receive `ServerMiddlewareContext[...]` with typed `message`, `method`, `timestamp`, `transport`, `session_id`, `headers`, `client_ip`, `metadata`. Use `context.copy(...)` to enrich metadata.
+
+## Minimal middleware
+
+```python
+class LoggingMiddleware(Middleware):
+    async def on_request(self, context, call_next):
+        start = time.time()
+        print(f"→ {context.method}")
+        try:
+            result = await call_next(context)
+            print(f"← {context.method} ({(time.time()-start)*1000:.1f}ms)")
+            return result
+        except Exception:
+            print("✗ failed"); raise
+```
+
+## Common patterns
+
+- **Auth**: read `context.headers.get("x-api-key")`, raise on failure, stash auth info in `context.copy(metadata=...)`.
+- **Rate limit**: key by `context.session_id or "anonymous"`, track timestamps, reject when over limit.
+- **Validation**: inspect `context.message` (typed params) before calling `call_next`.
+- **Caching**: cache by resource URI (or by session) and TTL; on miss call `call_next` then store.
+
+## Sessions in middleware
+
+Session IDs come from the SDK via the `mcp-session-id` header; available as `context.session_id`. Use for per-session state, limits, caching. Spec: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
+
+```python
+class SessionTracking(Middleware):
+    def __init__(self): self.stats = defaultdict(int)
+    async def on_request(self, context, call_next):
+        sid = context.session_id or "anonymous"
+        self.stats[sid] += 1
+        return await call_next(context)
+```
+
+## Best practices
+
+- Order matters: metadata/logging first, auth early, validation before business logic.
+- Keep each middleware focused; use `context.metadata` to pass data.
+- Avoid blocking calls; handle errors with try/except and re-raise.
+
+## Reference
+
+See the full example: [libraries/python/examples/server/middleware_example.py](https://github.com/mcp-use/mcp-use/blob/main/libraries/python/examples/server/middleware_example.py).

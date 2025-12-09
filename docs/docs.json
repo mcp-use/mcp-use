@@ -118,7 +118,8 @@
                     "icon": "globe",
                     "pages": [
                       "python/server/compatibility",
-                      "python/server/running"
+                      "python/server/running",
+                      "python/server/sessions"
                     ]
                   },
                   {
@@ -133,6 +134,7 @@
                       "python/server/notifications"
                     ]
                   },
+                  "python/server/middleware",
                   "python/server/router",
                   "python/server/inspector",
                   "python/server/logging",

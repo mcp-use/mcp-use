@@ -243,12 +243,15 @@ class MCPServer(FastMCP):
             original = handlers[request_cls]
 
             async def wrapped(request: Any) -> ServerResult:
+                # Get session ID from HTTP headers if available
+                session_id = self._get_session_id_from_request()
+
                 context = ServerMiddlewareContext(
                     message=request.params,
                     method=method,
                     timestamp=datetime.now(UTC),
                     transport=self._transport_type,
-                    session_id=self._get_session_id(),
+                    session_id=session_id,
                 )
 
                 async def call_original(_: ServerMiddlewareContext[Any]) -> Any:
@@ -314,6 +317,7 @@ class MCPServer(FastMCP):
             return None
 
     def _get_session_id(self) -> str | None:
+        """Get session ID from the session object (deprecated - use _get_session_id_from_request)."""
         session = self._current_session()
         if session is None:
             return None
@@ -325,3 +329,24 @@ class MCPServer(FastMCP):
                 return session.id  # type: ignore[attr-defined]
             except AttributeError:
                 return None
+
+    def _get_session_id_from_request(self) -> str | None:
+        """Get session ID from HTTP request headers (for Streamable HTTP transport).
+
+        The session ID is managed at the transport layer and sent via the
+        mcp-session-id header according to the MCP specification.
+        """
+        request_context = self._get_request_context()
+        if request_context is None:
+            return None
+
+        # Try to get the HTTP request from context
+        request = getattr(request_context, "request", None)
+        if request is None:
+            return None
+
+        # Extract mcp-session-id header
+        try:
+            return request.headers.get("mcp-session-id")
+        except (AttributeError, KeyError):
+            return None
