@@ -381,7 +381,6 @@ class MCPClient:
 
         return {name: self.sessions[name] for name in self.active_sessions if name in self.sessions}
 
-    @telemetry("client_close_session")
     async def close_session(self, server_name: str) -> None:
         """Close a session.
 
@@ -414,7 +413,6 @@ class MCPClient:
             if server_name in self.active_sessions:
                 self.active_sessions.remove(server_name)
 
-    @telemetry("client_close_all_sessions")
     async def close_all_sessions(self) -> None:
         """Close all active sessions.
 

@@ -100,6 +100,7 @@ class BaseAdapter(Generic[T], ABC):
         sessions = client.get_all_active_sessions()
         return [session.connector for session in sessions.values()]
 
+    @telemetry("adapter_create_all")
     async def create_all(self, client: MCPClient) -> None:
         """Create tools, resources, and prompts from an MCPClient instance."""
         await self.create_tools(client)
@@ -151,7 +152,6 @@ class BaseAdapter(Generic[T], ABC):
 
         return self.prompts
 
-    @telemetry("adapter_load_tools")
     async def load_tools_for_connector(self, connector: BaseConnector) -> list[T]:
         """Dynamically load tools for a specific connector.
 
