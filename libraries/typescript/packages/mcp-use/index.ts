@@ -17,7 +17,6 @@ import { BaseConnector } from "./src/connectors/base.js";
 import type { NotificationHandler } from "./src/connectors/base.js";
 import { HttpConnector } from "./src/connectors/http.js";
 import { StdioConnector } from "./src/connectors/stdio.js";
-import { WebSocketConnector } from "./src/connectors/websocket.js";
 
 import { Logger, logger } from "./src/logging.js";
 import {
@@ -92,7 +91,6 @@ export {
   MCPSession,
   RemoteAgent,
   StdioConnector,
-  WebSocketConnector,
 };
 
 // Export session-related types

@@ -400,7 +400,7 @@ server.prompt('code_review', {
 **Command not found:**
 
 ```bash
-# Make sure you have Node.js 18+ installed
+# Make sure you have Node.js 20.19+ installed
 node --version
 
 # Try with npx

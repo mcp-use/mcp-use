@@ -332,7 +332,7 @@ WorkOS handles session management automatically through AuthKit. Access tokens h
 ### Docker
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install

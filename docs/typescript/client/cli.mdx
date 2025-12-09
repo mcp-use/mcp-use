@@ -1,0 +1,474 @@
+---
+title: CLI Client
+description: Use MCP servers directly from the terminal with the mcp-use CLI client
+icon: "terminal"
+---
+
+The mcp-use CLI client allows you to interact with MCP servers directly from your terminal without writing any code. It provides a powerful command-line interface with scoped commands for tools, resources, prompts, and session management.
+
+## Installation
+
+The CLI client is included with the `mcp-use` package:
+
+```bash
+npm install -g mcp-use
+# or
+npx mcp-use client --help
+```
+
+## Quick Start
+
+Connect to an MCP server and start using it:
+
+```bash
+# Connect to an HTTP server
+npx mcp-use client connect http://localhost:3000/mcp --name my-server
+
+# List available tools
+npx mcp-use client tools list
+
+# Call a tool
+npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
+
+# Start interactive mode
+npx mcp-use client interactive
+```
+
+## Command Structure
+
+The CLI client uses scoped commands organized by resource type:
+
+- **Connection Management**: `connect`, `disconnect`
+- **Sessions**: `sessions list`, `sessions switch`
+- **Tools**: `tools list`, `tools call`, `tools describe`
+- **Resources**: `resources list`, `resources read`, `resources subscribe`, `resources unsubscribe`
+- **Prompts**: `prompts list`, `prompts get`
+- **Interactive Mode**: `interactive`
+
+## Connection Management
+
+### Connect to a Server
+
+Connect to an HTTP MCP server:
+
+```bash
+npx mcp-use client connect http://localhost:3000/mcp --name my-server
+```
+
+**Options:**
+- `--name <name>`: Session name (optional, auto-generated if not provided)
+- `--auth <token>`: Authentication token for Bearer auth
+- `--stdio`: Use stdio connector instead of HTTP (see below)
+
+### Connect to a Stdio Server
+
+Connect to a server using stdio transport:
+
+```bash
+npx mcp-use client connect --stdio "npx -y @modelcontextprotocol/server-filesystem /tmp" --name fs-server
+```
+
+The command after `--stdio` is parsed as: `command args...`
+
+### Disconnect from a Server
+
+```bash
+# Disconnect from active session
+npx mcp-use client disconnect
+
+# Disconnect from specific session
+npx mcp-use client disconnect my-server
+
+# Disconnect all sessions
+npx mcp-use client disconnect --all
+```
+
+## Session Management
+
+Sessions are automatically saved to `~/.mcp-use/cli-sessions.json` and can be restored later.
+
+### List Sessions
+
+```bash
+npx mcp-use client sessions list
+```
+
+Output example:
+```
+Saved Sessions:
+
+┌──────────────┬────────┬─────────────────────────────┬────────────────┬──────────────┐
+│ Name         │ Type   │ Target                      │ Server         │ Status       │
+├──────────────┼────────┼─────────────────────────────┼────────────────┼──────────────┤
+│ my-server *  │ http   │ http://localhost:3000/mcp   │ my-mcp-server  │ connected    │
+│ fs-server    │ stdio  │ npx -y @mc...filesystem     │ fs-server      │ disconnected │
+└──────────────┴────────┴─────────────────────────────┴────────────────┴──────────────┘
+
+* = active session
+```
+
+### Switch Sessions
+
+```bash
+npx mcp-use client sessions switch fs-server
+```
+
+## Working with Tools
+
+### List Available Tools
+
+```bash
+# List tools from active session
+npx mcp-use client tools list
+
+# List tools from specific session
+npx mcp-use client tools list --session my-server
+
+# Output as JSON
+npx mcp-use client tools list --json
+```
+
+### Describe a Tool
+
+View detailed information about a tool including its input schema:
+
+```bash
+npx mcp-use client tools describe read_file
+```
+
+Output example:
+```
+Tool: read_file
+
+Read the contents of a file from the filesystem
+
+Input Schema:
+path (string) *required
+  The path to the file to read
+encoding (string)
+  The text encoding to use (default: utf-8)
+```
+
+### Call a Tool
+
+Execute a tool with arguments:
+
+```bash
+# With JSON arguments
+npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
+
+# Without arguments (for tools that don't require them)
+npx mcp-use client tools call list_files
+
+# With timeout
+npx mcp-use client tools call slow_operation '{}' --timeout 60000
+
+# Output as JSON
+npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}' --json
+```
+
+**Tips:**
+- Arguments must be valid JSON
+- If a tool requires arguments but none are provided, an error will show the schema
+- Use single quotes around JSON to avoid shell escaping issues
+
+## Working with Resources
+
+### List Available Resources
+
+```bash
+# List resources from active session
+npx mcp-use client resources list
+
+# Output as JSON
+npx mcp-use client resources list --json
+```
+
+Output example:
+```
+Available Resources (3):
+
+┌──────────────────────────────┬────────────────┬─────────────┐
+│ URI                          │ Name           │ Type        │
+├──────────────────────────────┼────────────────┼─────────────┤
+│ file:///tmp/data.json        │ Data File      │ text/json   │
+│ file:///tmp/config.yaml      │ Config         │ text/yaml   │
+│ file:///tmp/image.png        │ Screenshot     │ image/png   │
+└──────────────────────────────┴────────────────┴─────────────┘
+```
+
+### Read a Resource
+
+```bash
+npx mcp-use client resources read "file:///tmp/data.json"
+```
+
+### Subscribe to Resource Updates
+
+Subscribe to notifications when a resource changes:
+
+```bash
+npx mcp-use client resources subscribe "file:///tmp/data.json"
+```
+
+This will keep the process running and display updates as they arrive. Press Ctrl+C to stop.
+
+### Unsubscribe from Resource
+
+```bash
+npx mcp-use client resources unsubscribe "file:///tmp/data.json"
+```
+
+## Working with Prompts
+
+### List Available Prompts
+
+```bash
+npx mcp-use client prompts list
+```
+
+### Get a Prompt
+
+Retrieve a prompt with arguments:
+
+```bash
+# With arguments
+npx mcp-use client prompts get greeting '{"name": "Alice"}'
+
+# Without arguments
+npx mcp-use client prompts get daily_summary
+
+# Output as JSON
+npx mcp-use client prompts get greeting '{"name": "Alice"}' --json
+```
+
+## Interactive Mode
+
+Start an interactive REPL session for easier exploration:
+
+```bash
+npx mcp-use client interactive
+```
+
+In interactive mode, you can use shortened commands:
+
+```
+mcp> tools list
+Available tools: read_file, write_file, list_directory
+
+mcp> tools call read_file
+Arguments (JSON, or press Enter for none): {"path": "/tmp/test.txt"}
+✓ Tool executed successfully
+...
+
+mcp> resources list
+Available resources: file:///tmp/data.json, file:///tmp/config.yaml
+
+mcp> exit
+```
+
+**Available commands in interactive mode:**
+- `tools list` - List available tools
+- `tools call <name>` - Call a tool (will prompt for arguments)
+- `tools describe <name>` - Show tool details
+- `resources list` - List available resources
+- `resources read <uri>` - Read a resource
+- `prompts list` - List available prompts
+- `prompts get <name>` - Get a prompt (will prompt for arguments)
+- `sessions list` - List all sessions
+- `exit` or `quit` - Exit interactive mode
+
+## Global Flags
+
+All commands support these global flags:
+
+- `--session <name>`: Use a specific session instead of the active one
+- `--json`: Output results in JSON format
+- `--timeout <ms>`: Request timeout in milliseconds (for tool calls and resource operations)
+
+Example:
+```bash
+npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}' \
+  --session my-server \
+  --json \
+  --timeout 10000
+```
+
+## Session Storage
+
+Sessions are stored in `~/.mcp-use/cli-sessions.json`:
+
+```json
+{
+  "activeSession": "my-server",
+  "sessions": {
+    "my-server": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "lastUsed": "2025-12-09T10:30:00Z",
+      "serverInfo": {
+        "name": "my-mcp-server",
+        "version": "1.0.0"
+      }
+    },
+    "fs-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "lastUsed": "2025-12-09T11:00:00Z"
+    }
+  }
+}
+```
+
+You can manually edit this file to:
+- Change session names
+- Update connection details
+- Remove old sessions
+
+## Common Use Cases
+
+### Debugging an MCP Server
+
+```bash
+# Connect to your development server
+npx mcp-use client connect http://localhost:3000/mcp --name dev
+
+# Explore available tools
+npx mcp-use client tools list
+
+# Test a specific tool
+npx mcp-use client tools describe my_tool
+npx mcp-use client tools call my_tool '{"param": "value"}'
+```
+
+### Working with Multiple Servers
+
+```bash
+# Connect to multiple servers
+npx mcp-use client connect http://localhost:3000/mcp --name server1
+npx mcp-use client connect http://localhost:4000/mcp --name server2
+
+# List all sessions
+npx mcp-use client sessions list
+
+# Use tools from different servers
+npx mcp-use client tools list --session server1
+npx mcp-use client tools list --session server2
+
+# Switch between them
+npx mcp-use client sessions switch server2
+```
+
+### Scripting with the CLI
+
+Use the CLI in shell scripts:
+
+```bash
+#!/bin/bash
+
+# Connect to server
+npx mcp-use client connect http://localhost:3000/mcp --name script-session
+
+# Get data as JSON
+DATA=$(npx mcp-use client tools call get_data '{}' --json)
+
+# Process with jq
+echo "$DATA" | jq '.content[0].text'
+
+# Disconnect
+npx mcp-use client disconnect script-session
+```
+
+### Testing Filesystem Server
+
+```bash
+# Connect to filesystem server
+npx mcp-use client connect --stdio "npx -y @modelcontextprotocol/server-filesystem /tmp" --name fs
+
+# List files
+npx mcp-use client tools call list_directory '{"path": "/tmp"}'
+
+# Read a file
+npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
+
+# Write a file
+npx mcp-use client tools call write_file '{"path": "/tmp/hello.txt", "content": "Hello, World!"}'
+```
+
+## Error Handling
+
+The CLI provides helpful error messages:
+
+### No Active Session
+```
+✗ Error: No active session. Connect to a server first.
+Use: npx mcp-use client connect <url> --name <name>
+```
+
+### Tool Not Found
+```
+✗ Error: Tool 'invalid_tool' not found
+
+Available tools:
+  • read_file
+  • write_file
+  • list_directory
+```
+
+### Invalid Arguments
+```
+✗ Error: This tool requires arguments. Provide them as a JSON string.
+
+Example:
+  npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
+
+Tool schema:
+path (string) *required
+  The path to the file to read
+```
+
+## Tips and Best practices
+
+1. **Use Named Sessions**: Always provide a `--name` when connecting to make sessions easier to manage
+2. **Interactive Mode for Exploration**: Use interactive mode when exploring a new server
+3. **JSON Output for Scripts**: Use `--json` flag when using the CLI in scripts
+4. **Session Persistence**: Sessions are saved automatically, so you can disconnect and reconnect later
+5. **Multiple Terminals**: You can have multiple terminal windows with different active sessions
+
+## Troubleshooting
+
+### Connection Issues
+
+**Problem**: Can't connect to HTTP server
+
+```bash
+✗ Error: Connection failed: fetch failed
+```
+
+**Solution**: Check that:
+- The server is running
+- The URL is correct
+- The server supports HTTP/SSE transport
+- Firewall isn't blocking the connection
+
+### Stdio Server Issues
+
+**Problem**: Stdio server fails to start
+
+**Solution**:
+- Ensure the command is available (`npx`, `node`, etc.)
+- Check that the server package is installed or accessible
+- Verify the arguments are correct
+
+### Session Not Found
+
+**Problem**: Session disappeared after restart
+
+**Solution**: Sessions are stored in `~/.mcp-use/cli-sessions.json`. If deleted, you'll need to reconnect.
+
+## Next Steps
+
+- Learn about [MCP Agents](/typescript/agent) for programmatic access
+- Explore [Server Development](/typescript/server) to create your own MCP servers
+- Check out [Examples](/typescript/examples) for more use cases

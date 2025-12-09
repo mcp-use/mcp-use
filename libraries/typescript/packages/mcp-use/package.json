@@ -34,27 +34,33 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./agent": {
       "types": "./dist/src/agents/index.d.ts",
-      "import": "./dist/src/agents/index.js"
+      "import": "./dist/src/agents/index.js",
+      "require": "./dist/src/agents/index.cjs"
     },
     "./auth": {
       "types": "./dist/src/auth/index.d.ts",
-      "import": "./dist/src/auth/index.js"
+      "import": "./dist/src/auth/index.js",
+      "require": "./dist/src/auth/index.cjs"
     },
     "./browser": {
       "types": "./dist/src/browser.d.ts",
-      "import": "./dist/src/browser.js"
+      "import": "./dist/src/browser.js",
+      "require": "./dist/src/browser.cjs"
     },
     "./react": {
       "types": "./dist/src/react/index.d.ts",
-      "import": "./dist/src/react/index.js"
+      "import": "./dist/src/react/index.js",
+      "require": "./dist/src/react/index.cjs"
     },
     "./server": {
       "types": "./dist/src/server/index.d.ts",
-      "import": "./dist/src/server/index.js"
+      "import": "./dist/src/server/index.js",
+      "require": "./dist/src/server/index.cjs"
     }
   },
   "main": "./dist/index.js",
@@ -67,7 +73,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
@@ -113,6 +119,7 @@
     "example:add_server": "tsx examples/client/add_server_tool.ts",
     "example:structured": "tsx examples/client/structured_output.ts",
     "example:observability": "tsx examples/client/observability.ts",
+    "example:commonjs": "node examples/client/commonjs_example.cjs",
     "example:code_mode": "tsx examples/client/code_mode_example.ts",
     "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts",
     "example:server:notification": "tsx examples/server/notification-example/src/server.ts",
