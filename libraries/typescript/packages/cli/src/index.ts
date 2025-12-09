@@ -9,6 +9,7 @@ import path from "node:path";
 import open from "open";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { deployCommand } from "./commands/deploy.js";
+import { createClientCommand } from "./commands/client.js";
 
 const program = new Command();
 
@@ -1020,5 +1021,8 @@ program
       fromSource: options.fromSource,
     });
   });
+
+// Client command
+program.addCommand(createClientCommand());
 
 program.parse();

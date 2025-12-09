@@ -61,7 +61,7 @@
 
 ### Requirements
 
-- Node.js 22.0.0 or higher
+- Node.js 18.0.0 or higher
 - npm, yarn, or pnpm (examples use pnpm)
 
 ### Installation
