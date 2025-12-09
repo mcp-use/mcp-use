@@ -61,6 +61,24 @@ export class HttpConnector extends BaseConnector {
       return;
     }
 
+    // Check if we're in a browser environment with custom headers that would trigger CORS preflight
+    // Skip streamable HTTP to avoid OPTIONS requests (FastMCP compatibility)
+    const isBrowser = typeof window !== "undefined";
+    const hasCustomHeaders =
+      this.headers && Object.keys(this.headers).length > 0;
+    const wouldTriggerPreflight = isBrowser && hasCustomHeaders;
+
+    // If we have custom headers in browser, skip streamable HTTP to avoid OPTIONS preflight
+    // This prevents CORS preflight OPTIONS requests that FastMCP doesn't support
+    if (wouldTriggerPreflight) {
+      logger.debug(
+        `Skipping streamable HTTP (custom headers would trigger CORS preflight) - using SSE transport directly`
+      );
+      logger.info("🔄 Using SSE transport to avoid OPTIONS preflight requests...");
+      await this.connectWithSse(baseUrl);
+      return;
+    }
+
     // Try streamable HTTP first, then fall back to SSE
     logger.debug(`Connecting to MCP implementation via HTTP: ${baseUrl}`);
 
