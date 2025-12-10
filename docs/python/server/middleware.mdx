@@ -9,13 +9,16 @@ Use middleware to run cross-cutting logic (logging, auth, rate limiting, validat
 ## Hooks (typed)
 
 - `on_request` (all requests)
-- `on_initialize`
 - `on_call_tool`
 - `on_read_resource`
 - `on_get_prompt`
 - `on_list_tools/resources/prompts`
 
 All hooks receive `ServerMiddlewareContext[...]` with typed `message`, `method`, `timestamp`, `transport`, `session_id`, `headers`, `client_ip`, `metadata`. Use `context.copy(...)` to enrich metadata.
+
+<Note>
+**Note about initialize**: The `initialize` request is handled at the MCP protocol/session layer before middleware is invoked. This is by design - it's a bootstrap operation similar to TCP handshake or TLS negotiation. If you need to track initialize events, handle them directly in your telemetry system rather than through middleware.
+</Note>
 
 ## Minimal middleware
 

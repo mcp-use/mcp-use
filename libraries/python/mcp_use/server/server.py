@@ -12,7 +12,6 @@ from mcp.types import (
     AnyFunction,
     CallToolRequest,
     GetPromptRequest,
-    InitializeRequest,
     ListPromptsRequest,
     ListResourcesRequest,
     ListToolsRequest,
@@ -233,8 +232,19 @@ class MCPServer(FastMCP):
         return app
 
     def _wrap_handlers_with_middleware(self) -> None:
-        """Wrap MCP request handlers with middleware chain."""
+        """Wrap MCP request handlers with middleware chain.
+
+        Note: InitializeRequest is NOT included here because it's handled at the session
+        protocol layer (ServerSession._received_request) before reaching request_handlers.
+        This is by design in the MCP protocol - initialize is a bootstrap/handshake operation
+        that establishes the session, similar to TCP handshake or TLS negotiation.
+
+        If you need to track initialize events, do so directly in telemetry without middleware.
+        """
         handlers = self._mcp_server.request_handlers
+
+        if self.debug_level >= 1:
+            logger.debug(f"Wrapping handlers. Available handlers: {list(handlers.keys())}")
 
         def wrap_request(request_cls: type, method: str) -> None:
             if request_cls not in handlers:
@@ -261,7 +271,6 @@ class MCPServer(FastMCP):
 
             handlers[request_cls] = wrapped
 
-        wrap_request(InitializeRequest, "initialize")
         wrap_request(CallToolRequest, "tools/call")
         wrap_request(ReadResourceRequest, "resources/read")
         wrap_request(GetPromptRequest, "prompts/get")
