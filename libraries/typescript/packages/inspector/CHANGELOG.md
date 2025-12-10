@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.12.2
+
+### Patch Changes
+
+- fix: update zod error
+- Updated dependencies
+  - mcp-use@1.10.2
+
 ## 0.12.1
 
 ### Patch Changes
