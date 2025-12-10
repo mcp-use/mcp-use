@@ -379,8 +379,8 @@ importers:
         specifier: ^5.16.0
         version: 5.17.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(zod@4.1.13)
       '@mcp-use/modelcontextprotocol-sdk':
-        specifier: 1.24.3-mcp-use.4
-        version: 1.24.3-mcp-use.4(@cfworker/json-schema@4.1.1)(zod@4.1.13)
+        specifier: 1.24.3-mcp-use.2
+        version: 1.24.3-mcp-use.2(@cfworker/json-schema@4.1.1)(zod@4.1.13)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -557,8 +557,8 @@ importers:
         specifier: workspace:*
         version: link:../inspector
       '@mcp-use/modelcontextprotocol-sdk':
-        specifier: 1.24.3-mcp-use.4
-        version: 1.24.3-mcp-use.4(@cfworker/json-schema@4.1.1)(zod@4.1.13)
+        specifier: 1.24.3-mcp-use.2
+        version: 1.24.3-mcp-use.2(@cfworker/json-schema@4.1.1)(zod@4.1.13)
       express:
         specifier: ^5.2.0
         version: 5.2.1
@@ -920,70 +920,6 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
-
-  test_app:
-    dependencies:
-      '@openai/apps-sdk-ui':
-        specifier: ^0.2.0
-        version: 0.2.0(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(immer@11.0.1)(react-dom@19.2.0(react@19.2.0))(react-is@18.3.1)(react@19.2.0)(redux@5.0.1)(tailwindcss@4.1.17)(use-sync-external-store@1.6.0(react@19.2.0))
-      '@tanstack/react-query':
-        specifier: ^5.90.11
-        version: 5.90.11(react@19.2.0)
-      cors:
-        specifier: ^2.8.5
-        version: 2.8.5
-      express:
-        specifier: ^5.2.0
-        version: 5.2.1
-      mcp-use:
-        specifier: workspace:*
-        version: link:../packages/mcp-use
-      node-mocks-http:
-        specifier: ^1.17.2
-        version: 1.17.2(@types/express@5.0.5)(@types/node@24.10.1)
-      react:
-        specifier: ^19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.0(react@19.2.0)
-      react-router:
-        specifier: ^7.9.6
-        version: 7.9.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      react-router-dom:
-        specifier: ^7.9.6
-        version: 7.9.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      tailwindcss:
-        specifier: ^4.1.17
-        version: 4.1.17
-      zod:
-        specifier: ^4.1.13
-        version: 4.1.13
-    devDependencies:
-      '@tailwindcss/vite':
-        specifier: ^4.1.17
-        version: 4.1.17(vite@7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1))
-      '@types/node':
-        specifier: ^24.10.1
-        version: 24.10.1
-      '@types/react':
-        specifier: ^19.2.7
-        version: 19.2.7
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.3(@types/react@19.2.7)
-      '@vitejs/plugin-react':
-        specifier: ^5.1.1
-        version: 5.1.1(vite@7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1))
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vite:
-        specifier: '>=5.4.21'
-        version: 7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
 
 packages:
 
@@ -1696,8 +1632,8 @@ packages:
   '@mcp-ui/server@5.16.1':
     resolution: {integrity: sha512-/kK6pTFunWGyyS8j4Kt61o8oSsdqbgQTimYXMkF/2sFp3XwIFEBzjrBP4BzzLwBYzu7YCDHYff60AC6uUZHqQw==}
 
-  '@mcp-use/modelcontextprotocol-sdk@1.24.3-mcp-use.4':
-    resolution: {integrity: sha512-OJS8SCn7KM85cSq61llPFzSbr0hR8BeIubZ1nH+Cdmkns/Z9mL1j/bp2JAREueD1+ZlBlIBBn1nkWTREGSIMPQ==}
+  '@mcp-use/modelcontextprotocol-sdk@1.24.3-mcp-use.2':
+    resolution: {integrity: sha512-jRZbUeDWW7cy01qaLOArc/MSxs6U+RBxExpgyau6f8YqrQnD5jHmWK8OEhxahab25aOk62oLwIWjqRNhZ2NdSw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -8190,7 +8126,7 @@ snapshots:
       - supports-color
       - zod
 
-  '@mcp-use/modelcontextprotocol-sdk@1.24.3-mcp-use.4(@cfworker/json-schema@4.1.1)(zod@4.1.13)':
+  '@mcp-use/modelcontextprotocol-sdk@1.24.3-mcp-use.2(@cfworker/json-schema@4.1.1)(zod@4.1.13)':
     dependencies:
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
