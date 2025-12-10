@@ -7,12 +7,11 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP as BaseServerClass
 from mcp.types import (
     AnyFunction,
     CallToolRequest,
     GetPromptRequest,
-    InitializeRequest,
     ListPromptsRequest,
     ListResourcesRequest,
     ListToolsRequest,
@@ -22,6 +21,7 @@ from mcp.types import (
 
 from mcp_use.server.context import Context as MCPContext
 from mcp_use.server.logging import MCPLoggingMiddleware
+from mcp_use.server.lowlevel import MCPUseLowLevelServer
 from mcp_use.server.middleware import (
     Middleware,
     MiddlewareManager,
@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 _telemetry = Telemetry()
 
 
-class MCPServer(FastMCP):
+class MCPServer(BaseServerClass):
     """Main MCP Server class with integrated inspector and development tools."""
 
     def __init__(
@@ -64,7 +64,26 @@ class MCPServer(FastMCP):
         pretty_print_jsonrpc: bool = False,
     ):
         self._start_time = time.time()
+        self._transport_type: TransportType = "streamable-http"
+
+        # Initialize middleware manager first (needed by low-level server)
+        self.middleware_manager = MiddlewareManager()
+        self.middleware_manager.add_middleware(TelemetryMiddleware())
+
+        if middleware:
+            for middleware_instance in middleware:
+                self.middleware_manager.add_middleware(middleware_instance)
+
+        # Initialize FastMCP parent class to set up all its internal state
         super().__init__(name=name or "mcp-use server", instructions=instructions)
+
+        # Replace the default _mcp_server with our custom middleware-enabled version
+        self._mcp_server = MCPUseLowLevelServer(
+            middleware_manager=self.middleware_manager,
+            transport_type=self._transport_type,
+            name=name or "mcp-use server",
+            instructions=instructions,
+        )
 
         if version:
             self._mcp_server.version = version
@@ -85,14 +104,6 @@ class MCPServer(FastMCP):
         self.openmcp_path = openmcp_path
         self.show_inspector_logs = show_inspector_logs
         self.pretty_print_jsonrpc = pretty_print_jsonrpc
-        self._transport_type: TransportType = "streamable-http"
-
-        self.middleware_manager = MiddlewareManager()
-        self.middleware_manager.add_middleware(TelemetryMiddleware())
-
-        if middleware:
-            for middleware_instance in middleware:
-                self.middleware_manager.add_middleware(middleware_instance)
 
         # Add dev routes only in DEBUG=1 and above
         if self.debug_level >= 1:
@@ -233,14 +244,26 @@ class MCPServer(FastMCP):
         return app
 
     def _wrap_handlers_with_middleware(self) -> None:
-        """Wrap MCP request handlers with middleware chain."""
+        """Wrap MCP request handlers with middleware chain.
+
+        Note: InitializeRequest is handled by MCPUseServerSession and does not need
+        wrapping here. It flows through the middleware chain automatically via the
+        custom session's _received_request override.
+        """
         handlers = self._mcp_server.request_handlers
+
+        if self.debug_level >= 1:
+            logger.debug(f"Wrapping handlers. Available handlers: {list(handlers.keys())}")
 
         def wrap_request(request_cls: type, method: str) -> None:
             if request_cls not in handlers:
+                if self.debug_level >= 1:
+                    logger.debug(f"Handler not found for {request_cls.__name__} (method: {method})")
                 return
 
             original = handlers[request_cls]
+            if self.debug_level >= 1:
+                logger.debug(f"Wrapping handler for {request_cls.__name__} (method: {method})")
 
             async def wrapped(request: Any) -> ServerResult:
                 # Get session ID from HTTP headers if available
@@ -261,7 +284,8 @@ class MCPServer(FastMCP):
 
             handlers[request_cls] = wrapped
 
-        wrap_request(InitializeRequest, "initialize")
+        # Wrap all standard request handlers
+        # Note: InitializeRequest is handled by MCPUseServerSession, not here
         wrap_request(CallToolRequest, "tools/call")
         wrap_request(ReadResourceRequest, "resources/read")
         wrap_request(GetPromptRequest, "prompts/get")
