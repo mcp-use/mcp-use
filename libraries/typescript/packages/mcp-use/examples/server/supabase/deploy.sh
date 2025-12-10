@@ -99,7 +99,7 @@ show_help() {
 }
 
 # Parse flags and arguments
-MCP_USE_VERSION="1.9.0"
+MCP_USE_VERSION="1.10.6"
 PROJECT_ID=""
 FUNCTION_NAME=""
 BUCKET_NAME=""

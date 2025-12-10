@@ -1,6 +1,6 @@
 {
   "name": "@mcp-use/cli",
-  "version": "2.5.5",
+  "version": "2.5.6",
   "description": "The mcp-use CLI is a tool for building and deploying MCP servers with support for ChatGPT Apps, Code Mode, OAuth, Notifications, Sampling, Observability and more.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
