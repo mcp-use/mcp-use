@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { registerMangoRoutes } from "@mcp-use/mango/server";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
 import { isPortAvailable } from "./utils.js";
@@ -16,6 +17,11 @@ app.use("*", cors());
 
 // Register all API routes
 registerInspectorRoutes(app);
+
+// Register Mango routes
+registerMangoRoutes(app, {
+  workspaceDir: process.env.MANGO_WORKSPACE_DIR,
+});
 
 // Register static file serving with dev proxy support (must be last as it includes catch-all route)
 registerStaticRoutesWithDevProxy(app);
