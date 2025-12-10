@@ -2,7 +2,12 @@
 title: Middleware
 description: Add middleware to intercept and modify MCP requests
 icon: "layers"
+tags: ["beta"]
 ---
+
+<Warning>
+**Beta Feature**: Middleware support is currently in beta. The API is stable but some features are still being refined.
+</Warning>
 
 Use middleware to run cross-cutting logic (logging, auth, rate limiting, validation, caching) around MCP requests.
 
@@ -16,9 +21,9 @@ Use middleware to run cross-cutting logic (logging, auth, rate limiting, validat
 
 All hooks receive `ServerMiddlewareContext[...]` with typed `message`, `method`, `timestamp`, `transport`, `session_id`, `headers`, `client_ip`, `metadata`. Use `context.copy(...)` to enrich metadata.
 
-<Note>
-**Note about initialize**: The `initialize` request is handled at the MCP protocol/session layer before middleware is invoked. This is by design - it's a bootstrap operation similar to TCP handshake or TLS negotiation. If you need to track initialize events, handle them directly in your telemetry system rather than through middleware.
-</Note>
+<Info>
+**`on_initialize` coming soon**: Support for the `initialize` hook is being added in an upcoming release. Currently, `initialize` requests are handled at the protocol/session layer. Track progress at [#issue-link](https://github.com/mcp-use/mcp-use/issues).
+</Info>
 
 ## Minimal middleware
 
