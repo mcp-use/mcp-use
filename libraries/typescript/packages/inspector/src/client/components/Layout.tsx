@@ -6,6 +6,7 @@ import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
+import { MangoButton, MangoChat } from "@mcp-use/mango/client";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -14,6 +15,7 @@ import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
 import { ServerConnectionModal } from "./ServerConnectionModal";
+import { useConfig } from "./chat/useConfig";
 
 interface LayoutProps {
   children: ReactNode;
@@ -42,6 +44,7 @@ export function Layout({ children }: LayoutProps) {
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
     null
   );
+  const [isMangoOpen, setIsMangoOpen] = useState(false);
   const savedRequests = useSavedRequests();
 
   // Read tunnelUrl from query parameters and store in context
@@ -224,6 +227,22 @@ export function Layout({ children }: LayoutProps) {
     ]
   );
 
+  // Handle server created by Mango
+  const handleServerCreated = useCallback(
+    (serverUrl: string, projectName: string) => {
+      // Add the new server to connections
+      addConnection(serverUrl, projectName);
+      toast.success(`Server "${projectName}" connected to inspector!`);
+
+      // Navigate to the new server after a short delay
+      setTimeout(() => {
+        const encodedUrl = encodeURIComponent(serverUrl);
+        navigate(`/?server=${encodedUrl}`);
+      }, 1000);
+    },
+    [addConnection, navigate]
+  );
+
   const handleCommandPaletteNavigate = (
     tab: "tools" | "prompts" | "resources",
     itemName?: string,
@@ -274,6 +293,9 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const selectedServer = connections.find((c) => c.id === selectedServerId);
+
+  // Get LLM config for Mango (reuse ChatTab config)
+  const { llmConfig } = useConfig({ mcpServerUrl: selectedServer?.url || "" });
 
   // Aggregate tools, prompts, and resources from all connected servers
   // When a server is selected, use only that server's items
@@ -480,6 +502,29 @@ export function Layout({ children }: LayoutProps) {
           }}
           onConnect={handleUpdateConnection}
         />
+
+        {/* Mango Button */}
+        <MangoButton onClick={() => setIsMangoOpen(true)} />
+
+        {/* Mango Chat */}
+        {isMangoOpen && (
+          <MangoChat
+            onClose={() => setIsMangoOpen(false)}
+            llmConfig={
+              llmConfig
+                ? {
+                    provider: llmConfig.provider as
+                      | "openai"
+                      | "anthropic"
+                      | "google",
+                    apiKey: llmConfig.apiKey,
+                    model: llmConfig.model,
+                  }
+                : undefined
+            }
+            onServerCreated={handleServerCreated}
+          />
+        )}
       </div>
     </TooltipProvider>
   );
