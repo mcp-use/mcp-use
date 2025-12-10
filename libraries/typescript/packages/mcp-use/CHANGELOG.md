@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.10.5
+
+### Patch Changes
+
+- dcf938f: fix: add cors to getHandler
+  - @mcp-use/cli@2.5.5
+  - @mcp-use/inspector@0.12.5
+
 ## 1.10.4
 
 ### Patch Changes

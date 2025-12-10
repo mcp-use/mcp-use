@@ -68,6 +68,8 @@ import {
   logRegisteredItems as logRegisteredItemsHelper,
   startServer,
   rewriteSupabaseRequest,
+  getDenoCorsHeaders,
+  applyDenoCorsHeaders,
   createHonoApp,
   createHonoProxy,
   isProductionMode as isProductionModeHelper,
@@ -1099,12 +1101,22 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Wrap the fetch handler to ensure it always returns a Promise<Response>
     const fetchHandler = this.app.fetch.bind(this.app);
 
-    // Handle platform-specific path rewriting
+    // Handle platform-specific path rewriting and CORS
     if (options?.provider === "supabase") {
       return async (req: Request) => {
+        const corsHeaders = getDenoCorsHeaders();
+
+        // Handle CORS preflight
+        if (req.method === "OPTIONS") {
+          return new Response("ok", { headers: corsHeaders });
+        }
+
+        // Rewrite path and process request
         const rewrittenReq = rewriteSupabaseRequest(req);
         const result = await fetchHandler(rewrittenReq);
-        return result;
+
+        // Apply CORS headers to response
+        return applyDenoCorsHeaders(result);
       };
     }
 
