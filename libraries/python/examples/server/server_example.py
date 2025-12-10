@@ -35,7 +35,7 @@ def lupo_tool(a: int, b: int) -> str:
 )
 async def echo(message: str, context: Context) -> str:
     """Echoes back the message you provide."""
-    return f"You said: {message} one"
+    return f"You said: {message}"
 
 
 @server.resource(
@@ -85,4 +85,4 @@ if __name__ == "__main__":
     #     openmcp_path="/custom-openmcp.json"
     # )
 
-    server.run(transport="stdio", port=8000, reload=True)
+    server.run(transport="streamable-http", port=8000, reload=True)
