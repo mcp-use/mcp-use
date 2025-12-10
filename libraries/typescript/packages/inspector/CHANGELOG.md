@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.12.5
+
+### Patch Changes
+
+- Updated dependencies [dcf938f]
+  - mcp-use@1.10.5
+
 ## 0.12.4
 
 ### Patch Changes
