@@ -36,6 +36,8 @@ class MCPSession:
         self.connector = connector
         self.session_info: dict[str, Any] | None = None
         self.auto_connect = auto_connect
+        self._record_telemetry = True
+        self.connector._record_telemetry = False
 
     async def __aenter__(self) -> "MCPSession":
         """Enter the async context manager.

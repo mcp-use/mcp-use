@@ -118,7 +118,8 @@
                     "icon": "globe",
                     "pages": [
                       "python/server/compatibility",
-                      "python/server/running"
+                      "python/server/running",
+                      "python/server/sessions"
                     ]
                   },
                   {
@@ -133,6 +134,7 @@
                       "python/server/notifications"
                     ]
                   },
+                  "python/server/middleware",
                   "python/server/router",
                   "python/server/inspector",
                   "python/server/logging",
@@ -371,6 +373,7 @@
                       "python/api-reference/mcp_use_server_logging_state"
                     ]
                   },
+                  "python/api-reference/mcp_use_server_middleware_middleware",
                   "python/api-reference/mcp_use_server_router",
                   "python/api-reference/mcp_use_server_runner",
                   "python/api-reference/mcp_use_server_server",

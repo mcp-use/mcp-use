@@ -30,9 +30,10 @@ from mcp_use.server.server import MCPServer
 ### `method` __init__
 
 **Parameters**
-><ParamField body="name" type="str" required="True" >   Name identifier </ParamField>
+><ParamField body="name" type="str | None" default="None" >   Name identifier </ParamField>
 ><ParamField body="version" type="str | None" default="None" >   String value </ParamField>
 ><ParamField body="instructions" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="middleware" type="list[Middleware] | None" default="None" >   Middleware instance </ParamField>
 ><ParamField body="debug" type="bool" default="False" >   Enable debug/verbose mode </ParamField>
 ><ParamField body="mcp_path" type="str" default='/mcp' >   File path </ParamField>
 ><ParamField body="docs_path" type="str" default='/docs' >   File path </ParamField>
@@ -43,7 +44,7 @@ from mcp_use.server.server import MCPServer
 
 **Signature**
 ```python wrap
-def __init__(name: str, version: str | None = None, instructions: str | None = None, debug: bool = False, mcp_path: str = "/mcp", docs_path: str = "/docs", inspector_path: str = "/inspector", openmcp_path: str = "/openmcp.json", show_inspector_logs: bool = False, pretty_print_jsonrpc: bool = False):
+def __init__(name: str | None = None, version: str | None = None, instructions: str | None = None, middleware: list[Middleware] | None = None, debug: bool = False, mcp_path: str = "/mcp", docs_path: str = "/docs", inspector_path: str = "/inspector", openmcp_path: str = "/openmcp.json", show_inspector_logs: bool = False, pretty_print_jsonrpc: bool = False):
 ```
 
 </Card>
