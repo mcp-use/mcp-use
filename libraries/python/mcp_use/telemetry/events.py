@@ -234,8 +234,7 @@ class TelemetryClientInfo:
     name: str
     version: str
     title: str | None = None
-    description: str | None = None
-    websiteUrl: str | None = None
+    website_url: str | None = None
 
 
 # Type alias for all telemetry events
