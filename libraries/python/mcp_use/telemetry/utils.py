@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 def get_package_version() -> str:
     """Get the current mcp-use package version."""
     try:
-        return importlib.metadata.version("mcp-use")
+        return importlib.metadata.version("mcp_use")
     except importlib.metadata.PackageNotFoundError:
         return "unknown"
 
