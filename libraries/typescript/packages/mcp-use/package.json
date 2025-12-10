@@ -162,7 +162,7 @@
     "@mcp-ui/server": "^5.15.0",
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
-    "@mcp-use/modelcontextprotocol-sdk": "1.24.3-mcp-use.1",
+    "@mcp-use/modelcontextprotocol-sdk": "1.24.3-mcp-use.2",
     "express": "^5.2.0",
     "hono": "^4.10.7",
     "jose": "^6.1.2",

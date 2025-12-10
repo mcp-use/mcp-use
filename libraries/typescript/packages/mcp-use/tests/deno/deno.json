@@ -1,6 +1,6 @@
 {
   "imports": {
-    "@modelcontextprotocol/sdk": "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.1",
+    "@modelcontextprotocol/sdk": "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.2",
     "mcp-use/server": "npm:mcp-use/server"
   },
   "compilerOptions": {
