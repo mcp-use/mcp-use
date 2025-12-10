@@ -23,6 +23,7 @@ from mcp.types import (
 )
 
 from mcp_use.telemetry.events import (
+    AdapterUsageEvent,
     TelemetryClientInfo,
     TelemetryContent,
     TelemetryPrompt,
@@ -284,4 +285,24 @@ def track_server_run_from_server(
         capabilities=capabilities_json,
         apps_sdk_resources=None,
         mcp_ui_resources=None,
+    )
+
+
+def track_adapter_usage(
+    adapter: "Any",  # BaseAdapter
+    operation: str,
+    telemetry: "Telemetry",
+) -> None:
+    """Track adapter usage by extracting data from the adapter instance.
+
+    Args:
+        adapter: The BaseAdapter instance
+        operation: Operation being performed ("create_tools", "create_resources", "create_prompts", "create_all")
+        telemetry: Telemetry instance to use for tracking
+    """
+    telemetry.capture(
+        event=AdapterUsageEvent(
+            operation=operation,
+            framework=adapter.framework,
+        )
     )

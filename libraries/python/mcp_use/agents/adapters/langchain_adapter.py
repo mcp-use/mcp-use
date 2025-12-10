@@ -29,7 +29,7 @@ from mcp_use.logging import logger
 class LangChainAdapter(BaseAdapter[BaseTool]):
     """Adapter for converting MCP tools to LangChain tools."""
 
-    framework = "langchain"
+    framework: str = "langchain"
 
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new LangChain adapter.
@@ -37,7 +37,7 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
         Args:
             disallowed_tools: list of tool names that should not be available.
         """
-        super().__init__(disallowed_tools)
+        super().__init__(disallowed_tools=disallowed_tools)
         self._connector_tool_map: dict[BaseConnector, list[BaseTool]] = {}
         self._connector_resource_map: dict[BaseConnector, list[BaseTool]] = {}
         self._connector_prompt_map: dict[BaseConnector, list[BaseTool]] = {}

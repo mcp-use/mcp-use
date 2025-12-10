@@ -23,7 +23,7 @@ def _sanitize_for_tool_name(name: str) -> str:
 
 
 class GoogleMCPAdapter(BaseAdapter[types.FunctionDeclaration]):
-    framework = "google"
+    framework: str = "google"
 
     def __init__(self, disallowed_tools: list[str] | None = None) -> None:
         """Initialize a new Google adapter.
@@ -31,7 +31,7 @@ class GoogleMCPAdapter(BaseAdapter[types.FunctionDeclaration]):
         Args:
             disallowed_tools: list of tool names that should not be available.
         """
-        super().__init__(disallowed_tools)
+        super().__init__(disallowed_tools=disallowed_tools)
         # This map stores the actual async function to call for each tool.
         self.tool_executors: dict[str, Callable[..., Coroutine[Any, Any, Any]]] = {}
 

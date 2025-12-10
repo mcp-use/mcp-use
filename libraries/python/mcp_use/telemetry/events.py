@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -8,10 +9,20 @@ class BaseEvent:
     source: str = field(default="python", init=False)
 
 
+@dataclass
 class GenericTelemetryEvent(BaseEvent):
-    def __init__(self, EVENT_NAME: str, **properties):
-        super().__init__()
+    EVENT_NAME: str
+    # we keep this for storing all dynamic props in one place as well
+    properties: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def __init__(self, EVENT_NAME: str, **properties: Any) -> None:
+        # assign the "normal" field
         self.EVENT_NAME = EVENT_NAME
+
+        # store all extra kwargs in the properties dict
+        self.properties = properties
+
+        # also expose them as attributes on the instance
         for key, value in properties.items():
             setattr(self, key, value)
 
@@ -163,6 +174,15 @@ class ConnectorInitEvent(BaseEvent):
     public_identifier: str | None = None
 
 
+@dataclass
+class AdapterUsageEvent(BaseEvent):
+    """Event for tracking adapter usage (create_tools, create_resources, create_prompts, create_all)"""
+
+    EVENT_NAME: str = field(default="adapter_usage", init=False)
+    operation: str  # "create_tools", "create_resources", "create_prompts", "create_all"
+    framework: str  # "openai", "anthropic", "google", "unknown"
+
+
 # Supporting dataclasses for telemetry - simplified versions of MCP types
 
 
@@ -230,6 +250,7 @@ TelemetryEvent = (
     | ServerContextEvent
     | MCPClientInitEvent
     | ConnectorInitEvent
+    | AdapterUsageEvent
 )
 
 # Export all event classes
@@ -245,6 +266,7 @@ __all__ = [
     "ServerContextEvent",
     "MCPClientInitEvent",
     "ConnectorInitEvent",
+    "AdapterUsageEvent",
     "TelemetryTool",
     "TelemetryResource",
     "TelemetryPrompt",
