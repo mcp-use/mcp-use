@@ -1,0 +1,195 @@
+name: Python Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "libraries/python/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/python
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system tomli
+
+      - name: Get current version
+        id: current-version
+        run: |
+          VERSION=$(python -c "
+          import tomli
+          with open('pyproject.toml', 'rb') as f:
+              data = tomli.load(f)
+          print(data['project']['version'])
+          ")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Get latest release version
+        id: latest-release
+        run: |
+          # Get the latest python release tag
+          LATEST_TAG=$(git tag -l "python-v*" --sort=-v:refname | head -n 1)
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous python releases found"
+            echo "version=0.0.0" >> $GITHUB_OUTPUT
+            echo "exists=false" >> $GITHUB_OUTPUT
+          else
+            LATEST_VERSION=${LATEST_TAG#python-v}
+            echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Latest release version: $LATEST_VERSION"
+          fi
+
+      - name: Compare versions
+        id: compare
+        run: |
+          CURRENT="${{ steps.current-version.outputs.version }}"
+          LATEST="${{ steps.latest-release.outputs.version }}"
+          
+          echo "Comparing versions:"
+          echo "  Current: $CURRENT"
+          echo "  Latest:  $LATEST"
+          
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "Version has not changed - skipping release"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version has been bumped - will create release"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate release notes
+        id: release-notes
+        if: steps.compare.outputs.should_release == 'true'
+        run: |
+          VERSION="${{ steps.current-version.outputs.version }}"
+          TAG_NAME="python-v$VERSION"
+          
+          # Get the previous tag for comparison
+          PREV_TAG="${{ steps.latest-release.outputs.exists == 'true' && format('python-v{0}', steps.latest-release.outputs.version) || '' }}"
+          
+          # Generate commit range
+          if [ -z "$PREV_TAG" ]; then
+            COMMIT_RANGE=""
+            RANGE_TEXT="all commits"
+          else
+            COMMIT_RANGE="$PREV_TAG..HEAD"
+            RANGE_TEXT="$PREV_TAG..HEAD"
+          fi
+          
+          echo "## What's Changed in v$VERSION" > notes.md
+          echo "" >> notes.md
+          
+          # Get commits that mention "python" (case insensitive)
+          if [ -z "$COMMIT_RANGE" ]; then
+            COMMITS=$(git log --oneline --grep="python" --grep="Python" --grep="PYTHON" -E)
+          else
+            COMMITS=$(git log --oneline "$COMMIT_RANGE" --grep="python" --grep="Python" --grep="PYTHON" -E)
+          fi
+          
+          if [ -n "$COMMITS" ]; then
+            echo "### Python Changes" >> notes.md
+            echo "" >> notes.md
+            echo "$COMMITS" | while IFS= read -r line; do
+              HASH=$(echo "$line" | awk '{print $1}')
+              MESSAGE=$(echo "$line" | cut -d' ' -f2-)
+              echo "* $MESSAGE (\`$HASH\`)" >> notes.md
+            done
+            echo "" >> notes.md
+          fi
+          
+          # Get contributors
+          echo "### Contributors" >> notes.md
+          echo "" >> notes.md
+          if [ -z "$COMMIT_RANGE" ]; then
+            CONTRIBUTORS=$(git log --format='%an' | sort -u)
+          else
+            CONTRIBUTORS=$(git log "$COMMIT_RANGE" --format='%an' | sort -u)
+          fi
+          echo "$CONTRIBUTORS" | while IFS= read -r contributor; do
+            echo "* @$contributor" >> notes.md
+          done
+          
+          cat notes.md
+          
+          # Save to output (escaped for GitHub Actions)
+          {
+            echo 'notes<<EOF'
+            cat notes.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Check if release already exists
+        id: check-release
+        if: steps.compare.outputs.should_release == 'true'
+        run: |
+          TAG_NAME="python-v${{ steps.current-version.outputs.version }}"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release $TAG_NAME does not exist"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: python-v${{ steps.current-version.outputs.version }}
+          name: Python v${{ steps.current-version.outputs.version }}
+          body: ${{ steps.release-notes.outputs.notes }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build package
+        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false'
+        run: |
+          uv build
+
+      - name: Check if already published to PyPI
+        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false'
+        id: check-pypi
+        run: |
+          # Check if this version exists on PyPI
+          VERSION="${{ steps.current-version.outputs.version }}"
+          if uv pip index versions mcp-use | grep -q "Available versions: .*$VERSION"; then
+            echo "Version $VERSION already exists on PyPI"
+            echo "publish_needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION not found on PyPI, will publish"
+            echo "publish_needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to PyPI
+        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false' && steps.check-pypi.outputs.publish_needed == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: libraries/python/dist/
+
