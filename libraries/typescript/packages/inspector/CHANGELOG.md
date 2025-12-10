@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.12.3
+
+### Patch Changes
+
+- fix: deno 3
+- Updated dependencies
+  - mcp-use@1.10.3
+
 ## 0.12.2
 
 ### Patch Changes
