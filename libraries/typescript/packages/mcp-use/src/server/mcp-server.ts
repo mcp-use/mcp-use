@@ -74,6 +74,7 @@ import {
   createHonoProxy,
   isProductionMode as isProductionModeHelper,
   parseTemplateUri as parseTemplateUriHelper,
+  isDeno,
 } from "./utils/index.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
 import type { OAuthProvider } from "./oauth/providers/types.js";
@@ -194,6 +195,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   constructor(config: ServerConfig) {
     this.config = config;
+
+    // Auto-detect stateless mode: Deno = stateless, Node.js = stateful
+    if (this.config.stateless === undefined) {
+      this.config.stateless = isDeno;
+      if (this.config.stateless) {
+        console.log("[MCP] Deno detected - using stateless mode (no sessions)");
+      }
+    }
+
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
 

@@ -36,9 +36,9 @@ export async function mountMcp(
   // Map to store transports by session ID (following official Hono example from PR #1209)
   const transports = new Map<string, any>();
 
-  // Start idle cleanup interval if configured
+  // Start idle cleanup interval if configured (only in stateful mode)
   let idleCleanupInterval: NodeJS.Timeout | undefined;
-  if (idleTimeoutMs > 0) {
+  if (!config.stateless && idleTimeoutMs > 0) {
     idleCleanupInterval = startIdleCleanup(
       sessions,
       idleTimeoutMs,
@@ -48,85 +48,104 @@ export async function mountMcp(
 
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
-    const sessionId = c.req.header("mcp-session-id");
+    if (config.stateless) {
+      // STATELESS MODE: New server instance per request (Deno default)
+      const server = mcpServerInstance.getServerForSession();
+      const transport = new FetchStreamableHTTPServerTransport({
+        sessionIdGenerator: undefined, // No session tracking
+      });
 
-    if (sessionId && transports.has(sessionId)) {
-      // Reuse existing transport for this session
-      const transport = transports.get(sessionId)!;
-
-      // Update session metadata
-      if (sessions.has(sessionId)) {
-        const session = sessions.get(sessionId)!;
-        session.lastAccessedAt = Date.now();
-        session.context = c;
-        session.honoContext = c;
+      try {
+        await server.connect(transport);
+        return await transport.handleRequest(c.req.raw);
+      } catch (error) {
+        console.error("[MCP] Stateless request error:", error);
+        transport.close();
+        server.close();
+        throw error;
       }
+    } else {
+      // STATEFUL MODE: Session management (Node.js default)
+      const sessionId = c.req.header("mcp-session-id");
+
+      if (sessionId && transports.has(sessionId)) {
+        // Reuse existing transport for this session
+        const transport = transports.get(sessionId)!;
+
+        // Update session metadata
+        if (sessions.has(sessionId)) {
+          const session = sessions.get(sessionId)!;
+          session.lastAccessedAt = Date.now();
+          session.context = c;
+          session.honoContext = c;
+        }
+
+        // Pass Web Standard Request directly - no adapter needed!
+        return transport.handleRequest(c.req.raw);
+      }
+
+      // For new sessions or initialization, create new transport and server
+      const server = mcpServerInstance.getServerForSession();
+      const transport = new FetchStreamableHTTPServerTransport({
+        sessionIdGenerator: () => generateUUID(),
+
+        onsessioninitialized: (sid: string) => {
+          console.log(`[MCP] Session initialized: ${sid}`);
+          transports.set(sid, transport);
+          sessions.set(sid, {
+            transport,
+            server,
+            lastAccessedAt: Date.now(),
+            context: c,
+            honoContext: c,
+          });
+
+          // Capture client capabilities after initialization completes
+          // The server.oninitialized callback fires after the client sends the initialized notification
+          server.server.oninitialized = () => {
+            const clientCapabilities = server.server.getClientCapabilities();
+            const clientInfo = (server.server as any).getClientInfo?.() || {};
+            const protocolVersion =
+              (server.server as any).getProtocolVersion?.() || "unknown";
+
+            if (clientCapabilities && sessions.has(sid)) {
+              const session = sessions.get(sid)!;
+              session.clientCapabilities = clientCapabilities;
+              console.log(
+                `[MCP] Captured client capabilities for session ${sid}:`,
+                Object.keys(clientCapabilities)
+              );
+            }
+
+            // Track server initialize event
+            Telemetry.getInstance()
+              .trackServerInitialize({
+                protocolVersion: String(protocolVersion),
+                clientInfo: clientInfo || {},
+                clientCapabilities: clientCapabilities || {},
+                sessionId: sid,
+              })
+              .catch((e) =>
+                console.debug(`Failed to track server initialize: ${e}`)
+              );
+          };
+        },
+
+        onsessionclosed: (sid: string) => {
+          console.log(`[MCP] Session closed: ${sid}`);
+          transports.delete(sid);
+          sessions.delete(sid);
+          // Clean up resource subscriptions for this session
+          mcpServerInstance.cleanupSessionSubscriptions?.(sid);
+        },
+      });
+
+      // Connect server to transport
+      await server.connect(transport);
 
       // Pass Web Standard Request directly - no adapter needed!
       return transport.handleRequest(c.req.raw);
     }
-
-    // For new sessions or initialization, create new transport and server
-    const server = mcpServerInstance.getServerForSession();
-    const transport = new FetchStreamableHTTPServerTransport({
-      sessionIdGenerator: () => generateUUID(),
-
-      onsessioninitialized: (sid: string) => {
-        console.log(`[MCP] Session initialized: ${sid}`);
-        transports.set(sid, transport);
-        sessions.set(sid, {
-          transport,
-          server,
-          lastAccessedAt: Date.now(),
-          context: c,
-          honoContext: c,
-        });
-
-        // Capture client capabilities after initialization completes
-        // The server.oninitialized callback fires after the client sends the initialized notification
-        server.server.oninitialized = () => {
-          const clientCapabilities = server.server.getClientCapabilities();
-          const clientInfo = (server.server as any).getClientInfo?.() || {};
-          const protocolVersion =
-            (server.server as any).getProtocolVersion?.() || "unknown";
-
-          if (clientCapabilities && sessions.has(sid)) {
-            const session = sessions.get(sid)!;
-            session.clientCapabilities = clientCapabilities;
-            console.log(
-              `[MCP] Captured client capabilities for session ${sid}:`,
-              Object.keys(clientCapabilities)
-            );
-          }
-
-          // Track server initialize event
-          Telemetry.getInstance()
-            .trackServerInitialize({
-              protocolVersion: String(protocolVersion),
-              clientInfo: clientInfo || {},
-              clientCapabilities: clientCapabilities || {},
-              sessionId: sid,
-            })
-            .catch((e) =>
-              console.debug(`Failed to track server initialize: ${e}`)
-            );
-        };
-      },
-
-      onsessionclosed: (sid: string) => {
-        console.log(`[MCP] Session closed: ${sid}`);
-        transports.delete(sid);
-        sessions.delete(sid);
-        // Clean up resource subscriptions for this session
-        mcpServerInstance.cleanupSessionSubscriptions?.(sid);
-      },
-    });
-
-    // Connect server to transport
-    await server.connect(transport);
-
-    // Pass Web Standard Request directly - no adapter needed!
-    return transport.handleRequest(c.req.raw);
   };
 
   // Mount the handler for all HTTP methods on both /mcp and /sse
@@ -135,7 +154,7 @@ export async function mountMcp(
   }
 
   console.log(
-    `[MCP] Server mounted at /mcp and /sse (using FetchStreamableHTTPServerTransport - Web Standard APIs)`
+    `[MCP] Server mounted at /mcp and /sse (${config.stateless ? "stateless" : "stateful"} mode)`
   );
 
   return { mcpMounted: true, idleCleanupInterval };
