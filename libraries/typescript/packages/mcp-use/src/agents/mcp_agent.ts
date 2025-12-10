@@ -48,6 +48,56 @@ export interface AgentStep {
   observation: string;
 }
 
+/**
+ * Options for agent run, stream, and streamEvents methods
+ */
+export interface RunOptions<T = string> {
+  prompt: string;
+  maxSteps?: number;
+  manageConnector?: boolean;
+  externalHistory?: BaseMessage[];
+  schema?: ZodSchema<T>;
+}
+
+/**
+ * Helper function to normalize run options from either old-style positional arguments
+ * or new-style options object
+ */
+function normalizeRunOptions<T>(
+  queryOrOptions: string | RunOptions<T>,
+  maxSteps?: number,
+  manageConnector?: boolean,
+  externalHistory?: BaseMessage[],
+  outputSchema?: ZodSchema<T>
+): {
+  query: string;
+  maxSteps?: number;
+  manageConnector?: boolean;
+  externalHistory?: BaseMessage[];
+  outputSchema?: ZodSchema<T>;
+} {
+  // Check if first argument is an options object
+  if (typeof queryOrOptions === "object" && queryOrOptions !== null) {
+    const options = queryOrOptions as RunOptions<T>;
+    return {
+      query: options.prompt,
+      maxSteps: options.maxSteps,
+      manageConnector: options.manageConnector,
+      externalHistory: options.externalHistory,
+      outputSchema: options.schema,
+    };
+  }
+
+  // Old-style positional arguments
+  return {
+    query: queryOrOptions as string,
+    maxSteps,
+    manageConnector,
+    externalHistory,
+    outputSchema,
+  };
+}
+
 export class MCPAgent {
   /**
    * Get the mcp-use package version.
@@ -1025,7 +1075,18 @@ export class MCPAgent {
   }
 
   /**
+   * Runs the agent with options object and returns a promise for the final result.
+   */
+  public async run(options: RunOptions): Promise<string>;
+
+  /**
+   * Runs the agent with options object and structured output, returns a promise for the typed result.
+   */
+  public async run<T>(options: RunOptions<T>): Promise<T>;
+
+  /**
    * Runs the agent and returns a promise for the final result.
+   * @deprecated Use options object instead: run({ prompt, maxSteps, ... })
    */
   public async run(
     query: string,
@@ -1036,6 +1097,7 @@ export class MCPAgent {
 
   /**
    * Runs the agent with structured output and returns a promise for the typed result.
+   * @deprecated Use options object instead: run({ prompt, schema, maxSteps, ... })
    */
   public async run<T>(
     query: string,
@@ -1046,48 +1108,92 @@ export class MCPAgent {
   ): Promise<T>;
 
   public async run<T>(
-    query: string,
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector?: boolean,
     externalHistory?: BaseMessage[],
     outputSchema?: ZodSchema<T>
   ): Promise<string | T> {
-    // Delegate to remote agent if in remote mode
-    if (this.isRemote && this.remoteAgent) {
-      return this.remoteAgent.run(
-        query,
-        maxSteps,
-        manageConnector,
-        externalHistory,
-        outputSchema
-      );
-    }
-
-    const generator = this.stream<T>(
+    // Normalize input to internal parameters
+    const {
       query,
+      maxSteps: steps,
+      manageConnector: manage,
+      externalHistory: history,
+      outputSchema: schema,
+    } = normalizeRunOptions(
+      queryOrOptions,
       maxSteps,
       manageConnector,
       externalHistory,
       outputSchema
     );
+
+    // Delegate to remote agent if in remote mode
+    if (this.isRemote && this.remoteAgent) {
+      return this.remoteAgent.run(query, steps, manage, history, schema);
+    }
+
+    const generator = this.stream<T>(query, steps, manage, history, schema);
     return this._consumeAndReturn(generator);
   }
 
+  /**
+   * Streams the agent execution with options object and returns string result.
+   */
+  public async *stream(
+    options: RunOptions
+  ): AsyncGenerator<AgentStep, string, void>;
+
+  /**
+   * Streams the agent execution with options object and structured output.
+   */
+  public async *stream<T>(
+    options: RunOptions<T>
+  ): AsyncGenerator<AgentStep, T, void>;
+
+  /**
+   * Streams the agent execution and yields agent steps.
+   * @deprecated Use options object instead: stream({ prompt, maxSteps, ... })
+   */
   public async *stream<T = string>(
     query: string,
+    maxSteps?: number,
+    manageConnector?: boolean,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): AsyncGenerator<AgentStep, string | T, void>;
+
+  public async *stream<T = string>(
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector = true,
     externalHistory?: BaseMessage[],
     outputSchema?: ZodSchema<T>
   ): AsyncGenerator<AgentStep, string | T, void> {
+    // Normalize input to internal parameters
+    const {
+      query,
+      maxSteps: steps,
+      manageConnector: manage,
+      externalHistory: history,
+      outputSchema: schema,
+    } = normalizeRunOptions(
+      queryOrOptions,
+      maxSteps,
+      manageConnector,
+      externalHistory,
+      outputSchema
+    );
+
     // Delegate to remote agent if in remote mode
     if (this.isRemote && this.remoteAgent) {
       const result = await this.remoteAgent.run(
         query,
-        maxSteps,
-        manageConnector,
-        externalHistory,
-        outputSchema
+        steps,
+        manage,
+        history,
+        schema
       );
       return result as string | T;
     }
@@ -1100,7 +1206,7 @@ export class MCPAgent {
 
     try {
       // 1. Initialize if needed
-      if (manageConnector && !this._initialized) {
+      if (manage && !this._initialized) {
         await this.initialize();
         initializedHere = true;
       } else if (!this._initialized && this.autoInitialize) {
@@ -1135,7 +1241,7 @@ export class MCPAgent {
       }
 
       // 2. Build inputs for the agent
-      const historyToUse = externalHistory ?? this.conversationHistory;
+      const historyToUse = history ?? this.conversationHistory;
 
       // Convert messages to format expected by LangChain agent
       const langchainHistory: BaseMessage[] = [];
@@ -1346,13 +1452,13 @@ export class MCPAgent {
       }
 
       // 5. Handle structured output if requested
-      if (outputSchema && finalOutput) {
+      if (schema && finalOutput) {
         try {
           logger.info("🔧 Attempting structured output...");
           const structuredResult = await this._attemptStructuredOutput<T>(
             finalOutput,
             this.llm!,
-            outputSchema
+            schema
           );
 
           if (this.memoryEnabled) {
@@ -1382,7 +1488,7 @@ export class MCPAgent {
       return (finalOutput || "No output generated") as string | T;
     } catch (e) {
       logger.error(`❌ Error running query: ${e}`);
-      if (initializedHere && manageConnector) {
+      if (initializedHere && manage) {
         logger.info("🧹 Cleaning up resources after error");
         await this.close();
       }
@@ -1420,9 +1526,9 @@ export class MCPAgent {
         maxStepsConfigured: this.maxSteps,
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
-        maxStepsUsed: maxSteps ?? null,
-        manageConnector,
-        externalHistoryUsed: externalHistory !== undefined,
+        maxStepsUsed: steps ?? null,
+        manageConnector: manage,
+        externalHistoryUsed: history !== undefined,
         stepsTaken,
         toolsUsedCount: this.toolsUsedNames.length,
         toolsUsedNames: this.toolsUsedNames,
@@ -1433,7 +1539,7 @@ export class MCPAgent {
       });
 
       // Clean up if necessary
-      if (manageConnector && !this.client && initializedHere) {
+      if (manage && !this.client && initializedHere) {
         logger.info("🧹 Closing agent after stream completion");
         await this.close();
       }
@@ -1508,11 +1614,34 @@ export class MCPAgent {
   }
 
   /**
+   * Yields with pretty-printed output for code mode with options object.
+   */
+  public async *prettyStreamEvents(
+    options: RunOptions
+  ): AsyncGenerator<void, string, void>;
+
+  /**
+   * Yields with pretty-printed output for code mode with options object and structured output.
+   */
+  public async *prettyStreamEvents<T>(
+    options: RunOptions<T>
+  ): AsyncGenerator<void, string, void>;
+
+  /**
    * Yields with pretty-printed output for code mode.
    * This method formats and displays tool executions in a user-friendly way with syntax highlighting.
+   * @deprecated Use options object instead: prettyStreamEvents({ prompt, maxSteps, ... })
    */
   public async *prettyStreamEvents<T = string>(
     query: string,
+    maxSteps?: number,
+    manageConnector?: boolean,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): AsyncGenerator<void, string, void>;
+
+  public async *prettyStreamEvents<T = string>(
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector = true,
     externalHistory?: BaseMessage[],
@@ -1524,7 +1653,7 @@ export class MCPAgent {
 
     for await (const _ of prettyStream(
       this.streamEvents(
-        query,
+        queryOrOptions as any,
         maxSteps,
         manageConnector,
         externalHistory,
@@ -1538,16 +1667,55 @@ export class MCPAgent {
   }
 
   /**
+   * Yields LangChain StreamEvent objects with options object.
+   */
+  public async *streamEvents(
+    options: RunOptions
+  ): AsyncGenerator<StreamEvent, void, void>;
+
+  /**
+   * Yields LangChain StreamEvent objects with options object and structured output.
+   */
+  public async *streamEvents<T>(
+    options: RunOptions<T>
+  ): AsyncGenerator<StreamEvent, void, void>;
+
+  /**
    * Yields LangChain StreamEvent objects from the underlying streamEvents() method.
    * This provides token-level streaming and fine-grained event updates.
+   * @deprecated Use options object instead: streamEvents({ prompt, maxSteps, ... })
    */
   public async *streamEvents<T = string>(
     query: string,
+    maxSteps?: number,
+    manageConnector?: boolean,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): AsyncGenerator<StreamEvent, void, void>;
+
+  public async *streamEvents<T = string>(
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector = true,
     externalHistory?: BaseMessage[],
     outputSchema?: ZodSchema<T>
   ): AsyncGenerator<StreamEvent, void, void> {
+    // Normalize input to internal parameters
+    const normalized = normalizeRunOptions(
+      queryOrOptions,
+      maxSteps,
+      manageConnector,
+      externalHistory,
+      outputSchema
+    );
+    let { query } = normalized;
+    const {
+      maxSteps: steps,
+      manageConnector: manage,
+      externalHistory: history,
+      outputSchema: schema,
+    } = normalized;
+
     let initializedHere = false;
     const startTime = Date.now();
     let success = false;
@@ -1556,13 +1724,13 @@ export class MCPAgent {
     let finalResponse = "";
 
     // Enhance query with schema information if structured output is requested
-    if (outputSchema) {
-      query = this._enhanceQueryWithSchema(query, outputSchema);
+    if (schema) {
+      query = this._enhanceQueryWithSchema(query, schema);
     }
 
     try {
       // Initialize if needed
-      if (manageConnector && !this._initialized) {
+      if (manage && !this._initialized) {
         await this.initialize();
         initializedHere = true;
       } else if (!this._initialized && this.autoInitialize) {
@@ -1576,7 +1744,7 @@ export class MCPAgent {
       }
 
       // Set max iterations
-      this.maxSteps = maxSteps ?? this.maxSteps;
+      this.maxSteps = steps ?? this.maxSteps;
 
       const display_query =
         typeof query === "string" && query.length > 50
@@ -1593,7 +1761,7 @@ export class MCPAgent {
       }
 
       // Prepare history
-      const historyToUse = externalHistory ?? this.conversationHistory;
+      const historyToUse = history ?? this.conversationHistory;
       const langchainHistory: BaseMessage[] = [];
       for (const msg of historyToUse) {
         if (
@@ -1694,7 +1862,7 @@ export class MCPAgent {
       }
 
       // Convert to structured output if requested
-      if (outputSchema && finalResponse) {
+      if (schema && finalResponse) {
         logger.info("🔧 Attempting structured output conversion...");
 
         try {
@@ -1703,11 +1871,7 @@ export class MCPAgent {
           let conversionResult: T | null = null;
           let conversionError: Error | null = null;
 
-          this._attemptStructuredOutput<T>(
-            finalResponse,
-            this.llm!,
-            outputSchema
-          )
+          this._attemptStructuredOutput<T>(finalResponse, this.llm!, schema)
             .then((result) => {
               conversionCompleted = true;
               conversionResult = result;
@@ -1778,7 +1942,7 @@ export class MCPAgent {
       success = true;
     } catch (e) {
       logger.error(`❌ Error during streamEvents: ${e}`);
-      if (initializedHere && manageConnector) {
+      if (initializedHere && manage) {
         logger.info(
           "🧹 Cleaning up resources after initialization error in streamEvents"
         );
@@ -1815,9 +1979,9 @@ export class MCPAgent {
         maxStepsConfigured: this.maxSteps,
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
-        maxStepsUsed: maxSteps ?? null,
-        manageConnector,
-        externalHistoryUsed: externalHistory !== undefined,
+        maxStepsUsed: steps ?? null,
+        manageConnector: manage,
+        externalHistoryUsed: history !== undefined,
         response: `[STREAMED RESPONSE - ${totalResponseLength} chars]`,
         executionTimeMs,
         errorType: success ? null : "streaming_error",
@@ -1825,7 +1989,7 @@ export class MCPAgent {
       });
 
       // Clean up if needed
-      if (manageConnector && !this.client && initializedHere) {
+      if (manage && !this.client && initializedHere) {
         logger.info("🧹 Closing agent after streamEvents completion");
         await this.close();
       }

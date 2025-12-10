@@ -5,11 +5,50 @@
 import type { ZodSchema } from "zod";
 import { toJSONSchema } from "zod";
 import { logger } from "../logging.js";
+import type { RunOptions } from "./mcp_agent.js";
 import type { BaseMessage } from "./types.js";
 
 // API endpoint constants
 const API_CHATS_ENDPOINT = "/api/v1/chats";
 const API_CHAT_EXECUTE_ENDPOINT = "/api/v1/chats/{chat_id}/execute";
+
+/**
+ * Helper function to normalize run options for remote agent
+ */
+function normalizeRemoteRunOptions<T>(
+  queryOrOptions: string | RunOptions<T>,
+  maxSteps?: number,
+  manageConnector?: boolean,
+  externalHistory?: BaseMessage[],
+  outputSchema?: ZodSchema<T>
+): {
+  query: string;
+  maxSteps?: number;
+  manageConnector?: boolean;
+  externalHistory?: BaseMessage[];
+  outputSchema?: ZodSchema<T>;
+} {
+  // Check if first argument is an options object
+  if (typeof queryOrOptions === "object" && queryOrOptions !== null) {
+    const options = queryOrOptions as RunOptions<T>;
+    return {
+      query: options.prompt,
+      maxSteps: options.maxSteps,
+      manageConnector: options.manageConnector,
+      externalHistory: options.externalHistory,
+      outputSchema: options.schema,
+    };
+  }
+
+  // Old-style positional arguments
+  return {
+    query: queryOrOptions as string,
+    maxSteps,
+    manageConnector,
+    externalHistory,
+    outputSchema,
+  };
+}
 
 export class RemoteAgent {
   private agentId: string;
@@ -145,8 +184,30 @@ export class RemoteAgent {
     }
   }
 
+  /**
+   * Runs the remote agent with options object and returns a promise for the final result.
+   */
+  public async run(options: RunOptions): Promise<string>;
+
+  /**
+   * Runs the remote agent with options object and structured output.
+   */
+  public async run<T>(options: RunOptions<T>): Promise<T>;
+
+  /**
+   * Runs the remote agent and returns a promise for the final result.
+   * @deprecated Use options object instead: run({ prompt, maxSteps, ... })
+   */
   public async run<T = string>(
     query: string,
+    maxSteps?: number,
+    manageConnector?: boolean,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): Promise<T>;
+
+  public async run<T = string>(
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector?: boolean,
     externalHistory?: BaseMessage[],
@@ -155,7 +216,21 @@ export class RemoteAgent {
     /**
      * Run a query on the remote agent.
      */
-    if (externalHistory !== undefined) {
+    // Normalize input to internal parameters
+    const {
+      query,
+      maxSteps: steps,
+      externalHistory: history,
+      outputSchema: schema,
+    } = normalizeRemoteRunOptions(
+      queryOrOptions,
+      maxSteps,
+      manageConnector,
+      externalHistory,
+      outputSchema
+    );
+
+    if (history !== undefined) {
       logger.warn("External history is not yet supported for remote execution");
     }
 
@@ -172,13 +247,12 @@ export class RemoteAgent {
       // Step 2: Execute the agent within the chat context
       const executionPayload: any = {
         query,
-        max_steps: maxSteps ?? 10,
+        max_steps: steps ?? 10,
       };
 
       // Add structured output schema if provided
-      if (outputSchema) {
-        executionPayload.output_schema =
-          this.pydanticToJsonSchema(outputSchema);
+      if (schema) {
+        executionPayload.output_schema = this.pydanticToJsonSchema(schema);
         logger.info(`🔧 Using structured output with schema`);
       }
 
@@ -270,8 +344,8 @@ export class RemoteAgent {
       }
 
       // Handle structured output
-      if (outputSchema) {
-        return this.parseStructuredResponse(result, outputSchema);
+      if (schema) {
+        return this.parseStructuredResponse(result, schema);
       }
 
       // Regular string output
@@ -300,9 +374,34 @@ export class RemoteAgent {
     }
   }
 
-  // eslint-disable-next-line require-yield
+  /**
+   * Streams the remote agent execution with options object.
+   */
+
+  public async *stream(options: RunOptions): AsyncGenerator<any, string, void>;
+
+  /**
+   * Streams the remote agent execution with options object and structured output.
+   */
+
+  public async *stream<T>(options: RunOptions<T>): AsyncGenerator<any, T, void>;
+
+  /**
+   * Streams the remote agent execution.
+   * @deprecated Use options object instead: stream({ prompt, maxSteps, ... })
+   */
+
   public async *stream<T = string>(
     query: string,
+    maxSteps?: number,
+    manageConnector?: boolean,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): AsyncGenerator<any, T, void>;
+
+  // eslint-disable-next-line require-yield
+  public async *stream<T = string>(
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector?: boolean,
     externalHistory?: BaseMessage[],
@@ -313,7 +412,7 @@ export class RemoteAgent {
      * In the future, this could be enhanced to support actual streaming from the API.
      */
     const result = await this.run(
-      query,
+      queryOrOptions as any,
       maxSteps,
       manageConnector,
       externalHistory,

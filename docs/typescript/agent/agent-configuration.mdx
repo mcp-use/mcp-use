@@ -4,6 +4,8 @@ description: "Configure your agents and LLM settings"
 icon: "cog"
 ---
 
+import { CodeSandbox } from '/snippets/codesandbox.jsx'
+
 Configure your MCPAgent to customize behavior, set LLM parameters, enable features, and optimize for your specific use case. This guide covers all configuration options available when creating and running agents.
 
 <Info>
@@ -36,7 +38,7 @@ const agent = new MCPAgent({
 })
 ```
 
-<CodeSandbox title="Edit mcp-use-get-started-agent" id="sweet-drake-m76ys6"></CodeSandbox>
+<CodeSandbox title="Edit mcp-use-get-started-agent" id="sweet-drake-m76ys6"/>
 
 ## Agent Parameters
 
@@ -49,33 +51,6 @@ const advancedAgent = new MCPAgent({
     llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.7 }),
     client: new MCPClient(config),
     maxSteps: 30,
-    serverName: undefined,
-    autoInitialize: true,
-    memoryEnabled: true,
-    systemPrompt: 'Custom instructions for the agent',
-    additionalInstructions: 'Additional guidelines for specific tasks',
-    disallowedTools: ['file_system', 'network', 'shell']  // Restrict potentially dangerous tools
-})
-```
-
-```typescript TypeScript
-import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-// Basic configuration
-const config = await loadConfigFile('config.json')
-const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.7 }),
-    client: new MCPClient(config),
-    maxSteps: 30
-})
-
-// Advanced configuration
-const advancedAgent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.7 }),
-    client: new MCPClient(config),
-    maxSteps: 30,
-    serverName: undefined,
     autoInitialize: true,
     memoryEnabled: true,
     systemPrompt: 'Custom instructions for the agent',
@@ -90,15 +65,14 @@ const advancedAgent = new MCPAgent({
 - `llm`: Any LangChain-compatible language model (required)
 - `client`: The MCPClient instance (optional if connectors are provided)
 - `connectors`: List of connectors if not using client (optional)
-- `server_name`: Name of the server to use (optional)
-- `max_steps`: Maximum number of steps the agent can take (default: 5)
-- `auto_initialize`: Whether to initialize automatically (default: False)
-- `memory_enabled`: Whether to enable memory (default: True)
-- `system_prompt`: Custom system prompt (optional)
-- `system_prompt_template`: Custom system prompt template (optional)
-- `additional_instructions`: Additional instructions for the agent (optional)
-- `disallowed_tools`: List of tool names that should not be available to the agent (optional)
-- `use_server_manager`: Enable dynamic server selection (default: False)
+- `maxSteps`: Maximum number of steps the agent can take (default: 5)
+- `autoInitialize`: Whether to initialize automatically (default: false)
+- `memoryEnabled`: Whether to enable memory (default: true)
+- `systemPrompt`: Custom system prompt (optional)
+- `systemPromptTemplate`: Custom system prompt template (optional)
+- `additionalInstructions`: Additional instructions for the agent (optional)
+- `disallowedTools`: List of tool names that should not be available to the agent (optional)
+- `useServerManager`: Enable dynamic server selection (default: false)
 
 ## Tool Access Control
 
@@ -106,99 +80,17 @@ You can restrict which tools are available to the agent for security or to limit
 
 <CodeGroup>
 ```typescript TypeScript
-import { config } from 'dotenv'
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
+...
+// mcp sevrers with filesystem, network, shell, and database
 
-async function main() {
-    // Load environment variables
-    config()
+const agent = new MCPAgent({
+  llm,
+  client,
+  disallowedTools: ['file_system', 'network', 'shell', 'database']
+})
 
-    // Create configuration object
-    const configuration = {
-        mcpServers: {
-            playwright: {
-                command: 'npx',
-                args: ['@playwright/mcp@latest'],
-                env: {
-                    DISPLAY: ':1'
-                }
-            }
-        }
-    }
+...
 
-    // Create MCPClient from configuration object
-    const client = new MCPClient(configuration)
-
-    // Create LLM
-    const llm = new ChatOpenAI({ model: 'gpt-4o' })
-
-    // Create agent with restricted tools
-    const agent = new MCPAgent({
-        llm,
-        client,
-        maxSteps: 30,
-        disallowedTools: ['file_system', 'network']  // Restrict potentially dangerous tools
-    })
-
-    // Run the query
-    const result = await agent.run(
-        'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
-    )
-    console.log(`\nResult: ${result}`)
-
-    await client.closeAllSessions()
-}
-
-main().catch(console.error)
-```
-
-```typescript TypeScript
-import { config } from 'dotenv'
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
-
-async function main() {
-    // Load environment variables
-    config()
-
-    // Create configuration object
-    const configuration = {
-        mcpServers: {
-            playwright: {
-                command: 'npx',
-                args: ['@playwright/mcp@latest'],
-                env: {
-                    DISPLAY: ':1'
-                }
-            }
-        }
-    }
-
-    // Create MCPClient from configuration object
-    const client = new MCPClient(configuration)
-
-    // Create LLM
-    const llm = new ChatOpenAI({ model: 'gpt-4o' })
-
-    // Create agent with restricted tools
-    const agent = new MCPAgent({
-        llm,
-        client,
-        maxSteps: 30,
-        disallowedTools: ['file_system', 'network']  // Restrict potentially dangerous tools
-    })
-
-    // Run the query
-    const result = await agent.run(
-        'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
-    )
-    console.log(`\nResult: ${result}`)
-
-    await client.closeAllSessions()
-}
-
-main().catch(console.error)
 ```
 </CodeGroup>
 
@@ -214,51 +106,17 @@ await agent.initialize()  // Reinitialize to apply changes
 const restrictedTools = agent.getDisallowedTools()
 console.log(`Restricted tools: ${restrictedTools}`)
 ```
-
-```typescript TypeScript
-// Update restrictions after initialization
-agent.setDisallowedTools(['file_system', 'network', 'shell', 'database'])
-await agent.initialize()  // Reinitialize to apply changes
-
-// Check current restrictions
-const restrictedTools = agent.getDisallowedTools()
-console.log(`Restricted tools: ${restrictedTools}`)
-```
 </CodeGroup>
 
-This feature is useful for:
-
-- Restricting access to sensitive operations
-- Limiting agent capabilities for specific tasks
-- Preventing the agent from using potentially dangerous tools
-- Focusing the agent on specific functionality
-
-## Working with Adapters Directly
-
-If you want more control over how tools are created, you can work with the adapters directly. The `BaseAdapter` class provides a unified interface for converting MCP tools to various framework formats, with `LangChainAdapter` being the most commonly used implementation.
-
-The adapter pattern makes it easy to:
-
-1. Create tools directly from an MCPClient
-2. Filter or customize which tools are available
-3. Integrate with different agent frameworks
-
-**Benefits of Direct Adapter Usage:**
-- **Flexibility**: More control over tool creation and management
-- **Custom Integration**: Easier to integrate with existing LangChain workflows
-- **Advanced Filtering**: Apply custom logic to tool selection and configuration
-- **Framework Agnostic**: Potential for future adapters to other frameworks
 
 ## Server Manager
 
 The Server Manager is an agent-level feature that enables dynamic server selection for improved performance with multi-server setups.
 
-### Enabling Server Manager
 
-To improve efficiency and potentially reduce agent confusion when many tools are available, you can enable the Server Manager by setting `use_server_manager=True` when creating the `MCPAgent`.
+To improve efficiency and potentially reduce agent confusion when many tools are available, you can enable the Server Manager by setting `useServerManager: true` when creating the `MCPAgent`.
 
-<CodeGroup>
-```typescript TypeScript
+```typescript
 // Enable server manager for automatic server selection
 const agent = new MCPAgent({
     llm,
@@ -266,78 +124,14 @@ const agent = new MCPAgent({
     useServerManager: true  // Enable dynamic server selection
 })
 ```
-
-```typescript TypeScript
-// Enable server manager for automatic server selection
-const agent = new MCPAgent({
-    llm,
-    client,
-    useServerManager: true  // Enable dynamic server selection
-})
-```
-</CodeGroup>
-
-### How It Works
-
-When enabled, the agent will automatically select the appropriate server based on the tool chosen by the LLM for each step. This avoids connecting to unnecessary servers and can improve performance with large numbers of available servers.
-
-<CodeGroup>
-```typescript TypeScript
-// Multi-server setup with server manager
-const config = await loadConfigFile('multi_server_config.json')
-const client = new MCPClient(config)
-const agent = new MCPAgent({
-    llm,
-    client,
-    useServerManager: true
-})
-
-// The agent automatically selects servers based on tool usage
-const result = await agent.run(
-    'Search for a place in Barcelona on Airbnb, then Google nearby restaurants.'
-)
-```
-
-```typescript TypeScript
-// Multi-server setup with server manager
-const config = await loadConfigFile('multi_server_config.json')
-const client = new MCPClient(config)
-const agent = new MCPAgent({
-    llm,
-    client,
-    useServerManager: true
-})
-
-// The agent automatically selects servers based on tool usage
-const result = await agent.run(
-    'Search for a place in Barcelona on Airbnb, then Google nearby restaurants.'
-)
-```
-</CodeGroup>
-
-### Benefits
-
-- **Performance**: Only connects to servers when their tools are actually needed
-- **Reduced Confusion**: Agents work better with focused tool sets rather than many tools at once
-- **Resource Efficiency**: Saves memory and connection overhead
-- **Automatic Selection**: No need to manually specify `server_name` for most use cases
-- **Scalability**: Better performance with large numbers of servers
-
-### When to Use
-
-- **Multi-server environments**: Essential for setups with 3+ servers
-- **Resource-constrained environments**: When memory or connection limits are a concern
-- **Complex workflows**: When agents need to dynamically choose between different tool categories
-- **Production deployments**: For better resource management and performance
 
 For more details on server manager implementation, see the [Server Manager](./server-manager) guide.
 
-## Memory Configuration
+## Memory
 
 MCPAgent supports conversation memory to maintain context across interactions:
 
-<CodeGroup>
-```typescript TypeScript
+```typescript
 // Enable memory (default)
 const agent = new MCPAgent({
     llm,
@@ -353,31 +147,13 @@ const statelessAgent = new MCPAgent({
 })
 ```
 
-```typescript TypeScript
-// Enable memory (default)
-const agent = new MCPAgent({
-    llm,
-    client,
-    memoryEnabled: true
-})
+For more details on memory management, see the [Memory Management](/typescript/agent/memory-management) guide.
 
-// Disable memory for stateless interactions
-const statelessAgent = new MCPAgent({
-    llm,
-    client,
-    memoryEnabled: false
-})
-```
-</CodeGroup>
-
-## System Prompt Customization
+## System Prompt
 
 You can customize the agent's behavior through system prompts:
 
-### Custom System Prompt
-
-<CodeGroup>
-```typescript TypeScript
+```typescript
 const customPrompt = `
 You are a helpful assistant specialized in data analysis.
 Always provide detailed explanations for your reasoning.
@@ -391,177 +167,14 @@ const agent = new MCPAgent({
 })
 ```
 
-```typescript TypeScript
-const customPrompt = `
-You are a helpful assistant specialized in data analysis.
-Always provide detailed explanations for your reasoning.
-When working with data, prioritize accuracy over speed.
-`
+## Next Steps
 
-const agent = new MCPAgent({
-    llm,
-    client,
-    systemPrompt: customPrompt
-})
-```
-</CodeGroup>
-
-### Additional Instructions
-
-Add task-specific instructions without replacing the base system prompt:
-
-<CodeGroup>
-```typescript TypeScript
-const agent = new MCPAgent({
-    llm,
-    client,
-    additionalInstructions: 'Focus on finding recent information from the last 6 months.'
-})
-```
-
-```typescript TypeScript
-const agent = new MCPAgent({
-    llm,
-    client,
-    additionalInstructions: 'Focus on finding recent information from the last 6 months.'
-})
-```
-</CodeGroup>
-
-### System Prompt Templates
-
-For more advanced customization, you can provide a custom system prompt template:
-
-## Performance Configuration
-
-Configure agent performance characteristics:
-
-## Debugging Configuration
-
-Enable debugging features during development:
-
-## Agent Initialization
-
-Control when and how the agent initializes:
-
-## Error Handling
-
-Configure how the agent handles errors:
-
-## Common Configuration Patterns
-
-### Development Setup
-
-<CodeGroup>
-```typescript TypeScript
-// Simple development configuration
-import { config } from 'dotenv'
-import { loadConfigFile, MCPAgent, MCPClient } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-config()
-
-const configuration = await loadConfigFile('dev-config.json')
-const client = new MCPClient(configuration)
-const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o' }),
-    client,
-    maxSteps: 10,
-    verbose: true
-})
-```
-
-```typescript TypeScript
-// Simple development configuration
-import { config } from 'dotenv'
-import { loadConfigFile, MCPAgent, MCPClient } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-config()
-
-const configuration = await loadConfigFile('dev-config.json')
-const client = new MCPClient(configuration)
-const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o' }),
-    client,
-    maxSteps: 10,
-    verbose: true
-})
-```
-</CodeGroup>
-
-### Production Setup
-
-<CodeGroup>
-```typescript TypeScript
-// Production configuration with restrictions
-const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.1 }),
-    client,
-    maxSteps: 30,
-    disallowedTools: ['file_system', 'shell'],
-    useServerManager: true,
-    memoryEnabled: true
-})
-```
-
-```typescript TypeScript
-// Production configuration with restrictions
-const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.1 }),
-    client,
-    maxSteps: 30,
-    disallowedTools: ['file_system', 'shell'],
-    useServerManager: true,
-    memoryEnabled: true
-})
-```
-</CodeGroup>
-
-### Multi-Server Setup
-
-<CodeGroup>
-```typescript TypeScript
-// Complex multi-server configuration
-const config = await loadConfigFile('multi-server.json')
-const client = new MCPClient(config)
-const agent = new MCPAgent({
-    llm,
-    client,
-    useServerManager: true,  // Auto-select servers
-    systemPrompt: 'You have access to web browsing, file operations, and API tools.'
-})
-```
-
-```typescript TypeScript
-// Complex multi-server configuration
-const config = await loadConfigFile('multi-server.json')
-const client = new MCPClient(config)
-const agent = new MCPAgent({
-    llm,
-    client,
-    useServerManager: true,  // Auto-select servers
-    systemPrompt: 'You have access to web browsing, file operations, and API tools.'
-})
-```
-</CodeGroup>
-
-## Best Practices
-
-1. **LLM Selection**: Use models with tool calling capabilities
-2. **Step Limits**: Set reasonable `max_steps` to prevent runaway execution
-3. **Tool Restrictions**: Use `disallowed_tools` for security
-4. **Memory Management**: Disable memory for stateless use cases
-5. **Server Manager**: Enable for multi-server setups
-6. **System Prompts**: Customize for domain-specific tasks
-7. **Error Handling**: Implement proper timeout and retry logic
-8. **Testing**: Test agent configurations in development environments
-
-## Common Issues
-
-1. **No Tools Available**: Check client configuration and server connections
-2. **Tool Execution Failures**: Enable verbose logging and check tool arguments
-3. **Memory Issues**: Disable memory or limit concurrent servers
-4. **Timeout Errors**: Increase `max_steps` or agent timeout values
-
-For detailed information, see the [Logging](/typescript/advanced/logging) guide.
+- [Memory Management](/typescript/agent/memory-management)
+- [Server Manager](/typescript/agent/server-manager)
+- [Tool Access Control](/typescript/agent/tool-access-control)
+- [System Prompt](/typescript/agent/system-prompt)
+- [Memory](/typescript/agent/memory)
+- [Server Manager](/typescript/agent/server-manager)
+- [Tool Access Control](/typescript/agent/tool-access-control)
+- [System Prompt](/typescript/agent/system-prompt)
+- [Memory](/typescript/agent/memory)

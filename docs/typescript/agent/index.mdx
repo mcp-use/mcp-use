@@ -73,7 +73,9 @@ const llm = new ChatOpenAI({ model: "gpt-5.1" });
 
 const agent = new MCPAgent({ llm, client, maxSteps: 50 });
 
-agent.run("What is in the current folder?").then(async (response) => {
+agent.run({ 
+  prompt: "What is in the current folder?" 
+}).then(async (response) => {
   console.log(response);
   await agent.close();
 });
@@ -127,7 +129,8 @@ Generate type-safe responses with Zod schema validation. The agent can return st
 ```typescript
 import { z } from 'zod'
 
-const result = await agent.run('Analyze the file structure', {
+const result = await agent.run({
+  prompt: 'Analyze the file structure',
   schema: z.object({
     totalFiles: z.number(),
     fileTypes: z.array(z.string()),
@@ -146,9 +149,23 @@ console.log(result.totalFiles)
 Stream agent responses in real-time for better user experience and immediate feedback:
 
 ```typescript
-for await (const chunk of agent.stream('Write a report')) {
-  if (chunk.type === 'text') {
-    process.stdout.write(chunk.content)
+// Step-by-step streaming
+for await (const step of agent.stream({ prompt: 'Write a report' })) {
+  console.log(`Tool: ${step.action.tool}`)
+}
+
+// Pretty formatted streaming (great for CLI tools)
+for await (const _ of agent.prettyStreamEvents({ 
+  prompt: 'Analyze the codebase',
+  maxSteps: 20 
+})) {
+  // Automatic syntax highlighting and formatting
+}
+
+// Low-level event streaming
+for await (const event of agent.streamEvents({ prompt: 'Generate content' })) {
+  if (event.event === 'on_chat_model_stream') {
+    process.stdout.write(event.data?.chunk?.content || '')
   }
 }
 ```
@@ -166,8 +183,8 @@ const agent = new MCPAgent({
   memoryEnabled: true  // Enable automatic memory management
 })
 
-await agent.run("Hello, my name is Alice")
-await agent.run("What's my name?")  // Agent remembers Alice
+await agent.run({ prompt: "Hello, my name is Alice" })
+await agent.run({ prompt: "What's my name?" })  // Agent remembers Alice
 
 // Clear history when needed
 agent.clearConversationHistory()
@@ -181,20 +198,12 @@ agent.clearConversationHistory()
   <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
     Configure your agent and LLM settings
   </Card>
-  <Card title="LLM Integration" icon="brain" href="/typescript/agent/llm-integration">
+  <Card title="LLM Integration" icon="brain-circuit" href="/typescript/agent/llm-integration">
     Integrate with OpenAI, Anthropic, Google, or Groq
   </Card>
-  <Card title="Structured Output" icon="brackets-curly" href="/typescript/agent/structured-output">
+  <Card title="Structured Output" icon="braces" href="/typescript/agent/structured-output">
     Generate type-safe responses with Zod schemas
   </Card>
-  <Card title="Streaming" icon="wave-pulse" href="/typescript/agent/streaming">
-    Stream agent responses in real-time
-  </Card>
-  <Card title="Memory Management" icon="brain" href="/typescript/agent/memory-management">
-    Manage conversation history and context
-  </Card>
-  <Card title="Custom Agents" icon="code" href="/typescript/agent/building-custom-agents">
-    Extend the agent framework for your needs
-  </Card>
+ 
 </CardGroup>
 

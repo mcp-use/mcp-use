@@ -6,28 +6,6 @@ icon: "brain-circuit"
 
 The MCPAgent works with any modern LLM provider through LangChain's unified interface. Connect to OpenAI, Anthropic, Google, Groq, or any other LangChain-compatible provider that supports tool calling.
 
-## Supported Providers
-
-The agent framework leverages LangChain for seamless integration with major LLM providers:
-
-<Info>
-**LangChain Integration**: mcp-use uses LangChain's chat model interface, giving you access to hundreds of LLM providers with a consistent API. This means you can easily switch between providers without changing your agent code.
-</Info>
-
-<CardGroup cols={2}>
-  <Card title="OpenAI" icon="openai">
-    GPT-4, GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo
-  </Card>
-  <Card title="Anthropic" icon="anthropic">
-    Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
-  </Card>
-  <Card title="Google" icon="google">
-    Gemini Pro, Gemini Flash, Gemini Ultra
-  </Card>
-  <Card title="Groq" icon="zap">
-    Llama 3.1, Mixtral, and more (ultra-fast inference)
-  </Card>
-</CardGroup>
 
 ## Requirements
 
@@ -37,9 +15,6 @@ Your chosen LLM must support:
 - **Structured output**: For type-safe responses (optional but recommended)
 - **Streaming**: For real-time response streaming (optional)
 
-<Tip>
-Most modern LLMs support these features. Check your provider's documentation to confirm tool calling support.
-</Tip>
 
 ## Provider Integration Examples
 
@@ -60,13 +35,8 @@ const llm = new ChatOpenAI({
 const agent = new MCPAgent({ llm, client })
 ```
 
-**Popular Models:**
-- `gpt-4o` - Most capable, best for complex tasks
-- `gpt-4o-mini` - Fast and cost-effective
-- `gpt-4-turbo` - Previous generation, still very capable
-- `gpt-3.5-turbo` - Fastest and most economical
 
-### Anthropic Claude
+### Anthropic
 
 ```typescript
 import { ChatAnthropic } from '@langchain/anthropic'
@@ -82,11 +52,6 @@ const llm = new ChatAnthropic({
 // Create agent
 const agent = new MCPAgent({ llm, client })
 ```
-
-**Popular Models:**
-- `claude-3-5-sonnet-20241022` - Best balance of intelligence and speed
-- `claude-3-opus-20240229` - Most capable Claude model
-- `claude-3-haiku-20240307` - Fastest and most cost-effective
 
 ### Google Gemini
 
@@ -105,12 +70,7 @@ const llm = new ChatGoogleGenerativeAI({
 const agent = new MCPAgent({ llm, client })
 ```
 
-**Popular Models:**
-- `gemini-pro` - Best for most tasks
-- `gemini-1.5-pro` - Extended context window (up to 2M tokens)
-- `gemini-flash` - Faster and more cost-effective
-
-### Groq (Fast Inference)
+### Groq
 
 ```typescript
 import { ChatGroq } from '@langchain/groq'
@@ -127,278 +87,5 @@ const llm = new ChatGroq({
 const agent = new MCPAgent({ llm, client })
 ```
 
-**Popular Models:**
-- `llama-3.1-70b-versatile` - Most capable open-source model
-- `llama-3.1-8b-instant` - Ultra-fast inference
-- `mixtral-8x7b-32768` - Good balance of speed and capability
-
-## Model Requirements
-
-### Tool Calling Support
-
-For MCP tools to work properly, your chosen model **must support tool calling**. Most modern LLMs support this:
-
-✅ **Supported Models:**
-- OpenAI: GPT-4, GPT-4o, GPT-3.5 Turbo
-- Anthropic: Claude 3+ series
-- Google: Gemini Pro, Gemini Flash
-- Groq: Llama 3.1, Mixtral models
-- Most recent open-source models
-
-❌ **Not Supported:**
-- Basic completion models without tool calling
-- Very old model versions
-- Models without function calling capabilities
-
-### Checking Tool Support
-
-You can verify if a model supports tools by checking the provider's documentation:
-
-```typescript
-import { ChatOpenAI } from '@langchain/openai'
-
-const llm = new ChatOpenAI({ model: 'gpt-4o' })
-
-// The agent will automatically detect tool support
-// and throw an error if the model doesn't support tools
-try {
-  const agent = new MCPAgent({ llm, client })
-  await agent.run('Use a tool')
-} catch (error) {
-  console.error('Model may not support tool calling:', error)
-}
-```
-
-**How to Check:**
-1. Refer to your LLM provider's documentation
-2. Look for "function calling" or "tool use" features
-3. Test with a simple tool call
-4. Check error messages during initialization
-
-## Model Configuration Tips
-
-### Temperature Settings
-
-Different tasks benefit from different temperature settings:
-
-```typescript
-// Deterministic tasks (tool usage, data processing)
-const llm = new ChatOpenAI({
-  model: 'gpt-4o',
-  temperature: 0  // More focused and deterministic
-})
-
-// Creative tasks (writing, brainstorming)
-const llm = new ChatOpenAI({
-  model: 'gpt-4o',
-  temperature: 0.9  // More creative and varied
-})
-
-// Balanced approach (general usage)
-const llm = new ChatOpenAI({
-  model: 'gpt-4o',
-  temperature: 0.7  // Good balance
-})
-```
-
-**Recommended Settings:**
-- **Tool-heavy workflows**: 0 - 0.3 (more deterministic tool usage)
-- **General assistance**: 0.5 - 0.7 (balanced)
-- **Creative writing**: 0.8 - 1.0 (more varied responses)
-
-### Model-Specific Parameters
-
-Each provider has unique parameters you can configure:
-
-<CodeGroup>
-```typescript OpenAI
-const llm = new ChatOpenAI({
-  model: 'gpt-4o',
-  temperature: 0.7,
-  maxTokens: 4096,
-  topP: 1,
-  frequencyPenalty: 0,
-  presencePenalty: 0
-})
-```
-
-```typescript Anthropic
-const llm = new ChatAnthropic({
-  model: 'claude-3-5-sonnet-20241022',
-  temperature: 0.7,
-  maxTokens: 4096,
-  topP: 1
-})
-```
-
-```typescript Google
-const llm = new ChatGoogleGenerativeAI({
-  model: 'gemini-pro',
-  temperature: 0.7,
-  maxOutputTokens: 2048,
-  topP: 1,
-  topK: 40
-})
-```
-
-```typescript Groq
-const llm = new ChatGroq({
-  model: 'llama-3.1-70b-versatile',
-  temperature: 0.7,
-  maxTokens: 4096,
-  topP: 1
-})
-```
-</CodeGroup>
-
-## Cost Optimization
-
-### Choosing Cost-Effective Models
-
-Consider your use case when selecting models:
-
-| Use Case | Recommended Models | Reason |
-|----------|-------------------|--------|
-| Development/Testing | GPT-3.5 Turbo, Claude Haiku | Lower cost, good performance |
-| Production/Complex | GPT-4o, Claude Sonnet | Best performance |
-| High Volume | Groq models | Fast inference, competitive pricing |
-| Privacy/Local | Ollama models | No API costs, data stays local |
-
-### Token Management
-
-Monitor and control token usage to optimize costs:
-
-```typescript
-import { ChatOpenAI } from '@langchain/openai'
-
-const llm = new ChatOpenAI({
-  model: 'gpt-4o',
-  maxTokens: 2048,  // Limit response length
-  callbacks: [
-    {
-      handleLLMEnd: (output) => {
-        // Track token usage
-        const tokens = output.llmOutput?.tokenUsage
-        console.log('Tokens used:', tokens)
-      }
-    }
-  ]
-})
-
-const agent = new MCPAgent({ llm, client })
-```
-
-**Tips for Token Management:**
-- Set `maxTokens` to limit response length
-- Use cheaper models for simple tasks
-- Implement caching for repeated queries
-- Monitor usage with callbacks
-
-## Environment Setup
-
-Always use environment variables for API keys:
-
-```bash
-# .env file
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=AI...
-GROQ_API_KEY=gsk_...
-```
-
-## Advanced Integration
-
-### Custom Model Wrappers
-
-You can use any LangChain-compatible LLM by extending the base classes:
-
-```typescript
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent } from 'mcp-use'
-
-// Create a custom configured LLM
-class CustomLLM extends ChatOpenAI {
-  constructor() {
-    super({
-      model: 'gpt-4o',
-      temperature: 0.7,
-      maxTokens: 4096,
-      // Add custom defaults
-      callbacks: [
-        {
-          handleLLMStart: () => console.log('LLM started...'),
-          handleLLMEnd: () => console.log('LLM finished.')
-        }
-      ]
-    })
-  }
-}
-
-const llm = new CustomLLM()
-const agent = new MCPAgent({ llm, client })
-```
-
-### Model Switching
-
-Switch between models dynamically based on task complexity:
-
-```typescript
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent } from 'mcp-use'
-
-// Create different models for different tasks
-const fastModel = new ChatOpenAI({ model: 'gpt-4o-mini' })
-const powerfulModel = new ChatOpenAI({ model: 'gpt-4o' })
-
-// Use fast model for simple queries
-const simpleAgent = new MCPAgent({ 
-  llm: fastModel, 
-  client 
-})
-
-// Use powerful model for complex tasks
-const complexAgent = new MCPAgent({ 
-  llm: powerfulModel, 
-  client 
-})
-
-// Route based on complexity
-async function routeQuery(query: string) {
-  const isComplex = query.length > 200 || query.includes('analyze')
-  const agent = isComplex ? complexAgent : simpleAgent
-  return await agent.run(query)
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"Model doesn't support tools"**: Ensure your model supports function calling
-2. **API key errors**: Check environment variables and API key validity
-3. **Rate limiting**: Implement retry logic or use different models
-4. **Token limits**: Adjust max_tokens or use models with larger context windows
-
-### Debug Model Behavior
-
-<CodeGroup>
-```typescript TypeScript
-// Enable verbose logging to see model interactions
-const agent = new MCPAgent({
-    llm,
-    client,
-    verbose: true  // Shows detailed model interactions
-})
-```
-
-```typescript TypeScript
-// Enable verbose logging to see model interactions
-const agent = new MCPAgent({
-    llm,
-    client,
-    verbose: true  // Shows detailed model interactions
-})
-```
-</CodeGroup>
 
 For more LLM providers and detailed integration examples, visit the [LangChain Chat Models documentation](https://python.langchain.com/docs/integrations/chat/).
