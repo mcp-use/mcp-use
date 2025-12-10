@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.10.6
+
+### Patch Changes
+
+- 918287c: fix: stateless mode for deno
+  - @mcp-use/cli@2.5.6
+  - @mcp-use/inspector@0.12.6
+
 ## 1.10.5
 
 ### Patch Changes
