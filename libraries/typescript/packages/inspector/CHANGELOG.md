@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.12.1
+
+### Patch Changes
+
+- b3d69ed: fix: zod import in official sdk
+- Updated dependencies [b3d69ed]
+  - mcp-use@1.10.1
+
 ## 0.12.0
 
 ### Minor Changes
