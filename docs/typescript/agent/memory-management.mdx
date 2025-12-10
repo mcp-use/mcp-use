@@ -1,0 +1,326 @@
+---
+title: Memory Management
+description: Learn how to manage conversation memory in MCPAgent with different memory modes
+icon: brain
+---
+
+# Memory Management
+
+MCPAgent provides flexible memory management options to control how conversation history is handled. You can choose between different memory strategies depending on your use case.
+
+## Memory Modes
+
+### 1. Self-Managed Memory (`memoryEnabled: true`)
+
+When `memoryEnabled` is set to `true` (the default), the agent automatically manages conversation history internally. This is the simplest option for most use cases.
+
+```typescript
+import { MCPAgent, MCPClient } from "mcp-use";
+import { ChatOpenAI } from "@langchain/openai";
+
+const client = new MCPClient({
+  mcpServers: {
+    filesystem: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"]
+    }
+  }
+});
+
+const llm = new ChatOpenAI({ model: "gpt-4o-mini" });
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: true  // Agent manages memory internally (default)
+});
+
+// The agent will automatically maintain conversation context
+const response1 = await agent.run("Hello, my name is Alice");
+const response2 = await agent.run("What's my name?");  // Agent remembers Alice
+
+await client.closeAllSessions();
+```
+
+### 2. No Memory (`memoryEnabled: false`)
+
+When `memoryEnabled` is set to `false`, the agent has no internal memory and treats each interaction independently.
+
+```typescript
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: false  // No internal memory
+});
+
+// Each interaction is independent
+const response1 = await agent.run("Hello, my name is Alice");
+const response2 = await agent.run("What's my name?");  // Agent doesn't remember Alice
+
+await client.closeAllSessions();
+```
+
+### 3. External Memory Management
+
+You can provide conversation history externally for full control over memory management. This allows you to implement custom memory strategies like limited history, persistence, or filtering.
+
+```typescript
+import { HumanMessage, AIMessage } from "langchain";
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: true  // Can be true or false
+});
+
+// External history management
+const externalHistory = [];
+
+// First interaction
+const response1 = await agent.run(
+  "Hello, my name is Alice",
+  undefined,  // maxSteps
+  undefined,  // manageConnector
+  externalHistory  // external history
+);
+externalHistory.push(new HumanMessage("Hello, my name is Alice"));
+externalHistory.push(new AIMessage(response1));
+
+// Second interaction with limited history
+const limitedHistory = externalHistory.slice(-4);  // Keep only last 4 messages
+const response2 = await agent.run(
+  "What's my name?",
+  undefined,
+  undefined,
+  limitedHistory
+);
+externalHistory.push(new HumanMessage("What's my name?"));
+externalHistory.push(new AIMessage(response2));
+
+await client.closeAllSessions();
+```
+
+## Memory Management Methods
+
+The MCPAgent provides methods to inspect and control conversation history:
+
+### `getConversationHistory()`
+
+Returns a copy of the current conversation history as an array of messages.
+
+```typescript
+const history = agent.getConversationHistory();
+console.log(`Current history has ${history.length} messages`);
+
+// Inspect message types
+for (const message of history) {
+  console.log(message.constructor.name, message.content);
+}
+```
+
+### `clearConversationHistory()`
+
+Clears the internal conversation history. If `memoryEnabled` is true and a system message exists, it will be preserved.
+
+```typescript
+// Clear conversation history
+agent.clearConversationHistory();
+console.log("Conversation history cleared");
+
+// Start fresh conversation
+const response = await agent.run("Start a new conversation");
+```
+
+## Memory Strategies
+
+### Unlimited History
+
+Keep all conversation history for maximum context:
+
+```typescript
+// Simply use default memory management
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: true
+});
+
+// All interactions are remembered
+await agent.run("First message");
+await agent.run("Second message");
+await agent.run("Third message");
+// Agent has full context of all previous messages
+```
+
+### Limited History
+
+Limit conversation history to manage memory usage and context length:
+
+```typescript
+const MAX_HISTORY_MESSAGES = 10;
+const externalHistory = [];
+
+async function runWithLimitedHistory(query: string) {
+  // Keep only last N messages
+  const limitedHistory = externalHistory.slice(-MAX_HISTORY_MESSAGES);
+  
+  const response = await agent.run(
+    query,
+    undefined,
+    undefined,
+    limitedHistory
+  );
+  
+  // Update external history
+  externalHistory.push(new HumanMessage(query));
+  externalHistory.push(new AIMessage(response));
+  
+  return response;
+}
+
+// Use the function
+await runWithLimitedHistory("First question");
+await runWithLimitedHistory("Second question");
+```
+
+### Sliding Window
+
+Implement a sliding window approach to maintain recent context while discarding older messages:
+
+```typescript
+function getSlidingWindowHistory(history: BaseMessage[], windowSize = 10) {
+  // Return the last windowSize messages from history
+  return history.slice(-windowSize);
+}
+
+// Usage with external history
+const fullHistory = [];
+const WINDOW_SIZE = 10;
+
+async function runWithSlidingWindow(query: string) {
+  const slidingHistory = getSlidingWindowHistory(fullHistory, WINDOW_SIZE);
+  
+  const response = await agent.run(
+    query,
+    undefined,
+    undefined,
+    slidingHistory
+  );
+  
+  // Update full history
+  fullHistory.push(new HumanMessage(query));
+  fullHistory.push(new AIMessage(response));
+  
+  return response;
+}
+```
+
+## Interactive Chat Example
+
+Here's a complete example showing how to build an interactive chat with memory management:
+
+```typescript
+import readline from "node:readline";
+import { ChatOpenAI } from "@langchain/openai";
+import { MCPAgent, MCPClient } from "mcp-use";
+
+async function runInteractiveChat() {
+  const client = new MCPClient({
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./"]
+      }
+    }
+  });
+
+  const llm = new ChatOpenAI({ model: "gpt-4o-mini" });
+  
+  const agent = new MCPAgent({
+    llm,
+    client,
+    memoryEnabled: true  // Enable conversation memory
+  });
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  const question = (prompt: string): Promise<string> => {
+    return new Promise((resolve) => {
+      rl.question(prompt, resolve);
+    });
+  };
+
+  console.log("\n===== Interactive Chat =====");
+  console.log("Type 'exit' to end, 'clear' to clear history\n");
+
+  try {
+    while (true) {
+      const userInput = await question("\nYou: ");
+
+      if (userInput.toLowerCase() === "exit") {
+        break;
+      }
+
+      if (userInput.toLowerCase() === "clear") {
+        agent.clearConversationHistory();
+        console.log("History cleared.");
+        continue;
+      }
+
+      try {
+        const response = await agent.run(userInput);
+        console.log(`\nAssistant: ${response}`);
+      } catch (error) {
+        console.error(`Error: ${error}`);
+      }
+    }
+  } finally {
+    rl.close();
+    await client.closeAllSessions();
+  }
+}
+
+runInteractiveChat().catch(console.error);
+```
+
+## Best Practices
+
+1. **For Simple Use Cases**: Use `memoryEnabled: true` for automatic memory management
+2. **For Stateless Operations**: Use `memoryEnabled: false` when each interaction should be independent
+3. **For Custom Control**: Use external memory management when you need specific memory strategies
+4. **Memory Limits**: Consider implementing memory limits to prevent context overflow with large conversations
+5. **Persistence**: For long-running applications, consider persisting conversation history to external storage
+6. **Token Management**: Monitor token usage in conversation history to stay within model context limits
+7. **System Messages**: The system message is preserved when clearing history with `memoryEnabled: true`
+
+## Configuration Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `memoryEnabled` | boolean | `true` | Enable/disable internal memory management |
+| `externalHistory` | BaseMessage[] | `undefined` | External conversation history to use (in `run()` method) |
+
+## Important Notes
+
+- When `externalHistory` is provided to the `run()` method, it takes precedence over the agent's internal memory
+- The conversation history includes system messages, user messages (HumanMessage), AI responses (AIMessage), and tool execution results (ToolMessage)
+- Memory is maintained across multiple `run()` calls when `memoryEnabled` is true
+- Use `getConversationHistory()` to inspect the current state of the conversation
+- Memory management works with both `run()` and `stream()` methods
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
+    Learn more about configuring agents
+  </Card>
+  <Card title="Structured Output" icon="brackets-curly" href="/typescript/agent/structured-output">
+    Generate type-safe responses with Zod schemas
+  </Card>
+  <Card title="Streaming" icon="wave-pulse" href="/typescript/agent/streaming">
+    Stream agent responses in real-time
+  </Card>
+</CardGroup>

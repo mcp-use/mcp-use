@@ -1,8 +1,4 @@
 import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
-import type {
-  BaseLanguageModelInterface,
-  LanguageModelLike,
-} from "@langchain/core/language_models/base";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { StreamEvent } from "@langchain/core/tracers/log_stream";
 import {
@@ -32,17 +28,13 @@ import {
   SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE,
 } from "./prompts/templates.js";
 import { RemoteAgent } from "./remote.js";
-import type { BaseMessage } from "./types.js";
-
-/**
- * Language model type that accepts any LangChain chat model.
- * createAgent accepts a LanguageModelLike but ChatOpenAI, ChatAnthropic, etc. are still of type BaseLanguageModelInterface.
- * Any is used to avoid TypeScript structural typing issues with protected properties until langchain fixes the issue.
- */
-export type LanguageModel =
-  | LanguageModelLike
-  | BaseLanguageModelInterface
-  | any;
+import type {
+  BaseMessage,
+  LanguageModel,
+  MCPAgentOptions,
+  MCPServerConfig,
+} from "./types.js";
+import { createLLMFromString, type LLMConfig } from "./utils/llm_provider.js";
 
 /**
  * Represents a single step in the agent's execution
@@ -103,30 +95,14 @@ export class MCPAgent {
   private isRemote = false;
   private remoteAgent: RemoteAgent | null = null;
 
-  constructor(options: {
-    llm?: LanguageModel;
-    client?: MCPClient;
-    connectors?: BaseConnector[];
-    maxSteps?: number;
-    autoInitialize?: boolean;
-    memoryEnabled?: boolean;
-    systemPrompt?: string | null;
-    systemPromptTemplate?: string | null;
-    additionalInstructions?: string | null;
-    disallowedTools?: string[];
-    additionalTools?: StructuredToolInterface[];
-    toolsUsedNames?: string[];
-    useServerManager?: boolean;
-    verbose?: boolean;
-    observe?: boolean;
-    adapter?: LangChainAdapter;
-    serverManagerFactory?: (client: MCPClient) => ServerManager;
-    callbacks?: BaseCallbackHandler[];
-    // Remote agent parameters
-    agentId?: string;
-    apiKey?: string;
-    baseUrl?: string;
-  }) {
+  // Simplified mode support
+  private isSimplifiedMode = false;
+  private llmString?: string;
+  private llmConfig?: LLMConfig;
+  private mcpServersConfig?: Record<string, MCPServerConfig>;
+  private clientOwnedByAgent = false;
+
+  constructor(options: MCPAgentOptions) {
     // Handle remote execution
     if (options.agentId) {
       this.isRemote = true;
@@ -164,10 +140,52 @@ export class MCPAgent {
       );
     }
 
-    this.llm = options.llm;
+    // Detect mode: simplified (string llm) vs explicit (object llm)
+    const isSimplifiedMode = typeof options.llm === "string";
 
-    this.client = options.client;
-    this.connectors = options.connectors ?? [];
+    if (isSimplifiedMode) {
+      // Simplified mode: llm is string, mcpServers must be provided
+      this.isSimplifiedMode = true;
+      this.llmString = options.llm as string;
+      this.llmConfig = (options as any).llmConfig;
+      this.mcpServersConfig = (options as any).mcpServers;
+
+      if (
+        !this.mcpServersConfig ||
+        Object.keys(this.mcpServersConfig).length === 0
+      ) {
+        throw new Error(
+          "Simplified mode requires 'mcpServers' configuration. " +
+            "Provide an object with server configurations, e.g., { filesystem: { command: 'npx', args: [...] } }"
+        );
+      }
+
+      // LLM and client will be created during initialize()
+      this.llm = undefined;
+      this.client = undefined;
+      this.clientOwnedByAgent = true; // Mark for cleanup
+      this.connectors = [];
+
+      logger.info(
+        `🎯 Simplified mode enabled: LLM will be created from '${this.llmString}'`
+      );
+    } else {
+      // Explicit mode: llm is object, client or connectors must be provided
+      this.isSimplifiedMode = false;
+      this.llm = options.llm as LanguageModel;
+      this.client = (options as any).client;
+      this.connectors = (options as any).connectors ?? [];
+      this.clientOwnedByAgent = false;
+
+      if (!this.client && this.connectors.length === 0) {
+        throw new Error(
+          "Explicit mode requires either 'client' or at least one 'connector'. " +
+            "Alternatively, use simplified mode with 'llm' as a string and 'mcpServers' config."
+        );
+      }
+    }
+
+    // Common configuration for both modes
     this.maxSteps = options.maxSteps ?? 5;
     this.autoInitialize = options.autoInitialize ?? false;
     this.memoryEnabled = options.memoryEnabled ?? true;
@@ -181,38 +199,40 @@ export class MCPAgent {
     this.verbose = options.verbose ?? false;
     this.observe = options.observe ?? true;
 
-    if (!this.client && this.connectors.length === 0) {
-      throw new Error(
-        "Either 'client' or at least one 'connector' must be provided."
-      );
-    }
-
-    if (this.useServerManager) {
-      if (!this.client) {
-        throw new Error(
-          "'client' must be provided when 'useServerManager' is true."
-        );
+    // Set up adapter and server manager (only for explicit mode with client)
+    if (!this.isSimplifiedMode) {
+      if (this.useServerManager) {
+        if (!this.client) {
+          throw new Error(
+            "'client' must be provided when 'useServerManager' is true."
+          );
+        }
+        this.adapter =
+          options.adapter ?? new LangChainAdapter(this.disallowedTools);
+        this.serverManager =
+          options.serverManagerFactory?.(this.client) ??
+          new ServerManager(this.client, this.adapter);
+      } else {
+        this.adapter =
+          options.adapter ?? new LangChainAdapter(this.disallowedTools);
       }
-      this.adapter =
-        options.adapter ?? new LangChainAdapter(this.disallowedTools);
-      this.serverManager =
-        options.serverManagerFactory?.(this.client) ??
-        new ServerManager(this.client, this.adapter);
-    }
-    // Let consumers swap allowed tools dynamically
-    else {
-      this.adapter =
-        options.adapter ?? new LangChainAdapter(this.disallowedTools);
-    }
 
-    // Initialize telemetry
-    this.telemetry = Telemetry.getInstance();
-    // Track model info for telemetry
-    if (this.llm) {
-      const [provider, name] = extractModelInfo(this.llm as any);
-      this.modelProvider = provider;
-      this.modelName = name;
+      // Initialize telemetry for explicit mode
+      this.telemetry = Telemetry.getInstance();
+      if (this.llm) {
+        const [provider, name] = extractModelInfo(this.llm as any);
+        this.modelProvider = provider;
+        this.modelName = name;
+      } else {
+        this.modelProvider = "unknown";
+        this.modelName = "unknown";
+      }
     } else {
+      // For simplified mode, defer adapter/telemetry initialization
+      this.adapter =
+        options.adapter ?? new LangChainAdapter(this.disallowedTools);
+      this.telemetry = Telemetry.getInstance();
+      // Model info will be set during initialize()
       this.modelProvider = "unknown";
       this.modelName = "unknown";
     }
@@ -250,6 +270,50 @@ export class MCPAgent {
     }
 
     logger.info("🚀 Initializing MCP agent and connecting to services...");
+
+    // Handle simplified mode: create client and LLM from configuration
+    if (this.isSimplifiedMode) {
+      logger.info(
+        "🎯 Simplified mode: Creating client and LLM from configuration..."
+      );
+
+      // Create MCPClient from mcpServers configuration
+      if (this.mcpServersConfig) {
+        logger.info(
+          `Creating MCPClient with ${Object.keys(this.mcpServersConfig).length} server(s)...`
+        );
+        this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
+        logger.info("✅ MCPClient created successfully");
+      }
+
+      // Create LLM from string specification
+      if (this.llmString) {
+        logger.info(`Creating LLM from string: ${this.llmString}...`);
+        try {
+          this.llm = await createLLMFromString(this.llmString, this.llmConfig);
+          logger.info("✅ LLM created successfully");
+
+          // Update model info for telemetry
+          const [provider, name] = extractModelInfo(this.llm as any);
+          this.modelProvider = provider;
+          this.modelName = name;
+        } catch (error: any) {
+          throw new Error(
+            `Failed to create LLM from string '${this.llmString}': ${error?.message || error}`
+          );
+        }
+      }
+
+      // Set up server manager if needed
+      if (this.useServerManager) {
+        if (!this.client) {
+          throw new Error(
+            "'client' must be available when 'useServerManager' is true."
+          );
+        }
+        this.serverManager = new ServerManager(this.client, this.adapter);
+      }
+    }
 
     // Initialize observability callbacks
     this.callbacks = await this.observabilityManager.getCallbacks();
@@ -1404,16 +1468,36 @@ export class MCPAgent {
     try {
       this._agentExecutor = null;
       this._tools = [];
+
+      // Clean up client (always close if we own it, or if it exists in explicit mode)
       if (this.client) {
-        logger.info("🔄 Closing client and cleaning up resources");
-        await this.client.close();
-        this.sessions = {};
+        // In simplified mode, we always own the client and should close it
+        // In explicit mode, we only close if explicitly requested (current behavior)
+        if (this.clientOwnedByAgent) {
+          logger.info(
+            "🔄 Closing internally-created client (simplified mode) and cleaning up resources"
+          );
+          await this.client.close();
+          this.sessions = {};
+          this.client = undefined;
+        } else {
+          logger.info("🔄 Closing client and cleaning up resources");
+          await this.client.close();
+          this.sessions = {};
+        }
       } else {
         for (const connector of this.connectors) {
           logger.info("🔄 Disconnecting connector");
           await connector.disconnect();
         }
       }
+
+      // Clean up LLM reference (important for simplified mode)
+      if (this.isSimplifiedMode && this.llm) {
+        logger.debug("🔄 Clearing LLM reference (simplified mode)");
+        this.llm = undefined;
+      }
+
       if ("connectorToolMap" in this.adapter) {
         this.adapter = new LangChainAdapter();
       }

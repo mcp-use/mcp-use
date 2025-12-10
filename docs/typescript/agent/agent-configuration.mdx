@@ -1,5 +1,5 @@
 ---
-title: "Agent Configuration"
+title: "Configuration"
 description: "Configure your agents and LLM settings"
 icon: "cog"
 ---
@@ -15,91 +15,28 @@ Configure your MCPAgent to customize behavior, set LLM parameters, enable featur
 Create an agent with minimal configuration:
 
 ```typescript
-import { MCPAgent } from 'mcp-use/agent'
-import { MCPClient } from 'mcp-use'
-import OpenAI from 'openai'
+import { MCPAgent, MCPClient } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
 
-const client = new MCPClient(config)
+const client = new MCPClient({
+  mcpServers: {
+    filesystem: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', './']
+    }
+  }
+})
 await client.createAllSessions()
 
-const llm = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const llm = new ChatOpenAI({ model: 'gpt-5.1' })
 
 const agent = new MCPAgent({
   llm,
-  client,
-  model: 'gpt-4'
+  client
 })
 ```
 
-## API Key Management
-
-<Warning>
-**Security First**: Never hardcode API keys in source code. Always use environment variables or secure secret management systems.
-</Warning>
-
-<Tabs>
-  <Tab title=".env File (Recommended)">
-    Create a `.env` file in your project root:
-
-    ```bash .env
-    # OpenAI
-    OPENAI_API_KEY=your_api_key_here
-    # Anthropic
-    ANTHROPIC_API_KEY=your_api_key_here
-    # Groq
-    GROQ_API_KEY=your_api_key_here
-    # Google
-    GOOGLE_API_KEY=your_api_key_here
-    ```
-
-    Load it in your application:
-
-    <CodeGroup>
-```typescript TypeScript
-    import { config } from 'dotenv'
-    config()
-    ```
-
-```typescript TypeScript
-    import { config } from 'dotenv'
-    config()
-    ```
-</CodeGroup>
-
-    <Tip>
-    This method keeps your keys organized and makes them available to your Python runtime.
-    </Tip>
-  </Tab>
-
-  <Tab title="Environment Variables">
-    Set environment variables directly in your terminal:
-
-    ```bash
-    export OPENAI_API_KEY="your_api_key_here"
-    export ANTHROPIC_API_KEY="your_api_key_here"
-    ```
-
-    Access them in your application:
-
-    <CodeGroup>
-```typescript TypeScript
-    const apiKey = process.env.OPENAI_API_KEY || ''
-    ```
-
-```typescript TypeScript
-    const apiKey = process.env.OPENAI_API_KEY || ''
-    ```
-</CodeGroup>
-  </Tab>
-
-  <Tab title="System Configuration">
-    For production environments, consider using:
-    - Docker secrets
-    - Kubernetes secrets
-    - Cloud provider secret managers (AWS Secrets Manager, etc.)
-    - System environment configuration
-  </Tab>
-</Tabs>
+<CodeSandbox title="Edit mcp-use-get-started-agent" id="sweet-drake-m76ys6"></CodeSandbox>
 
 ## Agent Parameters
 
@@ -107,17 +44,6 @@ When creating an MCPAgent, you can configure several parameters to customize its
 
 <CodeGroup>
 ```typescript TypeScript
-import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-// Basic configuration
-const config = await loadConfigFile('config.json')
-const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.7 }),
-    client: new MCPClient(config),
-    maxSteps: 30
-})
-
 // Advanced configuration
 const advancedAgent = new MCPAgent({
     llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.7 }),

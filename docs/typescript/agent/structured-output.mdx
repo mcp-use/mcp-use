@@ -1,7 +1,7 @@
 ---
 title: "Structured Output"
 description: "Type-safe responses with Zod schema validation"
-icon: "brackets-curly"
+icon: "braces"
 ---
 
 Structured output enables agents to return type-safe, validated data instead of plain text. By defining a Zod schema, you get automatic validation, type inference, and intelligent retry logic when data is incomplete.
@@ -32,7 +32,13 @@ const schema = z.object({
   age: z.number()
 })
 
-const result = await agent.run(prompt, { schema })
+const result = await agent.run(
+  prompt,
+  undefined,  // maxSteps
+  undefined,  // manageConnector
+  undefined,  // externalHistory
+  schema      // outputSchema
+)
 // result.name is string
 // result.age is number
 ```

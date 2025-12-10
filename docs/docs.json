@@ -468,19 +468,12 @@
                     "icon": "box",
                     "pages": [
                       "typescript/agent/llm-integration",
-                      "typescript/agent/server-manager"
-                    ]
-                  },
-                  {
-                    "group": "Features",
-                    "icon": "sparkle",
-                    "pages": [
+                      "typescript/agent/memory-management",
+                      "typescript/agent/server-manager",
                       "typescript/agent/structured-output",
-                      "typescript/agent/streaming",
-                      "typescript/agent/interactive-chat-patterns"
+                      "typescript/agent/streaming"
                     ]
                   },
-                  "typescript/agent/building-custom-agents",
                   "typescript/agent/observability"
                 ]
               },
