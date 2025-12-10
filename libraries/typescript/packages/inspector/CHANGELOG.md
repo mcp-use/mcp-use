@@ -12,6 +12,51 @@
 - Updated dependencies [e302f8d]
   - mcp-use@1.11.0-canary.3
 
+## 0.12.6
+
+### Patch Changes
+
+- Updated dependencies [918287c]
+  - mcp-use@1.10.6
+
+## 0.12.5
+
+### Patch Changes
+
+- Updated dependencies [dcf938f]
+  - mcp-use@1.10.5
+
+## 0.12.4
+
+### Patch Changes
+
+- Updated dependencies
+  - mcp-use@1.10.4
+
+## 0.12.3
+
+### Patch Changes
+
+- fix: deno 3
+- Updated dependencies
+  - mcp-use@1.10.3
+
+## 0.12.2
+
+### Patch Changes
+
+- fix: update zod error
+- Updated dependencies
+  - mcp-use@1.10.2
+
+## 0.12.1
+
+### Patch Changes
+
+- b3d69ed: fix: zod import in official sdk
+- Updated dependencies [b3d69ed]
+  - mcp-use@1.10.1
+
 ## 0.12.1-canary.2
 
 ### Patch Changes

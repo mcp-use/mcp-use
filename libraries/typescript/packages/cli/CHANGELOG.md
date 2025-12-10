@@ -13,6 +13,55 @@
   - mcp-use@1.11.0-canary.3
   - @mcp-use/inspector@0.13.0-canary.3
 
+## 2.5.6
+
+### Patch Changes
+
+- Updated dependencies [918287c]
+  - mcp-use@1.10.6
+  - @mcp-use/inspector@0.12.6
+
+## 2.5.5
+
+### Patch Changes
+
+- Updated dependencies [dcf938f]
+  - mcp-use@1.10.5
+  - @mcp-use/inspector@0.12.5
+
+## 2.5.4
+
+### Patch Changes
+
+- fix: deno 5
+- Updated dependencies
+  - mcp-use@1.10.4
+  - @mcp-use/inspector@0.12.4
+
+## 2.5.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@0.12.3
+  - mcp-use@1.10.3
+
+## 2.5.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@0.12.2
+  - mcp-use@1.10.2
+
+## 2.5.1
+
+### Patch Changes
+
+- Updated dependencies [b3d69ed]
+  - @mcp-use/inspector@0.12.1
+  - mcp-use@1.10.1
+
 ## 2.5.1-canary.2
 
 ### Patch Changes

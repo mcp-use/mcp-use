@@ -111,6 +111,32 @@ export interface ServerConfig {
    */
   autoCreateSessionOnInvalidId?: boolean; // Default: true (compatible with non-compliant clients)
   /**
+   * Enable stateless mode (no session tracking)
+   * - Default: true for Deno (edge runtimes), false for Node.js
+   * - Set to true to force stateless mode
+   * - Set to false to force stateful mode (with sessions)
+   *
+   * Stateless mode is required for edge functions where instances don't persist.
+   * Stateful mode supports sessions, resumability, and notifications.
+   *
+   * @example
+   * ```typescript
+   * // Auto-detected (Deno = stateless, Node.js = stateful)
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0'
+   * });
+   *
+   * // Force stateless mode (e.g., for Node.js edge functions)
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   stateless: true
+   * });
+   * ```
+   */
+  stateless?: boolean;
+  /**
    * OAuth authentication configuration
    *
    * When provided, automatically sets up OAuth authentication for the server including:

@@ -68,10 +68,13 @@ import {
   logRegisteredItems as logRegisteredItemsHelper,
   startServer,
   rewriteSupabaseRequest,
+  getDenoCorsHeaders,
+  applyDenoCorsHeaders,
   createHonoApp,
   createHonoProxy,
   isProductionMode as isProductionModeHelper,
   parseTemplateUri as parseTemplateUriHelper,
+  isDeno,
 } from "./utils/index.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
 import type { OAuthProvider } from "./oauth/providers/types.js";
@@ -192,6 +195,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   constructor(config: ServerConfig) {
     this.config = config;
+
+    // Auto-detect stateless mode: Deno = stateless, Node.js = stateful
+    if (this.config.stateless === undefined) {
+      this.config.stateless = isDeno;
+      if (this.config.stateless) {
+        console.log("[MCP] Deno detected - using stateless mode (no sessions)");
+      }
+    }
+
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
 
@@ -1099,12 +1111,22 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Wrap the fetch handler to ensure it always returns a Promise<Response>
     const fetchHandler = this.app.fetch.bind(this.app);
 
-    // Handle platform-specific path rewriting
+    // Handle platform-specific path rewriting and CORS
     if (options?.provider === "supabase") {
       return async (req: Request) => {
+        const corsHeaders = getDenoCorsHeaders();
+
+        // Handle CORS preflight
+        if (req.method === "OPTIONS") {
+          return new Response("ok", { headers: corsHeaders });
+        }
+
+        // Rewrite path and process request
         const rewrittenReq = rewriteSupabaseRequest(req);
         const result = await fetchHandler(rewrittenReq);
-        return result;
+
+        // Apply CORS headers to response
+        return applyDenoCorsHeaders(result);
       };
     }
 

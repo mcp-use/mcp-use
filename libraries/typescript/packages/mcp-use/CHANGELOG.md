@@ -14,6 +14,58 @@
   - @mcp-use/cli@2.6.0-canary.3
   - @mcp-use/inspector@0.13.0-canary.3
 
+## 1.10.6
+
+### Patch Changes
+
+- 918287c: fix: stateless mode for deno
+  - @mcp-use/cli@2.5.6
+  - @mcp-use/inspector@0.12.6
+
+## 1.10.5
+
+### Patch Changes
+
+- dcf938f: fix: add cors to getHandler
+  - @mcp-use/cli@2.5.5
+  - @mcp-use/inspector@0.12.5
+
+## 1.10.4
+
+### Patch Changes
+
+- fix: deno 5
+- Updated dependencies
+  - @mcp-use/cli@2.5.4
+  - @mcp-use/inspector@0.12.4
+
+## 1.10.3
+
+### Patch Changes
+
+- fix: deno 3
+- Updated dependencies
+  - @mcp-use/inspector@0.12.3
+  - @mcp-use/cli@2.5.3
+
+## 1.10.2
+
+### Patch Changes
+
+- fix: update zod error
+- Updated dependencies
+  - @mcp-use/inspector@0.12.2
+  - @mcp-use/cli@2.5.2
+
+## 1.10.1
+
+### Patch Changes
+
+- b3d69ed: fix: zod import in official sdk
+- Updated dependencies [b3d69ed]
+  - @mcp-use/inspector@0.12.1
+  - @mcp-use/cli@2.5.1
+
 ## 1.10.1-canary.2
 
 ### Patch Changes
