@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.11.0-canary.4
+
+### Patch Changes
+
+- f469d26: feat: updated agent docs and signature
+  - @mcp-use/cli@2.6.0-canary.4
+  - @mcp-use/inspector@0.13.0-canary.4
+
 ## 1.11.0-canary.3
 
 ### Minor Changes
