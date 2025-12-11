@@ -70,6 +70,8 @@ export default defineConfig({
         __dirname,
         "./src/client/stubs/async_hooks.js"
       ),
+      "node:stream": path.resolve(__dirname, "./src/client/stubs/stream.js"),
+      "node:process": path.resolve(__dirname, "./src/client/stubs/process.js"),
     },
   },
   define: {
@@ -96,7 +98,16 @@ export default defineConfig({
     minify: true,
     outDir: "dist/client",
     rollupOptions: {
-      external: ["langfuse-langchain", "langfuse", "@e2b/code-interpreter"],
+      external: [
+        "langfuse-langchain",
+        "langfuse",
+        "@e2b/code-interpreter",
+        "node:stream",
+        "node:process",
+        "child_process",
+        "fs",
+        "os",
+      ],
       onwarn(warning, warn) {
         // Suppress warnings about externalized modules for refractor
         if (
