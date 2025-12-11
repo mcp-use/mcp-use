@@ -1,0 +1,110 @@
+name: Python Release Drafter
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "libraries/python/**"
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - "libraries/python/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update_draft_release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest published release
+        id: latest-release
+        run: |
+          # Get the latest non-draft python release tag
+          LATEST_TAG=$(git tag -l "python-v*" --sort=-v:refname | head -n 1)
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous python releases found"
+            echo "version=0.0.0" >> $GITHUB_OUTPUT
+            echo "tag=none" >> $GITHUB_OUTPUT
+          else
+            LATEST_VERSION=${LATEST_TAG#python-v}
+            echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+            echo "Latest published release: $LATEST_VERSION"
+          fi
+
+      - name: Generate draft release notes
+        id: release-notes
+        run: |
+          PREV_TAG="${{ steps.latest-release.outputs.tag }}"
+          LATEST_VERSION="${{ steps.latest-release.outputs.version }}"
+          
+          echo "## Unreleased Python Changes" > notes.md
+          echo "" >> notes.md
+          echo "**This is a draft release tracking changes since v$LATEST_VERSION.**" >> notes.md
+          echo "**The actual version number will be determined when published.**" >> notes.md
+          echo "" >> notes.md
+          
+          # Get commits since last release that mention "python" (case insensitive)
+          if [ "$PREV_TAG" = "none" ]; then
+            COMMITS=$(git log --oneline --grep="python" --grep="Python" --grep="PYTHON" -E)
+          else
+            COMMITS=$(git log --oneline "$PREV_TAG..HEAD" --grep="python" --grep="Python" --grep="PYTHON" -E)
+          fi
+          
+          if [ -n "$COMMITS" ]; then
+            echo "### Python Changes" >> notes.md
+            echo "" >> notes.md
+            echo "$COMMITS" | while IFS= read -r line; do
+              HASH=$(echo "$line" | awk '{print $1}')
+              MESSAGE=$(echo "$line" | cut -d' ' -f2-)
+              echo "* $MESSAGE (\`$HASH\`)" >> notes.md
+            done
+            echo "" >> notes.md
+          else
+            echo "No commits with 'python' keyword found since last release." >> notes.md
+            echo "" >> notes.md
+          fi
+          
+          # Get contributors
+          echo "### Contributors" >> notes.md
+          echo "" >> notes.md
+          if [ "$PREV_TAG" = "none" ]; then
+            CONTRIBUTORS=$(git log --format='%an' | sort -u)
+          else
+            CONTRIBUTORS=$(git log "$PREV_TAG..HEAD" --format='%an' | sort -u)
+          fi
+          
+          if [ -n "$CONTRIBUTORS" ]; then
+            echo "$CONTRIBUTORS" | while IFS= read -r contributor; do
+              echo "* $contributor" >> notes.md
+            done
+          fi
+          
+          cat notes.md
+          
+          # Save to output
+          {
+            echo 'notes<<EOF'
+            cat notes.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Update or Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: python-draft
+          name: Python - Upcoming Release
+          body: ${{ steps.release-notes.outputs.notes }}
+          draft: true
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+

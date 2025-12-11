@@ -83,77 +83,43 @@ jobs:
             echo "should_release=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Generate release notes
+      - name: Get release notes from draft
         id: release-notes
         if: steps.compare.outputs.should_release == 'true'
         run: |
           VERSION="${{ steps.current-version.outputs.version }}"
-          TAG_NAME="python-v$VERSION"
           
-          # Get the previous tag for comparison
-          PREV_TAG="${{ steps.latest-release.outputs.exists == 'true' && format('python-v{0}', steps.latest-release.outputs.version) || '' }}"
+          # Get notes from the draft release
+          echo "Fetching release notes from python-draft..."
+          DRAFT_BODY=$(gh release view python-draft --json body -q '.body')
           
-          # Generate commit range
-          if [ -z "$PREV_TAG" ]; then
-            COMMIT_RANGE=""
-            RANGE_TEXT="all commits"
-          else
-            COMMIT_RANGE="$PREV_TAG..HEAD"
-            RANGE_TEXT="$PREV_TAG..HEAD"
-          fi
+          # Update header to include version number
+          UPDATED_BODY=$(echo "$DRAFT_BODY" | sed "s/## Unreleased Python Changes/## What's Changed in v$VERSION/")
+          UPDATED_BODY=$(echo "$UPDATED_BODY" | sed "/This is a draft release tracking changes/d")
+          UPDATED_BODY=$(echo "$UPDATED_BODY" | sed "/The actual version number will be determined/d")
           
-          echo "## What's Changed in v$VERSION" > notes.md
-          echo "" >> notes.md
-          
-          # Get commits that mention "python" (case insensitive)
-          if [ -z "$COMMIT_RANGE" ]; then
-            COMMITS=$(git log --oneline --grep="python" --grep="Python" --grep="PYTHON" -E)
-          else
-            COMMITS=$(git log --oneline "$COMMIT_RANGE" --grep="python" --grep="Python" --grep="PYTHON" -E)
-          fi
-          
-          if [ -n "$COMMITS" ]; then
-            echo "### Python Changes" >> notes.md
-            echo "" >> notes.md
-            echo "$COMMITS" | while IFS= read -r line; do
-              HASH=$(echo "$line" | awk '{print $1}')
-              MESSAGE=$(echo "$line" | cut -d' ' -f2-)
-              echo "* $MESSAGE (\`$HASH\`)" >> notes.md
-            done
-            echo "" >> notes.md
-          fi
-          
-          # Get contributors
-          echo "### Contributors" >> notes.md
-          echo "" >> notes.md
-          if [ -z "$COMMIT_RANGE" ]; then
-            CONTRIBUTORS=$(git log --format='%an' | sort -u)
-          else
-            CONTRIBUTORS=$(git log "$COMMIT_RANGE" --format='%an' | sort -u)
-          fi
-          echo "$CONTRIBUTORS" | while IFS= read -r contributor; do
-            echo "* @$contributor" >> notes.md
-          done
-          
-          cat notes.md
-          
-          # Save to output (escaped for GitHub Actions)
           {
             echo 'notes<<EOF'
-            cat notes.md
+            echo "$UPDATED_BODY"
             echo EOF
           } >> $GITHUB_OUTPUT
+          
+          echo "Release notes prepared successfully"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if release already exists
         id: check-release
         if: steps.compare.outputs.should_release == 'true'
         run: |
           TAG_NAME="python-v${{ steps.current-version.outputs.version }}"
+          
+          # Check if a published release with this version already exists
           if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
             echo "Release $TAG_NAME already exists"
             echo "exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Release $TAG_NAME does not exist"
+            echo "Release $TAG_NAME does not exist, will create it"
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
@@ -192,4 +158,19 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: libraries/python/dist/
+
+      - name: Delete draft release
+        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false'
+        working-directory: .
+        run: |
+          # Delete the python-draft release after successful publish
+          if gh release view python-draft >/dev/null 2>&1; then
+            gh release delete python-draft --yes
+            git push --delete origin python-draft || true
+            echo "Deleted python-draft release"
+          else
+            echo "No python-draft release found to delete"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
