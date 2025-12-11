@@ -785,17 +785,16 @@ function OpenAIComponentRendererBase({
         displayMode !== "pip" && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
             <IframeConsole iframeId={toolId} enabled={true} />
-            {useDevMode && (
-              <WidgetInspectorControls
-                displayMode={displayMode}
-                onDisplayModeChange={handleDisplayModeChange}
-                toolInput={widgetToolInput}
-                toolOutput={widgetToolOutput}
-                toolResult={toolResult}
-                iframeRef={iframeRef}
-                toolId={toolId}
-              />
-            )}
+            {/* Always show debug controls in inspector */}
+            <WidgetInspectorControls
+              displayMode={displayMode}
+              onDisplayModeChange={handleDisplayModeChange}
+              toolInput={widgetToolInput}
+              toolOutput={widgetToolOutput}
+              toolResult={toolResult}
+              iframeRef={iframeRef}
+              toolId={toolId}
+            />
           </div>
         )}
       <div
