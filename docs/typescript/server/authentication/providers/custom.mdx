@@ -1,0 +1,641 @@
+---
+title: "Custom Provider"
+description: "Use any OAuth provider"
+icon: "code"
+---
+
+## Setup
+
+The custom provider gives you complete control over:
+- OAuth endpoints configuration
+- JWT verification logic
+- User information extraction
+- Token validation rules
+
+## Basic Configuration
+
+```typescript
+import { McpServer, custom } from 'mcp-use/server'
+import { jwtVerify, createRemoteJWKSet } from 'jose'
+
+const server = new McpServer({
+  name: 'my-server',
+  version: '1.0.0',
+  oauth: custom({
+    issuer: 'https://auth.example.com',
+    authEndpoint: 'https://auth.example.com/oauth/authorize',
+    tokenEndpoint: 'https://auth.example.com/oauth/token',
+    
+    // Custom verification logic
+    async verifyToken(token: string) {
+      const JWKS = createRemoteJWKSet(
+        new URL('https://auth.example.com/.well-known/jwks.json')
+      )
+      
+      const result = await jwtVerify(token, JWKS, {
+        issuer: 'https://auth.example.com',
+        audience: 'your-audience'
+      })
+      
+      return result.payload
+    },
+    
+    // Optional: Custom user info extraction
+    getUserInfo(payload: any) {
+      return {
+        userId: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        roles: payload.roles || [],
+        permissions: payload.permissions || []
+      }
+    }
+  })
+})
+
+await server.listen(3000)
+```
+
+## Full Configuration Options
+
+```typescript
+const server = new McpServer({
+  oauth: custom({
+    // OAuth Endpoints
+    issuer: 'https://auth.example.com',
+    authEndpoint: 'https://auth.example.com/oauth/authorize',
+    tokenEndpoint: 'https://auth.example.com/oauth/token',
+    
+    // Optional: User info endpoint
+    userInfoEndpoint: 'https://auth.example.com/oauth/userinfo',
+    
+    // Optional: JWKS endpoint (for automatic verification)
+    jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+    
+    // OAuth Client Configuration
+    clientId: process.env.OAUTH_CLIENT_ID,
+    clientSecret: process.env.OAUTH_CLIENT_SECRET,
+    
+    // OAuth mode
+    mode: 'proxy', // or 'direct'
+    
+    // Scopes
+    scopes: ['openid', 'profile', 'email'],
+    
+    // Audience (for JWT verification)
+    audience: 'your-api-identifier',
+    
+    // Custom token verification
+    async verifyToken(token: string) {
+      // Your verification logic
+      return payload
+    },
+    
+    // Custom user info extraction
+    getUserInfo(payload: any) {
+      return {
+        userId: payload.sub,
+        // ... other fields
+      }
+    }
+  })
+})
+```
+
+## JWT Verification
+
+### Using JWKS (Recommended)
+
+Verify tokens using the provider's public keys:
+
+```typescript
+import { jwtVerify, createRemoteJWKSet } from 'jose'
+
+oauth: custom({
+  issuer: 'https://auth.example.com',
+  authEndpoint: 'https://auth.example.com/oauth/authorize',
+  tokenEndpoint: 'https://auth.example.com/oauth/token',
+  
+  async verifyToken(token: string) {
+    // Create JWKS getter
+    const JWKS = createRemoteJWKSet(
+      new URL('https://auth.example.com/.well-known/jwks.json')
+    )
+    
+    // Verify token
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: 'https://auth.example.com',
+      audience: 'your-audience',
+      algorithms: ['RS256', 'ES256']
+    })
+    
+    return payload
+  }
+})
+```
+
+### Using Shared Secret (HS256)
+
+For symmetric key signing:
+
+```typescript
+import { jwtVerify } from 'jose'
+
+oauth: custom({
+  issuer: 'https://auth.example.com',
+  authEndpoint: 'https://auth.example.com/oauth/authorize',
+  tokenEndpoint: 'https://auth.example.com/oauth/token',
+  
+  async verifyToken(token: string) {
+    const secret = new TextEncoder().encode(
+      process.env.JWT_SECRET!
+    )
+    
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: 'https://auth.example.com',
+      audience: 'your-audience',
+      algorithms: ['HS256']
+    })
+    
+    return payload
+  }
+})
+```
+
+### Skip Verification (Development Only)
+
+```typescript
+oauth: custom({
+  issuer: 'https://auth.example.com',
+  authEndpoint: 'https://auth.example.com/oauth/authorize',
+  tokenEndpoint: 'https://auth.example.com/oauth/token',
+  
+  async verifyToken(token: string) {
+    // ⚠️ Only for development!
+    if (process.env.NODE_ENV !== 'production') {
+      const jwt = require('jsonwebtoken')
+      return jwt.decode(token)
+    }
+    
+    // Production verification
+    // ... actual verification logic
+  }
+})
+```
+
+## User Info Extraction
+
+### Standard Claims
+
+Extract standard OIDC claims:
+
+```typescript
+getUserInfo(payload: any) {
+  return {
+    userId: payload.sub,                // Required: unique user ID
+    email: payload.email,               // Email address
+    emailVerified: payload.email_verified,
+    name: payload.name,                 // Full name
+    givenName: payload.given_name,      // First name
+    familyName: payload.family_name,    // Last name
+    nickname: payload.nickname,         // Nickname
+    username: payload.preferred_username,
+    picture: payload.picture,           // Profile picture URL
+    locale: payload.locale,             // Locale (e.g., 'en-US')
+    zoneinfo: payload.zoneinfo,         // Timezone
+  }
+}
+```
+
+### Custom Claims
+
+Extract provider-specific or custom claims:
+
+```typescript
+getUserInfo(payload: any) {
+  return {
+    userId: payload.sub,
+    email: payload.email,
+    name: payload.name,
+    
+    // Custom claims (use your provider's structure)
+    roles: payload['https://myapp.com/roles'] || payload.roles || [],
+    permissions: payload['https://myapp.com/permissions'] || [],
+    organizationId: payload.org_id || payload.organization_id,
+    department: payload.department,
+    
+    // Include all payload for access to any claim
+    ...payload
+  }
+}
+```
+
+### Nested Claims
+
+Extract deeply nested claims:
+
+```typescript
+getUserInfo(payload: any) {
+  return {
+    userId: payload.sub,
+    email: payload.email,
+    name: payload.name,
+    
+    // Nested custom claims
+    roles: payload.custom?.authorization?.roles || [],
+    permissions: payload.custom?.authorization?.permissions || [],
+    metadata: payload.app_metadata || payload.user_metadata || {},
+  }
+}
+```
+
+## OAuth Modes
+
+### Proxy Mode
+
+Server proxies OAuth requests (default):
+
+```typescript
+const server = new McpServer({
+  oauth: custom({
+    issuer: 'https://auth.example.com',
+    authEndpoint: 'https://auth.example.com/oauth/authorize',
+    tokenEndpoint: 'https://auth.example.com/oauth/token',
+    mode: 'proxy'
+  })
+})
+```
+
+Clients authenticate through your server:
+```typescript
+const client = new McpClient({
+  auth: {
+    authUrl: 'http://localhost:3000/authorize',
+    tokenUrl: 'http://localhost:3000/token',
+  }
+})
+```
+
+### Direct Mode
+
+Clients authenticate directly with provider:
+
+```typescript
+const server = new McpServer({
+  oauth: custom({
+    issuer: 'https://auth.example.com',
+    authEndpoint: 'https://auth.example.com/oauth/authorize',
+    tokenEndpoint: 'https://auth.example.com/oauth/token',
+    mode: 'direct'
+  })
+})
+```
+
+Clients use provider endpoints:
+```typescript
+const client = new McpClient({
+  auth: {
+    authUrl: 'https://auth.example.com/oauth/authorize',
+    tokenUrl: 'https://auth.example.com/oauth/token',
+  }
+})
+```
+
+## Examples
+
+### GitHub OAuth
+
+```typescript
+import { McpServer, custom } from 'mcp-use/server'
+
+const server = new McpServer({
+  oauth: custom({
+    issuer: 'https://github.com',
+    authEndpoint: 'https://github.com/login/oauth/authorize',
+    tokenEndpoint: 'https://github.com/login/oauth/access_token',
+    userInfoEndpoint: 'https://api.github.com/user',
+    
+    clientId: process.env.GITHUB_CLIENT_ID!,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    
+    scopes: ['read:user', 'user:email'],
+    
+    async verifyToken(token: string) {
+      // GitHub uses non-JWT tokens, fetch user info instead
+      const response = await fetch('https://api.github.com/user', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Invalid token')
+      }
+      
+      return await response.json()
+    },
+    
+    getUserInfo(payload: any) {
+      return {
+        userId: payload.id.toString(),
+        username: payload.login,
+        name: payload.name,
+        email: payload.email,
+        picture: payload.avatar_url,
+        bio: payload.bio,
+      }
+    }
+  })
+})
+```
+
+### Okta
+
+```typescript
+import { jwtVerify, createRemoteJWKSet } from 'jose'
+
+const server = new McpServer({
+  oauth: custom({
+    issuer: process.env.OKTA_DOMAIN!,
+    authEndpoint: `${process.env.OKTA_DOMAIN!}/oauth2/v1/authorize`,
+    tokenEndpoint: `${process.env.OKTA_DOMAIN!}/oauth2/v1/token`,
+    
+    clientId: process.env.OKTA_CLIENT_ID!,
+    clientSecret: process.env.OKTA_CLIENT_SECRET,
+    
+    async verifyToken(token: string) {
+      const JWKS = createRemoteJWKSet(
+        new URL(`${process.env.OKTA_DOMAIN!}/oauth2/v1/keys`)
+      )
+      
+      const { payload } = await jwtVerify(token, JWKS, {
+        issuer: process.env.OKTA_DOMAIN!,
+        audience: 'api://default'
+      })
+      
+      return payload
+    },
+    
+    getUserInfo(payload: any) {
+      return {
+        userId: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        username: payload.preferred_username,
+        groups: payload.groups || [],
+      }
+    }
+  })
+})
+```
+
+### Azure AD (Microsoft Entra ID)
+
+```typescript
+import { jwtVerify, createRemoteJWKSet } from 'jose'
+
+const tenantId = process.env.AZURE_TENANT_ID!
+
+const server = new McpServer({
+  oauth: custom({
+    issuer: `https://login.microsoftonline.com/${tenantId}/v2.0`,
+    authEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
+    tokenEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+    
+    clientId: process.env.AZURE_CLIENT_ID!,
+    clientSecret: process.env.AZURE_CLIENT_SECRET,
+    
+    scopes: ['openid', 'profile', 'email'],
+    
+    async verifyToken(token: string) {
+      const JWKS = createRemoteJWKSet(
+        new URL('https://login.microsoftonline.com/common/discovery/v2.0/keys')
+      )
+      
+      const { payload } = await jwtVerify(token, JWKS, {
+        issuer: `https://login.microsoftonline.com/${tenantId}/v2.0`,
+        audience: process.env.AZURE_CLIENT_ID!
+      })
+      
+      return payload
+    },
+    
+    getUserInfo(payload: any) {
+      return {
+        userId: payload.oid || payload.sub,
+        email: payload.email || payload.preferred_username,
+        name: payload.name,
+        tenantId: payload.tid,
+        roles: payload.roles || [],
+      }
+    }
+  })
+})
+```
+
+### Google OAuth
+
+```typescript
+import { jwtVerify, createRemoteJWKSet } from 'jose'
+
+const server = new McpServer({
+  oauth: custom({
+    issuer: 'https://accounts.google.com',
+    authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenEndpoint: 'https://oauth2.googleapis.com/token',
+    
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    
+    scopes: ['openid', 'profile', 'email'],
+    
+    async verifyToken(token: string) {
+      const JWKS = createRemoteJWKSet(
+        new URL('https://www.googleapis.com/oauth2/v3/certs')
+      )
+      
+      const { payload } = await jwtVerify(token, JWKS, {
+        issuer: 'https://accounts.google.com',
+        audience: process.env.GOOGLE_CLIENT_ID!
+      })
+      
+      return payload
+    },
+    
+    getUserInfo(payload: any) {
+      return {
+        userId: payload.sub,
+        email: payload.email,
+        emailVerified: payload.email_verified,
+        name: payload.name,
+        givenName: payload.given_name,
+        familyName: payload.family_name,
+        picture: payload.picture,
+        locale: payload.locale,
+      }
+    }
+  })
+})
+```
+
+## Advanced Patterns
+
+### Token Introspection
+
+For opaque tokens (non-JWT):
+
+```typescript
+oauth: custom({
+  issuer: 'https://auth.example.com',
+  authEndpoint: 'https://auth.example.com/oauth/authorize',
+  tokenEndpoint: 'https://auth.example.com/oauth/token',
+  
+  async verifyToken(token: string) {
+    // Introspect token at provider
+    const response = await fetch(
+      'https://auth.example.com/oauth/introspect',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${Buffer.from(
+            `${clientId}:${clientSecret}`
+          ).toString('base64')}`
+        },
+        body: `token=${token}`
+      }
+    )
+    
+    const result = await response.json()
+    
+    if (!result.active) {
+      throw new Error('Token is not active')
+    }
+    
+    return result
+  }
+})
+```
+
+### Custom Token Validation
+
+Add custom validation rules:
+
+```typescript
+oauth: custom({
+  issuer: 'https://auth.example.com',
+  authEndpoint: 'https://auth.example.com/oauth/authorize',
+  tokenEndpoint: 'https://auth.example.com/oauth/token',
+  
+  async verifyToken(token: string) {
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: 'https://auth.example.com'
+    })
+    
+    // Custom validation
+    if (payload.token_type !== 'access_token') {
+      throw new Error('Invalid token type')
+    }
+    
+    // Check custom claim
+    if (!payload.verified_email) {
+      throw new Error('Email not verified')
+    }
+    
+    // Check token age
+    const age = Date.now() / 1000 - (payload.iat || 0)
+    if (age > 3600) {
+      throw new Error('Token too old')
+    }
+    
+    return payload
+  }
+})
+```
+
+### Caching JWKS
+
+Cache JWKS for better performance:
+
+```typescript
+import { jwtVerify, createRemoteJWKSet } from 'jose'
+
+// Cache JWKS outside function
+const JWKS = createRemoteJWKSet(
+  new URL('https://auth.example.com/.well-known/jwks.json'),
+  {
+    cacheMaxAge: 3600000, // Cache for 1 hour
+    cooldownDuration: 30000 // 30 seconds cooldown
+  }
+)
+
+oauth: custom({
+  issuer: 'https://auth.example.com',
+  authEndpoint: 'https://auth.example.com/oauth/authorize',
+  tokenEndpoint: 'https://auth.example.com/oauth/token',
+  
+  async verifyToken(token: string) {
+    // Use cached JWKS
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: 'https://auth.example.com'
+    })
+    
+    return payload
+  }
+})
+```
+
+### Type Safety
+
+Type your user info:
+
+```typescript
+interface MyUserInfo {
+  userId: string
+  email: string
+  name: string
+  roles: string[]
+}
+
+getUserInfo(payload: any): MyUserInfo {
+  return {
+    userId: payload.sub,
+    email: payload.email,
+    name: payload.name,
+    roles: payload.roles || []
+  }
+}
+```
+
+### Validate Claims
+
+Always validate required claims:
+
+```typescript
+getUserInfo(payload: any) {
+  if (!payload.sub) {
+    throw new Error('Missing sub claim')
+  }
+  
+  if (!payload.email) {
+    throw new Error('Missing email claim')
+  }
+  
+  return {
+    userId: payload.sub,
+    email: payload.email,
+    name: payload.name || 'Unknown',
+    roles: Array.isArray(payload.roles) ? payload.roles : []
+  }
+}
+```
+
+## Resources
+
+- [Jose Library](https://github.com/panva/jose) - JWT verification
+- [OAuth 2.0 RFC](https://datatracker.ietf.org/doc/html/rfc6749)
+- [OIDC Specification](https://openid.net/specs/openid-connect-core-1_0.html)
+- [JWT.io](https://jwt.io/) - Token decoder
+
+## Next Steps
+
+- [User Context](/typescript/server/authentication/user-context) - Access user information
+

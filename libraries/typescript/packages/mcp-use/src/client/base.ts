@@ -1,6 +1,7 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { logger } from "../logging.js";
 import { MCPSession } from "../session.js";
+import { Tel } from "../telemetry/index.js";
 
 /**
  * Base MCPClient class with shared functionality
@@ -27,12 +28,14 @@ export abstract class BaseMCPClient {
   public addServer(name: string, serverConfig: Record<string, any>): void {
     this.config.mcpServers = this.config.mcpServers || {};
     this.config.mcpServers[name] = serverConfig;
+    Tel.getInstance().trackClientAddServer(name, serverConfig);
   }
 
   public removeServer(name: string): void {
     if (this.config.mcpServers?.[name]) {
       delete this.config.mcpServers[name];
       this.activeSessions = this.activeSessions.filter((n) => n !== name);
+      Tel.getInstance().trackClientRemoveServer(name);
     }
   }
 

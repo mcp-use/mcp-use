@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { MCPUIResource } from "./MCPUIResource";
+import { Spinner } from "../ui/spinner";
 
 interface ToolResultRendererProps {
   toolName: string;
@@ -8,6 +9,7 @@ interface ToolResultRendererProps {
   result: any;
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
+  toolMeta?: Record<string, any>;
 }
 
 /**
@@ -19,8 +21,21 @@ export function ToolResultRenderer({
   result,
   serverId,
   readResource,
+  toolMeta,
 }: ToolResultRendererProps) {
   const [resourceData, setResourceData] = useState<any>(null);
+
+  // Debug logging to understand the data flow
+  useEffect(() => {
+    console.log("[ToolResultRenderer] Rendering:", {
+      toolName,
+      hasToolMeta: !!toolMeta,
+      outputTemplate: toolMeta?.["openai/outputTemplate"],
+      hasResult: !!result,
+      hasServerId: !!serverId,
+      hasReadResource: !!readResource,
+    });
+  }, [toolName, toolMeta, result, serverId, readResource]);
 
   // Parse result if it's a JSON string (memoized to prevent re-renders)
   const parsedResult = useMemo(() => {
@@ -35,7 +50,14 @@ export function ToolResultRenderer({
     return result;
   }, [result]);
 
-  // Check if this is an OpenAI Apps SDK result with a component
+  // Check if this is an OpenAI Apps SDK tool by checking tool metadata
+  // (The tool definition has openai/outputTemplate in its _meta)
+  const isAppsSdkTool = useMemo(
+    () => !!toolMeta?.["openai/outputTemplate"],
+    [toolMeta]
+  );
+
+  // Check if the result content has the Apps SDK resource embedded
   const hasAppsSdkComponent = useMemo(
     () =>
       !!(
@@ -65,17 +87,55 @@ export function ToolResultRenderer({
     return null;
   }, [hasAppsSdkComponent, parsedResult]);
 
+  // Fetch resource for Apps SDK tools (when not embedded in result)
   useEffect(() => {
-    const updateResourceData = () => {
-      if (extractedResource) {
-        setResourceData(extractedResource);
-      }
-    };
-    updateResourceData();
-  }, [extractedResource]);
+    // If resource is already embedded, use it
+    if (extractedResource) {
+      setResourceData(extractedResource);
+      return;
+    }
+
+    // If this is an Apps SDK tool but resource isn't embedded, fetch it
+    if (isAppsSdkTool && toolMeta && readResource) {
+      const outputTemplateUri = toolMeta["openai/outputTemplate"] as string;
+      console.log(
+        "[ToolResultRenderer] Fetching resource for Apps SDK tool:",
+        outputTemplateUri
+      );
+
+      readResource(outputTemplateUri)
+        .then((data) => {
+          console.log("[ToolResultRenderer] Resource fetched:", data);
+          // Extract the first resource from the contents array
+          if (
+            data?.contents &&
+            Array.isArray(data.contents) &&
+            data.contents.length > 0
+          ) {
+            setResourceData(data.contents[0]);
+          } else {
+            console.warn(
+              "[ToolResultRenderer] No contents in fetched resource:",
+              data
+            );
+          }
+        })
+        .catch((error) => {
+          console.error(
+            "[ToolResultRenderer] Failed to fetch resource:",
+            error
+          );
+        });
+    }
+  }, [extractedResource, isAppsSdkTool, toolMeta, readResource]);
 
   // Render OpenAI Apps SDK component
-  if (hasAppsSdkComponent && resourceData && serverId && readResource) {
+  if (
+    (isAppsSdkTool || hasAppsSdkComponent) &&
+    resourceData &&
+    serverId &&
+    readResource
+  ) {
     return (
       <OpenAIComponentRenderer
         componentUrl={resourceData.uri}
@@ -91,12 +151,30 @@ export function ToolResultRenderer({
     );
   }
 
-  // Show loading state
-  if (hasAppsSdkComponent && !resourceData) {
+  // Show loading state for Apps SDK tools
+  if ((isAppsSdkTool || hasAppsSdkComponent) && !resourceData) {
     return (
-      <div className="my-4 p-4 bg-blue-50/30 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/50 rounded-lg">
-        <p className="text-sm text-blue-600 dark:text-blue-400">
-          Loading component...
+      <div className="flex items-center justify-center w-full h-[200px] rounded border">
+        <Spinner className="size-5" />
+      </div>
+    );
+  }
+
+  // Show error if Apps SDK tool but missing serverId or readResource
+  if (isAppsSdkTool && (!serverId || !readResource)) {
+    console.error(
+      "[ToolResultRenderer] Apps SDK tool but missing serverId or readResource:",
+      {
+        toolName,
+        hasServerId: !!serverId,
+        hasReadResource: !!readResource,
+      }
+    );
+    return (
+      <div className="my-4 p-4 bg-red-50/30 dark:bg-red-950/20 border border-red-200/50 dark:border-red-800/50 rounded-lg">
+        <p className="text-sm text-red-600 dark:text-red-400">
+          Cannot render widget: Missing required props (serverId or
+          readResource)
         </p>
       </div>
     );
@@ -128,6 +206,15 @@ export function ToolResultRenderer({
       </>
     );
   }
+
+  // Debug: Log when we're not rendering anything
+  console.log("[ToolResultRenderer] Not rendering (no UI resources found):", {
+    toolName,
+    isAppsSdkTool,
+    hasAppsSdkComponent,
+    hasResourceData: !!resourceData,
+    contentLength: parsedResult?.content?.length,
+  });
 
   return null;
 }

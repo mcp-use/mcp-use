@@ -295,7 +295,7 @@ export function ConnectionSettingsForm({
       <div className="space-y-2">
         <Label className={labelClassName}>URL</Label>
         <Input
-          placeholder="http://localhost:3001/sse"
+          placeholder="http://localhost:3000/sse"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onPaste={handlePaste}

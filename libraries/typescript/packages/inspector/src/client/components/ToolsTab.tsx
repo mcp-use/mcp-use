@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import {
   useCallback,
   useEffect,

@@ -5,16 +5,16 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
-import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
-import { createMCPServer } from "../../src/server/index.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { toJsonSchemaCompat } from "@mcp-use/modelcontextprotocol-sdk/server/zod-json-schema-compat.js";
+import { MCPServer } from "../../src/server/index.js";
+import { Client } from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
 import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import { ElicitRequestSchema } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 describe("Elicitation Integration Tests", () => {
   let server: any;
@@ -25,16 +25,19 @@ describe("Elicitation Integration Tests", () => {
 
   beforeAll(async () => {
     // Create test server
-    server = createMCPServer("test-elicitation-server", {
+    server = new MCPServer({
+      name: "test-elicitation-server",
       version: "1.0.0",
     });
 
     // Add test tools
-    server.tool({
-      name: "form-mode-simple",
-      description: "Simple form mode elicitation",
-      inputs: [],
-      cb: async (_: any, ctx: any) => {
+    server.tool(
+      {
+        name: "form-mode-simple",
+        description: "Simple form mode elicitation",
+        inputs: [],
+      },
+      async (_: any, ctx: any) => {
         const result = await ctx.elicit(
           "Enter your name",
           z.object({
@@ -51,14 +54,16 @@ describe("Elicitation Integration Tests", () => {
         return {
           content: [{ type: "text", text: "No name provided" }],
         };
-      },
-    });
+      }
+    );
 
-    server.tool({
-      name: "form-mode-validation",
-      description: "Form mode with validation",
-      inputs: [],
-      cb: async (_: any, ctx: any) => {
+    server.tool(
+      {
+        name: "form-mode-validation",
+        description: "Form mode with validation",
+        inputs: [],
+      },
+      async (_: any, ctx: any) => {
         const result = await ctx.elicit(
           "Enter user details",
           z.object({
@@ -82,14 +87,16 @@ describe("Elicitation Integration Tests", () => {
         return {
           content: [{ type: "text", text: "Cancelled" }],
         };
-      },
-    });
+      }
+    );
 
-    server.tool({
-      name: "url-mode-test",
-      description: "URL mode elicitation",
-      inputs: [],
-      cb: async (_: any, ctx: any) => {
+    server.tool(
+      {
+        name: "url-mode-test",
+        description: "URL mode elicitation",
+        inputs: [],
+      },
+      async (_: any, ctx: any) => {
         const result = await ctx.elicit(
           "Please authorize",
           "https://example.com/oauth"
@@ -104,14 +111,16 @@ describe("Elicitation Integration Tests", () => {
         return {
           content: [{ type: "text", text: "Authorization failed" }],
         };
-      },
-    });
+      }
+    );
 
-    server.tool({
-      name: "with-timeout",
-      description: "Elicitation with timeout",
-      inputs: [],
-      cb: async (_: any, ctx: any) => {
+    server.tool(
+      {
+        name: "with-timeout",
+        description: "Elicitation with timeout",
+        inputs: [],
+      },
+      async (_: any, ctx: any) => {
         const result = await ctx.elicit(
           "Quick response",
           z.object({ answer: z.string() }),
@@ -127,8 +136,8 @@ describe("Elicitation Integration Tests", () => {
         return {
           content: [{ type: "text", text: "No answer" }],
         };
-      },
-    });
+      }
+    );
 
     // Start server
     await server.listen(TEST_PORT);

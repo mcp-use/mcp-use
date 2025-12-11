@@ -1,0 +1,50 @@
+{
+  "name": "mcp-use server",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server with MCP-UI integration",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "uiresource",
+    "ui",
+    "react",
+    "widgets",
+    "ai",
+    "tools",
+    "mcp-ui"
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start",
+    "deploy": "mcp-use deploy"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.2.0",
+    "mcp-use": "workspace:*",
+    "node-mocks-http": "^1.17.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.6",
+    "tailwindcss": "^4.1.17",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4"
+  },
+  "overrides": {
+    "sugarss": "^5.0.1"
+  }
+}

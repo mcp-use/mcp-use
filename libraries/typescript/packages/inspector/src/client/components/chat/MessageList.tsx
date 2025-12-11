@@ -32,11 +32,24 @@ interface MessageListProps {
   isLoading: boolean;
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
+  tools?: any[];
 }
 
 export const MessageList = memo(
-  ({ messages, isLoading, serverId, readResource }: MessageListProps) => {
+  ({
+    messages,
+    isLoading,
+    serverId,
+    readResource,
+    tools,
+  }: MessageListProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Helper function to get tool metadata by name
+    const getToolMeta = (toolName: string): Record<string, any> | undefined => {
+      const tool = tools?.find((t) => t.name === toolName);
+      return tool?._meta;
+    };
 
     // Scroll to bottom when messages change or streaming status changes
     useEffect(() => {
@@ -161,6 +174,9 @@ export const MessageList = memo(
                               result={part.toolInvocation.result}
                               serverId={serverId}
                               readResource={readResource}
+                              toolMeta={getToolMeta(
+                                part.toolInvocation.toolName
+                              )}
                             />
                           )}
                         </div>
@@ -198,6 +214,7 @@ export const MessageList = memo(
                                   result={toolCall.result}
                                   serverId={serverId}
                                   readResource={readResource}
+                                  toolMeta={getToolMeta(toolCall.toolName)}
                                 />
                               )}
                             </div>

@@ -1,20 +1,40 @@
 ---
 title: "Elicitation"
-description: "Enable user input requests for MCP tools"
-icon: "check"
+description: "Interactive user input during tool execution"
+icon: "hand-pointer"
 ---
+
+Elicitation enables MCP tools to request additional information from users during execution. This creates interactive workflows where tools can dynamically gather data, credentials, or approvals as needed.
+
+## Understanding Elicitation
+
+When a tool needs user input, it sends an elicitation request to the client. The client handles presenting this request to the user and returning their response. This enables:
+
+- **Interactive workflows**: Tools can ask for input mid-execution
+- **Secure credentials**: Request sensitive data without storing it
+- **Dynamic decisions**: Get user approval for actions
+- **OAuth flows**: Redirect users for authentication
+
 <Info>
-Elicitation allows MCP tools to request additional information from users during their execution. Servers can collect structured data (form mode) or direct users to external URLs (URL mode) for sensitive operations.
+**Two Modes Available**: Form mode for structured data collection, and URL mode for directing users to external authentication or approval pages.
 </Info>
 
-## Overview
+## Elicitation Modes
 
-When a server tool needs user input, it sends an elicitation request to the client. The client presents this request to the user and returns their response. This enables interactive workflows where tools can dynamically gather information as needed.
+### Form Mode
 
-Elicitation supports two modes:
+Collect structured data with JSON schema validation. Best for:
+- Non-sensitive information
+- Structured input requirements
+- Client-side form rendering
 
-- **Form Mode**: Collect structured data with JSON schema validation (for non-sensitive information)
-- **URL Mode**: Direct users to external URLs (MUST be used for sensitive data like credentials, OAuth flows)
+### URL Mode
+
+Direct users to external URLs. Required for:
+- Sensitive credentials (passwords, API keys)
+- OAuth authentication flows
+- External approval processes
+- Third-party integrations
 
 <Note>
 **Server API**: Servers use a simplified API like `ctx.elicit(message, zodSchema)` or `ctx.elicit(message, url)`. The mode is automatically detected and the request is sent to the client with the appropriate JSON schema or URL.

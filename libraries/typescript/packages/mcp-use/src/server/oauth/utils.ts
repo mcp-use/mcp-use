@@ -6,13 +6,14 @@
  */
 
 import type { Context, Next } from "hono";
+import type { UserInfo } from "./providers/types.js";
 
 /**
  * Authentication information extracted from context
  */
 export interface AuthInfo {
-  user: any;
-  payload: any;
+  user: UserInfo;
+  payload: Record<string, unknown>;
   accessToken: string;
   scopes: string[];
   permissions: string[];

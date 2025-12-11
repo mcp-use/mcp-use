@@ -34,6 +34,7 @@ from mcp.types import (
     ReadResourceRequestParams,
     ReadResourceResult,
 )
+from pydantic import AnyUrl
 
 from mcp_use.telemetry.telemetry import telemetry
 
@@ -66,7 +67,7 @@ class MCPResponseContext:
     jsonrpc_response: JSONRPCResponse | None = None
 
     @classmethod
-    def create(cls, request_id: str, result: Any = None, error: Exception = None) -> "MCPResponseContext":
+    def create(cls, request_id: str, result: Any = None, error: Exception | None = None) -> "MCPResponseContext":
         return cls(request_id=request_id, result=result, error=error, duration=0.0, metadata={})
 
 
@@ -154,6 +155,7 @@ class MiddlewareManager:
 
     def __init__(self):
         self.middlewares: list[Middleware] = []
+        self._record_telemetry = True
 
     @telemetry("middleware_add")
     def add_middleware(self, callback: Middleware) -> None:
@@ -252,7 +254,7 @@ class CallbackClientSession:
             "resources/list", None, lambda ctx: self._client_session.list_resources(*args, **kwargs)
         )
 
-    async def read_resource(self, uri: str, *args, **kwargs) -> ReadResourceResult:
+    async def read_resource(self, uri: AnyUrl, *args, **kwargs) -> ReadResourceResult:
         params = ReadResourceRequestParams(uri=uri)
         return await self._intercept_call(
             "resources/read", params, lambda ctx: self._client_session.read_resource(ctx.params.uri, *args, **kwargs)

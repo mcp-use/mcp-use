@@ -3,7 +3,7 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 import type {
   CallToolResult,
   Tool as MCPTool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { ZodTypeAny } from "zod";
 import type { BaseConnector } from "../connectors/base.js";
 

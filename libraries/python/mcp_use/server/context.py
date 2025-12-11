@@ -10,11 +10,12 @@ from mcp.types import CreateMessageResult, ModelPreferences, SamplingMessage, Te
 from pydantic import BaseModel, Field, create_model
 from starlette.requests import Request
 
-from mcp_use.telemetry.telemetry import telemetry
+from mcp_use.telemetry.telemetry import Telemetry
+
+_telemetry = Telemetry()
 
 
 class Context(FastMCPContext):
-    @telemetry("context_sample_used")
     async def sample(
         self,
         messages: str | SamplingMessage | Sequence[SamplingMessage | str],
@@ -44,6 +45,8 @@ class Context(FastMCPContext):
             raw: When ``True`` returns the full ``CreateMessageResult`` instead of
                 just the ``TextContent`` convenience wrapper.
         """
+        _telemetry.track_server_context(context_type="sample")
+
         result = await self.session.create_message(
             messages=messages,
             max_tokens=max_tokens,
@@ -59,14 +62,17 @@ class Context(FastMCPContext):
 
     async def send_tool_list_changed(self) -> None:
         """Notify the client that the tool list changed."""
+        _telemetry.track_server_context(context_type="notification", notification_type="tools/list_changed")
         await self.session.send_tool_list_changed()
 
     async def send_resource_list_changed(self) -> None:
         """Notify the client that the resource list changed."""
+        _telemetry.track_server_context(context_type="notification", notification_type="resources/list_changed")
         await self.session.send_resource_list_changed()
 
     async def send_prompt_list_changed(self) -> None:
         """Notify the client that the prompt list changed."""
+        _telemetry.track_server_context(context_type="notification", notification_type="prompts/list_changed")
         await self.session.send_prompt_list_changed()
 
     def get_http_request(self) -> Request | None:
@@ -76,13 +82,14 @@ class Context(FastMCPContext):
             return None
         return cast(Request, request)
 
-    @telemetry("context_elicit_used")
     async def elicit(
         self,
         message: str,
         schema: type[ElicitSchemaModelT] | type[Any],
     ) -> ElicitationResult[ElicitSchemaModelT]:
         """Support both Pydantic models and dataclasses for elicitation schemas."""
+        _telemetry.track_server_context(context_type="elicit")
+
         schema_model, dataclass_schema = self._coerce_schema(schema)
         result = await super().elicit(message=message, schema=schema_model)
 

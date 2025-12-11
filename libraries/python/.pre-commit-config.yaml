@@ -13,6 +13,7 @@ repos:
         entry: ty check
         language: system
         types: [python]
+        exclude: ^tests/
 
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

@@ -1,0 +1,133 @@
+---
+title: "Overview"
+description: "Add OAuth 2.0/2.1 authentication to your MCP server with support for Auth0, WorkOS, Supabase, Keycloak, and custom providers"
+icon: "shield-check"
+---
+
+# Server Authentication
+
+Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server with built-in support for popular identity providers. Secure your tools with bearer token authentication, implement role-based access control (RBAC), and access authenticated user information in your tool callbacks.
+
+## Quick Start
+
+### Basic OAuth Server
+
+```typescript
+import { McpServer, auth0 } from 'mcp-use/server'
+
+const server = new McpServer({
+  name: 'my-secure-server',
+  version: '1.0.0',
+  oauth: auth0({
+    domain: 'your-tenant.auth0.com',
+    audience: 'https://your-api.example.com',
+  })
+})
+
+// Tools now have access to authenticated user context
+server.tool({
+  name: 'get-user-profile',
+  description: 'Get the authenticated user profile',
+  cb: async (params, context) => {
+    // Access authenticated user info
+    const user = context.auth
+    return {
+      userId: user.userId,
+      email: user.email,
+      name: user.name,
+      roles: user.roles
+    }
+  }
+})
+
+await server.listen(3000)
+```
+
+## OAuth Providers
+
+mcp-use includes built-in support for major identity providers. Each provider is documented in detail:
+
+- [Auth0](/typescript/server/authentication/providers/auth0) - Full OAuth 2.1 with PKCE and JWKS verification
+- [WorkOS](/typescript/server/authentication/providers/workos) - Enterprise SSO with direct mode OAuth
+- [Supabase](/typescript/server/authentication/providers/supabase) - Authentication for Supabase projects
+- [Keycloak](/typescript/server/authentication/providers/keycloak) - Enterprise SSO with realm roles
+- [Custom Provider](/typescript/server/authentication/providers/custom) - Use any OAuth provider
+
+
+## OAuth Modes
+
+Choose between proxy mode and direct mode based on your requirements:
+
+- **Proxy Mode** (Default) - Server proxies OAuth requests
+- **Direct Mode** - Clients authenticate directly with provider
+
+## OAuth Endpoints
+
+When OAuth is configured, your server automatically exposes these endpoints:
+
+### Authorization Endpoint
+
+```
+GET /authorize
+```
+
+Initiates the OAuth authorization flow.
+
+**Query Parameters:**
+- `response_type=code` - Response type
+- `client_id` - OAuth client ID
+- `redirect_uri` - Callback URL
+- `scope` - Requested scopes
+- `state` - CSRF protection token
+- `code_challenge` - PKCE challenge
+- `code_challenge_method=S256` - PKCE method
+
+### Token Endpoint
+
+```
+POST /token
+```
+
+Exchanges authorization code for access token.
+
+**Body Parameters:**
+- `grant_type=authorization_code` - Grant type
+- `code` - Authorization code
+- `redirect_uri` - Callback URL
+- `client_id` - OAuth client ID
+- `code_verifier` - PKCE verifier
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGci...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "openid profile email"
+}
+```
+
+### Discovery Endpoints
+
+```
+GET /.well-known/oauth-authorization-server
+GET /.well-known/openid-configuration
+```
+
+Returns OAuth/OIDC discovery metadata for automatic client configuration.
+
+## Bearer Token Authentication
+
+All `/mcp/*` endpoints require a valid bearer token when OAuth is configured:
+
+```
+Authorization: Bearer eyJhbGci...
+```
+
+
+## Next Steps
+
+- [Client Authentication](/typescript/client/authentication) - Connect to OAuth servers from clients
+- [useMcp Hook](/typescript/client/usemcp) - React hook with OAuth support
+- [User Context](/typescript/server/authentication/user-context) - Access user information in tools
+

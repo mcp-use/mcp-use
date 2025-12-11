@@ -2,7 +2,7 @@ import type {
   CallToolResult,
   ReadResourceResult,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { generateUUID } from "../server/utils/runtime.js";
 import { logger } from "../logging.js";
 import { WebSocketConnectionManager } from "../task_managers/websocket.js";

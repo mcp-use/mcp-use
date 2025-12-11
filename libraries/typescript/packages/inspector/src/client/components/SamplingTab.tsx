@@ -1,4 +1,4 @@
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CreateMessageResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { PendingSamplingRequest } from "@/client/types/sampling";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Hash } from "lucide-react";

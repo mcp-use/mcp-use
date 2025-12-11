@@ -970,9 +970,9 @@ npm install mcp-use @mcp-use/inspector
 **Create your MCP server:**
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-const server = createMCPServer('my-server', { version: '1.0.0' })
+const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
 
 server.tool({
   name: 'hello',

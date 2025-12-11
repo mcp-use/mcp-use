@@ -14,32 +14,43 @@ export class CustomOAuthProvider implements OAuthProvider {
     this.config = config;
   }
 
-  async verifyToken(token: string): Promise<any> {
+  async verifyToken(
+    token: string
+  ): Promise<{ payload: Record<string, unknown> }> {
     try {
       const result = await this.config.verifyToken(token);
-      return { payload: result };
+      return result;
     } catch (error) {
       throw new Error(`Custom OAuth verification failed: ${error}`);
     }
   }
 
-  getUserInfo(payload: any): UserInfo {
+  getUserInfo(payload: Record<string, unknown>): UserInfo {
     // Use custom getUserInfo if provided, otherwise create a basic UserInfo
     if (this.config.getUserInfo) {
       return this.config.getUserInfo(payload);
     }
 
     // Default extraction - assume standard OIDC claims
+    const scope = payload.scope as string | undefined;
+    const roles = payload.roles;
+    const permissions = payload.permissions;
     return {
-      userId: payload.sub || payload.user_id || payload.id,
-      email: payload.email,
-      name: payload.name,
-      username: payload.username || payload.preferred_username,
-      nickname: payload.nickname,
-      picture: payload.picture || payload.avatar_url,
-      roles: payload.roles || [],
-      permissions: payload.permissions || [],
-      scopes: payload.scope ? payload.scope.split(" ") : [],
+      userId: (payload.sub || payload.user_id || payload.id) as string,
+      email: payload.email ? (payload.email as string) : undefined,
+      name: payload.name ? (payload.name as string) : undefined,
+      username:
+        payload.username || payload.preferred_username
+          ? ((payload.username || payload.preferred_username) as string)
+          : undefined,
+      nickname: payload.nickname ? (payload.nickname as string) : undefined,
+      picture:
+        payload.picture || payload.avatar_url
+          ? ((payload.picture || payload.avatar_url) as string)
+          : undefined,
+      roles: Array.isArray(roles) ? (roles as string[]) : [],
+      permissions: Array.isArray(permissions) ? (permissions as string[]) : [],
+      scopes: scope ? scope.split(" ") : [],
     };
   }
 
