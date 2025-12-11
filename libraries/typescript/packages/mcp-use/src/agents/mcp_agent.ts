@@ -14,7 +14,7 @@ import {
 import type { ZodSchema } from "zod";
 import { toJSONSchema } from "zod";
 import { LangChainAdapter } from "../adapters/langchain_adapter.js";
-import type { MCPClient } from "../client.js";
+import { MCPClient } from "../client.js";
 import type { BaseConnector } from "../connectors/base.js";
 import { logger } from "../logging.js";
 import { ServerManager } from "../managers/server_manager.js";
@@ -35,6 +35,15 @@ import type {
   MCPServerConfig,
 } from "./types.js";
 import { createLLMFromString, type LLMConfig } from "./utils/llm_provider.js";
+
+// Re-export types for convenience
+export type {
+  LanguageModel,
+  BaseMessage,
+  MCPAgentOptions,
+  MCPServerConfig,
+} from "./types.js";
+export type { LLMConfig } from "./utils/llm_provider.js";
 
 /**
  * Represents a single step in the agent's execution
@@ -1141,22 +1150,18 @@ export class MCPAgent {
   /**
    * Streams the agent execution with options object and returns string result.
    */
-  public async *stream(
-    options: RunOptions
-  ): AsyncGenerator<AgentStep, string, void>;
+  public stream(options: RunOptions): AsyncGenerator<AgentStep, string, void>;
 
   /**
    * Streams the agent execution with options object and structured output.
    */
-  public async *stream<T>(
-    options: RunOptions<T>
-  ): AsyncGenerator<AgentStep, T, void>;
+  public stream<T>(options: RunOptions<T>): AsyncGenerator<AgentStep, T, void>;
 
   /**
    * Streams the agent execution and yields agent steps.
    * @deprecated Use options object instead: stream({ prompt, maxSteps, ... })
    */
-  public async *stream<T = string>(
+  public stream<T = string>(
     query: string,
     maxSteps?: number,
     manageConnector?: boolean,
@@ -1527,7 +1532,7 @@ export class MCPAgent {
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
         maxStepsUsed: steps ?? null,
-        manageConnector: manage,
+        manageConnector: manage ?? true,
         externalHistoryUsed: history !== undefined,
         stepsTaken,
         toolsUsedCount: this.toolsUsedNames.length,
@@ -1616,14 +1621,14 @@ export class MCPAgent {
   /**
    * Yields with pretty-printed output for code mode with options object.
    */
-  public async *prettyStreamEvents(
+  public prettyStreamEvents(
     options: RunOptions
   ): AsyncGenerator<void, string, void>;
 
   /**
    * Yields with pretty-printed output for code mode with options object and structured output.
    */
-  public async *prettyStreamEvents<T>(
+  public prettyStreamEvents<T>(
     options: RunOptions<T>
   ): AsyncGenerator<void, string, void>;
 
@@ -1632,7 +1637,7 @@ export class MCPAgent {
    * This method formats and displays tool executions in a user-friendly way with syntax highlighting.
    * @deprecated Use options object instead: prettyStreamEvents({ prompt, maxSteps, ... })
    */
-  public async *prettyStreamEvents<T = string>(
+  public prettyStreamEvents<T = string>(
     query: string,
     maxSteps?: number,
     manageConnector?: boolean,
@@ -1669,14 +1674,14 @@ export class MCPAgent {
   /**
    * Yields LangChain StreamEvent objects with options object.
    */
-  public async *streamEvents(
+  public streamEvents(
     options: RunOptions
   ): AsyncGenerator<StreamEvent, void, void>;
 
   /**
    * Yields LangChain StreamEvent objects with options object and structured output.
    */
-  public async *streamEvents<T>(
+  public streamEvents<T>(
     options: RunOptions<T>
   ): AsyncGenerator<StreamEvent, void, void>;
 
@@ -1685,7 +1690,7 @@ export class MCPAgent {
    * This provides token-level streaming and fine-grained event updates.
    * @deprecated Use options object instead: streamEvents({ prompt, maxSteps, ... })
    */
-  public async *streamEvents<T = string>(
+  public streamEvents<T = string>(
     query: string,
     maxSteps?: number,
     manageConnector?: boolean,
@@ -1980,7 +1985,7 @@ export class MCPAgent {
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
         maxStepsUsed: steps ?? null,
-        manageConnector: manage,
+        manageConnector: manage ?? true,
         externalHistoryUsed: history !== undefined,
         response: `[STREAMED RESPONSE - ${totalResponseLength} chars]`,
         executionTimeMs,

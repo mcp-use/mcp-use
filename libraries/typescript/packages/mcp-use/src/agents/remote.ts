@@ -377,21 +377,18 @@ export class RemoteAgent {
   /**
    * Streams the remote agent execution with options object.
    */
-
-  public async *stream(options: RunOptions): AsyncGenerator<any, string, void>;
+  public stream(options: RunOptions): AsyncGenerator<any, string, void>;
 
   /**
    * Streams the remote agent execution with options object and structured output.
    */
-
-  public async *stream<T>(options: RunOptions<T>): AsyncGenerator<any, T, void>;
+  public stream<T>(options: RunOptions<T>): AsyncGenerator<any, T, void>;
 
   /**
    * Streams the remote agent execution.
    * @deprecated Use options object instead: stream({ prompt, maxSteps, ... })
    */
-
-  public async *stream<T = string>(
+  public stream<T = string>(
     query: string,
     maxSteps?: number,
     manageConnector?: boolean,

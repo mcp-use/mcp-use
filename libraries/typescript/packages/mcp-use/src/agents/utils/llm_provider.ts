@@ -1,4 +1,4 @@
-import type { LanguageModel } from "../mcp_agent.js";
+import type { LanguageModel } from "../types.js";
 import { logger } from "../../logging.js";
 
 /**
