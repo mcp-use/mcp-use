@@ -1,0 +1,90 @@
+{
+  "name": "@mcp-use/mango",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Mango - AI Agent for MCP Server Development",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/mango"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-use",
+    "agent",
+    "development",
+    "coding-agent"
+  ],
+  "bin": {
+    "mango": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "vite --port 5175",
+    "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
+    "build": "npm run build:client && npm run build:server && npm run build:cli",
+    "build:client": "vite build",
+    "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
+    "build:cli": "tsup src/cli.ts --format esm --out-dir dist/",
+    "start": "node dist/server/server.js",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@hono/node-server": "^1.19.6",
+    "@mcp-ui/client": "^5.16.0",
+    "@mcp-use/modelcontextprotocol-sdk": "1.24.3-mcp-use.1",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tailwindcss/cli": "^4.1.17",
+    "@tailwindcss/vite": "^4.1.17",
+    "@xyflow/react": "^12.3.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "execa": "^9.5.2",
+    "hono": "^4.10.7",
+    "lucide-react": "^0.555.0",
+    "markdown-to-jsx": "^9.3.0",
+    "mcp-use": "workspace:*",
+    "next-themes": "^0.4.6",
+    "open": "^11.0.0",
+    "react-resizable-panels": "^3.0.6",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.4.0",
+    "vite-express": "^0.21.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.2.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwindcss": "^4.1.17",
+    "tsx": "^4.21.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
