@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.6.0-canary.6
+
+### Patch Changes
+
+- fdbd09e: fix: widgets do not pick up mcp-use styles
+- Updated dependencies [fdbd09e]
+  - mcp-use@1.11.0-canary.6
+  - @mcp-use/inspector@0.13.0-canary.6
+
 ## 2.6.0-canary.5
 
 ### Patch Changes
