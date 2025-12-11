@@ -158,21 +158,69 @@ jobs:
         if: steps.compare.outputs.should_publish == 'true'
         run: |
           VERSION="${{ steps.current-version.outputs.version }}"
+          PREV_TAG="${{ steps.latest-release.outputs.tag }}"
           
-          # Get notes from the draft release
-          echo "Fetching release notes from python-draft..."
-          DRAFT_BODY=$(gh release view python-draft --json body -q '.body')
-          
-          # Update header to include version number
-          UPDATED_BODY=$(echo "$DRAFT_BODY" | sed "s/## Unreleased Python Changes/## What's Changed in v$VERSION/")
-          UPDATED_BODY=$(echo "$UPDATED_BODY" | sed "/This is a draft release tracking changes/d")
-          UPDATED_BODY=$(echo "$UPDATED_BODY" | sed "/The actual version number will be determined/d")
-          
-          {
-            echo 'notes<<EOF'
-            echo "$UPDATED_BODY"
-            echo EOF
-          } >> $GITHUB_OUTPUT
+          # Check if draft release exists
+          if gh release view python-draft >/dev/null 2>&1; then
+            echo "Fetching release notes from python-draft..."
+            DRAFT_BODY=$(gh release view python-draft --json body -q '.body')
+            
+            # Update header to include version number
+            UPDATED_BODY=$(echo "$DRAFT_BODY" | sed "s/## Unreleased Python Changes/## What's Changed in v$VERSION/")
+            UPDATED_BODY=$(echo "$UPDATED_BODY" | sed "/This is a draft release tracking changes/d")
+            UPDATED_BODY=$(echo "$UPDATED_BODY" | sed "/The actual version number will be determined/d")
+            
+            {
+              echo 'notes<<EOF'
+              echo "$UPDATED_BODY"
+              echo EOF
+            } >> $GITHUB_OUTPUT
+          else
+            echo "No python-draft release found, generating release notes from git history..."
+            
+            # Generate notes from git history (fallback for first release or missing draft)
+            echo "## What's Changed in v$VERSION" > notes.md
+            echo "" >> notes.md
+            
+            # Get commits since last release that mention "python"
+            if [ "$PREV_TAG" = "none" ]; then
+              COMMITS=$(git log --oneline --grep="python" --grep="Python" --grep="PYTHON" -E)
+            else
+              COMMITS=$(git log --oneline "$PREV_TAG..HEAD" --grep="python" --grep="Python" --grep="PYTHON" -E)
+            fi
+            
+            if [ -n "$COMMITS" ]; then
+              echo "### Python Changes" >> notes.md
+              echo "" >> notes.md
+              echo "$COMMITS" | while IFS= read -r line; do
+                HASH=$(echo "$line" | awk '{print $1}')
+                MESSAGE=$(echo "$line" | cut -d' ' -f2-)
+                echo "* $MESSAGE (\`$HASH\`)" >> notes.md
+              done
+              echo "" >> notes.md
+            fi
+            
+            # Get contributors
+            echo "### Contributors" >> notes.md
+            echo "" >> notes.md
+            if [ "$PREV_TAG" = "none" ]; then
+              CONTRIBUTORS=$(git log --format='%an' | sort -u)
+            else
+              CONTRIBUTORS=$(git log "$PREV_TAG..HEAD" --format='%an' | sort -u)
+            fi
+            
+            if [ -n "$CONTRIBUTORS" ]; then
+              echo "$CONTRIBUTORS" | while IFS= read -r contributor; do
+                echo "* $contributor" >> notes.md
+              done
+            fi
+            
+            {
+              echo 'notes<<EOF'
+              cat notes.md
+              echo EOF
+            } >> $GITHUB_OUTPUT
+          fi
           
           echo "Release notes prepared successfully"
         env:
