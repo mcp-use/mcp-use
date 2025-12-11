@@ -326,7 +326,14 @@ async function buildWidgets(
     const relativeResourcesPath = path
       .relative(tempDir, resourcesDir)
       .replace(/\\/g, "/");
-    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory */\n@source "${relativeResourcesPath}";\n`;
+
+    // Calculate relative path to mcp-use package dynamically
+    const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
+    const relativeMcpUsePath = path
+      .relative(tempDir, mcpUsePath)
+      .replace(/\\/g, "/");
+
+    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory and mcp-use package */\n@source "${relativeResourcesPath}";\n@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";\n`;
     await fs.writeFile(path.join(tempDir, "styles.css"), cssContent, "utf8");
 
     // Create entry file
