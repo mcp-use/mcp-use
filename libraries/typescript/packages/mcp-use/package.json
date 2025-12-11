@@ -119,6 +119,7 @@
     "example:add_server": "tsx examples/client/add_server_tool.ts",
     "example:structured": "tsx examples/client/structured_output.ts",
     "example:observability": "tsx examples/client/observability.ts",
+    "example:simplified": "tsx examples/client/simplified_agent_example.ts",
     "example:commonjs": "node examples/client/commonjs_example.cjs",
     "example:code_mode": "tsx examples/client/code_mode_example.ts",
     "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts",

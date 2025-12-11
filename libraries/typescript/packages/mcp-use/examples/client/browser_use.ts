@@ -42,11 +42,11 @@ async function main() {
   const agent = new MCPAgent({ llm, client, maxSteps: 30 });
 
   // Run the query
-  const result = await agent.run(
-    `Navigate to https://github.com/mcp-use/mcp-use, give a star to the project and write
+  const result = await agent.run({
+    prompt: `Navigate to https://github.com/mcp-use/mcp-use, give a star to the project and write
 a summary of the project.`,
-    30
-  );
+    maxSteps: 30,
+  });
   console.error(`\nResult: ${result}`);
 }
 
