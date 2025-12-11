@@ -154,7 +154,7 @@ function OpenAIComponentRendererBase({
 
         if (computedUseDevMode && widgetName && serverBaseUrl) {
           const devServerBaseUrl = new URL(serverBaseUrl).origin;
-          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
+          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}`;
           widgetDataToStore.devWidgetUrl = devWidgetUrl;
           widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
         }
@@ -182,11 +182,11 @@ function OpenAIComponentRendererBase({
 
         if (computedUseDevMode && widgetName && serverBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
-          const proxyUrl = `/inspector/api/dev-widget/${toolId}?${urlParams.toString()}`;
+          const proxyUrl = `/inspector/api/dev-widget/${toolId}`;
           setWidgetUrl(proxyUrl);
           setIsSameOrigin(true); // Proxy makes it same-origin
         } else {
-          const prodUrl = `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`;
+          const prodUrl = `/inspector/api/resources/widget/${toolId}`;
           setWidgetUrl(prodUrl);
           // Relative URLs are always same-origin
           setIsSameOrigin(true);

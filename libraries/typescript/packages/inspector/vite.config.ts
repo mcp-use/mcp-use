@@ -66,6 +66,17 @@ export default defineConfig({
       util: path.resolve(__dirname, "./src/client/stubs/util.js"),
       path: path.resolve(__dirname, "./src/client/stubs/path.js"),
       process: path.resolve(__dirname, "./src/client/stubs/process.js"),
+      // More specific aliases must come first
+      "node:fs/promises": path.resolve(
+        __dirname,
+        "./src/client/stubs/fs-promises.js"
+      ),
+      "fs/promises": path.resolve(
+        __dirname,
+        "./src/client/stubs/fs-promises.js"
+      ),
+      "node:fs": path.resolve(__dirname, "./src/client/stubs/fs.js"),
+      fs: path.resolve(__dirname, "./src/client/stubs/fs.js"),
       "node:async_hooks": path.resolve(
         __dirname,
         "./src/client/stubs/async_hooks.js"
@@ -84,12 +95,12 @@ export default defineConfig({
     global: "globalThis",
   },
   optimizeDeps: {
-    include: [
-      "mcp-use/react",
-      "react-syntax-highlighter",
-      "refractor/lib/core",
-    ],
-    exclude: ["posthog-node"], // Exclude Node.js-only packages
+    include: ["mcp-use/react", "react-syntax-highlighter"],
+    exclude: [
+      "posthog-node",
+      "tar", // Node.js file system package
+      "path-scurry", // Node.js path utilities
+    ], // Exclude Node.js-only packages
   },
   ssr: {
     noExternal: ["react-syntax-highlighter", "refractor"],
