@@ -13,16 +13,13 @@ permissions:
   id-token: write
 
 jobs:
-  check-and-release:
+  release-or-draft:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: libraries/python
     
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,11 +30,13 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
+        working-directory: libraries/python
         run: |
           uv pip install --system tomli
 
       - name: Get current version
         id: current-version
+        working-directory: libraries/python
         run: |
           VERSION=$(python -c "
           import tomli
@@ -48,21 +47,21 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $VERSION"
 
-      - name: Get latest release version
+      - name: Get latest published release
         id: latest-release
         run: |
-          # Get the latest python release tag
+          # Get the latest published python release tag (not the draft)
           LATEST_TAG=$(git tag -l "python-v*" --sort=-v:refname | head -n 1)
           
           if [ -z "$LATEST_TAG" ]; then
             echo "No previous python releases found"
             echo "version=0.0.0" >> $GITHUB_OUTPUT
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "tag=none" >> $GITHUB_OUTPUT
           else
             LATEST_VERSION=${LATEST_TAG#python-v}
             echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Latest release version: $LATEST_VERSION"
+            echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+            echo "Latest published release: $LATEST_VERSION"
           fi
 
       - name: Compare versions
@@ -75,17 +74,88 @@ jobs:
           echo "  Current: $CURRENT"
           echo "  Latest:  $LATEST"
           
-          if [ "$CURRENT" = "$LATEST" ]; then
-            echo "Version has not changed - skipping release"
-            echo "should_release=false" >> $GITHUB_OUTPUT
+          if [ "$CURRENT" != "$LATEST" ]; then
+            echo "Version has been bumped - will publish release"
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "should_draft=false" >> $GITHUB_OUTPUT
           else
-            echo "Version has been bumped - will create release"
-            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "Version unchanged - will update draft"
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            echo "should_draft=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Generate release notes for draft
+        id: draft-notes
+        if: steps.compare.outputs.should_draft == 'true'
+        run: |
+          PREV_TAG="${{ steps.latest-release.outputs.tag }}"
+          LATEST_VERSION="${{ steps.latest-release.outputs.version }}"
+          
+          echo "## Unreleased Python Changes" > notes.md
+          echo "" >> notes.md
+          echo "**This is a draft release tracking changes since v$LATEST_VERSION.**" >> notes.md
+          echo "**The actual version number will be determined when published.**" >> notes.md
+          echo "" >> notes.md
+          
+          # Get commits since last release that mention "python" (case insensitive)
+          if [ "$PREV_TAG" = "none" ]; then
+            COMMITS=$(git log --oneline --grep="python" --grep="Python" --grep="PYTHON" -E)
+          else
+            COMMITS=$(git log --oneline "$PREV_TAG..HEAD" --grep="python" --grep="Python" --grep="PYTHON" -E)
+          fi
+          
+          if [ -n "$COMMITS" ]; then
+            echo "### Python Changes" >> notes.md
+            echo "" >> notes.md
+            echo "$COMMITS" | while IFS= read -r line; do
+              HASH=$(echo "$line" | awk '{print $1}')
+              MESSAGE=$(echo "$line" | cut -d' ' -f2-)
+              echo "* $MESSAGE (\`$HASH\`)" >> notes.md
+            done
+            echo "" >> notes.md
+          else
+            echo "No commits with 'python' keyword found since last release." >> notes.md
+            echo "" >> notes.md
+          fi
+          
+          # Get contributors
+          echo "### Contributors" >> notes.md
+          echo "" >> notes.md
+          if [ "$PREV_TAG" = "none" ]; then
+            CONTRIBUTORS=$(git log --format='%an' | sort -u)
+          else
+            CONTRIBUTORS=$(git log "$PREV_TAG..HEAD" --format='%an' | sort -u)
+          fi
+          
+          if [ -n "$CONTRIBUTORS" ]; then
+            echo "$CONTRIBUTORS" | while IFS= read -r contributor; do
+              echo "* $contributor" >> notes.md
+            done
+          fi
+          
+          cat notes.md
+          
+          # Save to output
+          {
+            echo 'notes<<EOF'
+            cat notes.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Update Draft Release
+        if: steps.compare.outputs.should_draft == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: python-draft
+          name: Python - Upcoming Release
+          body: ${{ steps.draft-notes.outputs.notes }}
+          draft: true
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Get release notes from draft
-        id: release-notes
-        if: steps.compare.outputs.should_release == 'true'
+        id: publish-notes
+        if: steps.compare.outputs.should_publish == 'true'
         run: |
           VERSION="${{ steps.current-version.outputs.version }}"
           
@@ -110,7 +180,7 @@ jobs:
 
       - name: Check if release already exists
         id: check-release
-        if: steps.compare.outputs.should_release == 'true'
+        if: steps.compare.outputs.should_publish == 'true'
         run: |
           TAG_NAME="python-v${{ steps.current-version.outputs.version }}"
           
@@ -124,24 +194,26 @@ jobs:
           fi
 
       - name: Create Release
-        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false'
+        if: steps.compare.outputs.should_publish == 'true' && steps.check-release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: python-v${{ steps.current-version.outputs.version }}
           name: Python v${{ steps.current-version.outputs.version }}
-          body: ${{ steps.release-notes.outputs.notes }}
+          body: ${{ steps.publish-notes.outputs.notes }}
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build package
-        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false'
+        if: steps.compare.outputs.should_publish == 'true' && steps.check-release.outputs.exists == 'false'
+        working-directory: libraries/python
         run: |
           uv build
 
       - name: Check if already published to PyPI
-        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false'
+        if: steps.compare.outputs.should_publish == 'true' && steps.check-release.outputs.exists == 'false'
         id: check-pypi
+        working-directory: libraries/python
         run: |
           # Check if this version exists on PyPI
           VERSION="${{ steps.current-version.outputs.version }}"
@@ -154,14 +226,13 @@ jobs:
           fi
 
       - name: Publish to PyPI
-        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false' && steps.check-pypi.outputs.publish_needed == 'true'
+        if: steps.compare.outputs.should_publish == 'true' && steps.check-release.outputs.exists == 'false' && steps.check-pypi.outputs.publish_needed == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: libraries/python/dist/
 
       - name: Delete draft release
-        if: steps.compare.outputs.should_release == 'true' && steps.check-release.outputs.exists == 'false'
-        working-directory: .
+        if: steps.compare.outputs.should_publish == 'true' && steps.check-release.outputs.exists == 'false'
         run: |
           # Delete the python-draft release after successful publish
           if gh release view python-draft >/dev/null 2>&1; then
@@ -173,4 +244,3 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
