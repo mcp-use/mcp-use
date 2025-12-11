@@ -137,7 +137,7 @@ export class MCPSession {
    * Call a tool on the server.
    *
    * @param name - Name of the tool to call
-   * @param args - Arguments to pass to the tool
+   * @param args - Arguments to pass to the tool (defaults to empty object)
    * @param options - Optional request options (timeout, progress handlers, etc.)
    * @returns Result from the tool execution
    *
@@ -149,7 +149,7 @@ export class MCPSession {
    */
   async callTool(
     name: string,
-    args: Record<string, any>,
+    args: Record<string, any> = {},
     options?: RequestOptions
   ): Promise<CallToolResult> {
     return this.connector.callTool(name, args, options);
