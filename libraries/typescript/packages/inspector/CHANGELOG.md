@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.5
+
+### Patch Changes
+
+- 861546b: fix: favicon url generator
+- Updated dependencies [0b2292d]
+  - mcp-use@1.11.0-canary.5
+
 ## 0.13.0-canary.4
 
 ### Patch Changes

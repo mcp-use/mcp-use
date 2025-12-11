@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.11.0-canary.5
+
+### Minor Changes
+
+- 0b2292d: feat(session): update callTool method to default args to an empty object and add requireSession method for session retrieval
+
+### Patch Changes
+
+- Updated dependencies [861546b]
+  - @mcp-use/inspector@0.13.0-canary.5
+  - @mcp-use/cli@2.6.0-canary.5
+
 ## 1.11.0-canary.4
 
 ### Patch Changes
