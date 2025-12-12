@@ -4,7 +4,7 @@ description: "Build ChatGPT compatible widgets using react with zero boilerplate
 icon: "openai"
 ---
 
-UI widgets allow you to create rich, interactive user interfaces that MCP clients can display. 
+UI widgets allow you to create rich, interactive user interfaces that MCP clients can display.
 **mcp-use** supports multiple widget formats including **OpenAI Apps SDK** (this page) and [**MCP-UI**](/typescript/server/mcp-ui-resources).
 
 
@@ -98,7 +98,7 @@ export const widgetMetadata: WidgetMetadata = {
 
 const ProductSearchResult: React.FC = () => {
   const { props } = useWidget<ProductSearchResultProps>();
-  
+
   return (
     <McpUseProvider autoSize>
       <div>
@@ -114,7 +114,7 @@ export default ProductSearchResult;
 
 
 
-## Widget Metadata 
+## Widget Metadata
 
 Contains the information that the MCP resource (and the tool that exposes it) will use when are automatically built by mcp-use.
 ```typescript
@@ -123,10 +123,10 @@ import type { WidgetMetadata } from 'mcp-use/react';
 export const widgetMetadata: WidgetMetadata = {
   // Required: Human-readable description
   description: string,
-  
+
   // Required: Zod schema defining component props
   inputs: z.ZodObject<...>,
-  
+
   // Optional: Apps SDK metadata (CSP, widget description, etc.)
   appsSdkMetadata?: {
     'openai/widgetDescription'?: string,
@@ -277,8 +277,8 @@ const { callTool } = useWidget();
 
 const handleSearch = async () => {
   try {
-    const result = await callTool('search_cities', { 
-      query: 'tokyo' 
+    const result = await callTool('search_cities', {
+      query: 'tokyo'
     });
     // result.content contains the tool response
     console.log(result.content);
@@ -334,7 +334,7 @@ function MyWidget() {
   );
 }
 ```
-or 
+or
 ```tsx
 import { WidgetControls } from 'mcp-use/react';
 
@@ -379,7 +379,7 @@ server.tool({
 }, async ({ city }) => {
   // Fetch weather data from API
   const weatherData = await fetchWeatherAPI(city);
-  
+
   // Return widget with runtime data only
   return widget({
     data: {
@@ -429,7 +429,7 @@ This ensures:
 - Widget URLs use the correct domain
 - Apps SDK CSP automatically includes your server
 
-Preferably set the variable at build time to have statically generated widget assets paths. 
+Preferably set the variable at build time to have statically generated widget assets paths.
 If you don't set it at build time you must set it at runtime either by passing the `baseUrl` option to the `MCPServer` constructor or by setting the `MCP_URL` environment variable.
 
 ### Environment Variables
@@ -496,4 +496,3 @@ You need to enable the Developer Mode in ChatGPT to test widgets.
 - [Creating Apps SDK Server](./creating-apps-sdk-server) - Complete guide
 - [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) - Test widgets with Inspector
 - [Project Templates](./templates) - Explore available templates
-

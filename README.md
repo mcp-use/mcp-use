@@ -77,8 +77,8 @@
       <h3>🤖 Build an AI Agent</h3>
       <p>Create intelligent agents that can use tools, browse the web, manage files, and more.</p>
       <p>
-        <a href="#build-an-ai-agent">Quick Start ↓</a> | 
-        <a href="https://docs.mcp-use.com/python/agent/agent-configuration">Python Docs</a> | 
+        <a href="#build-an-ai-agent">Quick Start ↓</a> |
+        <a href="https://docs.mcp-use.com/python/agent/agent-configuration">Python Docs</a> |
         <a href="https://docs.mcp-use.com/typescript/agent/agent-configuration">TypeScript Docs</a>
       </p>
     </td>
@@ -86,8 +86,8 @@
       <h3>🔌 Use MCP Client</h3>
       <p>Connect directly to MCP servers and call tools programmatically without an agent.</p>
       <p>
-        <a href="#use-mcp-client">Quick Start ↓</a> | 
-        <a href="https://docs.mcp-use.com/python/client/client-configuration">Python Docs</a> | 
+        <a href="#use-mcp-client">Quick Start ↓</a> |
+        <a href="https://docs.mcp-use.com/python/client/client-configuration">Python Docs</a> |
         <a href="https://docs.mcp-use.com/typescript/client/client-configuration">TypeScript Docs</a>
       </p>
     </td>
@@ -97,7 +97,7 @@
       <h3>🛠️ Create an MCP Server</h3>
       <p>Build your own MCP servers with tools, resources, and prompts.</p>
       <p>
-        <a href="#create-an-mcp-server">Quick Start ↓</a> | 
+        <a href="#create-an-mcp-server">Quick Start ↓</a> |
         <a href="https://docs.mcp-use.com/typescript/server/getting-started">TypeScript Docs</a>
       </p>
     </td>
@@ -105,8 +105,8 @@
       <h3>🔍 Debug with Inspector</h3>
       <p>Test, debug, and explore your MCP servers interactively.</p>
       <p>
-        <a href="#use-the-inspector">Quick Start ↓</a> | 
-        <a href="https://docs.mcp-use.com/inspector/index">Inspector Docs</a> | 
+        <a href="#use-the-inspector">Quick Start ↓</a> |
+        <a href="https://docs.mcp-use.com/inspector/index">Inspector Docs</a> |
         <a href="https://inspector.mcp-use.com">MCP Inspector online</a>
       </p>
     </td>
@@ -116,7 +116,7 @@
       <h3>🎨 Build ChatGPT Apps</h3>
       <p>Create interactive UIs with mcp-ui, react and live reload.</p>
       <p>
-        <a href="https://docs.mcp-use.com/typescript/server/mcp-ui-resources">Quick Start</a> | 
+        <a href="https://docs.mcp-use.com/typescript/server/mcp-ui-resources">Quick Start</a> |
         <a href="https://docs.mcp-use.com/typescript/server/templates">Templates</a>
       </p>
     </td>
@@ -124,7 +124,7 @@
       <h3>☁️ Deploy to MCP Cloud</h3>
       <p>Deploy and manage your MCP agents and servers in the cloud.</p>
       <p>
-        <a href="https://docs.mcp-use.com/home/mcp101">Quick Start</a> | 
+        <a href="https://docs.mcp-use.com/home/mcp101">Quick Start</a> |
         <a href="https://mcp-use.com">Cloud ↗</a>
       </p>
     </td>

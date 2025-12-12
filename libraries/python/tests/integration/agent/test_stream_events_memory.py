@@ -55,9 +55,9 @@ async def test_stream_events_keeps_ai_messages_in_memory():
             log_message(i, msg)
 
         # Assert we have at least 2 messages (1 human + 1 AI)
-        assert len(agent._conversation_history) >= 2, (
-            f"Expected at least 2 messages after first query, got {len(agent._conversation_history)}"
-        )
+        assert (
+            len(agent._conversation_history) >= 2
+        ), f"Expected at least 2 messages after first query, got {len(agent._conversation_history)}"
 
         # Check message types
         assert isinstance(agent._conversation_history[0], HumanMessage), "First message should be HumanMessage"
@@ -87,17 +87,17 @@ async def test_stream_events_keeps_ai_messages_in_memory():
             log_message(i, msg)
 
         # Assert we have at least 4 messages (2 human + 2 AI)
-        assert len(agent._conversation_history) >= 4, (
-            f"Expected at least 4 messages after second query, got {len(agent._conversation_history)}"
-        )
+        assert (
+            len(agent._conversation_history) >= 4
+        ), f"Expected at least 4 messages after second query, got {len(agent._conversation_history)}"
 
         # Verify message order and types
         messages = agent._conversation_history
         expected_types = [HumanMessage, AIMessage, HumanMessage, AIMessage]
         for i, expected_type in enumerate(expected_types):
-            assert isinstance(messages[i], expected_type), (
-                f"Message {i} should be {expected_type.__name__}, got {type(messages[i]).__name__}"
-            )
+            assert isinstance(
+                messages[i], expected_type
+            ), f"Message {i} should be {expected_type.__name__}, got {type(messages[i]).__name__}"
 
         # Verify all AI messages have content
         for i, msg in enumerate(messages):
@@ -129,9 +129,9 @@ async def test_stream_events_memory_disabled():
             pass
 
         # With memory disabled, history should be empty
-        assert len(agent._conversation_history) == 0, (
-            f"Expected empty history with memory_enabled=False, got {len(agent._conversation_history)}"
-        )
+        assert (
+            len(agent._conversation_history) == 0
+        ), f"Expected empty history with memory_enabled=False, got {len(agent._conversation_history)}"
 
         logger.info("✅ Test passed: stream_events respects memory_enabled=False")
 

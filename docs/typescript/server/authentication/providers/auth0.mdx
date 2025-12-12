@@ -75,20 +75,20 @@ const server = new McpServer({
     // Required
     domain: 'your-tenant.auth0.com',
     audience: 'https://your-api.example.com',
-    
+
     // Optional
     clientId: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
-    
+
     // OAuth mode: 'proxy' (default) or 'direct'
     mode: 'proxy',
-    
+
     // JWT verification (should be true in production)
     verifyJwt: process.env.NODE_ENV === 'production',
-    
+
     // Custom scopes
     scopes: ['openid', 'profile', 'email', 'offline_access'],
-    
+
     // Custom user info extraction
     getUserInfo: (payload) => ({
       userId: payload.sub,
@@ -138,7 +138,7 @@ server.tool({
   if (!context.auth.permissions?.includes('delete:documents')) {
     return error('Forbidden: delete:documents permission required')
   }
-  
+
   await db.documents.delete({ id: documentId })
   return text('Document deleted')
 })
@@ -167,4 +167,3 @@ Open the Inspector and authenticate with Auth0.
 ## Next Steps
 
 - [User Context](/typescript/server/authentication/user-context) - Access user information
-

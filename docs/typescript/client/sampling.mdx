@@ -40,10 +40,10 @@ async function samplingCallback(
   // Integrate with your LLM of choice (OpenAI, Anthropic, etc.)
   // Extract the last message content
   const lastMessage = params.messages[params.messages.length - 1]
-  const content = Array.isArray(lastMessage.content) 
-    ? lastMessage.content[0] 
+  const content = Array.isArray(lastMessage.content)
+    ? lastMessage.content[0]
     : lastMessage.content
-  
+
   // Call your LLM
   const response = await yourLlm.complete(content.text)
 
@@ -78,7 +78,7 @@ function MyComponent() {
       }
     }
   })
-  
+
   // ... rest of component
 }
 ```
@@ -128,10 +128,10 @@ Text to analyze: ${params.text}`
     })
 
     // Extract text from result
-    const content = Array.isArray(result.content) 
-      ? result.content[0] 
+    const content = Array.isArray(result.content)
+      ? result.content[0]
       : result.content
-    
+
     return {
       content: [{
         type: 'text',
@@ -158,10 +158,10 @@ const result = await ctx.sample(
   {
     // Optional: Limit wait time (default: Infinity)
     timeout: 120000, // 2 minutes
-    
+
     // Optional: Change progress interval (default: 5000ms)
     progressIntervalMs: 2000,
-    
+
     // Optional: Custom progress handling
     onProgress: ({ progress, message }) => console.log(message)
   }

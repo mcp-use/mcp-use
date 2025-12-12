@@ -24,7 +24,7 @@ interface MyWidgetProps {
 
 const MyWidget: React.FC = () => {
   const { props, theme, callTool } = useWidget<MyWidgetProps>();
-  
+
   return (
     <div data-theme={theme}>
       <h1>{props.city}</h1>
@@ -113,35 +113,35 @@ const ProductWidget: React.FC = () => {
     output,
     state,
     setState,
-    
+
     // Layout & theme
     theme,
     displayMode,
     safeArea,
-    
+
     // Actions
     callTool,
     sendFollowUpMessage,
     openExternal,
     requestDisplayMode,
     notifyIntrinsicHeight,
-    
+
     // Availability
     isAvailable,
   } = useWidget<ProductProps, ProductOutput, {}, ProductState>();
-  
+
   const handleAddToFavorites = async () => {
     const newFavorites = [...(state?.favorites || []), props.productId];
     await setState({ favorites: newFavorites });
   };
-  
+
   const handleGetReviews = async () => {
-    const result = await callTool('get-product-reviews', { 
-      productId: props.productId 
+    const result = await callTool('get-product-reviews', {
+      productId: props.productId
     });
     // Handle result
   };
-  
+
   return (
     <div data-theme={theme}>
       <h1>{props.name}</h1>
@@ -268,8 +268,8 @@ Call other MCP tools from your widget:
 const { callTool } = useWidget();
 
 const handleSearch = async () => {
-  const result = await callTool('search-products', { 
-    query: 'laptop' 
+  const result = await callTool('search-products', {
+    query: 'laptop'
   });
   // Handle result
 };
@@ -327,7 +327,7 @@ const handleAction = async () => {
     console.warn('Widget API not available');
     return;
   }
-  
+
   try {
     await callTool('my-tool', {});
   } catch (error) {
@@ -342,4 +342,3 @@ const handleAction = async () => {
 - [`WidgetControls`](./widgetcontrols) - Debug and view controls
 - [`ThemeProvider`](./themeprovider) - Theme management
 - [`ErrorBoundary`](./errorboundary) - Error handling
-

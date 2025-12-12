@@ -22,7 +22,7 @@ jobs:
   generate-changeset:
     runs-on: ubuntu-latest
     if: |
-      github.actor == 'dependabot[bot]' || 
+      github.actor == 'dependabot[bot]' ||
       github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
@@ -40,12 +40,12 @@ jobs:
               repo: context.repo.repo,
               pull_number: prNumber,
             });
-            
+
             if (pr.user.login !== 'dependabot[bot]') {
               core.setFailed(`PR #${prNumber} is not a Dependabot PR. User: ${pr.user.login}`);
               return;
             }
-            
+
             core.setOutput('head_ref', pr.head.ref);
             core.setOutput('head_sha', pr.head.sha);
             core.info(`✅ Found Dependabot PR #${prNumber}: ${pr.head.ref}`);
@@ -122,10 +122,10 @@ jobs:
             // Get changed package.json files from the diff against base branch
             const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "origin/main...HEAD"]);
             const diffFiles = diffOutput.split("\n").filter(Boolean);
-            
+
             console.log(`Found ${diffFiles.length} changed files in PR`);
             console.log("Changed files:", diffFiles.slice(0, 10).join(", ") + (diffFiles.length > 10 ? "..." : ""));
-            
+
             const changedPackageJsons = diffFiles
               .filter(file => file.startsWith(TYPESCRIPT_DIR))
               .filter(file => file.endsWith("package.json"))
@@ -140,7 +140,7 @@ jobs:
             async function getPackageNames(files) {
               const packageDirs = new Set();
               const packagesPath = `${TYPESCRIPT_DIR}/packages/`;
-              
+
               // For each changed file, find which package directory it belongs to
               for (const file of files) {
                 if (file.startsWith(packagesPath)) {
@@ -150,9 +150,9 @@ jobs:
                   packageDirs.add(`${packagesPath}${packageDir}`);
                 }
               }
-              
+
               console.log(`Found ${packageDirs.size} affected package directories:`, [...packageDirs]);
-              
+
               // Read each package's package.json to get the package name
               const names = [];
               for (const packageDir of packageDirs) {
@@ -171,7 +171,7 @@ jobs:
                   console.log(`Warning: Could not read package.json for ${packageDir}: ${e.message}`);
                 }
               }
-              
+
               return [...new Set(names)]; // Remove duplicates
             }
 
@@ -239,4 +239,3 @@ jobs:
             await exec.exec("git", ["push"]);
 
             console.log("✅ Changeset committed and pushed");
-

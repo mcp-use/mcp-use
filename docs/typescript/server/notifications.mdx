@@ -81,7 +81,7 @@ if (sessions.length > 0) {
     "custom/welcome",
     { message: "Hello, client!" }
   );
-  
+
   if (!success) {
     console.log("Session not found or expired");
   }
@@ -129,12 +129,12 @@ server.tool({
   name: 'long_llm_task',
   cb: async (params, ctx?: ToolContext) => {
     if (!ctx) return { content: [{ type: 'text', text: 'No context' }] }
-    
+
     // Progress notifications are sent automatically every 5 seconds
     const result = await ctx.sample({
       messages: [{ role: 'user', content: { type: 'text', text: params.prompt } }]
     })
-    
+
     return { content: [{ type: 'text', text: result.content.text }] }
   }
 })
@@ -150,18 +150,18 @@ server.tool({
   cb: async (params, ctx?: ToolContext) => {
     if (ctx?.reportProgress) {
       await ctx.reportProgress(0, 100, 'Starting...')
-      
+
       // Process data in stages
       await processStage1()
       await ctx.reportProgress(33, 100, 'Stage 1 complete')
-      
+
       await processStage2()
       await ctx.reportProgress(66, 100, 'Stage 2 complete')
-      
+
       await processStage3()
       await ctx.reportProgress(100, 100, 'Complete')
     }
-    
+
     return { content: [{ type: 'text', text: 'Done' }] }
   }
 })
@@ -226,11 +226,11 @@ const server = new MCPServer({
 // Handle roots/list_changed from clients
 server.onRootsChanged(async (roots) => {
   console.log(`Client updated roots: ${roots.length} root(s)`);
-  
+
   roots.forEach(root => {
     console.log(`  - ${root.name || "unnamed"}: ${root.uri}`);
   });
-  
+
   // You can use the new roots to adjust server behavior
   // For example, update which files the server can access
 });
@@ -245,7 +245,7 @@ const sessions = server.getActiveSessions();
 
 if (sessions.length > 0) {
   const roots = await server.listRoots(sessions[0]);
-  
+
   if (roots) {
     console.log(`Client has ${roots.length} roots:`);
     roots.forEach(r => console.log(`  - ${r.uri}`));
@@ -268,4 +268,3 @@ interface Root {
 - [Tools Guide](./tools) - Create tools that send notifications
 - [Configuration](./configuration) - Configure session management
 - [Examples](./examples) - More notification examples
-

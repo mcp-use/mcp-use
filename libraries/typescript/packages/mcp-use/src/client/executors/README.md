@@ -260,7 +260,7 @@ global.__callMcpTool = async (server, tool, args) => {
     type: '__MCP_TOOL_CALL__',
     id, server, tool, args
   }));
-  
+
   const resultPath = `/tmp/mcp_result_${id}.json`;
   // Poll for result with timeout
   while (attempts < 300) {
@@ -373,7 +373,7 @@ class MyExecutor extends BaseCodeExecutor {
   async execute(code: string, timeout?: number): Promise<ExecutionResult> {
     // Custom implementation
   }
-  
+
   async cleanup(): Promise<void> {
     // Resource cleanup
   }
@@ -399,4 +399,3 @@ const client = new MCPClient(config, {
 - User documentation: `/docs/typescript/client/code-mode.mdx`
 - Examples: `/examples/client/code_mode_example.ts`, `/examples/client/code_mode_e2b_example.ts`
 - Anthropic research: https://www.anthropic.com/engineering/code-execution-with-mcp
-

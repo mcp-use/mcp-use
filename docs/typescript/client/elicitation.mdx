@@ -63,23 +63,23 @@ async function elicitationCallback(
     // URL mode: Direct user to external URL
     console.log(`Please visit: ${params.url}`);
     console.log(`Reason: ${params.message}`);
-    
+
     // Show URL to user (open in browser, display in UI, etc.)
     // In a real app, you might open a popup or new tab
-    
+
     // Wait for user confirmation
     const userConsent = await promptUser('Did you complete the authorization?');
-    
+
     return {
       action: userConsent ? 'accept' : 'decline',
     };
   } else {
     // Form mode: Collect structured data
     console.log(`Server requests: ${params.message}`);
-    
+
     const schema = params.requestedSchema;
     const userData: Record<string, any> = {};
-    
+
     // Collect data based on schema properties
     if (schema.type === 'object' && schema.properties) {
       for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
@@ -90,7 +90,7 @@ async function elicitationCallback(
         userData[fieldName] = value;
       }
     }
-    
+
     return {
       action: 'accept',
       data: userData,
@@ -125,17 +125,17 @@ function MyComponent() {
         const confirmed = window.confirm(
           `${params.message}\n\nOpen ${params.url}?`
         );
-        
+
         if (confirmed) {
           window.open(params.url, '_blank');
-          
+
           // Wait for user to complete external action
           const completed = window.confirm('Did you complete the action?');
           return {
             action: completed ? 'accept' : 'decline',
           };
         }
-        
+
         return { action: 'decline' };
       } else {
         // Form mode: Show form to collect data
@@ -143,7 +143,7 @@ function MyComponent() {
           params.message,
           params.requestedSchema
         );
-        
+
         return {
           action: formData ? 'accept' : 'cancel',
           data: formData,
@@ -151,7 +151,7 @@ function MyComponent() {
       }
     },
   });
-  
+
   // ... rest of component
 }
 ```
@@ -194,10 +194,10 @@ async function handleFormElicitation(
   params: ElicitRequestFormParams
 ): Promise<ElicitResult> {
   const schema = params.requestedSchema;
-  
+
   if (schema.type === 'object' && schema.properties) {
     const formData: Record<string, any> = {};
-    
+
     // Build form based on schema
     for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
       const value = await showInputField({
@@ -213,10 +213,10 @@ async function handleFormElicitation(
         pattern: fieldDef.pattern,
         format: fieldDef.format,
       });
-      
+
       formData[fieldName] = value;
     }
-    
+
     // Optional: Validate before sending
     // This improves UX but server will validate anyway
     const validationErrors = validateAgainstSchema(formData, schema);
@@ -225,13 +225,13 @@ async function handleFormElicitation(
       await showValidationErrors(validationErrors);
       // Retry or cancel
     }
-    
+
     return {
       action: 'accept',
       data: formData,
     };
   }
-  
+
   return { action: 'cancel' };
 }
 ```
@@ -248,7 +248,7 @@ import { useState } from 'react';
 function ElicitationForm({ params, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({});
   const schema = params.requestedSchema;
-  
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit({
@@ -256,7 +256,7 @@ function ElicitationForm({ params, onSubmit, onCancel }) {
       data: formData,
     });
   };
-  
+
   return (
     <div className="elicitation-modal">
       <h3>{params.message}</h3>
@@ -265,13 +265,13 @@ function ElicitationForm({ params, onSubmit, onCancel }) {
           <div key={name}>
             <label>{field.title || name}</label>
             {field.description && <p>{field.description}</p>}
-            
+
             <input
               type={field.type === 'number' ? 'number' : 'text'}
               defaultValue={field.default}
               onChange={(e) => setFormData({
                 ...formData,
-                [name]: field.type === 'number' 
+                [name]: field.type === 'number'
                   ? parseFloat(e.target.value)
                   : e.target.value
               })}
@@ -279,7 +279,7 @@ function ElicitationForm({ params, onSubmit, onCancel }) {
             />
           </div>
         ))}
-        
+
         <button type="submit">Submit</button>
         <button type="button" onClick={() => onCancel({ action: 'cancel' })}>
           Cancel
@@ -322,23 +322,23 @@ async function handleUrlElicitation(
   // Display the URL to the user
   const userMessage = `
     ${params.message}
-    
+
     Please visit this URL to continue:
     ${params.url}
   `;
-  
+
   console.log(userMessage);
-  
+
   // In a browser environment, open in new tab
   if (typeof window !== 'undefined') {
     window.open(params.url, '_blank', 'noopener,noreferrer');
   }
-  
+
   // Wait for user confirmation
   const completed = await confirmWithUser(
     'Have you completed the authorization?'
   );
-  
+
   if (completed) {
     return { action: 'accept' };
   } else {
@@ -352,28 +352,28 @@ async function handleUrlElicitation(
 ```typescript
 function OAuthElicitation({ params, onComplete }) {
   const [loading, setLoading] = useState(false);
-  
+
   const handleAuthorize = () => {
     // Open OAuth URL in popup
     const width = 600;
     const height = 700;
     const left = (window.innerWidth - width) / 2;
     const top = (window.innerHeight - height) / 2;
-    
+
     const popup = window.open(
       params.url,
       'OAuth Authorization',
       `width=${width},height=${height},left=${left},top=${top}`
     );
-    
+
     setLoading(true);
-    
+
     // Poll for popup closure
     const checkPopup = setInterval(() => {
       if (popup?.closed) {
         clearInterval(checkPopup);
         setLoading(false);
-        
+
         // User completed or closed the popup
         const success = window.confirm('Did you complete the authorization?');
         onComplete({
@@ -382,16 +382,16 @@ function OAuthElicitation({ params, onComplete }) {
       }
     }, 500);
   };
-  
+
   return (
     <div className="oauth-modal">
       <h3>{params.message}</h3>
       <p>You will be redirected to complete the authorization.</p>
-      
+
       <button onClick={handleAuthorize} disabled={loading}>
         {loading ? 'Waiting for authorization...' : 'Authorize'}
       </button>
-      
+
       <button onClick={() => onComplete({ action: 'decline' })}>
         Cancel
       </button>
@@ -465,7 +465,7 @@ import { useState } from 'react';
 
 function App() {
   const [elicitationRequest, setElicitationRequest] = useState(null);
-  
+
   const { tools, callTool } = useMcp({
     url: 'http://localhost:3000/mcp',
     onElicitation: async (params) => {
@@ -478,21 +478,21 @@ function App() {
       });
     },
   });
-  
+
   const handleElicitationResponse = (result) => {
     if (elicitationRequest) {
       elicitationRequest.resolve(result);
       setElicitationRequest(null);
     }
   };
-  
+
   return (
     <div>
       <h1>MCP Application</h1>
-      
+
       {/* Your main app UI */}
       <ToolsList tools={tools} onCallTool={callTool} />
-      
+
       {/* Elicitation modal */}
       {elicitationRequest && (
         <ElicitationModal
@@ -507,14 +507,14 @@ function App() {
 function ElicitationModal({ params, onResponse }) {
   if (params.mode === 'url') {
     return (
-      <OAuthElicitation 
-        params={params} 
+      <OAuthElicitation
+        params={params}
         onComplete={onResponse}
       />
     );
   } else {
     return (
-      <ElicitationForm 
+      <ElicitationForm
         params={params}
         onSubmit={onResponse}
         onCancel={() => onResponse({ action: 'cancel' })}
@@ -575,7 +575,7 @@ const ALLOWED_DOMAINS = ['auth.example.com', 'oauth.github.com'];
 async function safeElicitationCallback(params) {
   if (params.mode === 'url') {
     const url = new URL(params.url);
-    
+
     // Validate domain
     if (!ALLOWED_DOMAINS.includes(url.hostname)) {
       console.warn(`Untrusted domain: ${url.hostname}`);
@@ -583,21 +583,21 @@ async function safeElicitationCallback(params) {
         action: 'decline',
       };
     }
-    
+
     // Show URL and get consent
     const consent = await getUserConsent(
       `Allow navigation to ${url.hostname}?`
     );
-    
+
     if (!consent) {
       return { action: 'decline' };
     }
-    
+
     // Proceed with authorization
     window.open(params.url, '_blank', 'noopener,noreferrer');
     // ... handle completion
   }
-  
+
   // ... handle form mode
 }
 ```

@@ -112,21 +112,21 @@ async def smart_search(query: str, ctx: Context) -> str:
         model_preferences={"hints": [{"name": "claude-3-5-sonnet"}]}
     )
     refined_query = result.content.text
-    
+
     # Elicitation: Get structured input from user
     from dataclasses import dataclass
-    
+
     @dataclass
     class SearchFilters:
         date_range: str
         categories: list[str]
         max_results: int = 10
-    
+
     filters = await ctx.elicit(
         message="Please specify search filters",
         schema=SearchFilters  # Supports both Pydantic and dataclasses
     )
-    
+
     # Perform search with refined query and filters...
     return f"Results for '{refined_query}' with filters: {filters.data}"
 
@@ -264,7 +264,7 @@ class ParameterEnrichmentMiddleware(Middleware):
             # Add/modify parameters
             context.params["enriched"] = True
             context.params["timestamp"] = time.time()
-        
+
         # Changes are automatically propagated to the tool call
         return await context.next()
 
@@ -311,7 +311,7 @@ async def structured_input(ctx: Context) -> dict:
         message="Please provide task details",
         schema=TaskSchema
     )
-    
+
     if result.action == "accept":
         return result.data.model_dump()
     else:
@@ -332,7 +332,7 @@ async def toggle_feature(feature: str, enabled: bool, ctx: Context) -> str:
     else:
         # Unregister tool
         pass
-    
+
     # Notify clients
     await ctx.send_tool_list_changed()
     return f"Feature {feature} {'enabled' if enabled else 'disabled'}"
@@ -526,13 +526,13 @@ server = MCPServer(name="advanced-server")
 async def advanced_tool(query: str, ctx: Context) -> str:
     # Use sampling
     result = await ctx.sample(messages=query)
-    
+
     # Send notifications
     await ctx.send_tool_list_changed()
-    
+
     # Access HTTP request
     request = ctx.get_http_request()
-    
+
     return result.content.text
 ```
 
@@ -577,4 +577,3 @@ Thank you to all contributors who made this release possible:
 ---
 
 For full changelog and commit history, see the [commit log](https://github.com/mcp-use/mcp-use/compare/e76f5e76...be9942a4).
-

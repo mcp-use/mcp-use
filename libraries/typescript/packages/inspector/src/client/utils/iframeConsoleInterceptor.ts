@@ -6,12 +6,12 @@
 export const IFRAME_CONSOLE_INTERCEPTOR_SCRIPT = `
 (function() {
   'use strict';
-  
+
   // Only intercept if we're in an iframe
   if (window.self === window.top) {
     return;
   }
-  
+
   // Store original console methods
   const originalConsole = {
     log: console.log.bind(console),
@@ -21,7 +21,7 @@ export const IFRAME_CONSOLE_INTERCEPTOR_SCRIPT = `
     debug: console.debug.bind(console),
     trace: console.trace.bind(console),
   };
-  
+
   // Helper to serialize arguments for postMessage
   function serializeArgs(args) {
     try {
@@ -48,7 +48,7 @@ export const IFRAME_CONSOLE_INTERCEPTOR_SCRIPT = `
       return [String(args)];
     }
   }
-  
+
   // Helper to send log to parent
   function sendToParent(level, args) {
     try {
@@ -64,38 +64,38 @@ export const IFRAME_CONSOLE_INTERCEPTOR_SCRIPT = `
       originalConsole.error('[Console Interceptor] Failed to send log:', e);
     }
   }
-  
+
   // Override console methods
   console.log = function(...args) {
     originalConsole.log.apply(console, args);
     sendToParent('log', args);
   };
-  
+
   console.error = function(...args) {
     originalConsole.error.apply(console, args);
     sendToParent('error', args);
   };
-  
+
   console.warn = function(...args) {
     originalConsole.warn.apply(console, args);
     sendToParent('warn', args);
   };
-  
+
   console.info = function(...args) {
     originalConsole.info.apply(console, args);
     sendToParent('info', args);
   };
-  
+
   console.debug = function(...args) {
     originalConsole.debug.apply(console, args);
     sendToParent('debug', args);
   };
-  
+
   console.trace = function(...args) {
     originalConsole.trace.apply(console, args);
     sendToParent('trace', args);
   };
-  
+
   // Also capture unhandled errors
   window.addEventListener('error', function(event) {
     sendToParent('error', [{
@@ -110,7 +110,7 @@ export const IFRAME_CONSOLE_INTERCEPTOR_SCRIPT = `
       } : null,
     }]);
   });
-  
+
   // Capture unhandled promise rejections
   window.addEventListener('unhandledrejection', function(event) {
     sendToParent('error', [{

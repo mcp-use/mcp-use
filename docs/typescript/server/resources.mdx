@@ -70,9 +70,9 @@ To help you defining resources, you can use the response helpers to create the r
 Here are some of the helpers you can use:
 
 ```typescript
-import { 
+import {
   text, markdown, html, xml, css, javascript, object, array,
-  image, audio, binary, mix, 
+  image, audio, binary, mix,
 } from 'mcp-use/server';
 ```
 
@@ -85,7 +85,7 @@ server.resourceTemplate({
   name: 'user_data',
   uriTemplate: 'user://{userId}/name',
 }, async (uri, { userId }) => {
-  
+
   // userId is automatically extracted from the URI and typed
   const userData = await fetchUserData(userId)
   return text(`User name: ${userData.name}`)
@@ -229,7 +229,7 @@ server.resourceTemplate(
 ```
 
 
-### Testing 
+### Testing
 
 1. Start server with inspector
 2. Navigate to Resources tab

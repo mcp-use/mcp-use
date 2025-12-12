@@ -6,7 +6,7 @@ icon: "list-start"
 
 # MCP Server
 
-**mcp-use** has a complete MCP server framework implementation for TypeScript. 
+**mcp-use** has a complete MCP server framework implementation for TypeScript.
 It improves the official Model Context Protocol SDK with support for Edge Runtime, ChatGPT Apps SDK and MCP-UI. In addition, it supports all official MCP features and achieves a conformance score of 100/100 based on the official MCP Conformance Tests.
 
 ## Key Features
@@ -92,7 +92,7 @@ pnpm deploy # deploy the server to mcp-use cloud
 
 When you run your MCP server, it will be available at:
 - **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
-- **MCP Inspector**: `http://localhost:3000/inspector` 
+- **MCP Inspector**: `http://localhost:3000/inspector`
 
 
 ### Deploy Your MCP Server
@@ -152,7 +152,7 @@ server.tool({
   schema: z.object({
     name: z.string().describe('The name of the person to greet'),
   })
-}, async ({ name }) => 
+}, async ({ name }) =>
     text(`Hello, ${name}! Welcome to MCP.`)
 )
 
@@ -161,7 +161,7 @@ server.resource({
   name: 'config',
   uri: 'config://settings',
   description: 'Server configuration',
-}, async () => 
+}, async () =>
     object({
       theme: 'dark',
       language: 'en'
@@ -241,7 +241,7 @@ class McpServer {
   resourceTemplate(definition: ResourceTemplateDefinition): this
   prompt(definition: PromptDefinition): this
   uiResource(definition: UIResourceDefinition): this
-  
+
   listen(port?: number): Promise<void>
 
   // Hono/Express proxy - all HTTP methods available
@@ -277,4 +277,3 @@ class McpServer {
     Deploy your server to mcp-use Cloud with one command
   </Card>
 </CardGroup>
-

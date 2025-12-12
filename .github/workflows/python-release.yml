@@ -46,7 +46,7 @@ jobs:
         run: |
           # Get the latest published python release tag (not the draft)
           LATEST_TAG=$(git tag -l "python-v*" --sort=-v:refname | head -n 1)
-          
+
           if [ -z "$LATEST_TAG" ]; then
             echo "No previous python releases found"
             echo "version=0.0.0" >> $GITHUB_OUTPUT
@@ -63,11 +63,11 @@ jobs:
         run: |
           CURRENT="${{ steps.current-version.outputs.version }}"
           LATEST="${{ steps.latest-release.outputs.version }}"
-          
+
           echo "Comparing versions:"
           echo "  Current: $CURRENT"
           echo "  Latest:  $LATEST"
-          
+
           if [ "$CURRENT" != "$LATEST" ]; then
             echo "Version has been bumped - will publish release"
             echo "should_publish=true" >> $GITHUB_OUTPUT
@@ -92,12 +92,12 @@ jobs:
         id: draft-notes
         run: |
           PREV_TAG="${{ needs.detect-release.outputs.latest_tag }}"
-          
+
           chmod +x .github/scripts/generate-python-release-notes.sh
           .github/scripts/generate-python-release-notes.sh "" "$PREV_TAG" "draft" > notes.md
-          
+
           cat notes.md
-          
+
           {
             echo 'notes<<EOF'
             cat notes.md
@@ -134,17 +134,17 @@ jobs:
         run: |
           VERSION="${{ needs.detect-release.outputs.current_version }}"
           PREV_TAG="${{ needs.detect-release.outputs.latest_tag }}"
-          
+
           # Check if draft release exists
           if gh release view python-draft >/dev/null 2>&1; then
             echo "Fetching release notes from python-draft..."
             DRAFT_BODY=$(gh release view python-draft --json body -q '.body')
-            
+
             # Update header and remove draft-specific text (fix sed chaining)
             UPDATED_BODY=$(echo "$DRAFT_BODY" | \
               sed "s/## Draft Release/## What's Changed/" | \
               sed "/This is a draft release tracking changes/d")
-            
+
             {
               echo 'notes<<EOF'
               echo "$UPDATED_BODY"
@@ -152,20 +152,20 @@ jobs:
             } >> $GITHUB_OUTPUT
           else
             echo "No python-draft release found, generating release notes from git history..."
-            
+
             # Make script executable
             chmod +x .github/scripts/generate-python-release-notes.sh
-            
+
             # Generate notes using shared script
             .github/scripts/generate-python-release-notes.sh "$VERSION" "$PREV_TAG" "publish" > notes.md
-            
+
             {
               echo 'notes<<EOF'
               cat notes.md
               echo EOF
             } >> $GITHUB_OUTPUT
           fi
-          
+
           echo "Release notes prepared successfully"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -174,7 +174,7 @@ jobs:
         id: check-release
         run: |
           TAG_NAME="python-v${{ needs.detect-release.outputs.current_version }}"
-          
+
           # Check if a published release with this version already exists
           if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
             echo "Release $TAG_NAME already exists"
@@ -224,10 +224,10 @@ jobs:
         run: |
           # Check if this version exists on PyPI
           VERSION="${{ needs.create-github-release.outputs.version }}"
-          
+
           # Get all available versions from PyPI and check if our version is in the list
           PYPI_VERSIONS=$(uv pip index versions mcp-use 2>/dev/null || echo "")
-          
+
           if echo "$PYPI_VERSIONS" | grep -qw "$VERSION"; then
             echo "Version $VERSION already exists on PyPI"
             echo "publish_needed=false" >> $GITHUB_OUTPUT
@@ -257,7 +257,7 @@ jobs:
           # Delete the python-draft release after successful publish
           if gh release view python-draft >/dev/null 2>&1; then
             gh release delete python-draft --yes
-            
+
             # Check if the tag exists on the remote before attempting to delete
             if git ls-remote --tags origin python-draft | grep -q "refs/tags/python-draft$"; then
               git push --delete origin python-draft
@@ -265,7 +265,7 @@ jobs:
             else
               echo "No python-draft tag found on remote to delete"
             fi
-            
+
             echo "Deleted python-draft release"
           else
             echo "No python-draft release found to delete"

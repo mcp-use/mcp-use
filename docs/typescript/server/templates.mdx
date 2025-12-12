@@ -68,7 +68,7 @@ npm run dev
 const weather = await client.callTool('fetch-weather', { city: 'London' })
 
 // Display it in a beautiful widget
-const widget = await client.callTool('display-weather', { 
+const widget = await client.callTool('display-weather', {
   city: 'London',
   temperature: '15',
   condition: 'Partly Cloudy'
@@ -111,7 +111,7 @@ npm run dev
 const brandInfo = await client.callTool('get-brand-info', {});
 
 // Display product search results widget
-const widget = await client.callTool('product-search-result', { 
+const widget = await client.callTool('product-search-result', {
   query: 'fruits',
   filters: { priceRange: [0, 50] }
 })
@@ -148,7 +148,7 @@ apps-sdk/
 The **mcp-ui** template demonstrates all three MCP-UI UIResource types with examples of each approach.
 
 **What's Included:**
-- **External URL (Iframe Widgets)**: 
+- **External URL (Iframe Widgets)**:
   - `kanban-board` - Complex interactive board served from filesystem
   - Automatic static file serving
   - Full asset support

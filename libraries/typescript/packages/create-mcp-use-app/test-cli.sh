@@ -50,21 +50,21 @@ run_test() {
     local template="$3"
     local flag="$4"
     local install="$5"
-    
+
     echo -e "${BLUE}🧪 Test: $test_name${NC}"
     echo -e "   Package Manager: $pm"
     echo -e "   Template: $template"
     echo -e "   Flag: ${flag:-none}"
     echo -e "   Install: ${install:-no}"
-    
+
     local app_name="test-app-$(echo $test_name | tr ' ' '-' | tr '[:upper:]' '[:lower:]')"
-    
+
     # Remove existing test app
     rm -rf "$app_name"
-    
+
     # Build command
     local cmd=""
-    
+
     case "$pm" in
         npm)
             cmd="npx --yes --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag $install_flag"
@@ -76,9 +76,9 @@ run_test() {
             cmd="pnpm --package=$PACKAGE_FULL_PATH dlx create-mcp-use-app $app_name --template $template $flag $install_flag"
             ;;
     esac
-    
+
     echo -e "${YELLOW}   Running: $cmd${NC}"
-    
+
     # Run command
     if eval "$cmd" > /tmp/test-output.log 2>&1; then
         # Verify project was created
@@ -87,19 +87,19 @@ run_test() {
             TESTS_FAILED=$((TESTS_FAILED + 1))
             return 1
         fi
-        
+
         if [ ! -f "$app_name/package.json" ]; then
             echo -e "${RED}❌ FAILED: package.json not found${NC}"
             TESTS_FAILED=$((TESTS_FAILED + 1))
             return 1
         fi
-        
+
         if [ ! -f "$app_name/index.ts" ]; then
             echo -e "${RED}❌ FAILED: index.ts not found${NC}"
             TESTS_FAILED=$((TESTS_FAILED + 1))
             return 1
         fi
-        
+
         # Check expected package manager command in output
         if [ -n "$flag" ]; then
             case "$flag" in
@@ -126,7 +126,7 @@ run_test() {
                     ;;
             esac
         fi
-        
+
         # If install was requested, verify node_modules
         if [ "$install" == "yes" ]; then
             if [ ! -d "$app_name/node_modules" ]; then
@@ -135,11 +135,11 @@ run_test() {
                 return 1
             fi
         fi
-        
+
         # Verify package versions based on flags
         if command -v jq > /dev/null 2>&1; then
             local package_json="$app_name/package.json"
-            
+
             if grep -q "\-\-dev" <<< "$flag"; then
                 # Check for workspace:* versions
                 local mcp_use_version=$(jq -r '.dependencies."mcp-use"' "$package_json")
@@ -169,7 +169,7 @@ run_test() {
                 echo -e "${GREEN}   ✓ Verified latest/specific versions${NC}"
             fi
         fi
-        
+
         echo -e "${GREEN}✅ PASSED${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
         return 0
@@ -230,7 +230,7 @@ if [ "${RUN_INSTALL_TESTS:-no}" == "yes" ]; then
     echo -e "${BLUE}Running Installation Tests (this may take a while)${NC}"
     echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
     echo ""
-    
+
     run_test "Install-NPM" npm ui "--npm" "yes"
     echo ""
     run_test "Install-Yarn" yarn ui "--yarn" "yes"
@@ -265,4 +265,3 @@ else
     echo -e "${RED}❌ Some tests failed${NC}"
     exit 1
 fi
-

@@ -148,7 +148,7 @@ console.log(`
    - collect-feedback: No timeout (waits indefinitely)
    - quick-confirmation: 30-second timeout
    - timed-authorization: 2-minute timeout
-   
+
 💡 Default behavior: Like sampling, elicitation waits indefinitely by default.
    Set options.timeout to limit wait time.
 `);

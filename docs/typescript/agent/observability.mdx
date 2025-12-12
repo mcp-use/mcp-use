@@ -80,7 +80,7 @@ Your observability dashboard will show something like:
 ### 1. Install Langfuse Packages
 
 <Note>
-**Package Names**: Use `langfuse` and `langfuse-langchain` (version 3.38.x+). 
+**Package Names**: Use `langfuse` and `langfuse-langchain` (version 3.38.x+).
 
 **Do NOT use** `@langfuse/core` or `@langfuse/langchain` - these are incorrect package names and will not work with mcp-use.
 </Note>
@@ -365,7 +365,7 @@ import { MCPAgent, MCPClient } from 'mcp-use'
 export async function handler(event: any) {
   const client = new MCPClient({ /* ... */ })
   const agent = new MCPAgent({ llm, client })
-  
+
   try {
     const result = await agent.run(event.query)
     return { statusCode: 200, body: JSON.stringify({ result }) }
@@ -393,10 +393,10 @@ export const handler: Handler = async (event, context) => {
       }
     }
   })
-  
+
   const llm = new ChatOpenAI({ model: 'gpt-4' })
   const agent = new MCPAgent({ llm, client })
-  
+
   try {
     const result = await agent.run(event.query)
     return {
@@ -468,7 +468,7 @@ async function testLangfuse() {
   console.log(`   LANGFUSE_PUBLIC_KEY: ${process.env.LANGFUSE_PUBLIC_KEY ? '✅ Set' : '❌ Missing'}`)
   console.log(`   LANGFUSE_SECRET_KEY: ${process.env.LANGFUSE_SECRET_KEY ? '✅ Set' : '❌ Missing'}`)
   console.log(`   LANGFUSE_HOST: ${process.env.LANGFUSE_HOST || 'Using default (cloud.langfuse.com)'}`)
-  
+
   const client = new MCPClient({
     mcpServers: {
       filesystem: {
@@ -477,18 +477,18 @@ async function testLangfuse() {
       }
     }
   })
-  
+
   const llm = new ChatOpenAI({ model: 'gpt-4', temperature: 0 })
   const agent = new MCPAgent({ llm, client, maxSteps: 5 })
-  
+
   // Set metadata for easy identification
   agent.setMetadata({
     test: true,
     timestamp: new Date().toISOString()
   })
-  
+
   agent.setTags(['test', 'langfuse-setup'])
-  
+
   try {
     console.log('💬 Running test query...')
     const result = await agent.run('Say hello!')
@@ -633,4 +633,3 @@ Need help with observability setup?
 <Tip>
 **Pro Tip**: Start with basic tracing first to understand your agent's behavior, then add custom metadata and tags for more sophisticated analysis and filtering in your dashboard.
 </Tip>
-

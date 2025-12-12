@@ -41,36 +41,36 @@ check_docker_running() {
 # Check if project has widgets
 has_widgets() {
     local resources_dir="resources"
-    
+
     # Check if resources directory exists
     if [ ! -d "$resources_dir" ]; then
         return 1
     fi
-    
+
     # Check for widget files: *.tsx, *.ts files directly in resources/, or widget.tsx in subdirectories
     # Exclude macOS resource fork files and hidden files
     for item in "$resources_dir"/*; do
         # Skip if no matches found (glob expansion)
         [ -e "$item" ] || continue
-        
+
         local basename=$(basename "$item")
-        
+
         # Skip hidden/system files
         if [[ "$basename" =~ ^\._ ]] || [[ "$basename" == ".DS_Store" ]]; then
             continue
         fi
-        
+
         # Check if it's a file with .tsx or .ts extension
         if [ -f "$item" ] && [[ "$basename" =~ \.(tsx|ts)$ ]]; then
             return 0
         fi
-        
+
         # Check if it's a directory with widget.tsx inside
         if [ -d "$item" ] && [ -f "$item/widget.tsx" ]; then
             return 0
         fi
     done
-    
+
     return 1
 }
 
@@ -214,7 +214,7 @@ else
     print_success "Project already linked: $LINKED_PROJECT"
     if [ "$LINKED_PROJECT" != "$PROJECT_ID" ]; then
         print_warning "Linked project ($LINKED_PROJECT) differs from specified project ($PROJECT_ID)"
-        
+
         # Check if linked project looks like a valid Supabase project ref (20 chars alphanumeric)
         if [[ ! "$LINKED_PROJECT" =~ ^[a-z0-9]{20}$ ]]; then
             print_warning "Linked project ID '$LINKED_PROJECT' doesn't look like a valid Supabase project ref"
@@ -265,7 +265,7 @@ if [ -f "supabase/config.toml" ]; then
     else
         print_warning "project_id not found in config.toml, skipping..."
     fi
-    
+
     # Ensure [functions.<function-name>] section exists and is properly configured
     if ! grep -q "\[functions.$FUNCTION_NAME\]" supabase/config.toml; then
         print_warning "Function configuration not found in config.toml"
@@ -321,12 +321,12 @@ print_success "Copied dist to $FUNCTION_DIR"
 # Check if index.ts exists, if not copy from current root
 if [ ! -f "$FUNCTION_DIR/index.ts" ]; then
     print_warning "index.ts not found in $FUNCTION_DIR"
-    
+
     # Check if we have index.ts in the current root
     if [ -f "index.ts" ]; then
         print_info "Copying index.ts from current root..."
         cp "index.ts" "$FUNCTION_DIR/"
-        
+
         # Update PROJECT_REF in index.ts
         sed -i.bak "s/nnpumlykjksvxivhywwo/$PROJECT_ID/g" "$FUNCTION_DIR/index.ts"
         rm -f "$FUNCTION_DIR/index.ts.bak"
@@ -380,11 +380,11 @@ print_success "Function deployed successfully"
 # Upload widgets to storage
 if [ -d "dist/resources/widgets" ]; then
     print_info "Uploading widgets to storage bucket: $BUCKET_NAME"
-    
+
     # Upload widgets to storage (upload contents, not the folder itself)
     if supabase storage cp -r dist/resources/widgets/ "ss:///${BUCKET_NAME}/" --experimental 2>&1; then
         print_success "Widgets uploaded successfully"
-        
+
         # Important: The bucket must be public for widgets to be accessible
         echo ""
         print_warning "The storage bucket needs to be set to PUBLIC for widgets to be accessible"
@@ -409,7 +409,7 @@ fi
 # Upload public files to storage
 if [ -d "dist/public" ]; then
     print_info "Uploading public files to storage bucket: $BUCKET_NAME"
-    
+
     if supabase storage cp -r dist/public "ss:///${BUCKET_NAME}/public/" --experimental 2>&1; then
         print_success "Public files uploaded successfully"
     else
@@ -438,7 +438,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     RESPONSE=$(curl -s -w "\n%{http_code}" -m 5 "$MCP_ENDPOINT" 2>&1)
     HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
     BODY=$(echo "$RESPONSE" | sed '$d')
-    
+
     # MCP server can return:
     # - 400: Bad request (server is up but rejecting the request format)
     # - 406: Not Acceptable (expects text/event-stream header)
@@ -454,7 +454,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
         print_success "MCP server is up and running!"
         break
     fi
-    
+
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
         echo -n "."
@@ -484,4 +484,3 @@ print_info "Inspector:"
 echo "  $INSPECTOR_URL"
 echo ""
 echo ""
-

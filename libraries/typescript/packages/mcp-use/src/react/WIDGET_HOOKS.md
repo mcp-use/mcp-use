@@ -24,7 +24,7 @@ interface MyWidgetProps {
 
 const MyWidget: React.FC = () => {
   const { props, theme, callTool } = useWidget<MyWidgetProps>();
-  
+
   return (
     <div data-theme={theme}>
       <h1>{props.title}</h1>
@@ -55,7 +55,7 @@ Main hook that provides access to all widget functionality.
   metadata: TMetadata | null;       // Tool response metadata
   state: TState | null;             // Persisted widget state
   setState: (state: TState) => Promise<void>;
-  
+
   // Layout and Theme
   theme: 'light' | 'dark';          // Current theme
   displayMode: 'inline' | 'pip' | 'fullscreen';
@@ -63,13 +63,13 @@ Main hook that provides access to all widget functionality.
   maxHeight: number;                // Maximum available height
   userAgent: UserAgent;             // Device and capabilities info
   locale: string;                   // Current locale
-  
+
   // Actions
   callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResponse>;
   sendFollowUpMessage: (prompt: string) => Promise<void>;
   openExternal: (href: string) => void;
   requestDisplayMode: (mode: DisplayMode) => Promise<{ mode: DisplayMode }>;
-  
+
   // Availability
   isAvailable: boolean;             // Whether window.openai is available
 }
@@ -112,11 +112,11 @@ import { useWidgetState } from 'mcp-use/react';
 
 const MyWidget: React.FC = () => {
   const [favorites, setFavorites] = useWidgetState<string[]>([]);
-  
+
   const addFavorite = async (item: string) => {
     await setFavorites(prev => [...(prev || []), item]);
   };
-  
+
   return <div>Favorites: {favorites?.length || 0}</div>;
 };
 ```
@@ -144,15 +144,15 @@ type WeatherProps = z.infer<typeof propSchema>;
 const WeatherWidget: React.FC = () => {
   const { props, theme, sendFollowUpMessage } = useWidget<WeatherProps>();
   const { city, weather, temperature } = props;
-  
+
   // Theme-aware styling
   const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
   const textColor = theme === 'dark' ? 'text-gray-100' : 'text-gray-800';
-  
+
   const askForForecast = async () => {
     await sendFollowUpMessage(`What's the 7-day forecast for ${city}?`);
   };
-  
+
   return (
     <div className={`${bgColor} ${textColor} rounded-xl shadow-lg p-6`}>
       <h2 className="text-2xl font-bold mb-2">{city}</h2>
@@ -160,7 +160,7 @@ const WeatherWidget: React.FC = () => {
         <span className="text-4xl">{temperature}°</span>
         <p className="text-lg capitalize">{weather}</p>
       </div>
-      <button 
+      <button
         onClick={askForForecast}
         className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
       >
@@ -180,12 +180,12 @@ export default WeatherWidget;
 ```tsx
 const MyWidget: React.FC = () => {
   const { callTool } = useWidget();
-  
+
   const refreshData = async () => {
     const result = await callTool('refresh_data', { city: 'San Francisco' });
     console.log('Refreshed:', result);
   };
-  
+
   return <button onClick={refreshData}>Refresh</button>;
 };
 ```
@@ -197,7 +197,7 @@ Widget state is persisted across sessions and shown to the model:
 ```tsx
 const PizzaWidget: React.FC = () => {
   const [favorites, setFavorites] = useWidgetState<string[]>([]);
-  
+
   const toggleFavorite = async (id: string) => {
     await setFavorites(prev => {
       const current = prev || [];
@@ -206,7 +206,7 @@ const PizzaWidget: React.FC = () => {
         : [...current, id];
     });
   };
-  
+
   return (
     <div>
       {/* Your UI */}
@@ -220,12 +220,12 @@ const PizzaWidget: React.FC = () => {
 ```tsx
 const MapWidget: React.FC = () => {
   const { requestDisplayMode } = useWidget();
-  
+
   const goFullscreen = async () => {
     const result = await requestDisplayMode('fullscreen');
     console.log('Display mode:', result.mode);
   };
-  
+
   return <button onClick={goFullscreen}>Go Fullscreen</button>;
 };
 ```
@@ -235,7 +235,7 @@ const MapWidget: React.FC = () => {
 ```tsx
 const MyWidget: React.FC = () => {
   const { openExternal } = useWidget();
-  
+
   return (
     <button onClick={() => openExternal('https://example.com')}>
       Open Website
@@ -272,7 +272,7 @@ const WeatherWidget: React.FC = () => {
     state,      // Type: WeatherState | null
     setState,   // Type: (state: WeatherState) => Promise<void>
   } = useWidget<WeatherProps, WeatherOutput, unknown, WeatherState>();
-  
+
   // All properties are fully typed!
   const { city, temperature, conditions } = props;
   const forecast = output?.forecast;
@@ -291,7 +291,7 @@ const WeatherWidget: React.FC = () => {
    ```tsx
    // Instead of:
    const { props } = useWidget<MyProps>();
-   
+
    // Use:
    const props = useWidgetProps<MyProps>();
    ```
@@ -307,7 +307,7 @@ const WeatherWidget: React.FC = () => {
 5. **Check availability**: For SSR or testing, check if the API is available:
    ```tsx
    const { isAvailable, callTool } = useWidget();
-   
+
    if (!isAvailable) {
      return <div>Widget API not available</div>;
    }
@@ -323,4 +323,3 @@ The `useWidget` hook is designed to work seamlessly with MCP-use's widget system
 4. **Type safety** is maintained throughout the entire stack
 
 See the [MCP-use documentation](https://mcp-use.github.io) for more information on building and deploying widgets.
-

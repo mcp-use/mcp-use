@@ -18,14 +18,14 @@ server.tool({
   cb: async ({ title, content }, context) => {
     // Access authenticated user
     const user = context.auth
-    
+
     // User info available:
     console.log('User ID:', user.userId)         // Unique user identifier
     console.log('Email:', user.email)            // User email
     console.log('Name:', user.name)              // Display name
     console.log('Roles:', user.roles)            // User roles
     console.log('Permissions:', user.permissions) // Permissions
-    
+
     // Create document with user context
     const doc = await db.documents.create({
       title,
@@ -33,7 +33,7 @@ server.tool({
       createdBy: user.userId,
       createdByName: user.name
     })
-    
+
     return text(`Document created by ${user.name}`)
   }
 })
@@ -54,7 +54,7 @@ interface UserInfo {
   roles?: string[]            // User roles
   permissions?: string[]      // User permissions
   scopes?: string[]           // OAuth scopes granted
-  
+
   // Provider-specific fields
   [key: string]: any          // Additional claims from provider
 }
@@ -115,7 +115,7 @@ if (context.auth.roles?.includes('admin')) {
 Array of specific permissions granted to the user. More granular than roles.
 
 ```typescript
-const permissions = context.auth.permissions 
+const permissions = context.auth.permissions
 // ["documents:read", "documents:write", "users:read"]
 
 // Check for specific permission
@@ -148,7 +148,7 @@ const server = new McpServer({
   oauth: auth0({
     domain: 'your-tenant.auth0.com',
     audience: 'https://your-api.example.com',
-    
+
     // Custom user info extraction
     getUserInfo: (payload) => {
       return {
@@ -170,4 +170,3 @@ const server = new McpServer({
 ## Next Steps
 
 - [OAuth Providers](/typescript/server/authentication/providers/auth0) - Configure user claims per provider
-

@@ -75,10 +75,10 @@ global.__callMcpTool = async (server, tool, args) => {
         tool,
         args
     }));
-    
+
     const resultPath = \`/tmp/mcp_result_\${id}.json\`;
     const fs = require('fs');
-    
+
     // Poll for result file
     let attempts = 0;
     while (attempts < 300) { // 30 seconds timeout
@@ -86,7 +86,7 @@ global.__callMcpTool = async (server, tool, args) => {
             const content = fs.readFileSync(resultPath, 'utf8');
             const result = JSON.parse(content);
             fs.unlinkSync(resultPath); // Clean up
-            
+
             if (result.error) {
                 throw new Error(result.error);
             }
@@ -110,14 +110,14 @@ global.search_tools = async (query, detailLevel = 'full') => {
         }))
       )
     )};
-    
+
     const filtered = allTools.filter(tool => {
         if (!query) return true;
         const q = query.toLowerCase();
-        return tool.name.toLowerCase().includes(q) || 
+        return tool.name.toLowerCase().includes(q) ||
                (tool.description && tool.description.toLowerCase().includes(q));
     });
-    
+
     if (detailLevel === 'names') {
         return filtered.map(t => ({ name: t.name, server: t.server }));
     } else if (detailLevel === 'descriptions') {

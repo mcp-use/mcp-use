@@ -125,7 +125,7 @@ The main dashboard is your central hub for managing MCP server connections:
 To connect to an MCP server:
 
 1. **Open Connect Panel**: Click the Connect panel on the right side of the dashboard
-2. **Configure Transport**: 
+2. **Configure Transport**:
    - Select "Streamable HTTP" for SSE connections
    - Select "WebSocket" for WS connections
    - Configure "stdin/stdio" for local process connections
@@ -383,7 +383,7 @@ Both providers respect your privacy and follow GDPR compliance.
 
 ## 🤝 Contributing
 
-We welcome contributions! 
+We welcome contributions!
 
 See our [contributing guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md) for details.
 

@@ -118,15 +118,15 @@ session.on("notification", async (notification) => {
     case "custom/heartbeat":
       console.log(`Heartbeat #${notification.params?.count}`);
       break;
-      
+
     case "custom/user-joined":
       console.log(`User joined: ${notification.params?.username}`);
       break;
-      
+
     case "custom/data-updated":
       console.log("Data updated:", notification.params);
       break;
-      
+
     default:
       console.log(`Unknown notification: ${notification.method}`);
   }
@@ -220,11 +220,11 @@ session.on("notification", async (notification: Notification) => {
       connectedUsers = notification.params?.connectedClients ?? 0;
       updateStatusUI();
       break;
-      
+
     case "custom/alert":
       showAlert(notification.params?.message);
       break;
-      
+
     case "notifications/tools/list_changed":
       await refreshToolsList();
       break;
@@ -255,7 +255,7 @@ session.on("notification", async (notification) => {
   if (notification.method === "custom/progress") {
     const { taskId, progress, status } = notification.params ?? {};
     console.log(`Task ${taskId}: ${progress}% - ${status}`);
-    
+
     // Update progress bar UI
     updateProgressBar(taskId, progress);
   }
