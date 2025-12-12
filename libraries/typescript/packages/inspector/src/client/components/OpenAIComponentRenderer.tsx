@@ -104,12 +104,6 @@ function OpenAIComponentRendererBase({
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await readResource(componentUrl);
 
-        // For Apps SDK widgets, use structuredContent as toolInput (the actual tool parameters)
-        // toolArgs might be empty or from the initial invocation, structuredContent has the real data
-        const computedToolInput = structuredContent || toolArgs;
-        setWidgetToolInput(computedToolInput);
-        setWidgetToolOutput(structuredContent);
-
         // Extract CSP metadata from tool result
         // Check both toolResult._meta (for tool calls) and toolResult.contents?.[0]?._meta (for resources)
         let widgetCSP = null;
@@ -119,10 +113,30 @@ function OpenAIComponentRendererBase({
           widgetCSP = metaSource["openai/widgetCSP"];
         }
 
+        // Extract widget props from _meta["mcp-use/props"]
+        const widgetProps = metaSource?.["mcp-use/props"] || null;
+
+        // Debug logging
+        console.log("[OpenAIComponentRenderer] Widget data extraction:", {
+          hasMetaSource: !!metaSource,
+          hasMcpUseProps: !!metaSource?.["mcp-use/props"],
+          widgetProps,
+          toolArgs,
+          structuredContent,
+          metaKeys: metaSource ? Object.keys(metaSource) : [],
+        });
+
+        // toolInput should be the original tool call arguments from toolArgs
+        const finalToolInput = toolArgs;
+
+        // Update state with final values
+        setWidgetToolInput(finalToolInput);
+        setWidgetToolOutput(structuredContent);
+
         // pass props as url params (toolInput, toolOutput)
         const urlParams = new URLSearchParams();
         const params = {
-          toolInput: widgetToolInput,
+          toolInput: finalToolInput,
           toolOutput: structuredContent,
           toolId,
         };
@@ -144,8 +158,11 @@ function OpenAIComponentRendererBase({
         const widgetDataToStore: any = {
           serverId,
           uri: componentUrl,
-          toolInput: computedToolInput,
-          toolOutput: structuredContent,
+          toolInput: finalToolInput, // Original tool call arguments
+          toolOutput: structuredContent, // Tool output (structured data)
+          toolResponseMetadata: widgetProps
+            ? { "mcp-use/props": widgetProps }
+            : null, // Widget-specific props
           resourceData, // Pass the fetched HTML
           toolId,
           widgetCSP, // Pass the CSP metadata
@@ -262,9 +279,8 @@ function OpenAIComponentRendererBase({
 
             // Dispatch the set_globals event to notify React components
             try {
-              const CustomEventConstructor =
-                iframeWindow.CustomEvent as typeof window.CustomEvent;
-              const globalsEvent = new CustomEventConstructor(
+              // Use global CustomEvent constructor
+              const globalsEvent = new (iframeWindow as any).CustomEvent(
                 "openai:set_globals",
                 {
                   detail: {

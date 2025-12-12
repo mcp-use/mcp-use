@@ -313,8 +313,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
                 widgetConfig.resultCanProduceWidget ?? true,
             };
 
-            // Set _meta on the result
-            (result as any)._meta = responseMeta;
+            // Set _meta on the result, merging with any existing _meta (e.g., from widget() helper)
+            (result as any)._meta = {
+              ...(result._meta || {}),
+              ...responseMeta,
+            };
 
             // Update message if empty
             if (
