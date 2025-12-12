@@ -1,7 +1,7 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:mcp-use@*": "1.6.2_react@19.2.0_react-router-dom@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3"
+    "npm:mcp-use@*": "1.6.2_react@19.2.0_react-router@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3"
   },
   "npm": {
     "@ai-sdk/provider-utils@2.2.8_zod@3.25.76": {
@@ -770,10 +770,10 @@
         "@modelcontextprotocol/sdk"
       ]
     },
-    "@mcp-use/cli@2.4.2_react@19.2.0_react-router-dom@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3": {
+    "@mcp-use/cli@2.4.2_react@19.2.0_react-router@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3": {
       "integrity": "sha512-krjg8JvX+1D9Jlu8mRvzVb2M7WXt21HZsxrUgIvd/7nRYtepoBwSRKKuUOLwCQbQqy1PA422iu0wwc1VQfCZKw==",
       "dependencies": [
-        "@mcp-use/inspector@0.8.2_react@19.2.0_react-router-dom@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_react-dom@19.2.0__react@19.2.0_ws@8.18.3",
+        "@mcp-use/inspector@0.8.2_react@19.2.0_react-router@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_react-dom@19.2.0__react@19.2.0_ws@8.18.3",
         "@tailwindcss/vite",
         "@vitejs/plugin-react@4.7.0_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_@babel+core@7.28.5_tsx@4.21.0",
         "chalk@5.6.2",
@@ -790,7 +790,7 @@
       ],
       "bin": true
     },
-    "@mcp-use/inspector@0.8.2_react@19.2.0_react-router-dom@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_react-dom@19.2.0__react@19.2.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3": {
+    "@mcp-use/inspector@0.8.2_react@19.2.0_react-router@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_react-dom@19.2.0__react@19.2.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3": {
       "integrity": "sha512-bIdRRzsgrzP0zxb/yo+S2q/xMomaI0IQnEPGjFjBBOGr5SCQXHBNinRWxslfJPU/4zdbtJFJpM0JyI89bofIsg==",
       "dependencies": [
         "@ai-sdk/react",
@@ -828,7 +828,7 @@
         "react",
         "react-dom",
         "react-resizable-panels",
-        "react-router-dom",
+        "react-router",
         "react-syntax-highlighter",
         "sonner",
         "tailwind-merge",
@@ -836,7 +836,7 @@
       ],
       "bin": true
     },
-    "@mcp-use/inspector@0.8.2_react@19.2.0_react-router-dom@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_react-dom@19.2.0__react@19.2.0_ws@8.18.3": {
+    "@mcp-use/inspector@0.8.2_react@19.2.0_react-router@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_react-dom@19.2.0__react@19.2.0_ws@8.18.3": {
       "integrity": "sha512-bIdRRzsgrzP0zxb/yo+S2q/xMomaI0IQnEPGjFjBBOGr5SCQXHBNinRWxslfJPU/4zdbtJFJpM0JyI89bofIsg==",
       "dependencies": [
         "@ai-sdk/react",
@@ -874,7 +874,7 @@
         "react",
         "react-dom",
         "react-resizable-panels",
-        "react-router-dom",
+        "react-router",
         "react-syntax-highlighter",
         "sonner",
         "tailwind-merge",
@@ -2887,7 +2887,7 @@
     "math-intrinsics@1.1.0": {
       "integrity": "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g=="
     },
-    "mcp-use@1.6.2_react@19.2.0_react-router-dom@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3": {
+    "mcp-use@1.6.2_react@19.2.0_react-router@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3": {
       "integrity": "sha512-fFxcTxTxKeyXPs/EgQZre6BY4oibtUiJw/LzgNkl22Rnq/Z0qAJrZ9s+5tiUpTw4RkAjSmtf3vAYdtK+EIj/1g==",
       "dependencies": [
         "@dmitryrechkin/json-schema-to-zod",
@@ -2895,7 +2895,7 @@
         "@langchain/core@1.1.0_ws@8.18.3_zod@3.25.76",
         "@mcp-ui/server",
         "@mcp-use/cli",
-        "@mcp-use/inspector@0.8.2_react@19.2.0_react-router-dom@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_react-dom@19.2.0__react@19.2.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3",
+        "@mcp-use/inspector@0.8.2_react@19.2.0_react-router@7.9.6__react@19.2.0__react-dom@19.2.0___react@19.2.0_hono@4.10.7_vite@6.4.1__tsx@4.21.0__picomatch@4.0.3_zod@3.25.76_@langchain+core@1.1.0__ws@8.18.3__zod@3.25.76_tsx@4.21.0_react-dom@19.2.0__react@19.2.0_zod-to-json-schema@3.25.0__zod@3.25.76_ws@8.18.3",
         "@modelcontextprotocol/sdk",
         "@scarf/scarf",
         "ai",
@@ -2909,7 +2909,7 @@
         "lodash-es",
         "posthog-node",
         "react",
-        "react-router-dom",
+        "react-router",
         "strict-url-sanitise",
         "strip-ansi@7.1.2",
         "ts-node",
@@ -3278,7 +3278,7 @@
         "react-dom"
       ]
     },
-    "react-router-dom@7.9.6_react@19.2.0_react-dom@19.2.0__react@19.2.0": {
+    "react-router@7.9.6_react@19.2.0_react-dom@19.2.0__react@19.2.0": {
       "integrity": "sha512-2MkC2XSXq6HjGcihnx1s0DBWQETI4mlis4Ux7YTLvP67xnGxCvq+BcCQSO81qQHVUTM1V53tl4iVVaY5sReCOA==",
       "dependencies": [
         "react",

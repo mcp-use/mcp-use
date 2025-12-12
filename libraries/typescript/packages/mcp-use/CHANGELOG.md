@@ -522,7 +522,7 @@
 
 ### Patch Changes
 
-- 2730902: Fix react-router-dom
+- 2730902: Fix react-router
 - 2730902: Fix: switched to https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/sdk@1194 instead of @modelcontextprotocol/sdk to fix zod errors on deno runtime
 - 2730902: Optimized dependencies
 - 2730902: Moved ai sdk dep to optional since it's only used in test and example
@@ -588,7 +588,7 @@
 
 ### Patch Changes
 
-- 0c8cb1a: Fix react-router-dom
+- 0c8cb1a: Fix react-router
   - @mcp-use/cli@2.4.3-canary.3
   - @mcp-use/inspector@0.9.0-canary.3
 

@@ -40,8 +40,8 @@ export default defineConfig({
     "cli-highlight",
     "winston",
     "supports-color",
-    // Keep react-router-dom external (optional, for widgets)
-    "react-router-dom",
+    // Keep react-router external (optional, for widgets)
+    "react-router",
   ],
   esbuildOptions(options) {
     // Preserve node: prefix for Deno compatibility
