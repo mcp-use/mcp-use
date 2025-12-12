@@ -11,5 +11,5 @@ jobs:
       - name: GitHub Releases to Discord
         uses: SethCohen/github-releases-to-discord@v1
         with:
-          webhook_url: ${{ secrets.WEBHOOK_URL }}
+          webhook_url: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}
           reduce_headings: true
