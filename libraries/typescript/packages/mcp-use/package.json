@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.11.0-canary.7",
+  "version": "1.11.0-canary.9",
   "packageManager": "pnpm@10.6.1",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents, Clients and Servers with support for ChatGPT Apps, Code Mode, OAuth, Notifications, Sampling, Observability and more.",
   "author": "mcp-use, Inc.",
@@ -56,6 +56,11 @@
       "types": "./dist/src/browser.d.ts",
       "import": "./dist/src/browser.js",
       "require": "./dist/src/browser.cjs"
+    },
+    "./client": {
+      "types": "./dist/src/client.d.ts",
+      "import": "./dist/src/client.js",
+      "require": "./dist/src/client.cjs"
     },
     "./react": {
       "types": "./dist/src/react/index.d.ts",
