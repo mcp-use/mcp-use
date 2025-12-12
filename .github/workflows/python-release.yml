@@ -113,7 +113,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: python-draft
-          name: Python - Upcoming Release
+          name: python-draft
           body: ${{ steps.draft-notes.outputs.notes }}
           draft: true
           prerelease: false

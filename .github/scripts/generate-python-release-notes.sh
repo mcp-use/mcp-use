@@ -73,6 +73,7 @@ if [ "$MODE" = "draft" ]; then
   echo "**This is a draft release tracking changes since ${PREV_TAG/python-v/v}.**"
   echo ""
 else
+  echo "## What's Changed"
   echo ""
 fi
 
@@ -168,14 +169,7 @@ if [ -s "$TMP_ITEMS" ]; then
   emit_section "Bug Fixes" "$TMP_FIXES"
   emit_section "Other" "$TMP_OTHERS"
 
-  echo "## Credits"
   echo "Huge thanks to the contributors of this release!"
-  echo ""
-
-  # First PR occurrence per author login (preserve first PR URL)
-  awk -F'\t' '$1 == "pr" && !seen[$4]++ { print $4 "\t" $5 }' "$TMP_ITEMS" | while IFS=$'\t' read -r LOGIN URL; do
-    echo "* @$LOGIN $URL"
-  done
   echo ""
 else
   if [ "$MODE" = "draft" ]; then
