@@ -28,7 +28,7 @@ import {
 } from "./src/session.js";
 import type { CreateMessageRequest } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
-export { BaseAdapter, LangChainAdapter } from "./src/adapters/index.js";
+export { BaseAdapter } from "./src/adapters/index.js";
 // Export AI SDK utilities
 export * from "./src/agents/utils/index.js";
 export { ServerManager } from "./src/managers/server_manager.js";

@@ -266,22 +266,42 @@ export function uiResourceRegistration<T extends UIResourceServer>(
             randomId
           );
 
-          // Update toolMetadata with the unique URI
+          // Update toolMetadata with the unique URI and widget props
           const uniqueToolMetadata = {
             ...toolMetadata,
             "openai/outputTemplate": uniqueUri,
+            "mcp-use/props": params, // Pass params as widget props
           };
+
+          // Generate tool output (what the model sees)
+          let toolOutputResult;
+          if (definition.toolOutput) {
+            // Use provided toolOutput (function or static)
+            toolOutputResult =
+              typeof definition.toolOutput === "function"
+                ? definition.toolOutput(params)
+                : definition.toolOutput;
+          } else {
+            // Default: text summary
+            toolOutputResult = {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Displaying ${displayName}`,
+                },
+              ],
+            };
+          }
+
+          // Ensure content exists (required by CallToolResult)
+          const content = toolOutputResult.content || [
+            { type: "text" as const, text: `Displaying ${displayName}` },
+          ];
 
           return {
             _meta: uniqueToolMetadata,
-            content: [
-              {
-                type: "text" as const,
-                text: `Displaying ${displayName}`,
-              },
-            ],
-            // structuredContent will be injected as window.openai.toolOutput by Apps SDK
-            structuredContent: params,
+            content: content,
+            structuredContent: toolOutputResult.structuredContent,
           };
         }
 

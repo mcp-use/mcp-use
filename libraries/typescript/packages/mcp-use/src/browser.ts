@@ -8,7 +8,7 @@ export { MCPAgent } from "./agents/mcp_agent.js";
 export { RemoteAgent } from "./agents/remote.js";
 
 // Export adapters
-export { BaseAdapter, LangChainAdapter } from "./adapters/index.js";
+export { BaseAdapter } from "./adapters/index.js";
 
 // Export connectors that work in the browser
 export { BaseConnector } from "./connectors/base.js";

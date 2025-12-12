@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: [
     "index.ts",
+    "src/adapters/index.ts",
     "src/agents/index.ts",
     "src/auth/index.ts",
     "src/bin.ts",
