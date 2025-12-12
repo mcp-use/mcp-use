@@ -310,6 +310,17 @@ async function buildWidgets(
   // @ts-ignore - @tailwindcss/vite may not have type declarations
   const tailwindcss = (await import("@tailwindcss/vite")).default;
 
+  // Read favicon config from package.json
+  const packageJsonPath = path.join(projectPath, "package.json");
+  let favicon = "";
+  try {
+    const pkgContent = await fs.readFile(packageJsonPath, "utf-8");
+    const pkg = JSON.parse(pkgContent);
+    favicon = pkg.mcpUse?.favicon || "";
+  } catch {
+    // No package.json or no mcpUse config, that's fine
+  }
+
   const builtWidgets: Array<{ name: string; metadata: any }> = [];
 
   for (const entry of entries) {
@@ -355,7 +366,12 @@ if (container && Component) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widgetName} Widget</title>
+    <title>${widgetName} Widget</title>${
+      favicon
+        ? `
+    <link rel="icon" href="/mcp-use/public/${favicon}" />`
+        : ""
+    }
   </head>
   <body>
     <div id="widget-root"></div>

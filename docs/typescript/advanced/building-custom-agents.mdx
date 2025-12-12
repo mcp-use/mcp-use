@@ -45,7 +45,8 @@ Here's a simple example of creating a custom agent using the LangChain adapter:
 import { ChatOpenAI } from '@langchain/openai'
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
-import { MCPClient, LangChainAdapter, loadConfigFile } from 'mcp-use'
+import { MCPClient, loadConfigFile } from 'mcp-use'
+import { LangChainAdapter } from 'mcp-use/adapters'
 
 async function main() {
     // Initialize the MCP client
@@ -89,7 +90,8 @@ main().catch(console.error)
 import { ChatOpenAI } from '@langchain/openai'
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
-import { MCPClient, LangChainAdapter, loadConfigFile } from 'mcp-use'
+import { MCPClient, loadConfigFile } from 'mcp-use'
+import { LangChainAdapter } from 'mcp-use/adapters'
 
 async function main() {
     // Initialize the MCP client

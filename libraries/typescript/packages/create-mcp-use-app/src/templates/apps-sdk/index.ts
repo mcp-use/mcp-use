@@ -3,6 +3,7 @@ import { createMCPServer } from "mcp-use/server";
 const server = createMCPServer("test-app", {
   version: "1.0.0",
   description: "Test MCP server with automatic UI widget registration",
+  // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
 });
 
 /**

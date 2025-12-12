@@ -37,6 +37,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./adapters": {
+      "types": "./dist/src/adapters/index.d.ts",
+      "import": "./dist/src/adapters/index.js",
+      "require": "./dist/src/adapters/index.cjs"
+    },
     "./agent": {
       "types": "./dist/src/agents/index.d.ts",
       "import": "./dist/src/agents/index.js",
@@ -138,8 +143,10 @@
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.2.0",
     "@langchain/anthropic": "^1.0.0",
+    "@langchain/core": "^1.0.0",
     "@langchain/openai": "^1.0.0",
     "ai": "^4.0.0 || ^5.0.0",
+    "langchain": "^1.0.0",
     "langfuse": "^3.38.6",
     "langfuse-langchain": "^3.38.6",
     "react": "^18.0.0 || ^19.0.0",
@@ -152,10 +159,16 @@
     "@langchain/anthropic": {
       "optional": true
     },
+    "@langchain/core": {
+      "optional": true
+    },
     "@langchain/openai": {
       "optional": true
     },
     "ai": {
+      "optional": true
+    },
+    "langchain": {
       "optional": true
     },
     "langfuse": {
@@ -167,7 +180,6 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
-    "@langchain/core": "^1.1.0",
     "@mcp-ui/server": "^5.15.0",
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
@@ -175,7 +187,6 @@
     "express": "^5.2.0",
     "hono": "^4.10.7",
     "jose": "^6.1.2",
-    "langchain": "^1.1.1",
     "posthog-js": "^1.302.2",
     "posthog-node": "^5.14.1",
     "ws": "^8.18.3",

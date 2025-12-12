@@ -119,6 +119,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public serverPort?: number;
   public serverHost: string;
   public serverBaseUrl?: string;
+  public favicon?: string;
   public registeredTools: string[] = [];
   public registeredPrompts: string[] = [];
   public registeredResources: string[] = [];
@@ -206,6 +207,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
+    this.favicon = config.favicon;
 
     // Create native SDK server instance with capabilities
     this.nativeServer = new OfficialMcpServer(
@@ -1289,6 +1291,7 @@ export function createMCPServer(
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
     autoCreateSessionOnInvalidId: config.autoCreateSessionOnInvalidId,
     oauth: config.oauth,
+    favicon: config.favicon,
   }) as any;
 
   return instance as unknown as McpServerInstance<boolean>;

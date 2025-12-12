@@ -12,6 +12,7 @@ import type { WidgetMetadata } from "../types/widget.js";
 import { pathHelpers, getCwd } from "../utils/runtime.js";
 import {
   setupPublicRoutes,
+  setupFaviconRoute,
   registerWidgetFromTemplate,
 } from "./widget-helpers.js";
 import type {
@@ -106,6 +107,30 @@ export async function mountWidgetsDev(
 
   // Create a temp directory for widget entry files
   const tempDir = pathHelpers.join(getCwd(), TMP_MCP_USE_DIR);
+
+  // Clean up stale widget directories in .mcp-use
+  try {
+    // Check if .mcp-use exists
+    await fs.access(tempDir);
+
+    // Get list of current widget names
+    const currentWidgetNames = new Set(entries.map((e) => e.name));
+
+    // Read existing directories in .mcp-use
+    const existingDirs = await fs.readdir(tempDir, { withFileTypes: true });
+
+    // Remove directories that are not in current widgets
+    for (const dirent of existingDirs) {
+      if (dirent.isDirectory() && !currentWidgetNames.has(dirent.name)) {
+        const staleDir = pathHelpers.join(tempDir, dirent.name);
+        await fs.rm(staleDir, { recursive: true, force: true });
+        console.log(`[WIDGETS] Cleaned up stale widget: ${dirent.name}`);
+      }
+    }
+  } catch {
+    // .mcp-use doesn't exist yet, no cleanup needed
+  }
+
   await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
   // Import dev dependencies - these are optional and only needed for dev mode
@@ -204,7 +229,12 @@ if (container && Component) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widget.name} Widget</title>
+    <title>${widget.name} Widget</title>${
+      serverConfig.favicon
+        ? `
+    <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
+        : ""
+    }
   </head>
   <body>
     <div id="widget-root"></div>
@@ -271,6 +301,70 @@ if (container && Component) {
       const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
       server.watcher.add(resourcesPath);
       console.log(`[WIDGETS] Watching resources directory: ${resourcesPath}`);
+
+      // Watch for file deletions and clean up corresponding .mcp-use directories
+      server.watcher.on("unlink", async (filePath: string) => {
+        // Check if the deleted file is a widget file
+        const relativePath = pathHelpers.relative(resourcesPath, filePath);
+
+        // Single file widget (e.g., widget-name.tsx)
+        if (
+          (relativePath.endsWith(".tsx") || relativePath.endsWith(".ts")) &&
+          !relativePath.includes("/")
+        ) {
+          const widgetName = relativePath.replace(/\.tsx?$/, "");
+          const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+          try {
+            await fs.access(widgetDir);
+            await fs.rm(widgetDir, { recursive: true, force: true });
+            console.log(
+              `[WIDGETS] Cleaned up stale widget (file removed): ${widgetName}`
+            );
+          } catch {
+            // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+        // Folder-based widget (e.g., widget-name/widget.tsx)
+        else if (relativePath.endsWith("widget.tsx")) {
+          const parts = relativePath.split("/");
+          if (parts.length === 2) {
+            const widgetName = parts[0];
+            const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+            try {
+              await fs.access(widgetDir);
+              await fs.rm(widgetDir, { recursive: true, force: true });
+              console.log(
+                `[WIDGETS] Cleaned up stale widget (file removed): ${widgetName}`
+              );
+            } catch {
+              // Widget directory doesn't exist, nothing to clean up
+            }
+          }
+        }
+      });
+
+      // Watch for directory deletions (folder-based widgets)
+      server.watcher.on("unlinkDir", async (dirPath: string) => {
+        const relativePath = pathHelpers.relative(resourcesPath, dirPath);
+
+        // Check if this is a top-level directory in resources/
+        if (relativePath && !relativePath.includes("/")) {
+          const widgetName = relativePath;
+          const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+          try {
+            await fs.access(widgetDir);
+            await fs.rm(widgetDir, { recursive: true, force: true });
+            console.log(
+              `[WIDGETS] Cleaned up stale widget (directory removed): ${widgetName}`
+            );
+          } catch {
+            // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+      });
     },
   };
 
@@ -405,6 +499,9 @@ export default PostHog;
 
   // Serve static files from public directory in dev mode
   setupPublicRoutes(app, false);
+
+  // Setup favicon route at server root
+  setupFaviconRoute(app, serverConfig.favicon, false);
 
   // Add a catch-all 404 handler for widget routes to prevent falling through to other middleware
   // (like the inspector) which might intercept the request and return the wrong content
