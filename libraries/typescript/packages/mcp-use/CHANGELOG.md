@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.11.0-canary.7
+
+### Patch Changes
+
+- 9acf03b: fix: drop react-router-dom in favor of react-router
+- Updated dependencies [9acf03b]
+  - @mcp-use/inspector@0.13.0-canary.7
+  - @mcp-use/cli@2.6.0-canary.7
+
 ## 1.11.0-canary.6
 
 ### Patch Changes

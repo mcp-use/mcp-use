@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.8.1-canary.1
+
+### Patch Changes
+
+- 9acf03b: fix: drop react-router-dom in favor of react-router
+
 ## 0.8.1-canary.0
 
 ### Patch Changes
