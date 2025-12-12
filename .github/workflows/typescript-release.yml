@@ -236,6 +236,7 @@ jobs:
               })
 
               core.info(`Created release for ${tag}`)
+            }
 
       - name: Create deployment marker (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
@@ -512,3 +513,4 @@ jobs:
               })
 
               core.info(`Created release for ${tag}`)
+            }
