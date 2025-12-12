@@ -1,0 +1,275 @@
+name: Python Release
+
+on:
+  push:
+    branches:
+      - main
+      - chore/python/release-action
+    paths:
+      - "libraries/python/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  detect-release:
+    name: Check Changes
+    runs-on: ubuntu-latest
+    outputs:
+      current_version: ${{ steps.current-version.outputs.version }}
+      latest_tag: ${{ steps.latest-release.outputs.tag }}
+      latest_version: ${{ steps.latest-release.outputs.version }}
+      should_publish: ${{ steps.compare.outputs.should_publish }}
+      should_draft: ${{ steps.compare.outputs.should_draft }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Get current version
+        id: current-version
+        working-directory: libraries/python
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Get latest published release
+        id: latest-release
+        run: |
+          # Get the latest published python release tag (not the draft)
+          LATEST_TAG=$(git tag -l "python-v*" --sort=-v:refname | head -n 1)
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous python releases found"
+            echo "version=0.0.0" >> $GITHUB_OUTPUT
+            echo "tag=none" >> $GITHUB_OUTPUT
+          else
+            LATEST_VERSION=${LATEST_TAG#python-v}
+            echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+            echo "Latest published release: $LATEST_VERSION"
+          fi
+
+      - name: Compare versions
+        id: compare
+        run: |
+          CURRENT="${{ steps.current-version.outputs.version }}"
+          LATEST="${{ steps.latest-release.outputs.version }}"
+          
+          echo "Comparing versions:"
+          echo "  Current: $CURRENT"
+          echo "  Latest:  $LATEST"
+          
+          if [ "$CURRENT" != "$LATEST" ]; then
+            echo "Version has been bumped - will publish release"
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "should_draft=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged - will update draft"
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            echo "should_draft=true" >> $GITHUB_OUTPUT
+          fi
+
+  update-draft:
+    name: Update python draft release
+    runs-on: ubuntu-latest
+    needs: [detect-release]
+    if: needs.detect-release.outputs.should_draft == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes for draft
+        id: draft-notes
+        run: |
+          PREV_TAG="${{ needs.detect-release.outputs.latest_tag }}"
+          
+          chmod +x .github/scripts/generate-python-release-notes.sh
+          .github/scripts/generate-python-release-notes.sh "" "$PREV_TAG" "draft" > notes.md
+          
+          cat notes.md
+          
+          {
+            echo 'notes<<EOF'
+            cat notes.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: python-draft
+          name: python-draft
+          body: ${{ steps.draft-notes.outputs.notes }}
+          draft: true
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  create-github-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: [detect-release]
+    if: needs.detect-release.outputs.should_publish == 'true'
+    outputs:
+      version: ${{ needs.detect-release.outputs.current_version }}
+      release_exists: ${{ steps.check-release.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get release notes from draft
+        id: publish-notes
+        run: |
+          VERSION="${{ needs.detect-release.outputs.current_version }}"
+          PREV_TAG="${{ needs.detect-release.outputs.latest_tag }}"
+          
+          # Check if draft release exists
+          if gh release view python-draft >/dev/null 2>&1; then
+            echo "Fetching release notes from python-draft..."
+            DRAFT_BODY=$(gh release view python-draft --json body -q '.body')
+            
+            # Update header and remove draft-specific text (fix sed chaining)
+            UPDATED_BODY=$(echo "$DRAFT_BODY" | \
+              sed "s/## Draft Release/## What's Changed/" | \
+              sed "/This is a draft release tracking changes/d")
+            
+            {
+              echo 'notes<<EOF'
+              echo "$UPDATED_BODY"
+              echo EOF
+            } >> $GITHUB_OUTPUT
+          else
+            echo "No python-draft release found, generating release notes from git history..."
+            
+            # Make script executable
+            chmod +x .github/scripts/generate-python-release-notes.sh
+            
+            # Generate notes using shared script
+            .github/scripts/generate-python-release-notes.sh "$VERSION" "$PREV_TAG" "publish" > notes.md
+            
+            {
+              echo 'notes<<EOF'
+              cat notes.md
+              echo EOF
+            } >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Release notes prepared successfully"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if release already exists
+        id: check-release
+        run: |
+          TAG_NAME="python-v${{ needs.detect-release.outputs.current_version }}"
+          
+          # Check if a published release with this version already exists
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release $TAG_NAME does not exist, will create it"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        if: steps.check-release.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: python-v${{ needs.detect-release.outputs.current_version }}
+          name: Python v${{ needs.detect-release.outputs.current_version }}
+          body: ${{ steps.publish-notes.outputs.notes }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [create-github-release]
+    if: needs.create-github-release.outputs.release_exists == 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        working-directory: libraries/python
+        run: |
+          uv build
+
+      - name: Check if already published to PyPI
+        id: check-pypi
+        working-directory: libraries/python
+        run: |
+          # Check if this version exists on PyPI
+          VERSION="${{ needs.create-github-release.outputs.version }}"
+          
+          # Get all available versions from PyPI and check if our version is in the list
+          PYPI_VERSIONS=$(uv pip index versions mcp-use 2>/dev/null || echo "")
+          
+          if echo "$PYPI_VERSIONS" | grep -qw "$VERSION"; then
+            echo "Version $VERSION already exists on PyPI"
+            echo "publish_needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION not found on PyPI, will publish"
+            echo "publish_needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to PyPI
+        if: steps.check-pypi.outputs.publish_needed == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: libraries/python/dist/
+
+  cleanup-draft:
+    name: Cleanup draft tag/release
+    runs-on: ubuntu-latest
+    needs: [create-github-release, publish-pypi]
+    if: needs.create-github-release.outputs.release_exists == 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete draft release
+        run: |
+          # Delete the python-draft release after successful publish
+          if gh release view python-draft >/dev/null 2>&1; then
+            gh release delete python-draft --yes
+            
+            # Check if the tag exists on the remote before attempting to delete
+            if git ls-remote --tags origin python-draft | grep -q "refs/tags/python-draft$"; then
+              git push --delete origin python-draft
+              echo "Deleted python-draft tag from remote"
+            else
+              echo "No python-draft tag found on remote to delete"
+            fi
+            
+            echo "Deleted python-draft release"
+          else
+            echo "No python-draft release found to delete"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
