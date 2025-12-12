@@ -1,5 +1,44 @@
 # @mcp-use/cli
 
+## 2.6.0-canary.6
+
+### Patch Changes
+
+- fdbd09e: fix: widgets do not pick up mcp-use styles
+- Updated dependencies [fdbd09e]
+  - mcp-use@1.11.0-canary.6
+  - @mcp-use/inspector@0.13.0-canary.6
+
+## 2.6.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [0b2292d]
+- Updated dependencies [861546b]
+  - mcp-use@1.11.0-canary.5
+  - @mcp-use/inspector@0.13.0-canary.5
+
+## 2.6.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f469d26]
+  - mcp-use@1.11.0-canary.4
+  - @mcp-use/inspector@0.13.0-canary.4
+
+## 2.6.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: added support for cli client
+
+### Patch Changes
+
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - mcp-use@1.11.0-canary.3
+  - @mcp-use/inspector@0.13.0-canary.3
+
 ## 2.5.6
 
 ### Patch Changes
@@ -48,6 +87,31 @@
 - Updated dependencies [b3d69ed]
   - @mcp-use/inspector@0.12.1
   - mcp-use@1.10.1
+
+## 2.5.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [1b6562a]
+  - mcp-use@1.10.1-canary.2
+  - @mcp-use/inspector@0.12.1-canary.2
+
+## 2.5.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2bb2278]
+  - mcp-use@1.10.1-canary.1
+  - @mcp-use/inspector@0.12.1-canary.1
+
+## 2.5.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - @mcp-use/inspector@0.12.1-canary.0
+  - mcp-use@1.10.1-canary.0
 
 ## 2.5.0
 

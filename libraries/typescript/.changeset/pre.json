@@ -1,0 +1,22 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.5.0",
+    "create-mcp-use-app": "0.8.0",
+    "@mcp-use/inspector": "0.12.0",
+    "mcp-use": "1.10.0"
+  },
+  "changesets": [
+    "fast-numbers-laugh",
+    "full-sheep-sneeze",
+    "good-turtles-poke",
+    "late-jokes-write",
+    "mighty-states-jam",
+    "new-waves-invite",
+    "shiny-cloths-thank",
+    "twenty-jars-call",
+    "whole-lemons-write",
+    "witty-walls-ask"
+  ]
+}

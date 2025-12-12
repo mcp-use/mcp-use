@@ -1,5 +1,39 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [fdbd09e]
+  - mcp-use@1.11.0-canary.6
+
+## 0.13.0-canary.5
+
+### Patch Changes
+
+- 861546b: fix: favicon url generator
+- Updated dependencies [0b2292d]
+  - mcp-use@1.11.0-canary.5
+
+## 0.13.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f469d26]
+  - mcp-use@1.11.0-canary.4
+
+## 0.13.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: removed websocket transport support
+
+### Patch Changes
+
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - mcp-use@1.11.0-canary.3
+
 ## 0.12.6
 
 ### Patch Changes
@@ -44,6 +78,28 @@
 - b3d69ed: fix: zod import in official sdk
 - Updated dependencies [b3d69ed]
   - mcp-use@1.10.1
+
+## 0.12.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [1b6562a]
+  - mcp-use@1.10.1-canary.2
+
+## 0.12.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2bb2278]
+  - mcp-use@1.10.1-canary.1
+
+## 0.12.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - mcp-use@1.10.1-canary.0
 
 ## 0.12.0
 

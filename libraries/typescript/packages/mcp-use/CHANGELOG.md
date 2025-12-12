@@ -1,5 +1,48 @@
 # mcp-use
 
+## 1.11.0-canary.6
+
+### Patch Changes
+
+- fdbd09e: fix: widgets do not pick up mcp-use styles
+- Updated dependencies [fdbd09e]
+  - @mcp-use/cli@2.6.0-canary.6
+  - @mcp-use/inspector@0.13.0-canary.6
+
+## 1.11.0-canary.5
+
+### Minor Changes
+
+- 0b2292d: feat(session): update callTool method to default args to an empty object and add requireSession method for session retrieval
+
+### Patch Changes
+
+- Updated dependencies [861546b]
+  - @mcp-use/inspector@0.13.0-canary.5
+  - @mcp-use/cli@2.6.0-canary.5
+
+## 1.11.0-canary.4
+
+### Patch Changes
+
+- f469d26: feat: updated agent docs and signature
+  - @mcp-use/cli@2.6.0-canary.4
+  - @mcp-use/inspector@0.13.0-canary.4
+
+## 1.11.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: removed websocket transport support
+
+### Patch Changes
+
+- e302f8d: chore: added support for node >= 18 and commonjs
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - @mcp-use/cli@2.6.0-canary.3
+  - @mcp-use/inspector@0.13.0-canary.3
+
 ## 1.10.6
 
 ### Patch Changes
@@ -51,6 +94,31 @@
 - Updated dependencies [b3d69ed]
   - @mcp-use/inspector@0.12.1
   - @mcp-use/cli@2.5.1
+
+## 1.10.1-canary.2
+
+### Patch Changes
+
+- 1b6562a: fix: clear transport when session idle
+  - @mcp-use/cli@2.5.1-canary.2
+  - @mcp-use/inspector@0.12.1-canary.2
+
+## 1.10.1-canary.1
+
+### Patch Changes
+
+- 2bb2278: fix: allow agent to access resources and prompts
+  - @mcp-use/cli@2.5.1-canary.1
+  - @mcp-use/inspector@0.12.1-canary.1
+
+## 1.10.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - @mcp-use/inspector@0.12.1-canary.0
+  - @mcp-use/cli@2.5.1-canary.0
 
 ## 1.10.0
 

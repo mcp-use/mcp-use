@@ -168,10 +168,18 @@ export async function mountWidgetsDev(
     const relativeResourcesPath = pathHelpers
       .relative(widgetTempDir, resourcesPath)
       .replace(/\\/g, "/");
+
+    // Calculate relative path to mcp-use package dynamically
+    const mcpUsePath = pathHelpers.join(getCwd(), "node_modules", "mcp-use");
+    const relativeMcpUsePath = pathHelpers
+      .relative(widgetTempDir, mcpUsePath)
+      .replace(/\\/g, "/");
+
     const cssContent = `@import "tailwindcss";
 
-/* Configure Tailwind to scan the resources directory */
+/* Configure Tailwind to scan the resources directory and mcp-use package */
 @source "${relativeResourcesPath}";
+@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
 `;
     await fs.writeFile(
       pathHelpers.join(widgetTempDir, "styles.css"),

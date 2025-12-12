@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.12.6",
+  "version": "0.13.0-canary.6",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -9,7 +9,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mcp-use/mcp-use.git",
-    "directory": "packages/inspector"
+    "directory": "libraries/typescript/packages/inspector"
   },
   "bugs": {
     "url": "https://github.com/mcp-use/mcp-use/issues"
@@ -56,8 +56,14 @@
     "lint:npm": "npm run lint:fix",
     "lint:pnpm": "pnpm lint:fix"
   },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "peerDependencies": {
-    "express": "^4.21.2 || ^5.0.0"
+    "express": "^4.21.2 || ^5.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "react-router-dom": "^7.0.0"
   },
   "peerDependenciesMeta": {
     "express": {
@@ -98,8 +104,6 @@
     "next-themes": "^0.4.6",
     "open": "^11.0.0",
     "posthog-node": "^5.14.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
     "react-resizable-panels": "^3.0.6",
     "react-router": "^7.9.6",
     "react-syntax-highlighter": "^16.1.0",
@@ -123,6 +127,9 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.6",
     "concurrently": "^9.2.1",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",

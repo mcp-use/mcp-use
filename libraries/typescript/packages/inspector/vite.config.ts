@@ -66,10 +66,23 @@ export default defineConfig({
       util: path.resolve(__dirname, "./src/client/stubs/util.js"),
       path: path.resolve(__dirname, "./src/client/stubs/path.js"),
       process: path.resolve(__dirname, "./src/client/stubs/process.js"),
+      // More specific aliases must come first
+      "node:fs/promises": path.resolve(
+        __dirname,
+        "./src/client/stubs/fs-promises.js"
+      ),
+      "fs/promises": path.resolve(
+        __dirname,
+        "./src/client/stubs/fs-promises.js"
+      ),
+      "node:fs": path.resolve(__dirname, "./src/client/stubs/fs.js"),
+      fs: path.resolve(__dirname, "./src/client/stubs/fs.js"),
       "node:async_hooks": path.resolve(
         __dirname,
         "./src/client/stubs/async_hooks.js"
       ),
+      "node:stream": path.resolve(__dirname, "./src/client/stubs/stream.js"),
+      "node:process": path.resolve(__dirname, "./src/client/stubs/process.js"),
     },
   },
   define: {
@@ -82,12 +95,12 @@ export default defineConfig({
     global: "globalThis",
   },
   optimizeDeps: {
-    include: [
-      "mcp-use/react",
-      "react-syntax-highlighter",
-      "refractor/lib/core",
-    ],
-    exclude: ["posthog-node"], // Exclude Node.js-only packages
+    include: ["mcp-use/react", "react-syntax-highlighter"],
+    exclude: [
+      "posthog-node",
+      "tar", // Node.js file system package
+      "path-scurry", // Node.js path utilities
+    ], // Exclude Node.js-only packages
   },
   ssr: {
     noExternal: ["react-syntax-highlighter", "refractor"],
@@ -96,7 +109,16 @@ export default defineConfig({
     minify: true,
     outDir: "dist/client",
     rollupOptions: {
-      external: ["langfuse-langchain", "langfuse", "@e2b/code-interpreter"],
+      external: [
+        "langfuse-langchain",
+        "langfuse",
+        "@e2b/code-interpreter",
+        "node:stream",
+        "node:process",
+        "child_process",
+        "fs",
+        "os",
+      ],
       onwarn(warning, warn) {
         // Suppress warnings about externalized modules for refractor
         if (

@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.8.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+
 ## 0.8.0
 
 ### Minor Changes
