@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - chore/python/release-action
     paths:
       - "libraries/python/**"
   workflow_dispatch:
@@ -89,49 +90,12 @@ jobs:
         if: steps.compare.outputs.should_draft == 'true'
         run: |
           PREV_TAG="${{ steps.latest-release.outputs.tag }}"
-          LATEST_VERSION="${{ steps.latest-release.outputs.version }}"
           
-          echo "## Unreleased Python Changes" > notes.md
-          echo "" >> notes.md
-          echo "**This is a draft release tracking changes since v$LATEST_VERSION.**" >> notes.md
-          echo "**The actual version number will be determined when published.**" >> notes.md
-          echo "" >> notes.md
+          # Make script executable
+          chmod +x .github/scripts/generate-python-release-notes.sh
           
-          # Get commits since last release that mention "python" (case insensitive)
-          if [ "$PREV_TAG" = "none" ]; then
-            COMMITS=$(git log --oneline --grep="python" --grep="Python" --grep="PYTHON" -E)
-          else
-            COMMITS=$(git log --oneline "$PREV_TAG..HEAD" --grep="python" --grep="Python" --grep="PYTHON" -E)
-          fi
-          
-          if [ -n "$COMMITS" ]; then
-            echo "### Python Changes" >> notes.md
-            echo "" >> notes.md
-            echo "$COMMITS" | while IFS= read -r line; do
-              HASH=$(echo "$line" | awk '{print $1}')
-              MESSAGE=$(echo "$line" | cut -d' ' -f2-)
-              echo "* $MESSAGE (\`$HASH\`)" >> notes.md
-            done
-            echo "" >> notes.md
-          else
-            echo "No commits with 'python' keyword found since last release." >> notes.md
-            echo "" >> notes.md
-          fi
-          
-          # Get contributors
-          echo "### Contributors" >> notes.md
-          echo "" >> notes.md
-          if [ "$PREV_TAG" = "none" ]; then
-            CONTRIBUTORS=$(git log --format='%an' | sort -u)
-          else
-            CONTRIBUTORS=$(git log "$PREV_TAG..HEAD" --format='%an' | sort -u)
-          fi
-          
-          if [ -n "$CONTRIBUTORS" ]; then
-            echo "$CONTRIBUTORS" | while IFS= read -r contributor; do
-              echo "* $contributor" >> notes.md
-            done
-          fi
+          # Generate notes using shared script
+          .github/scripts/generate-python-release-notes.sh "" "$PREV_TAG" "draft" > notes.md
           
           cat notes.md
           
@@ -141,6 +105,8 @@ jobs:
             cat notes.md
             echo EOF
           } >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Draft Release
         if: steps.compare.outputs.should_draft == 'true'
@@ -165,10 +131,11 @@ jobs:
             echo "Fetching release notes from python-draft..."
             DRAFT_BODY=$(gh release view python-draft --json body -q '.body')
             
-            # Update header to include version number
-            UPDATED_BODY=$(echo "$DRAFT_BODY" | sed "s/## Unreleased Python Changes/## What's Changed in v$VERSION/")
-            UPDATED_BODY=$(echo "$UPDATED_BODY" | sed "/This is a draft release tracking changes/d")
-            UPDATED_BODY=$(echo "$UPDATED_BODY" | sed "/The actual version number will be determined/d")
+            # Update header and remove draft-specific text (fix sed chaining)
+            UPDATED_BODY=$(echo "$DRAFT_BODY" | \
+              sed "s/## Draft Release/## What's Changed/" | \
+              sed "/This is a draft release tracking changes/d" | \
+              sed "/The actual version number will be determined/d")
             
             {
               echo 'notes<<EOF'
@@ -178,42 +145,11 @@ jobs:
           else
             echo "No python-draft release found, generating release notes from git history..."
             
-            # Generate notes from git history (fallback for first release or missing draft)
-            echo "## What's Changed in v$VERSION" > notes.md
-            echo "" >> notes.md
+            # Make script executable
+            chmod +x .github/scripts/generate-python-release-notes.sh
             
-            # Get commits since last release that mention "python"
-            if [ "$PREV_TAG" = "none" ]; then
-              COMMITS=$(git log --oneline --grep="python" --grep="Python" --grep="PYTHON" -E)
-            else
-              COMMITS=$(git log --oneline "$PREV_TAG..HEAD" --grep="python" --grep="Python" --grep="PYTHON" -E)
-            fi
-            
-            if [ -n "$COMMITS" ]; then
-              echo "### Python Changes" >> notes.md
-              echo "" >> notes.md
-              echo "$COMMITS" | while IFS= read -r line; do
-                HASH=$(echo "$line" | awk '{print $1}')
-                MESSAGE=$(echo "$line" | cut -d' ' -f2-)
-                echo "* $MESSAGE (\`$HASH\`)" >> notes.md
-              done
-              echo "" >> notes.md
-            fi
-            
-            # Get contributors
-            echo "### Contributors" >> notes.md
-            echo "" >> notes.md
-            if [ "$PREV_TAG" = "none" ]; then
-              CONTRIBUTORS=$(git log --format='%an' | sort -u)
-            else
-              CONTRIBUTORS=$(git log "$PREV_TAG..HEAD" --format='%an' | sort -u)
-            fi
-            
-            if [ -n "$CONTRIBUTORS" ]; then
-              echo "$CONTRIBUTORS" | while IFS= read -r contributor; do
-                echo "* $contributor" >> notes.md
-              done
-            fi
+            # Generate notes using shared script
+            .github/scripts/generate-python-release-notes.sh "$VERSION" "$PREV_TAG" "publish" > notes.md
             
             {
               echo 'notes<<EOF'
@@ -265,7 +201,11 @@ jobs:
         run: |
           # Check if this version exists on PyPI
           VERSION="${{ steps.current-version.outputs.version }}"
-          if uv pip index versions mcp-use | grep -q "Available versions: .*$VERSION"; then
+          
+          # Get all available versions from PyPI and check if our version is in the list
+          PYPI_VERSIONS=$(uv pip index versions mcp-use 2>/dev/null || echo "")
+          
+          if echo "$PYPI_VERSIONS" | grep -qw "$VERSION"; then
             echo "Version $VERSION already exists on PyPI"
             echo "publish_needed=false" >> $GITHUB_OUTPUT
           else
@@ -285,7 +225,15 @@ jobs:
           # Delete the python-draft release after successful publish
           if gh release view python-draft >/dev/null 2>&1; then
             gh release delete python-draft --yes
-            git push --delete origin python-draft || true
+            
+            # Check if the tag exists on the remote before attempting to delete
+            if git ls-remote --tags origin python-draft | grep -q "refs/tags/python-draft$"; then
+              git push --delete origin python-draft
+              echo "Deleted python-draft tag from remote"
+            else
+              echo "No python-draft tag found on remote to delete"
+            fi
+            
             echo "Deleted python-draft release"
           else
             echo "No python-draft release found to delete"
