@@ -9,7 +9,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
 import { useMcpContext } from "../../client/context/McpContext";

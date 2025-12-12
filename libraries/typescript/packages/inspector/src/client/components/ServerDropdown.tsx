@@ -17,7 +17,7 @@ import {
 import type { MCPConnection } from "@/client/context/McpContext";
 import { cn } from "@/client/lib/utils";
 import { ChevronDown, Server, Settings } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ServerIcon } from "./ServerIcon";
 
