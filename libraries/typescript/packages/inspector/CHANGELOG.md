@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.8
+
+### Patch Changes
+
+- 3945a10: fix: widgets
+- Updated dependencies [3945a10]
+- Updated dependencies [3945a10]
+  - mcp-use@1.11.0-canary.8
+
 ## 0.13.0-canary.7
 
 ### Patch Changes
