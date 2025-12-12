@@ -101,8 +101,7 @@
             "icon": "book",
             "groups": [
               {
-                "group": "Getting Started",
-                "icon": "list-start",
+                "group": "Get Started",
                 "pages": [
                   "python/getting-started/quickstart",
                   "python/getting-started/installation",
@@ -112,7 +111,6 @@
               {
                 "group": "MCP Server",
                 "icon": "server",
-                "tag": "Beta",
                 "pages": [
                   "python/server/index",
                   {
@@ -120,7 +118,8 @@
                     "icon": "globe",
                     "pages": [
                       "python/server/compatibility",
-                      "python/server/running"
+                      "python/server/running",
+                      "python/server/sessions"
                     ]
                   },
                   {
@@ -135,6 +134,7 @@
                       "python/server/notifications"
                     ]
                   },
+                  "python/server/middleware",
                   "python/server/router",
                   "python/server/inspector",
                   "python/server/logging",
@@ -373,6 +373,7 @@
                       "python/api-reference/mcp_use_server_logging_state"
                     ]
                   },
+                  "python/api-reference/mcp_use_server_middleware_middleware",
                   "python/api-reference/mcp_use_server_router",
                   "python/api-reference/mcp_use_server_runner",
                   "python/api-reference/mcp_use_server_server",
@@ -451,12 +452,79 @@
             "icon": "book",
             "groups": [
               {
-                "group": "Getting Started",
-                "icon": "list-start",
+                "group": "Get Started",
                 "pages": [
+                  "typescript/getting-started/welcome",
                   "typescript/getting-started/quickstart",
                   "typescript/getting-started/installation",
-                  "typescript/getting-started/configuration"
+                  "typescript/changelog/changelog"
+                ]
+              },
+              {
+                "group": "MCP Agent",
+                "icon": "brain",
+                "pages": [
+                  "typescript/agent/index",
+                  {
+                    "group": "Core Concepts",
+                    "icon": "box",
+                    "pages": [
+                      "typescript/agent/agent-configuration",
+                      "typescript/agent/llm-integration",
+                      "typescript/agent/server-manager"
+                    ]
+                  },
+                  {
+                    "group": "Features",
+                    "icon": "sparkle",
+                    "pages": [
+                      "typescript/agent/structured-output",
+                      "typescript/agent/streaming",
+                      "typescript/agent/interactive-chat-patterns"
+                    ]
+                  },
+                  "typescript/agent/building-custom-agents",
+                  "typescript/agent/observability"
+                ]
+              },
+              {
+                "group": "MCP Client",
+                "icon": "router",
+                "pages": [
+                  "typescript/client/index",
+                  {
+                    "group": "Core Components",
+                    "icon": "box",
+                    "pages": [
+                      "typescript/client/tools",
+                      "typescript/client/resources",
+                      "typescript/client/prompts"
+                    ]
+                  },
+                  {
+                    "group": "Connection",
+                    "icon": "cable",
+                    "pages": [
+                      "typescript/client/client-configuration",
+                      "typescript/client/connection-types",
+                      "typescript/client/sandbox",
+                      "typescript/client/multi-server-setup"
+                    ]
+                  },
+                  {
+                    "group": "Advanced Features",
+                    "icon": "sparkle",
+                    "pages": [
+                      "typescript/client/sampling",
+                      "typescript/client/elicitation",
+                      "typescript/client/notifications",
+                      "typescript/client/logging",
+                      "typescript/client/direct-tool-calls"
+                    ]
+                  },
+                  "typescript/client/authentication",
+                  "typescript/client/usemcp",
+                  "typescript/client/code-mode"
                 ]
               },
               {
@@ -466,50 +534,57 @@
                 "pages": [
                   "typescript/server/index",
                   {
-                    "group": "Overview",
-                    "icon": "globe",
-                    "pages": [
-                      "typescript/server/getting-started",
-                      "typescript/server/templates"
-                    ]
-                  },
-                  {
-                    "group": "Core Features",
-                    "icon": "list-plus",
+                    "group": "Core Components",
+                    "icon": "box",
                     "pages": [
                       "typescript/server/tools",
                       "typescript/server/resources",
-                      "typescript/server/prompts",
-                      "typescript/server/notifications",
-                      "typescript/server/api-reference"
+                      "typescript/server/prompts"
+                    ]
+                  },
+                  "typescript/server/response-helpers",
+                  {
+                    "group": "UI Widgets",
+                    "icon": "app-window-mac",
+                    "tag": "Apps SDK",
+                    "pages": [
+                      "typescript/server/ui-widgets",
+                      "typescript/server/widget-components/usewidget",
+                      "typescript/server/widget-components/mcpuseprovider",
+                      "typescript/server/widget-components/widgetcontrols",
+                      "typescript/server/widget-components/errorboundary",
+                      "typescript/server/widget-components/image",
+                      "typescript/server/widget-components/themeprovider",
+                      "typescript/server/mcp-ui-resources"
                     ]
                   },
                   {
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
-                      "typescript/server/authentication",
-                      "typescript/server/elicitation"
+                      "typescript/server/configuration",
+                      "typescript/server/elicitation",
+                      "typescript/server/sampling",
+                      "typescript/server/subscriptions",
+                      "typescript/server/notifications",
+                      "typescript/server/logging"
                     ]
                   },
                   {
-                    "group": "UI Widgets",
-                    "icon": "palette",
-                    "tag": "Apps SDK",
+                    "group": "Authentication",
+                    "icon": "shield",
                     "pages": [
-                      "typescript/server/ui-widgets",
-                      "typescript/server/mcp-ui-resources",
-                      "typescript/server/apps-sdk-resources",
+                      "typescript/server/authentication/index",
+                      "typescript/server/authentication/user-context",
                       {
-                        "group": "Components & Hooks",
-                        "icon": "component",
+                        "group": "OAuth Providers",
+                        "icon": "plug",
                         "pages": [
-                          "typescript/server/widget-components/mcpuseprovider",
-                          "typescript/server/widget-components/widgetcontrols",
-                          "typescript/server/widget-components/usewidget",
-                          "typescript/server/widget-components/errorboundary",
-                          "typescript/server/widget-components/image",
-                          "typescript/server/widget-components/themeprovider"
+                          "typescript/server/authentication/providers/auth0",
+                          "typescript/server/authentication/providers/workos",
+                          "typescript/server/authentication/providers/supabase",
+                          "typescript/server/authentication/providers/keycloak",
+                          "typescript/server/authentication/providers/custom"
                         ]
                       }
                     ]
@@ -525,76 +600,10 @@
                 ]
               },
               {
-                "group": "MCP Client",
-                "icon": "router",
-                "pages": [
-                  {
-                    "group": "Overview",
-                    "icon": "globe",
-                    "pages": [
-                      "typescript/client/client-configuration",
-                      "typescript/client/connection-types",
-                      "typescript/client/sandbox",
-                      "typescript/client/direct-tool-calls"
-                    ]
-                  },
-                  {
-                    "group": "Core Features",
-                    "icon": "list-plus",
-                    "pages": [
-                      "typescript/client/multi-server-setup",
-                      "typescript/client/tools",
-                      "typescript/client/resources",
-                      "typescript/client/prompts"
-                    ]
-                  },
-                  {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
-                    "pages": [
-                      "typescript/client/sampling",
-                      "typescript/client/elicitation",
-                      "typescript/client/notifications",
-                      "typescript/client/logging"
-                    ]
-                  },
-                  "typescript/client/authentication",
-                  "typescript/client/usemcp",
-                  "typescript/client/code-mode"
-                ]
-              },
-              {
-                "group": "MCP Agents",
-                "icon": "brain",
-                "pages": [
-                  {
-                    "group": "Overview",
-                    "icon": "globe",
-                    "pages": [
-                      "typescript/agent/agent-configuration",
-                      "typescript/agent/llm-integration"
-                    ]
-                  },
-                  {
-                    "group": "Core Features",
-                    "icon": "list-plus",
-                    "pages": [
-                      "typescript/agent/structured-output",
-                      "typescript/agent/streaming",
-                      "typescript/agent/interactive-chat-patterns"
-                    ]
-                  },
-                  "typescript/agent/server-manager",
-                  "typescript/agent/building-custom-agents",
-                  "typescript/agent/observability"
-                ]
-              },
-              {
                 "group": "Development",
-                "icon": "sparkle",
+                "icon": "folder-code",
                 "pages": [
-                  "typescript/development/logging",
-                  "typescript/development/security",
+                  "/inspector/index",
                   "tunneling/index"
                 ]
               }
@@ -611,11 +620,9 @@
             "groups": [
               {
                 "group": "Changelog",
-                "pages": []
-              },
-              {
-                "group": "Versions",
-                "pages": []
+                "pages": [
+                  "typescript/changelog/changelog"
+                ]
               }
             ]
           },
@@ -648,6 +655,12 @@
       }
     ]
   },
+  "redirects": [
+    {
+      "source": "/typescript/getting-started",
+      "destination": "/typescript/getting-started/quickstart"
+    }
+  ],
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"

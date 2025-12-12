@@ -1,7 +1,7 @@
 ---
 title: "Configuration"
 description: "Advanced configuration and deployment options"
-icon: "gear"
+icon: "cog"
 ---
 
 # Configuration
@@ -15,9 +15,10 @@ This guide covers advanced configuration options, deployment strategies, and bes
 The server accepts configuration during initialization:
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',              // Semantic version
   description: 'Server purpose',  // Human-readable description
   host: 'localhost',             // Hostname (defaults to 'localhost')
@@ -56,7 +57,8 @@ const config = {
   baseUrl: process.env.MCP_URL
 }
 
-const server = createMCPServer('configured-server', {
+const server = new MCPServer({
+  name: 'configured-server',
   version: '1.0.0',
   description: `Server running in ${config.environment} mode`
 })
@@ -94,7 +96,8 @@ Load configuration from JSON or YAML:
 // Load in server
 import config from './config.json'
 
-const server = createMCPServer(config.server.name, {
+const server = new MCPServer({
+  name: config.server.name,
   version: config.server.version
 })
 
@@ -286,16 +289,18 @@ The server supports DNS rebinding protection through the `allowedOrigins` config
 **Example Configuration:**
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
 // Development: No configuration needed (allows all origins)
-const devServer = createMCPServer('dev-server', {
+const devServer = new MCPServer({
+  name: 'dev-server',
   version: '1.0.0'
 })
 // Works with direct browser connections, inspector, etc.
 
 // Production: Explicitly set allowed origins
-const prodServer = createMCPServer('prod-server', {
+const prodServer = new MCPServer({
+  name: 'prod-server',
   version: '1.0.0',
   allowedOrigins: [
     'https://myapp.com',
@@ -306,7 +311,8 @@ const prodServer = createMCPServer('prod-server', {
 // Only allows connections from these specific origins
 
 // Environment-based configuration
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   allowedOrigins: process.env.NODE_ENV === 'production'
     ? process.env.ALLOWED_ORIGINS?.split(',') || []
@@ -340,18 +346,20 @@ By default, the server automatically creates a new session when it receives a re
 According to the [MCP protocol specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management), clients **MUST** start a new session by sending a new `InitializeRequest` when they receive HTTP 404 in response to a request containing an `MCP-Session-Id`. However, some clients (like ChatGPT) don't properly implement this behavior and fail to reconnect.
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
 // Default behavior (compatible with ChatGPT and other non-compliant clients)
 // Automatically creates new session when invalid session ID is detected
-const compatibleServer = createMCPServer('my-server', {
+const compatibleServer = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   autoCreateSessionOnInvalidId: true  // Default: true
 })
 
 // Use strict MCP spec behavior (requires compliant clients)
 // Returns 404 for invalid session IDs, requires explicit initialize
-const specCompliantServer = createMCPServer('my-server', {
+const specCompliantServer = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   autoCreateSessionOnInvalidId: false  // Strict MCP spec compliance
 })
@@ -375,7 +383,8 @@ const specCompliantServer = createMCPServer('my-server', {
 
 ```typescript
 // Server with auto-reconnection enabled
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   sessionIdleTimeoutMs: 300000,  // 5 minutes
   autoCreateSessionOnInvalidId: true  // Auto-create on invalid session
@@ -838,7 +847,7 @@ Configure MCP clients to connect to your server:
 
 ## Next Steps
 
-- [Getting Started](./getting-started) - Initial setup
+- [Getting Started](/typescript/getting-started/quickstart) - Initial setup
 - [API Reference](./api-reference) - Complete API docs
 - [Examples](./examples) - Real-world implementations
 - [UI Widgets](./ui-widgets) - Widget configuration

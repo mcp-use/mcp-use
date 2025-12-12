@@ -1,0 +1,127 @@
+---
+title: "Keycloak Provider"
+description: "Configure Keycloak OAuth"
+icon: "); -webkit-mask-image: url('https://simpleicons.org/icons/keycloak.svg'); mask-image: url('https://simpleicons.org/icons/keycloak.svg');/*"
+---
+
+## Setup
+
+### 1. Install Keycloak
+
+Choose your deployment method:
+
+**Docker:**
+```bash
+docker run -p 8080:8080 \
+  -e KEYCLOAK_ADMIN=admin \
+  -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  quay.io/keycloak/keycloak:latest start-dev
+```
+
+**Or use existing Keycloak instance**
+
+### 2. Create Realm
+
+1. Open Keycloak Admin Console (http://localhost:8080)
+2. Click **Add Realm** or select existing realm
+3. Set Realm Name (e.g., "my-realm")
+
+### 3. Create Client
+
+1. Go to **Clients** → **Create**
+2. Set **Client ID**: `my-mcp-server`
+3. Set **Client Protocol**: `openid-connect`
+4. Click **Save**
+
+**Configure Client:**
+- **Access Type**: `confidential` (for server-side) or `public` (for SPA)
+- **Valid Redirect URIs**: `http://localhost:3000/callback`, `https://yourdomain.com/callback`
+- **Web Origins**: `http://localhost:3000`, `https://yourdomain.com`
+- Save and note the **Client Secret** from Credentials tab
+
+### 4. Create Users and Roles
+
+**Create Realm Roles:**
+1. Go to **Roles** → **Add Role**
+2. Create roles: `admin`, `editor`, `viewer`
+
+**Create Users:**
+1. Go to **Users** → **Add User**
+2. Set username, email, enable user
+3. In **Credentials** tab, set password
+4. In **Role Mappings** tab, assign roles
+
+## Configuration
+
+### Basic Configuration
+
+```typescript
+import { McpServer, keycloak } from 'mcp-use/server'
+
+const server = new McpServer({
+  name: 'my-server',
+  version: '1.0.0',
+  oauth: keycloak({
+    serverUrl: process.env.MCP_USE_OAUTH_KEYCLOAK_SERVER_URL!, // 'https://keycloak.example.com'
+    realm: process.env.MCP_USE_OAUTH_KEYCLOAK_REALM!,          // 'my-realm'
+    clientId: process.env.MCP_USE_OAUTH_KEYCLOAK_CLIENT_ID!,   // 'my-mcp-server'
+  })
+})
+
+await server.listen(3000)
+```
+
+### Environment Variables
+
+```bash
+# .env
+MCP_USE_OAUTH_KEYCLOAK_SERVER_URL=http://localhost:8080
+MCP_USE_OAUTH_KEYCLOAK_REALM=my-realm
+MCP_USE_OAUTH_KEYCLOAK_CLIENT_ID=my-mcp-server
+```
+
+### Full Configuration Options
+
+```typescript
+const server = new McpServer({
+  oauth: keycloak({
+    // Required
+    serverUrl: 'https://keycloak.example.com',
+    realm: 'my-realm',
+    clientId: 'my-mcp-server',
+    
+    // Optional
+    clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
+    
+    // OAuth mode: 'proxy' (default) or 'direct'
+    mode: 'proxy',
+    
+    // JWT verification
+    verifyJwt: process.env.NODE_ENV === 'production',
+    
+    // Custom scopes
+    scopes: ['openid', 'profile', 'email', 'roles'],
+    
+    // Custom user info extraction
+    getUserInfo: (payload) => ({
+      userId: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      username: payload.preferred_username,
+      roles: payload.realm_access?.roles || [],
+      clientRoles: payload.resource_access?.[clientId]?.roles || [],
+    })
+  })
+})
+```
+
+## Resources
+
+- [Keycloak Documentation](https://www.keycloak.org/documentation)
+- [Keycloak Authorization Services](https://www.keycloak.org/docs/latest/authorization_services/)
+- [Keycloak Client Roles](https://www.keycloak.org/docs/latest/server_admin/#client-roles)
+
+## Next Steps
+
+- [User Context](/typescript/server/authentication/user-context) - Access user information
+

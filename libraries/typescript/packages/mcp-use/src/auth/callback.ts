@@ -1,5 +1,5 @@
 // callback.ts
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth } from "@mcp-use/modelcontextprotocol-sdk/client/auth.js";
 import { BrowserOAuthClientProvider } from "./browser-provider.js"; // Adjust path
 import type { StoredState } from "./types.js"; // Adjust path, ensure definition includes providerOptions
 
@@ -153,18 +153,57 @@ export async function onMcpAuthorization() {
 
     // Display error in the callback window
     try {
-      document.body.innerHTML = `
-            <div style="font-family: sans-serif; padding: 20px;">
-            <h1>Authentication Error</h1>
-            <p style="color: red; background-color: #ffebeb; border: 1px solid red; padding: 10px; border-radius: 4px;">
-                ${errorMessage}
-            </p>
-            <p>You can close this window or <a href="#" onclick="window.close(); return false;">click here to close</a>.</p>
-            <pre style="font-size: 0.8em; color: #555; margin-top: 20px; white-space: pre-wrap;">${
-              err instanceof Error ? err.stack : ""
-            }</pre>
-            </div>
-        `;
+      // Clear body content safely
+      document.body.innerHTML = "";
+
+      // Create container div
+      const container = document.createElement("div");
+      container.style.fontFamily = "sans-serif";
+      container.style.padding = "20px";
+
+      // Create heading
+      const heading = document.createElement("h1");
+      heading.textContent = "Authentication Error";
+      container.appendChild(heading);
+
+      // Create error message paragraph
+      const errorPara = document.createElement("p");
+      errorPara.style.color = "red";
+      errorPara.style.backgroundColor = "#ffebeb";
+      errorPara.style.border = "1px solid red";
+      errorPara.style.padding = "10px";
+      errorPara.style.borderRadius = "4px";
+      errorPara.textContent = errorMessage; // Safely set as text content
+      container.appendChild(errorPara);
+
+      // Create close instruction paragraph
+      const closePara = document.createElement("p");
+      closePara.textContent = "You can close this window or ";
+      const closeLink = document.createElement("a");
+      closeLink.href = "#";
+      closeLink.textContent = "click here to close";
+      closeLink.onclick = (e) => {
+        e.preventDefault();
+        window.close();
+        return false;
+      };
+      closePara.appendChild(closeLink);
+      closePara.appendChild(document.createTextNode("."));
+      container.appendChild(closePara);
+
+      // Create stack trace pre element if available
+      if (err instanceof Error && err.stack) {
+        const stackPre = document.createElement("pre");
+        stackPre.style.fontSize = "0.8em";
+        stackPre.style.color = "#555";
+        stackPre.style.marginTop = "20px";
+        stackPre.style.whiteSpace = "pre-wrap";
+        stackPre.textContent = err.stack; // Safely set as text content
+        container.appendChild(stackPre);
+      }
+
+      // Append container to body
+      document.body.appendChild(container);
     } catch (displayError) {
       console.error(
         `${logPrefix} Could not display error in callback window:`,

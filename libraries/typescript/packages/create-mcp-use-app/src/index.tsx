@@ -397,6 +397,15 @@ program
           process.exit(0);
         }
 
+        // Validate that --dev and --canary are mutually exclusive
+        if (options.dev && options.canary) {
+          console.error(chalk.red("❌ Cannot use --dev and --canary together"));
+          console.error(
+            chalk.yellow("   Please choose only one dependency mode")
+          );
+          process.exit(1);
+        }
+
         let selectedTemplate = options.template;
 
         // If no project name provided, prompt for it

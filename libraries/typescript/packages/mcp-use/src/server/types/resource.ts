@@ -1,6 +1,12 @@
-import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  ReadResourceResult,
+  CallToolResult,
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { ResourceAnnotations } from "./common.js";
+import type { ToolAnnotations } from "./tool.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
+import type { TypedCallToolResult } from "../utils/response-helpers.js";
+import type { McpContext } from "./context.js";
 
 // UIResourceContent type from MCP-UI
 export type UIResourceContent = {
@@ -78,12 +84,74 @@ export interface AppsSdkToolMetadata extends Record<string, unknown> {
   "openai/resultCanProduceWidget"?: boolean;
 }
 
-// Callback types
-export type ReadResourceCallback = () => Promise<ReadResourceResult>;
-export type ReadResourceTemplateCallback = (
-  uri: URL,
-  params: Record<string, any>
-) => Promise<ReadResourceResult>;
+/**
+ * Enhanced Resource Context that provides access to request context.
+ *
+ * This unified context provides:
+ * - `auth` - Authentication info (when OAuth is configured)
+ * - `req` - Hono request object
+ * - All other Hono Context properties and methods
+ *
+ * @template HasOAuth - Whether OAuth is configured (affects auth availability)
+ */
+export type EnhancedResourceContext<HasOAuth extends boolean = false> =
+  McpContext<HasOAuth>;
+
+/**
+ * Helper interface for bivariant parameter checking on resource callbacks.
+ * @internal
+ */
+interface ReadResourceCallbackBivariant<HasOAuth extends boolean> {
+  bivarianceHack(
+    ctx: EnhancedResourceContext<HasOAuth>
+  ): Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
+}
+
+/**
+ * Callback type for reading a static resource.
+ * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
+ *
+ * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
+ */
+export type ReadResourceCallback<HasOAuth extends boolean = false> =
+  ReadResourceCallbackBivariant<HasOAuth>["bivarianceHack"];
+
+/**
+ * Callback type for reading a resource template with parameters.
+ * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
+ *
+ * Supports multiple callback signatures:
+ * - `async () => ...` - No parameters
+ * - `async (uri: URL) => ...` - Just URI (required)
+ * - `async (uri: URL, params: Record<string, any>) => ...` - URI and parameters (both required)
+ * - `async (uri: URL, params: Record<string, any>, ctx: EnhancedResourceContext) => ...` - All parameters (all required)
+ *
+ * The implementation checks callback.length to determine which signature to use.
+ *
+ * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
+ */
+export type ReadResourceTemplateCallback<HasOAuth extends boolean = false> =
+  | (() => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL,
+      params: Record<string, any>
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >)
+  | ((
+      uri: URL,
+      params: Record<string, any>,
+      ctx: EnhancedResourceContext<HasOAuth>
+    ) => Promise<
+      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+    >);
 
 /**
  * Configuration for a resource template
@@ -99,17 +167,83 @@ export interface ResourceTemplateConfig {
   description?: string;
 }
 
-export interface ResourceTemplateDefinition {
+/**
+ * Resource template definition with readCallback (old API)
+ */
+export interface ResourceTemplateDefinition<HasOAuth extends boolean = false> {
   name: string;
   resourceTemplate: ResourceTemplateConfig;
   title?: string;
   description?: string;
   annotations?: ResourceAnnotations;
-  readCallback: ReadResourceTemplateCallback;
+  readCallback: ReadResourceTemplateCallback<HasOAuth>;
   _meta?: Record<string, unknown>;
 }
 
-export interface ResourceDefinition {
+/**
+ * Resource template definition without readCallback (new API with separate callback parameter)
+ */
+export interface ResourceTemplateDefinitionWithoutCallback {
+  name: string;
+  resourceTemplate: ResourceTemplateConfig;
+  title?: string;
+  description?: string;
+  annotations?: ResourceAnnotations;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Flat resource template definition with readCallback (new API)
+ *
+ * Simplified structure where uriTemplate is directly on the definition object
+ * instead of nested in a resourceTemplate property.
+ */
+export interface FlatResourceTemplateDefinition<
+  HasOAuth extends boolean = false,
+> {
+  /** Unique identifier for the template */
+  name: string;
+  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  uriTemplate: string;
+  /** Optional title for the resource */
+  title?: string;
+  /** Optional description of the resource */
+  description?: string;
+  /** MIME type of the resource content */
+  mimeType?: string;
+  /** Optional annotations for the resource */
+  annotations?: ResourceAnnotations;
+  /** Async callback function that returns the resource content */
+  readCallback: ReadResourceTemplateCallback<HasOAuth>;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Flat resource template definition without readCallback (new API with separate callback parameter)
+ *
+ * Simplified structure where uriTemplate is directly on the definition object
+ * instead of nested in a resourceTemplate property.
+ */
+export interface FlatResourceTemplateDefinitionWithoutCallback {
+  /** Unique identifier for the template */
+  name: string;
+  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  uriTemplate: string;
+  /** Optional title for the resource */
+  title?: string;
+  /** Optional description of the resource */
+  description?: string;
+  /** MIME type of the resource content */
+  mimeType?: string;
+  /** Optional annotations for the resource */
+  annotations?: ResourceAnnotations;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Resource definition with readCallback (old API)
+ */
+export interface ResourceDefinition<HasOAuth extends boolean = false> {
   /** Unique identifier for the resource */
   name: string;
   /** URI pattern for accessing the resource (e.g., 'config://app-settings') */
@@ -118,12 +252,32 @@ export interface ResourceDefinition {
   title?: string;
   /** Optional description of the resource */
   description?: string;
-  /** MIME type of the resource content (required) */
+  /** MIME type of the resource content (required for old API) */
   mimeType: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   /** Async callback function that returns the resource content */
-  readCallback: ReadResourceCallback;
+  readCallback: ReadResourceCallback<HasOAuth>;
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Resource definition without readCallback (new API with separate callback parameter)
+ * MIME type is optional when using response helpers - it's inferred from the helper
+ */
+export interface ResourceDefinitionWithoutCallback {
+  /** Unique identifier for the resource */
+  name: string;
+  /** URI pattern for accessing the resource (e.g., 'config://app-settings') */
+  uri: string;
+  /** Optional title for the resource */
+  title?: string;
+  /** Optional description of the resource */
+  description?: string;
+  /** MIME type (optional - inferred from response helpers like text(), object(), etc.) */
+  mimeType?: string;
+  /** Optional annotations for the resource */
+  annotations?: ResourceAnnotations;
   _meta?: Record<string, unknown>;
 }
 
@@ -134,7 +288,7 @@ export interface WidgetProps {
   [key: string]: {
     type: "string" | "number" | "boolean" | "object" | "array";
     required?: boolean;
-    default?: any;
+    default?: unknown;
     description?: string;
   };
 }
@@ -167,6 +321,10 @@ interface BaseUIResourceDefinition {
   annotations?: ResourceAnnotations;
   /** Encoding for the resource content (defaults to 'text') */
   encoding?: UIEncoding;
+  /** Control automatic tool registration (defaults to true) */
+  exposeAsTool?: boolean;
+  /** Tool annotations when registered as a tool */
+  toolAnnotations?: ToolAnnotations;
 
   _meta?: Record<string, unknown>;
 }

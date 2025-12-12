@@ -4,6 +4,7 @@ import platform
 import time
 import uuid
 from collections.abc import Callable
+from dataclasses import asdict
 from functools import wraps
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,24 @@ from posthog import Posthog
 from scarf import ScarfEventLogger
 
 from mcp_use.logging import MCP_USE_DEBUG
-from mcp_use.telemetry.events import BaseTelemetryEvent, FeatureUsageEvent, MCPAgentExecutionEvent
+from mcp_use.telemetry.events import (
+    ConnectorInitEvent,
+    GenericTelemetryEvent,
+    MCPAgentExecutionEvent,
+    MCPClientInitEvent,
+    ServerContextEvent,
+    ServerInitializeEvent,
+    ServerPromptCallEvent,
+    ServerResourceCallEvent,
+    ServerRunEvent,
+    ServerToolCallEvent,
+    TelemetryClientInfo,
+    TelemetryContent,
+    TelemetryEvent,
+    TelemetryPrompt,
+    TelemetryResource,
+    TelemetryTool,
+)
 from mcp_use.telemetry.utils import get_package_version
 from mcp_use.utils import singleton
 
@@ -31,12 +49,17 @@ def requires_telemetry(func: Callable) -> Callable:
     return wrapper
 
 
-def telemetry(feature_name: str, additional_properties: dict[str, Any] | None = None):
+def telemetry(event_name: str, additional_properties: dict[str, Any] | None = None):
     """Decorator to automatically track feature usage"""
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(self, *args, **kwargs):
+            # Check if telemetry is disabled on this instance
+            record_telemetry = getattr(self, "_record_telemetry", None)
+            if record_telemetry is not None and not record_telemetry:
+                return func(self, *args, **kwargs)
+
             start_time = time.time()
             success = True
             error_type = None
@@ -51,25 +74,25 @@ def telemetry(feature_name: str, additional_properties: dict[str, Any] | None = 
             finally:
                 execution_time_ms = int((time.time() - start_time) * 1000)
 
-                # Get telemetry instance (try common patterns)
                 telemetry = None
                 if hasattr(self, "telemetry"):
                     telemetry = self.telemetry
                 elif hasattr(self, "_telemetry"):
                     telemetry = self._telemetry
                 else:
-                    # Fallback to singleton instance
                     telemetry = Telemetry()
 
                 if telemetry:
-                    telemetry.telemetry(
-                        feature_name=feature_name,
-                        class_name=self.__class__.__name__,
-                        method_name=func.__name__,
-                        success=success,
-                        execution_time_ms=execution_time_ms,
-                        error_type=error_type,
-                        additional_properties=additional_properties,
+                    telemetry.capture(
+                        event=GenericTelemetryEvent(
+                            EVENT_NAME=event_name,
+                            **{
+                                **(additional_properties or {}),
+                                "success": success,
+                                "execution_time_ms": execution_time_ms,
+                                "error_type": error_type,
+                            },
+                        )
                     )
 
         return wrapper
@@ -145,7 +168,7 @@ class Telemetry:
                 self._scarf_client = ScarfEventLogger(
                     endpoint_url=self.SCARF_GATEWAY_URL,
                     timeout=3.0,
-                    verbose=MCP_USE_DEBUG >= 2,
+                    verbose=False,
                 )
 
                 # Silence scarf's logging unless debug mode (level 2)
@@ -192,32 +215,74 @@ class Telemetry:
         return self._curr_user_id
 
     @requires_telemetry
-    def capture(self, event: BaseTelemetryEvent, provider: str = "posthog+scarf") -> None:
-        """Capture a telemetry event"""
+    def capture(self, event: TelemetryEvent, provider: str = "posthog+scarf") -> None:
+        """Capture a telemetry event from a dataclass
+
+        Args:
+            event: Event dataclass with EVENT_NAME attribute
+            provider: Which telemetry providers to send to ("posthog", "scarf", or "posthog+scarf")
+        """
+        # Populate base event fields with runtime values
+        event.mcp_use_version = get_package_version()
+
+        # Get event name - handle both class attribute and property
+        event_name = getattr(event, "EVENT_NAME", None)
+        if event_name is None or callable(event_name):
+            event_name = event.EVENT_NAME  # For property case like ServerContextEvent
+
+        # Convert event to dict using dataclasses.asdict()
+        properties = asdict(event)
+
         # Send to PostHog
         if "posthog" in provider and self._posthog_client:
             try:
-                # Add package version to all events
-                properties = event.properties.copy()
-                properties["mcp_use_version"] = get_package_version()
-
-                self._posthog_client.capture(distinct_id=self.user_id, event=event.name, properties=properties)
+                self._posthog_client.capture(distinct_id=self.user_id, event=event_name, properties=properties)
             except Exception as e:
-                logger.debug(f"Failed to track PostHog event {event.name}: {e}")
+                logger.debug(f"Failed to track PostHog event {event_name}: {e}")
 
         # Send to Scarf
         if "scarf" in provider and self._scarf_client:
             try:
-                # Add package version and user_id to all events
-                properties = {}
-                properties["mcp_use_version"] = get_package_version()
-                properties["user_id"] = self.user_id
-                properties["event"] = event.name
-
+                # Add user_id and event name for Scarf
+                scarf_props = {
+                    "user_id": self.user_id,
+                    "event": event_name,
+                    **properties,
+                }
                 # Convert complex types to simple types for Scarf compatibility
-                self._scarf_client.log_event(properties=properties)
+                self._scarf_client.log_event(properties=scarf_props)
             except Exception as e:
-                logger.debug(f"Failed to track Scarf event {event.name}: {e}")
+                logger.debug(f"Failed to track Scarf event {event_name}: {e}")
+
+    @requires_telemetry
+    def flush(self) -> None:
+        """Flush any queued telemetry events"""
+        # Flush PostHog
+        if self._posthog_client:
+            try:
+                self._posthog_client.flush()
+                logger.debug("PostHog client telemetry queue flushed")
+            except Exception as e:
+                logger.debug(f"Failed to flush PostHog client: {e}")
+
+        # Scarf events are sent immediately, no flush needed
+        if self._scarf_client:
+            logger.debug("Scarf telemetry events sent immediately (no flush needed)")
+
+    @requires_telemetry
+    def shutdown(self) -> None:
+        """Shutdown telemetry clients and flush remaining events"""
+        # Shutdown PostHog
+        if self._posthog_client:
+            try:
+                self._posthog_client.shutdown()
+                logger.debug("PostHog client shutdown successfully")
+            except Exception as e:
+                logger.debug(f"Error shutting down PostHog client: {e}")
+
+        # Scarf doesn't require explicit shutdown
+        if self._scarf_client:
+            logger.debug("Scarf telemetry client shutdown (no action needed)")
 
     @requires_telemetry
     def track_package_download(self, properties: dict[str, Any] | None = None) -> None:
@@ -296,6 +361,7 @@ class Telemetry:
         event = MCPAgentExecutionEvent(
             execution_method=execution_method,
             query=query,
+            query_length=len(query),
             success=success,
             model_provider=model_provider,
             model_name=model_name,
@@ -313,61 +379,179 @@ class Telemetry:
             tools_used_count=tools_used_count,
             tools_used_names=tools_used_names,
             response=response,
+            response_length=len(response) if response else None,
             execution_time_ms=execution_time_ms,
             error_type=error_type,
             conversation_history_length=conversation_history_length,
         )
-        self.capture(event)
+        self.capture(event, provider="posthog")
 
     @requires_telemetry
-    def telemetry(
+    def track_server_run(
         self,
-        feature_name: str,
-        class_name: str,
-        method_name: str,
-        success: bool,
-        execution_time_ms: int | None = None,
-        error_type: str | None = None,
-        additional_properties: dict[str, Any] | None = None,
+        transport: str,
+        tools_number: int,
+        resources_number: int,
+        prompts_number: int,
+        auth: bool,
+        name: str,
+        description: str | None = None,
+        base_url: str | None = None,
+        tool_names: list[str] | None = None,
+        resource_names: list[str] | None = None,
+        prompt_names: list[str] | None = None,
+        tools: list[TelemetryTool] | None = None,
+        resources: list[TelemetryResource] | None = None,
+        prompts: list[TelemetryPrompt] | None = None,
+        templates: list[TelemetryPrompt] | None = None,
+        capabilities: str | None = None,
+        apps_sdk_resources: str | None = None,
+        mcp_ui_resources: str | None = None,
     ) -> None:
-        """Track feature usage across the library"""
-        event = FeatureUsageEvent(
-            feature_name=feature_name,
-            class_name=class_name,
-            method_name=method_name,
-            success=success,
-            execution_time_ms=execution_time_ms,
-            error_type=error_type,
-            additional_properties=additional_properties,
+        """Track server startup with full configuration"""
+        event = ServerRunEvent(
+            transport=transport,
+            tools_number=tools_number,
+            resources_number=resources_number,
+            prompts_number=prompts_number,
+            auth=auth,
+            name=name,
+            description=description,
+            base_url=base_url,
+            tool_names=tool_names,
+            resource_names=resource_names,
+            prompt_names=prompt_names,
+            tools=tools,
+            resources=resources,
+            prompts=prompts,
+            templates=templates,
+            capabilities=capabilities,
+            apps_sdk_resources=apps_sdk_resources,
+            mcp_ui_resources=mcp_ui_resources,
         )
         self.capture(event, provider="posthog")
 
     @requires_telemetry
-    def flush(self) -> None:
-        """Flush any queued telemetry events"""
-        # Flush PostHog
-        if self._posthog_client:
-            try:
-                self._posthog_client.flush()
-                logger.debug("PostHog client telemetry queue flushed")
-            except Exception as e:
-                logger.debug(f"Failed to flush PostHog client: {e}")
-
-        # Scarf events are sent immediately, no flush needed
-        if self._scarf_client:
-            logger.debug("Scarf telemetry events sent immediately (no flush needed)")
+    def track_server_initialize(
+        self,
+        protocol_version: str,
+        client_info: TelemetryClientInfo,
+        client_capabilities: str,
+        session_id: str | None = None,
+    ) -> None:
+        """Track server initialization call"""
+        event = ServerInitializeEvent(
+            protocol_version=protocol_version,
+            client_info=client_info,
+            client_capabilities=client_capabilities,
+            session_id=session_id,
+        )
+        self.capture(event, provider="posthog")
 
     @requires_telemetry
-    def shutdown(self) -> None:
-        """Shutdown telemetry clients and flush remaining events"""
-        # Shutdown PostHog
-        if self._posthog_client:
-            try:
-                self._posthog_client.shutdown()
-                logger.debug("PostHog client shutdown successfully")
-            except Exception as e:
-                logger.debug(f"Error shutting down PostHog client: {e}")
+    def track_server_tool_call(
+        self,
+        tool_name: str,
+        length_input_argument: int,
+        success: bool,
+        error_type: str | None = None,
+        execution_time_ms: int | None = None,
+    ) -> None:
+        """Track server tool call"""
+        event = ServerToolCallEvent(
+            tool_name=tool_name,
+            length_input_argument=length_input_argument,
+            success=success,
+            error_type=error_type,
+            execution_time_ms=execution_time_ms,
+        )
+        self.capture(event, provider="posthog")
 
-        # Scarf doesn't require explicit shutdown
-        if self._scarf_client:
-            logger.debug("Scarf telemetry client shutdown (no action needed)")
+    @requires_telemetry
+    def track_server_resource_call(
+        self,
+        name: str,
+        description: str | None,
+        contents: list[TelemetryContent],
+        success: bool,
+        error_type: str | None = None,
+    ) -> None:
+        """Track server resource call"""
+        event = ServerResourceCallEvent(
+            name=name,
+            description=description,
+            contents=contents,
+            success=success,
+            error_type=error_type,
+        )
+        self.capture(event, provider="posthog")
+
+    @requires_telemetry
+    def track_server_prompt_call(
+        self,
+        name: str,
+        description: str | None,
+        success: bool,
+        error_type: str | None = None,
+    ) -> None:
+        """Track server prompt call"""
+        event = ServerPromptCallEvent(
+            name=name,
+            description=description,
+            success=success,
+            error_type=error_type,
+        )
+        self.capture(event, provider="posthog")
+
+    @requires_telemetry
+    def track_server_context(
+        self,
+        context_type: str,
+        notification_type: str | None = None,
+    ) -> None:
+        """Track server context operations (sample, elicit, notification)"""
+        event = ServerContextEvent(
+            context_type=context_type,
+            notification_type=notification_type,
+        )
+        self.capture(event, provider="posthog")
+
+    @requires_telemetry
+    def track_client_init(
+        self,
+        code_mode: bool,
+        sandbox: bool,
+        all_callbacks: bool,
+        verify: bool,
+        servers: list[str],
+        num_servers: int,
+    ) -> None:
+        """Track MCP client initialization"""
+        event = MCPClientInitEvent(
+            code_mode=code_mode,
+            sandbox=sandbox,
+            all_callbacks=all_callbacks,
+            verify=verify,
+            servers=servers,
+            num_servers=num_servers,
+        )
+        self.capture(event, provider="posthog")
+
+    @requires_telemetry
+    def track_connector_init(
+        self,
+        connector_type: str,
+        server_command: str | None = None,
+        server_args: list[str] | None = None,
+        server_url: str | None = None,
+        public_identifier: str | None = None,
+    ) -> None:
+        """Track connector initialization"""
+        event = ConnectorInitEvent(
+            connector_type=connector_type,
+            server_command=server_command,
+            server_args=server_args,
+            server_url=server_url,
+            public_identifier=public_identifier,
+        )
+        self.capture(event, provider="posthog")

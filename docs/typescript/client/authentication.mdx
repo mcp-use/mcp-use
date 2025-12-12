@@ -1,15 +1,25 @@
 ---
 title: "Authentication"
-description: "mcp-use supports multiple authentication methods for MCP servers, including OAuth 2.0 with automatic Dynamic Client Registration (DCR), bearer tokens, and custom authentication providers."
-icon: "key"
+description: "Secure your MCP connections with OAuth and bearer tokens"
+icon: "shield"
 tag: "New"
 ---
 
-## Quick Start
+The mcp-use client supports multiple authentication methods for secure connections to MCP servers, including OAuth 2.0 with automatic token management, bearer token authentication, and custom authentication providers.
 
-### OAuth Authentication
+## Supported Authentication Methods
 
-For servers that support OAuth, mcp-use handles the complete OAuth flow automatically using the `useMcp` hook:
+- **OAuth 2.0**: Complete OAuth flow with automatic Dynamic Client Registration (DCR)
+- **Bearer Tokens**: API key and token-based authentication
+- **Custom Headers**: Flexible authentication header support
+
+<Tip>
+**OAuth Made Simple**: The `useMcp` React hook automatically handles the entire OAuth flow, including token refresh and session management. No manual token handling required.
+</Tip>
+
+## OAuth Authentication
+
+OAuth provides secure, token-based authentication with automatic token refresh and user consent flows.
 
 <CodeGroup>
 ```typescript React Hook

@@ -1,0 +1,35 @@
+name: Post Conformance Comment
+
+on:
+  workflow_run:
+    workflows: ["MCP Conformance Tests"]
+    types:
+      - completed
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  comment:
+    name: Post Conformance Results Comment
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'cancelled'
+
+    steps:
+      - name: Download conformance results
+        uses: actions/download-artifact@v4
+        with:
+          name: conformance-results
+          path: conformance-results
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Post comment using action
+        uses: mcp-use/mcp-conformance-action@v1
+        with:
+          mode: comment
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-mode: update

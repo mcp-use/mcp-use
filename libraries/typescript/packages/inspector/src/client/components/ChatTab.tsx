@@ -178,6 +178,7 @@ export function ChatTab({
             isLoading={isLoading}
             serverId={connection.url}
             readResource={readResource}
+            tools={connection.tools}
           />
         )}
       </div>

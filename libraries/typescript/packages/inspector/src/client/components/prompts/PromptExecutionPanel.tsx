@@ -1,5 +1,6 @@
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { Play, Save } from "lucide-react";
+import { useEffect } from "react";
 import { Button } from "@/client/components/ui/button";
 import { Spinner } from "@/client/components/ui/spinner";
 import { PromptInputForm } from "./PromptInputForm";
@@ -23,6 +24,23 @@ export function PromptExecutionPanel({
   onExecute,
   onSave,
 }: PromptExecutionPanelProps) {
+  // Handle Cmd/Ctrl + Enter keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      // Check if Cmd/Ctrl + Enter is pressed
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        // Only execute if a prompt is selected and not already executing
+        if (selectedPrompt && !isExecuting && isConnected) {
+          event.preventDefault();
+          onExecute();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [selectedPrompt, isExecuting, isConnected, onExecute]);
+
   if (!selectedPrompt) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
@@ -49,7 +67,7 @@ export function PromptExecutionPanel({
                 onClick={onExecute}
                 disabled={isExecuting || !isConnected}
                 size="sm"
-                className="lg:size-default"
+                className="lg:size-default pr-1! gap-0"
               >
                 {isExecuting ? (
                   <>
@@ -60,6 +78,9 @@ export function PromptExecutionPanel({
                   <>
                     <Play className="h-4 w-4 sm:mr-2" />
                     <span className="hidden sm:inline">Execute</span>
+                    <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
+                      ⌘↵
+                    </span>
                   </>
                 )}
               </Button>
