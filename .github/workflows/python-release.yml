@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - chore/python/release-action
     paths:
       - "libraries/python/**"
   workflow_dispatch:
