@@ -3,10 +3,34 @@
  *
  * Manages active SSE connections using Redis Pub/Sub for distributed notifications.
  * Enables server-to-client push notifications across multiple server instances.
+ *
+ * **Note:** Redis is an optional dependency. Install it with:
+ * ```bash
+ * npm install redis
+ * # or
+ * pnpm add redis
+ * ```
+ *
+ * If Redis is not installed, importing this module will throw an error at runtime
+ * when attempting to use RedisStreamManager. Use dynamic imports with error handling
+ * if you want to gracefully fall back when Redis is not available.
  */
 
 import type { StreamManager } from "./index.js";
 import type { RedisClient } from "../stores/redis.js";
+
+/**
+ * Check if Redis is available as an optional dependency
+ * @returns true if Redis can be imported, false otherwise
+ */
+export async function isRedisAvailable(): Promise<boolean> {
+  try {
+    await import("redis");
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Configuration for Redis stream manager
@@ -151,6 +175,11 @@ export class RedisStreamManager implements StreamManager {
 
       // Subscribe to Redis Pub/Sub channel for this session
       const channel = this.getChannel(sessionId);
+      if (!this.pubSubClient.subscribe) {
+        throw new Error(
+          "[RedisStreamManager] Redis client does not support subscribe method"
+        );
+      }
       await this.pubSubClient.subscribe(channel, (message: string) => {
         const localController = this.localControllers.get(sessionId);
         if (localController) {
@@ -203,6 +232,11 @@ export class RedisStreamManager implements StreamManager {
           const sessionId = key.replace(`available:${this.prefix}`, "");
           const channel = this.getChannel(sessionId);
           // Use regular client for publishing (pubSubClient is in subscriber mode)
+          if (!this.client.publish) {
+            throw new Error(
+              "[RedisStreamManager] Redis client does not support publish method"
+            );
+          }
           await this.client.publish(channel, data);
         }
       } else {
@@ -210,6 +244,11 @@ export class RedisStreamManager implements StreamManager {
         for (const sessionId of sessionIds) {
           const channel = this.getChannel(sessionId);
           // Use regular client for publishing (pubSubClient is in subscriber mode)
+          if (!this.client.publish) {
+            throw new Error(
+              "[RedisStreamManager] Redis client does not support publish method"
+            );
+          }
           await this.client.publish(channel, data);
         }
       }
@@ -235,10 +274,20 @@ export class RedisStreamManager implements StreamManager {
       const channel = this.getChannel(sessionId);
       const deleteChannel = `delete:${channel}`;
 
+      if (!this.pubSubClient.unsubscribe) {
+        throw new Error(
+          "[RedisStreamManager] Redis client does not support unsubscribe method"
+        );
+      }
       await this.pubSubClient.unsubscribe(channel);
       await this.pubSubClient.unsubscribe(deleteChannel);
 
       // Publish delete message to notify other servers (use regular client for publishing)
+      if (!this.client.publish) {
+        throw new Error(
+          "[RedisStreamManager] Redis client does not support publish method"
+        );
+      }
       await this.client.publish(deleteChannel, "");
 
       // Delete availability key

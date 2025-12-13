@@ -101,6 +101,7 @@ export async function mountMcp(
         const request = c.req.raw;
         if (!clientSupportsSSE) {
           // Clone request with modified headers
+          // Note: duplex is a Node.js-specific extension, cast to any to avoid TypeScript error
           const modifiedRequest = new Request(request.url, {
             method: request.method,
             headers: {
@@ -108,7 +109,7 @@ export async function mountMcp(
               Accept: "application/json, text/event-stream",
             },
             body: request.body,
-            duplex: "half" as RequestDuplex,
+            ...(request.body && ({ duplex: "half" } as any)),
           });
           return await transport.handleRequest(modifiedRequest);
         }

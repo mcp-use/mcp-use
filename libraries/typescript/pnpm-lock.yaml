@@ -638,9 +638,6 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.0
-      redis:
-        specifier: ^5.10.0
-        version: 5.10.0
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -657,6 +654,9 @@ importers:
       cli-highlight:
         specifier: ^2.1.11
         version: 2.1.11
+      redis:
+        specifier: ^5.10.0
+        version: 5.10.0
       winston:
         specifier: ^3.18.3
         version: 3.18.3
@@ -9209,22 +9209,27 @@ snapshots:
   '@redis/bloom@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
+    optional: true
 
   '@redis/client@5.10.0':
     dependencies:
       cluster-key-slot: 1.1.2
+    optional: true
 
   '@redis/json@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
+    optional: true
 
   '@redis/search@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
+    optional: true
 
   '@redis/time-series@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
+    optional: true
 
   '@reduxjs/toolkit@2.11.0(react-redux@9.2.0(@types/react@19.2.7)(react@19.2.0)(redux@5.0.1))(react@19.2.0)':
     dependencies:
@@ -10325,7 +10330,8 @@ snapshots:
 
   clsx@2.1.1: {}
 
-  cluster-key-slot@1.1.2: {}
+  cluster-key-slot@1.1.2:
+    optional: true
 
   cmdk@1.1.1(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
@@ -13412,6 +13418,7 @@ snapshots:
       '@redis/json': 5.10.0(@redis/client@5.10.0)
       '@redis/search': 5.10.0(@redis/client@5.10.0)
       '@redis/time-series': 5.10.0(@redis/client@5.10.0)
+    optional: true
 
   redux-thunk@3.1.0(redux@5.0.1):
     dependencies:

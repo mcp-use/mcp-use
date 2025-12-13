@@ -62,11 +62,25 @@ export class SseConnectionManager extends ConnectionManager<SSEClientTransport> 
     // Wrap the send method to handle 404 session errors per MCP spec
     const originalSend = transport.send.bind(transport);
     transport.send = async (
-      message: JSONRPCMessage | JSONRPCMessage[],
-      options?: any
-    ) => {
+      message: JSONRPCMessage | JSONRPCMessage[]
+    ): Promise<void> => {
+      // Helper to send message(s) - handles both single and array
+      // Always returns void to match the expected signature
+      const sendMessage = async (
+        msg: JSONRPCMessage | JSONRPCMessage[]
+      ): Promise<void> => {
+        if (Array.isArray(msg)) {
+          // If it's an array, send each message individually
+          for (const singleMsg of msg) {
+            await originalSend(singleMsg);
+          }
+        } else {
+          await originalSend(msg);
+        }
+      };
+
       try {
-        return await originalSend(message, options);
+        await sendMessage(message);
       } catch (error: any) {
         // Per MCP spec: When client receives 404 with session ID, MUST re-initialize
         // See: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
@@ -90,12 +104,13 @@ export class SseConnectionManager extends ConnectionManager<SSEClientTransport> 
             logger.info(`[SSE] Re-initialization successful, retrying request`);
 
             // Retry the original message with new session
-            return await originalSend(message);
+            await sendMessage(message);
           } finally {
             this.reinitializing = false;
           }
+        } else {
+          throw error;
         }
-        throw error;
       }
     };
 

@@ -83,3 +83,8 @@ export interface StreamManager {
 
 export * from "./memory.js";
 export * from "./redis.js";
+
+// Note: RedisStreamManager and related types are exported above.
+// Redis is an optional dependency - install with: npm install redis
+// The classes will work as long as you provide a RedisClient instance.
+// Use isRedisAvailable() to check if the redis package is installed.
