@@ -229,6 +229,25 @@ server.resourceTemplate(
 ```
 
 
+## Notifying Clients of Resource Changes
+
+When dynamically adding or removing resources, notify clients to refresh their resources cache:
+
+```typescript
+// Register a new resource dynamically
+server.resource({
+  name: 'new_resource',
+  uri: 'app://new',
+  description: 'A dynamically added resource'
+}, async () => text('New resource content'));
+
+// Notify all connected clients
+await server.sendResourcesListChanged();
+```
+
+See [Notifications](./notifications) for more details.
+
+
 ### Testing 
 
 1. Start server with inspector
