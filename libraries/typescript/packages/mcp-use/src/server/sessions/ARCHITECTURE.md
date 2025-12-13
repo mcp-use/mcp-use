@@ -4,7 +4,7 @@ This document explains mcp-use's session management architecture and how it enab
 
 ## Overview
 
-mcp-use uses a **split architecture** inspired by tmcp, separating concerns into two distinct systems:
+mcp-use uses a **split architecture** separating concerns into two distinct systems:
 
 1. **SessionStore** - Manages serializable metadata
 2. **StreamManager** - Manages active SSE connections
@@ -182,16 +182,6 @@ const server = new MCPServer({
 });
 ```
 
-## Comparison with Other Implementations
-
-| Implementation | Approach | Metadata Storage | Stream Management |
-|----------------|----------|------------------|-------------------|
-| **mcp-use** | Split architecture | SessionStore (pluggable) | StreamManager (pluggable) |
-| **tmcp** | Split architecture | InfoSessionManager | StreamSessionManager |
-| **FastMCP** | Docket + Redis | Redis keys | Redis Pub/Sub + Docket |
-| **Official SDK** | Single instance | In-memory | EventStore (resumability) |
-| **xmcp** | Stateless | N/A | N/A |
-
 ## Future Enhancements
 
 Planned implementations:
@@ -203,7 +193,6 @@ Planned implementations:
 
 ## References
 
-- [tmcp session-manager packages](https://github.com/tmcp-io/tmcp/tree/main/packages)
-- [FastMCP Docket integration](https://github.com/jlowin/fastmcp)
+
 - [MCP Specification - Session Management](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management)
 
