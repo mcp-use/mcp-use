@@ -280,13 +280,13 @@ class TestMCPAgentStream:
 
         human_message = HumanMessage(
             content=[
-                {"type": "text", "text": "Summarize the attached file"},
+                {"type": "text", "text": "What is in this image?"},
                 {
                     "type": "input_file",
                     "input": {
-                        "name": "notes.txt",
-                        "mime_type": "text/plain",
-                        "data": "ZmlsZSBjb250ZW50",  # base64 for "file content"
+                        "name": "screenshot.png",
+                        "mime_type": "image/png",
+                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",  # base64 for a 1x1 red pixel PNG
                     },
                 },
             ]

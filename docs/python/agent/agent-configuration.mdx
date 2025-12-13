@@ -141,16 +141,16 @@ async def main():
         client=client,
     )
 
-    file_bytes = Path("notes.txt").read_bytes()
+    image_bytes = Path("screenshot.png").read_bytes()
     human_message = HumanMessage(
         content=[
-            {"type": "text", "text": "Summarize the attached notes."},
+            {"type": "text", "text": "What is in this image?"},
             {
                 "type": "input_file",
                 "input": {
-                    "name": "notes.txt",
-                    "mime_type": "text/plain",
-                    "data": base64.b64encode(file_bytes).decode("utf-8"),
+                    "name": "screenshot.png",
+                    "mime_type": "image/png",
+                    "data": base64.b64encode(image_bytes).decode("utf-8"),
                 },
             },
         ]
