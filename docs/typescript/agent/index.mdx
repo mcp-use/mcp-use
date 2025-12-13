@@ -204,16 +204,16 @@ The `MCPAgent` class provides a clean API for agent interactions:
 class MCPAgent {
   // Basic execution
   run(prompt: string, options?: RunOptions): Promise<string>
-  
+
   // Streaming
   stream(prompt: string, options?: StreamOptions): AsyncIterator<Chunk>
-  
+
   // Structured output
   run<T>(prompt: string, options: { schema: ZodSchema<T> }): Promise<T>
-  
+
   // Conversation management
   createConversation(): Conversation
-  
+
   // Configuration
   updateSystemPrompt(prompt: string): void
 }
@@ -310,4 +310,3 @@ try {
     Extend the agent framework for your needs
   </Card>
 </CardGroup>
-

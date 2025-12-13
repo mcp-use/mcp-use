@@ -34,7 +34,7 @@ HAS_CODE_CHANGES=$(echo "$STAGED_FILES" | grep -E '\.(ts|tsx|js|jsx)$' || true)
 if [ -n "$HAS_CODE_CHANGES" ]; then
   # Check if there's a changeset file (excluding README.md)
   CHANGESET_FILES=$(find .changeset -name '*.md' -not -name 'README.md' 2>/dev/null || true)
-  
+
   if [ -z "$CHANGESET_FILES" ]; then
     echo ""
     echo "❌ No changeset found!"

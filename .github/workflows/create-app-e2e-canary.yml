@@ -29,7 +29,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
-      
+
       - name: Check if packages were published
         id: check
         run: |
@@ -53,13 +53,13 @@ jobs:
       - name: Wait for canary packages to be available on npm
         run: |
           echo "Waiting for canary packages to be available on npm..."
-          
+
           MAX_RETRIES=30
           SLEEP_TIME=20
-          
+
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i/$MAX_RETRIES: Checking npm registry..."
-            
+
             # Check all three packages
             if npm view mcp-use@canary version && \
                npm view @mcp-use/cli@canary version && \
@@ -67,11 +67,11 @@ jobs:
               echo "All canary packages are available on npm"
               exit 0
             fi
-            
+
             echo "Packages not yet available, waiting ${SLEEP_TIME}s..."
             sleep $SLEEP_TIME
           done
-          
+
           echo "Timeout waiting for canary packages"
           exit 1
 
@@ -88,18 +88,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      
+
       - name: Create app with npm and canary flag
         run: |
           npx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --canary
           echo "Project created successfully"
-      
+
       - name: Install dependencies
         working-directory: test-app-${{ matrix.template }}
         run: |
           npm install
           echo "Dependencies installed"
-      
+
       - name: Run dev server and kill it
         working-directory: test-app-${{ matrix.template }}
         run: |
@@ -109,7 +109,7 @@ jobs:
           kill $DEV_PID 2>/dev/null || true
           wait $DEV_PID 2>/dev/null || true
           echo "Dev server started and stopped successfully"
-      
+
       - name: Build project
         working-directory: test-app-${{ matrix.template }}
         run: |
@@ -131,18 +131,18 @@ jobs:
           node-version: 22
       - name: Setup Yarn
         run: corepack enable
-      
+
       - name: Create app with yarn and canary flag
         run: |
           yarn dlx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --canary
           echo "Project created successfully"
-      
+
       - name: Install dependencies
         working-directory: test-app-${{ matrix.template }}
         run: |
           yarn install
           echo "Dependencies installed"
-      
+
       - name: Run dev server and kill it
         working-directory: test-app-${{ matrix.template }}
         run: |
@@ -152,7 +152,7 @@ jobs:
           kill $DEV_PID 2>/dev/null || true
           wait $DEV_PID 2>/dev/null || true
           echo "Dev server started and stopped successfully"
-      
+
       - name: Build project
         working-directory: test-app-${{ matrix.template }}
         run: |

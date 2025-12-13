@@ -115,4 +115,3 @@ username: undefined  // required, no default
 ## Security Notes
 
 ⚠️ **Important**: Always use URL mode for sensitive data collection. Form mode data passes through the MCP client and should only be used for non-sensitive information.
-

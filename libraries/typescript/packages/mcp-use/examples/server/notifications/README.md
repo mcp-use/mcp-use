@@ -131,4 +131,3 @@ For stateless edge environments (Supabase, Cloudflare Workers):
 - Sessions are disabled by default
 - Notifications are silently discarded
 - Use polling or webhooks instead of push notifications
-

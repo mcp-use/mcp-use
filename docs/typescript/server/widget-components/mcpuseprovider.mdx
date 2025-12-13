@@ -96,7 +96,7 @@ import { useWidget } from 'mcp-use/react';
 
 function ProductWidget() {
   const { props } = useWidget<{ productName: string }>();
-  
+
   return (
     <div>
       <h1>{props.productName}</h1>
@@ -122,4 +122,3 @@ export default function App() {
 - [`ThemeProvider`](./themeprovider) - Theme management
 - [`ErrorBoundary`](./errorboundary) - Error handling
 - [`useWidget`](./usewidget) - Widget hook for accessing props and actions
-

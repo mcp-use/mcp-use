@@ -51,7 +51,7 @@ server.tool({
 }, async (params, ctx) => {
   // Simple string API - just pass a prompt!
   const response = await ctx.sample(
-    `Analyze the sentiment of the following text as positive, negative, or neutral. 
+    `Analyze the sentiment of the following text as positive, negative, or neutral.
      Just output a single word. Text: ${params.text}`
   );
 
@@ -81,7 +81,7 @@ server.tool({
   const response = await ctx.sample(
     `Summarize this text in one sentence: ${params.text}`
   );
-  
+
   return text(response.content[0].text);
 });
 ```
@@ -117,9 +117,9 @@ server.tool({
     messages: [
       {
         role: 'user',
-        content: { 
-          type: 'text', 
-          text: `Analyze: ${params.text}` 
+        content: {
+          type: 'text',
+          text: `Analyze: ${params.text}`
         },
       },
     ],
@@ -153,17 +153,17 @@ server.tool({
     {
       // Limit wait time (default: Infinity)
       timeout: 120000,  // 2 minutes
-      
+
       // Change progress interval (default: 5000ms)
       progressIntervalMs: 2000,
-      
+
       // Custom progress handling
       onProgress: ({ message }) => {
         console.log(`[Progress] ${message}`);
       }
     }
   );
-  
+
   return text(response.content[0].text);
 });
 ```
@@ -212,7 +212,7 @@ server.tool({
   const caps = ctx.client.capabilities();
   console.log('Client capabilities:', caps);
   // { sampling: {}, roots: { listChanged: true }, elicitation: { form: {}, url: {} } }
-  
+
   if (ctx.client.can('sampling') && ctx.client.can('elicitation')) {
     // Use both sampling and elicitation
     const analysis = await ctx.sample(`Analyze: ${params.input}`);
@@ -253,7 +253,7 @@ Text to analyze: ${params.text}`;
 
   const response = await ctx.sample(prompt);
   const sentiment = response.content[0].text.trim().toLowerCase();
-  
+
   return text(`Sentiment: ${sentiment}`);
 });
 
@@ -265,7 +265,7 @@ await server.listen();
 
 ### ctx.sample(prompt: string, options?)
 
-Simplified API 
+Simplified API
 
 **Parameters:**
 - `prompt` (string): The text prompt to send to the LLM
@@ -280,7 +280,7 @@ Simplified API
 
 ### ctx.sample(CreateMessageRequestParams, options?)
 
-Extended API 
+Extended API
 
 **Parameters:**
 - `params` (object):
@@ -345,4 +345,3 @@ Server runs on http://localhost:3000 with MCP Inspector available.
 - [Elicitation](./elicitation) - Request user input during execution
 - [Notifications](./notifications) - Send status updates to clients
 - [Client Sampling](/typescript/client/sampling) - Configure sampling on the client side
-

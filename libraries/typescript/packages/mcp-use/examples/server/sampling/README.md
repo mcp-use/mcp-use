@@ -58,4 +58,3 @@ await client.callTool('translate-text', {
   targetLanguage: 'Spanish'
 })
 ```
-

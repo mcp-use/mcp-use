@@ -89,19 +89,19 @@ const server = new McpServer({
     serverUrl: 'https://keycloak.example.com',
     realm: 'my-realm',
     clientId: 'my-mcp-server',
-    
+
     // Optional
     clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
-    
+
     // OAuth mode: 'proxy' (default) or 'direct'
     mode: 'proxy',
-    
+
     // JWT verification
     verifyJwt: process.env.NODE_ENV === 'production',
-    
+
     // Custom scopes
     scopes: ['openid', 'profile', 'email', 'roles'],
-    
+
     // Custom user info extraction
     getUserInfo: (payload) => ({
       userId: payload.sub,
@@ -124,4 +124,3 @@ const server = new McpServer({
 ## Next Steps
 
 - [User Context](/typescript/server/authentication/user-context) - Access user information
-

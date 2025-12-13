@@ -62,8 +62,8 @@ const tools = await session.listTools()
 console.log('Available tools:', tools)
 
 // Call a tool
-const result = await session.callTool('tool_name', { 
-  param: 'value' 
+const result = await session.callTool('tool_name', {
+  param: 'value'
 })
 console.log('Result:', result)
 
@@ -139,7 +139,7 @@ class MCPClient {
   getSession(serverName: string): Session
   closeAllSessions(): Promise<void>
   closeSession(serverName: string): Promise<void>
-  
+
   // Server Management
   listServers(): string[]
   getServerConfig(serverName: string): ServerConfig
@@ -155,15 +155,15 @@ class Session {
   // Tools
   listTools(): Promise<Tool[]>
   callTool(name: string, params: any): Promise<ToolResult>
-  
+
   // Resources
   listResources(): Promise<Resource[]>
   readResource(uri: string): Promise<ResourceContent>
-  
+
   // Prompts
   listPrompts(): Promise<Prompt[]>
   getPrompt(name: string, args?: any): Promise<PromptResult>
-  
+
   // Advanced Features
   enableNotifications(): void
   subscribeTo(uri: string): Promise<void>
@@ -235,4 +235,3 @@ const client = new MCPClient(config, {
     Secure your connections with OAuth and bearer tokens
   </Card>
 </CardGroup>
-

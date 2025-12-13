@@ -204,8 +204,8 @@ Keep widget state under 4k tokens for performance. State is sent to ChatGPT and 
 Request a different display mode for the widget.
 
 ```javascript
-const result = await window.openai.requestDisplayMode({ 
-  mode: "fullscreen" 
+const result = await window.openai.requestDisplayMode({
+  mode: "fullscreen"
 });
 // Returns: { mode: "fullscreen" }
 ```
@@ -226,8 +226,8 @@ const result = await window.openai.requestDisplayMode({
 Open an external link in a new window/tab.
 
 ```javascript
-window.openai.openExternal({ 
-  href: "https://example.com" 
+window.openai.openExternal({
+  href: "https://example.com"
 });
 
 // Or with string
@@ -400,7 +400,7 @@ function useOpenAiGlobal(key) {
 function MyWidget() {
   const theme = useOpenAiGlobal('theme');
   const toolOutput = useOpenAiGlobal('toolOutput');
-  
+
   return <div className={theme === 'dark' ? 'dark' : 'light'}>
     {/* Widget content */}
   </div>;
@@ -836,4 +836,3 @@ View widget console output:
 - [Overview](/inspector/index) - Saved requests and preview mode
 - [Connection Settings](/inspector/connection-settings) - Advanced configuration
 - [Getting Started](/inspector/index) - Basic inspector usage
-

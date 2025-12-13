@@ -268,11 +268,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const transports = ['stdio', 'sse', 'streamable_http'];
             let tableRows = [];
             let allPassed = true;
-            
+
             for (const transport of transports) {
               const xmlPath = path.join('test-results', `transport-test-results-${transport}`, `test-results-${transport}.xml`);
               let status = '⏭️ Skipped';
@@ -281,28 +281,28 @@ jobs:
               let failed = '-';
               let errors = '-';
               let time = '-';
-              
+
               if (fs.existsSync(xmlPath)) {
                 const content = fs.readFileSync(xmlPath, 'utf8');
-                
+
                 // Parse basic stats from JUnit XML
                 const testsMatch = content.match(/tests="(\d+)"/);
                 const failuresMatch = content.match(/failures="(\d+)"/);
                 const errorsMatch = content.match(/errors="(\d+)"/);
                 const timeMatch = content.match(/time="([\d.]+)"/);
-                
+
                 if (testsMatch) {
                   const totalTests = parseInt(testsMatch[1]);
                   const failureCount = failuresMatch ? parseInt(failuresMatch[1]) : 0;
                   const errorCount = errorsMatch ? parseInt(errorsMatch[1]) : 0;
                   const passedCount = totalTests - failureCount - errorCount;
-                  
+
                   tests = totalTests.toString();
                   passed = passedCount.toString();
                   failed = failureCount.toString();
                   errors = errorCount.toString();
                   time = timeMatch ? `${parseFloat(timeMatch[1]).toFixed(2)}s` : '-';
-                  
+
                   if (failureCount === 0 && errorCount === 0) {
                     status = '✅ Passed';
                   } else {
@@ -311,33 +311,33 @@ jobs:
                   }
                 }
               }
-              
+
               tableRows.push(`| ${transport} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
             }
-            
+
             const overallStatus = allPassed ? '✅ All transport tests passed!' : '❌ Some transport tests failed';
-            
+
             const comment = `## Python Transport Tests Results
-            
+
             ${overallStatus}
-            
+
             | Transport | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
-            const botComment = comments.find(c => 
-              c.user.type === 'Bot' && 
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' &&
               c.body.includes('## Python Transport Tests Results')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -432,11 +432,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const primitives = ['sampling', 'tools', 'resources', 'prompts', 'elicitation', 'notifications', 'auth'];
             let tableRows = [];
             let allPassed = true;
-            
+
             for (const primitive of primitives) {
               const xmlPath = path.join('test-results', `primitive-test-results-${primitive}`, `test-results-${primitive}.xml`);
               let status = '⏭️ Skipped';
@@ -445,28 +445,28 @@ jobs:
               let failed = '-';
               let errors = '-';
               let time = '-';
-              
+
               if (fs.existsSync(xmlPath)) {
                 const content = fs.readFileSync(xmlPath, 'utf8');
-                
+
                 // Parse basic stats from JUnit XML
                 const testsMatch = content.match(/tests="(\d+)"/);
                 const failuresMatch = content.match(/failures="(\d+)"/);
                 const errorsMatch = content.match(/errors="(\d+)"/);
                 const timeMatch = content.match(/time="([\d.]+)"/);
-                
+
                 if (testsMatch) {
                   const totalTests = parseInt(testsMatch[1]);
                   const failureCount = failuresMatch ? parseInt(failuresMatch[1]) : 0;
                   const errorCount = errorsMatch ? parseInt(errorsMatch[1]) : 0;
                   const passedCount = totalTests - failureCount - errorCount;
-                  
+
                   tests = totalTests.toString();
                   passed = passedCount.toString();
                   failed = failureCount.toString();
                   errors = errorCount.toString();
                   time = timeMatch ? `${parseFloat(timeMatch[1]).toFixed(2)}s` : '-';
-                  
+
                   if (failureCount === 0 && errorCount === 0) {
                     status = '✅ Passed';
                   } else {
@@ -475,33 +475,33 @@ jobs:
                   }
                 }
               }
-              
+
               tableRows.push(`| ${primitive} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
             }
-            
+
             const overallStatus = allPassed ? '✅ All primitive tests passed!' : '❌ Some primitive tests failed';
-            
+
             const comment = `## Python Primitive Tests Results
-            
+
             ${overallStatus}
-            
+
             | Primitive | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
-            const botComment = comments.find(c => 
-              c.user.type === 'Bot' && 
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' &&
               c.body.includes('## Python Primitive Tests Results')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,

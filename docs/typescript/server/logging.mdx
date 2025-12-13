@@ -90,17 +90,17 @@ server.tool({
 }, async ({ items }, ctx) => {
   // Log the start of processing
   await ctx.log('info', 'Starting data processing');
-  
+
   // Debug-level logging for detailed information
   await ctx.log('debug', `Processing ${items.length} items`, 'my-tool');
-  
+
   for (const item of items) {
     // Log warnings when needed
     if (!item.trim()) {
       await ctx.log('warning', 'Empty item found, skipping');
       continue;
     }
-    
+
     try {
       await processItem(item);
     } catch (err) {
@@ -108,7 +108,7 @@ server.tool({
       await ctx.log('error', `Failed to process item: ${err.message}`);
     }
   }
-  
+
   await ctx.log('info', 'Processing completed');
   return text('All items processed');
 })
@@ -146,4 +146,3 @@ ctx.log(level, message, logger?)
 - [Notifications](./notifications) - Send status updates to clients
 - [Configuration](./configuration) - Configure server options
 - [Tools Guide](./tools) - Building tools with proper error handling
-
