@@ -3,9 +3,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import open from "open";
-import { chatRoutes } from "./routes/chat.js";
+// import { chatRoutes } from "./routes/chat.js"; // Old agent - deprecated
+import { chatRoutesV2 } from "./routes/chat-v2.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { workspaceRoutes } from "./routes/workspace.js";
+import { anthropicProxyRoutes } from "./routes/anthropic-proxy.js";
 import { registerStaticRoutes } from "./static.js";
 import { findAvailablePort, isPortAvailable } from "./utils.js";
 
@@ -16,9 +18,11 @@ app.use("*", cors());
 app.use("*", logger());
 
 // Register API routes
-app.route("/api/chat", chatRoutes);
+// app.route("/api/chat", chatRoutes); // Old agent - deprecated, use v2
+app.route("/api/chat/v2", chatRoutesV2);
 app.route("/api/mcp", mcpRoutes);
 app.route("/api/workspace", workspaceRoutes);
+app.route("/api/anthropic-proxy", anthropicProxyRoutes);
 
 // Health check
 app.get("/api/health", (c) => {

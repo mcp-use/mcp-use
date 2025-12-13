@@ -15,6 +15,7 @@ export function useMangoChat(workspaceDir?: string): UseMangoChat {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const conversationIdRef = useRef<string>(`conv-${Date.now()}`);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -45,15 +46,18 @@ export function useMangoChat(workspaceDir?: string): UseMangoChat {
 
         console.log("[Mango] Calling API with", apiMessages.length, "messages");
 
-        // Start streaming
-        const response = await fetch("/api/chat/stream", {
+        // Use persistent conversation ID for this chat session
+        const conversationId = conversationIdRef.current;
+
+        // Start streaming (v2 endpoint with E2B sandbox)
+        const response = await fetch("/api/chat/v2/stream", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             messages: apiMessages,
-            workspaceDir,
+            conversationId,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -96,7 +100,98 @@ export function useMangoChat(workspaceDir?: string): UseMangoChat {
             try {
               const event = JSON.parse(data);
 
-              if (event.type === "content_block_start") {
+              // Handle v2 event types (from Agent SDK)
+              if (event.type === "sandbox_status") {
+                // Show sandbox initialization status
+                console.log("[Mango] Sandbox:", event.status, event.message);
+                setMessages((prev) => {
+                  const lastMsg = prev[prev.length - 1];
+                  if (
+                    lastMsg?.role === "assistant" &&
+                    lastMsg.id === assistantMessageId
+                  ) {
+                    return [
+                      ...prev.slice(0, -1),
+                      { ...lastMsg, content: `🔧 ${event.message}` },
+                    ];
+                  } else {
+                    return [
+                      ...prev,
+                      {
+                        id: assistantMessageId,
+                        role: "assistant" as const,
+                        content: `🔧 ${event.message}`,
+                        timestamp: new Date(),
+                      },
+                    ];
+                  }
+                });
+              } else if (event.type === "assistant") {
+                // Handle assistant messages from Agent SDK
+                const message = event.message;
+                if (message?.content) {
+                  for (const block of message.content) {
+                    if (block.type === "text") {
+                      currentContent += block.text;
+                    }
+                  }
+
+                  setMessages((prev) => {
+                    const lastMsg = prev[prev.length - 1];
+                    if (
+                      lastMsg?.role === "assistant" &&
+                      lastMsg.id === assistantMessageId
+                    ) {
+                      return [
+                        ...prev.slice(0, -1),
+                        { ...lastMsg, content: currentContent },
+                      ];
+                    } else {
+                      return [
+                        ...prev,
+                        {
+                          id: assistantMessageId,
+                          role: "assistant" as const,
+                          content: currentContent,
+                          timestamp: new Date(),
+                        },
+                      ];
+                    }
+                  });
+                }
+              } else if (event.type === "stream_event") {
+                // Handle token-by-token streaming from Agent SDK
+                const streamEvent = event.event;
+                if (streamEvent.type === "content_block_delta") {
+                  const delta = streamEvent.delta;
+                  if (delta?.type === "text_delta") {
+                    currentContent += delta.text;
+
+                    setMessages((prev) => {
+                      const lastMsg = prev[prev.length - 1];
+                      if (
+                        lastMsg?.role === "assistant" &&
+                        lastMsg.id === assistantMessageId
+                      ) {
+                        return [
+                          ...prev.slice(0, -1),
+                          { ...lastMsg, content: currentContent },
+                        ];
+                      } else {
+                        return [
+                          ...prev,
+                          {
+                            id: assistantMessageId,
+                            role: "assistant" as const,
+                            content: currentContent,
+                            timestamp: new Date(),
+                          },
+                        ];
+                      }
+                    });
+                  }
+                }
+              } else if (event.type === "content_block_start") {
                 const block = event.content_block;
                 if (block?.type === "thinking") {
                   // Start showing thinking indicator
@@ -272,6 +367,8 @@ export function useMangoChat(workspaceDir?: string): UseMangoChat {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    // Generate new conversation ID when clearing (creates new sandbox)
+    conversationIdRef.current = `conv-${Date.now()}`;
   }, []);
 
   return {

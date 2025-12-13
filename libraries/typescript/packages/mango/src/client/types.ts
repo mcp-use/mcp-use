@@ -36,6 +36,15 @@ export interface McpPrimitives {
 }
 
 /**
+ * Todo item
+ */
+export interface Todo {
+  id: string;
+  content: string;
+  status: "pending" | "in_progress" | "completed" | "cancelled";
+}
+
+/**
  * Chat message
  */
 export interface ChatMessage {
@@ -46,6 +55,7 @@ export interface ChatMessage {
   toolCalls?: any[];
   thinking?: string;
   isThinking?: boolean;
+  todos?: Todo[];
 }
 
 /**

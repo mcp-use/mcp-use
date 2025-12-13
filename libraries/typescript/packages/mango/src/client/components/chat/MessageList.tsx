@@ -2,10 +2,13 @@ import { Bot, Brain, User, Wrench } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "../../types.js";
 import { cn } from "../../lib/utils.js";
+import { TodoList, type Todo } from "../TodoList.js";
+import { ThinkingBlock } from "../ThinkingBlock.js";
 
 export interface MessageListProps {
   messages: ChatMessage[];
   isStreaming?: boolean;
+  currentTodos?: Todo[];
 }
 
 /**
@@ -14,6 +17,7 @@ export interface MessageListProps {
 export function MessageList({
   messages,
   isStreaming = false,
+  currentTodos = [],
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -74,14 +78,14 @@ export function MessageList({
             )}
 
             {message.thinking && (
-              <div className="mb-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded p-2 space-y-1">
-                <div className="flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                  <Brain className="h-3 w-3" />
-                  <span>Extended Thinking</span>
-                </div>
-                <div className="text-xs text-blue-600 dark:text-blue-400 whitespace-pre-wrap">
-                  {message.thinking}
-                </div>
+              <div className="mb-2">
+                <ThinkingBlock thinking={message.thinking} />
+              </div>
+            )}
+
+            {message.todos && message.todos.length > 0 && (
+              <div className="mb-2">
+                <TodoList todos={message.todos} />
               </div>
             )}
 
@@ -135,6 +139,13 @@ export function MessageList({
               <span className="animate-bounce [animation-delay:0.4s]">●</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Show current todos while streaming */}
+      {isStreaming && currentTodos.length > 0 && (
+        <div className="mx-auto max-w-2xl">
+          <TodoList todos={currentTodos} />
         </div>
       )}
 

@@ -44,7 +44,9 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.69",
     "@anthropic-ai/sdk": "^0.32.1",
+    "@e2b/code-interpreter": "^1.5.1",
     "@hono/node-server": "^1.19.6",
     "@mcp-ui/client": "^5.16.0",
     "@mcp-use/modelcontextprotocol-sdk": "1.24.3-mcp-use.1",
@@ -59,12 +61,14 @@
     "lucide-react": "^0.555.0",
     "markdown-to-jsx": "^9.3.0",
     "mcp-use": "workspace:*",
+    "nanoid": "^5.1.6",
     "next-themes": "^0.4.6",
     "open": "^11.0.0",
     "react-resizable-panels": "^3.0.6",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "vite-express": "^0.21.1"
+    "vite-express": "^0.21.1",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
@@ -75,8 +79,8 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.1.17",
-    "tsx": "^4.21.0",
     "tsup": "^8.3.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.2.4"
   },
