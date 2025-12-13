@@ -87,6 +87,8 @@ class MCPAgent:
         callbacks: list | None = None,
         chat_id: str | None = None,
         retry_on_error: bool = True,
+        metadata: dict[str] | None = None,
+        message_id: str | None = None,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -110,6 +112,8 @@ class MCPAgent:
             retry_on_error: Whether to enable automatic error handling for tool calls. When True, tool errors
                 (including validation errors) are caught and returned as messages to the LLM, allowing it to
                 retry with corrected input. When False, errors will halt execution immediately. Default: True.
+	        metadata: Specific data to be passed to tools without passing through llm.
+            message_id: Unique Id to be passed to each message in a chat.
         """
         # Handle remote execution
         if agent_id is not None:
@@ -171,6 +175,8 @@ class MCPAgent:
         self._agent_executor = None
         self._system_message: SystemMessage | None = None
         self._tools: list[BaseTool] = []
+        self.metadata = metadata if metadata else {}
+        self.message_id = message_id if message_id else None
 
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
@@ -705,6 +711,7 @@ class MCPAgent:
                     config={
                         "callbacks": self.callbacks,
                         "recursion_limit": self.recursion_limit,
+                        "metadata": self.metadata,
                     },
                 ):
                     # chunk is a dict with node names as keys
@@ -828,9 +835,9 @@ class MCPAgent:
 
             # 4. Update conversation history
             if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
+                self.add_to_history(HumanMessage(content=query, id=self.message_id))
                 if final_output:
-                    self.add_to_history(AIMessage(content=final_output))
+                    self.add_to_history(AIMessage(content=final_output, id=self.message_id))
 
             # 5. Handle structured output if requested
             if output_schema and final_output:
@@ -853,7 +860,9 @@ class MCPAgent:
                     )
 
                     if self.memory_enabled:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                        self.add_to_history(
+                            AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                        )
 
                     logger.info("✅ Structured output successful")
                     success = True
@@ -943,6 +952,7 @@ class MCPAgent:
             config={
                 "callbacks": self.callbacks,
                 "recursion_limit": recursion_limit,
+                "metadata": self.metadata,
             },
         ):
             # Collect AI message chunks for history
@@ -962,11 +972,11 @@ class MCPAgent:
         # 5. Update conversation history with both messages ---------------------
         if self.memory_enabled:
             # Add human message first
-            self.add_to_history(HumanMessage(content=query))
+            self.add_to_history(HumanMessage(content=query, id=self.message_id))
             # Add AI message if we collected any chunks
             if ai_message_chunks:
                 ai_content = "".join(ai_message_chunks)
-                self.add_to_history(AIMessage(content=ai_content))
+                self.add_to_history(AIMessage(content=ai_content, id=self.message_id))
 
         # 6. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
