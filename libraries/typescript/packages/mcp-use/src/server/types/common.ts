@@ -75,41 +75,20 @@ export interface ServerConfig {
   allowedOrigins?: string[];
   sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
   /**
-   * Automatically create a new session when a request is received with an invalid/expired session ID.
+   * @deprecated This option is deprecated and will be removed in a future version.
    *
-   * **Default: true** (enables compatibility with non-compliant clients like ChatGPT)
+   * The MCP specification requires clients to send a new InitializeRequest when they receive
+   * a 404 response for a stale session. Modern MCP clients
+   * handle this correctly. The server now follows the spec strictly by returning 404 for invalid
+   * session IDs.
    *
-   * When set to `true` (default), the server will automatically create a new session when it receives
-   * a request with an invalid or expired session ID. This allows clients to seamlessly
-   * reconnect after server restarts without needing to send a new `initialize` request.
+   * If you need session persistence across server restarts, use the `sessionStore` option
+   * with a persistent storage backend (Redis, PostgreSQL, etc.) instead.
    *
-   * **Note**: According to the [MCP protocol specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management),
-   * clients **MUST** start a new session by sending a new `InitializeRequest` when they receive
-   * HTTP 404 in response to a request containing an `MCP-Session-Id`. However, some clients (like
-   * ChatGPT) don't properly handle this and fail to reconnect. Setting this to `true` enables
-   * compatibility with these non-compliant clients.
-   *
-   * When set to `false`, the server follows the MCP protocol specification strictly:
-   * it returns HTTP 404 Not Found for requests with invalid session IDs, requiring
-   * clients to explicitly send a new `initialize` request.
-   *
-   * @example
-   * ```typescript
-   * // Default behavior (compatible with ChatGPT and other non-compliant clients)
-   * const server = new MCPServer({
-   *   name: 'my-server',
-   *   version: '1.0.0'
-   * });
-   *
-   * // Use strict MCP spec behavior (requires compliant clients)
-   * const server = new MCPServer({
-   *   name: 'my-server',
-   *   version: '1.0.0',
-   *   autoCreateSessionOnInvalidId: false
-   * });
-   * ```
+   * @see {@link sessionStore} for persistent session storage
+   * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
    */
-  autoCreateSessionOnInvalidId?: boolean; // Default: true (compatible with non-compliant clients)
+  autoCreateSessionOnInvalidId?: boolean;
   /**
    * Enable stateless mode (no session tracking)
    * - Default: true for Deno (edge runtimes), false for Node.js
@@ -136,6 +115,72 @@ export interface ServerConfig {
    * ```
    */
   stateless?: boolean;
+  /**
+   * Custom session metadata storage backend (default: in-memory)
+   *
+   * Stores serializable session metadata (client capabilities, log level, timestamps).
+   * For active SSE stream management, use `streamManager`.
+   *
+   * Allows pluggable session persistence for scenarios requiring:
+   * - Session metadata survival across server restarts
+   * - Distributed/clustered deployments
+   * - Horizontal scaling with session sharing
+   *
+   * Default: InMemorySessionStore (metadata lost on restart)
+   *
+   * @example
+   * ```typescript
+   * import { MCPServer, RedisSessionStore } from 'mcp-use/server';
+   * import { createClient } from 'redis';
+   *
+   * const redis = createClient({ url: process.env.REDIS_URL });
+   * await redis.connect();
+   *
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   sessionStore: new RedisSessionStore({ client: redis })
+   * });
+   * ```
+   */
+  sessionStore?: import("../sessions/stores/index.js").SessionStore;
+  /**
+   * Custom stream manager for active SSE connections (default: in-memory)
+   *
+   * Manages active SSE stream controllers for server-to-client push notifications.
+   * Separate from sessionStore to enable distributed notifications via Redis Pub/Sub.
+   *
+   * Default: InMemoryStreamManager (streams on this server only)
+   *
+   * For distributed deployments where notifications/sampling need to work across
+   * multiple server instances, use RedisStreamManager with Redis Pub/Sub.
+   *
+   * @example
+   * ```typescript
+   * import { MCPServer, RedisStreamManager, RedisSessionStore } from 'mcp-use/server';
+   * import { createClient } from 'redis';
+   *
+   * // Create two Redis clients (Pub/Sub requires dedicated client)
+   * const redis = createClient({ url: process.env.REDIS_URL });
+   * const pubSubRedis = redis.duplicate();
+   *
+   * await redis.connect();
+   * await pubSubRedis.connect();
+   *
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   sessionStore: new RedisSessionStore({ client: redis }),
+   *   streamManager: new RedisStreamManager({
+   *     client: redis,
+   *     pubSubClient: pubSubRedis
+   *   })
+   * });
+   *
+   * // Now notifications and sampling work across all server instances!
+   * ```
+   */
+  streamManager?: import("../sessions/streams/index.js").StreamManager;
   /**
    * OAuth authentication configuration
    *

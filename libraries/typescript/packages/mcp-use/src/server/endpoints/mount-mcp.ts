@@ -7,7 +7,11 @@
 
 import type { Context, Hono as HonoType } from "hono";
 import type { SessionData } from "../sessions/index.js";
-import { startIdleCleanup } from "../sessions/index.js";
+import {
+  startIdleCleanup,
+  InMemorySessionStore,
+  InMemoryStreamManager,
+} from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
 import { generateUUID } from "../utils/runtime.js";
 import { Telemetry } from "../../telemetry/index.js";
@@ -33,8 +37,26 @@ export async function mountMcp(
 
   const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
+  // Initialize session store (pluggable - can be Redis, Postgres, etc.)
+  // Stores ONLY serializable metadata (client capabilities, log level, timestamps)
+  const sessionStore = config.sessionStore ?? new InMemorySessionStore();
+
+  // Initialize stream manager (pluggable - can be Redis Pub/Sub, Postgres NOTIFY, etc.)
+  // Manages active SSE connections for notifications, sampling, resource subscriptions
+  const streamManager = config.streamManager ?? new InMemoryStreamManager();
+
   // Map to store transports by session ID (following official Hono example from PR #1209)
   const transports = new Map<string, any>();
+
+  // Warn if deprecated option is used
+  if (config.autoCreateSessionOnInvalidId !== undefined) {
+    console.warn(
+      "[MCP] WARNING: 'autoCreateSessionOnInvalidId' is deprecated and will be removed in a future version.\n" +
+        "The MCP specification requires clients to send a new InitializeRequest when receiving a 404 for stale sessions.\n" +
+        "Modern MCP clients handle this correctly. For session persistence across restarts, use the 'sessionStore' option.\n" +
+        "See: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management"
+    );
+  }
 
   // Start idle cleanup interval if configured (only in stateful mode)
   let idleCleanupInterval: NodeJS.Timeout | undefined;
@@ -71,22 +93,51 @@ export async function mountMcp(
 
       // Handle HEAD requests for keep-alive/health checks
       if (c.req.method === "HEAD") {
-        if (sessionId && sessions.has(sessionId)) {
-          sessions.get(sessionId)!.lastAccessedAt = Date.now();
+        if (sessionId && (await sessionStore.has(sessionId))) {
+          const session = await sessionStore.get(sessionId);
+          if (session) {
+            session.lastAccessedAt = Date.now();
+            await sessionStore.set(sessionId, session);
+          }
         }
         return new Response(null, { status: 200 });
+      }
+
+      // Check if session ID exists but transport doesn't (stale session after restart)
+      if (sessionId && !(await sessionStore.has(sessionId))) {
+        // Per MCP spec: Return 404 for invalid/expired sessions
+        // Client MUST send new InitializeRequest to establish new session
+        // See: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
+        console.log(
+          `[MCP] Session not found: ${sessionId} - returning 404 (client should re-initialize)`
+        );
+        return c.json(
+          {
+            jsonrpc: "2.0",
+            error: { code: -32001, message: "Session not found" },
+            id: null,
+          },
+          404
+        );
       }
 
       if (sessionId && transports.has(sessionId)) {
         // Reuse existing transport for this session
         const transport = transports.get(sessionId)!;
 
-        // Update session metadata
-        if (sessions.has(sessionId)) {
-          const session = sessions.get(sessionId)!;
-          session.lastAccessedAt = Date.now();
-          session.context = c;
-          session.honoContext = c;
+        // Update session metadata (only serializable fields)
+        const metadata = await sessionStore.get(sessionId);
+        if (metadata) {
+          metadata.lastAccessedAt = Date.now();
+          await sessionStore.set(sessionId, metadata);
+        }
+
+        // Update in-memory session data with current context
+        const sessionData = sessions.get(sessionId);
+        if (sessionData) {
+          sessionData.lastAccessedAt = Date.now();
+          sessionData.context = c;
+          sessionData.honoContext = c;
         }
 
         // Pass Web Standard Request directly - no adapter needed!
@@ -98,32 +149,51 @@ export async function mountMcp(
       const transport = new FetchStreamableHTTPServerTransport({
         sessionIdGenerator: () => generateUUID(),
 
-        onsessioninitialized: (sid: string) => {
+        onsessioninitialized: async (sid: string) => {
           console.log(`[MCP] Session initialized: ${sid}`);
           transports.set(sid, transport);
-          sessions.set(sid, {
+
+          // Store full session data in memory (includes transport, server, context)
+          const sessionData: SessionData = {
             transport,
             server,
             lastAccessedAt: Date.now(),
             context: c,
             honoContext: c,
+          };
+          sessions.set(sid, sessionData);
+
+          // Store only serializable metadata in sessionStore
+          await sessionStore.set(sid, {
+            lastAccessedAt: Date.now(),
           });
 
           // Capture client capabilities after initialization completes
           // The server.oninitialized callback fires after the client sends the initialized notification
-          server.server.oninitialized = () => {
+          server.server.oninitialized = async () => {
             const clientCapabilities = server.server.getClientCapabilities();
             const clientInfo = (server.server as any).getClientInfo?.() || {};
             const protocolVersion =
               (server.server as any).getProtocolVersion?.() || "unknown";
 
-            if (clientCapabilities && sessions.has(sid)) {
-              const session = sessions.get(sid)!;
-              session.clientCapabilities = clientCapabilities;
+            // Update metadata in sessionStore
+            const metadata = await sessionStore.get(sid);
+            if (metadata) {
+              metadata.clientCapabilities = clientCapabilities;
+              metadata.clientInfo = clientInfo;
+              metadata.protocolVersion = String(protocolVersion);
+              await sessionStore.set(sid, metadata);
+
               console.log(
                 `[MCP] Captured client capabilities for session ${sid}:`,
-                Object.keys(clientCapabilities)
+                clientCapabilities ? Object.keys(clientCapabilities) : "none"
               );
+            }
+
+            // Update in-memory session data
+            const sessionData = sessions.get(sid);
+            if (sessionData) {
+              sessionData.clientCapabilities = clientCapabilities;
             }
 
             // Track server initialize event
@@ -140,10 +210,17 @@ export async function mountMcp(
           };
         },
 
-        onsessionclosed: (sid: string) => {
+        onsessionclosed: async (sid: string) => {
           console.log(`[MCP] Session closed: ${sid}`);
           transports.delete(sid);
+
+          // Clean up stream manager
+          await streamManager.delete(sid);
+
+          // Clean up session metadata
+          await sessionStore.delete(sid);
           sessions.delete(sid);
+
           // Clean up resource subscriptions for this session
           mcpServerInstance.cleanupSessionSubscriptions?.(sid);
         },

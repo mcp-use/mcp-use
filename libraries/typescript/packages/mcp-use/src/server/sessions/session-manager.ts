@@ -10,33 +10,48 @@ import type { Transport } from "@mcp-use/modelcontextprotocol-sdk/shared/transpo
 import type { McpServer } from "@mcp-use/modelcontextprotocol-sdk/server/mcp.js";
 
 /**
- * Session data stored for each active MCP session
- * Following official SDK pattern - each session has its own transport and server
+ * Serializable session metadata
+ *
+ * This is the data that can be stored in external stores (Redis, Postgres).
+ * It excludes runtime objects like transport and server instances.
  */
-export interface SessionData {
-  /** Reference to this session's transport instance */
-  transport: Transport;
-  /** Reference to this session's server instance */
-  server?: McpServer;
+export interface SessionMetadata {
   /** Timestamp of last activity for idle timeout tracking */
   lastAccessedAt: number;
-  /** Hono context for this session's current request */
-  context?: Context;
-  /** Progress token for current tool call (if any) */
-  progressToken?: number;
-  /** Function to send notifications to the client */
-  sendNotification?: (notification: {
-    method: string;
-    params: Record<string, unknown>;
-  }) => Promise<void>;
-  /** Express-like response object for notifications */
-  expressRes?: Response | Record<string, unknown>;
-  /** Hono context for direct response access */
-  honoContext?: Context;
   /** Minimum log level for filtering log messages (RFC 5424 levels) */
   logLevel?: string;
   /** Client capabilities advertised during initialization */
   clientCapabilities?: Record<string, unknown>;
+  /** Client info (name, version) */
+  clientInfo?: Record<string, unknown>;
+  /** Protocol version negotiated during initialization */
+  protocolVersion?: string;
+  /** Progress token for current tool call (if any) */
+  progressToken?: number;
+}
+
+/**
+ * Complete session data including runtime instances
+ *
+ * This extends SessionMetadata with non-serializable runtime objects.
+ * The full SessionData is only available in memory on the server handling the session.
+ */
+export interface SessionData extends SessionMetadata {
+  /** Reference to this session's transport instance (not serializable) */
+  transport: Transport;
+  /** Reference to this session's server instance (not serializable) */
+  server?: McpServer;
+  /** Hono context for this session's current request (not serializable) */
+  context?: Context;
+  /** Function to send notifications to the client (not serializable) */
+  sendNotification?: (notification: {
+    method: string;
+    params: Record<string, unknown>;
+  }) => Promise<void>;
+  /** Express-like response object for notifications (not serializable) */
+  expressRes?: Response | Record<string, unknown>;
+  /** Hono context for direct response access (not serializable) */
+  honoContext?: Context;
 }
 
 /**

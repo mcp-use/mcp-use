@@ -1,0 +1,350 @@
+---
+title: "Scale Testing"
+description: "Load testing, stress testing, and validating MCP servers at production scale"
+---
+
+# Scale Testing MCP Servers
+
+Comprehensive guide for testing MCP servers under realistic production loads, validating performance, stability, and resilience.
+
+## Overview
+
+The mcp-use scale testing suite validates your MCP server across multiple dimensions:
+
+- **Load Testing**: Performance under concurrent client connections
+- **Stress Testing**: Finding breaking points and limits
+- **Longevity Testing**: 24-72 hour stability and memory leak detection
+- **Chaos Testing**: Resilience under failure conditions
+- **Distributed Testing**: Multi-server deployments with load balancing
+
+## Test Server
+
+All tests use a comprehensive test server located at `tests/scale/test-server.ts` that implements:
+
+**Tools:**
+- `fast-echo` - Minimal latency baseline
+- `slow-computation` - CPU-intensive workload
+- `fetch-data` - I/O-bound operations
+- `trigger-notification` - Send notifications to clients
+- `request-sampling` - Test client sampling capability
+- `request-input` - Test client elicitation capability
+
+**Resources:**
+- `app://static-data` - Static content
+- `app://dynamic-data` - Server state and metrics
+- `app://large-data` - 100KB payload for bandwidth testing
+
+**Prompts:**
+- `greeting` - Simple template with parameters
+- `code-review` - Multi-line template
+
+## Running Tests
+
+### 1. Capability Matrix Test
+
+Validates all MCP features work with different client capability combinations.
+
+```bash
+npx tsx tests/scale/capability-matrix.ts
+```
+
+**Duration:** 2-3 minutes
+
+**What it tests:**
+- Minimal clients (no special capabilities)
+- Sampling-capable clients
+- Elicitation-capable clients
+- Full-featured clients
+
+**Expected output:**
+
+```
+╔═══════════════════════════════════════════════════════════╗
+║         Client Capability Matrix Test                     ║
+╚═══════════════════════════════════════════════════════════╝
+
+Profile         Tools  Resources  Prompts  Sampling  Elicitation  Notifications
+Minimal Client   ✅      ✅         ✅        ⊘          ⊘             ✅
+Sampling Client  ✅      ✅         ✅        ✅         ⊘             ✅
+Full-Featured    ✅      ✅         ✅        ✅         ✅            ✅
+```
+
+### 2. Load Test (Mixed Workload)
+
+Simulates realistic production usage patterns.
+
+```bash
+# Light load: 100 clients, 5 minutes
+REDIS_URL=redis://... npx tsx tests/scale/load-mixed-workload.ts \
+  --clients=100 --duration=300000 --rpm=10
+
+# Moderate load: 1000 clients, 30 minutes
+REDIS_URL=redis://... npx tsx tests/scale/load-mixed-workload.ts \
+  --clients=1000 --duration=1800000 --rpm=20
+
+# Heavy load: 10000 clients, 1 hour (requires distributed setup)
+REDIS_URL=redis://... npx tsx tests/scale/load-mixed-workload.ts \
+  --clients=10000 --duration=3600000 --rpm=10
+```
+
+**Parameters:**
+- `--clients`: Number of concurrent clients
+- `--duration`: Test duration in milliseconds
+- `--rpm`: Requests per minute per client
+
+**Success Criteria:**
+
+| Clients | Target p95 Latency | Max Error Rate |
+|---------|-------------------|----------------|
+| 100     | < 50ms            | < 0.1%         |
+| 1,000   | < 100ms           | < 0.5%         |
+| 10,000  | < 200ms           | < 1%           |
+
+### 3. Notification Stress Test
+
+Tests high-volume notification delivery.
+
+```bash
+# 100 clients, 50 notifications
+REDIS_URL=redis://... npx tsx tests/scale/notification-stress.ts \
+  --clients=100 --per-batch=10 --batches=5
+
+# 1000 clients, 200 notifications
+REDIS_URL=redis://... npx tsx tests/scale/notification-stress.ts \
+  --clients=1000 --per-batch=20 --batches=10
+```
+
+**Verifies:**
+- Redis Pub/Sub scalability
+- SSE stream stability
+- Cross-server notification delivery
+
+**Target:** ≥ 99% delivery rate, p95 latency < 500ms
+
+### 4. k6 Load Test
+
+Industry-standard load testing with k6.
+
+```bash
+# Install k6
+brew install k6  # macOS
+
+# Quick test (100 VUs, 1 minute)
+k6 run --vus=100 --duration=1m tests/scale/k6-mcp-server.js
+
+# Full scenario suite
+k6 run tests/scale/k6-mcp-server.js
+
+# With JSON output
+k6 run --out json=results.json tests/scale/k6-mcp-server.js
+```
+
+**Scenarios included:**
+1. **Baseline**: 50 VUs constant for 5 minutes
+2. **Ramping**: 0 → 1000 VUs over 15 minutes
+3. **Spike**: 0 → 2000 for 1 minute (burst)
+
+**Thresholds:**
+- http_req_duration p(95) < 500ms
+- http_req_failed rate < 1%
+- tool_call_duration p(95) < 200ms
+
+### 5. Long-Running Stability
+
+Detects memory leaks and performance degradation.
+
+```bash
+# 1 hour (quick validation)
+REDIS_URL=redis://... npx tsx tests/scale/long-running-sessions.ts --duration=1
+
+# 24 hours (recommended before production)
+REDIS_URL=redis://... npx tsx tests/scale/long-running-sessions.ts --duration=24
+
+# 72 hours (comprehensive validation)
+REDIS_URL=redis://... npx tsx tests/scale/long-running-sessions.ts --duration=72
+```
+
+**Monitors:**
+- Memory usage every hour
+- Request success/error rates
+- Session stability
+- Redis connection health
+
+**Outputs:**
+- Real-time progress to console
+- Memory snapshots: `test-results/longevity/memory-snapshots.jsonl`
+- Final report: `test-results/longevity/longevity-report-<timestamp>.json`
+
+**Analysis:**
+
+```bash
+# Plot memory over time
+cat test-results/longevity/memory-snapshots.jsonl | \
+  jq -r '[.elapsedHours, .memory.heapUsed] | @csv'
+```
+
+### 6. Chaos Testing
+
+Validates resilience under failures.
+
+```bash
+REDIS_URL=redis://... npx tsx tests/scale/chaos-test.ts
+```
+
+**Scenarios:**
+- ✅ Server restart during active sessions
+- ⊘ Redis connection failure (requires manual Redis control)
+- ✅ High latency network conditions
+
+**Expected behavior:**
+- Clients auto-recover with 404 → re-initialize
+- Graceful degradation during Redis outage
+- Stable performance after recovery
+
+## Distributed Testing
+
+Test multi-server deployment with Docker Compose.
+
+### Setup
+
+```bash
+cd tests/scale
+
+# Start 3 servers + Redis + nginx load balancer
+docker-compose up -d
+
+# Check health
+docker-compose ps
+
+# View logs
+docker-compose logs -f mcp-server-1
+```
+
+**Architecture:**
+
+```
+Client → nginx:8080 → (load balance) → Server 1:3001
+                                     → Server 2:3002
+                                     → Server 3:3003
+                                         ↓
+                                    Redis:6379
+```
+
+### Test Cross-Server Notifications
+
+```bash
+# Terminal 1: Watch server 1 logs
+docker-compose logs -f mcp-server-1
+
+# Terminal 2: Send request to server 2 that triggers notification
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "trigger-notification",
+      "arguments": { "type": "tools" }
+    },
+    "id": 1
+  }'
+
+# Verify notification delivered via server 1's SSE connection
+```
+
+### Cleanup
+
+```bash
+docker-compose down -v  # Remove volumes
+```
+
+## Metrics and Monitoring
+
+### Prometheus Integration
+
+The test server exposes metrics at `/metrics`:
+
+```typescript
+import { getMetricsCollector } from './metrics-collector.js';
+
+const collector = getMetricsCollector();
+collector.startMonitoring(server, streamManager, 5000);
+
+// In your server
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', 'text/plain');
+  res.send(await collector.getMetrics());
+});
+```
+
+### Key Metrics to Monitor
+
+**Request Metrics:**
+- `mcp_tool_calls_total{tool_name, status}` - Tool invocations
+- `mcp_request_duration_seconds{method}` - Latency by operation
+- `mcp_errors_total{error_type, operation}` - Errors
+
+**Session Metrics:**
+- `mcp_active_sessions` - Current sessions
+- `mcp_sessions_created_total` - Total created
+- `mcp_sessions_closed_total{reason}` - Total closed
+
+**Notification Metrics:**
+- `mcp_notifications_sent_total{notification_type}` - Notifications
+- `mcp_notification_latency_seconds` - Delivery time
+- `mcp_active_sse_streams` - Active SSE connections
+
+**System Metrics:**
+- `mcp_memory_usage_bytes{type}` - Memory consumption
+- `mcp_redis_connections` - Redis connections
+
+### Grafana Queries
+
+**Requests per second:**
+```promql
+rate(mcp_tool_calls_total[1m])
+```
+
+**Error rate:**
+```promql
+rate(mcp_errors_total[1m]) / rate(mcp_tool_calls_total[1m])
+```
+
+**p95 latency:**
+```promql
+histogram_quantile(0.95, rate(mcp_request_duration_seconds_bucket[5m]))
+```
+
+**Active sessions over time:**
+```promql
+mcp_active_sessions
+```
+
+## Success Criteria Summary
+
+| Test Type | Duration | Clients | Success Criteria |
+|-----------|----------|---------|------------------|
+| Capability Matrix | 2-3 min | 4 profiles | All core features work |
+| Load (Light) | 5 min | 100 | p95 < 50ms, errors < 0.1% |
+| Load (Moderate) | 30 min | 1,000 | p95 < 100ms, errors < 0.5% |
+| Load (Heavy) | 1 hour | 10,000 | p95 < 200ms, errors < 1% |
+| Notifications | 5 min | 1,000 | ≥ 99% delivery, p95 < 500ms |
+| Longevity | 24 hours | 100 | < 50% heap growth, < 1% errors |
+| Chaos | 15 min | Varies | Auto-recovery from failures |
+
+## Next Steps
+
+After validating scale:
+
+1. **Establish Baselines**: Document your performance numbers
+2. **Set Up Monitoring**: Deploy Prometheus/Grafana for production
+3. **Create Alerts**: Define SLOs and alert thresholds
+4. **Run Regularly**: Schedule weekly scale tests
+5. **Regression Testing**: Compare new releases against baselines
+
+## Related Documentation
+
+- [Session Management](/typescript/server/session-management)
+- [Distributed Deployments](/typescript/server/deployment-mcp-use)
+- [Monitoring Guide](/typescript/server/logging)

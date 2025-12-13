@@ -40,7 +40,24 @@ export type UseMcpOptions = {
   autoReconnect?: boolean | number;
   /** Popup window features string (dimensions and behavior) for OAuth */
   popupFeatures?: string;
-  /** Transport type preference: 'auto' (HTTP with SSE fallback), 'http' (HTTP only), 'sse' (SSE only) */
+  /**
+   * Transport type preference.
+   *
+   * @deprecated The 'sse' option is deprecated. Use 'http' or 'auto' instead.
+   *
+   * As of MCP spec 2025-11-25, the old HTTP+SSE transport is deprecated in favor
+   * of Streamable HTTP (unified endpoint). StreamableHTTP still supports SSE for
+   * notifications - it just uses a single /mcp endpoint instead of separate endpoints.
+   *
+   * **Backward compatibility:** 'sse' option still works and is maintained.
+   *
+   * Options:
+   * - 'auto': Try HTTP (Streamable HTTP), fallback to SSE if needed (recommended)
+   * - 'http': Use Streamable HTTP only (recommended for new code)
+   * - 'sse': Use old SSE transport (deprecated, but still works)
+   *
+   * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+   */
   transportType?: "auto" | "http" | "sse";
   /**
    * Prevent automatic authentication popup/redirect on initial connection (default: false)

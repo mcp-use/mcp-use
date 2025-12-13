@@ -69,6 +69,25 @@ export {
   type CustomProviderConfig,
 } from "./oauth/index.js";
 
+// Session storage utilities for pluggable persistence
+export {
+  type SessionStore,
+  InMemorySessionStore,
+  RedisSessionStore,
+  type RedisClient,
+  type RedisSessionStoreConfig,
+  type SessionData,
+  type SessionMetadata,
+} from "./sessions/index.js";
+
+// Stream management utilities for active SSE connections
+export {
+  type StreamManager,
+  InMemoryStreamManager,
+  RedisStreamManager,
+  type RedisStreamManagerConfig,
+} from "./sessions/index.js";
+
 // MCP-UI adapter utility functions
 export {
   buildWidgetUrl,
