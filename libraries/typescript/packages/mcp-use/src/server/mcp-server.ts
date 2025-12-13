@@ -53,6 +53,9 @@ import {
   getActiveSessions,
   sendNotification,
   sendNotificationToSession,
+  sendToolsListChanged,
+  sendResourcesListChanged,
+  sendPromptsListChanged,
 } from "./notifications/index.js";
 import {
   findSessionContext,
@@ -886,6 +889,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public getActiveSessions = getActiveSessions;
   public sendNotification = sendNotification;
   public sendNotificationToSession = sendNotificationToSession;
+  public sendToolsListChanged = sendToolsListChanged;
+  public sendResourcesListChanged = sendResourcesListChanged;
+  public sendPromptsListChanged = sendPromptsListChanged;
 
   /**
    * Notify subscribed clients that a resource has been updated

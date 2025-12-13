@@ -105,6 +105,13 @@
     "test:integration:structured": "vitest run tests/integration/agent/test_agent_structured_output.test.ts",
     "test:integration:manager": "vitest run tests/integration/agent/test_server_manager.test.ts",
     "test:integration:observability": "vitest run tests/integration/agent/test_agent_observability.test.ts",
+    "test:scale:capability": "tsx tests/scale/capability-matrix.ts",
+    "test:scale:load": "tsx tests/scale/load-mixed-workload.ts --clients=100 --duration=300000 --rpm=10",
+    "test:scale:notifications": "tsx tests/scale/notification-stress.ts --clients=100 --per-batch=10 --batches=5",
+    "test:scale:longevity": "tsx tests/scale/long-running-sessions.ts --duration=1",
+    "test:scale:chaos": "tsx tests/scale/chaos-test.ts",
+    "test:scale:all": "npm run test:scale:capability && npm run test:scale:load && npm run test:scale:notifications",
+    "scale:server": "tsx tests/scale/test-server.ts",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build",
@@ -200,6 +207,7 @@
   "optionalDependencies": {
     "chalk": "^5.6.2",
     "cli-highlight": "^2.1.11",
+    "redis": "^5.10.0",
     "winston": "^3.18.3"
   },
   "devDependencies": {

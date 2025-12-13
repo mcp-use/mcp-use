@@ -44,6 +44,9 @@ export default defineConfig({
     "supports-color",
     // Keep react-router-dom external (optional, for widgets)
     "react-router-dom",
+    // Keep Redis external (optional dependency, uses Node.js built-ins)
+    "redis",
+    "@redis/client",
   ],
   esbuildOptions(options) {
     // Preserve node: prefix for Deno compatibility

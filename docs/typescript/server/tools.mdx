@@ -350,6 +350,25 @@ server.tool({
 The `ctx.log()` function accepts a log level (`'debug'`, `'info'`, `'notice'`, `'warning'`, `'error'`, `'critical'`, `'alert'`, `'emergency'`), a message string, and an optional logger name. See [Server Logging](./logging#tool-logging-with-ctxlog) for complete documentation on log levels and best practices.
 
 
+## Notifying Clients of Tool Changes
+
+When dynamically adding or removing tools, notify clients to refresh their tools cache:
+
+```typescript
+// Register a new tool dynamically
+server.tool({
+  name: 'new_tool',
+  description: 'A dynamically added tool',
+  schema: z.object({ input: z.string() })
+}, async ({ input }) => text(`Processed: ${input}`));
+
+// Notify all connected clients
+await server.sendToolsListChanged();
+```
+
+See [Notifications](./notifications) for more details.
+
+
 ## Testing
 
 

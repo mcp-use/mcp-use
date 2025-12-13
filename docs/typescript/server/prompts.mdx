@@ -46,6 +46,26 @@ server.prompt({
 })
 ```
 
+## Notifying Clients of Prompt Changes
+
+When dynamically adding or removing prompts, notify clients to refresh their prompts cache:
+
+```typescript
+// Register a new prompt dynamically
+server.prompt({
+  name: 'new_prompt',
+  description: 'A dynamically added prompt',
+  schema: z.object({ topic: z.string() })
+}, async ({ topic }) => ({
+  messages: [{ role: 'system', content: `Expert in ${topic}` }]
+}));
+
+// Notify all connected clients
+await server.sendPromptsListChanged();
+```
+
+See [Notifications](./notifications) for more details.
+
 ## Next Steps
 
 - [Tools Guide](./tools) - Building executable tools

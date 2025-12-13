@@ -107,3 +107,78 @@ export async function sendNotificationToSession(
     params
   );
 }
+
+/**
+ * Notify all clients that the tools list has changed
+ *
+ * Convenience method that sends a `notifications/tools/list_changed` notification
+ * to all connected clients. Use this when dynamically adding or removing tools
+ * to prompt clients to refresh their tools cache.
+ *
+ * Note: This only works in stateful mode with active sessions.
+ *
+ * @example
+ * ```typescript
+ * // After dynamically registering a new tool
+ * server.tool({ name: 'new_tool', ... }, async () => {...});
+ * await server.sendToolsListChanged();
+ * ```
+ */
+export async function sendToolsListChanged(
+  this: NotificationServerContext
+): Promise<void> {
+  await sendNotificationToAll(
+    this.sessions,
+    "notifications/tools/list_changed"
+  );
+}
+
+/**
+ * Notify all clients that the resources list has changed
+ *
+ * Convenience method that sends a `notifications/resources/list_changed` notification
+ * to all connected clients. Use this when dynamically adding or removing resources
+ * to prompt clients to refresh their resources cache.
+ *
+ * Note: This only works in stateful mode with active sessions.
+ *
+ * @example
+ * ```typescript
+ * // After dynamically registering a new resource
+ * server.resource({ name: 'new_resource', uri: 'app://new' }, async () => {...});
+ * await server.sendResourcesListChanged();
+ * ```
+ */
+export async function sendResourcesListChanged(
+  this: NotificationServerContext
+): Promise<void> {
+  await sendNotificationToAll(
+    this.sessions,
+    "notifications/resources/list_changed"
+  );
+}
+
+/**
+ * Notify all clients that the prompts list has changed
+ *
+ * Convenience method that sends a `notifications/prompts/list_changed` notification
+ * to all connected clients. Use this when dynamically adding or removing prompts
+ * to prompt clients to refresh their prompts cache.
+ *
+ * Note: This only works in stateful mode with active sessions.
+ *
+ * @example
+ * ```typescript
+ * // After dynamically registering a new prompt
+ * server.prompt({ name: 'new_prompt', ... }, async () => {...});
+ * await server.sendPromptsListChanged();
+ * ```
+ */
+export async function sendPromptsListChanged(
+  this: NotificationServerContext
+): Promise<void> {
+  await sendNotificationToAll(
+    this.sessions,
+    "notifications/prompts/list_changed"
+  );
+}

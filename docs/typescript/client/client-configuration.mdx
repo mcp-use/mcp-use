@@ -58,6 +58,115 @@ The connection type is automatically detected based on your server configuration
 | **STDIO** | Local development | Testing servers locally, file system access, no network setup needed |
 | **HTTP/SSE** | Production deployment | Remote servers, load balancing, authentication, multiple clients |
 
+<Note>
+**Transport Migration Notice (MCP Spec 2025-11-25)**
+
+The old SSE transport (separate POST and SSE endpoints) is deprecated in favor of **Streamable HTTP** (unified endpoint).
+
+**Your existing code still works!** The `sse` transport option is maintained for backward compatibility.
+
+**What changed:**
+- **Old way**: POST `/messages` for requests, GET `/sse` for notifications (two endpoints)
+- **New way**: POST `/mcp` and GET `/mcp` (one unified endpoint)
+- **SSE still works** for notifications - just through the unified endpoint
+
+**Migration (when convenient):**
+
+```typescript
+// Old (deprecated, but still works)
+const mcp = useMcp({
+  url: 'http://localhost:3000/sse',
+  transportType: 'sse'
+});
+
+// New (recommended)
+const mcp = useMcp({
+  url: 'http://localhost:3000/mcp',
+  transportType: 'http'  // or 'auto'
+});
+```
+
+**No action required** for existing code. Migrate at your own pace.
+
+Learn more: [MCP Spec - Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http)
+</Note>
+
+## Automatic Session Management
+
+mcp-use clients automatically handle session lifecycle and recovery per the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management).
+
+### Automatic 404 Recovery
+
+When using HTTP/SSE transports, the client automatically handles server restarts and expired sessions:
+
+```mermaid
+sequenceDiagram
+    participant App as Your App
+    participant Client as mcp-use Client
+    participant Server as MCP Server
+    
+    Note over App,Server: Normal operation
+    App->>Client: callTool("fetch_data")
+    Client->>Server: POST /mcp<br/>session-id: abc-123
+    Server-->>Client: 200 OK + result
+    Client-->>App: Tool result
+    
+    Note over Server: SERVER RESTARTS
+    
+    Note over App,Server: Next request
+    App->>Client: callTool("another_tool")
+    Client->>Server: POST /mcp<br/>session-id: abc-123
+    Server-->>Client: 404 Session not found
+    
+    Note over Client: Auto-detect 404<br/>Clear stale session<br/>Re-initialize
+    
+    Client->>Server: POST /mcp<br/>(no session-id)<br/>initialize
+    Server-->>Client: 200 OK<br/>new session-id: def-456
+    
+    Client->>Server: POST /mcp<br/>session-id: def-456<br/>Retry callTool
+    Server-->>Client: 200 OK + result
+    Client-->>App: Tool result
+```
+
+**How it works:**
+
+1. Client makes request with session ID
+2. Server returns 404 (session expired or server restarted)
+3. **Client automatically**:
+   - Detects 404 error with active session
+   - Clears stale session ID
+   - Sends new `initialize` request
+   - Retries original request with new session
+4. Original request succeeds - **completely transparent to your app**
+
+**Benefits:**
+
+- ✅ No manual reconnection required
+- ✅ Seamless recovery from server restarts
+- ✅ Works for both HTTP and SSE transports
+- ✅ Complies with MCP specification
+- ✅ Automatic in inspector, React hooks, and Node.js clients
+
+**Logging:**
+
+Watch for these log messages to see automatic recovery in action:
+
+```
+[StreamableHttp] Session not found (404), re-initializing per MCP spec...
+[StreamableHttp] Re-initialization successful, retrying request
+```
+
+### Session Persistence
+
+HTTP/SSE connections maintain session state across requests:
+
+- **Session ID**: Automatically managed by the client
+- **Client capabilities**: Preserved across requests
+- **Server capabilities**: Cached after initialization
+- **Subscriptions**: Maintained for resource updates
+
+STDIO connections are stateless and don't use sessions.
+
 ## Server Configuration
 
 The MCPClient uses a flexible configuration system that supports any MCP server, regardless of connection type.

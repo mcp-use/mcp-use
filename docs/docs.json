@@ -543,9 +543,19 @@
                     ]
                   },
                   {
+                    "group": "Session Management",
+                    "icon": "key-round",
+                    "pages": [
+                      "typescript/server/session-management",
+                      "typescript/server/session-management/memory-storage",
+                      "typescript/server/session-management/redis-storage"
+                    ]
+                  },
+                  {
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
+                      "typescript/server/comparison-with-other-implementations",
                       "typescript/server/elicitation",
                       "typescript/server/sampling",
                       "typescript/server/subscriptions",
@@ -577,7 +587,8 @@
                     "icon": "rocket",
                     "pages": [
                       "typescript/server/deployment-mcp-use",
-                      "typescript/server/deployment-supabase"
+                      "typescript/server/deployment-supabase",
+                      "typescript/server/scale-testing"
                     ]
                   }
                 ]

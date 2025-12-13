@@ -2,9 +2,28 @@
  * Session Management Exports
  */
 
-export { type SessionData, startIdleCleanup } from "./session-manager.js";
+export {
+  type SessionData,
+  type SessionMetadata,
+  startIdleCleanup,
+} from "./session-manager.js";
 
 export {
   sendNotificationToAll,
   sendNotificationToSession,
 } from "./notifications.js";
+
+export {
+  type SessionStore,
+  InMemorySessionStore,
+  RedisSessionStore,
+  type RedisClient,
+  type RedisSessionStoreConfig,
+} from "./stores/index.js";
+
+export {
+  type StreamManager,
+  InMemoryStreamManager,
+  RedisStreamManager,
+  type RedisStreamManagerConfig,
+} from "./streams/index.js";
