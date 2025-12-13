@@ -71,16 +71,49 @@ export async function mountMcp(
 
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
-    if (config.stateless) {
-      // STATELESS MODE: New server instance per request (Deno default)
+    // Auto-detect mode based on Accept header
+    // Per MCP spec: clients that support SSE will send Accept: text/event-stream
+    // Clients that don't (k6, curl, etc.) should work in stateless mode
+    const acceptHeader = c.req.header("Accept") || c.req.header("accept") || "";
+    const clientSupportsSSE = acceptHeader.includes("text/event-stream");
+
+    // Use stateless mode if:
+    // 1. Explicitly configured as stateless, OR
+    // 2. Client doesn't support SSE (no text/event-stream in Accept header)
+    const useStatelessMode = config.stateless || !clientSupportsSSE;
+
+    if (useStatelessMode) {
+      // STATELESS MODE: New server instance per request
+      // Used for: Deno/edge runtimes, k6 load testing, curl, clients without SSE
       const server = mcpServerInstance.getServerForSession();
       const transport = new FetchStreamableHTTPServerTransport({
         sessionIdGenerator: undefined, // No session tracking
+        // Enable plain JSON responses ONLY if client doesn't support SSE
+        // This allows k6/curl to work while maintaining SSE format for compatible clients
+        enableJsonResponse: !clientSupportsSSE,
       });
 
       try {
         await server.connect(transport);
-        return await transport.handleRequest(c.req.raw);
+
+        // If client doesn't support SSE, add the Accept header to bypass SDK validation
+        // The transport requires Accept: text/event-stream even when using enableJsonResponse
+        const request = c.req.raw;
+        if (!clientSupportsSSE) {
+          // Clone request with modified headers
+          const modifiedRequest = new Request(request.url, {
+            method: request.method,
+            headers: {
+              ...Object.fromEntries(request.headers.entries()),
+              Accept: "application/json, text/event-stream",
+            },
+            body: request.body,
+            duplex: "half" as RequestDuplex,
+          });
+          return await transport.handleRequest(modifiedRequest);
+        }
+
+        return await transport.handleRequest(request);
       } catch (error) {
         console.error("[MCP] Stateless request error:", error);
         transport.close();

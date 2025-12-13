@@ -94,19 +94,28 @@ export interface ServerConfig {
    * - Default: true for Deno (edge runtimes), false for Node.js
    * - Set to true to force stateless mode
    * - Set to false to force stateful mode (with sessions)
+   * - Auto-detected per-request based on client Accept header
+   *
+   * **Auto-detection (Node.js default):**
+   * - Client sends `Accept: application/json, text/event-stream` → Stateful mode
+   * - Client sends `Accept: application/json` only → Stateless mode
+   * - Explicit `stateless: true` → Always stateless (ignores Accept header)
+   *
+   * This enables compatibility with k6, curl, and other HTTP-only clients
+   * while maintaining full SSE support for capable clients.
    *
    * Stateless mode is required for edge functions where instances don't persist.
    * Stateful mode supports sessions, resumability, and notifications.
    *
    * @example
    * ```typescript
-   * // Auto-detected (Deno = stateless, Node.js = stateful)
+   * // Auto-detected (Deno = stateless, Node.js = stateful with Accept header detection)
    * const server = new MCPServer({
    *   name: 'my-server',
    *   version: '1.0.0'
    * });
    *
-   * // Force stateless mode (e.g., for Node.js edge functions)
+   * // Force stateless mode (ignores Accept header)
    * const server = new MCPServer({
    *   name: 'my-server',
    *   version: '1.0.0',

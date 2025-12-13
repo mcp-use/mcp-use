@@ -90,6 +90,12 @@ const server = new MCPServer({
 server.start({ port: 3000 });
 ```
 
+**Auto-detection:** When `stateless` is not explicitly set, the server automatically detects mode per-request:
+- Client sends `Accept: application/json, text/event-stream` → Stateful mode
+- Client sends `Accept: application/json` only → Stateless mode
+
+This enables compatibility with k6, curl, and other HTTP-only clients while maintaining full SSE support for capable clients.
+
 **Features:**
 - Session tracking with unique IDs
 - Client capability storage (sampling, elicitation, roots)
